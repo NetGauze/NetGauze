@@ -1,0 +1,16 @@
+[package]
+name = "netgauze-bgp-pkt"
+version = "0.0.1"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+description = """
+BGP-4 Protocol representation and serde.
+"""
+
+[dependencies]
+netgauze-iana = {path = "../netgauze-iana"}
+ipnet = "2.5"
+strum = "0.24"
+strum_macros = "0.24"
