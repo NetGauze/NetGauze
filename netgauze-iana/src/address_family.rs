@@ -206,7 +206,9 @@ impl TryFrom<u16> for AddressFamily {
 /// Subsequent Address families identifiers (SAFI) registered at IANA [Subsequent Address Family Identifiers (SAFI) Parameters](https://www.iana.org/assignments/safi-namespace/safi-namespace.xhtml)
 ///
 /// ```rust
-/// use netgauze_iana::address_family::{SubsequentAddressFamily, UndefinedSubsequentAddressFamily};
+/// use netgauze_iana::address_family::{
+///     SubsequentAddressFamily, UndefinedSubsequentAddressFamily,
+/// };
 ///
 /// let safi = SubsequentAddressFamily::Unicast;
 /// println!("Unicast SAFI is: {}", safi);
