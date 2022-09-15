@@ -1,0 +1,15 @@
+[package]
+name = "netgauze-iana"
+version = "0.0.1"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+description = """
+Collection of generic Internet Naming Authority (IANA) definitions that are not specific to a single protocol.
+"""
+
+
+[dependencies]
+strum = "0.24"
+strum_macros = "0.24"

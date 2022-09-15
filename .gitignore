@@ -1,6 +1,7 @@
 # Rust
 debug/
 target/
+Cargo.lock
 
 # IntelliJ
 .idea
