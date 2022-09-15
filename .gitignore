@@ -1,0 +1,11 @@
+# Rust
+debug/
+target/
+
+# IntelliJ
+.idea
+
+# VisualStudioCode
+.vscode/*
+.history/
+
