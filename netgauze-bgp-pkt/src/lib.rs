@@ -27,10 +27,10 @@
 
 use crate::{open::BGPOpenMessage, update::BGPUpdateMessage};
 
-mod capabilities;
+pub mod capabilities;
 pub mod iana;
 pub mod open;
-mod path_attribute;
+pub mod path_attribute;
 pub mod update;
 
 /// BGP message wire format as defined by [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271#section-4.1)
