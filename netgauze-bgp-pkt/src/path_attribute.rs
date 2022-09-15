@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Contains the extensible definitions for various [PathAttribute] that can be
+//! used in [crate::update::BGPUpdateMessage].
+
 use std::net::Ipv4Addr;
 use strum_macros::{Display, FromRepr};
 
@@ -26,117 +29,139 @@ use strum_macros::{Display, FromRepr};
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PathAttribute {
+pub enum PathAttribute {
+    Origin {
+        extended_length: bool,
+        value: Origin,
+    },
+    ASPath {
+        extended_length: bool,
+        value: ASPath,
+    },
+    AS4Path {
+        partial: bool,
+        extended_length: bool,
+        value: AS4Path,
+    },
+    NextHop {
+        extended_length: bool,
+        value: NextHop,
+    },
+    MultiExitDiscriminator {
+        extended_length: bool,
+        value: MultiExitDiscriminator,
+    },
+    LocalPreference {
+        extended_length: bool,
+        value: LocalPreference,
+    },
+    AtomicAggregate {
+        extended_length: bool,
+        value: AtomicAggregate,
+    },
+    Aggregator {
+        partial: bool,
+        extended_length: bool,
+        value: Aggregator,
+    },
+    UnknownAttribute {
+        partial: bool,
+        extended_length: bool,
+        value: UnknownAttribute,
+    },
+}
+
+impl PathAttribute {
+    /// Optional bit defines whether the attribute is optional (if set to
+    /// `true`) or well-known (if set to `false`).
+    pub const fn optional(&self) -> bool {
+        match self {
+            Self::Origin { .. } => Origin::optional(),
+            Self::ASPath { .. } => ASPath::optional(),
+            Self::AS4Path { .. } => AS4Path::optional(),
+            Self::NextHop { .. } => NextHop::optional(),
+            Self::MultiExitDiscriminator { .. } => MultiExitDiscriminator::optional(),
+            Self::LocalPreference { .. } => LocalPreference::optional(),
+            Self::AtomicAggregate { .. } => AtomicAggregate::optional(),
+            Self::Aggregator { .. } => Aggregator::optional(),
+            Self::UnknownAttribute { value, .. } => value.optional(),
+        }
+    }
+
+    /// Transitive bit defines whether an optional attribute is transitive (if
+    /// set to `true`) or non-transitive (if set to `false`). For well-known
+    /// attributes, the Transitive bit MUST be set to `true`.
+    pub const fn transitive(&self) -> bool {
+        match self {
+            Self::Origin { .. } => Origin::transitive(),
+            Self::ASPath { .. } => ASPath::transitive(),
+            Self::AS4Path { .. } => AS4Path::transitive(),
+            Self::NextHop { .. } => NextHop::transitive(),
+            Self::MultiExitDiscriminator { .. } => MultiExitDiscriminator::transitive(),
+            Self::LocalPreference { .. } => LocalPreference::transitive(),
+            Self::AtomicAggregate { .. } => AtomicAggregate::transitive(),
+            Self::Aggregator { .. } => Aggregator::transitive(),
+            Self::UnknownAttribute { value, .. } => value.transitive(),
+        }
+    }
+
     /// Partial bit defines whether the information contained in the optional
     /// transitive attribute is partial (if set to `true`) or complete (if
     /// set to `false`).
     ///
     /// For well-known attributes and for optional non-transitive attributes,
     /// the Partial bit MUST be set to `false`.
-    partial: bool,
+    pub const fn partial(&self) -> bool {
+        match self {
+            Self::Origin { .. } => Origin::partial(),
+            Self::ASPath { .. } => ASPath::partial(),
+            Self::AS4Path { partial, .. } => *partial,
+            Self::NextHop { .. } => NextHop::partial(),
+            Self::MultiExitDiscriminator { .. } => MultiExitDiscriminator::partial(),
+            Self::LocalPreference { .. } => LocalPreference::partial(),
+            Self::AtomicAggregate { .. } => AtomicAggregate::partial(),
+            Self::Aggregator { partial, .. } => *partial,
+            Self::UnknownAttribute { partial, .. } => *partial,
+        }
+    }
 
     /// Extended Length bit defines whether the Attribute Length is one octet
     /// (if set to `false`) or two octets (if set to `true`).
-    extended_length: bool,
-
-    /// Attribute value and are interpreted according to the Attribute Flags and
-    /// the Attribute Type Code.
-    value: PathAttributeValue,
-}
-
-impl PathAttribute {
-    pub const fn new(partial: bool, extended_length: bool, value: PathAttributeValue) -> Self {
-        Self {
-            partial,
-            extended_length,
-            value,
-        }
-    }
-
-    /// Optional bit defines whether the attribute is optional (if set to
-    /// `true`) or well-known (if set to `false`).
-    pub fn optional(&self) -> bool {
-        self.value.is_optional()
-    }
-
-    /// Transitive bit defines whether an optional attribute is transitive (if
-    /// set to `true`) or non-transitive (if set to `false`). For well-known
-    /// attributes, the Transitive bit MUST be set to `true`.
-    pub fn transitive(&self) -> bool {
-        self.value.is_transitive()
-    }
-
-    pub const fn partial(&self) -> bool {
-        self.partial
-    }
-
     pub const fn extended_length(&self) -> bool {
-        self.extended_length
-    }
-
-    pub const fn value(&self) -> &PathAttributeValue {
-        &self.value
-    }
-}
-
-pub(crate) trait PathAttributeValueOptions {
-    fn is_optional() -> bool;
-    fn is_transitive() -> bool;
-}
-
-/// PathAttributeValue
-///
-/// ```text
-/// 0                   1                   2                   3
-/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-/// |  Attr. Code   | value (variable)
-/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-/// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum PathAttributeValue {
-    Origin(Origin),
-    ASPath(AsPathSegments),
-    AS4Path(As4PathSegments),
-    NextHop(NextHop),
-    MultiExitDiscriminator(MultiExitDiscriminator),
-    LocalPreference(LocalPreference),
-    AtomicAggregate(AtomicAggregate),
-    Aggregator(Aggregator),
-    UnknownAttribute(UnknownAttribute),
-}
-
-impl PathAttributeValue {
-    fn is_optional(&self) -> bool {
         match self {
-            Self::Origin(_) => Origin::is_optional(),
-            Self::ASPath(_) => AsPathSegments::is_optional(),
-            Self::AS4Path(_) => As4PathSegments::is_optional(),
-            Self::NextHop(_) => NextHop::is_optional(),
-            Self::MultiExitDiscriminator(_) => MultiExitDiscriminator::is_optional(),
-            Self::LocalPreference(_) => LocalPreference::is_optional(),
-            Self::AtomicAggregate(_) => AtomicAggregate::is_optional(),
-            Self::Aggregator(_) => Aggregator::is_optional(),
-            Self::UnknownAttribute(attr) => attr.optional(),
-        }
-    }
-
-    fn is_transitive(&self) -> bool {
-        match self {
-            Self::Origin(_) => Origin::is_transitive(),
-            Self::ASPath(_) => AsPathSegments::is_transitive(),
-            Self::AS4Path(_) => As4PathSegments::is_transitive(),
-            Self::NextHop(_) => NextHop::is_transitive(),
-            Self::MultiExitDiscriminator(_) => MultiExitDiscriminator::is_transitive(),
-            Self::LocalPreference(_) => LocalPreference::is_transitive(),
-            Self::AtomicAggregate(_) => AtomicAggregate::is_transitive(),
-            Self::Aggregator(_) => Aggregator::is_transitive(),
-            Self::UnknownAttribute(attr) => attr.transitive(),
+            Self::Origin {
+                extended_length, ..
+            } => *extended_length,
+            Self::ASPath {
+                extended_length, ..
+            } => *extended_length,
+            Self::AS4Path {
+                extended_length, ..
+            } => *extended_length,
+            Self::NextHop {
+                extended_length, ..
+            } => *extended_length,
+            Self::MultiExitDiscriminator {
+                extended_length, ..
+            } => *extended_length,
+            Self::LocalPreference {
+                extended_length, ..
+            } => *extended_length,
+            Self::AtomicAggregate {
+                extended_length, ..
+            } => *extended_length,
+            Self::Aggregator {
+                extended_length, ..
+            } => *extended_length,
+            Self::UnknownAttribute {
+                extended_length, ..
+            } => *extended_length,
         }
     }
 }
 
-/// Origin
+/// ORIGIN is a well-known mandatory attribute that defines the origin of the
+/// path information.
 ///
 /// ```text
 /// 0                   1
@@ -153,13 +178,17 @@ pub enum Origin {
     Incomplete = 2,
 }
 
-impl PathAttributeValueOptions for Origin {
-    fn is_optional() -> bool {
+impl Origin {
+    pub const fn optional() -> bool {
         false
     }
 
-    fn is_transitive() -> bool {
+    pub const fn transitive() -> bool {
         true
+    }
+
+    pub const fn partial() -> bool {
+        false
     }
 }
 
@@ -185,19 +214,27 @@ impl TryFrom<u8> for Origin {
     }
 }
 
+/// AS_PATH is a well-known mandatory attribute that is composed
+/// of a sequence of AS path segments.  Each AS path segment is
+/// represented by a triple <path segment type, path segment
+/// length, path segment value>.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum AsPathSegments {
-    As2PathSegments(As2PathSegments),
-    As4PathSegments(As4PathSegments),
+pub enum ASPath {
+    As2PathSegments(Vec<As2PathSegment>),
+    As4PathSegments(Vec<As4PathSegment>),
 }
 
-impl PathAttributeValueOptions for AsPathSegments {
-    fn is_optional() -> bool {
+impl ASPath {
+    pub const fn optional() -> bool {
         false
     }
 
-    fn is_transitive() -> bool {
+    pub const fn transitive() -> bool {
         true
+    }
+
+    pub const fn partial() -> bool {
+        false
     }
 }
 
@@ -239,7 +276,8 @@ impl TryFrom<u8> for AsPathSegmentType {
     }
 }
 
-/// As2PathSegment
+///  Each AS path segment is represented by a triple:
+/// <path segment type, path segment length, path segment value>.
 ///
 /// ```text
 /// 0                   1
@@ -277,25 +315,14 @@ impl As2PathSegment {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct As2PathSegments {
-    segments: Vec<As2PathSegment>,
-}
-impl As2PathSegments {
-    pub const fn new(segments: Vec<As2PathSegment>) -> Self {
-        Self { segments }
-    }
-
-    pub const fn segments(&self) -> &Vec<As2PathSegment> {
-        &self.segments
-    }
-}
-
+///  Each AS path segment is represented by a triple:
+/// <path segment type, path segment length, path segment value>.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct As4PathSegment {
     segment_type: AsPathSegmentType,
     as_numbers: Vec<u32>,
 }
+
 impl As4PathSegment {
     pub const fn new(segment_type: AsPathSegmentType, as_numbers: Vec<u32>) -> Self {
         Self {
@@ -314,11 +341,11 @@ impl As4PathSegment {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct As4PathSegments {
+pub struct AS4Path {
     segments: Vec<As4PathSegment>,
 }
 
-impl As4PathSegments {
+impl AS4Path {
     pub const fn new(segments: Vec<As4PathSegment>) -> Self {
         Self { segments }
     }
@@ -328,16 +355,20 @@ impl As4PathSegments {
     }
 }
 
-impl PathAttributeValueOptions for As4PathSegments {
-    fn is_optional() -> bool {
+impl AS4Path {
+    pub const fn optional() -> bool {
         true
     }
 
-    fn is_transitive() -> bool {
+    pub const fn transitive() -> bool {
         true
     }
 }
 
+/// This is a well-known mandatory attribute that defines the
+/// (unicast) IP address of the router that SHOULD be used as
+/// the next hop to the destinations listed in the Network Layer
+/// Reachability Information field of the UPDATE message.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NextHop {
     next_hop: Ipv4Addr,
@@ -352,16 +383,25 @@ impl NextHop {
     }
 }
 
-impl PathAttributeValueOptions for NextHop {
-    fn is_optional() -> bool {
+impl NextHop {
+    pub const fn optional() -> bool {
         false
     }
 
-    fn is_transitive() -> bool {
+    pub const fn transitive() -> bool {
         true
+    }
+
+    pub const fn partial() -> bool {
+        false
     }
 }
 
+/// This is an optional non-transitive attribute that is a
+/// four-octet unsigned integer. The value of this attribute
+/// MAY be used by a BGP speaker's Decision Process to
+/// discriminate among multiple entry points to a neighboring
+/// autonomous system.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MultiExitDiscriminator {
     metric: u32,
@@ -375,18 +415,24 @@ impl MultiExitDiscriminator {
     pub const fn metric(&self) -> u32 {
         self.metric
     }
-}
 
-impl PathAttributeValueOptions for MultiExitDiscriminator {
-    fn is_optional() -> bool {
+    pub const fn optional() -> bool {
         true
     }
 
-    fn is_transitive() -> bool {
+    pub const fn transitive() -> bool {
+        false
+    }
+
+    pub const fn partial() -> bool {
         false
     }
 }
 
+/// LOCAL_PREF is a well-known attribute that is a four-octet
+/// unsigned integer. A BGP speaker uses it to inform its other
+/// internal peers of the advertising speaker's degree of
+/// preference for an advertised route.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LocalPreference {
     metric: u32,
@@ -402,29 +448,44 @@ impl LocalPreference {
     }
 }
 
-impl PathAttributeValueOptions for LocalPreference {
-    fn is_optional() -> bool {
+impl LocalPreference {
+    pub const fn optional() -> bool {
         false
     }
 
-    fn is_transitive() -> bool {
+    pub const fn transitive() -> bool {
         true
+    }
+
+    pub const fn partial() -> bool {
+        false
     }
 }
 
+/// ATOMIC_AGGREGATE is a well-known discretionary attribute of length 0.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct AtomicAggregate;
 
-impl PathAttributeValueOptions for AtomicAggregate {
-    fn is_optional() -> bool {
+impl AtomicAggregate {
+    pub const fn optional() -> bool {
         true
     }
 
-    fn is_transitive() -> bool {
+    pub const fn transitive() -> bool {
         true
+    }
+
+    pub const fn partial() -> bool {
+        false
     }
 }
 
+/// AGGREGATOR is an optional transitive attribute of length 6.
+/// The attribute contains the last AS number that formed the
+/// aggregate route (encoded as 2 octets), followed by the IP
+/// address of the BGP speaker that formed the aggregate route
+/// (encoded as 4 octets). This SHOULD be the same address as
+/// the one used for the BGP Identifier of the speaker.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct As2Aggregator {
     asn: u16,
@@ -463,24 +524,28 @@ impl As4Aggregator {
     }
 }
 
+/// AGGREGATOR is an optional transitive attribute. The attribute contains the
+/// last AS number that formed the aggregate route, followed by the IP
+/// address of the BGP speaker that formed the aggregate route.
+/// This SHOULD be the same address as the one used for the BGP Identifier of
+/// the speaker.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Aggregator {
     As2Aggregator(As2Aggregator),
     As4Aggregator(As4Aggregator),
 }
 
-impl PathAttributeValueOptions for Aggregator {
-    fn is_optional() -> bool {
+impl Aggregator {
+    pub const fn optional() -> bool {
         true
     }
 
-    fn is_transitive() -> bool {
+    pub const fn transitive() -> bool {
         true
     }
 }
 
-/// Path attribute can be of size `u8` or `u16` if the `extended_length` bit is
-/// toggled.
+/// Path attribute can be of size `u8` or `u16` based on `extended_length` bit.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum PathAttributeLength {
     U8(u8),
@@ -496,6 +561,9 @@ impl From<PathAttributeLength> for u16 {
     }
 }
 
+/// Path Attribute that is not recognized.
+/// BGP Allows parsing unrecognized attributes as is, and then only consider
+/// the transitive and partial bits of the attribute.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct UnknownAttribute {
     optional: bool,
@@ -521,6 +589,7 @@ impl UnknownAttribute {
         }
     }
 
+    /// Attribute Type code
     pub const fn code(&self) -> &u8 {
         &self.code
     }
@@ -529,6 +598,7 @@ impl UnknownAttribute {
         &self.length
     }
 
+    /// Raw u8 vector of the value carried in the attribute
     pub const fn value(&self) -> &Vec<u8> {
         &self.value
     }
@@ -545,9 +615,8 @@ impl UnknownAttribute {
 #[cfg(test)]
 mod tests {
     use crate::path_attribute::{
-        Aggregator, As4PathSegments, AsPathSegmentType, AsPathSegments, LocalPreference,
-        MultiExitDiscriminator, NextHop, Origin, PathAttributeValueOptions,
-        UndefinedAsPathSegmentType, UndefinedOrigin,
+        AS4Path, ASPath, Aggregator, AsPathSegmentType, LocalPreference, MultiExitDiscriminator,
+        NextHop, Origin, UndefinedAsPathSegmentType, UndefinedOrigin,
     };
 
     #[test]
@@ -579,27 +648,27 @@ mod tests {
 
     #[test]
     fn test_path_attributes_well_known_mandatory() {
-        assert!(!Origin::is_optional());
-        assert!(Origin::is_transitive());
-        assert!(!AsPathSegments::is_optional());
-        assert!(AsPathSegments::is_transitive());
-        assert!(!NextHop::is_optional());
-        assert!(NextHop::is_transitive());
-        assert!(!LocalPreference::is_optional());
-        assert!(LocalPreference::is_transitive());
+        assert!(!Origin::optional());
+        assert!(Origin::transitive());
+        assert!(!ASPath::optional());
+        assert!(ASPath::transitive());
+        assert!(!NextHop::optional());
+        assert!(NextHop::transitive());
+        assert!(!LocalPreference::optional());
+        assert!(LocalPreference::transitive());
     }
 
     #[test]
     fn test_path_attributes_well_known_discretionary() {
-        assert!(MultiExitDiscriminator::is_optional());
-        assert!(!MultiExitDiscriminator::is_transitive());
+        assert!(MultiExitDiscriminator::optional());
+        assert!(!MultiExitDiscriminator::transitive());
     }
 
     #[test]
     fn test_path_attributes_optional() {
-        assert!(As4PathSegments::is_optional());
-        assert!(As4PathSegments::is_transitive());
-        assert!(Aggregator::is_optional());
-        assert!(Aggregator::is_transitive());
+        assert!(AS4Path::optional());
+        assert!(AS4Path::transitive());
+        assert!(Aggregator::optional());
+        assert!(Aggregator::transitive());
     }
 }
