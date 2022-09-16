@@ -3,4 +3,6 @@
 members = [
     "netgauze-bgp-pkt",
     "netgauze-iana",
+    "netgauze-locate",
+    "netgauze-parse-utils",
 ]

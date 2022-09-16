@@ -23,7 +23,6 @@
 #![deny(clippy::clone_on_ref_ptr)]
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::missing_const_for_fn)]
-#![forbid(unsafe_code)]
 
 use crate::{open::BGPOpenMessage, update::BGPUpdateMessage};
 
@@ -31,6 +30,8 @@ pub mod capabilities;
 pub mod iana;
 pub mod open;
 pub mod path_attribute;
+#[cfg(feature = "serde")]
+pub mod serde;
 pub mod update;
 
 /// BGP message wire format as defined by [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271#section-4.1)

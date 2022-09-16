@@ -10,7 +10,20 @@ BGP-4 Protocol representation and serde.
 """
 
 [dependencies]
-netgauze-iana = {path = "../netgauze-iana"}
+netgauze-iana = { path = "../netgauze-iana" }
+netgauze-locate = { path = "../netgauze-locate", optional = true }
+netgauze-parse-utils = { path = "../netgauze-parse-utils", optional = true }
+thiserror = { version = "1.0", optional = true }
 ipnet = "2.5"
 strum = "0.24"
 strum_macros = "0.24"
+nom = { version = "7.1", optional = true }
+byteorder = { version = "1.4", optional = true }
+
+[features]
+default = ["serde"]
+serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "thiserror"]
+
+
+[dev-dependencies]
+netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-helpers"] }

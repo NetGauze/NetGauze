@@ -1,0 +1,14 @@
+[package]
+name = "netgauze-parse-utils"
+version = "0.0.1"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+
+[dependencies]
+netgauze-locate = {path = "../netgauze-locate"}
+nom = { version = "7", default-features = false }
+
+[features]
+test-helpers = []
