@@ -16,10 +16,10 @@
 //! Various functions used in testing the correctness or
 //! serializing/deserializing wire protocols
 
-use crate::{ReadablePDU, Span};
+use crate::{ReadablePDU, Span, WritablePDU};
 use netgauze_locate::BinarySpan;
 use nom::IResult;
-use std::fmt::Debug;
+use std::{fmt::Debug, io::Cursor};
 
 /// Helper method to combine multiple vectors into one
 pub fn combine(v: Vec<&[u8]>) -> Vec<u8> {
@@ -71,4 +71,20 @@ where
             parsed
         );
     }
+}
+
+pub fn test_write<T: WritablePDU<E>, E: Eq>(input: &T, expected: &[u8]) -> Result<(), E> {
+    let mut buf: Vec<u8> = vec![];
+    let mut cursor = Cursor::new(&mut buf);
+    input.write(&mut cursor)?;
+    assert_eq!(
+        buf, expected,
+        "Serialized buffer is different the the expected one"
+    );
+    assert_eq!(
+        input.len(),
+        expected.len(),
+        "Packet::len() is different the serialized buffer length"
+    );
+    Ok(())
 }

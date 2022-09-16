@@ -46,3 +46,14 @@ pub trait ReadablePDUWithTwoInput<'a, T, U, ErrorType> {
     where
         Self: Sized;
 }
+
+/// Generic trait for Writable Protocol Data Unit that doesn't need any external
+/// input while writing the packet.
+#[allow(clippy::len_without_is_empty)]
+pub trait WritablePDU<ErrorType> {
+    fn len(&self) -> usize;
+
+    fn write<T: std::io::Write>(&self, _writer: &mut T) -> Result<(), ErrorType>
+    where
+        Self: Sized;
+}
