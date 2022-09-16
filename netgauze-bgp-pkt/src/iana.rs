@@ -29,6 +29,8 @@ pub enum BGPMessageType {
     RouteRefresh = 5,
 }
 
+/// BGP Message type is not one of [BGPMessageType], the carried value is the
+/// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct UndefinedBgpMessageType(pub u8);
 
