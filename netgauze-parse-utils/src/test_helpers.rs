@@ -100,7 +100,7 @@ where
 pub fn test_parse_error_with_one_input<'a, T, I, E>(
     input: &'a [u8],
     parser_input: I,
-    expected_err: &E,
+    expected_err: &'a E,
 ) where
     T: ReadablePDUWithOneInput<'a, I, E> + Debug,
     E: Debug + Eq,
