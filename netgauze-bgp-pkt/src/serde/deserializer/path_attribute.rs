@@ -36,7 +36,7 @@ const EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK: u8 = 0x10;
 const ORIGIN_LEN: u16 = 1;
 
 #[inline]
-fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
+const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
     match attr_len {
         PathAttributeLength::U8(len) => len as u16 == expected,
         PathAttributeLength::U16(len) => len == expected,
@@ -205,9 +205,7 @@ impl<'a> ReadablePDU<'a, LocatedBGPPathAttributeParsingError<'a>> for PathAttrib
         let extended_length =
             attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
         match BGPPathAttributeType::try_from(code) {
-            _ => {
-                todo!()
-            }
+            _ => todo!(),
         }
     }
 }
