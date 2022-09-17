@@ -15,17 +15,21 @@
 
 use crate::{
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, NextHop, Origin,
-        PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, MultiExitDiscriminator,
+        NextHop, Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType,
+        UndefinedOrigin,
     },
     serde::{
         deserializer::path_attribute::{
-            AsPathParsingError, LocatedAsPathParsingError, LocatedNextHopParsingError,
-            LocatedOriginParsingError, LocatedPathAttributeParsingError, NextHopParsingError,
-            OriginParsingError, PathAttributeParsingError,
+            AsPathParsingError, LocatedAsPathParsingError,
+            LocatedMultiExitDiscriminatorParsingError, LocatedNextHopParsingError,
+            LocatedOriginParsingError, LocatedPathAttributeParsingError,
+            MultiExitDiscriminatorParsingError, NextHopParsingError, OriginParsingError,
+            PathAttributeParsingError,
         },
         serializer::path_attribute::{
-            AsPathWritingError, NextHopWritingError, OriginWritingError, PathAttributeWritingError,
+            AsPathWritingError, MultiExitDiscriminatorWritingError, NextHopWritingError,
+            OriginWritingError, PathAttributeWritingError,
         },
     },
 };
@@ -437,6 +441,53 @@ fn test_path_attribute_next_hop() -> Result<(), PathAttributeWritingError> {
     test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
         &bad_wire, false, &bad,
     );
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_wire_extended)?;
+    Ok(())
+}
+
+#[test]
+fn test_multi_exit_discriminator() -> Result<(), MultiExitDiscriminatorWritingError> {
+    let good_wire = [0x04, 0x00, 0x00, 0x00, 0x01];
+    let good_extended_wire = [0x00, 0x04, 0x00, 0x00, 0x00, 0x01];
+    let bad_wire = [0x03, 0x00, 0x00, 0x00, 0x01];
+
+    let good = MultiExitDiscriminator::new(1);
+    let good_extended = MultiExitDiscriminator::new(1);
+    let bad = LocatedMultiExitDiscriminatorParsingError::new(
+        Span::new(&bad_wire),
+        MultiExitDiscriminatorParsingError::InvalidLength(PathAttributeLength::U8(3)),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input::<
+        MultiExitDiscriminator,
+        bool,
+        LocatedMultiExitDiscriminatorParsingError<'_>,
+    >(&bad_wire, false, &bad);
+
+    test_write_with_one_input(&good, false, &good_wire)?;
+    test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_multi_exit_discriminator() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0x80, 0x04, 0x04, 0x00, 0x00, 0x00, 0x01];
+    let good_wire_extended = [0x90, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01];
+
+    let good = PathAttribute::MultiExitDiscriminator {
+        extended_length: false,
+        value: MultiExitDiscriminator::new(1),
+    };
+    let good_extended = PathAttribute::MultiExitDiscriminator {
+        extended_length: true,
+        value: MultiExitDiscriminator::new(1),
+    };
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
     Ok(())
