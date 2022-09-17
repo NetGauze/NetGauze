@@ -110,90 +110,6 @@ impl<'a> nom::error::ParseError<Span<'a>> for LocatedPathAttributeParsingError<'
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub enum OriginParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
-    /// additional information.
-    NomError(ErrorKind),
-    InvalidOriginLength(PathAttributeLength),
-    UndefinedOrigin(UndefinedOrigin),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedOriginParsingError<'a> {
-    span: Span<'a>,
-    error: OriginParsingError,
-}
-
-impl<'a> LocatedOriginParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: OriginParsingError) -> Self {
-        Self { span, error }
-    }
-
-    pub const fn span(&self) -> &Span<'a> {
-        &self.span
-    }
-
-    pub const fn error(&self) -> &OriginParsingError {
-        &self.error
-    }
-
-    pub const fn into_located_attribute_parsing_error(
-        self,
-    ) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::OriginError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, OriginParsingError> for LocatedOriginParsingError<'a> {
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: OriginParsingError) -> Self {
-        LocatedOriginParsingError::new(input, error)
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedOrigin> for LocatedOriginParsingError<'a> {
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: UndefinedOrigin) -> Self {
-        LocatedOriginParsingError::new(input, OriginParsingError::UndefinedOrigin(error))
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedOriginParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedOriginParsingError::new(input, OriginParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Origin {
-    fn from_wire(
-        buf: Span<'a>,
-        extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedOriginParsingError<'a>> {
-        let input = buf;
-        let (buf, length) = if extended_length {
-            let (buf, raw) = be_u16(buf)?;
-            (buf, PathAttributeLength::U16(raw))
-        } else {
-            let (buf, raw) = be_u8(buf)?;
-            (buf, PathAttributeLength::U8(raw))
-        };
-        if !check_length(length, ORIGIN_LEN) {
-            return Err(nom::Err::Error(LocatedOriginParsingError::new(
-                input,
-                OriginParsingError::InvalidOriginLength(length),
-            )));
-        }
-        let (buf, origin) = nom::combinator::map_res(be_u8, Origin::try_from)(buf)?;
-        Ok((buf, origin))
-    }
-}
-
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>> for PathAttribute {
     fn from_wire(
         buf: Span<'a>,
@@ -275,6 +191,90 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
             }
             _ => todo!(),
         }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum OriginParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidOriginLength(PathAttributeLength),
+    UndefinedOrigin(UndefinedOrigin),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedOriginParsingError<'a> {
+    span: Span<'a>,
+    error: OriginParsingError,
+}
+
+impl<'a> LocatedOriginParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: OriginParsingError) -> Self {
+        Self { span, error }
+    }
+
+    pub const fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    pub const fn error(&self) -> &OriginParsingError {
+        &self.error
+    }
+
+    pub const fn into_located_attribute_parsing_error(
+        self,
+    ) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
+            self.span,
+            PathAttributeParsingError::OriginError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, OriginParsingError> for LocatedOriginParsingError<'a> {
+    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: OriginParsingError) -> Self {
+        LocatedOriginParsingError::new(input, error)
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedOrigin> for LocatedOriginParsingError<'a> {
+    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: UndefinedOrigin) -> Self {
+        LocatedOriginParsingError::new(input, OriginParsingError::UndefinedOrigin(error))
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedOriginParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedOriginParsingError::new(input, OriginParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Origin {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedOriginParsingError<'a>> {
+        let input = buf;
+        let (buf, length) = if extended_length {
+            let (buf, raw) = be_u16(buf)?;
+            (buf, PathAttributeLength::U16(raw))
+        } else {
+            let (buf, raw) = be_u8(buf)?;
+            (buf, PathAttributeLength::U8(raw))
+        };
+        if !check_length(length, ORIGIN_LEN) {
+            return Err(nom::Err::Error(LocatedOriginParsingError::new(
+                input,
+                OriginParsingError::InvalidOriginLength(length),
+            )));
+        }
+        let (buf, origin) = nom::combinator::map_res(be_u8, Origin::try_from)(buf)?;
+        Ok((buf, origin))
     }
 }
 
