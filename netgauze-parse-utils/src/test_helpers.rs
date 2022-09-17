@@ -16,7 +16,7 @@
 //! Various functions used in testing the correctness or
 //! serializing/deserializing wire protocols
 
-use crate::{ReadablePDU, Span, WritablePDU};
+use crate::{ReadablePDU, ReadablePDUWithOneInput, Span, WritablePDU, WritablePDUWithOneInput};
 use netgauze_locate::BinarySpan;
 use nom::IResult;
 use std::{fmt::Debug, io::Cursor};
@@ -36,6 +36,29 @@ where
     E: Debug,
 {
     let parsed = <T as ReadablePDU<E>>::from_wire(Span::new(input));
+    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
+    let (span, value) = parsed.unwrap();
+    assert_eq!(&value, expected);
+    assert_eq!(
+        span.fragment().len(),
+        0,
+        "Not all the input is consumed by the parser, didn't consume: {:?}",
+        span
+    );
+    value
+}
+
+/// Fancier assert to for more meaningful error messages
+pub fn test_parsed_completely_with_one_input<'a, T, I, E>(
+    input: &'a [u8],
+    parser_input: I,
+    expected: &T,
+) -> T
+where
+    T: ReadablePDUWithOneInput<'a, I, E> + PartialEq + Debug,
+    E: Debug,
+{
+    let parsed = <T as ReadablePDUWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
     assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
@@ -73,6 +96,34 @@ where
     }
 }
 
+/// Fancier assert to for more meaningful error messages
+pub fn test_parse_error_with_one_input<'a, T, I, E>(
+    input: &'a [u8],
+    parser_input: I,
+    expected_err: &E,
+) where
+    T: ReadablePDUWithOneInput<'a, I, E> + Debug,
+    E: Debug + Eq,
+{
+    let parsed: IResult<BinarySpan<&[u8]>, T, E> =
+        <T as ReadablePDUWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
+    assert!(
+        parsed.is_err(),
+        "Message was parsed, while expecting it to fail.\n\tExpected : {:?}\n\tParsed msg: {:?}",
+        expected_err,
+        parsed
+    );
+
+    if let Err(nom::Err::Error(parsed_error)) = parsed {
+        assert_eq!(&parsed_error, expected_err);
+    } else {
+        panic!(
+            "Expected the test to fail with Err(nom::Err:Err(x)) but it didn't. Got {:?} instead",
+            parsed
+        );
+    }
+}
+
 pub fn test_write<T: WritablePDU<E>, E: Eq>(input: &T, expected: &[u8]) -> Result<(), E> {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
@@ -83,6 +134,26 @@ pub fn test_write<T: WritablePDU<E>, E: Eq>(input: &T, expected: &[u8]) -> Resul
     );
     assert_eq!(
         input.len(),
+        expected.len(),
+        "Packet::len() is different the serialized buffer length"
+    );
+    Ok(())
+}
+
+pub fn test_write_with_one_input<I: Copy, T: WritablePDUWithOneInput<I, E>, E: Eq>(
+    input: &T,
+    parser_input: I,
+    expected: &[u8],
+) -> Result<(), E> {
+    let mut buf: Vec<u8> = vec![];
+    let mut cursor = Cursor::new(&mut buf);
+    input.write(&mut cursor, parser_input)?;
+    assert_eq!(
+        buf, expected,
+        "Serialized buffer is different the the expected one"
+    );
+    assert_eq!(
+        input.len(parser_input),
         expected.len(),
         "Packet::len() is different the serialized buffer length"
     );

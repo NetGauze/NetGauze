@@ -16,13 +16,16 @@
 //! Serializer for BGP Path Attributes
 
 use crate::{
-    path_attribute::PathAttribute, serde::serializer::update::BGPUpdateMessageWritingError,
+    path_attribute::{Origin, PathAttribute},
+    serde::serializer::update::BGPUpdateMessageWritingError,
 };
-use netgauze_parse_utils::WritablePDU;
+use byteorder::{NetworkEndian, WriteBytesExt};
+use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
     StdIOError(String),
+    OriginError(OriginWritingError),
 }
 
 impl From<std::io::Error> for PathAttributeWritingError {
@@ -46,5 +49,63 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
 
     fn write<T: std::io::Write>(&self, _writer: &mut T) -> Result<(), PathAttributeWritingError> {
         todo!()
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum OriginWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for OriginWritingError {
+    fn from(err: std::io::Error) -> Self {
+        OriginWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<OriginWritingError> for PathAttributeWritingError {
+    fn from(value: OriginWritingError) -> Self {
+        PathAttributeWritingError::OriginError(value)
+    }
+}
+
+#[inline]
+fn write_length<T: Sized + WritablePDUWithOneInput<bool, E>, E, W: std::io::Write>(
+    attribute: &T,
+    extended_length: bool,
+    writer: &mut W,
+) -> Result<(), E>
+where
+    E: From<std::io::Error>,
+{
+    let len = attribute.len(extended_length) - 1;
+    if extended_length || len > u8::MAX.into() {
+        writer.write_u16::<NetworkEndian>((len - 1) as u16)?;
+    } else {
+        writer.write_u8(len as u8)?;
+    }
+    Ok(())
+}
+
+impl WritablePDUWithOneInput<bool, OriginWritingError> for Origin {
+    // One octet length (if extended is not enabled) and second for the origin value
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self, extended_length: bool) -> usize {
+        if extended_length {
+            Self::BASE_LENGTH + 1
+        } else {
+            Self::BASE_LENGTH
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), OriginWritingError> {
+        write_length(self, extended_length, writer)?;
+        writer.write_u8((*self) as u8)?;
+        Ok(())
     }
 }
