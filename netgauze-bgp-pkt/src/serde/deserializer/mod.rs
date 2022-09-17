@@ -21,10 +21,7 @@ pub mod path_attribute;
 pub mod update;
 
 use ipnet::Ipv4Net;
-use std::{
-    fmt::{Display, Formatter},
-    net::Ipv4Addr,
-};
+use std::net::Ipv4Addr;
 
 use nom::{
     error::{ErrorKind, FromExternalError},
