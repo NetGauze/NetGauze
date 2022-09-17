@@ -200,6 +200,27 @@ impl<'a> ReadablePDU<'a, LocatedPathAttributeParsingError<'a>> for PathAttribute
         let extended_length =
             attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
         match PathAttributeType::try_from(code) {
+            Ok(PathAttributeType::Origin) => {
+                let (buf, origin) = match Origin::from_wire(buf, extended_length) {
+                    Ok((buf, origin)) => (buf, origin),
+                    Err(err) => {
+                        return match err {
+                            nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                            nom::Err::Error(error) => Err(nom::Err::Error(
+                                error.into_located_attribute_parsing_error(),
+                            )),
+                            nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                                failure.into_located_attribute_parsing_error(),
+                            )),
+                        }
+                    }
+                };
+                let path_attr = PathAttribute::Origin {
+                    extended_length,
+                    value: origin,
+                };
+                Ok((buf, path_attr))
+            }
             _ => todo!(),
         }
     }

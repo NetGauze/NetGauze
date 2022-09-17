@@ -16,6 +16,7 @@
 //! Serializer for BGP Path Attributes
 
 use crate::{
+    iana::PathAttributeType,
     path_attribute::{Origin, PathAttribute},
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
@@ -41,14 +42,60 @@ impl From<PathAttributeWritingError> for BGPUpdateMessageWritingError {
 }
 
 impl WritablePDU<PathAttributeWritingError> for PathAttribute {
-    const BASE_LENGTH: usize = 0;
+    const BASE_LENGTH: usize = 2;
 
     fn len(&self) -> usize {
-        todo!()
+        //self.value().len(self.extended_length()) + 1
+        let value_len = match self {
+            Self::Origin {
+                extended_length,
+                value,
+            } => value.len(*extended_length),
+            Self::ASPath { .. } => todo!(),
+            Self::AS4Path { .. } => todo!(),
+            Self::NextHop { .. } => todo!(),
+            Self::MultiExitDiscriminator { .. } => todo!(),
+            Self::LocalPreference { .. } => todo!(),
+            Self::AtomicAggregate { .. } => todo!(),
+            Self::Aggregator { .. } => todo!(),
+            Self::UnknownAttribute { .. } => todo!(),
+        };
+        Self::BASE_LENGTH + value_len
     }
 
-    fn write<T: std::io::Write>(&self, _writer: &mut T) -> Result<(), PathAttributeWritingError> {
-        todo!()
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), PathAttributeWritingError> {
+        let mut attributes = 0x00u8;
+        if self.optional() {
+            attributes |= 0b10000000;
+        }
+        if self.transitive() {
+            attributes |= 0b01000000;
+        }
+        if self.partial() {
+            attributes |= 0b00100000;
+        }
+        if self.extended_length() {
+            attributes |= 0b00010000;
+        }
+        writer.write_u8(attributes)?;
+        match self {
+            Self::Origin {
+                extended_length,
+                value,
+            } => {
+                writer.write_u8(PathAttributeType::Origin.into())?;
+                value.write(writer, *extended_length)?;
+            }
+            Self::ASPath { .. } => todo!(),
+            Self::AS4Path { .. } => todo!(),
+            Self::NextHop { .. } => todo!(),
+            Self::MultiExitDiscriminator { .. } => todo!(),
+            Self::LocalPreference { .. } => todo!(),
+            Self::AtomicAggregate { .. } => todo!(),
+            Self::Aggregator { .. } => todo!(),
+            Self::UnknownAttribute { .. } => todo!(),
+        }
+        Ok(())
     }
 }
 

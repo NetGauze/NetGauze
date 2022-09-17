@@ -14,16 +14,19 @@
 // limitations under the License.
 
 use crate::{
-    path_attribute::{Origin, PathAttributeLength, UndefinedOrigin},
+    path_attribute::{Origin, PathAttribute, PathAttributeLength, UndefinedOrigin},
     serde::{
-        deserializer::path_attribute::{LocatedOriginParsingError, OriginParsingError},
-        serializer::path_attribute::OriginWritingError,
+        deserializer::path_attribute::{
+            LocatedOriginParsingError, LocatedPathAttributeParsingError, OriginParsingError,
+            PathAttributeParsingError,
+        },
+        serializer::path_attribute::{OriginWritingError, PathAttributeWritingError},
     },
 };
 use netgauze_parse_utils::{
     test_helpers::{
-        test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
-        test_write_with_one_input,
+        test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
+        test_parsed_completely_with_one_input, test_write, test_write_with_one_input,
     },
     Span,
 };
@@ -77,5 +80,38 @@ fn test_origin_value() -> Result<(), OriginWritingError> {
     test_write_with_one_input(&igp, false, &good_igp_wire)?;
     test_write_with_one_input(&egp, false, &good_egp_wire)?;
     test_write_with_one_input(&incomplete, false, &good_incomplete_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0x40, 0x01, 0x01, 0x00];
+    let good_wire_extended = [0x50, 0x01, 0x00, 0x01, 0x00];
+    let bad_wire_extended = [0x50, 0x01, 0x00, 0x01, 0x03];
+    let good = PathAttribute::Origin {
+        extended_length: false,
+        value: Origin::IGP,
+    };
+    let good_extended = PathAttribute::Origin {
+        extended_length: true,
+        value: Origin::IGP,
+    };
+
+    let bad_extended = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(4, &bad_wire_extended[4..]) },
+        PathAttributeParsingError::OriginError(OriginParsingError::UndefinedOrigin(
+            UndefinedOrigin(3),
+        )),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely(&good_wire_extended, &good_extended);
+    test_parse_error::<PathAttribute, LocatedPathAttributeParsingError<'_>>(
+        &bad_wire_extended,
+        &bad_extended,
+    );
+
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_wire_extended)?;
     Ok(())
 }
