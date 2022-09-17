@@ -51,6 +51,11 @@ pub trait ReadablePDUWithTwoInput<'a, T, U, ErrorType> {
 /// input while writing the packet.
 #[allow(clippy::len_without_is_empty)]
 pub trait WritablePDU<ErrorType> {
+    /// The total length of the written buffer
+    ///
+    /// *Note*: the [Self::len] might be less than the length value written in
+    /// the PDU, since most PDUs don't include the length of their 'length'
+    /// field in the calculation
     fn len(&self) -> usize;
 
     fn write<T: std::io::Write>(&self, _writer: &mut T) -> Result<(), ErrorType>
