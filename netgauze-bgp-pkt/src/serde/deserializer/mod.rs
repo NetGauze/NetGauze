@@ -31,7 +31,6 @@ use nom::{
     number::complete::{be_u128, be_u16, be_u8},
     IResult,
 };
-use thiserror::Error;
 
 use netgauze_parse_utils::{ReadablePDU, ReadablePDUWithOneInput, Span};
 
@@ -144,7 +143,7 @@ pub(crate) fn ipv4_network_from_wire(
 }
 
 /// BGP Message Parsing errors
-#[derive(Error, Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug)]
 pub enum BGPMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -166,12 +165,6 @@ pub enum BGPMessageParsingError {
     BGPOpenMessageParsingError(BGPOpenMessageParsingError),
 
     BGPUpdateMessageParsingError(BGPUpdateMessageParsingError),
-}
-
-impl Display for BGPMessageParsingError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
 }
 
 /// BGP Message Parsing errors  with the input location of where it occurred in
