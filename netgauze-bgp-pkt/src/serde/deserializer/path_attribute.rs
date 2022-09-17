@@ -18,8 +18,8 @@
 use crate::{
     iana::PathAttributeType,
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, Origin, PathAttribute,
-        PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, NextHop, Origin,
+        PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::deserializer::{
         update::LocatedBGPUpdateMessageParsingError, BGPUpdateMessageParsingError,
@@ -33,12 +33,14 @@ use nom::{
     number::complete::{be_u16, be_u32, be_u8},
     IResult,
 };
+use std::net::Ipv4Addr;
 
 const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
 const TRANSITIVE_PATH_ATTRIBUTE_MASK: u8 = 0x40;
 const PARTIAL_PATH_ATTRIBUTE_MASK: u8 = 0x20;
 const EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK: u8 = 0x10;
 const ORIGIN_LEN: u16 = 1;
+const NEXT_HOP_LEN: u16 = 4;
 
 #[inline]
 const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
@@ -55,6 +57,7 @@ pub enum PathAttributeParsingError {
     NomError(ErrorKind),
     OriginError(OriginParsingError),
     AsPathError(AsPathParsingError),
+    NextHopError(NextHopParsingError),
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -184,6 +187,27 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 };
                 let path_attr = PathAttribute::AS4Path {
                     partial,
+                    extended_length,
+                    value,
+                };
+                Ok((buf, path_attr))
+            }
+            Ok(PathAttributeType::NextHop) => {
+                let (buf, value) = match NextHop::from_wire(buf, extended_length) {
+                    Ok((buf, origin)) => (buf, origin),
+                    Err(err) => {
+                        return match err {
+                            nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                            nom::Err::Error(error) => Err(nom::Err::Error(
+                                error.into_located_attribute_parsing_error(),
+                            )),
+                            nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                                failure.into_located_attribute_parsing_error(),
+                            )),
+                        }
+                    }
+                };
+                let path_attr = PathAttribute::NextHop {
                     extended_length,
                     value,
                 };
@@ -392,5 +416,84 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for AS
         };
         let (_, segments) = parse_till_empty(segments_buf)?;
         Ok((buf, Self::new(segments)))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum NextHopParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidNextHopLength(PathAttributeLength),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedNextHopParsingError<'a> {
+    span: Span<'a>,
+    error: NextHopParsingError,
+}
+
+impl<'a> LocatedNextHopParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: NextHopParsingError) -> Self {
+        Self { span, error }
+    }
+
+    pub const fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    pub const fn error(&self) -> &NextHopParsingError {
+        &self.error
+    }
+
+    pub const fn into_located_attribute_parsing_error(
+        self,
+    ) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
+            self.span,
+            PathAttributeParsingError::NextHopError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, NextHopParsingError> for LocatedNextHopParsingError<'a> {
+    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: NextHopParsingError) -> Self {
+        LocatedNextHopParsingError::new(input, error)
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedNextHopParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedNextHopParsingError::new(input, NextHopParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedNextHopParsingError<'a>> for NextHop {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedNextHopParsingError<'a>> {
+        let input = buf;
+        let (buf, length) = if extended_length {
+            let (buf, raw) = be_u16(buf)?;
+            (buf, PathAttributeLength::U16(raw))
+        } else {
+            let (buf, raw) = be_u8(buf)?;
+            (buf, PathAttributeLength::U8(raw))
+        };
+        if !check_length(length, NEXT_HOP_LEN) {
+            return Err(nom::Err::Error(LocatedNextHopParsingError::new(
+                input,
+                NextHopParsingError::InvalidNextHopLength(length),
+            )));
+        }
+        let (buf, address) = be_u32(buf)?;
+        let address = Ipv4Addr::from(address);
+
+        Ok((buf, NextHop::new(address)))
     }
 }

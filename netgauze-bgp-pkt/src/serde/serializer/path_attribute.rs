@@ -17,7 +17,9 @@
 
 use crate::{
     iana::PathAttributeType,
-    path_attribute::{AS4Path, ASPath, As2PathSegment, As4PathSegment, Origin, PathAttribute},
+    path_attribute::{
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, NextHop, Origin, PathAttribute,
+    },
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -28,6 +30,7 @@ pub enum PathAttributeWritingError {
     StdIOError(String),
     OriginError(OriginWritingError),
     AsPathError(AsPathWritingError),
+    NextHopError(NextHopWritingError),
 }
 
 impl From<std::io::Error> for PathAttributeWritingError {
@@ -60,7 +63,10 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value,
                 ..
             } => value.len(*extended_length),
-            Self::NextHop { .. } => todo!(),
+            Self::NextHop {
+                extended_length,
+                value,
+            } => value.len(*extended_length),
             Self::MultiExitDiscriminator { .. } => todo!(),
             Self::LocalPreference { .. } => todo!(),
             Self::AtomicAggregate { .. } => todo!(),
@@ -108,7 +114,13 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 writer.write_u8(PathAttributeType::AS4Path.into())?;
                 value.write(writer, *extended_length)?;
             }
-            Self::NextHop { .. } => todo!(),
+            Self::NextHop {
+                extended_length,
+                value,
+            } => {
+                writer.write_u8(PathAttributeType::NextHop.into())?;
+                value.write(writer, *extended_length)?;
+            }
             Self::MultiExitDiscriminator { .. } => todo!(),
             Self::LocalPreference { .. } => todo!(),
             Self::AtomicAggregate { .. } => todo!(),
@@ -275,6 +287,46 @@ impl WritablePDUWithOneInput<bool, AsPathWritingError> for AS4Path {
         for segment in self.segments() {
             segment.write(writer)?;
         }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum NextHopWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for NextHopWritingError {
+    fn from(err: std::io::Error) -> Self {
+        NextHopWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<NextHopWritingError> for PathAttributeWritingError {
+    fn from(value: NextHopWritingError) -> Self {
+        PathAttributeWritingError::NextHopError(value)
+    }
+}
+
+impl WritablePDUWithOneInput<bool, NextHopWritingError> for NextHop {
+    // One octet length (if extended is not enabled) and 4 for ipv4
+    const BASE_LENGTH: usize = 5;
+
+    fn len(&self, extended_length: bool) -> usize {
+        if extended_length {
+            Self::BASE_LENGTH + 1
+        } else {
+            Self::BASE_LENGTH
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), NextHopWritingError> {
+        write_length(self, extended_length, writer)?;
+        writer.write_all(&self.next_hop().octets())?;
         Ok(())
     }
 }

@@ -15,16 +15,17 @@
 
 use crate::{
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, Origin, PathAttribute,
-        PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, NextHop, Origin,
+        PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::{
         deserializer::path_attribute::{
-            AsPathParsingError, LocatedAsPathParsingError, LocatedOriginParsingError,
-            LocatedPathAttributeParsingError, OriginParsingError, PathAttributeParsingError,
+            AsPathParsingError, LocatedAsPathParsingError, LocatedNextHopParsingError,
+            LocatedOriginParsingError, LocatedPathAttributeParsingError, NextHopParsingError,
+            OriginParsingError, PathAttributeParsingError,
         },
         serializer::path_attribute::{
-            AsPathWritingError, OriginWritingError, PathAttributeWritingError,
+            AsPathWritingError, NextHopWritingError, OriginWritingError, PathAttributeWritingError,
         },
     },
 };
@@ -36,6 +37,7 @@ use netgauze_parse_utils::{
     },
     Span,
 };
+use std::net::Ipv4Addr;
 
 #[test]
 fn test_origin_value() -> Result<(), OriginWritingError> {
@@ -386,5 +388,56 @@ fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritin
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
     test_write(&good_partial, &good_wire_partial)?;
+    Ok(())
+}
+
+#[test]
+fn test_next_hop() -> Result<(), NextHopWritingError> {
+    let good_wire = [0x04, 0xac, 0x10, 0x03, 0x02];
+    let bad_wire = [0x05, 0xac, 0x10, 0x03, 0x02];
+
+    let good = NextHop::new(Ipv4Addr::new(172, 16, 3, 2));
+    let bad = LocatedNextHopParsingError::new(
+        unsafe { Span::new_from_raw_offset(0, &bad_wire) },
+        NextHopParsingError::InvalidNextHopLength(PathAttributeLength::U8(5)),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parse_error_with_one_input::<NextHop, bool, LocatedNextHopParsingError<'_>>(
+        &bad_wire, false, &bad,
+    );
+
+    test_write_with_one_input(&good, false, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_next_hop() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0x40, 0x03, 0x04, 0xac, 0x10, 0x03, 0x01];
+    let good_wire_extended = [0x50, 0x03, 0x00, 0x04, 0xac, 0x10, 0x03, 0x01];
+    let bad_wire = [0x50, 0x03, 0x00, 0x03, 0xac, 0x10, 0x03, 0x01];
+
+    let good = PathAttribute::NextHop {
+        extended_length: false,
+        value: NextHop::new(Ipv4Addr::new(172, 16, 3, 1)),
+    };
+    let good_extended = PathAttribute::NextHop {
+        extended_length: true,
+        value: NextHop::new(Ipv4Addr::new(172, 16, 3, 1)),
+    };
+    let bad = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &bad_wire[2..]) },
+        PathAttributeParsingError::NextHopError(NextHopParsingError::InvalidNextHopLength(
+            PathAttributeLength::U16(3),
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &bad_wire, false, &bad,
+    );
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_wire_extended)?;
     Ok(())
 }
