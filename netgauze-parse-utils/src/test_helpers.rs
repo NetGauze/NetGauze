@@ -72,7 +72,7 @@ where
 }
 
 /// Fancier assert to for more meaningful error messages
-pub fn test_parse_error<'a, 'b, 'c, T, E>(input: &'a [u8], expected_err: &E)
+pub fn test_parse_error<'a, T, E>(input: &'a [u8], expected_err: &E)
 where
     T: ReadablePDU<'a, E> + Debug,
     E: Debug + Eq,
