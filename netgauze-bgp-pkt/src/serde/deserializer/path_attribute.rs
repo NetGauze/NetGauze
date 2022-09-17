@@ -18,7 +18,7 @@
 use crate::{
     iana::PathAttributeType,
     path_attribute::{
-        ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, Origin, PathAttribute,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, Origin, PathAttribute,
         PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::deserializer::{
@@ -251,6 +251,28 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 };
                 Ok((buf, path_attr))
             }
+            Ok(PathAttributeType::AS4Path) => {
+                let (buf, value) = match AS4Path::from_wire(buf, extended_length) {
+                    Ok((buf, origin)) => (buf, origin),
+                    Err(err) => {
+                        return match err {
+                            nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                            nom::Err::Error(error) => Err(nom::Err::Error(
+                                error.into_located_attribute_parsing_error(),
+                            )),
+                            nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                                failure.into_located_attribute_parsing_error(),
+                            )),
+                        }
+                    }
+                };
+                let path_attr = PathAttribute::AS4Path {
+                    partial,
+                    extended_length,
+                    value,
+                };
+                Ok((buf, path_attr))
+            }
             _ => todo!(),
         }
     }
@@ -355,5 +377,20 @@ impl<'a> ReadablePDU<'a, LocatedAsPathParsingError<'a>> for As4PathSegment {
             nom::combinator::map_res(be_u8, AsPathSegmentType::try_from)(buf)?;
         let (buf, as_numbers) = nom::multi::length_count(be_u8, be_u32)(buf)?;
         Ok((buf, As4PathSegment::new(segment_type, as_numbers)))
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for AS4Path {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
+        let (buf, segments_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (_, segments) = parse_till_empty(segments_buf)?;
+        Ok((buf, Self::new(segments)))
     }
 }

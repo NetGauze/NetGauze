@@ -15,7 +15,7 @@
 
 use crate::{
     path_attribute::{
-        ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, Origin, PathAttribute,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, Origin, PathAttribute,
         PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::{
@@ -339,5 +339,52 @@ fn test_path_attribute_as4_path() -> Result<(), PathAttributeWritingError> {
     test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0xc0, 0x11, 0x0a, 0x02, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x01, 0x2c,
+    ];
+    let good_wire_extended = [
+        0xd0, 0x11, 0x00, 0x0a, 0x02, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x01, 0x2c,
+    ];
+    let good_wire_partial = [
+        0xf0, 0x11, 0x00, 0x0a, 0x02, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x01, 0x2c,
+    ];
+
+    let good = PathAttribute::AS4Path {
+        partial: false,
+        extended_length: false,
+        value: AS4Path::new(vec![As4PathSegment::new(
+            AsPathSegmentType::AsSequence,
+            vec![100, 300],
+        )]),
+    };
+    let good_extended = PathAttribute::AS4Path {
+        partial: false,
+        extended_length: true,
+        value: AS4Path::new(vec![As4PathSegment::new(
+            AsPathSegmentType::AsSequence,
+            vec![100, 300],
+        )]),
+    };
+    let good_partial = PathAttribute::AS4Path {
+        partial: true,
+        extended_length: true,
+        value: AS4Path::new(vec![As4PathSegment::new(
+            AsPathSegmentType::AsSequence,
+            vec![100, 300],
+        )]),
+    };
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
+    test_parsed_completely_with_one_input(&good_wire_partial, true, &good_partial);
+
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_wire_extended)?;
+    test_write(&good_partial, &good_wire_partial)?;
     Ok(())
 }

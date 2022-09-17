@@ -17,7 +17,7 @@
 
 use crate::{
     iana::PathAttributeType,
-    path_attribute::{ASPath, As2PathSegment, As4PathSegment, Origin, PathAttribute},
+    path_attribute::{AS4Path, ASPath, As2PathSegment, As4PathSegment, Origin, PathAttribute},
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -55,7 +55,11 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 extended_length,
                 value,
             } => value.len(*extended_length),
-            Self::AS4Path { .. } => todo!(),
+            Self::AS4Path {
+                extended_length,
+                value,
+                ..
+            } => value.len(*extended_length),
             Self::NextHop { .. } => todo!(),
             Self::MultiExitDiscriminator { .. } => todo!(),
             Self::LocalPreference { .. } => todo!(),
@@ -96,7 +100,14 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 writer.write_u8(PathAttributeType::ASPath.into())?;
                 value.write(writer, *extended_length)?;
             }
-            Self::AS4Path { .. } => todo!(),
+            Self::AS4Path {
+                extended_length,
+                value,
+                ..
+            } => {
+                writer.write_u8(PathAttributeType::AS4Path.into())?;
+                value.write(writer, *extended_length)?;
+            }
             Self::NextHop { .. } => todo!(),
             Self::MultiExitDiscriminator { .. } => todo!(),
             Self::LocalPreference { .. } => todo!(),
@@ -237,6 +248,32 @@ impl WritablePDUWithOneInput<bool, AsPathWritingError> for ASPath {
                     segment.write(writer)?;
                 }
             }
+        }
+        Ok(())
+    }
+}
+
+impl WritablePDUWithOneInput<bool, AsPathWritingError> for AS4Path {
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let base = Self::BASE_LENGTH + if extended_length { 1 } else { 0 };
+        let segment_len = self
+            .segments()
+            .iter()
+            .map(|segment| segment.len())
+            .sum::<usize>();
+        base + segment_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), AsPathWritingError> {
+        write_length(self, extended_length, writer)?;
+        for segment in self.segments() {
+            segment.write(writer)?;
         }
         Ok(())
     }
