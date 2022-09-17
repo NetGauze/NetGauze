@@ -15,6 +15,15 @@
 
 use netgauze_iana::address_family::AddressType;
 
+/// Enhanced route refresh have fixed length as per RFC2918
+pub(crate) const ROUTE_REFRESH_CAPABILITY_LENGTH: u8 = 0;
+
+/// Enhanced route refresh have fixed length as per RFC7313
+pub(crate) const ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH: u8 = 0;
+
+/// Multi Protocol extension have fixed length as per RFC2858
+pub(crate) const MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH: u8 = 4;
+
 /// BGP Capabilities are included as parameters in the BGPOpen message
 /// to indicate support of certain BGP Features.
 ///
@@ -40,6 +49,30 @@ pub enum BGPCapability {
 
     /// Defined in [RFC7313](https://datatracker.ietf.org/doc/html/rfc7313)
     EnhancedRouteRefresh,
+
+    Unrecognized(UnrecognizedCapability),
+}
+
+/// Generic struct to carry all the unsupported BGP capabilities
+#[repr(C)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct UnrecognizedCapability {
+    code: u8,
+    value: Vec<u8>,
+}
+
+impl UnrecognizedCapability {
+    pub const fn new(code: u8, value: Vec<u8>) -> Self {
+        Self { code, value }
+    }
+
+    pub const fn code(&self) -> &u8 {
+        &self.code
+    }
+
+    pub const fn value(&self) -> &Vec<u8> {
+        &self.value
+    }
 }
 
 /// Capability advertisement to speak a multi-protocol for a given

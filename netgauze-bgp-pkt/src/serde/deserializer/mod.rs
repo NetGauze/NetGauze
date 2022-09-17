@@ -15,6 +15,9 @@
 
 //! Deserializer library for BGP's wire protocol
 
+pub mod capabilities;
+pub mod open;
+
 use std::fmt::{Display, Formatter};
 
 use nom::{
@@ -28,7 +31,8 @@ use netgauze_parse_utils::{ReadablePDU, Span};
 
 use crate::{
     iana::{BGPMessageType, UndefinedBgpMessageType},
-    BGPMessage,
+    serde::deserializer::open::BGPOpenMessageParsingError,
+    BGPMessage, BGPOpenMessage,
 };
 
 /// Min message size in BGP is 19 octets. They're counted from
@@ -60,6 +64,8 @@ pub enum BGPMessageParsingError {
     /// BGP Message length is not in the defined \[min, max\] range for the
     /// given message type
     BadMessageLength(u16),
+
+    BGPOpenMessageParsingError(BGPOpenMessageParsingError),
 }
 
 impl Display for BGPMessageParsingError {
@@ -189,7 +195,21 @@ impl<'a> ReadablePDU<'a, LocatedBGPMessageParsingError<'a>> for BGPMessage {
         let (buf, (_, message_type, reminder_buf)) = parse_bgp_message_length_and_type(buf)?;
 
         let (buf, msg) = match message_type {
-            BGPMessageType::Open => todo!(),
+            BGPMessageType::Open => match BGPOpenMessage::from_wire(buf) {
+                Ok((buf, open)) => (buf, BGPMessage::Open(open)),
+
+                Err(err) => {
+                    return match err {
+                        nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                        nom::Err::Error(error) => Err(nom::Err::Error(
+                            error.into_located_bgp_message_parsing_error(),
+                        )),
+                        nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                            failure.into_located_bgp_message_parsing_error(),
+                        )),
+                    }
+                }
+            },
             BGPMessageType::Update => todo!(),
             BGPMessageType::Notification => todo!(),
             BGPMessageType::KeepAlive => (buf, BGPMessage::KeepAlive),

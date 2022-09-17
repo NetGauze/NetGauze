@@ -51,6 +51,8 @@ pub trait ReadablePDUWithTwoInput<'a, T, U, ErrorType> {
 /// input while writing the packet.
 #[allow(clippy::len_without_is_empty)]
 pub trait WritablePDU<ErrorType> {
+    const BASE_LENGTH: usize;
+
     /// The total length of the written buffer
     ///
     /// *Note*: the [Self::len] might be less than the length value written in
@@ -61,4 +63,19 @@ pub trait WritablePDU<ErrorType> {
     fn write<T: std::io::Write>(&self, _writer: &mut T) -> Result<(), ErrorType>
     where
         Self: Sized;
+}
+
+/// Keep repeating the parser till the buf is empty
+#[inline]
+pub fn parse_till_empty<'a, T: ReadablePDU<'a, E>, E: Debug>(
+    buf: Span<'a>,
+) -> nom::IResult<Span<'a>, Vec<T>, E> {
+    let mut buf = buf;
+    let mut ret = Vec::new();
+    while !buf.is_empty() {
+        let (tmp, element) = T::from_wire(buf)?;
+        ret.push(element);
+        buf = tmp;
+    }
+    Ok((buf, ret))
 }
