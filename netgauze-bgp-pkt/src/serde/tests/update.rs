@@ -29,7 +29,9 @@ use crate::{
 };
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
-    test_helpers::{test_parse_error, test_parsed_completely, test_write},
+    test_helpers::{
+        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input, test_write,
+    },
     Span,
 };
 use nom::error::ErrorKind;
@@ -101,7 +103,7 @@ fn test_empty_update() -> Result<(), BGPMessageWritingError> {
         0xff, 0x00, 0x17, 0x02, 0x00, 0x00, 0x00, 0x00,
     ];
     let good = BGPMessage::Update(BGPUpdateMessage::new(vec![], vec![], vec![]));
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -120,7 +122,7 @@ fn test_withdraw_update() -> Result<(), BGPMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely(&good_withdraw_wire, &good_withdraw);
+    test_parsed_completely_with_one_input(&good_withdraw_wire, false, &good_withdraw);
     test_write(&good_withdraw, &good_withdraw_wire)?;
     Ok(())
 }

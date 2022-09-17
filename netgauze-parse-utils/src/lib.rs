@@ -41,7 +41,7 @@ pub trait ReadablePDUWithOneInput<'a, T, ErrorType> {
 
 /// Generic trait for Readable Protocol Data Unit that does need two external
 /// inputs
-pub trait ReadablePDUWithTwoInput<'a, T, U, ErrorType> {
+pub trait ReadablePDUWithTwoInputs<'a, T, U, ErrorType> {
     fn from_wire(buf: Span<'a>, input1: T, input2: U) -> nom::IResult<Span<'a>, Self, ErrorType>
     where
         Self: Sized;
@@ -92,6 +92,27 @@ pub fn parse_till_empty<'a, T: ReadablePDU<'a, E>, E: Debug>(
     let mut ret = Vec::new();
     while !buf.is_empty() {
         let (tmp, element) = T::from_wire(buf)?;
+        ret.push(element);
+        buf = tmp;
+    }
+    Ok((buf, ret))
+}
+
+/// Keep repeating the parser till the buf is empty
+#[inline]
+pub fn parse_till_empty_with_one_input<
+    'a,
+    I: Copy,
+    T: ReadablePDUWithOneInput<'a, I, E>,
+    E: Debug,
+>(
+    buf: Span<'a>,
+    input: I,
+) -> nom::IResult<Span<'a>, Vec<T>, E> {
+    let mut buf = buf;
+    let mut ret = Vec::new();
+    while !buf.is_empty() {
+        let (tmp, element) = T::from_wire(buf, input)?;
         ret.push(element);
         buf = tmp;
     }

@@ -23,7 +23,10 @@ use crate::{
     BGPMessage, BGPOpenMessage,
 };
 use netgauze_parse_utils::{
-    test_helpers::{combine, test_parse_error, test_parsed_completely, test_write},
+    test_helpers::{
+        combine, test_parse_error_with_one_input, test_parsed_completely,
+        test_parsed_completely_with_one_input, test_write,
+    },
     Span,
 };
 use nom::error::ErrorKind;
@@ -49,7 +52,11 @@ fn test_bgp_message_not_synchronized_marker() {
         unsafe { Span::new_from_raw_offset(0, &invalid_wire[0..]) },
         BGPMessageParsingError::ConnectionNotSynchronized(0u128),
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(&invalid_wire, &invalid);
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+        &invalid_wire,
+        false,
+        &invalid,
+    );
 }
 
 #[test]
@@ -118,38 +125,50 @@ fn test_bgp_message_length_bounds() {
         BGPMessageParsingError::BadMessageLength(4097),
     );
 
-    test_parsed_completely(&good_wire[..], &good);
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(
+    test_parsed_completely_with_one_input(&good_wire[..], true, &good);
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
         &open_underflow_wire,
+        false,
         &open_underflow,
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
         &open_less_than_min_wire,
+        false,
         &open_less_than_min,
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
         &update_less_than_min_wire,
+        false,
         &update_less_than_min,
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
         &notification_less_than_min_wire,
+        false,
         &notification_less_than_min,
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
         &keepalive_less_than_min_wire,
+        false,
         &keepalive_less_than_min,
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
         &route_refresh_less_than_min_wire,
+        false,
         &route_refresh_less_than_min,
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(&overflow_wire, &overflow);
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+        &overflow_wire,
+        false,
+        &overflow,
+    );
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
         &keepalive_overflow_extended_wire,
+        false,
         &keepalive_overflow_extended,
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
         &open_overflow_extended_wire,
+        false,
         &open_overflow_extended,
     );
 }
@@ -161,7 +180,11 @@ fn test_bgp_message_undefined_message_type() {
         unsafe { Span::new_from_raw_offset(18, &invalid_wire[18..]) },
         BGPMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(0xff)),
     );
-    test_parse_error::<BGPMessage, LocatedBGPMessageParsingError<'_>>(&invalid_wire, &invalid);
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+        &invalid_wire,
+        true,
+        &invalid,
+    );
 }
 
 #[test]

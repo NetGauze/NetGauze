@@ -16,7 +16,10 @@
 //! Various functions used in testing the correctness or
 //! serializing/deserializing wire protocols
 
-use crate::{ReadablePDU, ReadablePDUWithOneInput, Span, WritablePDU, WritablePDUWithOneInput};
+use crate::{
+    ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span, WritablePDU,
+    WritablePDUWithOneInput,
+};
 use netgauze_locate::BinarySpan;
 use nom::IResult;
 use std::{fmt::Debug, io::Cursor};
@@ -59,6 +62,34 @@ where
     E: Debug,
 {
     let parsed = <T as ReadablePDUWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
+    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
+    let (span, value) = parsed.unwrap();
+    assert_eq!(&value, expected);
+    assert_eq!(
+        span.fragment().len(),
+        0,
+        "Not all the input is consumed by the parser, didn't consume: {:?}",
+        span
+    );
+    value
+}
+
+/// Fancier assert to for more meaningful error messages
+pub fn test_parsed_completely_with_two_inputs<'a, T, I, K, E>(
+    input: &'a [u8],
+    parser_input1: I,
+    parser_input2: K,
+    expected: &T,
+) -> T
+where
+    T: ReadablePDUWithTwoInputs<'a, I, K, E> + PartialEq + Debug,
+    E: Debug,
+{
+    let parsed = <T as ReadablePDUWithTwoInputs<I, K, E>>::from_wire(
+        Span::new(input),
+        parser_input1,
+        parser_input2,
+    );
     assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
@@ -122,6 +153,32 @@ pub fn test_parse_error_with_one_input<'a, T, I, E>(
             parsed
         );
     }
+}
+
+/// Fancier assert to for more meaningful error messages
+pub fn test_parse_error_with_two_inputs<'a, T, I, K, E>(
+    input: &'a [u8],
+    parser_input1: I,
+    parser_input2: K,
+    expected_err: nom::Err<E>,
+) where
+    T: ReadablePDUWithTwoInputs<'a, I, K, E> + Debug,
+    E: Debug + Eq,
+{
+    let parsed: IResult<BinarySpan<&[u8]>, T, E> =
+        <T as ReadablePDUWithTwoInputs<I, K, E>>::from_wire(
+            Span::new(input),
+            parser_input1,
+            parser_input2,
+        );
+    assert!(
+        parsed.is_err(),
+        "Message was parsed, while expecting it to fail.\n\tExpected : {:?}\n\tParsed msg: {:?}",
+        expected_err,
+        parsed
+    );
+
+    assert_eq!(parsed.err().unwrap(), expected_err);
 }
 
 pub fn test_write<T: WritablePDU<E>, E: Eq>(input: &T, expected: &[u8]) -> Result<(), E> {

@@ -14,19 +14,25 @@
 // limitations under the License.
 
 use crate::{
-    path_attribute::{Origin, PathAttribute, PathAttributeLength, UndefinedOrigin},
+    path_attribute::{
+        ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, Origin, PathAttribute,
+        PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
+    },
     serde::{
         deserializer::path_attribute::{
-            LocatedOriginParsingError, LocatedPathAttributeParsingError, OriginParsingError,
-            PathAttributeParsingError,
+            AsPathParsingError, LocatedAsPathParsingError, LocatedOriginParsingError,
+            LocatedPathAttributeParsingError, OriginParsingError, PathAttributeParsingError,
         },
-        serializer::path_attribute::{OriginWritingError, PathAttributeWritingError},
+        serializer::path_attribute::{
+            AsPathWritingError, OriginWritingError, PathAttributeWritingError,
+        },
     },
 };
 use netgauze_parse_utils::{
     test_helpers::{
-        test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
-        test_parsed_completely_with_one_input, test_write, test_write_with_one_input,
+        test_parse_error, test_parse_error_with_one_input, test_parse_error_with_two_inputs,
+        test_parsed_completely, test_parsed_completely_with_one_input,
+        test_parsed_completely_with_two_inputs, test_write, test_write_with_one_input,
     },
     Span,
 };
@@ -104,13 +110,233 @@ fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
         )),
     );
 
-    test_parsed_completely(&good_wire, &good);
-    test_parsed_completely(&good_wire_extended, &good_extended);
-    test_parse_error::<PathAttribute, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_wire_extended, false, &good_extended);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
         &bad_wire_extended,
+        false,
         &bad_extended,
     );
 
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_wire_extended)?;
+    Ok(())
+}
+
+#[test]
+fn test_as2_path_segment() -> Result<(), AsPathWritingError> {
+    let good_set_wire = [0x01, 0x01, 0x00, 0x01];
+    let good_seq_wire = [0x02, 0x01, 0x00, 0x01];
+    let good_empty_wire = [0x01, 0x00];
+    let undefined_segment_type_wire = [0x00, 0x01, 0x00, 0x01];
+
+    let set = As2PathSegment::new(AsPathSegmentType::AsSet, vec![1]);
+    let seq = As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]);
+    let empty = As2PathSegment::new(AsPathSegmentType::AsSet, vec![]);
+
+    let undefined_segment_type = LocatedAsPathParsingError::new(
+        unsafe { Span::new_from_raw_offset(0, &undefined_segment_type_wire) },
+        AsPathParsingError::UndefinedAsPathSegmentType(UndefinedAsPathSegmentType(0x00)),
+    );
+
+    test_parsed_completely(&good_set_wire, &set);
+    test_parsed_completely(&good_seq_wire, &seq);
+    test_parsed_completely(&good_empty_wire, &empty);
+    test_parse_error::<As2PathSegment, LocatedAsPathParsingError<'_>>(
+        &undefined_segment_type_wire,
+        &undefined_segment_type,
+    );
+
+    test_write(&set, &good_set_wire)?;
+    test_write(&seq, &good_seq_wire)?;
+    test_write(&empty, &good_empty_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_as4_path_segment() -> Result<(), AsPathWritingError> {
+    let good_set_wire = [0x01, 0x01, 0x00, 0x00, 0x00, 0x01];
+    let good_seq_wire = [0x02, 0x01, 0x00, 0x00, 0x00, 0x01];
+    let good_empty_wire = [0x01, 0x00];
+    let undefined_segment_type_wire = [0x00, 0x01, 0x00, 0x00, 0x00, 0x01];
+
+    let set = As4PathSegment::new(AsPathSegmentType::AsSet, vec![1]);
+    let seq = As4PathSegment::new(AsPathSegmentType::AsSequence, vec![1]);
+    let empty = As4PathSegment::new(AsPathSegmentType::AsSet, vec![]);
+
+    let undefined_segment_type = LocatedAsPathParsingError::new(
+        unsafe { Span::new_from_raw_offset(0, &undefined_segment_type_wire) },
+        AsPathParsingError::UndefinedAsPathSegmentType(UndefinedAsPathSegmentType(0x00)),
+    );
+
+    test_parsed_completely(&good_set_wire, &set);
+    test_parsed_completely(&good_seq_wire, &seq);
+    test_parsed_completely(&good_empty_wire, &empty);
+    test_parse_error::<As4PathSegment, LocatedAsPathParsingError<'_>>(
+        &undefined_segment_type_wire,
+        &undefined_segment_type,
+    );
+
+    test_write(&set, &good_set_wire)?;
+    test_write(&seq, &good_seq_wire)?;
+    test_write(&empty, &good_empty_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_as2_path_segments() -> Result<(), AsPathWritingError> {
+    let good_wire = [0x08, 0x01, 0x01, 0x00, 0x01, 0x02, 0x01, 0x00, 0x01];
+    let good_extended_wire = [0x00, 0x08, 0x01, 0x01, 0x00, 0x01, 0x02, 0x01, 0x00, 0x01];
+    let good_empty_wire = [0x00];
+    let bad_underflow_wire = [0x08, 0x01, 0x01, 0x00, 0x01];
+    let bad_overflow_wire = [0x08, 0x01, 0x02, 0x00, 0x01, 0x00, 0x02];
+
+    let good = ASPath::As2PathSegments(vec![
+        As2PathSegment::new(AsPathSegmentType::AsSet, vec![1]),
+        As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]),
+    ]);
+    let good_extended = ASPath::As2PathSegments(vec![
+        As2PathSegment::new(AsPathSegmentType::AsSet, vec![1]),
+        As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]),
+    ]);
+    let good_empty = ASPath::As2PathSegments(vec![]);
+    let bad_underflow = nom::Err::Incomplete(nom::Needed::new(4));
+    let bad_overflow = nom::Err::Incomplete(nom::Needed::new(2));
+
+    test_parsed_completely_with_two_inputs(&good_wire, false, false, &good);
+    test_parsed_completely_with_two_inputs(&good_empty_wire, false, false, &good_empty);
+    test_parsed_completely_with_two_inputs(&good_extended_wire, true, false, &good_extended);
+    test_parse_error_with_two_inputs::<ASPath, bool, bool, LocatedAsPathParsingError<'_>>(
+        &bad_underflow_wire,
+        false,
+        false,
+        bad_underflow,
+    );
+    test_parse_error_with_two_inputs::<ASPath, bool, bool, LocatedAsPathParsingError<'_>>(
+        &bad_overflow_wire,
+        false,
+        false,
+        bad_overflow,
+    );
+
+    test_write_with_one_input(&good, false, &good_wire)?;
+    test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
+    test_write_with_one_input(&good_empty, false, &good_empty_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_as4_path_segments() -> Result<(), AsPathWritingError> {
+    let good_empty_wire = [0x00, 0x00];
+    let good_one_wire = [0x00, 0x06, 0x02, 0x01, 0x00, 0x00, 0x00, 0x01];
+    let good_two_wire = [
+        0x00, 0x0c, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01, 0x02, 0x01, 0x00, 0x00, 0x00, 0x01,
+    ];
+    let bad_underflow_wire = [0x00, 0x08, 0x01, 0x01, 0x00, 0x01];
+    let bad_overflow_wire = [0x00, 0x08, 0x01, 0x02, 0x00, 0x01, 0x00, 0x02];
+
+    let good_empty = ASPath::As4PathSegments(vec![]);
+    let good_one = ASPath::As4PathSegments(vec![As4PathSegment::new(
+        AsPathSegmentType::AsSequence,
+        vec![1],
+    )]);
+    let good_two = ASPath::As4PathSegments(vec![
+        As4PathSegment::new(AsPathSegmentType::AsSet, vec![1]),
+        As4PathSegment::new(AsPathSegmentType::AsSequence, vec![1]),
+    ]);
+
+    let bad_underflow = nom::Err::Incomplete(nom::Needed::new(4));
+    let bad_overflow = nom::Err::Incomplete(nom::Needed::new(2));
+
+    test_parsed_completely_with_two_inputs(&good_empty_wire, true, true, &good_empty);
+    test_parsed_completely_with_two_inputs(&good_one_wire, true, true, &good_one);
+    test_parsed_completely_with_two_inputs(&good_two_wire, true, true, &good_two);
+
+    test_parse_error_with_two_inputs::<ASPath, bool, bool, LocatedAsPathParsingError<'_>>(
+        &bad_underflow_wire,
+        true,
+        true,
+        bad_underflow,
+    );
+    test_parse_error_with_two_inputs::<ASPath, bool, bool, LocatedAsPathParsingError<'_>>(
+        &bad_overflow_wire,
+        true,
+        true,
+        bad_overflow,
+    );
+
+    test_write_with_one_input(&good_empty, true, &good_empty_wire)?;
+    test_write_with_one_input(&good_one, true, &good_one_wire)?;
+    test_write_with_one_input(&good_two, true, &good_two_wire)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_as2_path() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0x40, 0x02, 0x06, 0x02, 0x02, 0x00, 0x64, 0x01, 0x2c];
+    let good_wire_extended = [0x50, 0x02, 0x00, 0x06, 0x02, 0x02, 0x00, 0x64, 0x01, 0x2c];
+    let undefined_segment_type_wire = [0x50, 0x02, 0x00, 0x06, 0x00, 0x00, 0x00, 0x64, 0x01, 0x2c];
+
+    let good = PathAttribute::ASPath {
+        extended_length: false,
+        value: ASPath::As2PathSegments(vec![As2PathSegment::new(
+            AsPathSegmentType::AsSequence,
+            vec![100, 300],
+        )]),
+    };
+    let good_extended = PathAttribute::ASPath {
+        extended_length: true,
+        value: ASPath::As2PathSegments(vec![As2PathSegment::new(
+            AsPathSegmentType::AsSequence,
+            vec![100, 300],
+        )]),
+    };
+
+    let undefined_segment_type = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(4, &undefined_segment_type_wire[4..]) },
+        PathAttributeParsingError::AsPathError(AsPathParsingError::UndefinedAsPathSegmentType(
+            UndefinedAsPathSegmentType(0),
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_wire_extended, false, &good_extended);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &undefined_segment_type_wire,
+        false,
+        &undefined_segment_type,
+    );
+    test_write(&good_extended, &good_wire_extended)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_as4_path() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x40, 0x02, 0x0a, 0x02, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x01, 0x2c,
+    ];
+    let good_wire_extended = [
+        0x50, 0x02, 0x00, 0x0a, 0x02, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x01, 0x2c,
+    ];
+
+    let good = PathAttribute::ASPath {
+        extended_length: false,
+        value: ASPath::As4PathSegments(vec![As4PathSegment::new(
+            AsPathSegmentType::AsSequence,
+            vec![100, 300],
+        )]),
+    };
+    let good_extended = PathAttribute::ASPath {
+        extended_length: true,
+        value: ASPath::As4PathSegments(vec![As4PathSegment::new(
+            AsPathSegmentType::AsSequence,
+            vec![100, 300],
+        )]),
+    };
+
+    test_parsed_completely_with_one_input(&good_wire, true, &good);
+    test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
     Ok(())

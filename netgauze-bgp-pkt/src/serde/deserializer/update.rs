@@ -26,10 +26,12 @@ use crate::{
     BGPUpdateMessage,
 };
 use ipnet::Ipv4Net;
-use netgauze_parse_utils::{parse_till_empty, ReadablePDU, Span};
+use netgauze_parse_utils::{
+    parse_till_empty, parse_till_empty_with_one_input, ReadablePDU, ReadablePDUWithOneInput, Span,
+};
 use nom::{
     error::{ErrorKind, FromExternalError},
-    number::streaming::be_u16,
+    number::complete::be_u16,
     IResult,
 };
 
@@ -125,8 +127,15 @@ fn parse_withdraw_routes(
 #[inline]
 fn parse_path_attributes(
     buf: Span<'_>,
+    asn4: bool,
 ) -> IResult<Span<'_>, Vec<PathAttribute>, LocatedBGPUpdateMessageParsingError<'_>> {
-    match parse_till_empty::<'_, PathAttribute, LocatedPathAttributeParsingError<'_>>(buf) {
+    match parse_till_empty_with_one_input::<
+        '_,
+        bool,
+        PathAttribute,
+        LocatedPathAttributeParsingError<'_>,
+    >(buf, asn4)
+    {
         Ok((buf, path_attrs)) => Ok((buf, path_attrs)),
         Err(err) => {
             return match err {
@@ -173,14 +182,17 @@ fn parse_nlri(
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedBGPUpdateMessageParsingError<'a>> for BGPUpdateMessage {
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPUpdateMessageParsingError<'a>>
+    for BGPUpdateMessage
+{
     fn from_wire(
         buf: Span<'a>,
+        asn4: bool,
     ) -> IResult<Span<'a>, Self, LocatedBGPUpdateMessageParsingError<'a>> {
         let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
         let (_, withdrawn_routes) = parse_withdraw_routes(withdrawn_buf)?;
         let (buf, path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (_, path_attributes) = parse_path_attributes(path_attributes_buf)?;
+        let (_, path_attributes) = parse_path_attributes(path_attributes_buf, asn4)?;
         let (buf, nlri_vec) = parse_nlri(buf)?;
         Ok((
             buf,

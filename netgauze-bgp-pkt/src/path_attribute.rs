@@ -331,8 +331,8 @@ impl As4PathSegment {
         }
     }
 
-    pub const fn segment_type(&self) -> &AsPathSegmentType {
-        &self.segment_type
+    pub const fn segment_type(&self) -> AsPathSegmentType {
+        self.segment_type
     }
 
     pub const fn as_numbers(&self) -> &Vec<u32> {

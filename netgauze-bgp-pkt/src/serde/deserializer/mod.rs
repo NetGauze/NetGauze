@@ -33,7 +33,7 @@ use nom::{
 };
 use thiserror::Error;
 
-use netgauze_parse_utils::{ReadablePDU, Span};
+use netgauze_parse_utils::{ReadablePDU, ReadablePDUWithOneInput, Span};
 
 use crate::{
     iana::{BGPMessageType, UndefinedBgpMessageType},
@@ -280,8 +280,11 @@ fn parse_bgp_message_length_and_type<'a>(
     Ok((buf, (length, message_type, reminder_buf)))
 }
 
-impl<'a> ReadablePDU<'a, LocatedBGPMessageParsingError<'a>> for BGPMessage {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBGPMessageParsingError<'a>> {
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPMessageParsingError<'a>> for BGPMessage {
+    fn from_wire(
+        buf: Span<'a>,
+        asn4: bool,
+    ) -> IResult<Span<'a>, Self, LocatedBGPMessageParsingError<'a>> {
         let (buf, _) = nom::combinator::map_res(be_u128, |x| {
             if x == u128::MAX {
                 Ok(x)
@@ -310,7 +313,7 @@ impl<'a> ReadablePDU<'a, LocatedBGPMessageParsingError<'a>> for BGPMessage {
                     }
                 }
             },
-            BGPMessageType::Update => match BGPUpdateMessage::from_wire(buf) {
+            BGPMessageType::Update => match BGPUpdateMessage::from_wire(buf, asn4) {
                 Ok((buf, update)) => (buf, BGPMessage::Update(update)),
                 Err(err) => {
                     return match err {

@@ -17,7 +17,7 @@
 
 use crate::{
     iana::PathAttributeType,
-    path_attribute::{Origin, PathAttribute},
+    path_attribute::{ASPath, As2PathSegment, As4PathSegment, Origin, PathAttribute},
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -27,6 +27,7 @@ use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
 pub enum PathAttributeWritingError {
     StdIOError(String),
     OriginError(OriginWritingError),
+    AsPathError(AsPathWritingError),
 }
 
 impl From<std::io::Error> for PathAttributeWritingError {
@@ -45,13 +46,15 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
     const BASE_LENGTH: usize = 2;
 
     fn len(&self) -> usize {
-        //self.value().len(self.extended_length()) + 1
         let value_len = match self {
             Self::Origin {
                 extended_length,
                 value,
             } => value.len(*extended_length),
-            Self::ASPath { .. } => todo!(),
+            Self::ASPath {
+                extended_length,
+                value,
+            } => value.len(*extended_length),
             Self::AS4Path { .. } => todo!(),
             Self::NextHop { .. } => todo!(),
             Self::MultiExitDiscriminator { .. } => todo!(),
@@ -86,7 +89,13 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 writer.write_u8(PathAttributeType::Origin.into())?;
                 value.write(writer, *extended_length)?;
             }
-            Self::ASPath { .. } => todo!(),
+            Self::ASPath {
+                extended_length,
+                value,
+            } => {
+                writer.write_u8(PathAttributeType::ASPath.into())?;
+                value.write(writer, *extended_length)?;
+            }
             Self::AS4Path { .. } => todo!(),
             Self::NextHop { .. } => todo!(),
             Self::MultiExitDiscriminator { .. } => todo!(),
@@ -116,24 +125,6 @@ impl From<OriginWritingError> for PathAttributeWritingError {
     }
 }
 
-#[inline]
-fn write_length<T: Sized + WritablePDUWithOneInput<bool, E>, E, W: std::io::Write>(
-    attribute: &T,
-    extended_length: bool,
-    writer: &mut W,
-) -> Result<(), E>
-where
-    E: From<std::io::Error>,
-{
-    let len = attribute.len(extended_length) - 1;
-    if extended_length || len > u8::MAX.into() {
-        writer.write_u16::<NetworkEndian>((len - 1) as u16)?;
-    } else {
-        writer.write_u8(len as u8)?;
-    }
-    Ok(())
-}
-
 impl WritablePDUWithOneInput<bool, OriginWritingError> for Origin {
     // One octet length (if extended is not enabled) and second for the origin value
     const BASE_LENGTH: usize = 2;
@@ -155,4 +146,116 @@ impl WritablePDUWithOneInput<bool, OriginWritingError> for Origin {
         writer.write_u8((*self) as u8)?;
         Ok(())
     }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum AsPathWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for AsPathWritingError {
+    fn from(err: std::io::Error) -> Self {
+        AsPathWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<AsPathWritingError> for PathAttributeWritingError {
+    fn from(value: AsPathWritingError) -> Self {
+        PathAttributeWritingError::AsPathError(value)
+    }
+}
+
+impl WritablePDU<AsPathWritingError> for As2PathSegment {
+    // one octet length + one more for segment type
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        // Multiply self.as_numbers().len() by 2 since each is two octets
+        Self::BASE_LENGTH + (self.as_numbers().len() * 2)
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), AsPathWritingError> {
+        writer.write_u8(self.segment_type() as u8)?;
+        writer.write_u8(self.as_numbers().len() as u8)?;
+        for as_num in self.as_numbers() {
+            writer.write_u16::<NetworkEndian>(*as_num)?;
+        }
+        Ok(())
+    }
+}
+
+impl WritablePDU<AsPathWritingError> for As4PathSegment {
+    // one octet length + one more for segment type
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        // Multiply self.as_numbers().len() by 4 since each is four octets
+        Self::BASE_LENGTH + (self.as_numbers().len() * 4)
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), AsPathWritingError> {
+        writer.write_u8(self.segment_type() as u8)?;
+        writer.write_u8(self.as_numbers().len() as u8)?;
+        for as_num in self.as_numbers() {
+            writer.write_u32::<NetworkEndian>(*as_num)?;
+        }
+        Ok(())
+    }
+}
+
+impl WritablePDUWithOneInput<bool, AsPathWritingError> for ASPath {
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let base = Self::BASE_LENGTH + if extended_length { 1 } else { 0 };
+
+        let segment_len = match self {
+            Self::As2PathSegments(segments) => {
+                segments.iter().map(|segment| segment.len()).sum::<usize>()
+            }
+            Self::As4PathSegments(segments) => {
+                segments.iter().map(|segment| segment.len()).sum::<usize>()
+            }
+        };
+        base + segment_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), AsPathWritingError> {
+        write_length(self, extended_length, writer)?;
+        match self {
+            Self::As2PathSegments(segments) => {
+                for segment in segments {
+                    segment.write(writer)?;
+                }
+            }
+            Self::As4PathSegments(segments) => {
+                for segment in segments {
+                    segment.write(writer)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[inline]
+fn write_length<T: Sized + WritablePDUWithOneInput<bool, E>, E, W: std::io::Write>(
+    attribute: &T,
+    extended_length: bool,
+    writer: &mut W,
+) -> Result<(), E>
+where
+    E: From<std::io::Error>,
+{
+    let len = attribute.len(extended_length) - 1;
+    if extended_length || len > u8::MAX.into() {
+        writer.write_u16::<NetworkEndian>((len - 1) as u16)?;
+    } else {
+        writer.write_u8(len as u8)?;
+    }
+    Ok(())
 }
