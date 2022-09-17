@@ -17,8 +17,14 @@
 
 pub mod capabilities;
 pub mod open;
+pub mod path_attribute;
+pub mod update;
 
-use std::fmt::{Display, Formatter};
+use ipnet::Ipv4Net;
+use std::{
+    fmt::{Display, Formatter},
+    net::Ipv4Addr,
+};
 
 use nom::{
     error::{ErrorKind, FromExternalError},
@@ -31,8 +37,15 @@ use netgauze_parse_utils::{ReadablePDU, Span};
 
 use crate::{
     iana::{BGPMessageType, UndefinedBgpMessageType},
-    serde::deserializer::open::BGPOpenMessageParsingError,
-    BGPMessage, BGPOpenMessage,
+    serde::deserializer::{
+        open::BGPOpenMessageParsingError,
+        update::{
+            BGPUpdateMessageParsingError, LocatedNetworkLayerReachabilityInformationParsingError,
+            LocatedWithdrawRouteParsingError, NetworkLayerReachabilityInformationParsingError,
+            WithdrawRouteParsingError,
+        },
+    },
+    BGPMessage, BGPOpenMessage, BGPUpdateMessage,
 };
 
 /// Min message size in BGP is 19 octets. They're counted from
@@ -44,6 +57,91 @@ pub const BGP_MIN_MESSAGE_LENGTH: u16 = 19;
 /// according to the updated
 /// [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654)
 pub const BGP_MAX_MESSAGE_LENGTH: u16 = 4096;
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum Ipv4PrefixParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidIpv4PrefixLen(u8),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedIpv4PrefixParsingError<'a> {
+    span: Span<'a>,
+    error: Ipv4PrefixParsingError,
+}
+
+impl<'a> LocatedIpv4PrefixParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: Ipv4PrefixParsingError) -> Self {
+        Self { span, error }
+    }
+
+    pub const fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    pub const fn error(&self) -> &Ipv4PrefixParsingError {
+        &self.error
+    }
+
+    pub const fn into_located_bgp_withdraw_route_parsing_error(
+        self,
+    ) -> LocatedWithdrawRouteParsingError<'a> {
+        LocatedWithdrawRouteParsingError::new(
+            self.span,
+            WithdrawRouteParsingError::Ipv4PrefixParsingError(self.error),
+        )
+    }
+
+    pub const fn into_located_nlri_parsing_error(
+        self,
+    ) -> LocatedNetworkLayerReachabilityInformationParsingError<'a> {
+        LocatedNetworkLayerReachabilityInformationParsingError::new(
+            self.span,
+            NetworkLayerReachabilityInformationParsingError::Ipv4PrefixParsingError(self.error),
+        )
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedIpv4PrefixParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedIpv4PrefixParsingError::new(input, Ipv4PrefixParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+/// Parse IPv4 prefix
+pub(crate) fn ipv4_network_from_wire(
+    buf: Span<'_>,
+) -> IResult<Span<'_>, Ipv4Net, LocatedIpv4PrefixParsingError<'_>> {
+    let input = buf;
+    let (buf, prefix_len) = be_u8(buf)?;
+    // The prefix value must fall into the octet boundary, even if the prefix_len
+    // doesn't. For example,
+    // prefix_len=24 => prefix_size=24 while prefix_len=19 => prefix_size=24
+    let prefix_size = if prefix_len >= u8::MAX - 7 {
+        u8::MAX
+    } else {
+        (prefix_len + 7) / 8
+    };
+    let (buf, prefix) = nom::bytes::complete::take(prefix_size.min(4))(buf)?;
+    // Fill the rest of bits with zeros if
+    let mut network = [0; 4];
+    prefix.iter().enumerate().for_each(|(i, v)| network[i] = *v);
+    let addr = Ipv4Addr::from(network);
+
+    match Ipv4Net::new(addr, prefix_len) {
+        Ok(net) => Ok((buf, net)),
+        Err(_) => Err(nom::Err::Error(LocatedIpv4PrefixParsingError::new(
+            input,
+            Ipv4PrefixParsingError::InvalidIpv4PrefixLen(prefix_len),
+        ))),
+    }
+}
 
 /// BGP Message Parsing errors
 #[derive(Error, Eq, PartialEq, Clone, Debug)]
@@ -66,6 +164,8 @@ pub enum BGPMessageParsingError {
     BadMessageLength(u16),
 
     BGPOpenMessageParsingError(BGPOpenMessageParsingError),
+
+    BGPUpdateMessageParsingError(BGPUpdateMessageParsingError),
 }
 
 impl Display for BGPMessageParsingError {
@@ -210,7 +310,20 @@ impl<'a> ReadablePDU<'a, LocatedBGPMessageParsingError<'a>> for BGPMessage {
                     }
                 }
             },
-            BGPMessageType::Update => todo!(),
+            BGPMessageType::Update => match BGPUpdateMessage::from_wire(buf) {
+                Ok((buf, update)) => (buf, BGPMessage::Update(update)),
+                Err(err) => {
+                    return match err {
+                        nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                        nom::Err::Error(error) => Err(nom::Err::Error(
+                            error.into_located_bgp_message_parsing_error(),
+                        )),
+                        nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                            failure.into_located_bgp_message_parsing_error(),
+                        )),
+                    }
+                }
+            },
             BGPMessageType::Notification => todo!(),
             BGPMessageType::KeepAlive => (buf, BGPMessage::KeepAlive),
             BGPMessageType::RouteRefresh => todo!(),

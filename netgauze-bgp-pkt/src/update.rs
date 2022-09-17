@@ -85,3 +85,13 @@ impl WithdrawRoute {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct NetworkLayerReachabilityInformation(Vec<Ipv4Net>);
+
+impl NetworkLayerReachabilityInformation {
+    pub fn new(networks: Vec<Ipv4Net>) -> Self {
+        Self(networks)
+    }
+
+    pub const fn networks(&self) -> &Vec<Ipv4Net> {
+        &self.0
+    }
+}

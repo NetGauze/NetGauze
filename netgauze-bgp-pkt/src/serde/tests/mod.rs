@@ -32,6 +32,7 @@ use std::net::Ipv4Addr;
 mod capabilities;
 mod keepalive;
 mod open;
+mod update;
 
 pub(crate) const BGP_MARKER: &'static [u8] = &[0xff; 16];
 pub(crate) const MY_AS: &'static [u8] = &[0x01, 0x02];

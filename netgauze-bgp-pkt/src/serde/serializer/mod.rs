@@ -17,6 +17,8 @@
 
 pub mod capabilities;
 pub mod open;
+pub mod path_attribute;
+pub mod update;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
 
@@ -26,10 +28,16 @@ use crate::{
     iana::BGPMessageType,
     serde::{
         deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
-        serializer::open::BGPOpenMessageWritingError,
+        serializer::{open::BGPOpenMessageWritingError, update::BGPUpdateMessageWritingError},
     },
     BGPMessage,
 };
+
+/// Helper method to round up the number of bytes based on a given length
+#[inline]
+fn round_len(len: u8) -> u8 {
+    (len as f32 / 8.0).ceil() as u8
+}
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum BGPMessageWritingError {
@@ -41,6 +49,9 @@ pub enum BGPMessageWritingError {
 
     /// Error encountered during parsing a [BGPOpenMessage]
     OpenError(BGPOpenMessageWritingError),
+
+    /// Error encountered during parsing a [BGPUpdateMessage]
+    UpdateError(BGPUpdateMessageWritingError),
 }
 
 impl From<std::io::Error> for BGPMessageWritingError {
@@ -54,7 +65,7 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
     fn len(&self) -> usize {
         let body_len = match self {
             Self::Open(open) => open.len(),
-            Self::Update(_) => todo!(),
+            Self::Update(update) => update.len(),
             Self::KeepAlive => 0,
         };
         Self::BASE_LENGTH as usize + body_len
@@ -73,8 +84,14 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
         writer.write_all(&u128::MAX.to_be_bytes())?;
         writer.write_u16::<NetworkEndian>(len as u16)?;
         match self {
-            BGPMessage::Open(open) => open.write(writer)?,
-            BGPMessage::Update(_) => todo!(),
+            BGPMessage::Open(open) => {
+                writer.write_u8(BGPMessageType::Open.into())?;
+                open.write(writer)?;
+            }
+            BGPMessage::Update(update) => {
+                writer.write_u8(BGPMessageType::Update.into())?;
+                update.write(writer)?;
+            }
             BGPMessage::KeepAlive => {
                 writer.write_u8(BGPMessageType::KeepAlive.into())?;
             }
