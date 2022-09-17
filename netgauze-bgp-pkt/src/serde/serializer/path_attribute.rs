@@ -18,8 +18,8 @@
 use crate::{
     iana::PathAttributeType,
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, MultiExitDiscriminator, NextHop, Origin,
-        PathAttribute,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, LocalPreference, MultiExitDiscriminator,
+        NextHop, Origin, PathAttribute,
     },
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
@@ -33,6 +33,7 @@ pub enum PathAttributeWritingError {
     AsPathError(AsPathWritingError),
     NextHopError(NextHopWritingError),
     MultiExitDiscriminatorError(MultiExitDiscriminatorWritingError),
+    LocalPreferenceError(LocalPreferenceWritingError),
 }
 
 impl From<std::io::Error> for PathAttributeWritingError {
@@ -73,7 +74,10 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 extended_length,
                 value,
             } => value.len(*extended_length),
-            Self::LocalPreference { .. } => todo!(),
+            Self::LocalPreference {
+                extended_length,
+                value,
+            } => value.len(*extended_length),
             Self::AtomicAggregate { .. } => todo!(),
             Self::Aggregator { .. } => todo!(),
             Self::UnknownAttribute { .. } => todo!(),
@@ -133,7 +137,13 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 writer.write_u8(PathAttributeType::MultiExitDiscriminator.into())?;
                 value.write(writer, *extended_length)?;
             }
-            Self::LocalPreference { .. } => todo!(),
+            Self::LocalPreference {
+                extended_length,
+                value,
+            } => {
+                writer.write_u8(PathAttributeType::LocalPreference.into())?;
+                value.write(writer, *extended_length)?;
+            }
             Self::AtomicAggregate { .. } => todo!(),
             Self::Aggregator { .. } => todo!(),
             Self::UnknownAttribute { .. } => todo!(),
@@ -376,6 +386,46 @@ impl WritablePDUWithOneInput<bool, MultiExitDiscriminatorWritingError> for Multi
         writer: &mut T,
         extended_length: bool,
     ) -> Result<(), MultiExitDiscriminatorWritingError> {
+        write_length(self, extended_length, writer)?;
+        writer.write_u32::<NetworkEndian>(self.metric())?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum LocalPreferenceWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for LocalPreferenceWritingError {
+    fn from(err: std::io::Error) -> Self {
+        LocalPreferenceWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<LocalPreferenceWritingError> for PathAttributeWritingError {
+    fn from(value: LocalPreferenceWritingError) -> Self {
+        PathAttributeWritingError::LocalPreferenceError(value)
+    }
+}
+
+impl WritablePDUWithOneInput<bool, LocalPreferenceWritingError> for LocalPreference {
+    // One octet length (if extended is not enabled) and 4 for u32 local pref
+    const BASE_LENGTH: usize = 5;
+
+    fn len(&self, extended_length: bool) -> usize {
+        if extended_length {
+            Self::BASE_LENGTH + 1
+        } else {
+            Self::BASE_LENGTH
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), LocalPreferenceWritingError> {
         write_length(self, extended_length, writer)?;
         writer.write_u32::<NetworkEndian>(self.metric())?;
         Ok(())

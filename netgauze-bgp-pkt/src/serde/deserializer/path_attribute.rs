@@ -18,9 +18,9 @@
 use crate::{
     iana::PathAttributeType,
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, MultiExitDiscriminator,
-        NextHop, Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType,
-        UndefinedOrigin,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, LocalPreference,
+        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
+        UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::deserializer::{
         update::LocatedBGPUpdateMessageParsingError, BGPUpdateMessageParsingError,
@@ -43,6 +43,7 @@ const EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK: u8 = 0x10;
 const ORIGIN_LEN: u16 = 1;
 const NEXT_HOP_LEN: u16 = 4;
 const MULTI_EXIT_DISCRIMINATOR_LEN: u16 = 4;
+const LOCAL_PREFERENCE_LEN: u16 = 4;
 
 #[inline]
 const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
@@ -61,6 +62,7 @@ pub enum PathAttributeParsingError {
     AsPathError(AsPathParsingError),
     NextHopError(NextHopParsingError),
     MultiExitDiscriminatorError(MultiExitDiscriminatorParsingError),
+    LocalPreferenceError(LocalPreferenceParsingError),
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -232,6 +234,27 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                     }
                 };
                 let path_attr = PathAttribute::MultiExitDiscriminator {
+                    extended_length,
+                    value,
+                };
+                Ok((buf, path_attr))
+            }
+            Ok(PathAttributeType::LocalPreference) => {
+                let (buf, value) = match LocalPreference::from_wire(buf, extended_length) {
+                    Ok((buf, origin)) => (buf, origin),
+                    Err(err) => {
+                        return match err {
+                            nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                            nom::Err::Error(error) => Err(nom::Err::Error(
+                                error.into_located_attribute_parsing_error(),
+                            )),
+                            nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                                failure.into_located_attribute_parsing_error(),
+                            )),
+                        }
+                    }
+                };
+                let path_attr = PathAttribute::LocalPreference {
                     extended_length,
                     value,
                 };
@@ -610,5 +633,91 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMultiExitDiscriminatorParsingE
 
         let (buf, metric) = be_u32(buf)?;
         Ok((buf, MultiExitDiscriminator::new(metric)))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum LocalPreferenceParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidLength(PathAttributeLength),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedLocalPreferenceParsingError<'a> {
+    span: Span<'a>,
+    error: LocalPreferenceParsingError,
+}
+
+impl<'a> LocatedLocalPreferenceParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: LocalPreferenceParsingError) -> Self {
+        Self { span, error }
+    }
+
+    pub const fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    pub const fn error(&self) -> &LocalPreferenceParsingError {
+        &self.error
+    }
+
+    pub const fn into_located_attribute_parsing_error(
+        self,
+    ) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
+            self.span,
+            PathAttributeParsingError::LocalPreferenceError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, LocalPreferenceParsingError>
+    for LocatedLocalPreferenceParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: LocalPreferenceParsingError,
+    ) -> Self {
+        LocatedLocalPreferenceParsingError::new(input, error)
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedLocalPreferenceParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedLocalPreferenceParsingError::new(input, LocalPreferenceParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a>>
+    for LocalPreference
+{
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedLocalPreferenceParsingError<'a>> {
+        let input = buf;
+        let (buf, length) = if extended_length {
+            let (buf, raw) = be_u16(buf)?;
+            (buf, PathAttributeLength::U16(raw))
+        } else {
+            let (buf, raw) = be_u8(buf)?;
+            (buf, PathAttributeLength::U8(raw))
+        };
+        if !check_length(length, LOCAL_PREFERENCE_LEN) {
+            return Err(nom::Err::Error(LocatedLocalPreferenceParsingError::new(
+                input,
+                LocalPreferenceParsingError::InvalidLength(length),
+            )));
+        }
+
+        let (buf, pref) = be_u32(buf)?;
+        Ok((buf, LocalPreference::new(pref)))
     }
 }

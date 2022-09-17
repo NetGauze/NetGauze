@@ -15,21 +15,21 @@
 
 use crate::{
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, MultiExitDiscriminator,
-        NextHop, Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType,
-        UndefinedOrigin,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, LocalPreference,
+        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
+        UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::{
         deserializer::path_attribute::{
-            AsPathParsingError, LocatedAsPathParsingError,
-            LocatedMultiExitDiscriminatorParsingError, LocatedNextHopParsingError,
-            LocatedOriginParsingError, LocatedPathAttributeParsingError,
-            MultiExitDiscriminatorParsingError, NextHopParsingError, OriginParsingError,
-            PathAttributeParsingError,
+            AsPathParsingError, LocalPreferenceParsingError, LocatedAsPathParsingError,
+            LocatedLocalPreferenceParsingError, LocatedMultiExitDiscriminatorParsingError,
+            LocatedNextHopParsingError, LocatedOriginParsingError,
+            LocatedPathAttributeParsingError, MultiExitDiscriminatorParsingError,
+            NextHopParsingError, OriginParsingError, PathAttributeParsingError,
         },
         serializer::path_attribute::{
-            AsPathWritingError, MultiExitDiscriminatorWritingError, NextHopWritingError,
-            OriginWritingError, PathAttributeWritingError,
+            AsPathWritingError, LocalPreferenceWritingError, MultiExitDiscriminatorWritingError,
+            NextHopWritingError, OriginWritingError, PathAttributeWritingError,
         },
     },
 };
@@ -41,6 +41,7 @@ use netgauze_parse_utils::{
     },
     Span,
 };
+use nom::error::ErrorKind;
 use std::net::Ipv4Addr;
 
 #[test]
@@ -490,5 +491,62 @@ fn test_path_attribute_multi_exit_discriminator() -> Result<(), PathAttributeWri
     test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
+    Ok(())
+}
+
+#[test]
+fn test_local_preference() -> Result<(), LocalPreferenceWritingError> {
+    let good_wire = [0x04, 0x00, 0x00, 0x00, 0x01];
+    let good_extended_wire = [0x00, 0x04, 0x00, 0x00, 0x00, 0x01];
+    let bad_underflow_wire = [0x04, 0x00, 0x00, 0x01];
+    let bad_length_wire = [0x03, 0x00, 0x00, 0x01];
+
+    let good = LocalPreference::new(1);
+    let good_extended = LocalPreference::new(1);
+    let bad_underflow = LocatedLocalPreferenceParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_underflow_wire[1..]) },
+        LocalPreferenceParsingError::NomError(ErrorKind::Eof),
+    );
+    let bad_length = LocatedLocalPreferenceParsingError::new(
+        Span::new(&bad_length_wire),
+        LocalPreferenceParsingError::InvalidLength(PathAttributeLength::U8(3)),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input::<LocalPreference, bool, LocatedLocalPreferenceParsingError<'_>>(
+        &bad_underflow_wire,
+        false,
+        &bad_underflow,
+    );
+    test_parse_error_with_one_input::<LocalPreference, bool, LocatedLocalPreferenceParsingError<'_>>(
+        &bad_length_wire,
+        false,
+        &bad_length,
+    );
+
+    test_write_with_one_input(&good, false, &good_wire)?;
+    test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_local_preference() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0x40, 0x05, 0x04, 0x00, 0x00, 0x00, 0x64];
+    let good_extended_wire = [0x50, 0x05, 0x00, 0x04, 0x00, 0x00, 0x00, 0x64];
+
+    let good = PathAttribute::LocalPreference {
+        extended_length: false,
+        value: LocalPreference::new(100),
+    };
+    let good_extended = PathAttribute::LocalPreference {
+        extended_length: true,
+        value: LocalPreference::new(100),
+    };
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_extended_wire)?;
     Ok(())
 }
