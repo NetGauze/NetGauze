@@ -19,7 +19,7 @@ use crate::{
     path_attribute::PathAttribute,
     serde::deserializer::{
         ipv4_network_from_wire,
-        path_attribute::{BGPPathAttributeParsingError, LocatedBGPPathAttributeParsingError},
+        path_attribute::{LocatedPathAttributeParsingError, PathAttributeParsingError},
         BGPMessageParsingError, Ipv4PrefixParsingError, LocatedBGPMessageParsingError,
     },
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
@@ -40,7 +40,7 @@ pub enum BGPUpdateMessageParsingError {
     /// additional information.
     NomError(ErrorKind),
     WithdrawRouteError(WithdrawRouteParsingError),
-    PathAttributeError(BGPPathAttributeParsingError),
+    PathAttributeError(PathAttributeParsingError),
     NetworkLayerReachabilityInformationError(NetworkLayerReachabilityInformationParsingError),
 }
 
@@ -126,7 +126,7 @@ fn parse_withdraw_routes(
 fn parse_path_attributes(
     buf: Span<'_>,
 ) -> IResult<Span<'_>, Vec<PathAttribute>, LocatedBGPUpdateMessageParsingError<'_>> {
-    match parse_till_empty::<'_, PathAttribute, LocatedBGPPathAttributeParsingError<'_>>(buf) {
+    match parse_till_empty::<'_, PathAttribute, LocatedPathAttributeParsingError<'_>>(buf) {
         Ok((buf, path_attrs)) => Ok((buf, path_attrs)),
         Err(err) => {
             return match err {

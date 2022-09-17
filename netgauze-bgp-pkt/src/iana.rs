@@ -54,7 +54,7 @@ impl TryFrom<u8> for BGPMessageType {
 /// BGP Path Attributes as defined by IANA [BGP Path Attributes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-2)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
-pub enum BGPPathAttributeType {
+pub enum PathAttributeType {
     /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
     Origin = 1,
 
@@ -149,22 +149,22 @@ pub enum BGPPathAttributeType {
     Development = 255,
 }
 
-impl From<BGPPathAttributeType> for u8 {
-    fn from(value: BGPPathAttributeType) -> Self {
+impl From<PathAttributeType> for u8 {
+    fn from(value: PathAttributeType) -> Self {
         value as u8
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct UndefinedBGPPathAttributeType(pub u8);
+pub struct UndefinedPathAttributeType(pub u8);
 
-impl TryFrom<u8> for BGPPathAttributeType {
-    type Error = UndefinedBGPPathAttributeType;
+impl TryFrom<u8> for PathAttributeType {
+    type Error = UndefinedPathAttributeType;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UndefinedBGPPathAttributeType(value)),
+            None => Err(UndefinedPathAttributeType(value)),
         }
     }
 }
@@ -617,15 +617,12 @@ mod tests {
     fn test_bgp_path_attribute_type() {
         let undefined_code = 0;
         let origin_code = 1;
-        let origin = BGPPathAttributeType::try_from(origin_code);
-        let undefined = BGPPathAttributeType::try_from(undefined_code);
-        let origin_u8: u8 = BGPPathAttributeType::Origin.into();
-        assert_eq!(origin, Ok(BGPPathAttributeType::Origin));
+        let origin = PathAttributeType::try_from(origin_code);
+        let undefined = PathAttributeType::try_from(undefined_code);
+        let origin_u8: u8 = PathAttributeType::Origin.into();
+        assert_eq!(origin, Ok(PathAttributeType::Origin));
         assert_eq!(origin_u8, origin_code);
-        assert_eq!(
-            undefined,
-            Err(UndefinedBGPPathAttributeType(undefined_code))
-        );
+        assert_eq!(undefined, Err(UndefinedPathAttributeType(undefined_code)));
     }
 
     #[test]

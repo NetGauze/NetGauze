@@ -16,7 +16,7 @@
 //! Deserializer for BGP Path Attributes
 
 use crate::{
-    iana::BGPPathAttributeType,
+    iana::PathAttributeType,
     path_attribute::{Origin, PathAttribute, PathAttributeLength, UndefinedOrigin},
     serde::deserializer::{
         update::LocatedBGPUpdateMessageParsingError, BGPUpdateMessageParsingError,
@@ -44,7 +44,7 @@ const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub enum BGPPathAttributeParsingError {
+pub enum PathAttributeParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
     NomError(ErrorKind),
@@ -52,13 +52,13 @@ pub enum BGPPathAttributeParsingError {
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedBGPPathAttributeParsingError<'a> {
+pub struct LocatedPathAttributeParsingError<'a> {
     span: Span<'a>,
-    error: BGPPathAttributeParsingError,
+    error: PathAttributeParsingError,
 }
 
-impl<'a> LocatedBGPPathAttributeParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: BGPPathAttributeParsingError) -> Self {
+impl<'a> LocatedPathAttributeParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: PathAttributeParsingError) -> Self {
         Self { span, error }
     }
 
@@ -66,7 +66,7 @@ impl<'a> LocatedBGPPathAttributeParsingError<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &BGPPathAttributeParsingError {
+    pub const fn error(&self) -> &PathAttributeParsingError {
         &self.error
     }
 
@@ -82,24 +82,21 @@ impl<'a> LocatedBGPPathAttributeParsingError<'a> {
     }
 }
 
-impl<'a> FromExternalError<Span<'a>, BGPPathAttributeParsingError>
-    for LocatedBGPPathAttributeParsingError<'a>
+impl<'a> FromExternalError<Span<'a>, PathAttributeParsingError>
+    for LocatedPathAttributeParsingError<'a>
 {
     fn from_external_error(
         input: Span<'a>,
         _kind: ErrorKind,
-        error: BGPPathAttributeParsingError,
+        error: PathAttributeParsingError,
     ) -> Self {
-        LocatedBGPPathAttributeParsingError::new(input, error)
+        LocatedPathAttributeParsingError::new(input, error)
     }
 }
 
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedBGPPathAttributeParsingError<'a> {
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedPathAttributeParsingError<'a> {
     fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedBGPPathAttributeParsingError::new(
-            input,
-            BGPPathAttributeParsingError::NomError(kind),
-        )
+        LocatedPathAttributeParsingError::new(input, PathAttributeParsingError::NomError(kind))
     }
 
     fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
@@ -137,10 +134,10 @@ impl<'a> LocatedOriginParsingError<'a> {
 
     pub const fn into_located_attribute_parsing_error(
         self,
-    ) -> LocatedBGPPathAttributeParsingError<'a> {
-        LocatedBGPPathAttributeParsingError::new(
+    ) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
             self.span,
-            BGPPathAttributeParsingError::OriginError(self.error),
+            PathAttributeParsingError::OriginError(self.error),
         )
     }
 }
@@ -191,10 +188,8 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Or
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedBGPPathAttributeParsingError<'a>> for PathAttribute {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBGPPathAttributeParsingError<'a>> {
+impl<'a> ReadablePDU<'a, LocatedPathAttributeParsingError<'a>> for PathAttribute {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedPathAttributeParsingError<'a>> {
         let (buf, attributes) = be_u8(buf)?;
         let buf_before_code = buf;
         let (buf, code) = be_u8(buf)?;
@@ -204,7 +199,7 @@ impl<'a> ReadablePDU<'a, LocatedBGPPathAttributeParsingError<'a>> for PathAttrib
         let partial = attributes & PARTIAL_PATH_ATTRIBUTE_MASK == PARTIAL_PATH_ATTRIBUTE_MASK;
         let extended_length =
             attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
-        match BGPPathAttributeType::try_from(code) {
+        match PathAttributeType::try_from(code) {
             _ => todo!(),
         }
     }
