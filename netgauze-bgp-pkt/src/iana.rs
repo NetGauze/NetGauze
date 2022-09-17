@@ -448,7 +448,7 @@ impl TryFrom<u8> for RouteRefreshMessageErrorSubCode {
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
 pub enum BGPOpenMessageParameterType {
     /// [RFC5492](https://datatracker.ietf.org/doc/html/rfc5492)
-    Capability = 1,
+    Capability = 2,
 
     /// [RFC59072](https://datatracker.ietf.org/doc/html/rfc9072)
     ExtendedLength = 255,
@@ -743,7 +743,7 @@ mod tests {
     #[test]
     fn test_bgp_open_message_parameter_type() {
         let undefined_code = 0;
-        let valid_code = 1;
+        let valid_code = 2;
         let ret = BGPOpenMessageParameterType::try_from(valid_code);
         let undefined = BGPOpenMessageParameterType::try_from(undefined_code);
         let valid_u8: u8 = BGPOpenMessageParameterType::Capability.into();
