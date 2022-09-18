@@ -93,24 +93,49 @@ fn test_message_header_error() -> Result<(), MessageHeaderErrorWritingError> {
 #[test]
 fn test_bgp_notification_message_header() -> Result<(), BGPNotificationMessageWritingError> {
     let good_header_wire = [0x01, 0x01, 0x01, 0x01];
-    let bad_invalid_code_wire = [0xff, 0x01, 0x01, 0x01];
+    let bad_undefined_code_wire = [0xff, 0x01, 0x01, 0x01];
+    let bad_undefined_sub_code_wire = [0x01, 0xff, 0x01, 0x01];
+    let bad_incomplete_wire = [0x01];
 
     let good_header =
         BGPNotificationMessage::MessageHeaderError(MessageHeaderError::ConnectionNotSynchronized {
             value: good_header_wire[2..].to_vec(),
         });
-    let bad_invalid_code = LocatedBGPNotificationMessageParsingError::new(
-        Span::new(&bad_invalid_code_wire),
+    let bad_undefined_code = LocatedBGPNotificationMessageParsingError::new(
+        Span::new(&bad_undefined_code_wire),
         BGPNotificationMessageParsingError::UndefinedBGPErrorNotificationCode(
             UndefinedBGPErrorNotificationCode(0xff),
         ),
     );
-    test_parsed_completely(&good_header_wire, &good_header);
-
-    test_parse_error::<BGPNotificationMessage, LocatedBGPNotificationMessageParsingError<'_>>(
-        &bad_invalid_code_wire,
-        &bad_invalid_code,
+    let bad_undefined_sub_code = LocatedBGPNotificationMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_undefined_sub_code_wire[1..]) },
+        BGPNotificationMessageParsingError::MessageHeaderError(
+            MessageHeaderErrorParsingError::UndefinedMessageHeaderErrorType(
+                UndefinedMessageHeaderErrorSubCode(0xff),
+            ),
+        ),
     );
+    let bad_incomplete = LocatedBGPNotificationMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
+        BGPNotificationMessageParsingError::MessageHeaderError(
+            MessageHeaderErrorParsingError::NomError(ErrorKind::Eof),
+        ),
+    );
+
+    test_parsed_completely(&good_header_wire, &good_header);
+    test_parse_error::<BGPNotificationMessage, LocatedBGPNotificationMessageParsingError<'_>>(
+        &bad_undefined_code_wire,
+        &bad_undefined_code,
+    );
+    test_parse_error::<BGPNotificationMessage, LocatedBGPNotificationMessageParsingError<'_>>(
+        &bad_undefined_sub_code_wire,
+        &bad_undefined_sub_code,
+    );
+    test_parse_error::<BGPNotificationMessage, LocatedBGPNotificationMessageParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
     test_write(&good_header, &good_header_wire)?;
     Ok(())
 }
@@ -195,13 +220,38 @@ fn test_open_message_error() -> Result<(), OpenMessageErrorWritingError> {
 #[test]
 fn test_bgp_notification_open_message() -> Result<(), BGPNotificationMessageWritingError> {
     let good_wire = [0x02, 0x01, 0x01, 0x01];
+    let bad_undefined_wire = [0x02, 0xff, 0x01, 0x01];
+    let bad_incomplete_wire = [0x02];
 
     let good =
         BGPNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
             value: good_wire[2..].to_vec(),
         });
+    let bad_undefined = LocatedBGPNotificationMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_undefined_wire[1..]) },
+        BGPNotificationMessageParsingError::OpenMessageError(
+            OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode(
+                UndefinedOpenMessageErrorSubCode(0xff),
+            ),
+        ),
+    );
+    let bad_incomplete = LocatedBGPNotificationMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
+        BGPNotificationMessageParsingError::OpenMessageError(
+            OpenMessageErrorParsingError::NomError(ErrorKind::Eof),
+        ),
+    );
 
     test_parsed_completely(&good_wire, &good);
+    test_parse_error::<BGPNotificationMessage, LocatedBGPNotificationMessageParsingError<'_>>(
+        &bad_undefined_wire,
+        &bad_undefined,
+    );
+    test_parse_error::<BGPNotificationMessage, LocatedBGPNotificationMessageParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
     test_write(&good, &good_wire)?;
     Ok(())
 }
