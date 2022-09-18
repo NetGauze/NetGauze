@@ -15,19 +15,22 @@
 
 use crate::{
     iana::{
-        UndefinedBGPErrorNotificationCode, UndefinedBgpMessageType, UndefinedCeaseErrorSubCode,
+        RouteRefreshSubcode, UndefinedBGPErrorNotificationCode, UndefinedBgpMessageType,
+        UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
     },
     notification::CeaseError,
     open::BGP_VERSION,
     serde::{
         deserializer::{
             notification::{BGPNotificationMessageParsingError, CeaseErrorParsingError},
+            route_refresh::BGPRouteRefreshMessageParsingError,
             BGPMessageParsingError, LocatedBGPMessageParsingError,
         },
         serializer::BGPMessageWritingError,
     },
-    BGPMessage, BGPNotificationMessage, BGPOpenMessage,
+    BGPMessage, BGPNotificationMessage, BGPOpenMessage, BGPRouteRefreshMessage,
 };
+use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
     test_helpers::{
         combine, test_parse_error_with_one_input, test_parsed_completely,
@@ -43,6 +46,7 @@ mod keepalive;
 mod notification;
 mod open;
 mod path_attribute;
+mod route_refresh;
 mod update;
 
 pub(crate) const BGP_MARKER: &'static [u8] = &[0xff; 16];
@@ -252,5 +256,35 @@ fn test_bgp_message_notification() -> Result<(), BGPMessageWritingError> {
     );
 
     test_write(&good_cease, &good_cease_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_message_route_refresh() -> Result<(), BGPMessageWritingError> {
+    let good_normal_payload_wire = [0x00, 0x01, 0x00, 0x01];
+    let good_normal_wire = combine(vec![BGP_MARKER, &[0x00, 23, 5], &good_normal_payload_wire]);
+    let bad_payload_wire = [0x00, 0x01, 0xff, 0x01];
+    let bad_wire = combine(vec![BGP_MARKER, &[0x00, 23, 5], &bad_payload_wire]);
+
+    let good_normal = BGPMessage::RouteRefresh(BGPRouteRefreshMessage::new(
+        AddressType::Ipv4Unicast,
+        RouteRefreshSubcode::NormalRequest,
+    ));
+
+    let bad = LocatedBGPMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(21, &bad_wire[21..]) },
+        BGPMessageParsingError::BGPRouteRefreshMessageParsingError(
+            BGPRouteRefreshMessageParsingError::UndefinedOperation(UndefinedRouteRefreshSubcode(
+                255,
+            )),
+        ),
+    );
+
+    test_parsed_completely_with_one_input(&good_normal_wire, false, &good_normal);
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+        &bad_wire, false, &bad,
+    );
+    test_write(&good_normal, &good_normal_wire)?;
+
     Ok(())
 }

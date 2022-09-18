@@ -19,6 +19,7 @@ pub mod capabilities;
 pub mod notification;
 pub mod open;
 pub mod path_attribute;
+pub mod route_refresh;
 pub mod update;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -31,6 +32,7 @@ use crate::{
         deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
         serializer::{
             notification::BGPNotificationMessageWritingError, open::BGPOpenMessageWritingError,
+            route_refresh::BGPRouteRefreshMessageWritingError,
             update::BGPUpdateMessageWritingError,
         },
     },
@@ -58,6 +60,8 @@ pub enum BGPMessageWritingError {
     UpdateError(BGPUpdateMessageWritingError),
 
     NotificationError(BGPNotificationMessageWritingError),
+
+    RouteRefreshError(BGPRouteRefreshMessageWritingError),
 }
 
 impl From<std::io::Error> for BGPMessageWritingError {
@@ -74,6 +78,7 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
             Self::Update(update) => update.len(),
             Self::Notification(notification) => notification.len(),
             Self::KeepAlive => 0,
+            Self::RouteRefresh(route_refresh) => route_refresh.len(),
         };
         Self::BASE_LENGTH as usize + body_len
     }
@@ -81,21 +86,21 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), BGPMessageWritingError> {
         let len = self.len();
         match self {
-            BGPMessage::Open(_) | BGPMessage::KeepAlive => {
+            Self::Open(_) | Self::KeepAlive => {
                 if len > BGP_MAX_MESSAGE_LENGTH as usize {
                     return Err(BGPMessageWritingError::BGPMessageLengthOverflow(len));
                 }
             }
-            BGPMessage::Update(_) | BGPMessage::Notification(_) => {}
+            Self::Update(_) | Self::Notification(_) | Self::RouteRefresh(_) => {}
         }
         writer.write_all(&u128::MAX.to_be_bytes())?;
         writer.write_u16::<NetworkEndian>(len as u16)?;
         match self {
-            BGPMessage::Open(open) => {
+            Self::Open(open) => {
                 writer.write_u8(BGPMessageType::Open.into())?;
                 open.write(writer)?;
             }
-            BGPMessage::Update(update) => {
+            Self::Update(update) => {
                 writer.write_u8(BGPMessageType::Update.into())?;
                 update.write(writer)?;
             }
@@ -103,8 +108,12 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
                 writer.write_u8(BGPMessageType::Notification.into())?;
                 notification.write(writer)?;
             }
-            BGPMessage::KeepAlive => {
+            Self::KeepAlive => {
                 writer.write_u8(BGPMessageType::KeepAlive.into())?;
+            }
+            Self::RouteRefresh(route_refresh) => {
+                writer.write_u8(BGPMessageType::RouteRefresh.into())?;
+                route_refresh.write(writer)?;
             }
         }
         Ok(())

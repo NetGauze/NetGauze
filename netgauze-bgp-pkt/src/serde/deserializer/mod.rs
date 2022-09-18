@@ -19,6 +19,7 @@ pub mod capabilities;
 pub mod notification;
 pub mod open;
 pub mod path_attribute;
+pub mod route_refresh;
 pub mod update;
 
 use ipnet::Ipv4Net;
@@ -40,6 +41,7 @@ use crate::{
     serde::deserializer::{
         notification::BGPNotificationMessageParsingError,
         open::BGPOpenMessageParsingError,
+        route_refresh::BGPRouteRefreshMessageParsingError,
         update::{
             BGPUpdateMessageParsingError, LocatedNetworkLayerReachabilityInformationParsingError,
             LocatedWithdrawRouteParsingError, NetworkLayerReachabilityInformationParsingError,
@@ -169,6 +171,8 @@ pub enum BGPMessageParsingError {
     BGPUpdateMessageParsingError(BGPUpdateMessageParsingError),
 
     BGPNotificationMessageParsingError(BGPNotificationMessageParsingError),
+
+    BGPRouteRefreshMessageParsingError(BGPRouteRefreshMessageParsingError),
 }
 
 /// BGP Message Parsing errors  with the input location of where it occurred in
@@ -309,7 +313,10 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPMessageParsingError<'a>> fo
                 (buf, BGPMessage::Notification(notification))
             }
             BGPMessageType::KeepAlive => (buf, BGPMessage::KeepAlive),
-            BGPMessageType::RouteRefresh => todo!(),
+            BGPMessageType::RouteRefresh => {
+                let (buf, route_refresh) = parse_into_located(buf)?;
+                (buf, BGPMessage::RouteRefresh(route_refresh))
+            }
         };
 
         // Make sure we consumed the full BGP message as specified by its length

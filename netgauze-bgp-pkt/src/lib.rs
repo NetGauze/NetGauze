@@ -24,13 +24,17 @@
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::missing_const_for_fn)]
 
-use crate::{notification::BGPNotificationMessage, open::BGPOpenMessage, update::BGPUpdateMessage};
+use crate::{
+    notification::BGPNotificationMessage, open::BGPOpenMessage,
+    route_refresh::BGPRouteRefreshMessage, update::BGPUpdateMessage,
+};
 
 pub mod capabilities;
 pub mod iana;
 pub mod notification;
 pub mod open;
 pub mod path_attribute;
+pub mod route_refresh;
 #[cfg(feature = "serde")]
 pub mod serde;
 pub mod update;
@@ -60,5 +64,5 @@ pub enum BGPMessage {
     Update(BGPUpdateMessage),
     Notification(BGPNotificationMessage),
     KeepAlive,
-    //RouteRefresh(BGPRouteRefreshMessage),
+    RouteRefresh(BGPRouteRefreshMessage),
 }
