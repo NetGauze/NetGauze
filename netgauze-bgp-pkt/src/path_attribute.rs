@@ -76,15 +76,45 @@ impl PathAttribute {
     /// `true`) or well-known (if set to `false`).
     pub const fn optional(&self) -> bool {
         match self {
-            Self::Origin { .. } => Origin::optional(),
-            Self::ASPath { .. } => ASPath::optional(),
-            Self::AS4Path { .. } => AS4Path::optional(),
-            Self::NextHop { .. } => NextHop::optional(),
-            Self::MultiExitDiscriminator { .. } => MultiExitDiscriminator::optional(),
-            Self::LocalPreference { .. } => LocalPreference::optional(),
-            Self::AtomicAggregate { .. } => AtomicAggregate::optional(),
-            Self::Aggregator { .. } => Aggregator::optional(),
-            Self::UnknownAttribute { value, .. } => value.optional(),
+            Self::Origin {
+                extended_length: _,
+                value: _,
+            } => Origin::optional(),
+            Self::ASPath {
+                extended_length: _,
+                value: _,
+            } => ASPath::optional(),
+            Self::AS4Path {
+                partial: _,
+                extended_length: _,
+                value: _,
+            } => AS4Path::optional(),
+            Self::NextHop {
+                extended_length: _,
+                value: _,
+            } => NextHop::optional(),
+            Self::MultiExitDiscriminator {
+                extended_length: _,
+                value: _,
+            } => MultiExitDiscriminator::optional(),
+            Self::LocalPreference {
+                extended_length: _,
+                value: _,
+            } => LocalPreference::optional(),
+            Self::AtomicAggregate {
+                extended_length: _,
+                value: _,
+            } => AtomicAggregate::optional(),
+            Self::Aggregator {
+                partial: _,
+                extended_length: _,
+                value: _,
+            } => Aggregator::optional(),
+            Self::UnknownAttribute {
+                partial: _,
+                extended_length: _,
+                value,
+            } => value.optional(),
         }
     }
 
@@ -93,15 +123,45 @@ impl PathAttribute {
     /// attributes, the Transitive bit MUST be set to `true`.
     pub const fn transitive(&self) -> bool {
         match self {
-            Self::Origin { .. } => Origin::transitive(),
-            Self::ASPath { .. } => ASPath::transitive(),
-            Self::AS4Path { .. } => AS4Path::transitive(),
-            Self::NextHop { .. } => NextHop::transitive(),
-            Self::MultiExitDiscriminator { .. } => MultiExitDiscriminator::transitive(),
-            Self::LocalPreference { .. } => LocalPreference::transitive(),
-            Self::AtomicAggregate { .. } => AtomicAggregate::transitive(),
-            Self::Aggregator { .. } => Aggregator::transitive(),
-            Self::UnknownAttribute { value, .. } => value.transitive(),
+            Self::Origin {
+                extended_length: _,
+                value: _,
+            } => Origin::transitive(),
+            Self::ASPath {
+                extended_length: _,
+                value: _,
+            } => ASPath::transitive(),
+            Self::AS4Path {
+                partial: _,
+                extended_length: _,
+                value: _,
+            } => AS4Path::transitive(),
+            Self::NextHop {
+                extended_length: _,
+                value: _,
+            } => NextHop::transitive(),
+            Self::MultiExitDiscriminator {
+                extended_length: _,
+                value: _,
+            } => MultiExitDiscriminator::transitive(),
+            Self::LocalPreference {
+                extended_length: _,
+                value: _,
+            } => LocalPreference::transitive(),
+            Self::AtomicAggregate {
+                extended_length: _,
+                value: _,
+            } => AtomicAggregate::transitive(),
+            Self::Aggregator {
+                partial: _,
+                extended_length: _,
+                value: _,
+            } => Aggregator::transitive(),
+            Self::UnknownAttribute {
+                partial: _,
+                extended_length: _,
+                value,
+            } => value.transitive(),
         }
     }
 
@@ -113,15 +173,45 @@ impl PathAttribute {
     /// the Partial bit MUST be set to `false`.
     pub const fn partial(&self) -> bool {
         match self {
-            Self::Origin { .. } => Origin::partial(),
-            Self::ASPath { .. } => ASPath::partial(),
-            Self::AS4Path { partial, .. } => *partial,
-            Self::NextHop { .. } => NextHop::partial(),
-            Self::MultiExitDiscriminator { .. } => MultiExitDiscriminator::partial(),
-            Self::LocalPreference { .. } => LocalPreference::partial(),
-            Self::AtomicAggregate { .. } => AtomicAggregate::partial(),
-            Self::Aggregator { partial, .. } => *partial,
-            Self::UnknownAttribute { partial, .. } => *partial,
+            Self::Origin {
+                extended_length: _,
+                value: _,
+            } => Origin::partial(),
+            Self::ASPath {
+                extended_length: _,
+                value: _,
+            } => ASPath::partial(),
+            Self::AS4Path {
+                partial,
+                extended_length: _,
+                value: _,
+            } => *partial,
+            Self::NextHop {
+                extended_length: _,
+                value: _,
+            } => NextHop::partial(),
+            Self::MultiExitDiscriminator {
+                extended_length: _,
+                value: _,
+            } => MultiExitDiscriminator::partial(),
+            Self::LocalPreference {
+                extended_length: _,
+                value: _,
+            } => LocalPreference::partial(),
+            Self::AtomicAggregate {
+                extended_length: _,
+                value: _,
+            } => AtomicAggregate::partial(),
+            Self::Aggregator {
+                partial,
+                extended_length: _,
+                value: _,
+            } => *partial,
+            Self::UnknownAttribute {
+                partial,
+                extended_length: _,
+                value: _,
+            } => *partial,
         }
     }
 
@@ -130,31 +220,43 @@ impl PathAttribute {
     pub const fn extended_length(&self) -> bool {
         match self {
             Self::Origin {
-                extended_length, ..
+                extended_length,
+                value: _,
             } => *extended_length,
             Self::ASPath {
-                extended_length, ..
+                extended_length,
+                value: _,
             } => *extended_length,
             Self::AS4Path {
-                extended_length, ..
+                partial: _,
+                extended_length,
+                value: _,
             } => *extended_length,
             Self::NextHop {
-                extended_length, ..
+                extended_length,
+                value: _,
             } => *extended_length,
             Self::MultiExitDiscriminator {
-                extended_length, ..
+                extended_length,
+                value: _,
             } => *extended_length,
             Self::LocalPreference {
-                extended_length, ..
+                extended_length,
+                value: _,
             } => *extended_length,
             Self::AtomicAggregate {
-                extended_length, ..
+                extended_length,
+                value: _,
             } => *extended_length,
             Self::Aggregator {
-                extended_length, ..
+                partial: _,
+                extended_length,
+                value: _,
             } => *extended_length,
             Self::UnknownAttribute {
-                extended_length, ..
+                partial: _,
+                extended_length,
+                value: _,
             } => *extended_length,
         }
     }

@@ -64,9 +64,9 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value,
             } => value.len(*extended_length),
             Self::AS4Path {
+                partial: _,
                 extended_length,
                 value,
-                ..
             } => value.len(*extended_length),
             Self::NextHop {
                 extended_length,
@@ -85,11 +85,15 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value,
             } => value.len(*extended_length),
             Self::Aggregator {
+                partial: _,
                 extended_length,
                 value,
-                ..
             } => value.len(*extended_length),
-            Self::UnknownAttribute { .. } => todo!(),
+            Self::UnknownAttribute {
+                partial: _,
+                extended_length: _,
+                value: _,
+            } => todo!(),
         };
         Self::BASE_LENGTH + value_len
     }
@@ -125,9 +129,9 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value.write(writer, *extended_length)?;
             }
             Self::AS4Path {
+                partial: _,
                 extended_length,
                 value,
-                ..
             } => {
                 writer.write_u8(PathAttributeType::AS4Path.into())?;
                 value.write(writer, *extended_length)?;
@@ -161,14 +165,18 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value.write(writer, *extended_length)?;
             }
             Self::Aggregator {
+                partial: _,
                 extended_length,
                 value,
-                ..
             } => {
                 writer.write_u8(PathAttributeType::Aggregator.into())?;
                 value.write(writer, *extended_length)?;
             }
-            Self::UnknownAttribute { .. } => todo!(),
+            Self::UnknownAttribute {
+                partial: _,
+                extended_length: _,
+                value: _,
+            } => todo!(),
         }
         Ok(())
     }
