@@ -16,6 +16,7 @@
 //! Serializer library for BGP's wire protocol
 
 pub mod capabilities;
+pub mod notification;
 pub mod open;
 pub mod path_attribute;
 pub mod update;
@@ -28,7 +29,10 @@ use crate::{
     iana::BGPMessageType,
     serde::{
         deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
-        serializer::{open::BGPOpenMessageWritingError, update::BGPUpdateMessageWritingError},
+        serializer::{
+            notification::BGPNotificationMessageWritingError, open::BGPOpenMessageWritingError,
+            update::BGPUpdateMessageWritingError,
+        },
     },
     BGPMessage,
 };
@@ -52,6 +56,8 @@ pub enum BGPMessageWritingError {
 
     /// Error encountered during parsing a [crate::update::BGPUpdateMessage]
     UpdateError(BGPUpdateMessageWritingError),
+
+    NotificationError(BGPNotificationMessageWritingError),
 }
 
 impl From<std::io::Error> for BGPMessageWritingError {

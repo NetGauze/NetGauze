@@ -35,6 +35,7 @@ pub enum BGPNotificationMessage {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MessageHeaderError {
+    Unspecific { value: Vec<u8> },
     ConnectionNotSynchronized { value: Vec<u8> },
     BadMessageLength { value: Vec<u8> },
     BadMessageType { value: Vec<u8> },

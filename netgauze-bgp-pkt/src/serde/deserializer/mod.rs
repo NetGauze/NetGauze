@@ -16,7 +16,7 @@
 //! Deserializer library for BGP's wire protocol
 
 pub mod capabilities;
-mod notification;
+pub mod notification;
 pub mod open;
 pub mod path_attribute;
 pub mod update;
