@@ -50,6 +50,8 @@ pub enum OpenMessageError {
     BadBGPIdentifier { value: Vec<u8> },
     UnsupportedOptionalParameter { value: Vec<u8> },
     UnacceptableHoldTime { value: Vec<u8> },
+    UnsupportedCapability { value: Vec<u8> },
+    RoleMismatch { value: Vec<u8> },
 }
 
 /// See [crate::iana::UpdateMessageErrorSubCode] for full documentation

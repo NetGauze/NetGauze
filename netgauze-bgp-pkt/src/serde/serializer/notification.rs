@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    iana::{BGPErrorNotificationCode, MessageHeaderErrorSubCode},
-    notification::MessageHeaderError,
+    iana::{BGPErrorNotificationCode, MessageHeaderErrorSubCode, OpenMessageErrorSubCode},
+    notification::{MessageHeaderError, OpenMessageError},
     serde::serializer::BGPMessageWritingError,
     BGPNotificationMessage,
 };
@@ -26,6 +26,7 @@ use netgauze_parse_utils::WritablePDU;
 pub enum BGPNotificationMessageWritingError {
     StdIOError(String),
     MessageHeaderError(MessageHeaderErrorWritingError),
+    OpenMessageError(OpenMessageErrorWritingError),
 }
 
 impl From<std::io::Error> for BGPNotificationMessageWritingError {
@@ -47,7 +48,7 @@ impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage 
     fn len(&self) -> usize {
         let value_len = match self {
             Self::MessageHeaderError(value) => value.len(),
-            Self::OpenMessageError(_) => todo!(),
+            Self::OpenMessageError(value) => value.len(),
             Self::UpdateMessageError(_) => todo!(),
             Self::HoldTimerExpiredError(_) => todo!(),
             Self::FiniteStateMachineError(_) => todo!(),
@@ -66,7 +67,10 @@ impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage 
                 writer.write_u8(BGPErrorNotificationCode::MessageHeaderError.into())?;
                 value.write(writer)?;
             }
-            Self::OpenMessageError(_) => todo!(),
+            Self::OpenMessageError(value) => {
+                writer.write_u8(BGPErrorNotificationCode::OpenMessageError.into())?;
+                value.write(writer)?;
+            }
             Self::UpdateMessageError(_) => todo!(),
             Self::HoldTimerExpiredError(_) => todo!(),
             Self::FiniteStateMachineError(_) => todo!(),
@@ -127,6 +131,80 @@ impl WritablePDU<MessageHeaderErrorWritingError> for MessageHeaderError {
             }
             Self::BadMessageType { value } => {
                 writer.write_u8(MessageHeaderErrorSubCode::BadMessageType.into())?;
+                writer.write_all(value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum OpenMessageErrorWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for OpenMessageErrorWritingError {
+    fn from(err: std::io::Error) -> Self {
+        OpenMessageErrorWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<OpenMessageErrorWritingError> for BGPNotificationMessageWritingError {
+    fn from(value: OpenMessageErrorWritingError) -> Self {
+        BGPNotificationMessageWritingError::OpenMessageError(value)
+    }
+}
+
+impl WritablePDU<OpenMessageErrorWritingError> for OpenMessageError {
+    // One octet sub-code
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        let value_len = match self {
+            Self::Unspecific { value } => value.len(),
+            Self::UnsupportedVersionNumber { value } => value.len(),
+            Self::BadPeerAS { value } => value.len(),
+            Self::BadBGPIdentifier { value } => value.len(),
+            Self::UnsupportedOptionalParameter { value } => value.len(),
+            Self::UnacceptableHoldTime { value } => value.len(),
+            Self::UnsupportedCapability { value } => value.len(),
+            Self::RoleMismatch { value } => value.len(),
+        };
+        Self::BASE_LENGTH + value_len
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), OpenMessageErrorWritingError> {
+        match self {
+            OpenMessageError::Unspecific { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::Unspecific.into())?;
+                writer.write_all(value)?;
+            }
+            OpenMessageError::UnsupportedVersionNumber { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::UnsupportedVersionNumber.into())?;
+                writer.write_all(value)?;
+            }
+            OpenMessageError::BadPeerAS { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::BadPeerAS.into())?;
+                writer.write_all(value)?;
+            }
+            OpenMessageError::BadBGPIdentifier { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::BadBGPIdentifier.into())?;
+                writer.write_all(value)?;
+            }
+            OpenMessageError::UnsupportedOptionalParameter { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::UnsupportedOptionalParameter.into())?;
+                writer.write_all(value)?;
+            }
+            OpenMessageError::UnacceptableHoldTime { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::UnacceptableHoldTime.into())?;
+                writer.write_all(value)?;
+            }
+            OpenMessageError::UnsupportedCapability { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::UnsupportedCapability.into())?;
+                writer.write_all(value)?;
+            }
+            OpenMessageError::RoleMismatch { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::RoleMismatch.into())?;
                 writer.write_all(value)?;
             }
         }

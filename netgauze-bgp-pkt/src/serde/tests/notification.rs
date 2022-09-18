@@ -14,15 +14,20 @@
 // limitations under the License.
 
 use crate::{
-    iana::{UndefinedBGPErrorNotificationCode, UndefinedMessageHeaderErrorSubCode},
-    notification::MessageHeaderError,
+    iana::{
+        UndefinedBGPErrorNotificationCode, UndefinedMessageHeaderErrorSubCode,
+        UndefinedOpenMessageErrorSubCode,
+    },
+    notification::{MessageHeaderError, OpenMessageError},
     serde::{
         deserializer::notification::{
             BGPNotificationMessageParsingError, LocatedBGPNotificationMessageParsingError,
-            LocatedMessageHeaderErrorParsingError, MessageHeaderErrorParsingError,
+            LocatedMessageHeaderErrorParsingError, LocatedOpenMessageErrorParsingError,
+            MessageHeaderErrorParsingError, OpenMessageErrorParsingError,
         },
         serializer::notification::{
             BGPNotificationMessageWritingError, MessageHeaderErrorWritingError,
+            OpenMessageErrorWritingError,
         },
     },
     BGPNotificationMessage,
@@ -106,5 +111,96 @@ fn test_bgp_notification_message_header() -> Result<(), BGPNotificationMessageWr
         &bad_invalid_code,
     );
     test_write(&good_header, &good_header_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_open_message_error() -> Result<(), OpenMessageErrorWritingError> {
+    let good_unspecific_wire = [0x00, 0x00, 0x05];
+    let good_version_wire = [0x01, 0x00, 0x00];
+    let good_peer_wire = [0x02, 0x01, 0x01];
+    let good_bgp_id_wire = [0x03, 0x02, 0x02];
+    let good_optional_wire = [0x04, 0x03, 0x03];
+    let good_hold_time_wire = [0x06, 0x04, 0x04];
+    let good_capability_wire = [0x07, 0x01, 0x04];
+    let good_role_mismatch_wire = [0x0b, 0x09, 0x04];
+    let bad_undefined_wire = [0xff, 0x02, 0x02];
+    let bad_incomplete_wire = [];
+
+    let good_unspecific = OpenMessageError::Unspecific {
+        value: good_unspecific_wire[1..].to_vec(),
+    };
+    let good_version = OpenMessageError::UnsupportedVersionNumber {
+        value: good_version_wire[1..].to_vec(),
+    };
+    let good_peer = OpenMessageError::BadPeerAS {
+        value: good_peer_wire[1..].to_vec(),
+    };
+    let good_bgp_id = OpenMessageError::BadBGPIdentifier {
+        value: good_bgp_id_wire[1..].to_vec(),
+    };
+    let good_optional = OpenMessageError::UnsupportedOptionalParameter {
+        value: good_optional_wire[1..].to_vec(),
+    };
+    let good_hold_time = OpenMessageError::UnacceptableHoldTime {
+        value: good_hold_time_wire[1..].to_vec(),
+    };
+    let good_capability = OpenMessageError::UnsupportedCapability {
+        value: good_capability_wire[1..].to_vec(),
+    };
+    let good_role_mismatch = OpenMessageError::RoleMismatch {
+        value: good_role_mismatch_wire[1..].to_vec(),
+    };
+
+    let bad_undefined = LocatedOpenMessageErrorParsingError::new(
+        Span::new(&bad_undefined_wire),
+        OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode(
+            UndefinedOpenMessageErrorSubCode(0xff),
+        ),
+    );
+
+    let bad_incomplete = LocatedOpenMessageErrorParsingError::new(
+        Span::new(&bad_incomplete_wire),
+        OpenMessageErrorParsingError::NomError(ErrorKind::Eof),
+    );
+
+    test_parsed_completely(&good_unspecific_wire, &good_unspecific);
+    test_parsed_completely(&good_version_wire, &good_version);
+    test_parsed_completely(&good_peer_wire, &good_peer);
+    test_parsed_completely(&good_bgp_id_wire, &good_bgp_id);
+    test_parsed_completely(&good_optional_wire, &good_optional);
+    test_parsed_completely(&good_hold_time_wire, &good_hold_time);
+    test_parsed_completely(&good_capability_wire, &good_capability);
+    test_parsed_completely(&good_role_mismatch_wire, &good_role_mismatch);
+    test_parse_error::<OpenMessageError, LocatedOpenMessageErrorParsingError<'_>>(
+        &bad_undefined_wire,
+        &bad_undefined,
+    );
+    test_parse_error::<OpenMessageError, LocatedOpenMessageErrorParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
+    test_write(&good_version, &good_version_wire)?;
+    test_write(&good_peer, &good_peer_wire)?;
+    test_write(&good_bgp_id, &good_bgp_id_wire)?;
+    test_write(&good_optional, &good_optional_wire)?;
+    test_write(&good_hold_time, &good_hold_time_wire)?;
+    test_write(&good_capability, &good_capability_wire)?;
+    test_write(&good_role_mismatch, &good_role_mismatch_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_notification_open_message() -> Result<(), BGPNotificationMessageWritingError> {
+    let good_wire = [0x02, 0x01, 0x01, 0x01];
+
+    let good =
+        BGPNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
+            value: good_wire[2..].to_vec(),
+        });
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
     Ok(())
 }
