@@ -18,9 +18,9 @@
 use crate::{
     iana::PathAttributeType,
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, AtomicAggregate,
-        LocalPreference, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
-        PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
+        AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
+        AsPathSegmentType, AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop,
+        Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::deserializer::{
         update::LocatedBGPUpdateMessageParsingError, BGPUpdateMessageParsingError,
@@ -45,6 +45,8 @@ const NEXT_HOP_LEN: u16 = 4;
 const MULTI_EXIT_DISCRIMINATOR_LEN: u16 = 4;
 const LOCAL_PREFERENCE_LEN: u16 = 4;
 const ATOMIC_AGGREGATE_LEN: u16 = 0;
+const AS2_AGGREGATOR_LEN: u16 = 6;
+const AS4_AGGREGATOR_LEN: u16 = 8;
 
 #[inline]
 const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
@@ -65,6 +67,7 @@ pub enum PathAttributeParsingError {
     MultiExitDiscriminatorError(MultiExitDiscriminatorParsingError),
     LocalPreferenceError(LocalPreferenceParsingError),
     AtomicAggregateError(AtomicAggregateParsingError),
+    AggregatorError(AggregatorParsingError),
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -278,6 +281,28 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                     }
                 };
                 let path_attr = PathAttribute::AtomicAggregate {
+                    extended_length,
+                    value,
+                };
+                Ok((buf, path_attr))
+            }
+            Ok(PathAttributeType::Aggregator) => {
+                let (buf, value) = match Aggregator::from_wire(buf, extended_length, asn4) {
+                    Ok((buf, origin)) => (buf, origin),
+                    Err(err) => {
+                        return match err {
+                            nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                            nom::Err::Error(error) => Err(nom::Err::Error(
+                                error.into_located_attribute_parsing_error(),
+                            )),
+                            nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                                failure.into_located_attribute_parsing_error(),
+                            )),
+                        }
+                    }
+                };
+                let path_attr = PathAttribute::Aggregator {
+                    partial,
                     extended_length,
                     value,
                 };
@@ -826,5 +851,132 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a
             )));
         }
         Ok((buf, AtomicAggregate))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum AggregatorParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidLength(PathAttributeLength),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedAggregatorParsingError<'a> {
+    span: Span<'a>,
+    error: AggregatorParsingError,
+}
+
+impl<'a> LocatedAggregatorParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: AggregatorParsingError) -> Self {
+        Self { span, error }
+    }
+
+    pub const fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    pub const fn error(&self) -> &AggregatorParsingError {
+        &self.error
+    }
+
+    pub const fn into_located_attribute_parsing_error(
+        self,
+    ) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
+            self.span,
+            PathAttributeParsingError::AggregatorError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, AggregatorParsingError> for LocatedAggregatorParsingError<'a> {
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: AggregatorParsingError,
+    ) -> Self {
+        LocatedAggregatorParsingError::new(input, error)
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedAggregatorParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedAggregatorParsingError::new(input, AggregatorParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAggregatorParsingError<'a>>
+    for Aggregator
+{
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+        asn4: bool,
+    ) -> IResult<Span<'a>, Self, LocatedAggregatorParsingError<'a>> {
+        if asn4 {
+            let (buf, as4_agg) = As4Aggregator::from_wire(buf, extended_length)?;
+            Ok((buf, Aggregator::As4Aggregator(as4_agg)))
+        } else {
+            let (buf, as2_agg) = As2Aggregator::from_wire(buf, extended_length)?;
+            Ok((buf, Aggregator::As2Aggregator(as2_agg)))
+        }
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> for As2Aggregator {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedAggregatorParsingError<'a>> {
+        let input = buf;
+        let (buf, length) = if extended_length {
+            let (buf, raw) = be_u16(buf)?;
+            (buf, PathAttributeLength::U16(raw))
+        } else {
+            let (buf, raw) = be_u8(buf)?;
+            (buf, PathAttributeLength::U8(raw))
+        };
+        if !check_length(length, AS2_AGGREGATOR_LEN) {
+            return Err(nom::Err::Error(LocatedAggregatorParsingError::new(
+                input,
+                AggregatorParsingError::InvalidLength(length),
+            )));
+        }
+        let (buf, asn) = be_u16(buf)?;
+        let (buf, origin) = be_u32(buf)?;
+
+        Ok((buf, As2Aggregator::new(asn, Ipv4Addr::from(origin))))
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> for As4Aggregator {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedAggregatorParsingError<'a>> {
+        let input = buf;
+        let (buf, length) = if extended_length {
+            let (buf, raw) = be_u16(buf)?;
+            (buf, PathAttributeLength::U16(raw))
+        } else {
+            let (buf, raw) = be_u8(buf)?;
+            (buf, PathAttributeLength::U8(raw))
+        };
+        if !check_length(length, AS4_AGGREGATOR_LEN) {
+            return Err(nom::Err::Error(LocatedAggregatorParsingError::new(
+                input,
+                AggregatorParsingError::InvalidLength(length),
+            )));
+        }
+        let (buf, asn) = be_u32(buf)?;
+        let (buf, origin) = be_u32(buf)?;
+
+        Ok((buf, As4Aggregator::new(asn, Ipv4Addr::from(origin))))
     }
 }

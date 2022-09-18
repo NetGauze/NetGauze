@@ -18,8 +18,8 @@
 use crate::{
     iana::PathAttributeType,
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AtomicAggregate, LocalPreference,
-        MultiExitDiscriminator, NextHop, Origin, PathAttribute,
+        AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
+        AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
     },
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
@@ -35,6 +35,7 @@ pub enum PathAttributeWritingError {
     MultiExitDiscriminatorError(MultiExitDiscriminatorWritingError),
     LocalPreferenceError(LocalPreferenceWritingError),
     AtomicAggregateError(AtomicAggregateWritingError),
+    AggregatorError(AggregatorWritingError),
 }
 
 impl From<std::io::Error> for PathAttributeWritingError {
@@ -83,7 +84,11 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 extended_length,
                 value,
             } => value.len(*extended_length),
-            Self::Aggregator { .. } => todo!(),
+            Self::Aggregator {
+                extended_length,
+                value,
+                ..
+            } => value.len(*extended_length),
             Self::UnknownAttribute { .. } => todo!(),
         };
         Self::BASE_LENGTH + value_len
@@ -155,7 +160,14 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 writer.write_u8(PathAttributeType::AtomicAggregate.into())?;
                 value.write(writer, *extended_length)?;
             }
-            Self::Aggregator { .. } => todo!(),
+            Self::Aggregator {
+                extended_length,
+                value,
+                ..
+            } => {
+                writer.write_u8(PathAttributeType::Aggregator.into())?;
+                value.write(writer, *extended_length)?;
+            }
             Self::UnknownAttribute { .. } => todo!(),
         }
         Ok(())
@@ -478,6 +490,85 @@ impl WritablePDUWithOneInput<bool, AtomicAggregateWritingError> for AtomicAggreg
     ) -> Result<(), AtomicAggregateWritingError> {
         write_length(self, extended_length, writer)?;
         Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum AggregatorWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for AggregatorWritingError {
+    fn from(err: std::io::Error) -> Self {
+        AggregatorWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<AggregatorWritingError> for PathAttributeWritingError {
+    fn from(value: AggregatorWritingError) -> Self {
+        PathAttributeWritingError::AggregatorError(value)
+    }
+}
+
+impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As2Aggregator {
+    // one length (not extended) + two octets as2 + 4 more for ipv4
+    const BASE_LENGTH: usize = 7;
+
+    fn len(&self, extended_length: bool) -> usize {
+        Self::BASE_LENGTH + if extended_length { 1 } else { 0 }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), AggregatorWritingError> {
+        write_length(self, extended_length, writer)?;
+        writer.write_u16::<NetworkEndian>(*self.asn())?;
+        writer.write_all(&self.origin().octets())?;
+        Ok(())
+    }
+}
+
+impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As4Aggregator {
+    // one length (not extended) + four octets as4 + 4 more for ipv4
+    const BASE_LENGTH: usize = 9;
+
+    fn len(&self, extended_length: bool) -> usize {
+        Self::BASE_LENGTH + if extended_length { 1 } else { 0 }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), AggregatorWritingError> {
+        write_length(self, extended_length, writer)?;
+        writer.write_u32::<NetworkEndian>(*self.asn())?;
+        writer.write_all(&self.origin().octets())?;
+        Ok(())
+    }
+}
+
+impl WritablePDUWithOneInput<bool, AggregatorWritingError> for Aggregator {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self, extended_length: bool) -> usize {
+        match self {
+            Self::As2Aggregator(agg) => agg.len(extended_length),
+            Self::As4Aggregator(agg) => agg.len(extended_length),
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), AggregatorWritingError> {
+        match self {
+            Self::As2Aggregator(agg) => agg.write(writer, extended_length),
+            Self::As4Aggregator(agg) => agg.write(writer, extended_length),
+        }
     }
 }
 

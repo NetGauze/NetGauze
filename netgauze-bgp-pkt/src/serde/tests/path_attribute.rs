@@ -15,23 +15,24 @@
 
 use crate::{
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, AtomicAggregate,
-        LocalPreference, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
-        PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
+        AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
+        AsPathSegmentType, AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop,
+        Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::{
         deserializer::path_attribute::{
-            AsPathParsingError, AtomicAggregateParsingError, LocalPreferenceParsingError,
-            LocatedAsPathParsingError, LocatedAtomicAggregateParsingError,
-            LocatedLocalPreferenceParsingError, LocatedMultiExitDiscriminatorParsingError,
-            LocatedNextHopParsingError, LocatedOriginParsingError,
-            LocatedPathAttributeParsingError, MultiExitDiscriminatorParsingError,
-            NextHopParsingError, OriginParsingError, PathAttributeParsingError,
+            AggregatorParsingError, AsPathParsingError, AtomicAggregateParsingError,
+            LocalPreferenceParsingError, LocatedAggregatorParsingError, LocatedAsPathParsingError,
+            LocatedAtomicAggregateParsingError, LocatedLocalPreferenceParsingError,
+            LocatedMultiExitDiscriminatorParsingError, LocatedNextHopParsingError,
+            LocatedOriginParsingError, LocatedPathAttributeParsingError,
+            MultiExitDiscriminatorParsingError, NextHopParsingError, OriginParsingError,
+            PathAttributeParsingError,
         },
         serializer::path_attribute::{
-            AsPathWritingError, AtomicAggregateWritingError, LocalPreferenceWritingError,
-            MultiExitDiscriminatorWritingError, NextHopWritingError, OriginWritingError,
-            PathAttributeWritingError,
+            AggregatorWritingError, AsPathWritingError, AtomicAggregateWritingError,
+            LocalPreferenceWritingError, MultiExitDiscriminatorWritingError, NextHopWritingError,
+            OriginWritingError, PathAttributeWritingError,
         },
     },
 };
@@ -632,5 +633,179 @@ fn test_path_attribute_atomic_aggregate() -> Result<(), PathAttributeWritingErro
 
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_as2_aggregator() -> Result<(), AggregatorWritingError> {
+    let good_wire = [0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let bad_length_wire = [0x05, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let good_extended_wire = [0x00, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let bad_extended_length_wire = [0x00, 0x07, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+
+    let good = As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10));
+    let good_extended = As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10));
+
+    let bad_length = LocatedAggregatorParsingError::new(
+        Span::new(&bad_length_wire),
+        AggregatorParsingError::InvalidLength(PathAttributeLength::U8(5)),
+    );
+
+    let bad_extended_length = LocatedAggregatorParsingError::new(
+        Span::new(&bad_extended_length_wire),
+        AggregatorParsingError::InvalidLength(PathAttributeLength::U16(7)),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input::<As2Aggregator, bool, LocatedAggregatorParsingError<'_>>(
+        &bad_length_wire,
+        false,
+        &bad_length,
+    );
+    test_parse_error_with_one_input::<As2Aggregator, bool, LocatedAggregatorParsingError<'_>>(
+        &bad_extended_length_wire,
+        true,
+        &bad_extended_length,
+    );
+
+    test_write_with_one_input(&good, false, &good_wire)?;
+    test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_as4_aggregator() -> Result<(), AggregatorWritingError> {
+    let good_wire = [0x08, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let bad_length_wire = [0x09, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let good_extended_wire = [0x00, 0x08, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let bad_extended_length_wire = [0x00, 0x07, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+
+    let good = As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10));
+    let good_extended = As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10));
+
+    let bad_length = LocatedAggregatorParsingError::new(
+        Span::new(&bad_length_wire),
+        AggregatorParsingError::InvalidLength(PathAttributeLength::U8(9)),
+    );
+
+    let bad_extended_length = LocatedAggregatorParsingError::new(
+        Span::new(&bad_extended_length_wire),
+        AggregatorParsingError::InvalidLength(PathAttributeLength::U16(7)),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input::<As4Aggregator, bool, LocatedAggregatorParsingError<'_>>(
+        &bad_length_wire,
+        false,
+        &bad_length,
+    );
+    test_parse_error_with_one_input::<As4Aggregator, bool, LocatedAggregatorParsingError<'_>>(
+        &bad_extended_length_wire,
+        true,
+        &bad_extended_length,
+    );
+
+    test_write_with_one_input(&good, false, &good_wire)?;
+    test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_as2_aggregator() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0xc0, 0x07, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let good_partial_wire = [0xe0, 0x07, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let good_extended_wire = [0xd0, 0x07, 0x00, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let good_partial_extended_wire = [0xf0, 0x07, 0x00, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+
+    let good = PathAttribute::Aggregator {
+        partial: false,
+        extended_length: false,
+        value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
+    };
+    let good_partial = PathAttribute::Aggregator {
+        partial: true,
+        extended_length: false,
+        value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
+    };
+
+    let good_extended = PathAttribute::Aggregator {
+        partial: false,
+        extended_length: true,
+        value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
+    };
+    let good_partial_extended = PathAttribute::Aggregator {
+        partial: true,
+        extended_length: true,
+        value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
+    };
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_partial_wire, false, &good_partial);
+    test_parsed_completely_with_one_input(&good_extended_wire, false, &good_extended);
+    test_parsed_completely_with_one_input(
+        &good_partial_extended_wire,
+        false,
+        &good_partial_extended,
+    );
+
+    test_write(&good, &good_wire)?;
+    test_write(&good_partial, &good_partial_wire)?;
+    test_write(&good_extended, &good_extended_wire)?;
+    test_write(&good_partial_extended, &good_partial_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_path_attribute_as4_aggregator() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0xc0, 0x07, 0x08, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a,
+    ];
+    let good_partial_wire = [
+        0xe0, 0x07, 0x08, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a,
+    ];
+    let good_extended_wire = [
+        0xd0, 0x07, 0x00, 0x08, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a,
+    ];
+    let good_partial_extended_wire = [
+        0xf0, 0x07, 0x00, 0x08, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a,
+    ];
+
+    let good = PathAttribute::Aggregator {
+        partial: false,
+        extended_length: false,
+        value: Aggregator::As4Aggregator(As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
+    };
+    let good_partial = PathAttribute::Aggregator {
+        partial: true,
+        extended_length: false,
+        value: Aggregator::As4Aggregator(As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
+    };
+
+    let good_extended = PathAttribute::Aggregator {
+        partial: false,
+        extended_length: true,
+        value: Aggregator::As4Aggregator(As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
+    };
+    let good_partial_extended = PathAttribute::Aggregator {
+        partial: true,
+        extended_length: true,
+        value: Aggregator::As4Aggregator(As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
+    };
+
+    test_parsed_completely_with_one_input(&good_wire, true, &good);
+    test_parsed_completely_with_one_input(&good_partial_wire, true, &good_partial);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parsed_completely_with_one_input(
+        &good_partial_extended_wire,
+        true,
+        &good_partial_extended,
+    );
+
+    test_write(&good, &good_wire)?;
+    test_write(&good_partial, &good_partial_wire)?;
+    test_write(&good_extended, &good_extended_wire)?;
+    test_write(&good_partial_extended, &good_partial_extended_wire)?;
     Ok(())
 }
