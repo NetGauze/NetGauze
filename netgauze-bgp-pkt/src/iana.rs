@@ -598,6 +598,35 @@ impl TryFrom<u8> for BGPCapabilityCode {
     }
 }
 
+/// [BGP Route Refresh Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-subcodes)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum RouteRefreshSubcode {
+    NormalRequest = 0,
+    BeginningOfRouteRefresh = 1,
+    EndOfRouteRefresh = 2,
+}
+
+impl From<RouteRefreshSubcode> for u8 {
+    fn from(value: RouteRefreshSubcode) -> Self {
+        value as u8
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct UndefinedRouteRefreshSubcode(pub u8);
+
+impl TryFrom<u8> for RouteRefreshSubcode {
+    type Error = UndefinedRouteRefreshSubcode;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedRouteRefreshSubcode(value)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -761,5 +790,17 @@ mod tests {
         assert_eq!(ret, Ok(BGPCapabilityCode::RouteRefreshCapability));
         assert_eq!(valid_u8, valid_code);
         assert_eq!(undefined, Err(UndefinedBGPCapabilityCode(undefined_code)));
+    }
+
+    #[test]
+    fn test_route_refresh_subcode() {
+        let undefined_code = 255;
+        let valid_code = 1;
+        let ret = RouteRefreshSubcode::try_from(valid_code);
+        let undefined = RouteRefreshSubcode::try_from(undefined_code);
+        let valid_u8: u8 = RouteRefreshSubcode::BeginningOfRouteRefresh.into();
+        assert_eq!(ret, Ok(RouteRefreshSubcode::BeginningOfRouteRefresh));
+        assert_eq!(valid_u8, valid_code);
+        assert_eq!(undefined, Err(UndefinedRouteRefreshSubcode(255)));
     }
 }
