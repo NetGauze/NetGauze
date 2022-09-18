@@ -17,12 +17,17 @@
 
 use crate::{
     iana::{
-        BGPErrorNotificationCode, MessageHeaderErrorSubCode, OpenMessageErrorSubCode,
-        UndefinedBGPErrorNotificationCode, UndefinedMessageHeaderErrorSubCode,
-        UndefinedOpenMessageErrorSubCode, UndefinedUpdateMessageErrorSubCode,
-        UpdateMessageErrorSubCode,
+        BGPErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
+        MessageHeaderErrorSubCode, OpenMessageErrorSubCode, RouteRefreshMessageErrorSubCode,
+        UndefinedBGPErrorNotificationCode, UndefinedCeaseErrorSubCode,
+        UndefinedFiniteStateMachineErrorSubCode, UndefinedMessageHeaderErrorSubCode,
+        UndefinedOpenMessageErrorSubCode, UndefinedRouteRefreshMessageError,
+        UndefinedUpdateMessageErrorSubCode, UpdateMessageErrorSubCode,
     },
-    notification::{MessageHeaderError, OpenMessageError, UpdateMessageError},
+    notification::{
+        CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
+        OpenMessageError, RouteRefreshError, UpdateMessageError,
+    },
     serde::deserializer::{BGPMessageParsingError, LocatedBGPMessageParsingError},
     BGPNotificationMessage,
 };
@@ -45,6 +50,10 @@ pub enum BGPNotificationMessageParsingError {
     MessageHeaderError(MessageHeaderErrorParsingError),
     OpenMessageError(OpenMessageErrorParsingError),
     UpdateMessageError(UpdateMessageErrorParsingError),
+    HoldTimerExpiredError(HoldTimerExpiredErrorParsingError),
+    FiniteStateMachineError(FiniteStateMachineErrorParsingError),
+    CeaseError(CeaseErrorParsingError),
+    RouteRefreshError(RouteRefreshErrorParsingError),
 }
 
 /// BGP Notification Message Parsing errors  with the input location of where it
@@ -143,10 +152,22 @@ impl<'a> ReadablePDU<'a, LocatedBGPNotificationMessageParsingError<'a>> for BGPN
                 let (buf, value) = parse_into_located(buf)?;
                 Ok((buf, BGPNotificationMessage::UpdateMessageError(value)))
             }
-            BGPErrorNotificationCode::HoldTimerExpired => todo!(),
-            BGPErrorNotificationCode::FiniteStateMachineError => todo!(),
-            BGPErrorNotificationCode::Cease => todo!(),
-            BGPErrorNotificationCode::RouteRefreshMessageError => todo!(),
+            BGPErrorNotificationCode::HoldTimerExpired => {
+                let (buf, value) = parse_into_located(buf)?;
+                Ok((buf, BGPNotificationMessage::HoldTimerExpiredError(value)))
+            }
+            BGPErrorNotificationCode::FiniteStateMachineError => {
+                let (buf, value) = parse_into_located(buf)?;
+                Ok((buf, BGPNotificationMessage::FiniteStateMachineError(value)))
+            }
+            BGPErrorNotificationCode::Cease => {
+                let (buf, value) = parse_into_located(buf)?;
+                Ok((buf, BGPNotificationMessage::CeaseError(value)))
+            }
+            BGPErrorNotificationCode::RouteRefreshMessageError => {
+                let (buf, value) = parse_into_located(buf)?;
+                Ok((buf, BGPNotificationMessage::RouteRefreshError(value)))
+            }
         }
     }
 }
@@ -582,6 +603,472 @@ impl<'a> ReadablePDU<'a, LocatedUpdateMessageErrorParsingError<'a>> for UpdateMe
             UpdateMessageErrorSubCode::MalformedASPath => Ok((
                 buf,
                 Self::MalformedASPath {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+        }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum HoldTimerExpiredErrorParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedHoldTimerExpiredErrorParsingError<'a> {
+    span: Span<'a>,
+    error: HoldTimerExpiredErrorParsingError,
+}
+
+impl<'a> LocatedHoldTimerExpiredErrorParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: HoldTimerExpiredErrorParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError<'a, HoldTimerExpiredErrorParsingError>
+    for LocatedHoldTimerExpiredErrorParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    fn error(&self) -> &HoldTimerExpiredErrorParsingError {
+        &self.error
+    }
+}
+
+impl<'a>
+    IntoLocatedError<
+        'a,
+        BGPNotificationMessageParsingError,
+        LocatedBGPNotificationMessageParsingError<'a>,
+    > for LocatedHoldTimerExpiredErrorParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
+        LocatedBGPNotificationMessageParsingError::new(
+            self.span,
+            BGPNotificationMessageParsingError::HoldTimerExpiredError(self.error),
+        )
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedHoldTimerExpiredErrorParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedHoldTimerExpiredErrorParsingError::new(
+            input,
+            HoldTimerExpiredErrorParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, HoldTimerExpiredErrorParsingError>
+    for LocatedHoldTimerExpiredErrorParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: HoldTimerExpiredErrorParsingError,
+    ) -> Self {
+        LocatedHoldTimerExpiredErrorParsingError::new(input, error)
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedHoldTimerExpiredErrorParsingError<'a>> for HoldTimerExpiredError {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedHoldTimerExpiredErrorParsingError<'a>> {
+        let (buf, sub_code) = be_u8(buf)?;
+        let (buf, value) = nom::bytes::complete::take(buf.len())(buf)?;
+        Ok((
+            buf,
+            HoldTimerExpiredError::Unspecific {
+                sub_code,
+                value: (*value.fragment()).into(),
+            },
+        ))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum FiniteStateMachineErrorParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    Undefined(UndefinedFiniteStateMachineErrorSubCode),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedFiniteStateMachineErrorParsingError<'a> {
+    span: Span<'a>,
+    error: FiniteStateMachineErrorParsingError,
+}
+
+impl<'a> LocatedFiniteStateMachineErrorParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: FiniteStateMachineErrorParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError<'a, FiniteStateMachineErrorParsingError>
+    for LocatedFiniteStateMachineErrorParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    fn error(&self) -> &FiniteStateMachineErrorParsingError {
+        &self.error
+    }
+}
+
+impl<'a>
+    IntoLocatedError<
+        'a,
+        BGPNotificationMessageParsingError,
+        LocatedBGPNotificationMessageParsingError<'a>,
+    > for LocatedFiniteStateMachineErrorParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
+        LocatedBGPNotificationMessageParsingError::new(
+            self.span,
+            BGPNotificationMessageParsingError::FiniteStateMachineError(self.error),
+        )
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedFiniteStateMachineErrorParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedFiniteStateMachineErrorParsingError::new(
+            input,
+            FiniteStateMachineErrorParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, FiniteStateMachineErrorParsingError>
+    for LocatedFiniteStateMachineErrorParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: FiniteStateMachineErrorParsingError,
+    ) -> Self {
+        LocatedFiniteStateMachineErrorParsingError::new(input, error)
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedFiniteStateMachineErrorSubCode>
+    for LocatedFiniteStateMachineErrorParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        e: UndefinedFiniteStateMachineErrorSubCode,
+    ) -> Self {
+        LocatedFiniteStateMachineErrorParsingError::new(
+            input,
+            FiniteStateMachineErrorParsingError::Undefined(e),
+        )
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedFiniteStateMachineErrorParsingError<'a>>
+    for FiniteStateMachineError
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedFiniteStateMachineErrorParsingError<'a>> {
+        let (buf, sub_code) =
+            nom::combinator::map_res(be_u8, FiniteStateMachineErrorSubCode::try_from)(buf)?;
+        let (buf, value) = nom::bytes::complete::take(buf.len())(buf)?;
+
+        match sub_code {
+            FiniteStateMachineErrorSubCode::UnspecifiedError => Ok((
+                buf,
+                FiniteStateMachineError::Unspecific {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInOpenSentState => Ok((
+                buf,
+                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInOpenConfirmState => Ok((
+                buf,
+                FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInEstablishedState => Ok((
+                buf,
+                FiniteStateMachineError::ReceiveUnexpectedMessageInEstablishedState {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+        }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum CeaseErrorParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    Undefined(UndefinedCeaseErrorSubCode),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedCeaseErrorParsingError<'a> {
+    span: Span<'a>,
+    error: CeaseErrorParsingError,
+}
+
+impl<'a> LocatedCeaseErrorParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: CeaseErrorParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError<'a, CeaseErrorParsingError> for LocatedCeaseErrorParsingError<'a> {
+    fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    fn error(&self) -> &CeaseErrorParsingError {
+        &self.error
+    }
+}
+
+impl<'a>
+    IntoLocatedError<
+        'a,
+        BGPNotificationMessageParsingError,
+        LocatedBGPNotificationMessageParsingError<'a>,
+    > for LocatedCeaseErrorParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
+        LocatedBGPNotificationMessageParsingError::new(
+            self.span,
+            BGPNotificationMessageParsingError::CeaseError(self.error),
+        )
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedCeaseErrorParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedCeaseErrorParsingError::new(input, CeaseErrorParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, CeaseErrorParsingError> for LocatedCeaseErrorParsingError<'a> {
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: CeaseErrorParsingError,
+    ) -> Self {
+        LocatedCeaseErrorParsingError::new(input, error)
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedCeaseErrorSubCode>
+    for LocatedCeaseErrorParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        e: UndefinedCeaseErrorSubCode,
+    ) -> Self {
+        LocatedCeaseErrorParsingError::new(input, CeaseErrorParsingError::Undefined(e))
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedCeaseErrorParsingError<'a>> for CeaseError {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedCeaseErrorParsingError<'a>> {
+        let (buf, sub_code) = nom::combinator::map_res(be_u8, CeaseErrorSubCode::try_from)(buf)?;
+        let (buf, value) = nom::bytes::complete::take(buf.len())(buf)?;
+
+        match sub_code {
+            CeaseErrorSubCode::MaximumNumberOfPrefixesReached => Ok((
+                buf,
+                CeaseError::MaximumNumberOfPrefixesReached {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::AdministrativeShutdown => Ok((
+                buf,
+                CeaseError::AdministrativeShutdown {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::PeerDeConfigured => Ok((
+                buf,
+                CeaseError::PeerDeConfigured {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::AdministrativeReset => Ok((
+                buf,
+                CeaseError::AdministrativeReset {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::ConnectionRejected => Ok((
+                buf,
+                CeaseError::ConnectionRejected {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::OtherConfigurationChange => Ok((
+                buf,
+                CeaseError::OtherConfigurationChange {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::ConnectionCollisionResolution => Ok((
+                buf,
+                CeaseError::ConnectionCollisionResolution {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::OutOfResources => Ok((
+                buf,
+                CeaseError::OutOfResources {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::HardReset => Ok((
+                buf,
+                CeaseError::HardReset {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            CeaseErrorSubCode::BfdDown => Ok((
+                buf,
+                CeaseError::BfdDown {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+        }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum RouteRefreshErrorParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    Undefined(UndefinedRouteRefreshMessageError),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedRouteRefreshErrorParsingError<'a> {
+    span: Span<'a>,
+    error: RouteRefreshErrorParsingError,
+}
+
+impl<'a> LocatedRouteRefreshErrorParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: RouteRefreshErrorParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError<'a, RouteRefreshErrorParsingError>
+    for LocatedRouteRefreshErrorParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    fn error(&self) -> &RouteRefreshErrorParsingError {
+        &self.error
+    }
+}
+
+impl<'a>
+    IntoLocatedError<
+        'a,
+        BGPNotificationMessageParsingError,
+        LocatedBGPNotificationMessageParsingError<'a>,
+    > for LocatedRouteRefreshErrorParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
+        LocatedBGPNotificationMessageParsingError::new(
+            self.span,
+            BGPNotificationMessageParsingError::RouteRefreshError(self.error),
+        )
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedRouteRefreshErrorParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedRouteRefreshErrorParsingError::new(
+            input,
+            RouteRefreshErrorParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, RouteRefreshErrorParsingError>
+    for LocatedRouteRefreshErrorParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: RouteRefreshErrorParsingError,
+    ) -> Self {
+        LocatedRouteRefreshErrorParsingError::new(input, error)
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedRouteRefreshMessageError>
+    for LocatedRouteRefreshErrorParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        e: UndefinedRouteRefreshMessageError,
+    ) -> Self {
+        LocatedRouteRefreshErrorParsingError::new(
+            input,
+            RouteRefreshErrorParsingError::Undefined(e),
+        )
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedRouteRefreshErrorParsingError<'a>> for RouteRefreshError {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedRouteRefreshErrorParsingError<'a>> {
+        let (buf, sub_code) =
+            nom::combinator::map_res(be_u8, RouteRefreshMessageErrorSubCode::try_from)(buf)?;
+        let (buf, value) = nom::bytes::complete::take(buf.len())(buf)?;
+
+        match sub_code {
+            RouteRefreshMessageErrorSubCode::InvalidMessageLength => Ok((
+                buf,
+                RouteRefreshError::InvalidMessageLength {
                     value: (*value.fragment()).into(),
                 },
             )),

@@ -72,7 +72,7 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
         let body_len = match self {
             Self::Open(open) => open.len(),
             Self::Update(update) => update.len(),
-            Self::Notification(_notification) => todo!(),
+            Self::Notification(notification) => notification.len(),
             Self::KeepAlive => 0,
         };
         Self::BASE_LENGTH as usize + body_len
@@ -99,7 +99,10 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
                 writer.write_u8(BGPMessageType::Update.into())?;
                 update.write(writer)?;
             }
-            Self::Notification(_notification) => todo!(),
+            Self::Notification(notification) => {
+                writer.write_u8(BGPMessageType::Notification.into())?;
+                notification.write(writer)?;
+            }
             BGPMessage::KeepAlive => {
                 writer.write_u8(BGPMessageType::KeepAlive.into())?;
             }

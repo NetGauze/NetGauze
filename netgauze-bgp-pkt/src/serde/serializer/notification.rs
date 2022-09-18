@@ -15,10 +15,14 @@
 
 use crate::{
     iana::{
-        BGPErrorNotificationCode, MessageHeaderErrorSubCode, OpenMessageErrorSubCode,
+        BGPErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
+        MessageHeaderErrorSubCode, OpenMessageErrorSubCode, RouteRefreshMessageErrorSubCode,
         UpdateMessageErrorSubCode,
     },
-    notification::{MessageHeaderError, OpenMessageError, UpdateMessageError},
+    notification::{
+        CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
+        OpenMessageError, RouteRefreshError, UpdateMessageError,
+    },
     serde::serializer::BGPMessageWritingError,
     BGPNotificationMessage,
 };
@@ -31,6 +35,10 @@ pub enum BGPNotificationMessageWritingError {
     MessageHeaderError(MessageHeaderErrorWritingError),
     OpenMessageError(OpenMessageErrorWritingError),
     UpdateMessageError(UpdateMessageErrorWritingError),
+    HoldTimerExpiredError(HoldTimerExpiredErrorWritingError),
+    FiniteStateMachineError(FiniteStateMachineErrorWritingError),
+    CeaseError(CeaseErrorWritingError),
+    RouteRefreshError(RouteRefreshErrorWritingError),
 }
 
 impl From<std::io::Error> for BGPNotificationMessageWritingError {
@@ -54,10 +62,10 @@ impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage 
             Self::MessageHeaderError(value) => value.len(),
             Self::OpenMessageError(value) => value.len(),
             Self::UpdateMessageError(value) => value.len(),
-            Self::HoldTimerExpiredError(_) => todo!(),
-            Self::FiniteStateMachineError(_) => todo!(),
-            Self::CeaseError(_) => todo!(),
-            Self::RouteRefreshError(_) => todo!(),
+            Self::HoldTimerExpiredError(value) => value.len(),
+            Self::FiniteStateMachineError(value) => value.len(),
+            Self::CeaseError(value) => value.len(),
+            Self::RouteRefreshError(value) => value.len(),
         };
         Self::BASE_LENGTH + value_len
     }
@@ -79,10 +87,22 @@ impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage 
                 writer.write_u8(BGPErrorNotificationCode::UpdateMessageError.into())?;
                 value.write(writer)?;
             }
-            Self::HoldTimerExpiredError(_) => todo!(),
-            Self::FiniteStateMachineError(_) => todo!(),
-            Self::CeaseError(_) => todo!(),
-            Self::RouteRefreshError(_) => todo!(),
+            Self::HoldTimerExpiredError(value) => {
+                writer.write_u8(BGPErrorNotificationCode::HoldTimerExpired.into())?;
+                value.write(writer)?;
+            }
+            Self::FiniteStateMachineError(value) => {
+                writer.write_u8(BGPErrorNotificationCode::FiniteStateMachineError.into())?;
+                value.write(writer)?;
+            }
+            Self::CeaseError(value) => {
+                writer.write_u8(BGPErrorNotificationCode::Cease.into())?;
+                value.write(writer)?;
+            }
+            Self::RouteRefreshError(value) => {
+                writer.write_u8(BGPErrorNotificationCode::RouteRefreshMessageError.into())?;
+                value.write(writer)?;
+            }
         }
         Ok(())
     }
@@ -305,6 +325,239 @@ impl WritablePDU<UpdateMessageErrorWritingError> for UpdateMessageError {
             }
             Self::MalformedASPath { value } => {
                 writer.write_u8(UpdateMessageErrorSubCode::MalformedASPath.into())?;
+                writer.write_all(value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum HoldTimerExpiredErrorWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for HoldTimerExpiredErrorWritingError {
+    fn from(err: std::io::Error) -> Self {
+        HoldTimerExpiredErrorWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<HoldTimerExpiredErrorWritingError> for BGPNotificationMessageWritingError {
+    fn from(value: HoldTimerExpiredErrorWritingError) -> Self {
+        BGPNotificationMessageWritingError::HoldTimerExpiredError(value)
+    }
+}
+
+impl WritablePDU<HoldTimerExpiredErrorWritingError> for HoldTimerExpiredError {
+    // One octet sub-code
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        let value_len = match self {
+            Self::Unspecific { sub_code: _, value } => value.len(),
+        };
+        Self::BASE_LENGTH + value_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), HoldTimerExpiredErrorWritingError> {
+        match self {
+            Self::Unspecific { sub_code, value } => {
+                writer.write_u8(*sub_code)?;
+                writer.write_all(value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum FiniteStateMachineErrorWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for FiniteStateMachineErrorWritingError {
+    fn from(err: std::io::Error) -> Self {
+        FiniteStateMachineErrorWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<FiniteStateMachineErrorWritingError> for BGPNotificationMessageWritingError {
+    fn from(value: FiniteStateMachineErrorWritingError) -> Self {
+        BGPNotificationMessageWritingError::FiniteStateMachineError(value)
+    }
+}
+
+impl WritablePDU<FiniteStateMachineErrorWritingError> for FiniteStateMachineError {
+    // One octet sub-code
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        let value_len = match self {
+            Self::Unspecific { value } => value.len(),
+            Self::ReceiveUnexpectedMessageInOpenSentState { value } => value.len(),
+            Self::ReceiveUnexpectedMessageInOpenConfirmState { value } => value.len(),
+            Self::ReceiveUnexpectedMessageInEstablishedState { value } => value.len(),
+        };
+        Self::BASE_LENGTH + value_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), FiniteStateMachineErrorWritingError> {
+        match self {
+            Self::Unspecific { value } => {
+                writer.write_u8(FiniteStateMachineErrorSubCode::UnspecifiedError.into())?;
+                writer.write_all(value)?;
+            }
+            Self::ReceiveUnexpectedMessageInOpenSentState { value } => {
+                writer.write_u8(
+                    FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInOpenSentState.into(),
+                )?;
+                writer.write_all(value)?;
+            }
+            Self::ReceiveUnexpectedMessageInOpenConfirmState { value } => {
+                writer.write_u8(
+                    FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInOpenConfirmState
+                        .into(),
+                )?;
+                writer.write_all(value)?;
+            }
+            Self::ReceiveUnexpectedMessageInEstablishedState { value } => {
+                writer.write_u8(
+                    FiniteStateMachineErrorSubCode::ReceiveUnexpectedMessageInEstablishedState
+                        .into(),
+                )?;
+                writer.write_all(value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum CeaseErrorWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for CeaseErrorWritingError {
+    fn from(err: std::io::Error) -> Self {
+        CeaseErrorWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<CeaseErrorWritingError> for BGPNotificationMessageWritingError {
+    fn from(value: CeaseErrorWritingError) -> Self {
+        BGPNotificationMessageWritingError::CeaseError(value)
+    }
+}
+
+impl WritablePDU<CeaseErrorWritingError> for CeaseError {
+    // One octet sub-code
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        let value_len = match self {
+            Self::MaximumNumberOfPrefixesReached { value } => value.len(),
+            Self::AdministrativeShutdown { value } => value.len(),
+            Self::PeerDeConfigured { value } => value.len(),
+            Self::AdministrativeReset { value } => value.len(),
+            Self::ConnectionRejected { value } => value.len(),
+            Self::OtherConfigurationChange { value } => value.len(),
+            Self::ConnectionCollisionResolution { value } => value.len(),
+            Self::OutOfResources { value } => value.len(),
+            Self::HardReset { value } => value.len(),
+            Self::BfdDown { value } => value.len(),
+        };
+        Self::BASE_LENGTH + value_len
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), CeaseErrorWritingError> {
+        match self {
+            Self::MaximumNumberOfPrefixesReached { value } => {
+                writer.write_u8(CeaseErrorSubCode::MaximumNumberOfPrefixesReached.into())?;
+                writer.write_all(value)?;
+            }
+            Self::AdministrativeShutdown { value } => {
+                writer.write_u8(CeaseErrorSubCode::AdministrativeShutdown.into())?;
+                writer.write_all(value)?;
+            }
+            Self::PeerDeConfigured { value } => {
+                writer.write_u8(CeaseErrorSubCode::PeerDeConfigured.into())?;
+                writer.write_all(value)?;
+            }
+            Self::AdministrativeReset { value } => {
+                writer.write_u8(CeaseErrorSubCode::AdministrativeReset.into())?;
+                writer.write_all(value)?;
+            }
+            Self::ConnectionRejected { value } => {
+                writer.write_u8(CeaseErrorSubCode::ConnectionRejected.into())?;
+                writer.write_all(value)?;
+            }
+            Self::OtherConfigurationChange { value } => {
+                writer.write_u8(CeaseErrorSubCode::OtherConfigurationChange.into())?;
+                writer.write_all(value)?;
+            }
+            Self::ConnectionCollisionResolution { value } => {
+                writer.write_u8(CeaseErrorSubCode::ConnectionCollisionResolution.into())?;
+                writer.write_all(value)?;
+            }
+            Self::OutOfResources { value } => {
+                writer.write_u8(CeaseErrorSubCode::OutOfResources.into())?;
+                writer.write_all(value)?;
+            }
+            Self::HardReset { value } => {
+                writer.write_u8(CeaseErrorSubCode::HardReset.into())?;
+                writer.write_all(value)?;
+            }
+            Self::BfdDown { value } => {
+                writer.write_u8(CeaseErrorSubCode::BfdDown.into())?;
+                writer.write_all(value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum RouteRefreshErrorWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for RouteRefreshErrorWritingError {
+    fn from(err: std::io::Error) -> Self {
+        RouteRefreshErrorWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<RouteRefreshErrorWritingError> for BGPNotificationMessageWritingError {
+    fn from(value: RouteRefreshErrorWritingError) -> Self {
+        BGPNotificationMessageWritingError::RouteRefreshError(value)
+    }
+}
+
+impl WritablePDU<RouteRefreshErrorWritingError> for RouteRefreshError {
+    // One octet sub-code
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        let value_len = match self {
+            Self::InvalidMessageLength { value } => value.len(),
+        };
+        Self::BASE_LENGTH + value_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), RouteRefreshErrorWritingError> {
+        match self {
+            Self::InvalidMessageLength { value } => {
+                writer.write_u8(RouteRefreshMessageErrorSubCode::InvalidMessageLength.into())?;
                 writer.write_all(value)?;
             }
         }

@@ -14,13 +14,19 @@
 // limitations under the License.
 
 use crate::{
-    iana::UndefinedBgpMessageType,
+    iana::{
+        UndefinedBGPErrorNotificationCode, UndefinedBgpMessageType, UndefinedCeaseErrorSubCode,
+    },
+    notification::CeaseError,
     open::BGP_VERSION,
     serde::{
-        deserializer::{BGPMessageParsingError, LocatedBGPMessageParsingError},
+        deserializer::{
+            notification::{BGPNotificationMessageParsingError, CeaseErrorParsingError},
+            BGPMessageParsingError, LocatedBGPMessageParsingError,
+        },
         serializer::BGPMessageWritingError,
     },
-    BGPMessage, BGPOpenMessage,
+    BGPMessage, BGPNotificationMessage, BGPOpenMessage,
 };
 use netgauze_parse_utils::{
     test_helpers::{
@@ -194,5 +200,57 @@ fn test_bgp_message_open_no_params() -> Result<(), BGPMessageWritingError> {
     let good_no_params_msg = BGPOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), vec![]);
     test_parsed_completely(&good_no_params_wire, &good_no_params_msg);
     test_write(&good_no_params_msg, &good_no_params_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_message_notification() -> Result<(), BGPMessageWritingError> {
+    let good_cease_wire = combine(vec![
+        &BGP_MARKER,
+        &[0x00, 0x17, 0x03, 0x06, 0x09, 0x06, 0x03],
+    ]);
+    let bad_undefined_notif_wire = combine(vec![
+        &BGP_MARKER,
+        &[0x00, 0x17, 0x03, 0xff, 0x09, 0x06, 0x03],
+    ]);
+    let bad_undefined_cease_wire = combine(vec![
+        &BGP_MARKER,
+        &[0x00, 0x17, 0x03, 0x06, 0xff, 0x06, 0x03],
+    ]);
+
+    let good_cease =
+        BGPMessage::Notification(BGPNotificationMessage::CeaseError(CeaseError::HardReset {
+            value: vec![6, 3],
+        }));
+    let bad_undefined_notif = LocatedBGPMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(19, &bad_undefined_notif_wire[19..]) },
+        BGPMessageParsingError::BGPNotificationMessageParsingError(
+            BGPNotificationMessageParsingError::UndefinedBGPErrorNotificationCode(
+                UndefinedBGPErrorNotificationCode(0xff),
+            ),
+        ),
+    );
+    let bad_undefined_cease = LocatedBGPMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(20, &bad_undefined_cease_wire[20..]) },
+        BGPMessageParsingError::BGPNotificationMessageParsingError(
+            BGPNotificationMessageParsingError::CeaseError(CeaseErrorParsingError::Undefined(
+                UndefinedCeaseErrorSubCode(0xff),
+            )),
+        ),
+    );
+
+    test_parsed_completely_with_one_input(&good_cease_wire, false, &good_cease);
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+        &bad_undefined_notif_wire,
+        false,
+        &bad_undefined_notif,
+    );
+    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+        &bad_undefined_cease_wire,
+        false,
+        &bad_undefined_cease,
+    );
+
+    test_write(&good_cease, &good_cease_wire)?;
     Ok(())
 }
