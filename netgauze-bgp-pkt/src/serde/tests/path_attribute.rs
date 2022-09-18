@@ -18,6 +18,7 @@ use crate::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
         AsPathSegmentType, AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop,
         Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
+        UnknownAttribute,
     },
     serde::{
         deserializer::path_attribute::{
@@ -32,7 +33,7 @@ use crate::{
         serializer::path_attribute::{
             AggregatorWritingError, AsPathWritingError, AtomicAggregateWritingError,
             LocalPreferenceWritingError, MultiExitDiscriminatorWritingError, NextHopWritingError,
-            OriginWritingError, PathAttributeWritingError,
+            OriginWritingError, PathAttributeWritingError, UnknownAttributeWritingError,
         },
     },
 };
@@ -40,7 +41,8 @@ use netgauze_parse_utils::{
     test_helpers::{
         test_parse_error, test_parse_error_with_one_input, test_parse_error_with_two_inputs,
         test_parsed_completely, test_parsed_completely_with_one_input,
-        test_parsed_completely_with_two_inputs, test_write, test_write_with_one_input,
+        test_parsed_completely_with_three_inputs, test_parsed_completely_with_two_inputs,
+        test_write, test_write_with_one_input,
     },
     Span,
 };
@@ -807,5 +809,72 @@ fn test_parse_path_attribute_as4_aggregator() -> Result<(), PathAttributeWriting
     test_write(&good_partial, &good_partial_wire)?;
     test_write(&good_extended, &good_extended_wire)?;
     test_write(&good_partial_extended, &good_partial_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_unknown_attribute() -> Result<(), UnknownAttributeWritingError> {
+    let good_wire = [0x00, 0x04, 0xac, 0x10, 0x03, 0x02];
+    let good_extended_wire = [0x00, 0x00, 0x04, 0xac, 0x10, 0x03, 0x02];
+
+    let good = UnknownAttribute::new(
+        true,
+        false,
+        0,
+        PathAttributeLength::U8(4),
+        vec![0xac, 0x10, 0x03, 0x02],
+    );
+    let good_extended = UnknownAttribute::new(
+        true,
+        false,
+        0,
+        PathAttributeLength::U16(4),
+        vec![0xac, 0x10, 0x03, 0x02],
+    );
+
+    test_parsed_completely_with_three_inputs(&good_wire, true, false, false, &good);
+    test_parsed_completely_with_three_inputs(
+        &good_extended_wire,
+        true,
+        false,
+        true,
+        &good_extended,
+    );
+
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0xc0, 0x00, 0x04, 0x00, 0x00, 0x00, 0x64];
+    let good_extended_wire = [0xd0, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x64];
+    let good = PathAttribute::UnknownAttribute {
+        partial: false,
+        value: UnknownAttribute::new(
+            true,
+            true,
+            0,
+            PathAttributeLength::U8(4),
+            good_wire[3..].into(),
+        ),
+    };
+
+    let good_extended = PathAttribute::UnknownAttribute {
+        partial: false,
+        value: UnknownAttribute::new(
+            true,
+            true,
+            0,
+            PathAttributeLength::U16(4),
+            good_wire[3..].into(),
+        ),
+    };
+    test_parsed_completely_with_one_input(&good_wire, true, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_extended_wire)?;
     Ok(())
 }

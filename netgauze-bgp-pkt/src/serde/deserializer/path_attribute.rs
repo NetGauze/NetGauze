@@ -16,18 +16,20 @@
 //! Deserializer for BGP Path Attributes
 
 use crate::{
-    iana::PathAttributeType,
+    iana::{PathAttributeType, UndefinedPathAttributeType},
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
         AsPathSegmentType, AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop,
         Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
+        UnknownAttribute,
     },
     serde::deserializer::{
         update::LocatedBGPUpdateMessageParsingError, BGPUpdateMessageParsingError,
     },
 };
 use netgauze_parse_utils::{
-    parse_till_empty, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
+    parse_till_empty, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs,
+    ReadablePDUWithTwoInputs, Span,
 };
 use nom::{
     error::{ErrorKind, FromExternalError},
@@ -110,6 +112,36 @@ fn parse_path_attribute_with_two_inputs<
     }
 }
 
+#[inline]
+fn parse_path_attribute_with_three_inputs<
+    'a,
+    I1,
+    I2,
+    I3,
+    E: IntoLocatedPathAttributeParsingError<'a>,
+    T: ReadablePDUWithThreeInputs<'a, I1, I2, I3, E>,
+>(
+    buf: Span<'a>,
+    input1: I1,
+    input2: I2,
+    input3: I3,
+) -> IResult<Span<'a>, T, LocatedPathAttributeParsingError<'a>> {
+    match T::from_wire(buf, input1, input2, input3) {
+        Ok((buf, value)) => Ok((buf, value)),
+        Err(err) => {
+            return match err {
+                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                nom::Err::Error(error) => Err(nom::Err::Error(
+                    error.into_located_attribute_parsing_error(),
+                )),
+                nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                    failure.into_located_attribute_parsing_error(),
+                )),
+            }
+        }
+    }
+}
+
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
@@ -122,6 +154,7 @@ pub enum PathAttributeParsingError {
     LocalPreferenceError(LocalPreferenceParsingError),
     AtomicAggregateError(AtomicAggregateParsingError),
     AggregatorError(AggregatorParsingError),
+    UnknownAttributeError(UnknownAttributeParsingError),
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -264,7 +297,26 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 };
                 Ok((buf, path_attr))
             }
-            _ => todo!(),
+            Ok(_code) => {
+                let (buf, value) = parse_path_attribute_with_three_inputs(
+                    buf_before_code,
+                    optional,
+                    transitive,
+                    extended_length,
+                )?;
+                let path_attr = PathAttribute::UnknownAttribute { partial, value };
+                Ok((buf, path_attr))
+            }
+            Err(UndefinedPathAttributeType(_code)) => {
+                let (buf, value) = parse_path_attribute_with_three_inputs(
+                    buf_before_code,
+                    optional,
+                    transitive,
+                    extended_length,
+                )?;
+                let path_attr = PathAttribute::UnknownAttribute { partial, value };
+                Ok((buf, path_attr))
+            }
         }
     }
 }
@@ -934,5 +986,93 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> fo
         let (buf, origin) = be_u32(buf)?;
 
         Ok((buf, As4Aggregator::new(asn, Ipv4Addr::from(origin))))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum UnknownAttributeParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedUnknownAttributeParsingError<'a> {
+    span: Span<'a>,
+    error: UnknownAttributeParsingError,
+}
+
+impl<'a> LocatedUnknownAttributeParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: UnknownAttributeParsingError) -> Self {
+        Self { span, error }
+    }
+
+    pub const fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    pub const fn error(&self) -> &UnknownAttributeParsingError {
+        &self.error
+    }
+}
+
+impl<'a> IntoLocatedPathAttributeParsingError<'a> for LocatedUnknownAttributeParsingError<'a> {
+    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
+            self.span,
+            PathAttributeParsingError::UnknownAttributeError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UnknownAttributeParsingError>
+    for LocatedUnknownAttributeParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UnknownAttributeParsingError,
+    ) -> Self {
+        LocatedUnknownAttributeParsingError::new(input, error)
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedUnknownAttributeParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedUnknownAttributeParsingError::new(
+            input,
+            UnknownAttributeParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> ReadablePDUWithThreeInputs<'a, bool, bool, bool, LocatedUnknownAttributeParsingError<'a>>
+    for UnknownAttribute
+{
+    fn from_wire(
+        buf: Span<'a>,
+        optional: bool,
+        transitive: bool,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedUnknownAttributeParsingError<'a>> {
+        let (buf, code) = be_u8(buf)?;
+        let (buf, len) = if extended_length {
+            let (buf, len) = be_u16(buf)?;
+            (buf, PathAttributeLength::U16(len))
+        } else {
+            let (buf, len) = be_u8(buf)?;
+            (buf, PathAttributeLength::U8(len))
+        };
+        let length: u16 = len.into();
+        let (buf, value) = nom::bytes::complete::take(length)(buf)?;
+
+        Ok((
+            buf,
+            UnknownAttribute::new(optional, transitive, code, len, (*value.fragment()).into()),
+        ))
     }
 }

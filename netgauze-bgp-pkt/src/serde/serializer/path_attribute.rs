@@ -20,6 +20,7 @@ use crate::{
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
         AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
+        PathAttributeLength, UnknownAttribute,
     },
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
@@ -36,6 +37,7 @@ pub enum PathAttributeWritingError {
     LocalPreferenceError(LocalPreferenceWritingError),
     AtomicAggregateError(AtomicAggregateWritingError),
     AggregatorError(AggregatorWritingError),
+    UnknownAttributeError(UnknownAttributeWritingError),
 }
 
 impl From<std::io::Error> for PathAttributeWritingError {
@@ -89,11 +91,10 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 extended_length,
                 value,
             } => value.len(*extended_length),
-            Self::UnknownAttribute {
-                partial: _,
-                extended_length: _,
-                value: _,
-            } => todo!(),
+            Self::UnknownAttribute { partial: _, value } => value.len() - 1, /* Unlike the rest,
+                                                                              * Unknown computes
+                                                                              * the code into the
+                                                                              * value length, */
         };
         Self::BASE_LENGTH + value_len
     }
@@ -172,11 +173,9 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 writer.write_u8(PathAttributeType::Aggregator.into())?;
                 value.write(writer, *extended_length)?;
             }
-            Self::UnknownAttribute {
-                partial: _,
-                extended_length: _,
-                value: _,
-            } => todo!(),
+            Self::UnknownAttribute { partial: _, value } => {
+                value.write(writer)?;
+            }
         }
         Ok(())
     }
@@ -577,6 +576,49 @@ impl WritablePDUWithOneInput<bool, AggregatorWritingError> for Aggregator {
             Self::As2Aggregator(agg) => agg.write(writer, extended_length),
             Self::As4Aggregator(agg) => agg.write(writer, extended_length),
         }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum UnknownAttributeWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for UnknownAttributeWritingError {
+    fn from(err: std::io::Error) -> Self {
+        UnknownAttributeWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<UnknownAttributeWritingError> for PathAttributeWritingError {
+    fn from(value: UnknownAttributeWritingError) -> Self {
+        PathAttributeWritingError::UnknownAttributeError(value)
+    }
+}
+
+impl WritablePDU<UnknownAttributeWritingError> for UnknownAttribute {
+    // One octet length (if extended is not enabled) and one octet for code
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        match self.length() {
+            PathAttributeLength::U8(len) => Self::BASE_LENGTH + len as usize,
+            PathAttributeLength::U16(len) => Self::BASE_LENGTH + 1 + len as usize,
+        }
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), UnknownAttributeWritingError> {
+        writer.write_u8(self.code())?;
+        match self.length() {
+            PathAttributeLength::U8(len) => {
+                writer.write_u8(len)?;
+            }
+            PathAttributeLength::U16(len) => {
+                writer.write_u16::<NetworkEndian>(len)?;
+            }
+        }
+        writer.write_all(self.value())?;
+        Ok(())
     }
 }
 

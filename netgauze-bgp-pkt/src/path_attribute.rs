@@ -66,7 +66,6 @@ pub enum PathAttribute {
     },
     UnknownAttribute {
         partial: bool,
-        extended_length: bool,
         value: UnknownAttribute,
     },
 }
@@ -110,11 +109,7 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => Aggregator::optional(),
-            Self::UnknownAttribute {
-                partial: _,
-                extended_length: _,
-                value,
-            } => value.optional(),
+            Self::UnknownAttribute { partial: _, value } => value.optional(),
         }
     }
 
@@ -157,11 +152,7 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => Aggregator::transitive(),
-            Self::UnknownAttribute {
-                partial: _,
-                extended_length: _,
-                value,
-            } => value.transitive(),
+            Self::UnknownAttribute { partial: _, value } => value.transitive(),
         }
     }
 
@@ -207,11 +198,7 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => *partial,
-            Self::UnknownAttribute {
-                partial,
-                extended_length: _,
-                value: _,
-            } => *partial,
+            Self::UnknownAttribute { partial, value: _ } => *partial,
         }
     }
 
@@ -253,11 +240,7 @@ impl PathAttribute {
                 extended_length,
                 value: _,
             } => *extended_length,
-            Self::UnknownAttribute {
-                partial: _,
-                extended_length,
-                value: _,
-            } => *extended_length,
+            Self::UnknownAttribute { partial: _, value } => value.extended_length(),
         }
     }
 }
@@ -692,12 +675,12 @@ impl UnknownAttribute {
     }
 
     /// Attribute Type code
-    pub const fn code(&self) -> &u8 {
-        &self.code
+    pub const fn code(&self) -> u8 {
+        self.code
     }
 
-    pub const fn length(&self) -> &PathAttributeLength {
-        &self.length
+    pub const fn length(&self) -> PathAttributeLength {
+        self.length
     }
 
     /// Raw u8 vector of the value carried in the attribute
@@ -711,6 +694,13 @@ impl UnknownAttribute {
 
     pub const fn transitive(&self) -> bool {
         self.transitive
+    }
+
+    pub const fn extended_length(&self) -> bool {
+        match self.length {
+            PathAttributeLength::U8(_) => false,
+            PathAttributeLength::U16(_) => true,
+        }
     }
 }
 

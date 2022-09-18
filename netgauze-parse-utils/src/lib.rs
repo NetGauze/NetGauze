@@ -47,6 +47,19 @@ pub trait ReadablePDUWithTwoInputs<'a, T, U, ErrorType> {
         Self: Sized;
 }
 
+/// Generic trait for Readable Protocol Data Unit that does need three external
+/// inputs
+pub trait ReadablePDUWithThreeInputs<'a, I1, I2, I3, ErrorType> {
+    fn from_wire(
+        buf: Span<'a>,
+        input1: I1,
+        input2: I2,
+        input3: I3,
+    ) -> nom::IResult<Span<'a>, Self, ErrorType>
+    where
+        Self: Sized;
+}
+
 /// Generic trait for Writable Protocol Data Unit that doesn't need any external
 /// input while writing the packet.
 #[allow(clippy::len_without_is_empty)]

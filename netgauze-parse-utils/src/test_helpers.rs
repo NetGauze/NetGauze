@@ -17,8 +17,8 @@
 //! serializing/deserializing wire protocols
 
 use crate::{
-    ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span, WritablePDU,
-    WritablePDUWithOneInput,
+    ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs,
+    Span, WritablePDU, WritablePDUWithOneInput,
 };
 use netgauze_locate::BinarySpan;
 use nom::IResult;
@@ -89,6 +89,36 @@ where
         Span::new(input),
         parser_input1,
         parser_input2,
+    );
+    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
+    let (span, value) = parsed.unwrap();
+    assert_eq!(&value, expected);
+    assert_eq!(
+        span.fragment().len(),
+        0,
+        "Not all the input is consumed by the parser, didn't consume: {:?}",
+        span
+    );
+    value
+}
+
+/// Fancier assert to for more meaningful error messages
+pub fn test_parsed_completely_with_three_inputs<'a, T, I1, I2, I3, E>(
+    input: &'a [u8],
+    parser_input1: I1,
+    parser_input2: I2,
+    parser_input3: I3,
+    expected: &T,
+) -> T
+where
+    T: ReadablePDUWithThreeInputs<'a, I1, I2, I3, E> + PartialEq + Debug,
+    E: Debug,
+{
+    let parsed = <T as ReadablePDUWithThreeInputs<I1, I2, I3, E>>::from_wire(
+        Span::new(input),
+        parser_input1,
+        parser_input2,
+        parser_input3,
     );
     assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
     let (span, value) = parsed.unwrap();
