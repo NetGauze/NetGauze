@@ -15,21 +15,23 @@
 
 use crate::{
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, LocalPreference,
-        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
-        UndefinedAsPathSegmentType, UndefinedOrigin,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, AtomicAggregate,
+        LocalPreference, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
+        PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::{
         deserializer::path_attribute::{
-            AsPathParsingError, LocalPreferenceParsingError, LocatedAsPathParsingError,
+            AsPathParsingError, AtomicAggregateParsingError, LocalPreferenceParsingError,
+            LocatedAsPathParsingError, LocatedAtomicAggregateParsingError,
             LocatedLocalPreferenceParsingError, LocatedMultiExitDiscriminatorParsingError,
             LocatedNextHopParsingError, LocatedOriginParsingError,
             LocatedPathAttributeParsingError, MultiExitDiscriminatorParsingError,
             NextHopParsingError, OriginParsingError, PathAttributeParsingError,
         },
         serializer::path_attribute::{
-            AsPathWritingError, LocalPreferenceWritingError, MultiExitDiscriminatorWritingError,
-            NextHopWritingError, OriginWritingError, PathAttributeWritingError,
+            AsPathWritingError, AtomicAggregateWritingError, LocalPreferenceWritingError,
+            MultiExitDiscriminatorWritingError, NextHopWritingError, OriginWritingError,
+            PathAttributeWritingError,
         },
     },
 };
@@ -546,6 +548,88 @@ fn test_path_attribute_local_preference() -> Result<(), PathAttributeWritingErro
 
     test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_write(&good, &good_wire)?;
+    test_write(&good_extended, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_atomic_aggregate() -> Result<(), AtomicAggregateWritingError> {
+    let good_wire = [0x00];
+    let good_extended_wire = [0x00, 0x00];
+    let bad_length_wire = [0x01];
+    let bad_extended_length_wire = [0x00, 0x01];
+
+    let good = AtomicAggregate;
+    let good_extended = AtomicAggregate;
+    let bad_length = LocatedAtomicAggregateParsingError::new(
+        Span::new(&bad_length_wire),
+        AtomicAggregateParsingError::InvalidLength(PathAttributeLength::U8(1)),
+    );
+    let bad_extended_length = LocatedAtomicAggregateParsingError::new(
+        Span::new(&bad_extended_length_wire),
+        AtomicAggregateParsingError::InvalidLength(PathAttributeLength::U16(1)),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input::<AtomicAggregate, bool, LocatedAtomicAggregateParsingError<'_>>(
+        &bad_length_wire,
+        false,
+        &bad_length,
+    );
+    test_parse_error_with_one_input::<AtomicAggregate, bool, LocatedAtomicAggregateParsingError<'_>>(
+        &bad_extended_length_wire,
+        true,
+        &bad_extended_length,
+    );
+
+    test_write_with_one_input(&good, false, &good_wire)?;
+    test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attribute_atomic_aggregate() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0xc0, 0x06, 0x00];
+    let good_extended_wire = [0xd0, 0x06, 0x00, 0x00];
+    let bad_length_wire = [0xc0, 0x06, 0x01];
+    let bad_extended_length_wire = [0xd0, 0x06, 0x00, 0x01];
+
+    let good = PathAttribute::AtomicAggregate {
+        extended_length: false,
+        value: AtomicAggregate,
+    };
+    let good_extended = PathAttribute::AtomicAggregate {
+        extended_length: true,
+        value: AtomicAggregate,
+    };
+    let bad_length = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &bad_length_wire[2..]) },
+        PathAttributeParsingError::AtomicAggregateError(
+            AtomicAggregateParsingError::InvalidLength(PathAttributeLength::U8(1)),
+        ),
+    );
+    let bad_extended_length = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &bad_extended_length_wire[2..]) },
+        PathAttributeParsingError::AtomicAggregateError(
+            AtomicAggregateParsingError::InvalidLength(PathAttributeLength::U16(1)),
+        ),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &bad_length_wire,
+        false,
+        &bad_length,
+    );
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &bad_extended_length_wire,
+        true,
+        &bad_extended_length,
+    );
+
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_extended_wire)?;
     Ok(())

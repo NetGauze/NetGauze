@@ -18,8 +18,8 @@
 use crate::{
     iana::PathAttributeType,
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, LocalPreference, MultiExitDiscriminator,
-        NextHop, Origin, PathAttribute,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AtomicAggregate, LocalPreference,
+        MultiExitDiscriminator, NextHop, Origin, PathAttribute,
     },
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
@@ -34,6 +34,7 @@ pub enum PathAttributeWritingError {
     NextHopError(NextHopWritingError),
     MultiExitDiscriminatorError(MultiExitDiscriminatorWritingError),
     LocalPreferenceError(LocalPreferenceWritingError),
+    AtomicAggregateError(AtomicAggregateWritingError),
 }
 
 impl From<std::io::Error> for PathAttributeWritingError {
@@ -78,7 +79,10 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 extended_length,
                 value,
             } => value.len(*extended_length),
-            Self::AtomicAggregate { .. } => todo!(),
+            Self::AtomicAggregate {
+                extended_length,
+                value,
+            } => value.len(*extended_length),
             Self::Aggregator { .. } => todo!(),
             Self::UnknownAttribute { .. } => todo!(),
         };
@@ -144,7 +148,13 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 writer.write_u8(PathAttributeType::LocalPreference.into())?;
                 value.write(writer, *extended_length)?;
             }
-            Self::AtomicAggregate { .. } => todo!(),
+            Self::AtomicAggregate {
+                extended_length,
+                value,
+            } => {
+                writer.write_u8(PathAttributeType::AtomicAggregate.into())?;
+                value.write(writer, *extended_length)?;
+            }
             Self::Aggregator { .. } => todo!(),
             Self::UnknownAttribute { .. } => todo!(),
         }
@@ -428,6 +438,45 @@ impl WritablePDUWithOneInput<bool, LocalPreferenceWritingError> for LocalPrefere
     ) -> Result<(), LocalPreferenceWritingError> {
         write_length(self, extended_length, writer)?;
         writer.write_u32::<NetworkEndian>(self.metric())?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum AtomicAggregateWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for AtomicAggregateWritingError {
+    fn from(err: std::io::Error) -> Self {
+        AtomicAggregateWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<AtomicAggregateWritingError> for PathAttributeWritingError {
+    fn from(value: AtomicAggregateWritingError) -> Self {
+        PathAttributeWritingError::AtomicAggregateError(value)
+    }
+}
+
+impl WritablePDUWithOneInput<bool, AtomicAggregateWritingError> for AtomicAggregate {
+    // One octet length (if extended is not enabled)
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self, extended_length: bool) -> usize {
+        if extended_length {
+            Self::BASE_LENGTH + 1
+        } else {
+            Self::BASE_LENGTH
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), AtomicAggregateWritingError> {
+        write_length(self, extended_length, writer)?;
         Ok(())
     }
 }

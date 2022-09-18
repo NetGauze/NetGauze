@@ -18,9 +18,9 @@
 use crate::{
     iana::PathAttributeType,
     path_attribute::{
-        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, LocalPreference,
-        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
-        UndefinedAsPathSegmentType, UndefinedOrigin,
+        AS4Path, ASPath, As2PathSegment, As4PathSegment, AsPathSegmentType, AtomicAggregate,
+        LocalPreference, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
+        PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
     },
     serde::deserializer::{
         update::LocatedBGPUpdateMessageParsingError, BGPUpdateMessageParsingError,
@@ -44,6 +44,7 @@ const ORIGIN_LEN: u16 = 1;
 const NEXT_HOP_LEN: u16 = 4;
 const MULTI_EXIT_DISCRIMINATOR_LEN: u16 = 4;
 const LOCAL_PREFERENCE_LEN: u16 = 4;
+const ATOMIC_AGGREGATE_LEN: u16 = 0;
 
 #[inline]
 const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
@@ -63,6 +64,7 @@ pub enum PathAttributeParsingError {
     NextHopError(NextHopParsingError),
     MultiExitDiscriminatorError(MultiExitDiscriminatorParsingError),
     LocalPreferenceError(LocalPreferenceParsingError),
+    AtomicAggregateError(AtomicAggregateParsingError),
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -255,6 +257,27 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                     }
                 };
                 let path_attr = PathAttribute::LocalPreference {
+                    extended_length,
+                    value,
+                };
+                Ok((buf, path_attr))
+            }
+            Ok(PathAttributeType::AtomicAggregate) => {
+                let (buf, value) = match AtomicAggregate::from_wire(buf, extended_length) {
+                    Ok((buf, origin)) => (buf, origin),
+                    Err(err) => {
+                        return match err {
+                            nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                            nom::Err::Error(error) => Err(nom::Err::Error(
+                                error.into_located_attribute_parsing_error(),
+                            )),
+                            nom::Err::Failure(failure) => Err(nom::Err::Failure(
+                                failure.into_located_attribute_parsing_error(),
+                            )),
+                        }
+                    }
+                };
+                let path_attr = PathAttribute::AtomicAggregate {
                     extended_length,
                     value,
                 };
@@ -719,5 +742,89 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a
 
         let (buf, pref) = be_u32(buf)?;
         Ok((buf, LocalPreference::new(pref)))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum AtomicAggregateParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidLength(PathAttributeLength),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedAtomicAggregateParsingError<'a> {
+    span: Span<'a>,
+    error: AtomicAggregateParsingError,
+}
+
+impl<'a> LocatedAtomicAggregateParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: AtomicAggregateParsingError) -> Self {
+        Self { span, error }
+    }
+
+    pub const fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    pub const fn error(&self) -> &AtomicAggregateParsingError {
+        &self.error
+    }
+
+    pub const fn into_located_attribute_parsing_error(
+        self,
+    ) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
+            self.span,
+            PathAttributeParsingError::AtomicAggregateError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, AtomicAggregateParsingError>
+    for LocatedAtomicAggregateParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: AtomicAggregateParsingError,
+    ) -> Self {
+        LocatedAtomicAggregateParsingError::new(input, error)
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedAtomicAggregateParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedAtomicAggregateParsingError::new(input, AtomicAggregateParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a>>
+    for AtomicAggregate
+{
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedAtomicAggregateParsingError<'a>> {
+        let input = buf;
+        let (buf, length) = if extended_length {
+            let (buf, raw) = be_u16(buf)?;
+            (buf, PathAttributeLength::U16(raw))
+        } else {
+            let (buf, raw) = be_u8(buf)?;
+            (buf, PathAttributeLength::U8(raw))
+        };
+        if !check_length(length, ATOMIC_AGGREGATE_LEN) {
+            return Err(nom::Err::Error(LocatedAtomicAggregateParsingError::new(
+                input,
+                AtomicAggregateParsingError::InvalidLength(length),
+            )));
+        }
+        Ok((buf, AtomicAggregate))
     }
 }
