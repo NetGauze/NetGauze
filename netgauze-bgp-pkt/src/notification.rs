@@ -57,6 +57,7 @@ pub enum OpenMessageError {
 /// See [crate::iana::UpdateMessageErrorSubCode] for full documentation
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum UpdateMessageError {
+    Unspecific { value: Vec<u8> },
     MalformedAttributeList { value: Vec<u8> },
     UnrecognizedWellKnownAttribute { value: Vec<u8> },
     MissingWellKnownAttribute { value: Vec<u8> },

@@ -19,9 +19,10 @@ use crate::{
     iana::{
         BGPErrorNotificationCode, MessageHeaderErrorSubCode, OpenMessageErrorSubCode,
         UndefinedBGPErrorNotificationCode, UndefinedMessageHeaderErrorSubCode,
-        UndefinedOpenMessageErrorSubCode,
+        UndefinedOpenMessageErrorSubCode, UndefinedUpdateMessageErrorSubCode,
+        UpdateMessageErrorSubCode,
     },
-    notification::{MessageHeaderError, OpenMessageError},
+    notification::{MessageHeaderError, OpenMessageError, UpdateMessageError},
     serde::deserializer::{BGPMessageParsingError, LocatedBGPMessageParsingError},
     BGPNotificationMessage,
 };
@@ -43,6 +44,7 @@ pub enum BGPNotificationMessageParsingError {
     UndefinedBGPErrorNotificationCode(UndefinedBGPErrorNotificationCode),
     MessageHeaderError(MessageHeaderErrorParsingError),
     OpenMessageError(OpenMessageErrorParsingError),
+    UpdateMessageError(UpdateMessageErrorParsingError),
 }
 
 /// BGP Notification Message Parsing errors  with the input location of where it
@@ -137,7 +139,10 @@ impl<'a> ReadablePDU<'a, LocatedBGPNotificationMessageParsingError<'a>> for BGPN
                 let (buf, value) = parse_into_located(buf)?;
                 Ok((buf, BGPNotificationMessage::OpenMessageError(value)))
             }
-            BGPErrorNotificationCode::UpdateMessageError => todo!(),
+            BGPErrorNotificationCode::UpdateMessageError => {
+                let (buf, value) = parse_into_located(buf)?;
+                Ok((buf, BGPNotificationMessage::UpdateMessageError(value)))
+            }
             BGPErrorNotificationCode::HoldTimerExpired => todo!(),
             BGPErrorNotificationCode::FiniteStateMachineError => todo!(),
             BGPErrorNotificationCode::Cease => todo!(),
@@ -411,6 +416,172 @@ impl<'a> ReadablePDU<'a, LocatedOpenMessageErrorParsingError<'a>> for OpenMessag
             OpenMessageErrorSubCode::RoleMismatch => Ok((
                 buf,
                 OpenMessageError::RoleMismatch {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+        }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum UpdateMessageErrorParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    UndefinedUpdateMessageErrorSubCode(UndefinedUpdateMessageErrorSubCode),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedUpdateMessageErrorParsingError<'a> {
+    span: Span<'a>,
+    error: UpdateMessageErrorParsingError,
+}
+
+impl<'a> LocatedUpdateMessageErrorParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: UpdateMessageErrorParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError<'a, UpdateMessageErrorParsingError>
+    for LocatedUpdateMessageErrorParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
+        &self.span
+    }
+
+    fn error(&self) -> &UpdateMessageErrorParsingError {
+        &self.error
+    }
+}
+
+impl<'a>
+    IntoLocatedError<
+        'a,
+        BGPNotificationMessageParsingError,
+        LocatedBGPNotificationMessageParsingError<'a>,
+    > for LocatedUpdateMessageErrorParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
+        LocatedBGPNotificationMessageParsingError::new(
+            self.span,
+            BGPNotificationMessageParsingError::UpdateMessageError(self.error),
+        )
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedUpdateMessageErrorParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedUpdateMessageErrorParsingError::new(
+            input,
+            UpdateMessageErrorParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UpdateMessageErrorParsingError>
+    for LocatedUpdateMessageErrorParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UpdateMessageErrorParsingError,
+    ) -> Self {
+        LocatedUpdateMessageErrorParsingError::new(input, error)
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedUpdateMessageErrorSubCode>
+    for LocatedUpdateMessageErrorParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        e: UndefinedUpdateMessageErrorSubCode,
+    ) -> Self {
+        LocatedUpdateMessageErrorParsingError::new(
+            input,
+            UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode(e),
+        )
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedUpdateMessageErrorParsingError<'a>> for UpdateMessageError {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedUpdateMessageErrorParsingError<'a>> {
+        let (buf, sub_code) =
+            nom::combinator::map_res(be_u8, UpdateMessageErrorSubCode::try_from)(buf)?;
+        let (buf, value) = nom::bytes::complete::take(buf.len())(buf)?;
+
+        match sub_code {
+            UpdateMessageErrorSubCode::Unspecific => Ok((
+                buf,
+                Self::Unspecific {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::MalformedAttributeList => Ok((
+                buf,
+                Self::MalformedAttributeList {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::UnrecognizedWellKnownAttribute => Ok((
+                buf,
+                Self::UnrecognizedWellKnownAttribute {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::MissingWellKnownAttribute => Ok((
+                buf,
+                Self::MissingWellKnownAttribute {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::AttributeFlagsError => Ok((
+                buf,
+                Self::AttributeFlagsError {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::AttributeLengthError => Ok((
+                buf,
+                Self::AttributeLengthError {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::InvalidOriginAttribute => Ok((
+                buf,
+                Self::InvalidOriginAttribute {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::InvalidNextHopAttribute => Ok((
+                buf,
+                Self::InvalidNextHopAttribute {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::OptionalAttributeError => Ok((
+                buf,
+                Self::OptionalAttributeError {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::InvalidNetworkField => Ok((
+                buf,
+                Self::InvalidNetworkField {
+                    value: (*value.fragment()).into(),
+                },
+            )),
+            UpdateMessageErrorSubCode::MalformedASPath => Ok((
+                buf,
+                Self::MalformedASPath {
                     value: (*value.fragment()).into(),
                 },
             )),

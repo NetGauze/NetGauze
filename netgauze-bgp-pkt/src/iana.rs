@@ -296,7 +296,7 @@ pub enum UpdateMessageErrorSubCode {
     MissingWellKnownAttribute = 3,
     AttributeFlagsError = 4,
     AttributeLengthError = 5,
-    InvalidORIGINAttribute = 6,
+    InvalidOriginAttribute = 6,
     InvalidNextHopAttribute = 8,
     OptionalAttributeError = 9,
     InvalidNetworkField = 10,

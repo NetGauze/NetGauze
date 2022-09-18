@@ -16,18 +16,19 @@
 use crate::{
     iana::{
         UndefinedBGPErrorNotificationCode, UndefinedMessageHeaderErrorSubCode,
-        UndefinedOpenMessageErrorSubCode,
+        UndefinedOpenMessageErrorSubCode, UndefinedUpdateMessageErrorSubCode,
     },
-    notification::{MessageHeaderError, OpenMessageError},
+    notification::{MessageHeaderError, OpenMessageError, UpdateMessageError},
     serde::{
         deserializer::notification::{
             BGPNotificationMessageParsingError, LocatedBGPNotificationMessageParsingError,
             LocatedMessageHeaderErrorParsingError, LocatedOpenMessageErrorParsingError,
-            MessageHeaderErrorParsingError, OpenMessageErrorParsingError,
+            LocatedUpdateMessageErrorParsingError, MessageHeaderErrorParsingError,
+            OpenMessageErrorParsingError, UpdateMessageErrorParsingError,
         },
         serializer::notification::{
             BGPNotificationMessageWritingError, MessageHeaderErrorWritingError,
-            OpenMessageErrorWritingError,
+            OpenMessageErrorWritingError, UpdateMessageErrorWritingError,
         },
     },
     BGPNotificationMessage,
@@ -201,6 +202,154 @@ fn test_bgp_notification_open_message() -> Result<(), BGPNotificationMessageWrit
         });
 
     test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_update_message_error() -> Result<(), UpdateMessageErrorWritingError> {
+    let good_unspecific_wire = [0x00, 0x01, 0xff];
+    let good_malformed_attributes_wire = [0x01, 0x00, 0x00];
+    let good_unrecognized_well_known_attribute_wire = [0x02, 0x01, 0x01];
+    let good_missing_well_know_attribute_wire = [0x03, 0x02, 0x02];
+    let good_attribute_flags_wire = [0x04, 0x03, 0x03];
+    let good_attribute_length_wire = [0x05, 0x04, 0x04];
+    let good_invalid_origin_wire = [0x06, 0x05, 0x05];
+    let good_next_hop_wire = [0x08, 0x06, 0x06];
+    let good_optional_attribute_wire = [0x09, 0x07, 0x07];
+    let good_network_field_wire = [0x0A, 0x08, 0x08];
+    let good_malformed_as_path_wire = [0x0B, 0x09, 0x09];
+    let bad_undefined_wire = [0xff, 0x020, 0x02];
+    let bad_incomplete_wire = [];
+
+    let good_unspecific = UpdateMessageError::Unspecific {
+        value: good_unspecific_wire[1..].to_vec(),
+    };
+    let good_malformed_attributes = UpdateMessageError::MalformedAttributeList {
+        value: good_malformed_attributes_wire[1..].to_vec(),
+    };
+    let good_unrecognized_well_known_attribute =
+        UpdateMessageError::UnrecognizedWellKnownAttribute {
+            value: good_unrecognized_well_known_attribute_wire[1..].to_vec(),
+        };
+    let good_missing_well_know_attribute = UpdateMessageError::MissingWellKnownAttribute {
+        value: good_missing_well_know_attribute_wire[1..].to_vec(),
+    };
+    let good_attribute_flags = UpdateMessageError::AttributeFlagsError {
+        value: good_attribute_flags_wire[1..].to_vec(),
+    };
+    let good_attribute_length = UpdateMessageError::AttributeLengthError {
+        value: good_attribute_length_wire[1..].to_vec(),
+    };
+    let good_invalid_origin = UpdateMessageError::InvalidOriginAttribute {
+        value: good_invalid_origin_wire[1..].to_vec(),
+    };
+    let good_next_hop = UpdateMessageError::InvalidNextHopAttribute {
+        value: good_next_hop_wire[1..].to_vec(),
+    };
+    let good_optional_attribute = UpdateMessageError::OptionalAttributeError {
+        value: good_optional_attribute_wire[1..].to_vec(),
+    };
+    let good_network_field = UpdateMessageError::InvalidNetworkField {
+        value: good_network_field_wire[1..].to_vec(),
+    };
+    let good_malformed_as_path = UpdateMessageError::MalformedASPath {
+        value: good_malformed_as_path_wire[1..].to_vec(),
+    };
+
+    let bad_undefined = LocatedUpdateMessageErrorParsingError::new(
+        Span::new(&bad_undefined_wire),
+        UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode(
+            UndefinedUpdateMessageErrorSubCode(0xff),
+        ),
+    );
+    let bad_incomplete = LocatedUpdateMessageErrorParsingError::new(
+        Span::new(&bad_incomplete_wire),
+        UpdateMessageErrorParsingError::NomError(ErrorKind::Eof),
+    );
+
+    test_parsed_completely(&good_unspecific_wire, &good_unspecific);
+    test_parsed_completely(&good_malformed_attributes_wire, &good_malformed_attributes);
+    test_parsed_completely(
+        &good_unrecognized_well_known_attribute_wire,
+        &good_unrecognized_well_known_attribute,
+    );
+    test_parsed_completely(
+        &good_missing_well_know_attribute_wire,
+        &good_missing_well_know_attribute,
+    );
+    test_parsed_completely(&good_attribute_flags_wire, &good_attribute_flags);
+    test_parsed_completely(&good_attribute_length_wire, &good_attribute_length);
+    test_parsed_completely(&good_invalid_origin_wire, &good_invalid_origin);
+    test_parsed_completely(&good_next_hop_wire, &good_next_hop);
+    test_parsed_completely(&good_optional_attribute_wire, &good_optional_attribute);
+    test_parsed_completely(&good_network_field_wire, &good_network_field);
+    test_parsed_completely(&good_malformed_as_path_wire, &good_malformed_as_path);
+    test_parse_error::<UpdateMessageError, LocatedUpdateMessageErrorParsingError<'_>>(
+        &bad_undefined_wire,
+        &bad_undefined,
+    );
+    test_parse_error::<UpdateMessageError, LocatedUpdateMessageErrorParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
+    test_write(&good_malformed_attributes, &good_malformed_attributes_wire)?;
+    test_write(
+        &good_unrecognized_well_known_attribute,
+        &good_unrecognized_well_known_attribute_wire,
+    )?;
+    test_write(
+        &good_missing_well_know_attribute,
+        &good_missing_well_know_attribute_wire,
+    )?;
+    test_write(&good_unspecific, &good_unspecific_wire)?;
+    test_write(&good_attribute_flags, &good_attribute_flags_wire)?;
+    test_write(&good_attribute_length, &good_attribute_length_wire)?;
+    test_write(&good_invalid_origin, &good_invalid_origin_wire)?;
+    test_write(&good_next_hop, &good_next_hop_wire)?;
+    test_write(&good_optional_attribute, &good_optional_attribute_wire)?;
+    test_write(&good_network_field, &good_network_field_wire)?;
+    test_write(&good_malformed_as_path, &good_malformed_as_path_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_notification_update_message() -> Result<(), BGPNotificationMessageWritingError> {
+    let good_wire = [0x03, 0x01, 0x01, 0x01];
+    let bad_undefined_wire = [0x03, 0xff, 0x01, 0x01];
+    let bad_incomplete_wire = [0x03];
+
+    let good =
+        BGPNotificationMessage::UpdateMessageError(UpdateMessageError::MalformedAttributeList {
+            value: good_wire[2..].to_vec(),
+        });
+
+    let bad_undefined = LocatedBGPNotificationMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_undefined_wire[1..]) },
+        BGPNotificationMessageParsingError::UpdateMessageError(
+            UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode(
+                UndefinedUpdateMessageErrorSubCode(0xff),
+            ),
+        ),
+    );
+    let bad_incomplete = LocatedBGPNotificationMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
+        BGPNotificationMessageParsingError::UpdateMessageError(
+            UpdateMessageErrorParsingError::NomError(ErrorKind::Eof),
+        ),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<BGPNotificationMessage, LocatedBGPNotificationMessageParsingError<'_>>(
+        &bad_undefined_wire,
+        &bad_undefined,
+    );
+    test_parse_error::<BGPNotificationMessage, LocatedBGPNotificationMessageParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
     test_write(&good, &good_wire)?;
     Ok(())
 }

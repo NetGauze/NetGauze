@@ -14,8 +14,11 @@
 // limitations under the License.
 
 use crate::{
-    iana::{BGPErrorNotificationCode, MessageHeaderErrorSubCode, OpenMessageErrorSubCode},
-    notification::{MessageHeaderError, OpenMessageError},
+    iana::{
+        BGPErrorNotificationCode, MessageHeaderErrorSubCode, OpenMessageErrorSubCode,
+        UpdateMessageErrorSubCode,
+    },
+    notification::{MessageHeaderError, OpenMessageError, UpdateMessageError},
     serde::serializer::BGPMessageWritingError,
     BGPNotificationMessage,
 };
@@ -27,6 +30,7 @@ pub enum BGPNotificationMessageWritingError {
     StdIOError(String),
     MessageHeaderError(MessageHeaderErrorWritingError),
     OpenMessageError(OpenMessageErrorWritingError),
+    UpdateMessageError(UpdateMessageErrorWritingError),
 }
 
 impl From<std::io::Error> for BGPNotificationMessageWritingError {
@@ -49,7 +53,7 @@ impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage 
         let value_len = match self {
             Self::MessageHeaderError(value) => value.len(),
             Self::OpenMessageError(value) => value.len(),
-            Self::UpdateMessageError(_) => todo!(),
+            Self::UpdateMessageError(value) => value.len(),
             Self::HoldTimerExpiredError(_) => todo!(),
             Self::FiniteStateMachineError(_) => todo!(),
             Self::CeaseError(_) => todo!(),
@@ -71,7 +75,10 @@ impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage 
                 writer.write_u8(BGPErrorNotificationCode::OpenMessageError.into())?;
                 value.write(writer)?;
             }
-            Self::UpdateMessageError(_) => todo!(),
+            Self::UpdateMessageError(value) => {
+                writer.write_u8(BGPErrorNotificationCode::UpdateMessageError.into())?;
+                value.write(writer)?;
+            }
             Self::HoldTimerExpiredError(_) => todo!(),
             Self::FiniteStateMachineError(_) => todo!(),
             Self::CeaseError(_) => todo!(),
@@ -205,6 +212,99 @@ impl WritablePDU<OpenMessageErrorWritingError> for OpenMessageError {
             }
             OpenMessageError::RoleMismatch { value } => {
                 writer.write_u8(OpenMessageErrorSubCode::RoleMismatch.into())?;
+                writer.write_all(value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum UpdateMessageErrorWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for UpdateMessageErrorWritingError {
+    fn from(err: std::io::Error) -> Self {
+        UpdateMessageErrorWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<UpdateMessageErrorWritingError> for BGPNotificationMessageWritingError {
+    fn from(value: UpdateMessageErrorWritingError) -> Self {
+        BGPNotificationMessageWritingError::UpdateMessageError(value)
+    }
+}
+
+impl WritablePDU<UpdateMessageErrorWritingError> for UpdateMessageError {
+    // One octet sub-code
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        let value_len = match self {
+            Self::Unspecific { value } => value.len(),
+            Self::MalformedAttributeList { value } => value.len(),
+            Self::UnrecognizedWellKnownAttribute { value } => value.len(),
+            Self::MissingWellKnownAttribute { value } => value.len(),
+            Self::AttributeFlagsError { value } => value.len(),
+            Self::AttributeLengthError { value } => value.len(),
+            Self::InvalidOriginAttribute { value } => value.len(),
+            Self::InvalidNextHopAttribute { value } => value.len(),
+            Self::OptionalAttributeError { value } => value.len(),
+            Self::InvalidNetworkField { value } => value.len(),
+            Self::MalformedASPath { value } => value.len(),
+        };
+        Self::BASE_LENGTH + value_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), UpdateMessageErrorWritingError> {
+        match self {
+            Self::Unspecific { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::Unspecific.into())?;
+                writer.write_all(value)?;
+            }
+            Self::MalformedAttributeList { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::MalformedAttributeList.into())?;
+                writer.write_all(value)?;
+            }
+            Self::UnrecognizedWellKnownAttribute { value } => {
+                writer
+                    .write_u8(UpdateMessageErrorSubCode::UnrecognizedWellKnownAttribute.into())?;
+                writer.write_all(value)?;
+            }
+            Self::MissingWellKnownAttribute { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::MissingWellKnownAttribute.into())?;
+                writer.write_all(value)?;
+            }
+            Self::AttributeFlagsError { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::AttributeFlagsError.into())?;
+                writer.write_all(value)?;
+            }
+            Self::AttributeLengthError { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::AttributeLengthError.into())?;
+                writer.write_all(value)?;
+            }
+            Self::InvalidOriginAttribute { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::InvalidOriginAttribute.into())?;
+                writer.write_all(value)?;
+            }
+            Self::InvalidNextHopAttribute { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::InvalidNextHopAttribute.into())?;
+                writer.write_all(value)?;
+            }
+            Self::OptionalAttributeError { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::OptionalAttributeError.into())?;
+                writer.write_all(value)?;
+            }
+            Self::InvalidNetworkField { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::InvalidNetworkField.into())?;
+                writer.write_all(value)?;
+            }
+            Self::MalformedASPath { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::MalformedASPath.into())?;
                 writer.write_all(value)?;
             }
         }
