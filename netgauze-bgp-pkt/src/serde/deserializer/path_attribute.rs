@@ -1076,3 +1076,106 @@ impl<'a> ReadablePDUWithThreeInputs<'a, bool, bool, bool, LocatedUnknownAttribut
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use netgauze_parse_utils::Span;
+    use nom::error::ErrorKind;
+
+    #[test]
+    fn test_located_path_attribute_parsing_error() {
+        let span = Span::new(&[1, 1, 3]);
+        let error = PathAttributeParsingError::NomError(ErrorKind::Eof);
+
+        let located = LocatedPathAttributeParsingError::new(span, error.clone());
+
+        assert_eq!(located.span().location_offset(), span.location_offset());
+        assert_eq!(located.span().fragment(), span.fragment());
+        assert_eq!(located.error(), &error);
+    }
+
+    #[test]
+    fn test_located_origin_parsing_error() {
+        let span = Span::new(&[1, 1, 3]);
+        let error = OriginParsingError::NomError(ErrorKind::Eof);
+
+        let located = LocatedOriginParsingError::new(span, error.clone());
+
+        assert_eq!(located.span().location_offset(), span.location_offset());
+        assert_eq!(located.span().fragment(), span.fragment());
+        assert_eq!(located.error(), &error);
+    }
+
+    #[test]
+    fn test_located_as_path_parsing_error() {
+        let span = Span::new(&[1, 1, 3]);
+        let error = AsPathParsingError::NomError(ErrorKind::Eof);
+
+        let located = LocatedAsPathParsingError::new(span, error.clone());
+
+        assert_eq!(located.span().location_offset(), span.location_offset());
+        assert_eq!(located.span().fragment(), span.fragment());
+        assert_eq!(located.error(), &error);
+    }
+
+    #[test]
+    fn test_located_next_hop_parsing_error() {
+        let span = Span::new(&[1, 1, 3]);
+        let error = NextHopParsingError::NomError(ErrorKind::Eof);
+
+        let located = LocatedNextHopParsingError::new(span, error.clone());
+
+        assert_eq!(located.span().location_offset(), span.location_offset());
+        assert_eq!(located.span().fragment(), span.fragment());
+        assert_eq!(located.error(), &error);
+    }
+
+    #[test]
+    fn test_located_med_parsing_error() {
+        let span = Span::new(&[1, 1, 3]);
+        let error = MultiExitDiscriminatorParsingError::NomError(ErrorKind::Eof);
+
+        let located = LocatedMultiExitDiscriminatorParsingError::new(span, error.clone());
+
+        assert_eq!(located.span().location_offset(), span.location_offset());
+        assert_eq!(located.span().fragment(), span.fragment());
+        assert_eq!(located.error(), &error);
+    }
+
+    #[test]
+    fn test_located_atomic_aggregate_parsing_error() {
+        let span = Span::new(&[1, 1, 3]);
+        let error = AtomicAggregateParsingError::NomError(ErrorKind::Eof);
+
+        let located = LocatedAtomicAggregateParsingError::new(span, error.clone());
+
+        assert_eq!(located.span().location_offset(), span.location_offset());
+        assert_eq!(located.span().fragment(), span.fragment());
+        assert_eq!(located.error(), &error);
+    }
+
+    #[test]
+    fn test_located_aggregate_parsing_error() {
+        let span = Span::new(&[1, 1, 3]);
+        let error = AggregatorParsingError::NomError(ErrorKind::Eof);
+
+        let located = LocatedAggregatorParsingError::new(span, error.clone());
+
+        assert_eq!(located.span().location_offset(), span.location_offset());
+        assert_eq!(located.span().fragment(), span.fragment());
+        assert_eq!(located.error(), &error);
+    }
+
+    #[test]
+    fn test_located_unknown_attr_parsing_error() {
+        let span = Span::new(&[1, 1, 3]);
+        let error = UnknownAttributeParsingError::NomError(ErrorKind::Eof);
+
+        let located = LocatedUnknownAttributeParsingError::new(span, error.clone());
+
+        assert_eq!(located.span().location_offset(), span.location_offset());
+        assert_eq!(located.span().fragment(), span.fragment());
+        assert_eq!(located.error(), &error);
+    }
+}

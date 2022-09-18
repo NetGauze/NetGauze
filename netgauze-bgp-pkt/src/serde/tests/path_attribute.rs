@@ -28,7 +28,7 @@ use crate::{
             LocatedMultiExitDiscriminatorParsingError, LocatedNextHopParsingError,
             LocatedOriginParsingError, LocatedPathAttributeParsingError,
             MultiExitDiscriminatorParsingError, NextHopParsingError, OriginParsingError,
-            PathAttributeParsingError,
+            PathAttributeParsingError, UnknownAttributeParsingError,
         },
         serializer::path_attribute::{
             AggregatorWritingError, AsPathWritingError, AtomicAggregateWritingError,
@@ -104,8 +104,10 @@ fn test_origin_value() -> Result<(), OriginWritingError> {
 #[test]
 fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
     let good_wire = [0x40, 0x01, 0x01, 0x00];
-    let good_wire_extended = [0x50, 0x01, 0x00, 0x01, 0x00];
-    let bad_wire_extended = [0x50, 0x01, 0x00, 0x01, 0x03];
+    let good_extended_wire = [0x50, 0x01, 0x00, 0x01, 0x00];
+    let bad_extended_wire = [0x50, 0x01, 0x00, 0x01, 0x03];
+    let bad_incomplete_wire = [0x40, 0x01, 0x01];
+
     let good = PathAttribute::Origin {
         extended_length: false,
         value: Origin::IGP,
@@ -116,22 +118,32 @@ fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
     };
 
     let bad_extended = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(4, &bad_wire_extended[4..]) },
+        unsafe { Span::new_from_raw_offset(4, &bad_extended_wire[4..]) },
         PathAttributeParsingError::OriginError(OriginParsingError::UndefinedOrigin(
             UndefinedOrigin(3),
         )),
     );
 
+    let bad_incomplete = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(3, &bad_incomplete_wire[3..]) },
+        PathAttributeParsingError::OriginError(OriginParsingError::NomError(ErrorKind::Eof)),
+    );
+
     test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_wire_extended, false, &good_extended);
+    test_parsed_completely_with_one_input(&good_extended_wire, false, &good_extended);
     test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
-        &bad_wire_extended,
+        &bad_extended_wire,
         false,
         &bad_extended,
     );
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &bad_incomplete_wire,
+        false,
+        &bad_incomplete,
+    );
 
     test_write(&good, &good_wire)?;
-    test_write(&good_extended, &good_wire_extended)?;
+    test_write(&good_extended, &good_extended_wire)?;
     Ok(())
 }
 
@@ -140,23 +152,32 @@ fn test_as2_path_segment() -> Result<(), AsPathWritingError> {
     let good_set_wire = [0x01, 0x01, 0x00, 0x01];
     let good_seq_wire = [0x02, 0x01, 0x00, 0x01];
     let good_empty_wire = [0x01, 0x00];
-    let undefined_segment_type_wire = [0x00, 0x01, 0x00, 0x01];
+    let bad_undefined_segment_type_wire = [0x00, 0x01, 0x00, 0x01];
+    let bad_incomplete_wire = [0x01, 0x01, 0x00];
 
     let set = As2PathSegment::new(AsPathSegmentType::AsSet, vec![1]);
     let seq = As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]);
     let empty = As2PathSegment::new(AsPathSegmentType::AsSet, vec![]);
 
-    let undefined_segment_type = LocatedAsPathParsingError::new(
-        unsafe { Span::new_from_raw_offset(0, &undefined_segment_type_wire) },
+    let bad_undefined_segment_type = LocatedAsPathParsingError::new(
+        Span::new(&bad_undefined_segment_type_wire),
         AsPathParsingError::UndefinedAsPathSegmentType(UndefinedAsPathSegmentType(0x00)),
+    );
+    let bad_incomplete = LocatedAsPathParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &bad_incomplete_wire[2..]) },
+        AsPathParsingError::NomError(ErrorKind::Eof),
     );
 
     test_parsed_completely(&good_set_wire, &set);
     test_parsed_completely(&good_seq_wire, &seq);
     test_parsed_completely(&good_empty_wire, &empty);
     test_parse_error::<As2PathSegment, LocatedAsPathParsingError<'_>>(
-        &undefined_segment_type_wire,
-        &undefined_segment_type,
+        &bad_undefined_segment_type_wire,
+        &bad_undefined_segment_type,
+    );
+    test_parse_error::<As2PathSegment, LocatedAsPathParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
     );
 
     test_write(&set, &good_set_wire)?;
@@ -482,6 +503,7 @@ fn test_multi_exit_discriminator() -> Result<(), MultiExitDiscriminatorWritingEr
 fn test_path_attribute_multi_exit_discriminator() -> Result<(), PathAttributeWritingError> {
     let good_wire = [0x80, 0x04, 0x04, 0x00, 0x00, 0x00, 0x01];
     let good_wire_extended = [0x90, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01];
+    let bad_eof_wire = [0x80, 0x04, 0x04, 0x00, 0x00, 0x00];
 
     let good = PathAttribute::MultiExitDiscriminator {
         extended_length: false,
@@ -491,9 +513,21 @@ fn test_path_attribute_multi_exit_discriminator() -> Result<(), PathAttributeWri
         extended_length: true,
         value: MultiExitDiscriminator::new(1),
     };
+    let bad_eof = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(3, &bad_eof_wire[3..]) },
+        PathAttributeParsingError::MultiExitDiscriminatorError(
+            MultiExitDiscriminatorParsingError::NomError(ErrorKind::Eof),
+        ),
+    );
 
     test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &bad_eof_wire,
+        false,
+        &bad_eof,
+    );
+
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
     Ok(())
@@ -720,6 +754,8 @@ fn test_path_attribute_as2_aggregator() -> Result<(), PathAttributeWritingError>
     let good_partial_wire = [0xe0, 0x07, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
     let good_extended_wire = [0xd0, 0x07, 0x00, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
     let good_partial_extended_wire = [0xf0, 0x07, 0x00, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let bad_length_wire = [0xc0, 0x07, 0x08, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
+    let bad_incomplete_wire = [0xc0, 0x07, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00];
 
     let good = PathAttribute::Aggregator {
         partial: false,
@@ -742,6 +778,19 @@ fn test_path_attribute_as2_aggregator() -> Result<(), PathAttributeWritingError>
         extended_length: true,
         value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
     };
+    let bad_length = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &bad_length_wire[2..]) },
+        PathAttributeParsingError::AggregatorError(AggregatorParsingError::InvalidLength(
+            PathAttributeLength::U8(8),
+        )),
+    );
+
+    let bad_incomplete = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(5, &bad_incomplete_wire[5..]) },
+        PathAttributeParsingError::AggregatorError(AggregatorParsingError::NomError(
+            ErrorKind::Eof,
+        )),
+    );
 
     test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_parsed_completely_with_one_input(&good_partial_wire, false, &good_partial);
@@ -750,6 +799,16 @@ fn test_path_attribute_as2_aggregator() -> Result<(), PathAttributeWritingError>
         &good_partial_extended_wire,
         false,
         &good_partial_extended,
+    );
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &bad_length_wire,
+        false,
+        &bad_length,
+    );
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &bad_incomplete_wire,
+        false,
+        &bad_incomplete,
     );
 
     test_write(&good, &good_wire)?;
@@ -850,6 +909,8 @@ fn test_unknown_attribute() -> Result<(), UnknownAttributeWritingError> {
 fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingError> {
     let good_wire = [0xc0, 0x00, 0x04, 0x00, 0x00, 0x00, 0x64];
     let good_extended_wire = [0xd0, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x64];
+    let bad_incomplete_wire = [0xc0, 0x00, 0x04, 0x00, 0x00, 0x00];
+
     let good = PathAttribute::UnknownAttribute {
         partial: false,
         value: UnknownAttribute::new(
@@ -860,7 +921,6 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
             good_wire[3..].into(),
         ),
     };
-
     let good_extended = PathAttribute::UnknownAttribute {
         partial: false,
         value: UnknownAttribute::new(
@@ -871,8 +931,20 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
             good_wire[3..].into(),
         ),
     };
+    let bad_incomplete = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(3, &bad_incomplete_wire[3..]) },
+        PathAttributeParsingError::UnknownAttributeError(UnknownAttributeParsingError::NomError(
+            ErrorKind::Eof,
+        )),
+    );
+
     test_parsed_completely_with_one_input(&good_wire, true, &good);
     test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &bad_incomplete_wire,
+        false,
+        &bad_incomplete,
+    );
 
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_extended_wire)?;
