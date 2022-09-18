@@ -14,16 +14,17 @@
 // limitations under the License.
 
 use crate::{
-    capabilities::BGPCapability,
     iana::{BGPOpenMessageParameterType, UndefinedBGPOpenMessageParameterType},
     open::BGPOpenMessageParameter,
     serde::deserializer::{
-        capabilities::{BGPCapabilityParsingError, LocatedBGPCapabilityParsingError},
-        BGPMessageParsingError, LocatedBGPMessageParsingError,
+        capabilities::BGPCapabilityParsingError, BGPMessageParsingError,
+        LocatedBGPMessageParsingError,
     },
     BGPOpenMessage,
 };
-use netgauze_parse_utils::{parse_till_empty, ReadablePDU, Span};
+use netgauze_parse_utils::{
+    parse_till_empty_into_located, IntoLocatedError, LocatedParsingError, ReadablePDU, Span,
+};
 use nom::{
     error::{ErrorKind, FromExternalError},
     number::complete::{be_u16, be_u32, be_u8},
@@ -53,21 +54,27 @@ impl<'a> LocatedBGPOpenMessageParsingError<'a> {
     pub const fn new(span: Span<'a>, error: BGPOpenMessageParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, BGPOpenMessageParsingError>
+    for LocatedBGPOpenMessageParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &BGPOpenMessageParsingError {
+    fn error(&self) -> &BGPOpenMessageParsingError {
         &self.error
     }
+}
 
-    pub const fn into_located_bgp_message_parsing_error(self) -> LocatedBGPMessageParsingError<'a> {
-        let span = self.span;
-        let error = self.error;
+impl<'a> IntoLocatedError<'a, BGPMessageParsingError, LocatedBGPMessageParsingError<'a>>
+    for LocatedBGPOpenMessageParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPMessageParsingError<'a> {
         LocatedBGPMessageParsingError::new(
-            span,
-            BGPMessageParsingError::BGPOpenMessageParsingError(error),
+            self.span,
+            BGPMessageParsingError::BGPOpenMessageParsingError(self.error),
         )
     }
 }
@@ -116,23 +123,25 @@ impl<'a> LocatedBGPParameterParsingError<'a> {
     pub const fn new(span: Span<'a>, error: BGPParameterParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, BGPParameterParsingError> for LocatedBGPParameterParsingError<'a> {
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &BGPParameterParsingError {
+    fn error(&self) -> &BGPParameterParsingError {
         &self.error
     }
+}
 
-    pub const fn into_located_bgp_open_message_parsing_error(
-        self,
-    ) -> LocatedBGPOpenMessageParsingError<'a> {
-        let span = self.span;
-        let error = self.error;
+impl<'a> IntoLocatedError<'a, BGPOpenMessageParsingError, LocatedBGPOpenMessageParsingError<'a>>
+    for LocatedBGPParameterParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPOpenMessageParsingError<'a> {
         LocatedBGPOpenMessageParsingError::new(
-            span,
-            BGPOpenMessageParsingError::ParameterError(error),
+            self.span,
+            BGPOpenMessageParsingError::ParameterError(self.error),
         )
     }
 }
@@ -188,25 +197,7 @@ impl<'a> ReadablePDU<'a, LocatedBGPOpenMessageParsingError<'a>> for BGPOpenMessa
         let (buf, bgp_id) = be_u32(buf)?;
         let bgp_id = Ipv4Addr::from(bgp_id);
         let (buf, params_buf) = nom::multi::length_data(be_u8)(buf)?;
-        let (_, params) = match parse_till_empty::<
-            '_,
-            BGPOpenMessageParameter,
-            LocatedBGPParameterParsingError<'_>,
-        >(params_buf)
-        {
-            Ok((buf, params)) => (buf, params),
-            Err(err) => {
-                return match err {
-                    nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                    nom::Err::Error(err) => Err(nom::Err::Error(
-                        err.into_located_bgp_open_message_parsing_error(),
-                    )),
-                    nom::Err::Failure(err) => Err(nom::Err::Failure(
-                        err.into_located_bgp_open_message_parsing_error(),
-                    )),
-                }
-            }
-        };
+        let (_, params) = parse_till_empty_into_located(params_buf)?;
         Ok((buf, BGPOpenMessage::new(my_as, hold_time, bgp_id, params)))
     }
 }
@@ -219,25 +210,7 @@ impl<'a> ReadablePDU<'a, LocatedBGPParameterParsingError<'a>> for BGPOpenMessage
         match param_type {
             BGPOpenMessageParameterType::Capability => {
                 let (buf, capabilities_buf) = nom::multi::length_data(be_u8)(buf)?;
-                let (_, capabilities) = match parse_till_empty::<
-                    '_,
-                    BGPCapability,
-                    LocatedBGPCapabilityParsingError<'_>,
-                >(capabilities_buf)
-                {
-                    Ok((buf, capabilities)) => (buf, capabilities),
-                    Err(err) => {
-                        return match err {
-                            nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                            nom::Err::Error(error) => {
-                                Err(nom::Err::Error(error.into_located_parameter_error()))
-                            }
-                            nom::Err::Failure(error) => {
-                                Err(nom::Err::Failure(error.into_located_parameter_error()))
-                            }
-                        }
-                    }
-                };
+                let (_, capabilities) = parse_till_empty_into_located(capabilities_buf)?;
                 Ok((buf, BGPOpenMessageParameter::Capabilities(capabilities)))
             }
             BGPOpenMessageParameterType::ExtendedLength => {

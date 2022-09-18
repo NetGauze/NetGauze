@@ -16,6 +16,7 @@
 //! Deserializer library for BGP's wire protocol
 
 pub mod capabilities;
+mod notification;
 pub mod open;
 pub mod path_attribute;
 pub mod update;
@@ -29,11 +30,15 @@ use nom::{
     IResult,
 };
 
-use netgauze_parse_utils::{ReadablePDU, ReadablePDUWithOneInput, Span};
+use netgauze_parse_utils::{
+    parse_into_located, parse_into_located_one_input, LocatedParsingError, ReadablePDUWithOneInput,
+    Span,
+};
 
 use crate::{
     iana::{BGPMessageType, UndefinedBgpMessageType},
     serde::deserializer::{
+        notification::BGPNotificationMessageParsingError,
         open::BGPOpenMessageParsingError,
         update::{
             BGPUpdateMessageParsingError, LocatedNetworkLayerReachabilityInformationParsingError,
@@ -41,7 +46,7 @@ use crate::{
             WithdrawRouteParsingError,
         },
     },
-    BGPMessage, BGPOpenMessage, BGPUpdateMessage,
+    BGPMessage,
 };
 
 /// Min message size in BGP is 19 octets. They're counted from
@@ -162,6 +167,8 @@ pub enum BGPMessageParsingError {
     BGPOpenMessageParsingError(BGPOpenMessageParsingError),
 
     BGPUpdateMessageParsingError(BGPUpdateMessageParsingError),
+
+    BGPNotificationMessageParsingError(BGPNotificationMessageParsingError),
 }
 
 /// BGP Message Parsing errors  with the input location of where it occurred in
@@ -176,12 +183,14 @@ impl<'a> LocatedBGPMessageParsingError<'a> {
     pub const fn new(span: Span<'a>, error: BGPMessageParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, BGPMessageParsingError> for LocatedBGPMessageParsingError<'a> {
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &BGPMessageParsingError {
+    fn error(&self) -> &BGPMessageParsingError {
         &self.error
     }
 }
@@ -286,38 +295,19 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPMessageParsingError<'a>> fo
         // Parse both length and type together, since we need to do input validation on
         // the length based on the type of the message
         let (buf, (_, message_type, reminder_buf)) = parse_bgp_message_length_and_type(buf)?;
-
         let (buf, msg) = match message_type {
-            BGPMessageType::Open => match BGPOpenMessage::from_wire(buf) {
-                Ok((buf, open)) => (buf, BGPMessage::Open(open)),
-
-                Err(err) => {
-                    return match err {
-                        nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                        nom::Err::Error(error) => Err(nom::Err::Error(
-                            error.into_located_bgp_message_parsing_error(),
-                        )),
-                        nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                            failure.into_located_bgp_message_parsing_error(),
-                        )),
-                    }
-                }
-            },
-            BGPMessageType::Update => match BGPUpdateMessage::from_wire(buf, asn4) {
-                Ok((buf, update)) => (buf, BGPMessage::Update(update)),
-                Err(err) => {
-                    return match err {
-                        nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                        nom::Err::Error(error) => Err(nom::Err::Error(
-                            error.into_located_bgp_message_parsing_error(),
-                        )),
-                        nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                            failure.into_located_bgp_message_parsing_error(),
-                        )),
-                    }
-                }
-            },
-            BGPMessageType::Notification => todo!(),
+            BGPMessageType::Open => {
+                let (buf, open) = parse_into_located(buf)?;
+                (buf, BGPMessage::Open(open))
+            }
+            BGPMessageType::Update => {
+                let (buf, update) = parse_into_located_one_input(buf, asn4)?;
+                (buf, BGPMessage::Update(update))
+            }
+            BGPMessageType::Notification => {
+                let (buf, notification) = parse_into_located(buf)?;
+                (buf, BGPMessage::Notification(notification))
+            }
             BGPMessageType::KeepAlive => (buf, BGPMessage::KeepAlive),
             BGPMessageType::RouteRefresh => todo!(),
         };

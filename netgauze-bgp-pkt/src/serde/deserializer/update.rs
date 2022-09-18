@@ -16,18 +16,17 @@
 //! Deserializer for BGP Update message
 
 use crate::{
-    path_attribute::PathAttribute,
     serde::deserializer::{
-        ipv4_network_from_wire,
-        path_attribute::{LocatedPathAttributeParsingError, PathAttributeParsingError},
-        BGPMessageParsingError, Ipv4PrefixParsingError, LocatedBGPMessageParsingError,
+        ipv4_network_from_wire, path_attribute::PathAttributeParsingError, BGPMessageParsingError,
+        Ipv4PrefixParsingError, LocatedBGPMessageParsingError,
     },
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
     BGPUpdateMessage,
 };
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
-    parse_till_empty, parse_till_empty_with_one_input, ReadablePDU, ReadablePDUWithOneInput, Span,
+    parse_till_empty_into_located, parse_till_empty_into_with_one_input_located, IntoLocatedError,
+    LocatedParsingError, ReadablePDU, ReadablePDUWithOneInput, Span,
 };
 use nom::{
     error::{ErrorKind, FromExternalError},
@@ -58,21 +57,27 @@ impl<'a> LocatedBGPUpdateMessageParsingError<'a> {
     pub const fn new(span: Span<'a>, error: BGPUpdateMessageParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, BGPUpdateMessageParsingError>
+    for LocatedBGPUpdateMessageParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &BGPUpdateMessageParsingError {
+    fn error(&self) -> &BGPUpdateMessageParsingError {
         &self.error
     }
+}
 
-    pub const fn into_located_bgp_message_parsing_error(self) -> LocatedBGPMessageParsingError<'a> {
-        let span = self.span;
-        let error = self.error;
+impl<'a> IntoLocatedError<'a, BGPMessageParsingError, LocatedBGPMessageParsingError<'a>>
+    for LocatedBGPUpdateMessageParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPMessageParsingError<'a> {
         LocatedBGPMessageParsingError::new(
-            span,
-            BGPMessageParsingError::BGPUpdateMessageParsingError(error),
+            self.span,
+            BGPMessageParsingError::BGPUpdateMessageParsingError(self.error),
         )
     }
 }
@@ -107,79 +112,8 @@ impl<'a> FromExternalError<Span<'a>, BGPUpdateMessageParsingError>
 fn parse_withdraw_routes(
     buf: Span<'_>,
 ) -> IResult<Span<'_>, Vec<WithdrawRoute>, LocatedBGPUpdateMessageParsingError<'_>> {
-    match parse_till_empty::<'_, WithdrawRoute, LocatedWithdrawRouteParsingError<'_>>(buf) {
-        Ok((buf, withdrawn_routes)) => Ok((buf, withdrawn_routes)),
-        Err(err) => {
-            return match err {
-                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                nom::Err::Error(error) => Err(nom::Err::Error(
-                    error.into_located_bgp_update_message_error(),
-                )),
-                nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                    failure.into_located_bgp_update_message_error(),
-                )),
-            }
-        }
-    }
-}
-
-/// Helper function to parse the the path attributes buffer in an update message
-#[inline]
-fn parse_path_attributes(
-    buf: Span<'_>,
-    asn4: bool,
-) -> IResult<Span<'_>, Vec<PathAttribute>, LocatedBGPUpdateMessageParsingError<'_>> {
-    match parse_till_empty_with_one_input::<
-        '_,
-        bool,
-        PathAttribute,
-        LocatedPathAttributeParsingError<'_>,
-    >(buf, asn4)
-    {
-        Ok((buf, path_attrs)) => Ok((buf, path_attrs)),
-        Err(err) => {
-            return match err {
-                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                nom::Err::Error(error) => Err(nom::Err::Error(
-                    error.into_located_bgp_update_message_error(),
-                )),
-                nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                    failure.into_located_bgp_update_message_error(),
-                )),
-            }
-        }
-    }
-}
-
-/// Helper function to parse the the network layer reachability info (NLRI)
-/// buffer in an update message
-#[inline]
-fn parse_nlri(
-    buf: Span<'_>,
-) -> IResult<
-    Span<'_>,
-    Vec<NetworkLayerReachabilityInformation>,
-    LocatedBGPUpdateMessageParsingError<'_>,
-> {
-    match parse_till_empty::<
-        '_,
-        NetworkLayerReachabilityInformation,
-        LocatedNetworkLayerReachabilityInformationParsingError<'_>,
-    >(buf)
-    {
-        Ok((buf, nlri)) => Ok((buf, nlri)),
-        Err(err) => {
-            return match err {
-                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                nom::Err::Error(error) => Err(nom::Err::Error(
-                    error.into_located_bgp_update_message_error(),
-                )),
-                nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                    failure.into_located_bgp_update_message_error(),
-                )),
-            }
-        }
-    }
+    let (buf, routes) = parse_till_empty_into_located(buf)?;
+    Ok((buf, routes))
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPUpdateMessageParsingError<'a>>
@@ -192,8 +126,9 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPUpdateMessageParsingError<'
         let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
         let (_, withdrawn_routes) = parse_withdraw_routes(withdrawn_buf)?;
         let (buf, path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (_, path_attributes) = parse_path_attributes(path_attributes_buf, asn4)?;
-        let (buf, nlri_vec) = parse_nlri(buf)?;
+        let (_, path_attributes) =
+            parse_till_empty_into_with_one_input_located(path_attributes_buf, asn4)?;
+        let (buf, nlri_vec) = parse_till_empty_into_located(buf)?;
         Ok((
             buf,
             BGPUpdateMessage::new(withdrawn_routes, path_attributes, nlri_vec),
@@ -219,23 +154,27 @@ impl<'a> LocatedWithdrawRouteParsingError<'a> {
     pub const fn new(span: Span<'a>, error: WithdrawRouteParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, WithdrawRouteParsingError>
+    for LocatedWithdrawRouteParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &WithdrawRouteParsingError {
+    fn error(&self) -> &WithdrawRouteParsingError {
         &self.error
     }
+}
 
-    pub const fn into_located_bgp_update_message_error(
-        self,
-    ) -> LocatedBGPUpdateMessageParsingError<'a> {
-        let span = self.span;
-        let error = self.error;
+impl<'a> IntoLocatedError<'a, BGPUpdateMessageParsingError, LocatedBGPUpdateMessageParsingError<'a>>
+    for LocatedWithdrawRouteParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
         LocatedBGPUpdateMessageParsingError::new(
-            span,
-            BGPUpdateMessageParsingError::WithdrawRouteError(error),
+            self.span,
+            BGPUpdateMessageParsingError::WithdrawRouteError(self.error),
         )
     }
 }
@@ -293,23 +232,27 @@ impl<'a> LocatedNetworkLayerReachabilityInformationParsingError<'a> {
     ) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, NetworkLayerReachabilityInformationParsingError>
+    for LocatedNetworkLayerReachabilityInformationParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &NetworkLayerReachabilityInformationParsingError {
+    fn error(&self) -> &NetworkLayerReachabilityInformationParsingError {
         &self.error
     }
+}
 
-    pub const fn into_located_bgp_update_message_error(
-        self,
-    ) -> LocatedBGPUpdateMessageParsingError<'a> {
-        let span = self.span;
-        let error = self.error;
+impl<'a> IntoLocatedError<'a, BGPUpdateMessageParsingError, LocatedBGPUpdateMessageParsingError<'a>>
+    for LocatedNetworkLayerReachabilityInformationParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
         LocatedBGPUpdateMessageParsingError::new(
-            span,
-            BGPUpdateMessageParsingError::NetworkLayerReachabilityInformationError(error),
+            self.span,
+            BGPUpdateMessageParsingError::NetworkLayerReachabilityInformationError(self.error),
         )
     }
 }

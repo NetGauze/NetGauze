@@ -28,8 +28,9 @@ use crate::{
     },
 };
 use netgauze_parse_utils::{
-    parse_till_empty, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs,
-    ReadablePDUWithTwoInputs, Span,
+    parse_into_located_one_input, parse_into_located_three_inputs, parse_into_located_two_inputs,
+    parse_till_empty, IntoLocatedError, LocatedParsingError, ReadablePDU, ReadablePDUWithOneInput,
+    ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs, Span,
 };
 use nom::{
     error::{ErrorKind, FromExternalError},
@@ -58,90 +59,6 @@ const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
     }
 }
 
-#[inline]
-fn parse_path_attribute_with_one_input<
-    'a,
-    I,
-    E: IntoLocatedPathAttributeParsingError<'a>,
-    T: ReadablePDUWithOneInput<'a, I, E>,
->(
-    buf: Span<'a>,
-    input: I,
-) -> IResult<Span<'a>, T, LocatedPathAttributeParsingError<'a>> {
-    match T::from_wire(buf, input) {
-        Ok((buf, value)) => Ok((buf, value)),
-        Err(err) => {
-            return match err {
-                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                nom::Err::Error(error) => Err(nom::Err::Error(
-                    error.into_located_attribute_parsing_error(),
-                )),
-                nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                    failure.into_located_attribute_parsing_error(),
-                )),
-            }
-        }
-    }
-}
-
-#[inline]
-fn parse_path_attribute_with_two_inputs<
-    'a,
-    I1,
-    I2,
-    E: IntoLocatedPathAttributeParsingError<'a>,
-    T: ReadablePDUWithTwoInputs<'a, I1, I2, E>,
->(
-    buf: Span<'a>,
-    input1: I1,
-    input2: I2,
-) -> IResult<Span<'a>, T, LocatedPathAttributeParsingError<'a>> {
-    match T::from_wire(buf, input1, input2) {
-        Ok((buf, value)) => Ok((buf, value)),
-        Err(err) => {
-            return match err {
-                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                nom::Err::Error(error) => Err(nom::Err::Error(
-                    error.into_located_attribute_parsing_error(),
-                )),
-                nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                    failure.into_located_attribute_parsing_error(),
-                )),
-            }
-        }
-    }
-}
-
-#[inline]
-fn parse_path_attribute_with_three_inputs<
-    'a,
-    I1,
-    I2,
-    I3,
-    E: IntoLocatedPathAttributeParsingError<'a>,
-    T: ReadablePDUWithThreeInputs<'a, I1, I2, I3, E>,
->(
-    buf: Span<'a>,
-    input1: I1,
-    input2: I2,
-    input3: I3,
-) -> IResult<Span<'a>, T, LocatedPathAttributeParsingError<'a>> {
-    match T::from_wire(buf, input1, input2, input3) {
-        Ok((buf, value)) => Ok((buf, value)),
-        Err(err) => {
-            return match err {
-                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                nom::Err::Error(error) => Err(nom::Err::Error(
-                    error.into_located_attribute_parsing_error(),
-                )),
-                nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                    failure.into_located_attribute_parsing_error(),
-                )),
-            }
-        }
-    }
-}
-
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
@@ -167,23 +84,27 @@ impl<'a> LocatedPathAttributeParsingError<'a> {
     pub const fn new(span: Span<'a>, error: PathAttributeParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, PathAttributeParsingError>
+    for LocatedPathAttributeParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &PathAttributeParsingError {
+    fn error(&self) -> &PathAttributeParsingError {
         &self.error
     }
+}
 
-    pub const fn into_located_bgp_update_message_error(
-        self,
-    ) -> LocatedBGPUpdateMessageParsingError<'a> {
-        let span = self.span;
-        let error = self.error;
+impl<'a> IntoLocatedError<'a, BGPUpdateMessageParsingError, LocatedBGPUpdateMessageParsingError<'a>>
+    for LocatedPathAttributeParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
         LocatedBGPUpdateMessageParsingError::new(
-            span,
-            BGPUpdateMessageParsingError::PathAttributeError(error),
+            self.span,
+            BGPUpdateMessageParsingError::PathAttributeError(self.error),
         )
     }
 }
@@ -230,7 +151,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
             attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
         match PathAttributeType::try_from(code) {
             Ok(PathAttributeType::Origin) => {
-                let (buf, value) = parse_path_attribute_with_one_input(buf, extended_length)?;
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let path_attr = PathAttribute::Origin {
                     extended_length,
                     value,
@@ -238,8 +159,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Ok(PathAttributeType::ASPath) => {
-                let (buf, value) =
-                    parse_path_attribute_with_two_inputs(buf, extended_length, asn4)?;
+                let (buf, value) = parse_into_located_two_inputs(buf, extended_length, asn4)?;
                 let path_attr = PathAttribute::ASPath {
                     extended_length,
                     value,
@@ -247,7 +167,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Ok(PathAttributeType::AS4Path) => {
-                let (buf, value) = parse_path_attribute_with_one_input(buf, extended_length)?;
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let path_attr = PathAttribute::AS4Path {
                     partial,
                     extended_length,
@@ -256,7 +176,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Ok(PathAttributeType::NextHop) => {
-                let (buf, value) = parse_path_attribute_with_one_input(buf, extended_length)?;
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let path_attr = PathAttribute::NextHop {
                     extended_length,
                     value,
@@ -264,7 +184,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Ok(PathAttributeType::MultiExitDiscriminator) => {
-                let (buf, value) = parse_path_attribute_with_one_input(buf, extended_length)?;
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let path_attr = PathAttribute::MultiExitDiscriminator {
                     extended_length,
                     value,
@@ -272,7 +192,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Ok(PathAttributeType::LocalPreference) => {
-                let (buf, value) = parse_path_attribute_with_one_input(buf, extended_length)?;
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let path_attr = PathAttribute::LocalPreference {
                     extended_length,
                     value,
@@ -280,7 +200,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Ok(PathAttributeType::AtomicAggregate) => {
-                let (buf, value) = parse_path_attribute_with_one_input(buf, extended_length)?;
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let path_attr = PathAttribute::AtomicAggregate {
                     extended_length,
                     value,
@@ -288,8 +208,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Ok(PathAttributeType::Aggregator) => {
-                let (buf, value) =
-                    parse_path_attribute_with_two_inputs(buf, extended_length, asn4)?;
+                let (buf, value) = parse_into_located_two_inputs(buf, extended_length, asn4)?;
                 let path_attr = PathAttribute::Aggregator {
                     partial,
                     extended_length,
@@ -298,7 +217,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Ok(_code) => {
-                let (buf, value) = parse_path_attribute_with_three_inputs(
+                let (buf, value) = parse_into_located_three_inputs(
                     buf_before_code,
                     optional,
                     transitive,
@@ -308,7 +227,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 Ok((buf, path_attr))
             }
             Err(UndefinedPathAttributeType(_code)) => {
-                let (buf, value) = parse_path_attribute_with_three_inputs(
+                let (buf, value) = parse_into_located_three_inputs(
                     buf_before_code,
                     optional,
                     transitive,
@@ -340,17 +259,22 @@ impl<'a> LocatedOriginParsingError<'a> {
     pub const fn new(span: Span<'a>, error: OriginParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, OriginParsingError> for LocatedOriginParsingError<'a> {
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &OriginParsingError {
+    fn error(&self) -> &OriginParsingError {
         &self.error
     }
 }
-impl<'a> IntoLocatedPathAttributeParsingError<'a> for LocatedOriginParsingError<'a> {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+
+impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+    for LocatedOriginParsingError<'a>
+{
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
             PathAttributeParsingError::OriginError(self.error),
@@ -422,18 +346,22 @@ impl<'a> LocatedAsPathParsingError<'a> {
     pub const fn new(span: Span<'a>, error: AsPathParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, AsPathParsingError> for LocatedAsPathParsingError<'a> {
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &AsPathParsingError {
+    fn error(&self) -> &AsPathParsingError {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedPathAttributeParsingError<'a> for LocatedAsPathParsingError<'a> {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+    for LocatedAsPathParsingError<'a>
+{
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
             PathAttributeParsingError::AsPathError(self.error),
@@ -539,18 +467,22 @@ impl<'a> LocatedNextHopParsingError<'a> {
     pub const fn new(span: Span<'a>, error: NextHopParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, NextHopParsingError> for LocatedNextHopParsingError<'a> {
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &NextHopParsingError {
+    fn error(&self) -> &NextHopParsingError {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedPathAttributeParsingError<'a> for LocatedNextHopParsingError<'a> {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+    for LocatedNextHopParsingError<'a>
+{
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
             PathAttributeParsingError::NextHopError(self.error),
@@ -618,20 +550,24 @@ impl<'a> LocatedMultiExitDiscriminatorParsingError<'a> {
     pub const fn new(span: Span<'a>, error: MultiExitDiscriminatorParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, MultiExitDiscriminatorParsingError>
+    for LocatedMultiExitDiscriminatorParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &MultiExitDiscriminatorParsingError {
+    fn error(&self) -> &MultiExitDiscriminatorParsingError {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedPathAttributeParsingError<'a>
+impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
     for LocatedMultiExitDiscriminatorParsingError<'a>
 {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
             PathAttributeParsingError::MultiExitDiscriminatorError(self.error),
@@ -711,18 +647,24 @@ impl<'a> LocatedLocalPreferenceParsingError<'a> {
     pub const fn new(span: Span<'a>, error: LocalPreferenceParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, LocalPreferenceParsingError>
+    for LocatedLocalPreferenceParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &LocalPreferenceParsingError {
+    fn error(&self) -> &LocalPreferenceParsingError {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedPathAttributeParsingError<'a> for LocatedLocalPreferenceParsingError<'a> {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+    for LocatedLocalPreferenceParsingError<'a>
+{
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
             PathAttributeParsingError::LocalPreferenceError(self.error),
@@ -797,17 +739,24 @@ impl<'a> LocatedAtomicAggregateParsingError<'a> {
     pub const fn new(span: Span<'a>, error: AtomicAggregateParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, AtomicAggregateParsingError>
+    for LocatedAtomicAggregateParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &AtomicAggregateParsingError {
+    fn error(&self) -> &AtomicAggregateParsingError {
         &self.error
     }
 }
-impl<'a> IntoLocatedPathAttributeParsingError<'a> for LocatedAtomicAggregateParsingError<'a> {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+
+impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+    for LocatedAtomicAggregateParsingError<'a>
+{
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
             PathAttributeParsingError::AtomicAggregateError(self.error),
@@ -880,18 +829,22 @@ impl<'a> LocatedAggregatorParsingError<'a> {
     pub const fn new(span: Span<'a>, error: AggregatorParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, AggregatorParsingError> for LocatedAggregatorParsingError<'a> {
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &AggregatorParsingError {
+    fn error(&self) -> &AggregatorParsingError {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedPathAttributeParsingError<'a> for LocatedAggregatorParsingError<'a> {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+    for LocatedAggregatorParsingError<'a>
+{
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
             PathAttributeParsingError::AggregatorError(self.error),
@@ -1006,18 +959,24 @@ impl<'a> LocatedUnknownAttributeParsingError<'a> {
     pub const fn new(span: Span<'a>, error: UnknownAttributeParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, UnknownAttributeParsingError>
+    for LocatedUnknownAttributeParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &UnknownAttributeParsingError {
+    fn error(&self) -> &UnknownAttributeParsingError {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedPathAttributeParsingError<'a> for LocatedUnknownAttributeParsingError<'a> {
-    fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a> {
+impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+    for LocatedUnknownAttributeParsingError<'a>
+{
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
             PathAttributeParsingError::UnknownAttributeError(self.error),

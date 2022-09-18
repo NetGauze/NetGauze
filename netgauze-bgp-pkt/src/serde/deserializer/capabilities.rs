@@ -21,7 +21,7 @@ use crate::{
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
     serde::deserializer::open::{BGPParameterParsingError, LocatedBGPParameterParsingError},
 };
-use netgauze_parse_utils::{ReadablePDU, Span};
+use netgauze_parse_utils::{IntoLocatedError, LocatedParsingError, ReadablePDU, Span};
 use nom::{
     error::{ErrorKind, FromExternalError},
     number::complete::be_u8,
@@ -51,19 +51,28 @@ impl<'a> LocatedBGPCapabilityParsingError<'a> {
     pub const fn new(span: Span<'a>, error: BGPCapabilityParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError<'a, BGPCapabilityParsingError>
+    for LocatedBGPCapabilityParsingError<'a>
+{
+    fn span(&self) -> &Span<'a> {
         &self.span
     }
 
-    pub const fn error(&self) -> &BGPCapabilityParsingError {
+    fn error(&self) -> &BGPCapabilityParsingError {
         &self.error
     }
+}
 
-    pub const fn into_located_parameter_error(self) -> LocatedBGPParameterParsingError<'a> {
-        let span = self.span;
-        let error = self.error;
-        LocatedBGPParameterParsingError::new(span, BGPParameterParsingError::CapabilityError(error))
+impl<'a> IntoLocatedError<'a, BGPParameterParsingError, LocatedBGPParameterParsingError<'a>>
+    for LocatedBGPCapabilityParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPParameterParsingError<'a> {
+        LocatedBGPParameterParsingError::new(
+            self.span,
+            BGPParameterParsingError::CapabilityError(self.error),
+        )
     }
 }
 
