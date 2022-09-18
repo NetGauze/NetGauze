@@ -392,7 +392,7 @@ pub enum CeaseErrorSubCode {
     HardReset = 9,
 
     /// [draft-ietf-idr-bfd-subcode](https://datatracker.ietf.org/doc/html/draft-ietf-idr-bfd-subcode)
-    BFDDown = 10,
+    BfdDown = 10,
 }
 
 impl From<CeaseErrorSubCode> for u8 {

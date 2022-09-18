@@ -78,7 +78,7 @@ pub enum HoldTimerExpiredError {
 /// See [crate::iana::FiniteStateMachineErrorSubCode] for full documentation
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum FiniteStateMachineError {
-    Unspecific { sub_code: u8, value: Vec<u8> },
+    Unspecific { value: Vec<u8> },
     ReceiveUnexpectedMessageInOpenSentState { value: Vec<u8> },
     ReceiveUnexpectedMessageInOpenConfirmState { value: Vec<u8> },
     ReceiveUnexpectedMessageInEstablishedState { value: Vec<u8> },
@@ -96,7 +96,7 @@ pub enum CeaseError {
     ConnectionCollisionResolution { value: Vec<u8> },
     OutOfResources { value: Vec<u8> },
     HardReset { value: Vec<u8> },
-    BFDDown { value: Vec<u8> },
+    BfdDown { value: Vec<u8> },
 }
 
 /// See [crate::iana::RouteRefreshMessageErrorSubCode] for full documentation
