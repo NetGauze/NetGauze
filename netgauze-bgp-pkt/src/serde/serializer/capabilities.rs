@@ -15,10 +15,10 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, FourOctetASCapability, MultiProtocolExtensionsCapability,
-        ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, EXTENDED_MESSAGE_CAPABILITY_LENGTH,
-        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
-        ROUTE_REFRESH_CAPABILITY_LENGTH,
+        AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, FourOctetASCapability,
+        MultiProtocolExtensionsCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
+        EXTENDED_MESSAGE_CAPABILITY_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
+        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::BGPCapabilityCode,
     serde::serializer::open::BGPOpenMessageWritingError,
@@ -32,6 +32,7 @@ pub enum BGPCapabilityWritingError {
     StdIOError(String),
     FourOctetASCapabilityError(FourOctetASCapabilityWritingError),
     MultiProtocolExtensionsCapabilityError(MultiProtocolExtensionsCapabilityWritingError),
+    AddPathCapabilityError(AddPathCapabilityWritingError),
 }
 
 impl From<std::io::Error> for BGPCapabilityWritingError {
@@ -57,8 +58,9 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             }
             Self::RouteRefresh => ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
-            Self::ExtendedMessage => EXTENDED_MESSAGE_CAPABILITY_LENGTH as usize,
             Self::FourOctetAS(value) => value.len(),
+            Self::AddPath(value) => value.len(),
+            Self::ExtendedMessage => EXTENDED_MESSAGE_CAPABILITY_LENGTH as usize,
             Self::Experimental(value) => value.value().len(),
             Self::Unrecognized(value) => value.value().len(),
         };
@@ -84,6 +86,11 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             Self::ExtendedMessage => {
                 writer.write_u8(BGPCapabilityCode::BGPExtendedMessage.into())?;
                 writer.write_u8(len)?;
+            }
+            Self::AddPath(value) => {
+                writer.write_u8(BGPCapabilityCode::ADDPathCapability.into())?;
+                writer.write_u8(len)?;
+                value.write(writer)?;
             }
             Self::FourOctetAS(value) => {
                 writer.write_u8(BGPCapabilityCode::FourOctetAS.into())?;
@@ -166,6 +173,61 @@ impl WritablePDU<MultiProtocolExtensionsCapabilityWritingError>
         writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
         writer.write_u8(0)?;
         writer.write_u8(self.address_type().subsequent_address_family().into())?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum AddPathCapabilityWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for AddPathCapabilityWritingError {
+    fn from(err: std::io::Error) -> Self {
+        AddPathCapabilityWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<AddPathCapabilityWritingError> for BGPCapabilityWritingError {
+    fn from(value: AddPathCapabilityWritingError) -> Self {
+        BGPCapabilityWritingError::AddPathCapabilityError(value)
+    }
+}
+
+impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapability {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self
+                .address_families()
+                .iter()
+                .map(|x| x.len())
+                .sum::<usize>()
+    }
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), AddPathCapabilityWritingError> {
+        for value in self.address_families() {
+            value.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapabilityAddressFamily {
+    // 2 octet AFI, 1 reserved, and 1 SAFI
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), AddPathCapabilityWritingError> {
+        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
+        writer.write_u8(self.address_type().subsequent_address_family().into())?;
+        // Flip second bit if send is enabled
+        let send = u8::from(self.send()) * 2;
+        // Flip first bit if send is enabled
+        let receive = u8::from(self.receive());
+        writer.write_u8(send | receive)?;
         Ok(())
     }
 }

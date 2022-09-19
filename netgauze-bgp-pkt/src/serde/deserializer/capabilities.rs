@@ -15,11 +15,11 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, FourOctetASCapability,
-        MultiProtocolExtensionsCapability, UnrecognizedCapability,
-        ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, EXTENDED_MESSAGE_CAPABILITY_LENGTH,
-        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
-        ROUTE_REFRESH_CAPABILITY_LENGTH,
+        AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, ExperimentalCapability,
+        ExperimentalCapabilityCode, FourOctetASCapability, MultiProtocolExtensionsCapability,
+        UnrecognizedCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
+        EXTENDED_MESSAGE_CAPABILITY_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
+        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
     serde::deserializer::open::{BGPParameterParsingError, LocatedBGPParameterParsingError},
@@ -29,7 +29,7 @@ use netgauze_iana::address_family::{
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located, IntoLocatedError, LocatedParsingError, ReadablePDU, Span,
+    parse_into_located, parse_till_empty, IntoLocatedError, LocatedParsingError, ReadablePDU, Span,
 };
 use nom::{
     error::{ErrorKind, FromExternalError, ParseError},
@@ -49,6 +49,7 @@ pub enum BGPCapabilityParsingError {
     InvalidExtendedMessageLength(u8),
     FourOctetASCapabilityError(FourOctetASCapabilityParsingError),
     MultiProtocolExtensionsCapabilityError(MultiProtocolExtensionsCapabilityParsingError),
+    AddPathCapabilityError(AddPathCapabilityParsingError),
 }
 
 /// BGP Open Message Parsing errors  with the input location of where it
@@ -228,7 +229,8 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
                     parse_unrecognized_capability(code.into(), buf)
                 }
                 BGPCapabilityCode::ADDPathCapability => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    let (buf, cap) = parse_into_located(buf)?;
+                    Ok((buf, BGPCapability::AddPath(cap)))
                 }
                 BGPCapabilityCode::EnhancedRouteRefresh => {
                     parse_enhanced_route_refresh_capability(buf)
@@ -512,5 +514,154 @@ impl<'a> ReadablePDU<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a
             }
         };
         Ok((buf, MultiProtocolExtensionsCapability::new(address_type)))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum AddPathCapabilityParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    AddressFamilyError(UndefinedAddressFamily),
+    SubsequentAddressFamilyError(UndefinedSubsequentAddressFamily),
+    AddressTypeError(InvalidAddressType),
+    InvalidAddPathSendReceiveValue(u8),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedAddPathCapabilityParsingError<'a> {
+    span: Span<'a>,
+    error: AddPathCapabilityParsingError,
+}
+
+impl<'a> LocatedAddPathCapabilityParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: AddPathCapabilityParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError for LocatedAddPathCapabilityParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = AddPathCapabilityParsingError;
+
+    fn span(&self) -> &Self::Span {
+        &self.span
+    }
+
+    fn error(&self) -> &Self::Error {
+        &self.error
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedBGPCapabilityParsingError<'a>>
+    for LocatedAddPathCapabilityParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPCapabilityParsingError<'a> {
+        LocatedBGPCapabilityParsingError::new(
+            self.span,
+            BGPCapabilityParsingError::AddPathCapabilityError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, AddPathCapabilityParsingError>
+    for LocatedAddPathCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: AddPathCapabilityParsingError,
+    ) -> Self {
+        LocatedAddPathCapabilityParsingError::new(input, error)
+    }
+}
+
+impl<'a> ParseError<Span<'a>> for LocatedAddPathCapabilityParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedAddPathCapabilityParsingError::new(
+            input,
+            AddPathCapabilityParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily>
+    for LocatedAddPathCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UndefinedAddressFamily,
+    ) -> Self {
+        LocatedAddPathCapabilityParsingError::new(
+            input,
+            AddPathCapabilityParsingError::AddressFamilyError(error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
+    for LocatedAddPathCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UndefinedSubsequentAddressFamily,
+    ) -> Self {
+        LocatedAddPathCapabilityParsingError::new(
+            input,
+            AddPathCapabilityParsingError::SubsequentAddressFamilyError(error),
+        )
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathCapability {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedAddPathCapabilityParsingError<'a>> {
+        let (buf, params_buf) = nom::multi::length_data(be_u8)(buf)?;
+        let (_, address_families) = parse_till_empty(params_buf)?;
+
+        Ok((buf, AddPathCapability::new(address_families)))
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>>
+    for AddPathCapabilityAddressFamily
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedAddPathCapabilityParsingError<'a>> {
+        let input = buf;
+        let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
+        let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+        let address_type = match AddressType::from_afi_safi(afi, safi) {
+            Ok(address_type) => address_type,
+            Err(err) => {
+                return Err(nom::Err::Error(LocatedAddPathCapabilityParsingError::new(
+                    input,
+                    AddPathCapabilityParsingError::AddressTypeError(err),
+                )))
+            }
+        };
+        let (buf, (receive, send)) = nom::combinator::map_res(be_u8, |send_receive| {
+            if send_receive > 0x03u8 {
+                Err(AddPathCapabilityParsingError::InvalidAddPathSendReceiveValue(send_receive))
+            } else {
+                Ok((
+                    send_receive & 0x01u8 == 0x01u8,
+                    send_receive & 0x02u8 == 0x02u8,
+                ))
+            }
+        })(buf)?;
+
+        Ok((
+            buf,
+            AddPathCapabilityAddressFamily::new(address_type, send, receive),
+        ))
     }
 }

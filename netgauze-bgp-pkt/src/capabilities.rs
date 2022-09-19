@@ -57,6 +57,8 @@ pub enum BGPCapability {
     /// Defined in [RFC7313](https://datatracker.ietf.org/doc/html/rfc7313)
     EnhancedRouteRefresh,
 
+    AddPath(AddPathCapability),
+
     ExtendedMessage,
 
     FourOctetAS(FourOctetASCapability),
@@ -169,5 +171,50 @@ impl FourOctetASCapability {
 
     pub const fn asn4(&self) -> u32 {
         self.asn4
+    }
+}
+
+/// See [RFC7911](https://datatracker.ietf.org/doc/html/RFC7911)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct AddPathCapability {
+    address_families: Vec<AddPathCapabilityAddressFamily>,
+}
+
+impl AddPathCapability {
+    pub const fn new(address_families: Vec<AddPathCapabilityAddressFamily>) -> Self {
+        Self { address_families }
+    }
+
+    pub const fn address_families(&self) -> &Vec<AddPathCapabilityAddressFamily> {
+        &self.address_families
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct AddPathCapabilityAddressFamily {
+    address_type: AddressType,
+    send: bool,
+    receive: bool,
+}
+
+impl AddPathCapabilityAddressFamily {
+    pub const fn new(address_type: AddressType, send: bool, receive: bool) -> Self {
+        Self {
+            address_type,
+            send,
+            receive,
+        }
+    }
+
+    pub const fn address_type(&self) -> AddressType {
+        self.address_type
+    }
+
+    pub const fn send(&self) -> bool {
+        self.send
+    }
+
+    pub const fn receive(&self) -> bool {
+        self.receive
     }
 }

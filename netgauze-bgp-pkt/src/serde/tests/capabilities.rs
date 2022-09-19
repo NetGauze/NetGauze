@@ -15,13 +15,15 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, FourOctetASCapability,
-        MultiProtocolExtensionsCapability, UnrecognizedCapability,
+        AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, ExperimentalCapability,
+        ExperimentalCapabilityCode, FourOctetASCapability, MultiProtocolExtensionsCapability,
+        UnrecognizedCapability,
     },
     serde::{
         deserializer::capabilities::{
-            BGPCapabilityParsingError, FourOctetASCapabilityParsingError,
-            LocatedBGPCapabilityParsingError, MultiProtocolExtensionsCapabilityParsingError,
+            AddPathCapabilityParsingError, BGPCapabilityParsingError,
+            FourOctetASCapabilityParsingError, LocatedBGPCapabilityParsingError,
+            MultiProtocolExtensionsCapabilityParsingError,
         },
         serializer::capabilities::BGPCapabilityWritingError,
     },
@@ -179,6 +181,49 @@ fn test_multi_protocol_extension() -> Result<(), BGPCapabilityWritingError> {
     );
 
     test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_add_path() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [0x45, 0x04, 0x00, 0x02, 0x01, 0x03];
+    let good_long_wire = [0x45, 0x08, 0x00, 0x01, 0x01, 0x02, 0x00, 0x02, 0x01, 0x01];
+    let bad_send_receive_wire = [0x45, 0x04, 0x00, 0x02, 0x01, 0x04];
+    let bad_incomplete_wire = [0x45, 0x03, 0x00, 0x02, 0x01, 0x03];
+
+    let good = BGPCapability::AddPath(AddPathCapability::new(vec![
+        AddPathCapabilityAddressFamily::new(AddressType::Ipv6Unicast, true, true),
+    ]));
+    let good_long = BGPCapability::AddPath(AddPathCapability::new(vec![
+        AddPathCapabilityAddressFamily::new(AddressType::Ipv4Unicast, true, false),
+        AddPathCapabilityAddressFamily::new(AddressType::Ipv6Unicast, false, true),
+    ]));
+    let bad_send_receive = LocatedBGPCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(5, &bad_send_receive_wire[5..]) },
+        BGPCapabilityParsingError::AddPathCapabilityError(
+            AddPathCapabilityParsingError::InvalidAddPathSendReceiveValue(bad_send_receive_wire[1]),
+        ),
+    );
+    let bad_incomplete_wire = LocatedBGPCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(5, &bad_incomplete_wire[5..]) },
+        BGPCapabilityParsingError::AddPathCapabilityError(AddPathCapabilityParsingError::NomError(
+            ErrorKind::Eof,
+        )),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely(&good_long_wire, &good_long);
+    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+        &bad_send_receive_wire,
+        &bad_send_receive,
+    );
+    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete_wire,
+    );
+
+    test_write(&good, &good_wire)?;
+
     Ok(())
 }
 
