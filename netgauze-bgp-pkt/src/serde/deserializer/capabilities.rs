@@ -136,29 +136,38 @@ fn parse_unrecognized_capability(
     ))
 }
 
-fn parse_route_refresh_capability(
+/// Helper function to read and check the capability exact length
+#[inline]
+fn check_capability_length(
     buf: Span<'_>,
-) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
-    let (buf, _) = nom::combinator::map_res(be_u8, |length| {
-        if length != ROUTE_REFRESH_CAPABILITY_LENGTH {
-            Err(BGPCapabilityParsingError::InvalidRouteRefreshLength(length))
+    expected: u8,
+    err: fn(u8) -> BGPCapabilityParsingError,
+) -> IResult<Span<'_>, u8, LocatedBGPCapabilityParsingError<'_>> {
+    let (buf, length) = nom::combinator::map_res(be_u8, |length| {
+        if length != expected {
+            Err(err(length))
         } else {
             Ok(length)
         }
     })(buf)?;
+    Ok((buf, length))
+}
+
+fn parse_route_refresh_capability(
+    buf: Span<'_>,
+) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
+    let (buf, _) = check_capability_length(buf, ROUTE_REFRESH_CAPABILITY_LENGTH, |x| {
+        BGPCapabilityParsingError::InvalidRouteRefreshLength(x)
+    })?;
     Ok((buf, BGPCapability::RouteRefresh))
 }
 
 fn parse_enhanced_route_refresh_capability(
     buf: Span<'_>,
 ) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
-    let (buf, _) = nom::combinator::map_res(be_u8, |length| {
-        if length != ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH {
-            Err(BGPCapabilityParsingError::InvalidEnhancedRouteRefreshLength(length))
-        } else {
-            Ok(length)
-        }
-    })(buf)?;
+    let (buf, _) = check_capability_length(buf, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, |x| {
+        BGPCapabilityParsingError::InvalidEnhancedRouteRefreshLength(x)
+    })?;
     Ok((buf, BGPCapability::EnhancedRouteRefresh))
 }
 
