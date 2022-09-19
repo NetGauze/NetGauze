@@ -114,6 +114,27 @@ fn test_four_octet_as() -> Result<(), BGPCapabilityWritingError> {
 }
 
 #[test]
+fn test_extended_message() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [0x06, 0x00];
+    let bad_invalid_length_wire = [0x06, 0x01];
+    let bad_with_content_wire = [0x06, 0x01, 0x01];
+
+    let good = BGPCapability::ExtendedMessage;
+    let bad_invalid_length = LocatedBGPCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_invalid_length_wire[1..]) },
+        BGPCapabilityParsingError::InvalidExtendedMessageLength(1),
+    );
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+        &bad_invalid_length_wire,
+        &bad_invalid_length,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_experimental_capabilities() -> Result<(), BGPCapabilityWritingError> {
     // IANA defines the codes 239-254 as reserved for Experimental Use
     for code in 239..255 {

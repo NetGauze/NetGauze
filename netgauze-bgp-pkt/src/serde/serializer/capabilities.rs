@@ -16,8 +16,8 @@
 use crate::{
     capabilities::{
         BGPCapability, FourOctetASCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
-        ROUTE_REFRESH_CAPABILITY_LENGTH,
+        EXTENDED_MESSAGE_CAPABILITY_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
+        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::BGPCapabilityCode,
     serde::serializer::open::BGPOpenMessageWritingError,
@@ -55,6 +55,7 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             }
             Self::RouteRefresh => ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
+            Self::ExtendedMessage => EXTENDED_MESSAGE_CAPABILITY_LENGTH as usize,
             Self::FourOctetAS(value) => value.len(),
             Self::Experimental(value) => value.value().len(),
             Self::Unrecognized(value) => value.value().len(),
@@ -72,6 +73,10 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             }
             Self::EnhancedRouteRefresh => {
                 writer.write_u8(BGPCapabilityCode::EnhancedRouteRefresh.into())?;
+                writer.write_u8(len)?;
+            }
+            Self::ExtendedMessage => {
+                writer.write_u8(BGPCapabilityCode::BGPExtendedMessage.into())?;
                 writer.write_u8(len)?;
             }
             Self::FourOctetAS(value) => {

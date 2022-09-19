@@ -17,7 +17,8 @@ use crate::{
     capabilities::{
         BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, FourOctetASCapability,
         UnrecognizedCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        FOUR_OCTET_AS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
+        EXTENDED_MESSAGE_CAPABILITY_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
+        ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
     serde::deserializer::open::{BGPParameterParsingError, LocatedBGPParameterParsingError},
@@ -40,6 +41,7 @@ pub enum BGPCapabilityParsingError {
     UndefinedCapabilityCode(UndefinedBGPCapabilityCode),
     InvalidRouteRefreshLength(u8),
     InvalidEnhancedRouteRefreshLength(u8),
+    InvalidExtendedMessageLength(u8),
     FourOctetASCapabilityError(FourOctetASCapabilityParsingError),
 }
 
@@ -192,7 +194,11 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
                     parse_unrecognized_capability(code.into(), buf)
                 }
                 BGPCapabilityCode::BGPExtendedMessage => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    let (buf, _) =
+                        check_capability_length(buf, EXTENDED_MESSAGE_CAPABILITY_LENGTH, |x| {
+                            BGPCapabilityParsingError::InvalidExtendedMessageLength(x)
+                        })?;
+                    Ok((buf, BGPCapability::ExtendedMessage))
                 }
                 BGPCapabilityCode::BGPSecCapability => {
                     parse_unrecognized_capability(code.into(), buf)
