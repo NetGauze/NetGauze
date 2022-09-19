@@ -22,7 +22,7 @@ pub(crate) const ROUTE_REFRESH_CAPABILITY_LENGTH: u8 = 0;
 /// Enhanced route refresh have fixed length as per RFC7313
 pub(crate) const ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH: u8 = 0;
 
-/// Multi Protocol extension have fixed length as per RFC2858
+/// Multi Protocol extension have fixed length as per RFC4760
 pub(crate) const MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH: u8 = 4;
 
 /// Four octet as capability have fixed length as per RFC6793
@@ -48,7 +48,7 @@ pub(crate) const EXTENDED_MESSAGE_CAPABILITY_LENGTH: u8 = 0;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BGPCapability {
-    /// Defined in [RFC2858](https://datatracker.ietf.org/doc/html/rfc2858)
+    /// Defined in [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
     MultiProtocolExtensions(MultiProtocolExtensionsCapability),
 
     /// Defined in [RFC2918](https://datatracker.ietf.org/doc/html/rfc2918)
@@ -135,7 +135,7 @@ impl ExperimentalCapability {
 }
 
 /// Capability advertisement to speak a multi-protocol for a given
-/// [AddressType] as defined in [RFC2858 Multiprotocol Extensions for BGP-4](https://datatracker.ietf.org/doc/html/rfc2858)
+/// [AddressType] as defined in [RFC4760 Multiprotocol Extensions for BGP-4](https://datatracker.ietf.org/doc/html/rfc4760)
 ///
 /// ```text
 /// 0       7      15      23      31

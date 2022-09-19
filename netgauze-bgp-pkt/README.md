@@ -16,7 +16,7 @@ BGP-4 Protocol representation and serde.
 
 | Capability                             | RFC                                                       | Notes                                                            |
 |----------------------------------------|-----------------------------------------------------------|------------------------------------------------------------------|
-| (WIP) MultiProtocolExtensions (MP-BGP) | [RFC 2858](https://datatracker.ietf.org/doc/html/rfc2858) | See MP-BGP supported address families below                      |
+| (WIP) MultiProtocolExtensions (MP-BGP) | [RFC 4760](https://datatracker.ietf.org/doc/html/rfc4760) | See MP-BGP supported address families below                      |
  | RouteRefresh                           | [RFC 2918](https://datatracker.ietf.org/doc/html/rfc2918) |                                                                  |
 | EnhancedRouteRefres                    | [RFC 7313](https://datatracker.ietf.org/doc/html/rfc7313) |                                                                  |
  | Unrecognized                           | [RFC 5492](https://datatracker.ietf.org/doc/html/rfc5492) | We carry the capability code and the `u8` vectore for it's value |
