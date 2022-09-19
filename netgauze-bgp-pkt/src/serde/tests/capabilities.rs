@@ -117,17 +117,25 @@ fn test_four_octet_as() -> Result<(), BGPCapabilityWritingError> {
 fn test_extended_message() -> Result<(), BGPCapabilityWritingError> {
     let good_wire = [0x06, 0x00];
     let bad_invalid_length_wire = [0x06, 0x01];
-    let bad_with_content_wire = [0x06, 0x01, 0x01];
+    let bad_incomplete_wire = [0x06];
 
     let good = BGPCapability::ExtendedMessage;
     let bad_invalid_length = LocatedBGPCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &bad_invalid_length_wire[1..]) },
         BGPCapabilityParsingError::InvalidExtendedMessageLength(1),
     );
+    let bad_incomplete = LocatedBGPCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
+        BGPCapabilityParsingError::NomError(ErrorKind::Eof),
+    );
     test_parsed_completely(&good_wire, &good);
     test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
         &bad_invalid_length_wire,
         &bad_invalid_length,
+    );
+    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
     );
 
     test_write(&good, &good_wire)?;
