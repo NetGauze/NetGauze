@@ -204,7 +204,7 @@ fn test_parse_add_path() -> Result<(), BGPCapabilityWritingError> {
             AddPathCapabilityParsingError::InvalidAddPathSendReceiveValue(bad_send_receive_wire[1]),
         ),
     );
-    let bad_incomplete_wire = LocatedBGPCapabilityParsingError::new(
+    let bad_incomplete = LocatedBGPCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(5, &bad_incomplete_wire[5..]) },
         BGPCapabilityParsingError::AddPathCapabilityError(AddPathCapabilityParsingError::NomError(
             ErrorKind::Eof,
