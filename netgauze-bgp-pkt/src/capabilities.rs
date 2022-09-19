@@ -25,6 +25,9 @@ pub(crate) const ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH: u8 = 0;
 /// Multi Protocol extension have fixed length as per RFC2858
 pub(crate) const MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH: u8 = 4;
 
+/// Four octet as capability have fixed length as per RFC6793
+pub(crate) const FOUR_OCTET_AS_CAPABILITY_LENGTH: u8 = 4;
+
 /// BGP Capabilities are included as parameters in the BGPOpen message
 /// to indicate support of certain BGP Features.
 ///
@@ -50,6 +53,8 @@ pub enum BGPCapability {
 
     /// Defined in [RFC7313](https://datatracker.ietf.org/doc/html/rfc7313)
     EnhancedRouteRefresh,
+
+    FourOctetAS(FourOctetASCapability),
 
     Experimental(ExperimentalCapability),
 
@@ -143,5 +148,21 @@ impl MultiProtocolExtensionsCapability {
 
     pub const fn address_type(&self) -> AddressType {
         self.address_type
+    }
+}
+
+/// Defined in [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FourOctetASCapability {
+    asn4: u32,
+}
+
+impl FourOctetASCapability {
+    pub const fn new(asn4: u32) -> Self {
+        Self { asn4 }
+    }
+
+    pub const fn asn4(&self) -> u32 {
+        self.asn4
     }
 }

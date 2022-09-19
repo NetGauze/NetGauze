@@ -15,10 +15,14 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, UnrecognizedCapability,
+        BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, FourOctetASCapability,
+        UnrecognizedCapability,
     },
     serde::{
-        deserializer::capabilities::{BGPCapabilityParsingError, LocatedBGPCapabilityParsingError},
+        deserializer::capabilities::{
+            BGPCapabilityParsingError, FourOctetASCapabilityParsingError,
+            LocatedBGPCapabilityParsingError,
+        },
         serializer::capabilities::BGPCapabilityWritingError,
     },
 };
@@ -26,6 +30,7 @@ use netgauze_parse_utils::{
     test_helpers::{test_parse_error, test_parsed_completely, test_write},
     Span,
 };
+use nom::error::ErrorKind;
 
 #[test]
 fn test_route_refresh() -> Result<(), BGPCapabilityWritingError> {
@@ -70,6 +75,40 @@ fn test_unrecognized_capability() -> Result<(), BGPCapabilityWritingError> {
     let good = BGPCapability::Unrecognized(UnrecognizedCapability::new(128, vec![1]));
 
     test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_four_octet_as() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [0x41, 0x04, 0x00, 0x00, 0x00, 0x064];
+    let invalid_length_wire = [0x41, 0x03, 0x00, 0x00, 0x00, 0x064];
+    let bad_incomplete_wire = [0x41, 0x04, 0x00, 0x00, 0x00];
+
+    let good = BGPCapability::FourOctetAS(FourOctetASCapability::new(100));
+    let invalid_length = LocatedBGPCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &invalid_length_wire[1..]) },
+        BGPCapabilityParsingError::FourOctetASCapabilityError(
+            FourOctetASCapabilityParsingError::InvalidLength(invalid_length_wire[1]),
+        ),
+    );
+    let bad_incomplete = LocatedBGPCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &bad_incomplete_wire[2..]) },
+        BGPCapabilityParsingError::FourOctetASCapabilityError(
+            FourOctetASCapabilityParsingError::NomError(ErrorKind::Eof),
+        ),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+        &invalid_length_wire,
+        &invalid_length,
+    );
+    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
     test_write(&good, &good_wire)?;
     Ok(())
 }

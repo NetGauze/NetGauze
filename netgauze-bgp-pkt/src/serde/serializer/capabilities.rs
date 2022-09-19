@@ -15,19 +15,21 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
+        BGPCapability, FourOctetASCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
+        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
+        ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::BGPCapabilityCode,
     serde::serializer::open::BGPOpenMessageWritingError,
 };
-use byteorder::WriteBytesExt;
+use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
 use std::io::Write;
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum BGPCapabilityWritingError {
     StdIOError(String),
+    FourOctetASCapabilityError(FourOctetASCapabilityWritingError),
 }
 
 impl From<std::io::Error> for BGPCapabilityWritingError {
@@ -53,6 +55,7 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             }
             Self::RouteRefresh => ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
+            Self::FourOctetAS(value) => value.len(),
             Self::Experimental(value) => value.value().len(),
             Self::Unrecognized(value) => value.value().len(),
         };
@@ -71,6 +74,11 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
                 writer.write_u8(BGPCapabilityCode::EnhancedRouteRefresh.into())?;
                 writer.write_u8(len)?;
             }
+            Self::FourOctetAS(value) => {
+                writer.write_u8(BGPCapabilityCode::FourOctetAS.into())?;
+                writer.write_u8(value.len() as u8)?;
+                writer.write_u32::<NetworkEndian>(value.asn4())?;
+            }
             Self::Experimental(value) => {
                 writer.write_u8(value.code() as u8)?;
                 writer.write_u8(len)?;
@@ -82,6 +90,35 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
                 writer.write_all(value.value())?;
             }
         }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum FourOctetASCapabilityWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for FourOctetASCapabilityWritingError {
+    fn from(err: std::io::Error) -> Self {
+        FourOctetASCapabilityWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<FourOctetASCapabilityWritingError> for BGPCapabilityWritingError {
+    fn from(value: FourOctetASCapabilityWritingError) -> Self {
+        BGPCapabilityWritingError::FourOctetASCapabilityError(value)
+    }
+}
+
+impl WritablePDU<FourOctetASCapabilityWritingError> for FourOctetASCapability {
+    const BASE_LENGTH: usize = FOUR_OCTET_AS_CAPABILITY_LENGTH as usize;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), FourOctetASCapabilityWritingError> {
+        writer.write_u32::<NetworkEndian>(self.asn4())?;
         Ok(())
     }
 }

@@ -15,16 +15,19 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, UnrecognizedCapability,
-        ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
+        BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, FourOctetASCapability,
+        UnrecognizedCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
+        FOUR_OCTET_AS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
     serde::deserializer::open::{BGPParameterParsingError, LocatedBGPParameterParsingError},
 };
-use netgauze_parse_utils::{IntoLocatedError, LocatedParsingError, ReadablePDU, Span};
+use netgauze_parse_utils::{
+    parse_into_located, IntoLocatedError, LocatedParsingError, ReadablePDU, Span,
+};
 use nom::{
-    error::{ErrorKind, FromExternalError},
-    number::complete::be_u8,
+    error::{ErrorKind, FromExternalError, ParseError},
+    number::complete::{be_u32, be_u8},
     IResult,
 };
 
@@ -37,6 +40,7 @@ pub enum BGPCapabilityParsingError {
     UndefinedCapabilityCode(UndefinedBGPCapabilityCode),
     InvalidRouteRefreshLength(u8),
     InvalidEnhancedRouteRefreshLength(u8),
+    FourOctetASCapabilityError(FourOctetASCapabilityParsingError),
 }
 
 /// BGP Open Message Parsing errors  with the input location of where it
@@ -77,7 +81,7 @@ impl<'a> IntoLocatedError<LocatedBGPParameterParsingError<'a>>
     }
 }
 
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedBGPCapabilityParsingError<'a> {
+impl<'a> ParseError<Span<'a>> for LocatedBGPCapabilityParsingError<'a> {
     fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
         LocatedBGPCapabilityParsingError::new(input, BGPCapabilityParsingError::NomError(kind))
     }
@@ -138,11 +142,11 @@ fn parse_unrecognized_capability(
 
 /// Helper function to read and check the capability exact length
 #[inline]
-fn check_capability_length(
-    buf: Span<'_>,
+fn check_capability_length<'a, E, L: FromExternalError<Span<'a>, E> + ParseError<Span<'a>>>(
+    buf: Span<'a>,
     expected: u8,
-    err: fn(u8) -> BGPCapabilityParsingError,
-) -> IResult<Span<'_>, u8, LocatedBGPCapabilityParsingError<'_>> {
+    err: fn(u8) -> E,
+) -> IResult<Span<'a>, u8, L> {
     let (buf, length) = nom::combinator::map_res(be_u8, |length| {
         if length != expected {
             Err(err(length))
@@ -200,7 +204,10 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
                 BGPCapabilityCode::GracefulRestartCapability => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
-                BGPCapabilityCode::FourOctetAS => parse_unrecognized_capability(code.into(), buf),
+                BGPCapabilityCode::FourOctetAS => {
+                    let (buf, cap) = parse_into_located(buf)?;
+                    Ok((buf, BGPCapability::FourOctetAS(cap)))
+                }
                 BGPCapabilityCode::SupportForDynamicCapability => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
@@ -280,5 +287,86 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
             }
             Err(err) => Err(err),
         }
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum FourOctetASCapabilityParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidLength(u8),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedFourOctetASCapabilityParsingError<'a> {
+    span: Span<'a>,
+    error: FourOctetASCapabilityParsingError,
+}
+
+impl<'a> LocatedFourOctetASCapabilityParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: FourOctetASCapabilityParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError for LocatedFourOctetASCapabilityParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = FourOctetASCapabilityParsingError;
+
+    fn span(&self) -> &Self::Span {
+        &self.span
+    }
+
+    fn error(&self) -> &Self::Error {
+        &self.error
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedBGPCapabilityParsingError<'a>>
+    for LocatedFourOctetASCapabilityParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPCapabilityParsingError<'a> {
+        LocatedBGPCapabilityParsingError::new(
+            self.span,
+            BGPCapabilityParsingError::FourOctetASCapabilityError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, FourOctetASCapabilityParsingError>
+    for LocatedFourOctetASCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: FourOctetASCapabilityParsingError,
+    ) -> Self {
+        LocatedFourOctetASCapabilityParsingError::new(input, error)
+    }
+}
+
+impl<'a> ParseError<Span<'a>> for LocatedFourOctetASCapabilityParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedFourOctetASCapabilityParsingError::new(
+            input,
+            FourOctetASCapabilityParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedFourOctetASCapabilityParsingError<'a>> for FourOctetASCapability {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedFourOctetASCapabilityParsingError<'a>> {
+        let (buf, _) = check_capability_length(buf, FOUR_OCTET_AS_CAPABILITY_LENGTH, |x| {
+            FourOctetASCapabilityParsingError::InvalidLength(x)
+        })?;
+        let (buf, asn4) = be_u32(buf)?;
+        Ok((buf, FourOctetASCapability::new(asn4)))
     }
 }
