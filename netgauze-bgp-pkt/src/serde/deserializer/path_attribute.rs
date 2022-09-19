@@ -86,19 +86,20 @@ impl<'a> LocatedPathAttributeParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, PathAttributeParsingError>
-    for LocatedPathAttributeParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedPathAttributeParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = PathAttributeParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &PathAttributeParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, BGPUpdateMessageParsingError, LocatedBGPUpdateMessageParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedBGPUpdateMessageParsingError<'a>>
     for LocatedPathAttributeParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
@@ -261,19 +262,20 @@ impl<'a> LocatedOriginParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, OriginParsingError> for LocatedOriginParsingError<'a> {
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedOriginParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = OriginParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &OriginParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
-    for LocatedOriginParsingError<'a>
-{
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>> for LocatedOriginParsingError<'a> {
     fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
@@ -348,19 +350,20 @@ impl<'a> LocatedAsPathParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, AsPathParsingError> for LocatedAsPathParsingError<'a> {
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedAsPathParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = AsPathParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &AsPathParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
-    for LocatedAsPathParsingError<'a>
-{
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>> for LocatedAsPathParsingError<'a> {
     fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
@@ -469,19 +472,20 @@ impl<'a> LocatedNextHopParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, NextHopParsingError> for LocatedNextHopParsingError<'a> {
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedNextHopParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = NextHopParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &NextHopParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
-    for LocatedNextHopParsingError<'a>
-{
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>> for LocatedNextHopParsingError<'a> {
     fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
         LocatedPathAttributeParsingError::new(
             self.span,
@@ -552,19 +556,20 @@ impl<'a> LocatedMultiExitDiscriminatorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, MultiExitDiscriminatorParsingError>
-    for LocatedMultiExitDiscriminatorParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedMultiExitDiscriminatorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = MultiExitDiscriminatorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &MultiExitDiscriminatorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
     for LocatedMultiExitDiscriminatorParsingError<'a>
 {
     fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
@@ -649,19 +654,20 @@ impl<'a> LocatedLocalPreferenceParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, LocalPreferenceParsingError>
-    for LocatedLocalPreferenceParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedLocalPreferenceParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = LocalPreferenceParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &LocalPreferenceParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
     for LocatedLocalPreferenceParsingError<'a>
 {
     fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
@@ -741,19 +747,20 @@ impl<'a> LocatedAtomicAggregateParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, AtomicAggregateParsingError>
-    for LocatedAtomicAggregateParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedAtomicAggregateParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = AtomicAggregateParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &AtomicAggregateParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
     for LocatedAtomicAggregateParsingError<'a>
 {
     fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
@@ -831,17 +838,20 @@ impl<'a> LocatedAggregatorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, AggregatorParsingError> for LocatedAggregatorParsingError<'a> {
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedAggregatorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = AggregatorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &AggregatorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
     for LocatedAggregatorParsingError<'a>
 {
     fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
@@ -961,19 +971,20 @@ impl<'a> LocatedUnknownAttributeParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, UnknownAttributeParsingError>
-    for LocatedUnknownAttributeParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedUnknownAttributeParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = UnknownAttributeParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &UnknownAttributeParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, PathAttributeParsingError, LocatedPathAttributeParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
     for LocatedUnknownAttributeParsingError<'a>
 {
     fn into_located(self) -> LocatedPathAttributeParsingError<'a> {

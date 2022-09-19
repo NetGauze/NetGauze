@@ -32,8 +32,8 @@ use nom::{
 };
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, LocatedParsingError, ReadablePDUWithOneInput,
-    Span,
+    parse_into_located, parse_into_located_one_input, IntoLocatedError, LocatedParsingError,
+    ReadablePDUWithOneInput, Span,
 };
 
 use crate::{
@@ -79,27 +79,36 @@ impl<'a> LocatedIpv4PrefixParsingError<'a> {
     pub const fn new(span: Span<'a>, error: Ipv4PrefixParsingError) -> Self {
         Self { span, error }
     }
+}
 
-    pub const fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedIpv4PrefixParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = Ipv4PrefixParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    pub const fn error(&self) -> &Ipv4PrefixParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
+}
 
-    pub const fn into_located_bgp_withdraw_route_parsing_error(
-        self,
-    ) -> LocatedWithdrawRouteParsingError<'a> {
+impl<'a> IntoLocatedError<LocatedWithdrawRouteParsingError<'a>>
+    for LocatedIpv4PrefixParsingError<'a>
+{
+    fn into_located(self) -> LocatedWithdrawRouteParsingError<'a> {
         LocatedWithdrawRouteParsingError::new(
             self.span,
             WithdrawRouteParsingError::Ipv4PrefixParsingError(self.error),
         )
     }
+}
 
-    pub const fn into_located_nlri_parsing_error(
-        self,
-    ) -> LocatedNetworkLayerReachabilityInformationParsingError<'a> {
+impl<'a> IntoLocatedError<LocatedNetworkLayerReachabilityInformationParsingError<'a>>
+    for LocatedIpv4PrefixParsingError<'a>
+{
+    fn into_located(self) -> LocatedNetworkLayerReachabilityInformationParsingError<'a> {
         LocatedNetworkLayerReachabilityInformationParsingError::new(
             self.span,
             NetworkLayerReachabilityInformationParsingError::Ipv4PrefixParsingError(self.error),
@@ -189,12 +198,15 @@ impl<'a> LocatedBGPMessageParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, BGPMessageParsingError> for LocatedBGPMessageParsingError<'a> {
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedBGPMessageParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = BGPMessageParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &BGPMessageParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }

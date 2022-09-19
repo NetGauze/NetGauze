@@ -59,19 +59,20 @@ impl<'a> LocatedBGPUpdateMessageParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, BGPUpdateMessageParsingError>
-    for LocatedBGPUpdateMessageParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedBGPUpdateMessageParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = BGPUpdateMessageParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &BGPUpdateMessageParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, BGPMessageParsingError, LocatedBGPMessageParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedBGPMessageParsingError<'a>>
     for LocatedBGPUpdateMessageParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPMessageParsingError<'a> {
@@ -156,19 +157,20 @@ impl<'a> LocatedWithdrawRouteParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, WithdrawRouteParsingError>
-    for LocatedWithdrawRouteParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedWithdrawRouteParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = WithdrawRouteParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &WithdrawRouteParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, BGPUpdateMessageParsingError, LocatedBGPUpdateMessageParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedBGPUpdateMessageParsingError<'a>>
     for LocatedWithdrawRouteParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
@@ -198,12 +200,8 @@ impl<'a> ReadablePDU<'a, LocatedWithdrawRouteParsingError<'a>> for WithdrawRoute
             Err(err) => {
                 return match err {
                     nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                    nom::Err::Error(error) => Err(nom::Err::Error(
-                        error.into_located_bgp_withdraw_route_parsing_error(),
-                    )),
-                    nom::Err::Failure(failure) => Err(nom::Err::Failure(
-                        failure.into_located_bgp_withdraw_route_parsing_error(),
-                    )),
+                    nom::Err::Error(error) => Err(nom::Err::Error(error.into_located())),
+                    nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into_located())),
                 }
             }
         };
@@ -234,19 +232,20 @@ impl<'a> LocatedNetworkLayerReachabilityInformationParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, NetworkLayerReachabilityInformationParsingError>
-    for LocatedNetworkLayerReachabilityInformationParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedNetworkLayerReachabilityInformationParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = NetworkLayerReachabilityInformationParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &NetworkLayerReachabilityInformationParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, BGPUpdateMessageParsingError, LocatedBGPUpdateMessageParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedBGPUpdateMessageParsingError<'a>>
     for LocatedNetworkLayerReachabilityInformationParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
@@ -277,17 +276,14 @@ fn parse_nlri_ipv4(
         Err(err) => {
             return match err {
                 nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                nom::Err::Error(error) => {
-                    Err(nom::Err::Error(error.into_located_nlri_parsing_error()))
-                }
-                nom::Err::Failure(failure) => {
-                    Err(nom::Err::Failure(failure.into_located_nlri_parsing_error()))
-                }
+                nom::Err::Error(error) => Err(nom::Err::Error(error.into_located())),
+                nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into_located())),
             }
         }
     };
     Ok((buf, net))
 }
+
 impl<'a> ReadablePDU<'a, LocatedNetworkLayerReachabilityInformationParsingError<'a>>
     for NetworkLayerReachabilityInformation
 {

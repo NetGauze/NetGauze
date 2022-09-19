@@ -53,19 +53,20 @@ impl<'a> LocatedBGPCapabilityParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, BGPCapabilityParsingError>
-    for LocatedBGPCapabilityParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedBGPCapabilityParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = BGPCapabilityParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &BGPCapabilityParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, BGPParameterParsingError, LocatedBGPParameterParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedBGPParameterParsingError<'a>>
     for LocatedBGPCapabilityParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPParameterParsingError<'a> {

@@ -53,19 +53,20 @@ impl<'a> LocatedBGPRouteRefreshMessageParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, BGPRouteRefreshMessageParsingError>
-    for LocatedBGPRouteRefreshMessageParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedBGPRouteRefreshMessageParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = BGPRouteRefreshMessageParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &BGPRouteRefreshMessageParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, BGPMessageParsingError, LocatedBGPMessageParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedBGPMessageParsingError<'a>>
     for LocatedBGPRouteRefreshMessageParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPMessageParsingError<'a> {

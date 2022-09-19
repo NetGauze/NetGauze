@@ -70,19 +70,20 @@ impl<'a> LocatedBGPNotificationMessageParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, BGPNotificationMessageParsingError>
-    for LocatedBGPNotificationMessageParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedBGPNotificationMessageParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = BGPNotificationMessageParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &BGPNotificationMessageParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a> IntoLocatedError<'a, BGPMessageParsingError, LocatedBGPMessageParsingError<'a>>
+impl<'a> IntoLocatedError<LocatedBGPMessageParsingError<'a>>
     for LocatedBGPNotificationMessageParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPMessageParsingError<'a> {
@@ -192,24 +193,21 @@ impl<'a> LocatedMessageHeaderErrorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, MessageHeaderErrorParsingError>
-    for LocatedMessageHeaderErrorParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedMessageHeaderErrorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = MessageHeaderErrorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &MessageHeaderErrorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a>
-    IntoLocatedError<
-        'a,
-        BGPNotificationMessageParsingError,
-        LocatedBGPNotificationMessageParsingError<'a>,
-    > for LocatedMessageHeaderErrorParsingError<'a>
+impl<'a> IntoLocatedError<LocatedBGPNotificationMessageParsingError<'a>>
+    for LocatedMessageHeaderErrorParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
         LocatedBGPNotificationMessageParsingError::new(
@@ -316,24 +314,21 @@ impl<'a> LocatedOpenMessageErrorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, OpenMessageErrorParsingError>
-    for LocatedOpenMessageErrorParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedOpenMessageErrorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = OpenMessageErrorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &OpenMessageErrorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a>
-    IntoLocatedError<
-        'a,
-        BGPNotificationMessageParsingError,
-        LocatedBGPNotificationMessageParsingError<'a>,
-    > for LocatedOpenMessageErrorParsingError<'a>
+impl<'a> IntoLocatedError<LocatedBGPNotificationMessageParsingError<'a>>
+    for LocatedOpenMessageErrorParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
         LocatedBGPNotificationMessageParsingError::new(
@@ -464,24 +459,21 @@ impl<'a> LocatedUpdateMessageErrorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, UpdateMessageErrorParsingError>
-    for LocatedUpdateMessageErrorParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedUpdateMessageErrorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = UpdateMessageErrorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &UpdateMessageErrorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a>
-    IntoLocatedError<
-        'a,
-        BGPNotificationMessageParsingError,
-        LocatedBGPNotificationMessageParsingError<'a>,
-    > for LocatedUpdateMessageErrorParsingError<'a>
+impl<'a> IntoLocatedError<LocatedBGPNotificationMessageParsingError<'a>>
+    for LocatedUpdateMessageErrorParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
         LocatedBGPNotificationMessageParsingError::new(
@@ -629,24 +621,21 @@ impl<'a> LocatedHoldTimerExpiredErrorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, HoldTimerExpiredErrorParsingError>
-    for LocatedHoldTimerExpiredErrorParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedHoldTimerExpiredErrorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = HoldTimerExpiredErrorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &HoldTimerExpiredErrorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a>
-    IntoLocatedError<
-        'a,
-        BGPNotificationMessageParsingError,
-        LocatedBGPNotificationMessageParsingError<'a>,
-    > for LocatedHoldTimerExpiredErrorParsingError<'a>
+impl<'a> IntoLocatedError<LocatedBGPNotificationMessageParsingError<'a>>
+    for LocatedHoldTimerExpiredErrorParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
         LocatedBGPNotificationMessageParsingError::new(
@@ -717,24 +706,21 @@ impl<'a> LocatedFiniteStateMachineErrorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, FiniteStateMachineErrorParsingError>
-    for LocatedFiniteStateMachineErrorParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedFiniteStateMachineErrorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = FiniteStateMachineErrorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &FiniteStateMachineErrorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a>
-    IntoLocatedError<
-        'a,
-        BGPNotificationMessageParsingError,
-        LocatedBGPNotificationMessageParsingError<'a>,
-    > for LocatedFiniteStateMachineErrorParsingError<'a>
+impl<'a> IntoLocatedError<LocatedBGPNotificationMessageParsingError<'a>>
+    for LocatedFiniteStateMachineErrorParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
         LocatedBGPNotificationMessageParsingError::new(
@@ -843,22 +829,21 @@ impl<'a> LocatedCeaseErrorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, CeaseErrorParsingError> for LocatedCeaseErrorParsingError<'a> {
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedCeaseErrorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = CeaseErrorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &CeaseErrorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a>
-    IntoLocatedError<
-        'a,
-        BGPNotificationMessageParsingError,
-        LocatedBGPNotificationMessageParsingError<'a>,
-    > for LocatedCeaseErrorParsingError<'a>
+impl<'a> IntoLocatedError<LocatedBGPNotificationMessageParsingError<'a>>
+    for LocatedCeaseErrorParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
         LocatedBGPNotificationMessageParsingError::new(
@@ -990,24 +975,21 @@ impl<'a> LocatedRouteRefreshErrorParsingError<'a> {
     }
 }
 
-impl<'a> LocatedParsingError<'a, RouteRefreshErrorParsingError>
-    for LocatedRouteRefreshErrorParsingError<'a>
-{
-    fn span(&self) -> &Span<'a> {
+impl<'a> LocatedParsingError for LocatedRouteRefreshErrorParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = RouteRefreshErrorParsingError;
+
+    fn span(&self) -> &Self::Span {
         &self.span
     }
 
-    fn error(&self) -> &RouteRefreshErrorParsingError {
+    fn error(&self) -> &Self::Error {
         &self.error
     }
 }
 
-impl<'a>
-    IntoLocatedError<
-        'a,
-        BGPNotificationMessageParsingError,
-        LocatedBGPNotificationMessageParsingError<'a>,
-    > for LocatedRouteRefreshErrorParsingError<'a>
+impl<'a> IntoLocatedError<LocatedBGPNotificationMessageParsingError<'a>>
+    for LocatedRouteRefreshErrorParsingError<'a>
 {
     fn into_located(self) -> LocatedBGPNotificationMessageParsingError<'a> {
         LocatedBGPNotificationMessageParsingError::new(
