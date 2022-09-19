@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use netgauze_iana::address_family::AddressType;
+use strum_macros::{Display, FromRepr};
 
 /// Enhanced route refresh have fixed length as per RFC2918
 pub(crate) const ROUTE_REFRESH_CAPABILITY_LENGTH: u8 = 0;
@@ -50,6 +51,8 @@ pub enum BGPCapability {
     /// Defined in [RFC7313](https://datatracker.ietf.org/doc/html/rfc7313)
     EnhancedRouteRefresh,
 
+    Experimental(ExperimentalCapability),
+
     Unrecognized(UnrecognizedCapability),
 }
 
@@ -68,6 +71,50 @@ impl UnrecognizedCapability {
 
     pub const fn code(&self) -> &u8 {
         &self.code
+    }
+
+    pub const fn value(&self) -> &Vec<u8> {
+        &self.value
+    }
+}
+
+/// Experimental Capabilities Codes as defined by [RFC8810](https://datatracker.ietf.org/doc/html/RFC8810)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum ExperimentalCapabilityCode {
+    Experimental239 = 239,
+    Experimental240 = 240,
+    Experimental241 = 241,
+    Experimental242 = 242,
+    Experimental243 = 243,
+    Experimental244 = 244,
+    Experimental245 = 245,
+    Experimental246 = 246,
+    Experimental247 = 247,
+    Experimental248 = 248,
+    Experimental249 = 249,
+    Experimental250 = 250,
+    Experimental251 = 251,
+    Experimental252 = 252,
+    Experimental253 = 253,
+    Experimental254 = 254,
+}
+
+/// Generic struct to carry all capabilities that are designated as experimental
+/// by IANA See [RFC8810](https://datatracker.ietf.org/doc/html/RFC8810)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ExperimentalCapability {
+    code: ExperimentalCapabilityCode,
+    value: Vec<u8>,
+}
+
+impl ExperimentalCapability {
+    pub const fn new(code: ExperimentalCapabilityCode, value: Vec<u8>) -> Self {
+        Self { code, value }
+    }
+
+    pub const fn code(&self) -> ExperimentalCapabilityCode {
+        self.code
     }
 
     pub const fn value(&self) -> &Vec<u8> {

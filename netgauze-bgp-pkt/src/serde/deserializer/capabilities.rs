@@ -15,8 +15,8 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, UnrecognizedCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        ROUTE_REFRESH_CAPABILITY_LENGTH,
+        BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, UnrecognizedCapability,
+        ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
     serde::deserializer::open::{BGPParameterParsingError, LocatedBGPParameterParsingError},
@@ -114,6 +114,17 @@ impl<'a> FromExternalError<Span<'a>, UndefinedBGPCapabilityCode>
     }
 }
 
+fn parse_experimental_capability(
+    code: ExperimentalCapabilityCode,
+    buf: Span<'_>,
+) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
+    let (buf, value) = nom::multi::length_value(be_u8, nom::multi::many0(be_u8))(buf)?;
+    Ok((
+        buf,
+        BGPCapability::Experimental(ExperimentalCapability::new(code, value)),
+    ))
+}
+
 fn parse_unrecognized_capability(
     code: u8,
     buf: Span<'_>,
@@ -201,52 +212,52 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
                 }
                 BGPCapabilityCode::FQDN => parse_unrecognized_capability(code.into(), buf),
                 BGPCapabilityCode::Experimental239 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental239, buf)
                 }
                 BGPCapabilityCode::Experimental240 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental240, buf)
                 }
                 BGPCapabilityCode::Experimental241 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental241, buf)
                 }
                 BGPCapabilityCode::Experimental242 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental242, buf)
                 }
                 BGPCapabilityCode::Experimental243 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental243, buf)
                 }
                 BGPCapabilityCode::Experimental244 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental244, buf)
                 }
                 BGPCapabilityCode::Experimental245 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental245, buf)
                 }
                 BGPCapabilityCode::Experimental246 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental246, buf)
                 }
                 BGPCapabilityCode::Experimental247 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental247, buf)
                 }
                 BGPCapabilityCode::Experimental248 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental248, buf)
                 }
                 BGPCapabilityCode::Experimental249 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental249, buf)
                 }
                 BGPCapabilityCode::Experimental250 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental250, buf)
                 }
                 BGPCapabilityCode::Experimental251 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental251, buf)
                 }
                 BGPCapabilityCode::Experimental252 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental252, buf)
                 }
                 BGPCapabilityCode::Experimental253 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental253, buf)
                 }
                 BGPCapabilityCode::Experimental254 => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    parse_experimental_capability(ExperimentalCapabilityCode::Experimental254, buf)
                 }
             },
             Err(nom::Err::Error(LocatedBGPCapabilityParsingError {

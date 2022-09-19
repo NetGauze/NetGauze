@@ -14,7 +14,9 @@
 // limitations under the License.
 
 use crate::{
-    capabilities::{BGPCapability, UnrecognizedCapability},
+    capabilities::{
+        BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, UnrecognizedCapability,
+    },
     serde::{
         deserializer::capabilities::{BGPCapabilityParsingError, LocatedBGPCapabilityParsingError},
         serializer::capabilities::BGPCapabilityWritingError,
@@ -69,5 +71,20 @@ fn test_unrecognized_capability() -> Result<(), BGPCapabilityWritingError> {
 
     test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_experimental_capabilities() -> Result<(), BGPCapabilityWritingError> {
+    // IANA defines the codes 239-254 as reserved for Experimental Use
+    for code in 239..255 {
+        let good_wire = [code, 0x01, 0x01];
+
+        let code = ExperimentalCapabilityCode::from_repr(code).unwrap();
+        let good = BGPCapability::Experimental(ExperimentalCapability::new(code, vec![1]));
+
+        test_parsed_completely(&good_wire, &good);
+        test_write(&good, &good_wire)?;
+    }
     Ok(())
 }

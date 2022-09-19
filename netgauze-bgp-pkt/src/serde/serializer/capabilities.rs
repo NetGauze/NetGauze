@@ -53,6 +53,7 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             }
             Self::RouteRefresh => ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
+            Self::Experimental(value) => value.value().len(),
             Self::Unrecognized(value) => value.value().len(),
         };
         Self::BASE_LENGTH + value_len
@@ -69,6 +70,11 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             Self::EnhancedRouteRefresh => {
                 writer.write_u8(BGPCapabilityCode::EnhancedRouteRefresh.into())?;
                 writer.write_u8(len)?;
+            }
+            Self::Experimental(value) => {
+                writer.write_u8(value.code() as u8)?;
+                writer.write_u8(len)?;
+                writer.write_all(value.value())?;
             }
             Self::Unrecognized(value) => {
                 writer.write_u8(*value.code())?;
