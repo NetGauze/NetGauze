@@ -219,7 +219,7 @@ fn test_parse_add_path() -> Result<(), BGPCapabilityWritingError> {
     );
     test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
         &bad_incomplete_wire,
-        &bad_incomplete_wire,
+        &bad_incomplete,
     );
 
     test_write(&good, &good_wire)?;
