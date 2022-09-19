@@ -16,16 +16,17 @@
 use crate::{
     capabilities::{
         BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, FourOctetASCapability,
-        UnrecognizedCapability,
+        MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
     serde::{
         deserializer::capabilities::{
             BGPCapabilityParsingError, FourOctetASCapabilityParsingError,
-            LocatedBGPCapabilityParsingError,
+            LocatedBGPCapabilityParsingError, MultiProtocolExtensionsCapabilityParsingError,
         },
         serializer::capabilities::BGPCapabilityWritingError,
     },
 };
+use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
     test_helpers::{test_parse_error, test_parsed_completely, test_write},
     Span,
@@ -128,6 +129,45 @@ fn test_extended_message() -> Result<(), BGPCapabilityWritingError> {
         unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
         BGPCapabilityParsingError::NomError(ErrorKind::Eof),
     );
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+        &bad_invalid_length_wire,
+        &bad_invalid_length,
+    );
+    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_multi_protocol_extension() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [0x01, 0x04, 0x00, 0x01, 0x00, 0x01];
+    let bad_invalid_length_wire = [0x01, 0x03, 0x00, 0x01, 0x00, 0x01];
+    let bad_incomplete_wire = [0x01, 0x04, 0x00, 0x01, 0x00];
+
+    let good = BGPCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+        AddressType::Ipv4Unicast,
+    ));
+
+    let bad_invalid_length = LocatedBGPCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_invalid_length_wire[1..]) },
+        BGPCapabilityParsingError::MultiProtocolExtensionsCapabilityError(
+            MultiProtocolExtensionsCapabilityParsingError::InvalidLength(
+                bad_invalid_length_wire[1],
+            ),
+        ),
+    );
+    let bad_incomplete = LocatedBGPCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(5, &bad_incomplete_wire[5..]) },
+        BGPCapabilityParsingError::MultiProtocolExtensionsCapabilityError(
+            MultiProtocolExtensionsCapabilityParsingError::NomError(ErrorKind::Eof),
+        ),
+    );
+
     test_parsed_completely(&good_wire, &good);
     test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
         &bad_invalid_length_wire,

@@ -15,9 +15,10 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, FourOctetASCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        EXTENDED_MESSAGE_CAPABILITY_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
-        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
+        BGPCapability, FourOctetASCapability, MultiProtocolExtensionsCapability,
+        ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, EXTENDED_MESSAGE_CAPABILITY_LENGTH,
+        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
+        ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::BGPCapabilityCode,
     serde::serializer::open::BGPOpenMessageWritingError,
@@ -30,6 +31,7 @@ use std::io::Write;
 pub enum BGPCapabilityWritingError {
     StdIOError(String),
     FourOctetASCapabilityError(FourOctetASCapabilityWritingError),
+    MultiProtocolExtensionsCapabilityError(MultiProtocolExtensionsCapabilityWritingError),
 }
 
 impl From<std::io::Error> for BGPCapabilityWritingError {
@@ -66,7 +68,11 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BGPCapabilityWritingError> {
         let len = (self.len() - Self::BASE_LENGTH) as u8;
         match self {
-            Self::MultiProtocolExtensions(_) => todo!(),
+            Self::MultiProtocolExtensions(value) => {
+                writer.write_u8(BGPCapabilityCode::MultiProtocolExtensions.into())?;
+                writer.write_u8(value.len() as u8)?;
+                value.write(writer)?;
+            }
             Self::RouteRefresh => {
                 writer.write_u8(BGPCapabilityCode::RouteRefreshCapability.into())?;
                 writer.write_u8(len)?;
@@ -82,7 +88,7 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             Self::FourOctetAS(value) => {
                 writer.write_u8(BGPCapabilityCode::FourOctetAS.into())?;
                 writer.write_u8(value.len() as u8)?;
-                writer.write_u32::<NetworkEndian>(value.asn4())?;
+                value.write(writer)?;
             }
             Self::Experimental(value) => {
                 writer.write_u8(value.code() as u8)?;
@@ -124,6 +130,42 @@ impl WritablePDU<FourOctetASCapabilityWritingError> for FourOctetASCapability {
     }
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), FourOctetASCapabilityWritingError> {
         writer.write_u32::<NetworkEndian>(self.asn4())?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum MultiProtocolExtensionsCapabilityWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for MultiProtocolExtensionsCapabilityWritingError {
+    fn from(err: std::io::Error) -> Self {
+        MultiProtocolExtensionsCapabilityWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<MultiProtocolExtensionsCapabilityWritingError> for BGPCapabilityWritingError {
+    fn from(value: MultiProtocolExtensionsCapabilityWritingError) -> Self {
+        BGPCapabilityWritingError::MultiProtocolExtensionsCapabilityError(value)
+    }
+}
+
+impl WritablePDU<MultiProtocolExtensionsCapabilityWritingError>
+    for MultiProtocolExtensionsCapability
+{
+    const BASE_LENGTH: usize = MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH as usize;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), MultiProtocolExtensionsCapabilityWritingError> {
+        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
+        writer.write_u8(0)?;
+        writer.write_u8(self.address_type().subsequent_address_family().into())?;
         Ok(())
     }
 }

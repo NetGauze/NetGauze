@@ -16,19 +16,24 @@
 use crate::{
     capabilities::{
         BGPCapability, ExperimentalCapability, ExperimentalCapabilityCode, FourOctetASCapability,
-        UnrecognizedCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        EXTENDED_MESSAGE_CAPABILITY_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
+        MultiProtocolExtensionsCapability, UnrecognizedCapability,
+        ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, EXTENDED_MESSAGE_CAPABILITY_LENGTH,
+        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
         ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
     serde::deserializer::open::{BGPParameterParsingError, LocatedBGPParameterParsingError},
+};
+use netgauze_iana::address_family::{
+    AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
+    UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
     parse_into_located, IntoLocatedError, LocatedParsingError, ReadablePDU, Span,
 };
 use nom::{
     error::{ErrorKind, FromExternalError, ParseError},
-    number::complete::{be_u32, be_u8},
+    number::complete::{be_u16, be_u32, be_u8},
     IResult,
 };
 
@@ -43,6 +48,7 @@ pub enum BGPCapabilityParsingError {
     InvalidEnhancedRouteRefreshLength(u8),
     InvalidExtendedMessageLength(u8),
     FourOctetASCapabilityError(FourOctetASCapabilityParsingError),
+    MultiProtocolExtensionsCapabilityError(MultiProtocolExtensionsCapabilityParsingError),
 }
 
 /// BGP Open Message Parsing errors  with the input location of where it
@@ -184,7 +190,8 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
         match parsed {
             Ok((buf, code)) => match code {
                 BGPCapabilityCode::MultiProtocolExtensions => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    let (buf, cap) = parse_into_located(buf)?;
+                    Ok((buf, BGPCapability::MultiProtocolExtensions(cap)))
                 }
                 BGPCapabilityCode::RouteRefreshCapability => parse_route_refresh_capability(buf),
                 BGPCapabilityCode::OutboundRouteFilteringCapability => {
@@ -374,5 +381,136 @@ impl<'a> ReadablePDU<'a, LocatedFourOctetASCapabilityParsingError<'a>> for FourO
         })?;
         let (buf, asn4) = be_u32(buf)?;
         Ok((buf, FourOctetASCapability::new(asn4)))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum MultiProtocolExtensionsCapabilityParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidLength(u8),
+    AddressFamilyError(UndefinedAddressFamily),
+    SubsequentAddressFamilyError(UndefinedSubsequentAddressFamily),
+    AddressTypeError(InvalidAddressType),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedMultiProtocolExtensionsCapabilityParsingError<'a> {
+    span: Span<'a>,
+    error: MultiProtocolExtensionsCapabilityParsingError,
+}
+
+impl<'a> LocatedMultiProtocolExtensionsCapabilityParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: MultiProtocolExtensionsCapabilityParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError for LocatedMultiProtocolExtensionsCapabilityParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = MultiProtocolExtensionsCapabilityParsingError;
+
+    fn span(&self) -> &Self::Span {
+        &self.span
+    }
+
+    fn error(&self) -> &Self::Error {
+        &self.error
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedBGPCapabilityParsingError<'a>>
+    for LocatedMultiProtocolExtensionsCapabilityParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPCapabilityParsingError<'a> {
+        LocatedBGPCapabilityParsingError::new(
+            self.span,
+            BGPCapabilityParsingError::MultiProtocolExtensionsCapabilityError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, MultiProtocolExtensionsCapabilityParsingError>
+    for LocatedMultiProtocolExtensionsCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: MultiProtocolExtensionsCapabilityParsingError,
+    ) -> Self {
+        LocatedMultiProtocolExtensionsCapabilityParsingError::new(input, error)
+    }
+}
+
+impl<'a> ParseError<Span<'a>> for LocatedMultiProtocolExtensionsCapabilityParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedMultiProtocolExtensionsCapabilityParsingError::new(
+            input,
+            MultiProtocolExtensionsCapabilityParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily>
+    for LocatedMultiProtocolExtensionsCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UndefinedAddressFamily,
+    ) -> Self {
+        LocatedMultiProtocolExtensionsCapabilityParsingError::new(
+            input,
+            MultiProtocolExtensionsCapabilityParsingError::AddressFamilyError(error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
+    for LocatedMultiProtocolExtensionsCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UndefinedSubsequentAddressFamily,
+    ) -> Self {
+        LocatedMultiProtocolExtensionsCapabilityParsingError::new(
+            input,
+            MultiProtocolExtensionsCapabilityParsingError::SubsequentAddressFamilyError(error),
+        )
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a>>
+    for MultiProtocolExtensionsCapability
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedMultiProtocolExtensionsCapabilityParsingError<'a>> {
+        let (buf, _) =
+            check_capability_length(buf, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, |x| {
+                MultiProtocolExtensionsCapabilityParsingError::InvalidLength(x)
+            })?;
+        let input = buf;
+        let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
+        let (buf, _) = be_u8(buf)?;
+        let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+        let address_type = match AddressType::from_afi_safi(afi, safi) {
+            Ok(address_type) => address_type,
+            Err(err) => {
+                return Err(nom::Err::Error(
+                    LocatedMultiProtocolExtensionsCapabilityParsingError::new(
+                        input,
+                        MultiProtocolExtensionsCapabilityParsingError::AddressTypeError(err),
+                    ),
+                ))
+            }
+        };
+        Ok((buf, MultiProtocolExtensionsCapability::new(address_type)))
     }
 }
