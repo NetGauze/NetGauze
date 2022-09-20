@@ -316,11 +316,11 @@ pub enum SubsequentAddressFamily {
 
     /// Dissemination of Flow Specification rules
     /// [RFC8955](https://datatracker.ietf.org/doc/html/RFC8955)
-    FlowSPecFilter = 133,
+    FlowSpecFilter = 133,
 
     /// L3VPN Dissemination of Flow Specification rules
     /// [RFC8955](https://datatracker.ietf.org/doc/html/RFC8955)
-    FlowSPecFilterL3Vpn = 134,
+    FlowSpecFilterL3Vpn = 134,
 
     /// [draft-ietf-l3vpn-bgpvpn-auto](https://datatracker.ietf.org/doc/html/draft-ietf-l3vpn-bgpvpn-auto)
     VpnAutoDiscovery = 140,
@@ -401,12 +401,19 @@ pub enum AddressType {
     IpPv4MplsLabeledVpn,
     Ipv4MulticastBgpMplsVpn,
     Ipv4Bgp4over6,
+    Ipv4FlowSpec,
+    Ipv4FlowSpecL3Vpn,
+    Ipv4NlriMplsLabels,
     Ipv6Unicast,
     Ipv6Multicast,
     Ipv6MPLSLabeledVpn,
     Ipv6MulticastBgpMplsVpn,
     Ipv6Bgp6over4,
+    Ipv6FlowSpec,
+    Ipv6FlowSpecL3Vpn,
+    Ipv6NlriMplsLabels,
     L2VpnBgpEvpn,
+    BgpLs,
 }
 
 /// Error type used in `[TryFrom] for [AddressType].
@@ -445,14 +452,22 @@ impl AddressType {
             Self::IpPv4MplsLabeledVpn => AddressFamily::IPv4,
             Self::Ipv4MulticastBgpMplsVpn => AddressFamily::IPv4,
             Self::Ipv4Bgp4over6 => AddressFamily::IPv4,
+            Self::Ipv4FlowSpec => AddressFamily::IPv4,
+            Self::Ipv4FlowSpecL3Vpn => AddressFamily::IPv4,
+            Self::Ipv4NlriMplsLabels => AddressFamily::IPv4,
 
             Self::Ipv6Unicast => AddressFamily::IPv6,
             Self::Ipv6Multicast => AddressFamily::IPv6,
             Self::Ipv6MPLSLabeledVpn => AddressFamily::IPv6,
             Self::Ipv6MulticastBgpMplsVpn => AddressFamily::IPv6,
             Self::Ipv6Bgp6over4 => AddressFamily::IPv6,
+            Self::Ipv6FlowSpec => AddressFamily::IPv6,
+            Self::Ipv6FlowSpecL3Vpn => AddressFamily::IPv6,
+            Self::Ipv6NlriMplsLabels => AddressFamily::IPv6,
 
             Self::L2VpnBgpEvpn => AddressFamily::L2vpn,
+
+            Self::BgpLs => AddressFamily::BgpLs,
         }
     }
 
@@ -463,14 +478,22 @@ impl AddressType {
             Self::IpPv4MplsLabeledVpn => SubsequentAddressFamily::MplsVpn,
             Self::Ipv4MulticastBgpMplsVpn => SubsequentAddressFamily::MulticastBgpMplsVpn,
             Self::Ipv4Bgp4over6 => SubsequentAddressFamily::Bgp4over6,
+            Self::Ipv4FlowSpec => SubsequentAddressFamily::FlowSpecFilter,
+            Self::Ipv4FlowSpecL3Vpn => SubsequentAddressFamily::FlowSpecFilterL3Vpn,
+            Self::Ipv4NlriMplsLabels => SubsequentAddressFamily::NlriMplsLabels,
 
             Self::Ipv6Unicast => SubsequentAddressFamily::Unicast,
             Self::Ipv6Multicast => SubsequentAddressFamily::Multicast,
             Self::Ipv6MPLSLabeledVpn => SubsequentAddressFamily::MplsVpn,
             Self::Ipv6MulticastBgpMplsVpn => SubsequentAddressFamily::MulticastBgpMplsVpn,
             Self::Ipv6Bgp6over4 => SubsequentAddressFamily::Bgp6over4,
+            Self::Ipv6FlowSpec => SubsequentAddressFamily::FlowSpecFilter,
+            Self::Ipv6FlowSpecL3Vpn => SubsequentAddressFamily::FlowSpecFilterL3Vpn,
+            Self::Ipv6NlriMplsLabels => SubsequentAddressFamily::NlriMplsLabels,
 
             Self::L2VpnBgpEvpn => SubsequentAddressFamily::BgpEvpn,
+
+            Self::BgpLs => SubsequentAddressFamily::BgpLs,
         }
     }
 
@@ -488,6 +511,15 @@ impl AddressType {
                 Ok(Self::Ipv4MulticastBgpMplsVpn)
             }
             (AddressFamily::IPv4, SubsequentAddressFamily::Bgp4over6) => Ok(Self::Ipv4Bgp4over6),
+            (AddressFamily::IPv4, SubsequentAddressFamily::FlowSpecFilter) => {
+                Ok(Self::Ipv4FlowSpec)
+            }
+            (AddressFamily::IPv4, SubsequentAddressFamily::FlowSpecFilterL3Vpn) => {
+                Ok(Self::Ipv4FlowSpecL3Vpn)
+            }
+            (AddressFamily::IPv4, SubsequentAddressFamily::NlriMplsLabels) => {
+                Ok(Self::Ipv4NlriMplsLabels)
+            }
 
             (AddressFamily::IPv6, SubsequentAddressFamily::Unicast) => Ok(Self::Ipv6Unicast),
             (AddressFamily::IPv6, SubsequentAddressFamily::Multicast) => Ok(Self::Ipv6Multicast),
@@ -496,8 +528,20 @@ impl AddressType {
                 Ok(Self::Ipv6MulticastBgpMplsVpn)
             }
             (AddressFamily::IPv6, SubsequentAddressFamily::Bgp6over4) => Ok(Self::Ipv6Bgp6over4),
+            (AddressFamily::IPv6, SubsequentAddressFamily::FlowSpecFilter) => {
+                Ok(Self::Ipv6FlowSpec)
+            }
+            (AddressFamily::IPv6, SubsequentAddressFamily::FlowSpecFilterL3Vpn) => {
+                Ok(Self::Ipv6FlowSpecL3Vpn)
+            }
+            (AddressFamily::IPv6, SubsequentAddressFamily::NlriMplsLabels) => {
+                Ok(Self::Ipv6NlriMplsLabels)
+            }
 
             (AddressFamily::L2vpn, SubsequentAddressFamily::BgpEvpn) => Ok(Self::L2VpnBgpEvpn),
+
+            (AddressFamily::BgpLs, SubsequentAddressFamily::BgpLs) => Ok(Self::BgpLs),
+
             _ => Err(InvalidAddressType::new(afi, safi)),
         }
     }
@@ -552,14 +596,21 @@ mod tests {
         let ipv4_mpls_vpn = AddressType::IpPv4MplsLabeledVpn;
         let ipv4_multicast_mpls_vpn = AddressType::Ipv4MulticastBgpMplsVpn;
         let ipv4_bgp_4_over_6 = AddressType::Ipv4Bgp4over6;
+        let ipv4_flow_spec = AddressType::Ipv4FlowSpec;
+        let ipv4_flow_spec_l3_vpn = AddressType::Ipv4FlowSpecL3Vpn;
+        let ipv4_nlri_mpls = AddressType::Ipv4NlriMplsLabels;
 
         let ipv6_unicast = AddressType::Ipv6Unicast;
         let ipv6_multicast = AddressType::Ipv6Multicast;
         let ipv6_mpls_vpn = AddressType::Ipv6MPLSLabeledVpn;
         let ipv6_multicast_mpls_vpn = AddressType::Ipv6MulticastBgpMplsVpn;
         let ipv6_bgp_6_over_4 = AddressType::Ipv6Bgp6over4;
+        let ipv6_flow_spec = AddressType::Ipv6FlowSpec;
+        let ipv6_flow_spec_l3_vpn = AddressType::Ipv6FlowSpecL3Vpn;
+        let ipv6_nlri_mpls = AddressType::Ipv6NlriMplsLabels;
 
         let l2vpn_bgp = AddressType::L2VpnBgpEvpn;
+        let bgp_ls = AddressType::BgpLs;
 
         assert_eq!(ipv4_unicast.address_family(), AddressFamily::IPv4);
         assert_eq!(ipv4_multicast.address_family(), AddressFamily::IPv4);
@@ -569,6 +620,9 @@ mod tests {
             AddressFamily::IPv4
         );
         assert_eq!(ipv4_bgp_4_over_6.address_family(), AddressFamily::IPv4);
+        assert_eq!(ipv4_flow_spec.address_family(), AddressFamily::IPv4);
+        assert_eq!(ipv4_flow_spec_l3_vpn.address_family(), AddressFamily::IPv4);
+        assert_eq!(ipv4_nlri_mpls.address_family(), AddressFamily::IPv4);
 
         assert_eq!(
             ipv4_unicast.subsequent_address_family(),
@@ -599,6 +653,9 @@ mod tests {
             AddressFamily::IPv6
         );
         assert_eq!(ipv6_bgp_6_over_4.address_family(), AddressFamily::IPv6);
+        assert_eq!(ipv6_flow_spec.address_family(), AddressFamily::IPv6);
+        assert_eq!(ipv6_flow_spec_l3_vpn.address_family(), AddressFamily::IPv6);
+        assert_eq!(ipv6_nlri_mpls.address_family(), AddressFamily::IPv6);
 
         assert_eq!(
             ipv6_unicast.subsequent_address_family(),
@@ -626,6 +683,12 @@ mod tests {
             l2vpn_bgp.subsequent_address_family(),
             SubsequentAddressFamily::BgpEvpn
         );
+
+        assert_eq!(bgp_ls.address_family(), AddressFamily::BgpLs);
+        assert_eq!(
+            bgp_ls.subsequent_address_family(),
+            SubsequentAddressFamily::BgpLs
+        );
     }
     #[test]
     fn test_address_type_try_from() {
@@ -633,20 +696,26 @@ mod tests {
             AddressFamily::AppleTalk,
             SubsequentAddressFamily::Bgp6over4,
         );
-        let ipv4_unicast = AddressType::Ipv4Unicast;
-        let ipv4_multicast = AddressType::Ipv4Multicast;
-        let ipv4_mpls_vpn = AddressType::IpPv4MplsLabeledVpn;
-        let ipv4_multicast_mpls_vpn = AddressType::Ipv4MulticastBgpMplsVpn;
-        let ipv4_bgp_4_over_6 = AddressType::Ipv4Bgp4over6;
-
-        let ipv6_unicast = AddressType::Ipv6Unicast;
-        let ipv6_multicast = AddressType::Ipv6Multicast;
-        let ipv6_mpls_vpn = AddressType::Ipv6MPLSLabeledVpn;
-        let ipv6_multicast_mpls_vpn = AddressType::Ipv6MulticastBgpMplsVpn;
-        let ipv6_bgp_6_over_4 = AddressType::Ipv6Bgp6over4;
-
-        let l2vpn_bgp = AddressType::L2VpnBgpEvpn;
-
+        let valid = vec![
+            AddressType::Ipv4Unicast,
+            AddressType::Ipv4Multicast,
+            AddressType::IpPv4MplsLabeledVpn,
+            AddressType::Ipv4MulticastBgpMplsVpn,
+            AddressType::Ipv4Bgp4over6,
+            AddressType::Ipv4FlowSpec,
+            AddressType::Ipv4FlowSpecL3Vpn,
+            AddressType::Ipv4NlriMplsLabels,
+            AddressType::Ipv6Unicast,
+            AddressType::Ipv6Multicast,
+            AddressType::Ipv6MPLSLabeledVpn,
+            AddressType::Ipv6MulticastBgpMplsVpn,
+            AddressType::Ipv6Bgp6over4,
+            AddressType::Ipv6FlowSpec,
+            AddressType::Ipv6FlowSpecL3Vpn,
+            AddressType::Ipv6NlriMplsLabels,
+            AddressType::L2VpnBgpEvpn,
+            AddressType::BgpLs,
+        ];
         assert_eq!(
             invalid,
             Err(InvalidAddressType::new(
@@ -662,84 +731,14 @@ mod tests {
             invalid.err().unwrap().subsequent_address_family(),
             SubsequentAddressFamily::Bgp6over4
         );
-        assert_eq!(
-            Ok(ipv4_unicast),
-            AddressType::from_afi_safi(
-                ipv4_unicast.address_family(),
-                ipv4_unicast.subsequent_address_family()
+        for valid_address in valid {
+            assert_eq!(
+                Ok(valid_address),
+                AddressType::from_afi_safi(
+                    valid_address.address_family(),
+                    valid_address.subsequent_address_family()
+                )
             )
-        );
-        assert_eq!(
-            Ok(ipv4_multicast),
-            AddressType::from_afi_safi(
-                ipv4_multicast.address_family(),
-                ipv4_multicast.subsequent_address_family()
-            )
-        );
-        assert_eq!(
-            Ok(ipv4_mpls_vpn),
-            AddressType::from_afi_safi(
-                ipv4_mpls_vpn.address_family(),
-                ipv4_mpls_vpn.subsequent_address_family()
-            )
-        );
-        assert_eq!(
-            Ok(ipv4_multicast_mpls_vpn),
-            AddressType::from_afi_safi(
-                ipv4_multicast_mpls_vpn.address_family(),
-                ipv4_multicast_mpls_vpn.subsequent_address_family()
-            )
-        );
-        assert_eq!(
-            Ok(ipv4_bgp_4_over_6),
-            AddressType::from_afi_safi(
-                ipv4_bgp_4_over_6.address_family(),
-                ipv4_bgp_4_over_6.subsequent_address_family()
-            )
-        );
-
-        assert_eq!(
-            Ok(ipv6_unicast),
-            AddressType::from_afi_safi(
-                ipv6_unicast.address_family(),
-                ipv6_unicast.subsequent_address_family()
-            )
-        );
-        assert_eq!(
-            Ok(ipv6_multicast),
-            AddressType::from_afi_safi(
-                ipv6_multicast.address_family(),
-                ipv6_multicast.subsequent_address_family()
-            )
-        );
-        assert_eq!(
-            Ok(ipv6_mpls_vpn),
-            AddressType::from_afi_safi(
-                ipv6_mpls_vpn.address_family(),
-                ipv6_mpls_vpn.subsequent_address_family()
-            )
-        );
-        assert_eq!(
-            Ok(ipv6_multicast_mpls_vpn),
-            AddressType::from_afi_safi(
-                ipv6_multicast_mpls_vpn.address_family(),
-                ipv6_multicast_mpls_vpn.subsequent_address_family()
-            )
-        );
-        assert_eq!(
-            Ok(ipv6_bgp_6_over_4),
-            AddressType::from_afi_safi(
-                ipv6_bgp_6_over_4.address_family(),
-                ipv6_bgp_6_over_4.subsequent_address_family()
-            )
-        );
-
-        assert_eq!(
-            Ok(l2vpn_bgp),
-            AddressType::from_afi_safi(
-                l2vpn_bgp.address_family(),
-                l2vpn_bgp.subsequent_address_family()
-            )
-        );
+        }
     }
 }
