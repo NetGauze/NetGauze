@@ -15,10 +15,12 @@
 
 use crate::{
     capabilities::{
-        AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, FourOctetASCapability,
+        AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, ExtendedNextHopEncoding,
+        ExtendedNextHopEncodingCapability, FourOctetASCapability,
         MultiProtocolExtensionsCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        EXTENDED_MESSAGE_CAPABILITY_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
-        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
+        EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
+        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
+        ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::BGPCapabilityCode,
     serde::serializer::open::BGPOpenMessageWritingError,
@@ -33,6 +35,7 @@ pub enum BGPCapabilityWritingError {
     FourOctetASCapabilityError(FourOctetASCapabilityWritingError),
     MultiProtocolExtensionsCapabilityError(MultiProtocolExtensionsCapabilityWritingError),
     AddPathCapabilityError(AddPathCapabilityWritingError),
+    ExtendedNextHopEncodingCapabilityError(ExtendedNextHopEncodingCapabilityWritingError),
 }
 
 impl From<std::io::Error> for BGPCapabilityWritingError {
@@ -60,6 +63,7 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::FourOctetAS(value) => value.len(),
             Self::AddPath(value) => value.len(),
+            Self::ExtendedNextHopEncoding(value) => value.len(),
             Self::ExtendedMessage => EXTENDED_MESSAGE_CAPABILITY_LENGTH as usize,
             Self::Experimental(value) => value.value().len(),
             Self::Unrecognized(value) => value.value().len(),
@@ -94,6 +98,11 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             }
             Self::FourOctetAS(value) => {
                 writer.write_u8(BGPCapabilityCode::FourOctetAS.into())?;
+                writer.write_u8(value.len() as u8)?;
+                value.write(writer)?;
+            }
+            Self::ExtendedNextHopEncoding(value) => {
+                writer.write_u8(BGPCapabilityCode::ExtendedNextHopEncoding.into())?;
                 writer.write_u8(value.len() as u8)?;
                 value.write(writer)?;
             }
@@ -228,6 +237,58 @@ impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapabilityAddressFami
         // Flip first bit if send is enabled
         let receive = u8::from(self.receive());
         writer.write_u8(send | receive)?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum ExtendedNextHopEncodingCapabilityWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for ExtendedNextHopEncodingCapabilityWritingError {
+    fn from(err: std::io::Error) -> Self {
+        ExtendedNextHopEncodingCapabilityWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<ExtendedNextHopEncodingCapabilityWritingError> for BGPCapabilityWritingError {
+    fn from(value: ExtendedNextHopEncodingCapabilityWritingError) -> Self {
+        BGPCapabilityWritingError::ExtendedNextHopEncodingCapabilityError(value)
+    }
+}
+
+impl WritablePDU<ExtendedNextHopEncodingCapabilityWritingError> for ExtendedNextHopEncoding {
+    const BASE_LENGTH: usize = EXTENDED_NEXT_HOP_ENCODING_LENGTH as usize;
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), ExtendedNextHopEncodingCapabilityWritingError> {
+        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
+        writer.write_u16::<NetworkEndian>(self.address_type().subsequent_address_family() as u16)?;
+        writer.write_u16::<NetworkEndian>(self.next_hop_afi().into())?;
+        Ok(())
+    }
+}
+impl WritablePDU<ExtendedNextHopEncodingCapabilityWritingError>
+    for ExtendedNextHopEncodingCapability
+{
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.encodings().iter().map(|x| x.len()).sum::<usize>()
+    }
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), ExtendedNextHopEncodingCapabilityWritingError> {
+        writer.write_u8(self.len() as u8 - 1)?;
+        for encoding in self.encodings() {
+            encoding.write(writer)?;
+        }
         Ok(())
     }
 }

@@ -16,19 +16,24 @@
 use crate::{
     capabilities::{
         AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, ExperimentalCapability,
-        ExperimentalCapabilityCode, FourOctetASCapability, MultiProtocolExtensionsCapability,
-        UnrecognizedCapability,
+        ExperimentalCapabilityCode, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
+        FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
     serde::{
         deserializer::capabilities::{
             AddPathCapabilityParsingError, BGPCapabilityParsingError,
-            FourOctetASCapabilityParsingError, LocatedBGPCapabilityParsingError,
+            ExtendedNextHopEncodingCapabilityParsingError, FourOctetASCapabilityParsingError,
+            LocatedBGPCapabilityParsingError, LocatedExtendedNextHopEncodingCapabilityParsingError,
             MultiProtocolExtensionsCapabilityParsingError,
         },
-        serializer::capabilities::BGPCapabilityWritingError,
+        serializer::capabilities::{
+            BGPCapabilityWritingError, ExtendedNextHopEncodingCapabilityWritingError,
+        },
     },
 };
-use netgauze_iana::address_family::AddressType;
+use netgauze_iana::address_family::{
+    AddressFamily, AddressType, UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
+};
 use netgauze_parse_utils::{
     test_helpers::{test_parse_error, test_parsed_completely, test_write},
     Span,
@@ -224,6 +229,79 @@ fn test_parse_add_path() -> Result<(), BGPCapabilityWritingError> {
 
     test_write(&good, &good_wire)?;
 
+    Ok(())
+}
+
+#[test]
+fn test_extended_next_hop_encoding() -> Result<(), ExtendedNextHopEncodingCapabilityWritingError> {
+    let good_wire = [0x00, 0x01, 0x00, 0x01, 0x00, 0x02];
+    let invalid_length_wire = [0x00, 0x01, 0x00, 0x01, 0x00];
+    let invalid_afi_wire = [0xff, 0xfe, 0x00, 0x01, 0x00, 0x02];
+    let invalid_safi_wire = [0x00, 0x01, 0x00, 0x00, 0x00, 0x02];
+
+    let good = ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6);
+    let invalid_length = LocatedExtendedNextHopEncodingCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(0, &invalid_length_wire[0..]) },
+        ExtendedNextHopEncodingCapabilityParsingError::NomError(ErrorKind::Eof),
+    );
+
+    let invalid_afi = LocatedExtendedNextHopEncodingCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(0, &invalid_afi_wire[0..]) },
+        ExtendedNextHopEncodingCapabilityParsingError::AddressFamilyError(UndefinedAddressFamily(
+            65534,
+        )),
+    );
+
+    let invalid_safi = LocatedExtendedNextHopEncodingCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &invalid_safi_wire[2..]) },
+        ExtendedNextHopEncodingCapabilityParsingError::SubsequentAddressFamilyError(
+            UndefinedSubsequentAddressFamily(0),
+        ),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<
+        ExtendedNextHopEncoding,
+        LocatedExtendedNextHopEncodingCapabilityParsingError<'_>,
+    >(&invalid_length_wire, &invalid_length);
+    test_parse_error::<
+        ExtendedNextHopEncoding,
+        LocatedExtendedNextHopEncodingCapabilityParsingError<'_>,
+    >(&invalid_afi_wire, &invalid_afi);
+    test_parse_error::<
+        ExtendedNextHopEncoding,
+        LocatedExtendedNextHopEncodingCapabilityParsingError<'_>,
+    >(&invalid_safi_wire, &invalid_safi);
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_extended_next_hop_encoding_capability() -> Result<(), BGPCapabilityWritingError> {
+    let good_zero_afi_wire = [0x00];
+    let good_one_afi_wire = [0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02];
+    let good_two_afi_wire = [
+        0x0c, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02,
+    ];
+
+    let good_zero_afi = ExtendedNextHopEncodingCapability::new(vec![]);
+    let good_one_afi = ExtendedNextHopEncodingCapability::new(vec![ExtendedNextHopEncoding::new(
+        AddressType::Ipv4Unicast,
+        AddressFamily::IPv6,
+    )]);
+    let good_two_afi = ExtendedNextHopEncodingCapability::new(vec![
+        ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
+        ExtendedNextHopEncoding::new(AddressType::Ipv6Unicast, AddressFamily::IPv6),
+    ]);
+
+    test_parsed_completely(&good_zero_afi_wire, &good_zero_afi);
+    test_parsed_completely(&good_one_afi_wire, &good_one_afi);
+    test_parsed_completely(&good_two_afi_wire, &good_two_afi);
+
+    test_write(&good_zero_afi, &good_zero_afi_wire)?;
+    test_write(&good_one_afi, &good_one_afi_wire)?;
+    test_write(&good_two_afi, &good_two_afi_wire)?;
     Ok(())
 }
 

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use netgauze_iana::address_family::AddressType;
+use netgauze_iana::address_family::{AddressFamily, AddressType};
 use strum_macros::{Display, FromRepr};
 
 /// Enhanced route refresh have fixed length as per RFC2918
@@ -30,6 +30,9 @@ pub(crate) const FOUR_OCTET_AS_CAPABILITY_LENGTH: u8 = 4;
 
 /// BGP Extended Message capability have fixed length as per RFC8654
 pub(crate) const EXTENDED_MESSAGE_CAPABILITY_LENGTH: u8 = 0;
+
+/// 2-octet NLRI AFI + 2-octet NLRI SAFI + 2-octet NextHop AFI as per RFC8950
+pub(crate) const EXTENDED_NEXT_HOP_ENCODING_LENGTH: u8 = 6;
 
 /// BGP Capabilities are included as parameters in the BGPOpen message
 /// to indicate support of certain BGP Features.
@@ -62,6 +65,9 @@ pub enum BGPCapability {
     ExtendedMessage,
 
     FourOctetAS(FourOctetASCapability),
+
+    /// [RFC8950](https://datatracker.ietf.org/doc/html/rfc8950)
+    ExtendedNextHopEncoding(ExtendedNextHopEncodingCapability),
 
     Experimental(ExperimentalCapability),
 
@@ -216,5 +222,65 @@ impl AddPathCapabilityAddressFamily {
 
     pub const fn receive(&self) -> bool {
         self.receive
+    }
+}
+
+/// Advertising IPv4 Network Layer Reachability Information with an IPv6 Next
+/// Hop
+//
+/// defined by: [RFC8950](https://datatracker.ietf.org/doc/html/rfc8950)
+///
+/// ```text
+/// +-----------------------------------------------------+
+/// | NLRI AFI - 1 (2 octets)                             |
+/// +-----------------------------------------------------+
+/// | NLRI SAFI - 1 (2 octets)                            |
+/// +-----------------------------------------------------+
+/// | Nexthop AFI - 1 (2 octets)                          |
+/// +-----------------------------------------------------+
+/// | .....                                               |
+/// +-----------------------------------------------------+
+/// | NLRI AFI - N (2 octets)                             |
+/// +-----------------------------------------------------+
+/// | NLRI SAFI - N (2 octets)                            |
+/// +-----------------------------------------------------+
+/// | Nexthop AFI - N (2 octets)                          |
+/// +-----------------------------------------------------+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ExtendedNextHopEncodingCapability {
+    encodings: Vec<ExtendedNextHopEncoding>,
+}
+
+impl ExtendedNextHopEncodingCapability {
+    pub const fn new(encodings: Vec<ExtendedNextHopEncoding>) -> Self {
+        Self { encodings }
+    }
+
+    pub const fn encodings(&self) -> &Vec<ExtendedNextHopEncoding> {
+        &self.encodings
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ExtendedNextHopEncoding {
+    address_type: AddressType,
+    next_hop_afi: AddressFamily,
+}
+
+impl ExtendedNextHopEncoding {
+    pub const fn new(address_type: AddressType, next_hop_afi: AddressFamily) -> Self {
+        Self {
+            address_type,
+            next_hop_afi,
+        }
+    }
+
+    pub const fn address_type(&self) -> AddressType {
+        self.address_type
+    }
+
+    pub const fn next_hop_afi(&self) -> AddressFamily {
+        self.next_hop_afi
     }
 }

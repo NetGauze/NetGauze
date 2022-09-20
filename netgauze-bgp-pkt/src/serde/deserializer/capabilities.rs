@@ -16,9 +16,10 @@
 use crate::{
     capabilities::{
         AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, ExperimentalCapability,
-        ExperimentalCapabilityCode, FourOctetASCapability, MultiProtocolExtensionsCapability,
-        UnrecognizedCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        EXTENDED_MESSAGE_CAPABILITY_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
+        ExperimentalCapabilityCode, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
+        FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
+        ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, EXTENDED_MESSAGE_CAPABILITY_LENGTH,
+        EXTENDED_NEXT_HOP_ENCODING_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
         MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
@@ -50,6 +51,7 @@ pub enum BGPCapabilityParsingError {
     FourOctetASCapabilityError(FourOctetASCapabilityParsingError),
     MultiProtocolExtensionsCapabilityError(MultiProtocolExtensionsCapabilityParsingError),
     AddPathCapabilityError(AddPathCapabilityParsingError),
+    ExtendedNextHopEncodingCapabilityError(ExtendedNextHopEncodingCapabilityParsingError),
 }
 
 /// BGP Open Message Parsing errors  with the input location of where it
@@ -199,7 +201,8 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
                     parse_unrecognized_capability(code.into(), buf)
                 }
                 BGPCapabilityCode::ExtendedNextHopEncoding => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    let (buf, cap) = parse_into_located(buf)?;
+                    Ok((buf, BGPCapability::ExtendedNextHopEncoding(cap)))
                 }
                 BGPCapabilityCode::BGPExtendedMessage => {
                     let (buf, _) =
@@ -662,6 +665,156 @@ impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>>
         Ok((
             buf,
             AddPathCapabilityAddressFamily::new(address_type, send, receive),
+        ))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum ExtendedNextHopEncodingCapabilityParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    AddressFamilyError(UndefinedAddressFamily),
+    SubsequentAddressFamilyError(UndefinedSubsequentAddressFamily),
+    AddressTypeError(InvalidAddressType),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedExtendedNextHopEncodingCapabilityParsingError<'a> {
+    span: Span<'a>,
+    error: ExtendedNextHopEncodingCapabilityParsingError,
+}
+
+impl<'a> LocatedExtendedNextHopEncodingCapabilityParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: ExtendedNextHopEncodingCapabilityParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError for LocatedExtendedNextHopEncodingCapabilityParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = ExtendedNextHopEncodingCapabilityParsingError;
+
+    fn span(&self) -> &Self::Span {
+        &self.span
+    }
+
+    fn error(&self) -> &Self::Error {
+        &self.error
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedBGPCapabilityParsingError<'a>>
+    for LocatedExtendedNextHopEncodingCapabilityParsingError<'a>
+{
+    fn into_located(self) -> LocatedBGPCapabilityParsingError<'a> {
+        LocatedBGPCapabilityParsingError::new(
+            self.span,
+            BGPCapabilityParsingError::ExtendedNextHopEncodingCapabilityError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, ExtendedNextHopEncodingCapabilityParsingError>
+    for LocatedExtendedNextHopEncodingCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: ExtendedNextHopEncodingCapabilityParsingError,
+    ) -> Self {
+        LocatedExtendedNextHopEncodingCapabilityParsingError::new(input, error)
+    }
+}
+
+impl<'a> ParseError<Span<'a>> for LocatedExtendedNextHopEncodingCapabilityParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedExtendedNextHopEncodingCapabilityParsingError::new(
+            input,
+            ExtendedNextHopEncodingCapabilityParsingError::NomError(kind),
+        )
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily>
+    for LocatedExtendedNextHopEncodingCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UndefinedAddressFamily,
+    ) -> Self {
+        LocatedExtendedNextHopEncodingCapabilityParsingError::new(
+            input,
+            ExtendedNextHopEncodingCapabilityParsingError::AddressFamilyError(error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
+    for LocatedExtendedNextHopEncodingCapabilityParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UndefinedSubsequentAddressFamily,
+    ) -> Self {
+        LocatedExtendedNextHopEncodingCapabilityParsingError::new(
+            input,
+            ExtendedNextHopEncodingCapabilityParsingError::SubsequentAddressFamilyError(error),
+        )
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>
+    for ExtendedNextHopEncodingCapability
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>> {
+        let (buf, encodings_buf) = nom::multi::length_data(be_u8)(buf)?;
+        let (_, encodings) = parse_till_empty(encodings_buf)?;
+
+        Ok((buf, ExtendedNextHopEncodingCapability::new(encodings)))
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>
+    for ExtendedNextHopEncoding
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>> {
+        let input = buf;
+        let (buf, ehe_buf) =
+            nom::bytes::complete::take(EXTENDED_NEXT_HOP_ENCODING_LENGTH as usize)(buf)?;
+        let (ehe_buf, nlri_afi) =
+            nom::combinator::map_res(be_u16, AddressFamily::try_from)(ehe_buf)?;
+        let (ehe_buf, nlri_safi) =
+            nom::combinator::map_res(be_u16, |x| SubsequentAddressFamily::try_from(x as u8))(
+                ehe_buf,
+            )?;
+        let address_type = match AddressType::from_afi_safi(nlri_afi, nlri_safi) {
+            Ok(address_type) => address_type,
+            Err(err) => {
+                return Err(nom::Err::Error(
+                    LocatedExtendedNextHopEncodingCapabilityParsingError::new(
+                        input,
+                        ExtendedNextHopEncodingCapabilityParsingError::AddressTypeError(err),
+                    ),
+                ))
+            }
+        };
+
+        let (_, next_hop_afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(ehe_buf)?;
+
+        Ok((
+            buf,
+            ExtendedNextHopEncoding::new(address_type, next_hop_afi),
         ))
     }
 }
