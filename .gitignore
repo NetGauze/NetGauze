@@ -3,6 +3,10 @@ debug/
 target/
 Cargo.lock
 
+# Ignore Fuzzer outputs
+fuzz/artifacts/
+fuzz/corpus/
+
 # IntelliJ
 .idea
 

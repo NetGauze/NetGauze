@@ -1,0 +1,22 @@
+[package]
+name = "bgp-fuzz"
+version = "0.0.1"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+readme = "../README.md"
+description = """Fuzzers for NetGauze"""
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+netgauze-parse-utils = {path = "../netgauze-parse-utils"}
+netgauze-bgp-pkt = {path = "../netgauze-bgp-pkt", features = ["serde"]}
+
+[[bin]]
+name = "fuzz-bgp-pkt"
+path = "fuzz_targets/fuzz_bgp_pkt.rs"
+test = false
+doc = false

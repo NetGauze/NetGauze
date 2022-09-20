@@ -5,4 +5,5 @@ members = [
     "netgauze-iana",
     "netgauze-locate",
     "netgauze-parse-utils",
+    "fuzz"
 ]
