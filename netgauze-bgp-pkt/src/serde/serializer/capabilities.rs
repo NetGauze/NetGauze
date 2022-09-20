@@ -63,7 +63,8 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::FourOctetAS(value) => value.len(),
             Self::AddPath(value) => value.len(),
-            Self::ExtendedNextHopEncoding(value) => value.len(),
+            // ExtendedNextHopEncoding carries an length field, so need to account for it here
+            Self::ExtendedNextHopEncoding(value) => value.len() - 1,
             Self::ExtendedMessage => EXTENDED_MESSAGE_CAPABILITY_LENGTH as usize,
             Self::Experimental(value) => value.value().len(),
             Self::Unrecognized(value) => value.value().len(),
@@ -103,7 +104,6 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             }
             Self::ExtendedNextHopEncoding(value) => {
                 writer.write_u8(BGPCapabilityCode::ExtendedNextHopEncoding.into())?;
-                writer.write_u8(value.len() as u8)?;
                 value.write(writer)?;
             }
             Self::Experimental(value) => {

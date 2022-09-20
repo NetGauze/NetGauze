@@ -14,12 +14,16 @@
 // limitations under the License.
 
 use crate::{
+    capabilities::{
+        BGPCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
+        FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
+    },
     iana::{
         RouteRefreshSubcode, UndefinedBGPErrorNotificationCode, UndefinedBgpMessageType,
         UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
     },
     notification::CeaseError,
-    open::BGP_VERSION,
+    open::{BGPOpenMessageParameter, BGP_VERSION},
     serde::{
         deserializer::{
             notification::{BGPNotificationMessageParsingError, CeaseErrorParsingError},
@@ -30,7 +34,7 @@ use crate::{
     },
     BGPMessage, BGPNotificationMessage, BGPOpenMessage, BGPRouteRefreshMessage,
 };
-use netgauze_iana::address_family::AddressType;
+use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
     test_helpers::{
         combine, test_parse_error_with_one_input, test_parsed_completely,
@@ -286,5 +290,52 @@ fn test_bgp_message_route_refresh() -> Result<(), BGPMessageWritingError> {
     );
     test_write(&good_normal, &good_normal_wire)?;
 
+    Ok(())
+}
+
+#[test]
+fn test_bgp_message_open1() -> Result<(), BGPMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x53, 0x01, 0x04, 0x00, 0x64, 0x00, 0xb4, 0x05, 0x05, 0x05, 0x05, 0x36, 0x02,
+        0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x80,
+        0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00, 0x02, 0x06, 0x41, 0x04, 0x00, 0x00, 0x00,
+        0x64, 0x02, 0x14, 0x05, 0x12, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02,
+        0x00, 0x02, 0x00, 0x01, 0x00, 0x80, 0x00, 0x02,
+    ];
+
+    let good = BGPMessage::Open(BGPOpenMessage::new(
+        100,
+        180,
+        Ipv4Addr::new(5, 5, 5, 5),
+        vec![
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+                MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
+            )]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+                MultiProtocolExtensionsCapability::new(AddressType::IpPv4MplsLabeledVpn),
+            )]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+                UnrecognizedCapability::new(128, vec![]),
+            )]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
+                FourOctetASCapability::new(100),
+            )]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::ExtendedNextHopEncoding(
+                ExtendedNextHopEncodingCapability::new(vec![
+                    ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
+                    ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
+                    ExtendedNextHopEncoding::new(
+                        AddressType::IpPv4MplsLabeledVpn,
+                        AddressFamily::IPv6,
+                    ),
+                ]),
+            )]),
+        ],
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
     Ok(())
 }

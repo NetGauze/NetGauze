@@ -278,7 +278,7 @@ fn test_extended_next_hop_encoding() -> Result<(), ExtendedNextHopEncodingCapabi
 }
 
 #[test]
-fn test_extended_next_hop_encoding_capability() -> Result<(), BGPCapabilityWritingError> {
+fn test_extended_next_hop_encodings() -> Result<(), BGPCapabilityWritingError> {
     let good_zero_afi_wire = [0x00];
     let good_one_afi_wire = [0x06, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02];
     let good_two_afi_wire = [
@@ -302,6 +302,24 @@ fn test_extended_next_hop_encoding_capability() -> Result<(), BGPCapabilityWriti
     test_write(&good_zero_afi, &good_zero_afi_wire)?;
     test_write(&good_one_afi, &good_one_afi_wire)?;
     test_write(&good_two_afi, &good_two_afi_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_extended_next_hop_encoding_capability() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [
+        5, 18, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 0, 2, 0, 1, 0, 128, 0, 2,
+    ];
+
+    let good =
+        BGPCapability::ExtendedNextHopEncoding(ExtendedNextHopEncodingCapability::new(vec![
+            ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
+            ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
+            ExtendedNextHopEncoding::new(AddressType::IpPv4MplsLabeledVpn, AddressFamily::IPv6),
+        ]));
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
     Ok(())
 }
 
