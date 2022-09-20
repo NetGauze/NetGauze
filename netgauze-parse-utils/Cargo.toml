@@ -7,7 +7,7 @@ license = "Apache-2.0"
 readme = "README.md"
 
 [dependencies]
-netgauze-locate = {path = "../netgauze-locate"}
+netgauze-locate = { path = "../netgauze-locate" }
 nom = { version = "7", default-features = false }
 
 [features]

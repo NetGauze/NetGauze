@@ -33,4 +33,4 @@ netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-hel
 [[bench]]
 name = "serde_benchmark"
 harness = false
-required-features = [ "bench" ]
+required-features = ["bench"]
