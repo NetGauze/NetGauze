@@ -1,4 +1,5 @@
 BGP-4 Protocol representation and serde.
+          
 
 ## Supported BGP-4 Protocol features
 
@@ -25,3 +26,11 @@ BGP-4 Protocol representation and serde.
  | Extended Next Hop Encoding       | [RFC 8950](https://datatracker.ietf.org/doc/html/rfc8950)  |                                                                                             |
  | Experimental                     | [RF C8810](https://datatracker.ietf.org/doc/html/RFC8810)  | Capabilities with codes 239-254 are marked as experimental, we read their values as Vec<u8> |
  | Unrecognized                     | [RFC 5492](https://datatracker.ietf.org/doc/html/rfc5492)  | We carry the capability code and the `u8` vector for it's value                             |
+
+
+
+# Development documentation
+
+*Running Packet Serde benchmarks*
+```cargo bench --features bench```
+

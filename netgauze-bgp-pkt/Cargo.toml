@@ -18,11 +18,19 @@ strum = "0.24"
 strum_macros = "0.24"
 nom = { version = "7.1", optional = true }
 byteorder = { version = "1.4", optional = true }
+criterion = { version = "0.4", optional = true } # Dev dep for bench
 
 [features]
 default = ["serde"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils"]
+bench = ["criterion"]
 
 
 [dev-dependencies]
 netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-helpers"] }
+
+
+[[bench]]
+name = "serde_benchmark"
+harness = false
+required-features = [ "bench" ]
