@@ -249,9 +249,9 @@ impl<'a> FromExternalError<Span<'a>, UndefinedBgpMessageType>
 /// Parse [BGPMessage] length and type, then check that the length of a BGP
 /// message is valid according to it's type. Takes into consideration both rules at [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
 /// and [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654).
-fn parse_bgp_message_length_and_type<'a>(
-    buf: Span<'a>,
-) -> IResult<Span<'a>, (u16, BGPMessageType, Span<'a>), LocatedBGPMessageParsingError<'_>> {
+fn parse_bgp_message_length_and_type(
+    buf: Span<'_>,
+) -> IResult<Span<'_>, (u16, BGPMessageType, Span<'_>), LocatedBGPMessageParsingError<'_>> {
     let pre_len_buf = buf;
     let (buf, length) = be_u16(buf)?;
 

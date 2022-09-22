@@ -294,7 +294,7 @@ impl WritablePDUWithOneInput<bool, AsPathWritingError> for ASPath {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self, extended_length: bool) -> usize {
-        let base = Self::BASE_LENGTH + if extended_length { 1 } else { 0 };
+        let base = Self::BASE_LENGTH + usize::from(extended_length);
 
         let segment_len = match self {
             Self::As2PathSegments(segments) => {
@@ -333,7 +333,7 @@ impl WritablePDUWithOneInput<bool, AsPathWritingError> for AS4Path {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self, extended_length: bool) -> usize {
-        let base = Self::BASE_LENGTH + if extended_length { 1 } else { 0 };
+        let base = Self::BASE_LENGTH + usize::from(extended_length);
         let segment_len = self
             .segments()
             .iter()
@@ -536,7 +536,7 @@ impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As2Aggregator {
     const BASE_LENGTH: usize = 7;
 
     fn len(&self, extended_length: bool) -> usize {
-        Self::BASE_LENGTH + if extended_length { 1 } else { 0 }
+        Self::BASE_LENGTH + usize::from(extended_length)
     }
 
     fn write<T: std::io::Write>(
@@ -556,7 +556,7 @@ impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As4Aggregator {
     const BASE_LENGTH: usize = 9;
 
     fn len(&self, extended_length: bool) -> usize {
-        Self::BASE_LENGTH + if extended_length { 1 } else { 0 }
+        Self::BASE_LENGTH + usize::from(extended_length)
     }
 
     fn write<T: std::io::Write>(
@@ -672,7 +672,7 @@ impl WritablePDUWithOneInput<bool, CommunitiesWritingError> for Communities {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self, extended_length: bool) -> usize {
-        let base = Self::BASE_LENGTH + if extended_length { 1 } else { 0 };
+        let base = Self::BASE_LENGTH + usize::from(extended_length);
         let value_len = self.communities().iter().map(|x| x.len()).sum::<usize>();
         base + value_len
     }

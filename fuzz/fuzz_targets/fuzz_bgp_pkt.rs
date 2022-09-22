@@ -21,7 +21,7 @@ use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
 
 fuzz_target!(|data: (&[u8], bool)| {
     let (mut buf, asn4) = data;
-    while let Ok((retbuf, _msg)) = BGPMessage::from_wire(Span::new(&buf), asn4) {
+    while let Ok((retbuf, _msg)) = BGPMessage::from_wire(Span::new(buf), asn4) {
         buf = retbuf.fragment();
     }
 });
