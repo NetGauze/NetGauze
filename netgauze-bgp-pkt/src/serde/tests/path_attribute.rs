@@ -16,15 +16,16 @@
 use crate::{
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AsPathSegmentType, AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop,
-        Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
-        UnknownAttribute,
+        AsPathSegmentType, AtomicAggregate, Communities, Community, LocalPreference,
+        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
+        UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
     },
     serde::{
         deserializer::path_attribute::{
             AggregatorParsingError, AsPathParsingError, AtomicAggregateParsingError,
-            LocalPreferenceParsingError, LocatedAggregatorParsingError, LocatedAsPathParsingError,
-            LocatedAtomicAggregateParsingError, LocatedLocalPreferenceParsingError,
+            CommunitiesParsingError, LocalPreferenceParsingError, LocatedAggregatorParsingError,
+            LocatedAsPathParsingError, LocatedAtomicAggregateParsingError,
+            LocatedCommunitiesParsingError, LocatedLocalPreferenceParsingError,
             LocatedMultiExitDiscriminatorParsingError, LocatedNextHopParsingError,
             LocatedOriginParsingError, LocatedPathAttributeParsingError,
             MultiExitDiscriminatorParsingError, NextHopParsingError, OriginParsingError,
@@ -32,8 +33,9 @@ use crate::{
         },
         serializer::path_attribute::{
             AggregatorWritingError, AsPathWritingError, AtomicAggregateWritingError,
-            LocalPreferenceWritingError, MultiExitDiscriminatorWritingError, NextHopWritingError,
-            OriginWritingError, PathAttributeWritingError, UnknownAttributeWritingError,
+            CommunitiesWritingError, LocalPreferenceWritingError,
+            MultiExitDiscriminatorWritingError, NextHopWritingError, OriginWritingError,
+            PathAttributeWritingError, UnknownAttributeWritingError,
         },
     },
 };
@@ -868,6 +870,73 @@ fn test_parse_path_attribute_as4_aggregator() -> Result<(), PathAttributeWriting
     test_write(&good_partial, &good_partial_wire)?;
     test_write(&good_extended, &good_extended_wire)?;
     test_write(&good_partial_extended, &good_partial_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_community() -> Result<(), CommunitiesWritingError> {
+    let good_wire = [0x00, 0xef, 0x00, 0x20];
+    let bad_incomplete_wire = [0x00];
+
+    let good = Community::new(0x00ef0020);
+    let bad_incomplete = LocatedCommunitiesParsingError::new(
+        Span::new(&bad_incomplete_wire),
+        CommunitiesParsingError::NomError(ErrorKind::Eof),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<Community, LocatedCommunitiesParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_path_attribute_communities() -> Result<(), PathAttributeWritingError> {
+    let good_zero_wire = [0xc0, 0x08, 0x00];
+    let good_one_wire = [0xc0, 0x08, 0x04, 0x00, 0x00, 0x00, 0x01];
+    let good_two_wire = [
+        0xc0, 0x08, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,
+    ];
+    let good_two_wire_extended = [
+        0xd0, 0x08, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,
+    ];
+
+    let good_zero = PathAttribute::Communities {
+        partial: false,
+        extended_length: false,
+        value: Communities::new(vec![]),
+    };
+
+    let good_one = PathAttribute::Communities {
+        partial: false,
+        extended_length: false,
+        value: Communities::new(vec![Community::new(1)]),
+    };
+
+    let good_two = PathAttribute::Communities {
+        partial: false,
+        extended_length: false,
+        value: Communities::new(vec![Community::new(1), Community::new(2)]),
+    };
+
+    let good_two_extended = PathAttribute::Communities {
+        partial: false,
+        extended_length: true,
+        value: Communities::new(vec![Community::new(1), Community::new(2)]),
+    };
+
+    test_parsed_completely_with_one_input(&good_zero_wire, false, &good_zero);
+    test_parsed_completely_with_one_input(&good_one_wire, false, &good_one);
+    test_parsed_completely_with_one_input(&good_two_wire, false, &good_two);
+    test_parsed_completely_with_one_input(&good_two_wire_extended, true, &good_two_extended);
+    test_write(&good_zero, &good_zero_wire)?;
+    test_write(&good_one, &good_one_wire)?;
+    test_write(&good_two, &good_two_wire)?;
+    test_write(&good_two_extended, &good_two_wire_extended)?;
     Ok(())
 }
 

@@ -16,6 +16,7 @@
 //! Contains the extensible definitions for various [PathAttribute] that can be
 //! used in [crate::update::BGPUpdateMessage].
 
+use crate::iana::WellKnownCommunity;
 use std::net::Ipv4Addr;
 use strum_macros::{Display, FromRepr};
 
@@ -64,6 +65,11 @@ pub enum PathAttribute {
         extended_length: bool,
         value: Aggregator,
     },
+    Communities {
+        partial: bool,
+        extended_length: bool,
+        value: Communities,
+    },
     UnknownAttribute {
         partial: bool,
         value: UnknownAttribute,
@@ -109,6 +115,11 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => Aggregator::optional(),
+            Self::Communities {
+                partial: _,
+                extended_length: _,
+                value: _,
+            } => Communities::optional(),
             Self::UnknownAttribute { partial: _, value } => value.optional(),
         }
     }
@@ -152,6 +163,11 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => Aggregator::transitive(),
+            Self::Communities {
+                partial: _,
+                extended_length: _,
+                value: _,
+            } => Communities::transitive(),
             Self::UnknownAttribute { partial: _, value } => value.transitive(),
         }
     }
@@ -198,6 +214,11 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => *partial,
+            Self::Communities {
+                partial,
+                extended_length: _,
+                value: _,
+            } => *partial,
             Self::UnknownAttribute { partial, value: _ } => *partial,
         }
     }
@@ -236,6 +257,11 @@ impl PathAttribute {
                 value: _,
             } => *extended_length,
             Self::Aggregator {
+                partial: _,
+                extended_length,
+                value: _,
+            } => *extended_length,
+            Self::Communities {
                 partial: _,
                 extended_length,
                 value: _,
@@ -646,6 +672,68 @@ impl From<PathAttributeLength> for u16 {
     }
 }
 
+/// COMMUNITIES path attribute is an optional transitive attribute of variable
+/// length. The attribute consists of a set of four octet values, each of which
+/// specify a community. All routes with this attribute belong to the
+/// communities listed in the attribute.
+///
+/// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Communities {
+    communities: Vec<Community>,
+}
+
+impl Communities {
+    pub const fn new(communities: Vec<Community>) -> Self {
+        Self { communities }
+    }
+
+    pub const fn communities(&self) -> &Vec<Community> {
+        &self.communities
+    }
+}
+
+impl Communities {
+    pub const fn optional() -> bool {
+        true
+    }
+
+    pub const fn transitive() -> bool {
+        true
+    }
+}
+
+/// Four octet values to specify a community.
+///
+/// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Community(u32);
+
+impl Community {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(&self) -> u32 {
+        self.0
+    }
+    /// Parse the community numerical value into a [WellKnownCommunity].
+    /// If the value is not well-known, then will return None.
+    pub const fn into_well_known(&self) -> Option<WellKnownCommunity> {
+        WellKnownCommunity::from_repr(self.0)
+    }
+
+    /// Getting the ASN number part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    pub const fn collection_asn(&self) -> u16 {
+        (self.0 >> 16 & 0xffff) as u16
+    }
+
+    /// Getting the value part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    pub const fn collection_value(&self) -> u16 {
+        (self.0 & 0x0000ffff) as u16
+    }
+}
+
 /// Path Attribute that is not recognized.
 /// BGP Allows parsing unrecognized attributes as is, and then only consider
 /// the transitive and partial bits of the attribute.
@@ -657,6 +745,7 @@ pub struct UnknownAttribute {
     length: PathAttributeLength,
     value: Vec<u8>,
 }
+
 impl UnknownAttribute {
     pub const fn new(
         optional: bool,
@@ -706,9 +795,12 @@ impl UnknownAttribute {
 
 #[cfg(test)]
 mod tests {
-    use crate::path_attribute::{
-        AS4Path, ASPath, Aggregator, AsPathSegmentType, LocalPreference, MultiExitDiscriminator,
-        NextHop, Origin, UndefinedAsPathSegmentType, UndefinedOrigin,
+    use crate::{
+        iana::WellKnownCommunity,
+        path_attribute::{
+            AS4Path, ASPath, Aggregator, AsPathSegmentType, Community, LocalPreference,
+            MultiExitDiscriminator, NextHop, Origin, UndefinedAsPathSegmentType, UndefinedOrigin,
+        },
     };
 
     #[test]
@@ -762,5 +854,22 @@ mod tests {
         assert!(AS4Path::transitive());
         assert!(Aggregator::optional());
         assert!(Aggregator::transitive());
+    }
+
+    #[test]
+    fn test_community_into_well_known() {
+        let well_known = Community::new(0xFFFFFF04);
+        let not_well_known = Community::new(0x00FF0F04);
+        assert_eq!(
+            well_known.into_well_known(),
+            Some(WellKnownCommunity::NoPeer)
+        );
+        assert_eq!(not_well_known.into_well_known(), None);
+    }
+    #[test]
+    fn test_community_val() {
+        let comm = Community::new(0x10012003);
+        assert_eq!(comm.collection_asn(), 0x1001);
+        assert_eq!(comm.collection_value(), 0x2003);
     }
 }

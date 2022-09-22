@@ -19,9 +19,9 @@ use crate::{
     iana::{PathAttributeType, UndefinedPathAttributeType},
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AsPathSegmentType, AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop,
-        Origin, PathAttribute, PathAttributeLength, UndefinedAsPathSegmentType, UndefinedOrigin,
-        UnknownAttribute,
+        AsPathSegmentType, AtomicAggregate, Communities, Community, LocalPreference,
+        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
+        UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
     },
     serde::deserializer::{
         update::LocatedBGPUpdateMessageParsingError, BGPUpdateMessageParsingError,
@@ -71,6 +71,7 @@ pub enum PathAttributeParsingError {
     LocalPreferenceError(LocalPreferenceParsingError),
     AtomicAggregateError(AtomicAggregateParsingError),
     AggregatorError(AggregatorParsingError),
+    CommunitiesError(CommunitiesParsingError),
     UnknownAttributeError(UnknownAttributeParsingError),
 }
 
@@ -211,6 +212,15 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
             Ok(PathAttributeType::Aggregator) => {
                 let (buf, value) = parse_into_located_two_inputs(buf, extended_length, asn4)?;
                 let path_attr = PathAttribute::Aggregator {
+                    partial,
+                    extended_length,
+                    value,
+                };
+                Ok((buf, path_attr))
+            }
+            Ok(PathAttributeType::Communities) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let path_attr = PathAttribute::Communities {
                     partial,
                     extended_length,
                     value,
@@ -1044,6 +1054,93 @@ impl<'a> ReadablePDUWithThreeInputs<'a, bool, bool, bool, LocatedUnknownAttribut
             buf,
             UnknownAttribute::new(optional, transitive, code, len, (*value.fragment()).into()),
         ))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum CommunitiesParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedCommunitiesParsingError<'a> {
+    span: Span<'a>,
+    error: CommunitiesParsingError,
+}
+
+impl<'a> LocatedCommunitiesParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: CommunitiesParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError for LocatedCommunitiesParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = CommunitiesParsingError;
+
+    fn span(&self) -> &Self::Span {
+        &self.span
+    }
+
+    fn error(&self) -> &Self::Error {
+        &self.error
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
+    for LocatedCommunitiesParsingError<'a>
+{
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
+            self.span,
+            PathAttributeParsingError::CommunitiesError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, CommunitiesParsingError>
+    for LocatedCommunitiesParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: CommunitiesParsingError,
+    ) -> Self {
+        LocatedCommunitiesParsingError::new(input, error)
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedCommunitiesParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedCommunitiesParsingError::new(input, CommunitiesParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedCommunitiesParsingError<'a>> for Communities {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedCommunitiesParsingError<'a>> {
+        let (buf, communities_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (_, communities) = parse_till_empty(communities_buf)?;
+        Ok((buf, Communities::new(communities)))
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedCommunitiesParsingError<'a>> for Community {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedCommunitiesParsingError<'a>> {
+        let (buf, value) = be_u32(buf)?;
+        Ok((buf, Community::new(value)))
     }
 }
 

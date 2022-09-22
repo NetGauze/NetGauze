@@ -627,6 +627,70 @@ impl TryFrom<u8> for RouteRefreshSubcode {
     }
 }
 
+/// [BGP Well-known Communities](https://www.iana.org/assignments/bgp-well-known-communities/bgp-well-known-communities.xhtml)
+///
+/// Out of the total community space defined by [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
+/// of 0x00000000 - 0xFFFFFFFF, the following ranges and values are reserved for
+/// communities that have global significance and their operations shall be
+/// implemented in any community-attribute-aware BGP speaker. The remainder of
+/// the space, specifically 0x00010000 - 0xFFFEFFFF, is for Private Use, with
+/// the first two octets encoding the autonomous system value as described by
+/// the RFC.
+#[repr(u32)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum WellKnownCommunity {
+    /// [RFC8326](https://datatracker.ietf.org/doc/html/rfc8326)
+    GracefulShutdown = 0xFFFF0000,
+    /// [RFC7611](https://datatracker.ietf.org/doc/html/rfc7611)
+    AcceptOwn = 0xFFFF0001,
+    /// [draft-uttaro-idr-bgp-persistence](https://datatracker.ietf.org/doc/html/draft-uttaro-idr-bgp-persistence)
+    LlgrStale = 0xFFFF0006,
+    /// [draft-uttaro-idr-bgp-persistence](https://datatracker.ietf.org/doc/html/draft-uttaro-idr-bgp-persistence)
+    NoLlgr = 0xFFFF0007,
+    /// [RFC9026](https://datatracker.ietf.org/doc/html/rfc9026)
+    StandbyPe = 0xFFFF0009,
+    /// [RFC7999](https://datatracker.ietf.org/doc/html/rfc7999)
+    BlackHole = 0xFFFF029A,
+    /// [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
+    NoExport = 0xFFFFFF01,
+    /// [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
+    NoAdvertise = 0xFFFFFF02,
+    /// [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
+    NoExportSubConfederation = 0xFFFFFF03,
+    /// [RFC3765](https://datatracker.ietf.org/doc/html/rfc3765)
+    NoPeer = 0xFFFFFF04,
+}
+
+/// [BGP Data Collection Standard Communities](https://www.iana.org/assignments/bgp-data-collection-communities-std/bgp-data-collection-communities-std.xhtml)
+///
+/// Standard (outbound) communities and their encodings for export to BGP route
+/// collectors defined by [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum BGPDataCollectionCommunityValueCode {
+    CustomerRoutes = 0b0000000000000001,
+    PeerRoutes = 0b0000000000000010,
+    InternalRoutes = 0b0000000000000011,
+    InternalMoreSpecificRoutes = 0b0000000000000100,
+    SpecialPurposeRoutes = 0b0000000000000101,
+    UpstreamRoutes = 0b0000000000000110,
+}
+
+/// [BGP Data Collection Standard Communities](https://www.iana.org/assignments/bgp-data-collection-communities-std/bgp-data-collection-communities-std.xhtml)
+///
+/// Region Identifiers defined [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum BGPDataCollectionCommunityRegionIdentifierCode {
+    Africa = 0b00001,
+    Oceania = 0b00010,
+    Asia = 0b00011,
+    Antarctic = 0b00100,
+    Europe = 0b00101,
+    LatinAmericaCaribbeanIslands = 0b00110,
+    NorthAmerica = 0b00111,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

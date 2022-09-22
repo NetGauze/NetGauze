@@ -19,8 +19,8 @@ use crate::{
     iana::PathAttributeType,
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AtomicAggregate, LocalPreference, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
-        PathAttributeLength, UnknownAttribute,
+        AtomicAggregate, Communities, Community, LocalPreference, MultiExitDiscriminator, NextHop,
+        Origin, PathAttribute, PathAttributeLength, UnknownAttribute,
     },
     serde::serializer::update::BGPUpdateMessageWritingError,
 };
@@ -37,6 +37,7 @@ pub enum PathAttributeWritingError {
     LocalPreferenceError(LocalPreferenceWritingError),
     AtomicAggregateError(AtomicAggregateWritingError),
     AggregatorError(AggregatorWritingError),
+    CommunitiesError(CommunitiesWritingError),
     UnknownAttributeError(UnknownAttributeWritingError),
 }
 
@@ -87,6 +88,11 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value,
             } => value.len(*extended_length),
             Self::Aggregator {
+                partial: _,
+                extended_length,
+                value,
+            } => value.len(*extended_length),
+            Self::Communities {
                 partial: _,
                 extended_length,
                 value,
@@ -171,6 +177,14 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value,
             } => {
                 writer.write_u8(PathAttributeType::Aggregator.into())?;
+                value.write(writer, *extended_length)?;
+            }
+            Self::Communities {
+                partial: _,
+                extended_length,
+                value,
+            } => {
+                writer.write_u8(PathAttributeType::Communities.into())?;
                 value.write(writer, *extended_length)?;
             }
             Self::UnknownAttribute { partial: _, value } => {
@@ -618,6 +632,60 @@ impl WritablePDU<UnknownAttributeWritingError> for UnknownAttribute {
             }
         }
         writer.write_all(self.value())?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum CommunitiesWritingError {
+    StdIOError(String),
+}
+
+impl From<std::io::Error> for CommunitiesWritingError {
+    fn from(err: std::io::Error) -> Self {
+        CommunitiesWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<CommunitiesWritingError> for PathAttributeWritingError {
+    fn from(value: CommunitiesWritingError) -> Self {
+        PathAttributeWritingError::CommunitiesError(value)
+    }
+}
+
+impl WritablePDU<CommunitiesWritingError> for Community {
+    // u32 community value
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), CommunitiesWritingError> {
+        writer.write_u32::<NetworkEndian>(self.value())?;
+        Ok(())
+    }
+}
+
+impl WritablePDUWithOneInput<bool, CommunitiesWritingError> for Communities {
+    // One octet length (if extended is not enabled)
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let base = Self::BASE_LENGTH + if extended_length { 1 } else { 0 };
+        let value_len = self.communities().iter().map(|x| x.len()).sum::<usize>();
+        base + value_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), CommunitiesWritingError> {
+        write_length(self, extended_length, writer)?;
+        for community in self.communities() {
+            community.write(writer)?;
+        }
         Ok(())
     }
 }
