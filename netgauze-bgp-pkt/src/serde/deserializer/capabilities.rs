@@ -133,7 +133,7 @@ fn parse_experimental_capability(
     code: ExperimentalCapabilityCode,
     buf: Span<'_>,
 ) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
-    let (buf, value) = nom::multi::length_value(be_u8, nom::multi::many0(be_u8))(buf)?;
+    let (buf, value) = nom::multi::length_count(be_u8, be_u8)(buf)?;
     Ok((
         buf,
         BGPCapability::Experimental(ExperimentalCapability::new(code, value)),
@@ -144,7 +144,7 @@ fn parse_unrecognized_capability(
     code: u8,
     buf: Span<'_>,
 ) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
-    let (buf, value) = nom::multi::length_value(be_u8, nom::multi::many0(be_u8))(buf)?;
+    let (buf, value) = nom::multi::length_count(be_u8, be_u8)(buf)?;
     Ok((
         buf,
         BGPCapability::Unrecognized(UnrecognizedCapability::new(code, value)),
