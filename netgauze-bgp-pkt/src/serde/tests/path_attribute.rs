@@ -39,6 +39,30 @@ use crate::{
         },
     },
 };
+
+use crate::{
+    nlri::{
+        InvalidIpv6MulticastNetwork, InvalidIpv6UnicastNetwork, Ipv4Multicast, Ipv4Unicast,
+        Ipv6Multicast, Ipv6Unicast,
+    },
+    path_attribute::MpReach,
+    serde::{
+        deserializer::{
+            nlri::{
+                Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
+                Ipv6UnicastParsingError,
+            },
+            path_attribute::{LocatedMpReachParsingError, MpReachParsingError},
+            Ipv4PrefixParsingError,
+        },
+        serializer::path_attribute::MpReachWritingError,
+    },
+};
+use ipnet::{Ipv4Net, Ipv6Net};
+use netgauze_iana::address_family::{
+    AddressFamily, InvalidAddressType, SubsequentAddressFamily, UndefinedAddressFamily,
+    UndefinedSubsequentAddressFamily,
+};
 use netgauze_parse_utils::{
     test_helpers::{
         test_parse_error, test_parse_error_with_one_input, test_parse_error_with_two_inputs,
@@ -49,7 +73,10 @@ use netgauze_parse_utils::{
     Span,
 };
 use nom::error::ErrorKind;
-use std::net::Ipv4Addr;
+use std::{
+    net::{Ipv4Addr, Ipv6Addr},
+    str::FromStr,
+};
 
 #[test]
 fn test_origin_value() -> Result<(), OriginWritingError> {
@@ -937,6 +964,286 @@ fn test_parse_path_attribute_communities() -> Result<(), PathAttributeWritingErr
     test_write(&good_one, &good_one_wire)?;
     test_write(&good_two, &good_two_wire)?;
     test_write(&good_two_extended, &good_two_wire_extended)?;
+    Ok(())
+}
+
+#[test]
+fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
+    let good_wire = [
+        0x40, 0x00, 0x02, 0x01, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x000,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0,
+        0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01,
+        0x00, 0x002, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0x20, 0x01, 0x0d,
+        0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+
+    let good_extended_wire = [
+        0x00, 0x40, 0x00, 0x02, 0x01, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x000, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xc0, 0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00,
+        0x01, 0x00, 0x002, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0x20, 0x01,
+        0x0d, 0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+
+    let invalid_afi_wire = [
+        0x40, 0x00, 0xff, 0x01, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x000,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0,
+        0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01,
+        0x00, 0x002, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0x20, 0x01, 0x0d,
+        0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+
+    let invalid_safi_wire = [
+        0x40, 0x00, 0x02, 0xff, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x000,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0,
+        0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01,
+        0x00, 0x002, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0x20, 0x01, 0x0d,
+        0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+    let invalid_address_type_wire = [
+        0x40, 0x00, 0x0c, 0x01, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x000,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0,
+        0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01,
+        0x00, 0x002, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0x20, 0x01, 0x0d,
+        0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+
+    let good = MpReach::Ipv6Unicast {
+        next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
+        next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
+        nlri: vec![
+            Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:2::/64").unwrap()).unwrap(),
+            Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:1::/64").unwrap()).unwrap(),
+            Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
+        ],
+    };
+
+    let invalid_afi = LocatedMpReachParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &invalid_afi_wire[1..]) },
+        MpReachParsingError::UndefinedAddressFamily(UndefinedAddressFamily(0xff)),
+    );
+
+    let invalid_safi = LocatedMpReachParsingError::new(
+        unsafe { Span::new_from_raw_offset(3, &invalid_safi_wire[3..]) },
+        MpReachParsingError::UndefinedSubsequentAddressFamily(UndefinedSubsequentAddressFamily(
+            0xff,
+        )),
+    );
+
+    let invalid_address_type = LocatedMpReachParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &invalid_address_type_wire[1..]) },
+        MpReachParsingError::InvalidAddressType(InvalidAddressType::new(
+            AddressFamily::AppleTalk,
+            SubsequentAddressFamily::Unicast,
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good);
+
+    test_parse_error_with_one_input::<MpReach, bool, LocatedMpReachParsingError<'_>>(
+        &invalid_afi_wire,
+        false,
+        &invalid_afi,
+    );
+    test_parse_error_with_one_input::<MpReach, bool, LocatedMpReachParsingError<'_>>(
+        &invalid_safi_wire,
+        false,
+        &invalid_safi,
+    );
+    test_parse_error_with_one_input::<MpReach, bool, LocatedMpReachParsingError<'_>>(
+        &invalid_address_type_wire,
+        false,
+        &invalid_address_type,
+    );
+
+    test_write_with_one_input(&good, false, &good_wire)?;
+    test_write_with_one_input(&good, true, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_path_attribute_mp_reach_nlri_ipv4_unicast() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x90, 0x0e, 0x00, 0x0c, 0x00, 0x01, 0x01, 0x04, 0xac, 0x10, 0x00, 0x14, 0x00, 0x10, 0xc0,
+        0xa8,
+    ];
+    let invalid_wire = [
+        0x90, 0x0e, 0x00, 0x0c, 0x00, 0x01, 0x01, 0x04, 0xac, 0x10, 0x00, 0x14, 0x00, 0x30, 0xe0,
+        0x00,
+    ];
+
+    let good = PathAttribute::MpReach {
+        extended_length: true,
+        value: MpReach::Ipv4Unicast {
+            next_hop: Ipv4Addr::new(172, 16, 0, 20),
+            nlri: vec![
+                Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.0.0/16").unwrap()).unwrap(),
+            ],
+        },
+    };
+
+    let invalid = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(14, &invalid_wire[14..]) },
+        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv4UnicastError(
+            Ipv4UnicastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
+                ErrorKind::Eof,
+            )),
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &invalid_wire,
+        false,
+        &invalid,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_path_attribute_mp_reach_nlri_ipv4_multicast() -> Result<(), PathAttributeWritingError>
+{
+    let good_wire = [
+        0x90, 0x0e, 0x00, 0x0c, 0x00, 0x01, 0x02, 0x04, 0xac, 0x10, 0x00, 0x14, 0x00, 0x10, 0xe0,
+        0x00,
+    ];
+    let invalid_wire = [
+        0x90, 0x0e, 0x00, 0x0c, 0x00, 0x01, 0x02, 0x04, 0xac, 0x10, 0x00, 0x14, 0x00, 0x30, 0xe0,
+        0x00,
+    ];
+
+    let good = PathAttribute::MpReach {
+        extended_length: true,
+        value: MpReach::Ipv4Multicast {
+            next_hop: Ipv4Addr::new(172, 16, 0, 20),
+            nlri: vec![
+                Ipv4Multicast::from_net(Ipv4Net::from_str("224.0.0.0/16").unwrap()).unwrap(),
+            ],
+        },
+    };
+
+    let invalid = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(14, &invalid_wire[14..]) },
+        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv4MulticastError(
+            Ipv4MulticastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
+                ErrorKind::Eof,
+            )),
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &invalid_wire,
+        false,
+        &invalid,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_path_attribute_mp_reach_nlri_ipv6_unicast() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x80, 0x0e, 0x40, 0x00, 0x02, 0x01, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x000, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xc0, 0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0x20, 0x01, 0x0d, 0xb8,
+        0x00, 0x01, 0x00, 0x002, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0x20,
+        0x01, 0x0d, 0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+    let invalid_addr_wire: [u8; 67] = [
+        0x80, 0x0e, 0x40, 0x00, 0x02, 0x01, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x000, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xc0, 0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0xff, 0x01, 0x0d, 0xb8,
+        0x00, 0x01, 0x00, 0x002, 0x40, 0xff, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0xff,
+        0x01, 0x0d, 0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+
+    let good = PathAttribute::MpReach {
+        extended_length: false,
+        value: MpReach::Ipv6Unicast {
+            next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
+            next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
+            nlri: vec![
+                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:2::/64").unwrap()).unwrap(),
+                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:1::/64").unwrap()).unwrap(),
+                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
+            ],
+        },
+    };
+
+    let invalid = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(40, &invalid_addr_wire[40..]) },
+        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv6UnicastError(
+            Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
+                Ipv6Net::from_str("ff01:db8:1:2::/64").unwrap(),
+            )),
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &invalid_addr_wire,
+        false,
+        &invalid,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAttributeWritingError>
+{
+    let good_wire = [
+        0x80, 0x0e, 0x40, 0x00, 0x02, 0x02, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x000, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xc0, 0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0xff, 0x01, 0x0d, 0xb8,
+        0x00, 0x01, 0x00, 0x002, 0x40, 0xff, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0xff,
+        0x01, 0x0d, 0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+
+    let invalid_addr_wire = [
+        0x80, 0x0e, 0x40, 0x00, 0x02, 0x02, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x000, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xc0, 0x001, 0x0b, 0xff, 0xfe, 0x7e, 0x00, 0x00, 0x00, 0x40, 0x20, 0x01, 0x0d, 0xb8,
+        0x00, 0x01, 0x00, 0x002, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x01, 0x40, 0x20,
+        0x01, 0x0d, 0xb8, 0x00, 0x001, 0x00, 0x00,
+    ];
+
+    let good = PathAttribute::MpReach {
+        extended_length: false,
+        value: MpReach::Ipv6Multicast {
+            next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
+            next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
+            nlri: vec![
+                Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1:2::/64").unwrap()).unwrap(),
+                Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1:1::/64").unwrap()).unwrap(),
+                Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1::/64").unwrap()).unwrap(),
+            ],
+        },
+    };
+
+    let invalid = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(40, &invalid_addr_wire[40..]) },
+        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv6MulticastError(
+            Ipv6MulticastParsingError::InvalidMulticastNetwork(InvalidIpv6MulticastNetwork(
+                Ipv6Net::from_str("2001:db8:1:2::/64").unwrap(),
+            )),
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &invalid_addr_wire,
+        false,
+        &invalid,
+    );
+
+    test_write(&good, &good_wire)?;
     Ok(())
 }
 

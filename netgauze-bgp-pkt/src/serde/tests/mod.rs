@@ -47,6 +47,7 @@ use std::net::Ipv4Addr;
 
 mod capabilities;
 mod keepalive;
+mod nlri;
 mod notification;
 mod open;
 mod path_attribute;

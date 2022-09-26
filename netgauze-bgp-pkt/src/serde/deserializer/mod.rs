@@ -16,14 +16,15 @@
 //! Deserializer library for BGP's wire protocol
 
 pub mod capabilities;
+pub mod nlri;
 pub mod notification;
 pub mod open;
 pub mod path_attribute;
 pub mod route_refresh;
 pub mod update;
 
-use ipnet::Ipv4Net;
-use std::net::Ipv4Addr;
+use ipnet::{Ipv4Net, Ipv6Net};
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use nom::{
     error::{ErrorKind, FromExternalError},
@@ -151,6 +152,78 @@ pub(crate) fn ipv4_network_from_wire(
         Err(_) => Err(nom::Err::Error(LocatedIpv4PrefixParsingError::new(
             input,
             Ipv4PrefixParsingError::InvalidIpv4PrefixLen(prefix_len),
+        ))),
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum Ipv6PrefixParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    InvalidIpv6PrefixLen(u8),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedIpv6PrefixParsingError<'a> {
+    span: Span<'a>,
+    error: Ipv6PrefixParsingError,
+}
+
+impl<'a> LocatedIpv6PrefixParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: Ipv6PrefixParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError for LocatedIpv6PrefixParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = Ipv6PrefixParsingError;
+
+    fn span(&self) -> &Self::Span {
+        &self.span
+    }
+
+    fn error(&self) -> &Self::Error {
+        &self.error
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedIpv6PrefixParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedIpv6PrefixParsingError::new(input, Ipv6PrefixParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+/// Parse IPv6 prefix
+fn ipv6_network_from_wire(
+    buf: Span<'_>,
+) -> IResult<Span<'_>, Ipv6Net, LocatedIpv6PrefixParsingError<'_>> {
+    let input = buf;
+    let (buf, prefix_len) = be_u8(buf)?;
+    // The prefix value must fall into the octet boundary, even if the prefix_len
+    // doesn't. For example,
+    // prefix_len=24 => prefix_size=24 while prefix_len=19 => prefix_size=24
+    let prefix_size = if prefix_len >= u8::MAX - 7 {
+        u8::MAX
+    } else {
+        (prefix_len + 7) / 8
+    };
+    let (buf, prefix) = nom::bytes::complete::take(prefix_size.min(16))(buf)?;
+    // Fill the rest of bits with zeros if
+    let mut network = [0; 16];
+    prefix.iter().enumerate().for_each(|(i, v)| network[i] = *v);
+    let addr = Ipv6Addr::from(network);
+
+    match Ipv6Net::new(addr, prefix_len) {
+        Ok(net) => Ok((buf, net)),
+        Err(_) => Err(nom::Err::Error(LocatedIpv6PrefixParsingError::new(
+            input,
+            Ipv6PrefixParsingError::InvalidIpv6PrefixLen(prefix_len),
         ))),
     }
 }

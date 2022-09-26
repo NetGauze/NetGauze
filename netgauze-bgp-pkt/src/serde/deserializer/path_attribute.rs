@@ -19,25 +19,35 @@ use crate::{
     iana::{PathAttributeType, UndefinedPathAttributeType},
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AsPathSegmentType, AtomicAggregate, Communities, Community, LocalPreference,
+        AsPathSegmentType, AtomicAggregate, Communities, Community, LocalPreference, MpReach,
         MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
         UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
     },
     serde::deserializer::{
-        update::LocatedBGPUpdateMessageParsingError, BGPUpdateMessageParsingError,
+        nlri::{
+            Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
+            Ipv6UnicastParsingError,
+        },
+        update::LocatedBGPUpdateMessageParsingError,
+        BGPUpdateMessageParsingError,
     },
+};
+use netgauze_iana::address_family::{
+    AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
+    UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
     parse_into_located_one_input, parse_into_located_three_inputs, parse_into_located_two_inputs,
-    parse_till_empty, IntoLocatedError, LocatedParsingError, ReadablePDU, ReadablePDUWithOneInput,
-    ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs, Span,
+    parse_till_empty, parse_till_empty_into_located, IntoLocatedError, LocatedParsingError,
+    ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs,
+    Span,
 };
 use nom::{
     error::{ErrorKind, FromExternalError},
-    number::complete::{be_u16, be_u32, be_u8},
+    number::complete::{be_u128, be_u16, be_u32, be_u8},
     IResult,
 };
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
 const TRANSITIVE_PATH_ATTRIBUTE_MASK: u8 = 0x40;
@@ -72,6 +82,7 @@ pub enum PathAttributeParsingError {
     AtomicAggregateError(AtomicAggregateParsingError),
     AggregatorError(AggregatorParsingError),
     CommunitiesError(CommunitiesParsingError),
+    MpReachErrorError(MpReachParsingError),
     UnknownAttributeError(UnknownAttributeParsingError),
 }
 
@@ -222,6 +233,14 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let path_attr = PathAttribute::Communities {
                     partial,
+                    extended_length,
+                    value,
+                };
+                Ok((buf, path_attr))
+            }
+            Ok(PathAttributeType::MPReachNLRI) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let path_attr = PathAttribute::MpReach {
                     extended_length,
                     value,
                 };
@@ -959,6 +978,264 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> fo
         let (buf, origin) = be_u32(buf)?;
 
         Ok((buf, As4Aggregator::new(asn, Ipv4Addr::from(origin))))
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum MpReachParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    NomError(ErrorKind),
+    UndefinedAddressFamily(UndefinedAddressFamily),
+    UndefinedSubsequentAddressFamily(UndefinedSubsequentAddressFamily),
+    InvalidAddressType(InvalidAddressType),
+    /// MP-BGP is not yet implemented for the given address type
+    UnknownAddressType(AddressType),
+    Ipv4UnicastError(Ipv4UnicastParsingError),
+    Ipv4MulticastError(Ipv4MulticastParsingError),
+    Ipv6UnicastError(Ipv6UnicastParsingError),
+    Ipv6MulticastError(Ipv6MulticastParsingError),
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct LocatedMpReachParsingError<'a> {
+    span: Span<'a>,
+    error: MpReachParsingError,
+}
+
+impl<'a> LocatedMpReachParsingError<'a> {
+    pub const fn new(span: Span<'a>, error: MpReachParsingError) -> Self {
+        Self { span, error }
+    }
+}
+
+impl<'a> LocatedParsingError for LocatedMpReachParsingError<'a> {
+    type Span = Span<'a>;
+    type Error = MpReachParsingError;
+
+    fn span(&self) -> &Self::Span {
+        &self.span
+    }
+
+    fn error(&self) -> &Self::Error {
+        &self.error
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>> for LocatedMpReachParsingError<'a> {
+    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
+        LocatedPathAttributeParsingError::new(
+            self.span,
+            PathAttributeParsingError::MpReachErrorError(self.error),
+        )
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, MpReachParsingError> for LocatedMpReachParsingError<'a> {
+    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: MpReachParsingError) -> Self {
+        LocatedMpReachParsingError::new(input, error)
+    }
+}
+
+impl<'a> nom::error::ParseError<Span<'a>> for LocatedMpReachParsingError<'a> {
+    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
+        LocatedMpReachParsingError::new(input, MpReachParsingError::NomError(kind))
+    }
+
+    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily> for LocatedMpReachParsingError<'a> {
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UndefinedAddressFamily,
+    ) -> Self {
+        LocatedMpReachParsingError::new(input, MpReachParsingError::UndefinedAddressFamily(error))
+    }
+}
+
+impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
+    for LocatedMpReachParsingError<'a>
+{
+    fn from_external_error(
+        input: Span<'a>,
+        _kind: ErrorKind,
+        error: UndefinedSubsequentAddressFamily,
+    ) -> Self {
+        LocatedMpReachParsingError::new(
+            input,
+            MpReachParsingError::UndefinedSubsequentAddressFamily(error),
+        )
+    }
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for MpReach {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedMpReachParsingError<'a>> {
+        let (buf, mp_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let mp_buf_begin = mp_buf;
+        let (mp_buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(mp_buf)?;
+        let (mp_buf, safi) =
+            nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(mp_buf)?;
+        let address_type = match AddressType::from_afi_safi(afi, safi) {
+            Ok(val) => val,
+            Err(err) => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::InvalidAddressType(err),
+                )))
+            }
+        };
+        let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
+        match address_type {
+            AddressType::Ipv4Unicast => {
+                let (mp_buf, next_hop) = be_u32(mp_buf)?;
+                let next_hop = Ipv4Addr::from(next_hop);
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpReach::Ipv4Unicast { next_hop, nlri }))
+            }
+            AddressType::Ipv4Multicast => {
+                let (mp_buf, next_hop) = be_u32(mp_buf)?;
+                let next_hop = Ipv4Addr::from(next_hop);
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpReach::Ipv4Multicast { next_hop, nlri }))
+            }
+            AddressType::IpPv4MplsLabeledVpn => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::IpPv4MplsLabeledVpn),
+                )))
+            }
+            AddressType::Ipv4MulticastBgpMplsVpn => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv4MulticastBgpMplsVpn),
+                )))
+            }
+            AddressType::Ipv4Bgp4over6 => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv4Bgp4over6),
+                )))
+            }
+            AddressType::Ipv4FlowSpec => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv4FlowSpec),
+                )))
+            }
+            AddressType::Ipv4FlowSpecL3Vpn => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv4FlowSpecL3Vpn),
+                )))
+            }
+            AddressType::Ipv4NlriMplsLabels => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv4NlriMplsLabels),
+                )))
+            }
+            AddressType::Ipv6Unicast => {
+                let (mp_buf, global) = be_u128(mp_buf)?;
+                let next_hop_global = Ipv6Addr::from(global);
+                let (mp_buf, next_hop_local) = if next_hop_len == 32 {
+                    let (mp_buf, local) = be_u128(mp_buf)?;
+                    (mp_buf, Some(Ipv6Addr::from(local)))
+                } else {
+                    (mp_buf, None)
+                };
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((
+                    buf,
+                    MpReach::Ipv6Unicast {
+                        next_hop_global,
+                        next_hop_local,
+                        nlri,
+                    },
+                ))
+            }
+            AddressType::Ipv6Multicast => {
+                let (mp_buf, global) = be_u128(mp_buf)?;
+                let next_hop_global = Ipv6Addr::from(global);
+                let (mp_buf, next_hop_local) = if next_hop_len == 32 {
+                    let (mp_buf, local) = be_u128(mp_buf)?;
+                    (mp_buf, Some(Ipv6Addr::from(local)))
+                } else {
+                    (mp_buf, None)
+                };
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((
+                    buf,
+                    MpReach::Ipv6Multicast {
+                        next_hop_global,
+                        next_hop_local,
+                        nlri,
+                    },
+                ))
+            }
+            AddressType::Ipv6MPLSLabeledVpn => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv6MPLSLabeledVpn),
+                )))
+            }
+            AddressType::Ipv6MulticastBgpMplsVpn => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv6MulticastBgpMplsVpn),
+                )))
+            }
+            AddressType::Ipv6Bgp6over4 => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv6Bgp6over4),
+                )))
+            }
+            AddressType::Ipv6FlowSpec => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv6FlowSpec),
+                )))
+            }
+            AddressType::Ipv6FlowSpecL3Vpn => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv6FlowSpecL3Vpn),
+                )))
+            }
+            AddressType::Ipv6NlriMplsLabels => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv6NlriMplsLabels),
+                )))
+            }
+            AddressType::L2VpnBgpEvpn => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::L2VpnBgpEvpn),
+                )))
+            }
+            AddressType::BgpLs => {
+                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                    mp_buf_begin,
+                    MpReachParsingError::UnknownAddressType(AddressType::BgpLs),
+                )))
+            }
+        }
     }
 }
 

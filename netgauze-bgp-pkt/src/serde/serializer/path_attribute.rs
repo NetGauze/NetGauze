@@ -17,15 +17,25 @@
 
 use crate::{
     iana::PathAttributeType,
+    nlri::{Ipv4Multicast, Ipv4Unicast, Ipv6Multicast, Ipv6Unicast, NlriAddressType},
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AtomicAggregate, Communities, Community, LocalPreference, MultiExitDiscriminator, NextHop,
-        Origin, PathAttribute, PathAttributeLength, UnknownAttribute,
+        AtomicAggregate, Communities, Community, LocalPreference, MpReach, MultiExitDiscriminator,
+        NextHop, Origin, PathAttribute, PathAttributeLength, UnknownAttribute,
     },
-    serde::serializer::update::BGPUpdateMessageWritingError,
+    serde::serializer::{
+        nlri::{
+            Ipv4MulticastWritingError, Ipv4UnicastWritingError, Ipv6MulticastWritingError,
+            Ipv6UnicastWritingError,
+        },
+        update::BGPUpdateMessageWritingError,
+    },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
+
+const IPV4_LEN: usize = 4;
+const IPV6_LEN: usize = 16;
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
@@ -38,6 +48,7 @@ pub enum PathAttributeWritingError {
     AtomicAggregateError(AtomicAggregateWritingError),
     AggregatorError(AggregatorWritingError),
     CommunitiesError(CommunitiesWritingError),
+    MpReachError(MpReachWritingError),
     UnknownAttributeError(UnknownAttributeWritingError),
 }
 
@@ -94,6 +105,10 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             } => value.len(*extended_length),
             Self::Communities {
                 partial: _,
+                extended_length,
+                value,
+            } => value.len(*extended_length),
+            Self::MpReach {
                 extended_length,
                 value,
             } => value.len(*extended_length),
@@ -185,6 +200,13 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value,
             } => {
                 writer.write_u8(PathAttributeType::Communities.into())?;
+                value.write(writer, *extended_length)?;
+            }
+            Self::MpReach {
+                extended_length,
+                value,
+            } => {
+                writer.write_u8(PathAttributeType::MPReachNLRI.into())?;
                 value.write(writer, *extended_length)?;
             }
             Self::UnknownAttribute { partial: _, value } => {
@@ -685,6 +707,184 @@ impl WritablePDUWithOneInput<bool, CommunitiesWritingError> for Communities {
         write_length(self, extended_length, writer)?;
         for community in self.communities() {
             community.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub enum MpReachWritingError {
+    StdIOError(String),
+    Ipv4UnicastError(Ipv4UnicastWritingError),
+    Ipv4MulticastError(Ipv4MulticastWritingError),
+    Ipv6UnicastError(Ipv6UnicastWritingError),
+    Ipv6MulticastError(Ipv6MulticastWritingError),
+}
+
+impl From<std::io::Error> for MpReachWritingError {
+    fn from(err: std::io::Error) -> Self {
+        MpReachWritingError::StdIOError(err.to_string())
+    }
+}
+
+impl From<Ipv4UnicastWritingError> for MpReachWritingError {
+    fn from(err: Ipv4UnicastWritingError) -> Self {
+        MpReachWritingError::Ipv4UnicastError(err)
+    }
+}
+
+impl From<Ipv4MulticastWritingError> for MpReachWritingError {
+    fn from(err: Ipv4MulticastWritingError) -> Self {
+        MpReachWritingError::Ipv4MulticastError(err)
+    }
+}
+
+impl From<Ipv6UnicastWritingError> for MpReachWritingError {
+    fn from(err: Ipv6UnicastWritingError) -> Self {
+        MpReachWritingError::Ipv6UnicastError(err)
+    }
+}
+
+impl From<Ipv6MulticastWritingError> for MpReachWritingError {
+    fn from(err: Ipv6MulticastWritingError) -> Self {
+        MpReachWritingError::Ipv6MulticastError(err)
+    }
+}
+
+impl From<MpReachWritingError> for PathAttributeWritingError {
+    fn from(value: MpReachWritingError) -> Self {
+        PathAttributeWritingError::MpReachError(value)
+    }
+}
+
+impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
+    // 2-octets AFI, 1-octet SAFI, and 1-octet reserved , 1-octet len
+    const BASE_LENGTH: usize = 5;
+
+    fn len(&self, extended_length: bool) -> usize {
+        // Multiply self.as_numbers().len() by 2 since each is two octets
+        let payload_len = match self {
+            Self::Ipv4Unicast { next_hop: _, nlri } => {
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                IPV4_LEN + 1 + nlri_len
+            }
+            Self::Ipv4Multicast { next_hop: _, nlri } => {
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                IPV4_LEN + 1 + nlri_len
+            }
+            Self::Ipv6Unicast {
+                next_hop_global: _,
+                next_hop_local,
+                nlri,
+            } => {
+                let local_len: usize = next_hop_local.map(|_| IPV6_LEN).unwrap_or(0);
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                IPV6_LEN + 1 + local_len + nlri_len
+            }
+            Self::Ipv6Multicast {
+                next_hop_global: _,
+                next_hop_local,
+                nlri,
+            } => {
+                let local_len: usize = next_hop_local.map(|_| IPV6_LEN).unwrap_or(0);
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                IPV6_LEN + 1 + local_len + nlri_len
+            }
+        };
+        Self::BASE_LENGTH + usize::from(extended_length) + payload_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), MpReachWritingError> {
+        write_length(self, extended_length, writer)?;
+        match self {
+            Self::Ipv4Unicast { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    Ipv4Unicast::address_type().address_family().into(),
+                )?;
+                writer.write_u8(
+                    Ipv4Unicast::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                writer.write_u8(IPV4_LEN as u8)?;
+                writer.write_all(&next_hop.octets())?;
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::Ipv4Multicast { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    Ipv4Multicast::address_type().address_family().into(),
+                )?;
+                writer.write_u8(
+                    Ipv4Multicast::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                writer.write_u8(IPV4_LEN as u8)?;
+                writer.write_all(&next_hop.octets())?;
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::Ipv6Unicast {
+                next_hop_global,
+                next_hop_local,
+                nlri,
+            } => {
+                writer.write_u16::<NetworkEndian>(
+                    Ipv6Unicast::address_type().address_family().into(),
+                )?;
+                writer.write_u8(
+                    Ipv6Unicast::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                if let Some(local) = next_hop_local {
+                    writer.write_u8(32)?;
+                    writer.write_all(&next_hop_global.octets())?;
+                    writer.write_all(&local.octets())?;
+                } else {
+                    writer.write_u8(16)?;
+                    writer.write_all(&next_hop_global.octets())?;
+                }
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::Ipv6Multicast {
+                next_hop_global,
+                next_hop_local,
+                nlri,
+            } => {
+                writer.write_u16::<NetworkEndian>(
+                    Ipv6Multicast::address_type().address_family().into(),
+                )?;
+                writer.write_u8(
+                    Ipv6Multicast::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                if let Some(local) = next_hop_local {
+                    writer.write_u8(32)?;
+                    writer.write_all(&next_hop_global.octets())?;
+                    writer.write_all(&local.octets())?;
+                } else {
+                    writer.write_u8(16)?;
+                    writer.write_all(&next_hop_global.octets())?;
+                }
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
         }
         Ok(())
     }

@@ -16,8 +16,11 @@
 //! Contains the extensible definitions for various [PathAttribute] that can be
 //! used in [crate::update::BGPUpdateMessage].
 
-use crate::iana::WellKnownCommunity;
-use std::net::Ipv4Addr;
+use crate::{
+    iana::WellKnownCommunity,
+    nlri::{Ipv4Multicast, Ipv4Unicast, Ipv6Multicast, Ipv6Unicast},
+};
+use std::net::{Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
 
 /// PathAttribute
@@ -70,6 +73,10 @@ pub enum PathAttribute {
         extended_length: bool,
         value: Communities,
     },
+    MpReach {
+        extended_length: bool,
+        value: MpReach,
+    },
     UnknownAttribute {
         partial: bool,
         value: UnknownAttribute,
@@ -120,6 +127,10 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => Communities::optional(),
+            Self::MpReach {
+                extended_length: _,
+                value: _,
+            } => MpReach::optional(),
             Self::UnknownAttribute { partial: _, value } => value.optional(),
         }
     }
@@ -168,6 +179,10 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => Communities::transitive(),
+            Self::MpReach {
+                extended_length: _,
+                value: _,
+            } => MpReach::transitive(),
             Self::UnknownAttribute { partial: _, value } => value.transitive(),
         }
     }
@@ -219,6 +234,10 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => *partial,
+            Self::MpReach {
+                extended_length: _,
+                value: _,
+            } => MpReach::partial(),
             Self::UnknownAttribute { partial, value: _ } => *partial,
         }
     }
@@ -263,6 +282,10 @@ impl PathAttribute {
             } => *extended_length,
             Self::Communities {
                 partial: _,
+                extended_length,
+                value: _,
+            } => *extended_length,
+            Self::MpReach {
                 extended_length,
                 value: _,
             } => *extended_length,
@@ -734,6 +757,68 @@ impl Community {
     }
 }
 
+/// Multi-protocol Reachable NLRI (MP_REACH_NLRI) is an optional non-transitive
+/// attribute that can be used for the following purposes:
+///
+/// 1. to advertise a feasible route to a peer
+/// 2. to permit a router to advertise the Network Layer address of the router
+/// that should be used as the next hop to the destinations
+/// listed in the Network Layer Reachability Information field of the MP_NLRI
+/// attribute.
+///
+/// see [RFC4760](https://www.rfc-editor.org/rfc/rfc4760)
+///
+/// ```text
+/// +---------------------------------------------------------+
+/// | Address Family Identifier (2 octets)                    |
+/// +---------------------------------------------------------+
+/// | Subsequent Address Family Identifier (1 octet)          |
+/// +---------------------------------------------------------+
+/// | Length of Next Hop Network Address (1 octet)            |
+/// +---------------------------------------------------------+
+/// | Network Address of Next Hop (variable)                  |
+/// +---------------------------------------------------------+
+/// | Reserved (1 octet)                                      |
+/// +---------------------------------------------------------+
+/// | Network Layer Reachability Information (variable)       |
+/// +---------------------------------------------------------+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum MpReach {
+    Ipv4Unicast {
+        next_hop: Ipv4Addr,
+        nlri: Vec<Ipv4Unicast>,
+    },
+    Ipv4Multicast {
+        next_hop: Ipv4Addr,
+        nlri: Vec<Ipv4Multicast>,
+    },
+    Ipv6Unicast {
+        next_hop_global: Ipv6Addr,
+        next_hop_local: Option<Ipv6Addr>,
+        nlri: Vec<Ipv6Unicast>,
+    },
+    Ipv6Multicast {
+        next_hop_global: Ipv6Addr,
+        next_hop_local: Option<Ipv6Addr>,
+        nlri: Vec<Ipv6Multicast>,
+    },
+}
+
+impl MpReach {
+    pub const fn optional() -> bool {
+        true
+    }
+
+    pub const fn transitive() -> bool {
+        false
+    }
+
+    pub const fn partial() -> bool {
+        false
+    }
+}
+
 /// Path Attribute that is not recognized.
 /// BGP Allows parsing unrecognized attributes as is, and then only consider
 /// the transitive and partial bits of the attribute.
@@ -798,7 +883,7 @@ mod tests {
     use crate::{
         iana::WellKnownCommunity,
         path_attribute::{
-            AS4Path, ASPath, Aggregator, AsPathSegmentType, Community, LocalPreference,
+            AS4Path, ASPath, Aggregator, AsPathSegmentType, Community, LocalPreference, MpReach,
             MultiExitDiscriminator, NextHop, Origin, UndefinedAsPathSegmentType, UndefinedOrigin,
         },
     };
@@ -854,6 +939,8 @@ mod tests {
         assert!(AS4Path::transitive());
         assert!(Aggregator::optional());
         assert!(Aggregator::transitive());
+        assert!(MpReach::optional());
+        assert!(!MpReach::transitive());
     }
 
     #[test]

@@ -31,6 +31,7 @@ use crate::{
 
 pub mod capabilities;
 pub mod iana;
+pub mod nlri;
 pub mod notification;
 pub mod open;
 pub mod path_attribute;

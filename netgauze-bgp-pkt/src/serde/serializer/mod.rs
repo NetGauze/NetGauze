@@ -16,6 +16,7 @@
 //! Serializer library for BGP's wire protocol
 
 pub mod capabilities;
+pub mod nlri;
 pub mod notification;
 pub mod open;
 pub mod path_attribute;
@@ -41,7 +42,7 @@ use crate::{
 
 /// Helper method to round up the number of bytes based on a given length
 #[inline]
-fn round_len(len: u8) -> u8 {
+pub(crate) fn round_len(len: u8) -> u8 {
     (len as f32 / 8.0).ceil() as u8
 }
 
