@@ -45,14 +45,16 @@ use crate::{
         InvalidIpv6MulticastNetwork, InvalidIpv6UnicastNetwork, Ipv4Multicast, Ipv4Unicast,
         Ipv6Multicast, Ipv6Unicast,
     },
-    path_attribute::MpReach,
+    path_attribute::{MpReach, MpUnreach},
     serde::{
         deserializer::{
             nlri::{
                 Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
                 Ipv6UnicastParsingError,
             },
-            path_attribute::{LocatedMpReachParsingError, MpReachParsingError},
+            path_attribute::{
+                LocatedMpReachParsingError, MpReachParsingError, MpUnreachParsingError,
+            },
             Ipv4PrefixParsingError,
         },
         serializer::path_attribute::MpReachWritingError,
@@ -1241,6 +1243,90 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
         &invalid_addr_wire,
         false,
         &invalid,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_path_attribute_mp_unreach_nlri_ipv6_unicast() -> Result<(), PathAttributeWritingError>
+{
+    let good_wire = [
+        0x90, 0x0f, 0x00, 0x11, 0x00, 0x02, 0x01, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x40, 0xfd, 0xfd,
+        0x00, 0x00, 0x00, 0x00, 0x8b, 0xea,
+    ];
+    let invalid_afi_wire = [
+        0x90, 0x0f, 0x00, 0x11, 0x00, 0x02, 0x01, 0x20, 0xff, 0x01, 0x0d, 0xb8, 0x40, 0xfd, 0xfd,
+        0x00, 0x00, 0x00, 0x00, 0x8b, 0xea,
+    ];
+
+    let good = PathAttribute::MpUnreach {
+        extended_length: true,
+        value: MpUnreach::Ipv6Unicast {
+            nlri: vec![
+                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8::/32").unwrap()).unwrap(),
+                Ipv6Unicast::from_net(Ipv6Net::from_str("fdfd:0:0:8bea::/64").unwrap()).unwrap(),
+            ],
+        },
+    };
+
+    let invalid_afi = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
+        PathAttributeParsingError::MpUnreachErrorError(MpUnreachParsingError::Ipv6UnicastError(
+            Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
+                Ipv6Net::from_str("ff01:db8::/32").unwrap(),
+            )),
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &invalid_afi_wire,
+        false,
+        &invalid_afi,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast(
+) -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x90, 0x0f, 0x00, 0x11, 0x00, 0x02, 0x02, 0x20, 0xff, 0x01, 0x0d, 0xb8, 0x40, 0xff, 0xfd,
+        0x00, 0x00, 0x00, 0x00, 0x8b, 0xea,
+    ];
+    let invalid_afi_wire = [
+        0x90, 0x0f, 0x00, 0x11, 0x00, 0x02, 0x02, 0x20, 0x20, 0x01, 0x0d, 0xb8, 0x40, 0xff, 0xfd,
+        0x00, 0x00, 0x00, 0x00, 0x8b, 0xea,
+    ];
+
+    let good = PathAttribute::MpUnreach {
+        extended_length: true,
+        value: MpUnreach::Ipv6Multicast {
+            nlri: vec![
+                Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8::/32").unwrap()).unwrap(),
+                Ipv6Multicast::from_net(Ipv6Net::from_str("fffd:0:0:8bea::/64").unwrap()).unwrap(),
+            ],
+        },
+    };
+
+    let invalid_afi = LocatedPathAttributeParsingError::new(
+        unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
+        PathAttributeParsingError::MpUnreachErrorError(MpUnreachParsingError::Ipv6MulticastError(
+            Ipv6MulticastParsingError::InvalidMulticastNetwork(InvalidIpv6MulticastNetwork(
+                Ipv6Net::from_str("2001:db8::/32").unwrap(),
+            )),
+        )),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+        &invalid_afi_wire,
+        false,
+        &invalid_afi,
     );
 
     test_write(&good, &good_wire)?;

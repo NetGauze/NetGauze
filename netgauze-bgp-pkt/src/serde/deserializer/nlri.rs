@@ -20,7 +20,10 @@ use crate::{
     },
     serde::deserializer::{
         ipv4_network_from_wire, ipv6_network_from_wire,
-        path_attribute::{LocatedMpReachParsingError, MpReachParsingError},
+        path_attribute::{
+            LocatedMpReachParsingError, LocatedMpUnreachParsingError, MpReachParsingError,
+            MpUnreachParsingError,
+        },
         Ipv4PrefixParsingError, Ipv6PrefixParsingError, LocatedIpv4PrefixParsingError,
         LocatedIpv6PrefixParsingError,
     },
@@ -89,6 +92,15 @@ impl<'a> IntoLocatedError<LocatedMpReachParsingError<'a>> for LocatedIpv6Unicast
         LocatedMpReachParsingError::new(
             self.span,
             MpReachParsingError::Ipv6UnicastError(self.error),
+        )
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedMpUnreachParsingError<'a>> for LocatedIpv6UnicastParsingError<'a> {
+    fn into_located(self) -> LocatedMpUnreachParsingError<'a> {
+        LocatedMpUnreachParsingError::new(
+            self.span,
+            MpUnreachParsingError::Ipv6UnicastError(self.error),
         )
     }
 }
@@ -181,11 +193,13 @@ impl<'a> IntoLocatedError<LocatedMpReachParsingError<'a>> for LocatedIpv6Multica
     }
 }
 
-impl<'a> IntoLocatedError<LocatedMpReachParsingError<'a>> for LocatedIpv4MulticastParsingError<'a> {
-    fn into_located(self) -> LocatedMpReachParsingError<'a> {
-        LocatedMpReachParsingError::new(
+impl<'a> IntoLocatedError<LocatedMpUnreachParsingError<'a>>
+    for LocatedIpv6MulticastParsingError<'a>
+{
+    fn into_located(self) -> LocatedMpUnreachParsingError<'a> {
+        LocatedMpUnreachParsingError::new(
             self.span,
-            MpReachParsingError::Ipv4MulticastError(self.error),
+            MpUnreachParsingError::Ipv6MulticastError(self.error),
         )
     }
 }
@@ -278,6 +292,15 @@ impl<'a> IntoLocatedError<LocatedMpReachParsingError<'a>> for LocatedIpv4Unicast
     }
 }
 
+impl<'a> IntoLocatedError<LocatedMpUnreachParsingError<'a>> for LocatedIpv4UnicastParsingError<'a> {
+    fn into_located(self) -> LocatedMpUnreachParsingError<'a> {
+        LocatedMpUnreachParsingError::new(
+            self.span,
+            MpUnreachParsingError::Ipv4UnicastError(self.error),
+        )
+    }
+}
+
 impl<'a> ReadablePDU<'a, LocatedIpv4UnicastParsingError<'a>> for Ipv4Unicast {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4UnicastParsingError<'a>> {
         let input = buf;
@@ -353,6 +376,26 @@ impl<'a> IntoLocatedError<LocatedIpv4MulticastParsingError<'a>>
         LocatedIpv4MulticastParsingError::new(
             self.span,
             Ipv4MulticastParsingError::Ipv4PrefixError(self.error),
+        )
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedMpReachParsingError<'a>> for LocatedIpv4MulticastParsingError<'a> {
+    fn into_located(self) -> LocatedMpReachParsingError<'a> {
+        LocatedMpReachParsingError::new(
+            self.span,
+            MpReachParsingError::Ipv4MulticastError(self.error),
+        )
+    }
+}
+
+impl<'a> IntoLocatedError<LocatedMpUnreachParsingError<'a>>
+    for LocatedIpv4MulticastParsingError<'a>
+{
+    fn into_located(self) -> LocatedMpUnreachParsingError<'a> {
+        LocatedMpUnreachParsingError::new(
+            self.span,
+            MpUnreachParsingError::Ipv4MulticastError(self.error),
         )
     }
 }

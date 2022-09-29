@@ -77,6 +77,10 @@ pub enum PathAttribute {
         extended_length: bool,
         value: MpReach,
     },
+    MpUnreach {
+        extended_length: bool,
+        value: MpUnreach,
+    },
     UnknownAttribute {
         partial: bool,
         value: UnknownAttribute,
@@ -131,6 +135,10 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => MpReach::optional(),
+            Self::MpUnreach {
+                extended_length: _,
+                value: _,
+            } => MpUnreach::optional(),
             Self::UnknownAttribute { partial: _, value } => value.optional(),
         }
     }
@@ -183,6 +191,10 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => MpReach::transitive(),
+            Self::MpUnreach {
+                extended_length: _,
+                value: _,
+            } => MpUnreach::transitive(),
             Self::UnknownAttribute { partial: _, value } => value.transitive(),
         }
     }
@@ -238,6 +250,10 @@ impl PathAttribute {
                 extended_length: _,
                 value: _,
             } => MpReach::partial(),
+            Self::MpUnreach {
+                extended_length: _,
+                value: _,
+            } => MpUnreach::partial(),
             Self::UnknownAttribute { partial, value: _ } => *partial,
         }
     }
@@ -286,6 +302,10 @@ impl PathAttribute {
                 value: _,
             } => *extended_length,
             Self::MpReach {
+                extended_length,
+                value: _,
+            } => *extended_length,
+            Self::MpUnreach {
                 extended_length,
                 value: _,
             } => *extended_length,
@@ -806,6 +826,43 @@ pub enum MpReach {
 }
 
 impl MpReach {
+    pub const fn optional() -> bool {
+        true
+    }
+
+    pub const fn transitive() -> bool {
+        false
+    }
+
+    pub const fn partial() -> bool {
+        false
+    }
+}
+
+/// Multi-protocol Unreachable NLRI (MP_UNREACH_NLRI) is an optional
+/// non-transitive attribute that can be used for the purpose of withdrawing
+/// multiple unfeasible routes from service.
+///
+/// see [RFC4760](https://www.rfc-editor.org/rfc/rfc4760)
+///
+/// ```text
+/// +---------------------------------------------------------+
+/// | Address Family Identifier (2 octets)                    |
+/// +---------------------------------------------------------+
+/// | Subsequent Address Family Identifier (1 octet)          |
+/// +---------------------------------------------------------+
+/// | Withdrawn Routes (variable)                             |
+/// +---------------------------------------------------------+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum MpUnreach {
+    Ipv4Unicast { nlri: Vec<Ipv4Unicast> },
+    Ipv4Multicast { nlri: Vec<Ipv4Multicast> },
+    Ipv6Unicast { nlri: Vec<Ipv6Unicast> },
+    Ipv6Multicast { nlri: Vec<Ipv6Multicast> },
+}
+
+impl MpUnreach {
     pub const fn optional() -> bool {
         true
     }
