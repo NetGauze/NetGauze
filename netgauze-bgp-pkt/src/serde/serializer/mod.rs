@@ -26,6 +26,7 @@ pub mod update;
 use byteorder::{NetworkEndian, WriteBytesExt};
 
 use netgauze_parse_utils::WritablePDU;
+use netgauze_serde_macros::WritingError;
 
 use crate::{
     iana::BGPMessageType,
@@ -46,29 +47,23 @@ pub(crate) fn round_len(len: u8) -> u8 {
     (len as f32 / 8.0).ceil() as u8
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPMessageWritingError {
     /// The size of written message is larger than allowed size: 4,096 for open
     /// and keepalive and 2^16 for the rest
     BGPMessageLengthOverflow(usize),
 
-    StdIOError(String),
+    StdIOError(#[from_std_io_error] String),
 
     /// Error encountered during parsing a [crate::open::BGPOpenMessage]
-    OpenError(BGPOpenMessageWritingError),
+    OpenError(#[from] BGPOpenMessageWritingError),
 
     /// Error encountered during parsing a [crate::update::BGPUpdateMessage]
-    UpdateError(BGPUpdateMessageWritingError),
+    UpdateError(#[from] BGPUpdateMessageWritingError),
 
-    NotificationError(BGPNotificationMessageWritingError),
+    NotificationError(#[from] BGPNotificationMessageWritingError),
 
-    RouteRefreshError(BGPRouteRefreshMessageWritingError),
-}
-
-impl From<std::io::Error> for BGPMessageWritingError {
-    fn from(err: std::io::Error) -> Self {
-        BGPMessageWritingError::StdIOError(err.to_string())
-    }
+    RouteRefreshError(#[from] BGPRouteRefreshMessageWritingError),
 }
 
 impl WritablePDU<BGPMessageWritingError> for BGPMessage {

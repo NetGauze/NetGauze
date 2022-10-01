@@ -24,46 +24,32 @@ use crate::{
         MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
         UnknownAttribute,
     },
-    serde::serializer::{
-        nlri::{
-            Ipv4MulticastWritingError, Ipv4UnicastWritingError, Ipv6MulticastWritingError,
-            Ipv6UnicastWritingError,
-        },
-        update::BGPUpdateMessageWritingError,
+    serde::serializer::nlri::{
+        Ipv4MulticastWritingError, Ipv4UnicastWritingError, Ipv6MulticastWritingError,
+        Ipv6UnicastWritingError,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
+use netgauze_serde_macros::WritingError;
 
 const IPV4_LEN: usize = 4;
 const IPV6_LEN: usize = 16;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
-    StdIOError(String),
-    OriginError(OriginWritingError),
-    AsPathError(AsPathWritingError),
-    NextHopError(NextHopWritingError),
-    MultiExitDiscriminatorError(MultiExitDiscriminatorWritingError),
-    LocalPreferenceError(LocalPreferenceWritingError),
-    AtomicAggregateError(AtomicAggregateWritingError),
-    AggregatorError(AggregatorWritingError),
-    CommunitiesError(CommunitiesWritingError),
-    MpReachError(MpReachWritingError),
-    MpUnreachError(MpUnreachWritingError),
-    UnknownAttributeError(UnknownAttributeWritingError),
-}
-
-impl From<std::io::Error> for PathAttributeWritingError {
-    fn from(err: std::io::Error) -> Self {
-        PathAttributeWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<PathAttributeWritingError> for BGPUpdateMessageWritingError {
-    fn from(value: PathAttributeWritingError) -> Self {
-        BGPUpdateMessageWritingError::PathAttributeError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
+    OriginError(#[from] OriginWritingError),
+    AsPathError(#[from] AsPathWritingError),
+    NextHopError(#[from] NextHopWritingError),
+    MultiExitDiscriminatorError(#[from] MultiExitDiscriminatorWritingError),
+    LocalPreferenceError(#[from] LocalPreferenceWritingError),
+    AtomicAggregateError(#[from] AtomicAggregateWritingError),
+    AggregatorError(#[from] AggregatorWritingError),
+    CommunitiesError(#[from] CommunitiesWritingError),
+    MpReachError(#[from] MpReachWritingError),
+    MpUnreachError(#[from] MpUnreachWritingError),
+    UnknownAttributeError(#[from] UnknownAttributeWritingError),
 }
 
 impl WritablePDU<PathAttributeWritingError> for PathAttribute {
@@ -230,21 +216,9 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum OriginWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for OriginWritingError {
-    fn from(err: std::io::Error) -> Self {
-        OriginWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<OriginWritingError> for PathAttributeWritingError {
-    fn from(value: OriginWritingError) -> Self {
-        PathAttributeWritingError::OriginError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDUWithOneInput<bool, OriginWritingError> for Origin {
@@ -270,21 +244,9 @@ impl WritablePDUWithOneInput<bool, OriginWritingError> for Origin {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum AsPathWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for AsPathWritingError {
-    fn from(err: std::io::Error) -> Self {
-        AsPathWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<AsPathWritingError> for PathAttributeWritingError {
-    fn from(value: AsPathWritingError) -> Self {
-        PathAttributeWritingError::AsPathError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<AsPathWritingError> for As2PathSegment {
@@ -390,21 +352,9 @@ impl WritablePDUWithOneInput<bool, AsPathWritingError> for AS4Path {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum NextHopWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for NextHopWritingError {
-    fn from(err: std::io::Error) -> Self {
-        NextHopWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<NextHopWritingError> for PathAttributeWritingError {
-    fn from(value: NextHopWritingError) -> Self {
-        PathAttributeWritingError::NextHopError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDUWithOneInput<bool, NextHopWritingError> for NextHop {
@@ -430,21 +380,9 @@ impl WritablePDUWithOneInput<bool, NextHopWritingError> for NextHop {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum MultiExitDiscriminatorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for MultiExitDiscriminatorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        MultiExitDiscriminatorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<MultiExitDiscriminatorWritingError> for PathAttributeWritingError {
-    fn from(value: MultiExitDiscriminatorWritingError) -> Self {
-        PathAttributeWritingError::MultiExitDiscriminatorError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDUWithOneInput<bool, MultiExitDiscriminatorWritingError> for MultiExitDiscriminator {
@@ -470,21 +408,9 @@ impl WritablePDUWithOneInput<bool, MultiExitDiscriminatorWritingError> for Multi
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum LocalPreferenceWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for LocalPreferenceWritingError {
-    fn from(err: std::io::Error) -> Self {
-        LocalPreferenceWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<LocalPreferenceWritingError> for PathAttributeWritingError {
-    fn from(value: LocalPreferenceWritingError) -> Self {
-        PathAttributeWritingError::LocalPreferenceError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDUWithOneInput<bool, LocalPreferenceWritingError> for LocalPreference {
@@ -510,21 +436,9 @@ impl WritablePDUWithOneInput<bool, LocalPreferenceWritingError> for LocalPrefere
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum AtomicAggregateWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for AtomicAggregateWritingError {
-    fn from(err: std::io::Error) -> Self {
-        AtomicAggregateWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<AtomicAggregateWritingError> for PathAttributeWritingError {
-    fn from(value: AtomicAggregateWritingError) -> Self {
-        PathAttributeWritingError::AtomicAggregateError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDUWithOneInput<bool, AtomicAggregateWritingError> for AtomicAggregate {
@@ -549,21 +463,9 @@ impl WritablePDUWithOneInput<bool, AtomicAggregateWritingError> for AtomicAggreg
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum AggregatorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for AggregatorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        AggregatorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<AggregatorWritingError> for PathAttributeWritingError {
-    fn from(value: AggregatorWritingError) -> Self {
-        PathAttributeWritingError::AggregatorError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As2Aggregator {
@@ -628,21 +530,9 @@ impl WritablePDUWithOneInput<bool, AggregatorWritingError> for Aggregator {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum UnknownAttributeWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for UnknownAttributeWritingError {
-    fn from(err: std::io::Error) -> Self {
-        UnknownAttributeWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<UnknownAttributeWritingError> for PathAttributeWritingError {
-    fn from(value: UnknownAttributeWritingError) -> Self {
-        PathAttributeWritingError::UnknownAttributeError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<UnknownAttributeWritingError> for UnknownAttribute {
@@ -671,21 +561,9 @@ impl WritablePDU<UnknownAttributeWritingError> for UnknownAttribute {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum CommunitiesWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for CommunitiesWritingError {
-    fn from(err: std::io::Error) -> Self {
-        CommunitiesWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<CommunitiesWritingError> for PathAttributeWritingError {
-    fn from(value: CommunitiesWritingError) -> Self {
-        PathAttributeWritingError::CommunitiesError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<CommunitiesWritingError> for Community {
@@ -725,49 +603,13 @@ impl WritablePDUWithOneInput<bool, CommunitiesWritingError> for Communities {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum MpReachWritingError {
-    StdIOError(String),
-    Ipv4UnicastError(Ipv4UnicastWritingError),
-    Ipv4MulticastError(Ipv4MulticastWritingError),
-    Ipv6UnicastError(Ipv6UnicastWritingError),
-    Ipv6MulticastError(Ipv6MulticastWritingError),
-}
-
-impl From<std::io::Error> for MpReachWritingError {
-    fn from(err: std::io::Error) -> Self {
-        MpReachWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<Ipv4UnicastWritingError> for MpReachWritingError {
-    fn from(err: Ipv4UnicastWritingError) -> Self {
-        MpReachWritingError::Ipv4UnicastError(err)
-    }
-}
-
-impl From<Ipv4MulticastWritingError> for MpReachWritingError {
-    fn from(err: Ipv4MulticastWritingError) -> Self {
-        MpReachWritingError::Ipv4MulticastError(err)
-    }
-}
-
-impl From<Ipv6UnicastWritingError> for MpReachWritingError {
-    fn from(err: Ipv6UnicastWritingError) -> Self {
-        MpReachWritingError::Ipv6UnicastError(err)
-    }
-}
-
-impl From<Ipv6MulticastWritingError> for MpReachWritingError {
-    fn from(err: Ipv6MulticastWritingError) -> Self {
-        MpReachWritingError::Ipv6MulticastError(err)
-    }
-}
-
-impl From<MpReachWritingError> for PathAttributeWritingError {
-    fn from(value: MpReachWritingError) -> Self {
-        PathAttributeWritingError::MpReachError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
+    Ipv4UnicastError(#[from] Ipv4UnicastWritingError),
+    Ipv4MulticastError(#[from] Ipv4MulticastWritingError),
+    Ipv6UnicastError(#[from] Ipv6UnicastWritingError),
+    Ipv6MulticastError(#[from] Ipv6MulticastWritingError),
 }
 
 impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
@@ -903,49 +745,13 @@ impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum MpUnreachWritingError {
-    StdIOError(String),
-    Ipv4UnicastError(Ipv4UnicastWritingError),
-    Ipv4MulticastError(Ipv4MulticastWritingError),
-    Ipv6UnicastError(Ipv6UnicastWritingError),
-    Ipv6MulticastError(Ipv6MulticastWritingError),
-}
-
-impl From<std::io::Error> for MpUnreachWritingError {
-    fn from(err: std::io::Error) -> Self {
-        MpUnreachWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<Ipv4UnicastWritingError> for MpUnreachWritingError {
-    fn from(err: Ipv4UnicastWritingError) -> Self {
-        MpUnreachWritingError::Ipv4UnicastError(err)
-    }
-}
-
-impl From<Ipv4MulticastWritingError> for MpUnreachWritingError {
-    fn from(err: Ipv4MulticastWritingError) -> Self {
-        MpUnreachWritingError::Ipv4MulticastError(err)
-    }
-}
-
-impl From<Ipv6UnicastWritingError> for MpUnreachWritingError {
-    fn from(err: Ipv6UnicastWritingError) -> Self {
-        MpUnreachWritingError::Ipv6UnicastError(err)
-    }
-}
-
-impl From<Ipv6MulticastWritingError> for MpUnreachWritingError {
-    fn from(err: Ipv6MulticastWritingError) -> Self {
-        MpUnreachWritingError::Ipv6MulticastError(err)
-    }
-}
-
-impl From<MpUnreachWritingError> for PathAttributeWritingError {
-    fn from(value: MpUnreachWritingError) -> Self {
-        PathAttributeWritingError::MpUnreachError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
+    Ipv4UnicastError(#[from] Ipv4UnicastWritingError),
+    Ipv4MulticastError(#[from] Ipv4MulticastWritingError),
+    Ipv6UnicastError(#[from] Ipv6UnicastWritingError),
+    Ipv6MulticastError(#[from] Ipv6MulticastWritingError),
 }
 
 impl WritablePDUWithOneInput<bool, MpUnreachWritingError> for MpUnreach {

@@ -90,6 +90,39 @@ fn parse_attribute(
     }
 }
 
+fn filter_attribute_by_name(
+    enum_data: &syn::DataEnum,
+    filter: &str,
+) -> syn::Result<(Vec<syn::Ident>, Vec<syn::Ident>)> {
+    let mut variants = vec![];
+    let mut idents = vec![];
+    for variant in enum_data.variants.iter() {
+        for field in variant.fields.iter() {
+            for attr in field.attrs.iter().filter(|attr| {
+                attr.path
+                    .segments
+                    .iter()
+                    .any(|seg| seg.ident == syn::Ident::new(filter, seg.span()))
+            }) {
+                if let syn::Type::Path(path) = &field.ty {
+                    variants.push(variant.ident.clone());
+                    let ident = path.path.get_ident();
+                    match ident {
+                        Some(ident) => idents.push(ident.clone()),
+                        None => {
+                            return Err(syn::Error::new(
+                                attr.span(),
+                                "Couldn't find identifier for this attribute",
+                            ))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok((variants, idents))
+}
+
 #[derive(Debug)]
 struct LocatedError {}
 
@@ -111,38 +144,6 @@ impl LocatedError {
             }
         }
         Ok(from_nom_variants)
-    }
-
-    fn get_from_external(
-        enum_data: &syn::DataEnum,
-    ) -> syn::Result<(Vec<syn::Ident>, Vec<syn::Ident>)> {
-        let mut from_external_variants = vec![];
-        let mut from_external_ident = vec![];
-        for variant in enum_data.variants.iter() {
-            for field in variant.fields.iter() {
-                for attr in field.attrs.iter().filter(|attr| {
-                    attr.path
-                        .segments
-                        .iter()
-                        .any(|seg| seg.ident == syn::Ident::new("from_external", seg.span()))
-                }) {
-                    if let syn::Type::Path(path) = &field.ty {
-                        from_external_variants.push(variant.ident.clone());
-                        let ident = path.path.get_ident();
-                        match ident {
-                            Some(ident) => from_external_ident.push(ident.clone()),
-                            None => {
-                                return Err(syn::Error::new(
-                                    attr.span(),
-                                    "Couldn't find identifier for this attribute",
-                                ))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Ok((from_external_variants, from_external_ident))
     }
 
     fn get_from_located(
@@ -223,7 +224,8 @@ impl LocatedError {
         let located_struct_name: syn::Ident = format_ident!("Located{}", ident);
 
         let from_nom_variants = LocatedError::get_from_nom(en)?;
-        let (from_external_variants, from_external_ident) = LocatedError::get_from_external(en)?;
+        let (from_external_variants, from_external_ident) =
+            filter_attribute_by_name(en, "from_external")?;
         let from_located = LocatedError::get_from_located(en)?;
 
         let mut output = quote! {
@@ -312,6 +314,54 @@ impl LocatedError {
 pub fn located_error(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse_macro_input!(input as syn::DeriveInput);
     match LocatedError::from(&ast) {
+        Ok(tokens) => tokens,
+        Err(err) => proc_macro::TokenStream::from(err.to_compile_error()),
+    }
+}
+
+#[derive(Debug)]
+struct WritingError {}
+
+impl WritingError {
+    fn from(input: &syn::DeriveInput) -> Result<proc_macro::TokenStream, syn::Error> {
+        let en = match &input.data {
+            syn::Data::Enum(en) => en,
+            _ => {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "Works only with enum error types",
+                ))
+            }
+        };
+        let ident = input.ident.clone();
+        let (from_variants, from_idents) = filter_attribute_by_name(en, "from")?;
+        let (from_std_io_error_variants, _) = filter_attribute_by_name(en, "from_std_io_error")?;
+        let output = quote! {
+            #(
+                #[automatically_derived]
+                impl From<#from_idents> for #ident {
+                    fn from(err: #from_idents) -> Self {
+                        #ident::#from_variants(err)
+                    }
+                }
+            )*
+            #(
+                #[automatically_derived]
+                impl From<std::io::Error> for #ident {
+                    fn from(err: std::io::Error) -> Self {
+                        #ident::#from_std_io_error_variants(err.to_string())
+                    }
+                }
+            )*
+        };
+        Ok(proc_macro::TokenStream::from(output))
+    }
+}
+
+#[proc_macro_derive(WritingError, attributes(from_std_io_error, from))]
+pub fn writing_error(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let ast = syn::parse_macro_input!(input as syn::DeriveInput);
+    match WritingError::from(&ast) {
         Ok(tokens) => tokens,
         Err(err) => proc_macro::TokenStream::from(err.to_compile_error()),
     }

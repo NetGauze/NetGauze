@@ -23,34 +23,22 @@ use crate::{
         CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
-    serde::serializer::BGPMessageWritingError,
     BGPNotificationMessage,
 };
 use byteorder::WriteBytesExt;
 use netgauze_parse_utils::WritablePDU;
+use netgauze_serde_macros::WritingError;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPNotificationMessageWritingError {
-    StdIOError(String),
-    MessageHeaderError(MessageHeaderErrorWritingError),
-    OpenMessageError(OpenMessageErrorWritingError),
-    UpdateMessageError(UpdateMessageErrorWritingError),
-    HoldTimerExpiredError(HoldTimerExpiredErrorWritingError),
-    FiniteStateMachineError(FiniteStateMachineErrorWritingError),
-    CeaseError(CeaseErrorWritingError),
-    RouteRefreshError(RouteRefreshErrorWritingError),
-}
-
-impl From<std::io::Error> for BGPNotificationMessageWritingError {
-    fn from(err: std::io::Error) -> Self {
-        BGPNotificationMessageWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<BGPNotificationMessageWritingError> for BGPMessageWritingError {
-    fn from(value: BGPNotificationMessageWritingError) -> Self {
-        BGPMessageWritingError::NotificationError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
+    MessageHeaderError(#[from] MessageHeaderErrorWritingError),
+    OpenMessageError(#[from] OpenMessageErrorWritingError),
+    UpdateMessageError(#[from] UpdateMessageErrorWritingError),
+    HoldTimerExpiredError(#[from] HoldTimerExpiredErrorWritingError),
+    FiniteStateMachineError(#[from] FiniteStateMachineErrorWritingError),
+    CeaseError(#[from] CeaseErrorWritingError),
+    RouteRefreshError(#[from] RouteRefreshErrorWritingError),
 }
 
 impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage {
@@ -108,21 +96,9 @@ impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage 
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum MessageHeaderErrorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for MessageHeaderErrorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        MessageHeaderErrorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<MessageHeaderErrorWritingError> for BGPNotificationMessageWritingError {
-    fn from(value: MessageHeaderErrorWritingError) -> Self {
-        BGPNotificationMessageWritingError::MessageHeaderError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<MessageHeaderErrorWritingError> for MessageHeaderError {
@@ -165,21 +141,9 @@ impl WritablePDU<MessageHeaderErrorWritingError> for MessageHeaderError {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum OpenMessageErrorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for OpenMessageErrorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        OpenMessageErrorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<OpenMessageErrorWritingError> for BGPNotificationMessageWritingError {
-    fn from(value: OpenMessageErrorWritingError) -> Self {
-        BGPNotificationMessageWritingError::OpenMessageError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<OpenMessageErrorWritingError> for OpenMessageError {
@@ -239,21 +203,9 @@ impl WritablePDU<OpenMessageErrorWritingError> for OpenMessageError {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum UpdateMessageErrorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for UpdateMessageErrorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        UpdateMessageErrorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<UpdateMessageErrorWritingError> for BGPNotificationMessageWritingError {
-    fn from(value: UpdateMessageErrorWritingError) -> Self {
-        BGPNotificationMessageWritingError::UpdateMessageError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<UpdateMessageErrorWritingError> for UpdateMessageError {
@@ -332,21 +284,9 @@ impl WritablePDU<UpdateMessageErrorWritingError> for UpdateMessageError {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum HoldTimerExpiredErrorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for HoldTimerExpiredErrorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        HoldTimerExpiredErrorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<HoldTimerExpiredErrorWritingError> for BGPNotificationMessageWritingError {
-    fn from(value: HoldTimerExpiredErrorWritingError) -> Self {
-        BGPNotificationMessageWritingError::HoldTimerExpiredError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<HoldTimerExpiredErrorWritingError> for HoldTimerExpiredError {
@@ -374,21 +314,9 @@ impl WritablePDU<HoldTimerExpiredErrorWritingError> for HoldTimerExpiredError {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum FiniteStateMachineErrorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for FiniteStateMachineErrorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        FiniteStateMachineErrorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<FiniteStateMachineErrorWritingError> for BGPNotificationMessageWritingError {
-    fn from(value: FiniteStateMachineErrorWritingError) -> Self {
-        BGPNotificationMessageWritingError::FiniteStateMachineError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<FiniteStateMachineErrorWritingError> for FiniteStateMachineError {
@@ -439,21 +367,9 @@ impl WritablePDU<FiniteStateMachineErrorWritingError> for FiniteStateMachineErro
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum CeaseErrorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for CeaseErrorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        CeaseErrorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<CeaseErrorWritingError> for BGPNotificationMessageWritingError {
-    fn from(value: CeaseErrorWritingError) -> Self {
-        BGPNotificationMessageWritingError::CeaseError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<CeaseErrorWritingError> for CeaseError {
@@ -523,21 +439,9 @@ impl WritablePDU<CeaseErrorWritingError> for CeaseError {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum RouteRefreshErrorWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for RouteRefreshErrorWritingError {
-    fn from(err: std::io::Error) -> Self {
-        RouteRefreshErrorWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<RouteRefreshErrorWritingError> for BGPNotificationMessageWritingError {
-    fn from(value: RouteRefreshErrorWritingError) -> Self {
-        BGPNotificationMessageWritingError::RouteRefreshError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<RouteRefreshErrorWritingError> for RouteRefreshError {

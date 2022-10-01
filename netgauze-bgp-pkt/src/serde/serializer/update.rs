@@ -16,33 +16,20 @@
 //! Serializer for BGP Update message
 
 use crate::{
-    serde::serializer::{
-        path_attribute::PathAttributeWritingError, round_len, BGPMessageWritingError,
-    },
+    serde::serializer::{path_attribute::PathAttributeWritingError, round_len},
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
     BGPUpdateMessage,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
+use netgauze_serde_macros::WritingError;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPUpdateMessageWritingError {
-    StdIOError(String),
-    WithdrawRouteError(WithdrawRouteWritingError),
-    NLRIError(NetworkLayerReachabilityInformationWritingError),
-    PathAttributeError(PathAttributeWritingError),
-}
-
-impl From<std::io::Error> for BGPUpdateMessageWritingError {
-    fn from(err: std::io::Error) -> Self {
-        BGPUpdateMessageWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<BGPUpdateMessageWritingError> for BGPMessageWritingError {
-    fn from(value: BGPUpdateMessageWritingError) -> Self {
-        BGPMessageWritingError::UpdateError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
+    WithdrawRouteError(#[from] WithdrawRouteWritingError),
+    NLRIError(#[from] NetworkLayerReachabilityInformationWritingError),
+    PathAttributeError(#[from] PathAttributeWritingError),
 }
 
 impl WritablePDU<BGPUpdateMessageWritingError> for BGPUpdateMessage {
@@ -93,21 +80,9 @@ impl WritablePDU<BGPUpdateMessageWritingError> for BGPUpdateMessage {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum WithdrawRouteWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for WithdrawRouteWritingError {
-    fn from(err: std::io::Error) -> Self {
-        WithdrawRouteWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<WithdrawRouteWritingError> for BGPUpdateMessageWritingError {
-    fn from(value: WithdrawRouteWritingError) -> Self {
-        BGPUpdateMessageWritingError::WithdrawRouteError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<WithdrawRouteWritingError> for WithdrawRoute {
@@ -134,21 +109,9 @@ impl WritablePDU<WithdrawRouteWritingError> for WithdrawRoute {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum NetworkLayerReachabilityInformationWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for NetworkLayerReachabilityInformationWritingError {
-    fn from(err: std::io::Error) -> Self {
-        NetworkLayerReachabilityInformationWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<NetworkLayerReachabilityInformationWritingError> for BGPUpdateMessageWritingError {
-    fn from(value: NetworkLayerReachabilityInformationWritingError) -> Self {
-        BGPUpdateMessageWritingError::NLRIError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<NetworkLayerReachabilityInformationWritingError>

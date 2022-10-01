@@ -23,31 +23,19 @@ use crate::{
         ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::BGPCapabilityCode,
-    serde::serializer::open::BGPOpenMessageWritingError,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
+use netgauze_serde_macros::WritingError;
 use std::io::Write;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPCapabilityWritingError {
-    StdIOError(String),
-    FourOctetASCapabilityError(FourOctetASCapabilityWritingError),
-    MultiProtocolExtensionsCapabilityError(MultiProtocolExtensionsCapabilityWritingError),
-    AddPathCapabilityError(AddPathCapabilityWritingError),
-    ExtendedNextHopEncodingCapabilityError(ExtendedNextHopEncodingCapabilityWritingError),
-}
-
-impl From<std::io::Error> for BGPCapabilityWritingError {
-    fn from(err: std::io::Error) -> Self {
-        BGPCapabilityWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<BGPCapabilityWritingError> for BGPOpenMessageWritingError {
-    fn from(value: BGPCapabilityWritingError) -> Self {
-        BGPOpenMessageWritingError::CapabilityError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
+    FourOctetASCapabilityError(#[from] FourOctetASCapabilityWritingError),
+    MultiProtocolExtensionsCapabilityError(#[from] MultiProtocolExtensionsCapabilityWritingError),
+    AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
+    ExtendedNextHopEncodingCapabilityError(#[from] ExtendedNextHopEncodingCapabilityWritingError),
 }
 
 impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
@@ -121,21 +109,9 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum FourOctetASCapabilityWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for FourOctetASCapabilityWritingError {
-    fn from(err: std::io::Error) -> Self {
-        FourOctetASCapabilityWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<FourOctetASCapabilityWritingError> for BGPCapabilityWritingError {
-    fn from(value: FourOctetASCapabilityWritingError) -> Self {
-        BGPCapabilityWritingError::FourOctetASCapabilityError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<FourOctetASCapabilityWritingError> for FourOctetASCapability {
@@ -150,21 +126,9 @@ impl WritablePDU<FourOctetASCapabilityWritingError> for FourOctetASCapability {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum MultiProtocolExtensionsCapabilityWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for MultiProtocolExtensionsCapabilityWritingError {
-    fn from(err: std::io::Error) -> Self {
-        MultiProtocolExtensionsCapabilityWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<MultiProtocolExtensionsCapabilityWritingError> for BGPCapabilityWritingError {
-    fn from(value: MultiProtocolExtensionsCapabilityWritingError) -> Self {
-        BGPCapabilityWritingError::MultiProtocolExtensionsCapabilityError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<MultiProtocolExtensionsCapabilityWritingError>
@@ -186,21 +150,9 @@ impl WritablePDU<MultiProtocolExtensionsCapabilityWritingError>
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum AddPathCapabilityWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for AddPathCapabilityWritingError {
-    fn from(err: std::io::Error) -> Self {
-        AddPathCapabilityWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<AddPathCapabilityWritingError> for BGPCapabilityWritingError {
-    fn from(value: AddPathCapabilityWritingError) -> Self {
-        BGPCapabilityWritingError::AddPathCapabilityError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapability {
@@ -241,21 +193,9 @@ impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapabilityAddressFami
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedNextHopEncodingCapabilityWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for ExtendedNextHopEncodingCapabilityWritingError {
-    fn from(err: std::io::Error) -> Self {
-        ExtendedNextHopEncodingCapabilityWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<ExtendedNextHopEncodingCapabilityWritingError> for BGPCapabilityWritingError {
-    fn from(value: ExtendedNextHopEncodingCapabilityWritingError) -> Self {
-        BGPCapabilityWritingError::ExtendedNextHopEncodingCapabilityError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<ExtendedNextHopEncodingCapabilityWritingError> for ExtendedNextHopEncoding {
@@ -273,6 +213,7 @@ impl WritablePDU<ExtendedNextHopEncodingCapabilityWritingError> for ExtendedNext
         Ok(())
     }
 }
+
 impl WritablePDU<ExtendedNextHopEncodingCapabilityWritingError>
     for ExtendedNextHopEncodingCapability
 {

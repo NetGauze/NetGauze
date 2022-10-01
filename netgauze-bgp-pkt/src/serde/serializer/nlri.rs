@@ -19,17 +19,12 @@ use crate::{
 };
 use byteorder::WriteBytesExt;
 use netgauze_parse_utils::WritablePDU;
+use netgauze_serde_macros::WritingError;
 use std::io::Write;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6UnicastWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for Ipv6UnicastWritingError {
-    fn from(err: std::io::Error) -> Self {
-        Ipv6UnicastWritingError::StdIOError(err.to_string())
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<Ipv6UnicastWritingError> for Ipv6Unicast {
@@ -48,15 +43,9 @@ impl WritablePDU<Ipv6UnicastWritingError> for Ipv6Unicast {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6MulticastWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for Ipv6MulticastWritingError {
-    fn from(err: std::io::Error) -> Self {
-        Ipv6MulticastWritingError::StdIOError(err.to_string())
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<Ipv6MulticastWritingError> for Ipv6Multicast {
@@ -75,15 +64,9 @@ impl WritablePDU<Ipv6MulticastWritingError> for Ipv6Multicast {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4UnicastWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for Ipv4UnicastWritingError {
-    fn from(err: std::io::Error) -> Self {
-        Ipv4UnicastWritingError::StdIOError(err.to_string())
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<Ipv4UnicastWritingError> for Ipv4Unicast {
@@ -102,15 +85,9 @@ impl WritablePDU<Ipv4UnicastWritingError> for Ipv4Unicast {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4MulticastWritingError {
-    StdIOError(String),
-}
-
-impl From<std::io::Error> for Ipv4MulticastWritingError {
-    fn from(err: std::io::Error) -> Self {
-        Ipv4MulticastWritingError::StdIOError(err.to_string())
-    }
+    StdIOError(#[from_std_io_error] String),
 }
 
 impl WritablePDU<Ipv4MulticastWritingError> for Ipv4Multicast {

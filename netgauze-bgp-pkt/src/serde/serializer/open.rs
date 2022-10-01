@@ -18,31 +18,17 @@ use std::io::Write;
 use byteorder::{NetworkEndian, WriteBytesExt};
 
 use netgauze_parse_utils::WritablePDU;
+use netgauze_serde_macros::WritingError;
 
 use crate::{
-    capabilities::BGPCapability,
-    iana::BGPOpenMessageParameterType,
-    open::BGPOpenMessageParameter,
-    serde::serializer::{capabilities::BGPCapabilityWritingError, BGPMessageWritingError},
-    BGPOpenMessage,
+    capabilities::BGPCapability, iana::BGPOpenMessageParameterType, open::BGPOpenMessageParameter,
+    serde::serializer::capabilities::BGPCapabilityWritingError, BGPOpenMessage,
 };
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPOpenMessageWritingError {
-    StdIOError(String),
-    CapabilityError(BGPCapabilityWritingError),
-}
-
-impl From<std::io::Error> for BGPOpenMessageWritingError {
-    fn from(err: std::io::Error) -> Self {
-        BGPOpenMessageWritingError::StdIOError(err.to_string())
-    }
-}
-
-impl From<BGPOpenMessageWritingError> for BGPMessageWritingError {
-    fn from(value: BGPOpenMessageWritingError) -> Self {
-        BGPMessageWritingError::OpenError(value)
-    }
+    StdIOError(#[from_std_io_error] String),
+    CapabilityError(#[from] BGPCapabilityWritingError),
 }
 
 impl WritablePDU<BGPOpenMessageWritingError> for BGPOpenMessage {
