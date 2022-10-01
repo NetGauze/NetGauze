@@ -2,7 +2,7 @@ error: 'module' of the Located error is not defined defined
   --> tests/trybuild/05-from-located-no-module.rs:16:7
    |
 16 |     A(#[from_located] AError),
-   |       ^^^^^^^^^^^^^^^
+   |       ^
 
 error[E0412]: cannot find type `LocatedTestError` in this scope
   --> tests/trybuild/05-from-located-no-module.rs:28:50
