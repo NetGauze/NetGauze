@@ -17,130 +17,29 @@
 
 use crate::{
     iana::{RouteRefreshSubcode, UndefinedRouteRefreshSubcode},
-    serde::deserializer::{BGPMessageParsingError, LocatedBGPMessageParsingError},
     BGPRouteRefreshMessage,
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
-use netgauze_parse_utils::{IntoLocatedError, LocatedParsingError, ReadablePDU, Span};
+use netgauze_parse_utils::{ReadablePDU, Span};
 use nom::{
-    error::{ErrorKind, FromExternalError},
+    error::ErrorKind,
     number::complete::{be_u16, be_u8},
     IResult,
 };
 
+use netgauze_serde_macros::LocatedError;
+
 /// BGP Route Refresh Message Parsing errors
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPRouteRefreshMessageParsingError {
-    NomError(ErrorKind),
-    UndefinedOperation(UndefinedRouteRefreshSubcode),
-    UndefinedAddressFamily(UndefinedAddressFamily),
-    UndefinedSubsequentAddressFamily(UndefinedSubsequentAddressFamily),
+    NomError(#[from_nom] ErrorKind),
+    UndefinedOperation(#[from_external] UndefinedRouteRefreshSubcode),
+    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
+    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
     InvalidAddressType(InvalidAddressType),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedBGPRouteRefreshMessageParsingError<'a> {
-    span: Span<'a>,
-    error: BGPRouteRefreshMessageParsingError,
-}
-
-impl<'a> LocatedBGPRouteRefreshMessageParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: BGPRouteRefreshMessageParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedBGPRouteRefreshMessageParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = BGPRouteRefreshMessageParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPMessageParsingError<'a>>
-    for LocatedBGPRouteRefreshMessageParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPMessageParsingError<'a> {
-        LocatedBGPMessageParsingError::new(
-            self.span,
-            BGPMessageParsingError::BGPRouteRefreshMessageParsingError(self.error),
-        )
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedBGPRouteRefreshMessageParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedBGPRouteRefreshMessageParsingError::new(
-            input,
-            BGPRouteRefreshMessageParsingError::NomError(kind),
-        )
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, BGPRouteRefreshMessageParsingError>
-    for LocatedBGPRouteRefreshMessageParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: BGPRouteRefreshMessageParsingError,
-    ) -> Self {
-        LocatedBGPRouteRefreshMessageParsingError::new(input, error)
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedRouteRefreshSubcode>
-    for LocatedBGPRouteRefreshMessageParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        e: UndefinedRouteRefreshSubcode,
-    ) -> Self {
-        LocatedBGPRouteRefreshMessageParsingError::new(
-            input,
-            BGPRouteRefreshMessageParsingError::UndefinedOperation(e),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily>
-    for LocatedBGPRouteRefreshMessageParsingError<'a>
-{
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, e: UndefinedAddressFamily) -> Self {
-        LocatedBGPRouteRefreshMessageParsingError::new(
-            input,
-            BGPRouteRefreshMessageParsingError::UndefinedAddressFamily(e),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
-    for LocatedBGPRouteRefreshMessageParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        e: UndefinedSubsequentAddressFamily,
-    ) -> Self {
-        LocatedBGPRouteRefreshMessageParsingError::new(
-            input,
-            BGPRouteRefreshMessageParsingError::UndefinedSubsequentAddressFamily(e),
-        )
-    }
 }
 
 impl<'a> ReadablePDU<'a, LocatedBGPRouteRefreshMessageParsingError<'a>> for BGPRouteRefreshMessage {

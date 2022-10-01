@@ -23,13 +23,9 @@ use crate::{
         MpUnreach, MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
         UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
     },
-    serde::deserializer::{
-        nlri::{
-            Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
-            Ipv6UnicastParsingError,
-        },
-        update::LocatedBGPUpdateMessageParsingError,
-        BGPUpdateMessageParsingError,
+    serde::deserializer::nlri::{
+        Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
+        Ipv6UnicastParsingError,
     },
 };
 use netgauze_iana::address_family::{
@@ -38,12 +34,12 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{
     parse_into_located_one_input, parse_into_located_three_inputs, parse_into_located_two_inputs,
-    parse_till_empty, parse_till_empty_into_located, IntoLocatedError, LocatedParsingError,
-    ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs,
-    Span,
+    parse_till_empty, parse_till_empty_into_located, ReadablePDU, ReadablePDUWithOneInput,
+    ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs, Span,
 };
+use netgauze_serde_macros::LocatedError;
 use nom::{
-    error::{ErrorKind, FromExternalError},
+    error::ErrorKind,
     number::complete::{be_u128, be_u16, be_u32, be_u8},
     IResult,
 };
@@ -69,80 +65,24 @@ const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    OriginError(OriginParsingError),
-    AsPathError(AsPathParsingError),
-    NextHopError(NextHopParsingError),
-    MultiExitDiscriminatorError(MultiExitDiscriminatorParsingError),
-    LocalPreferenceError(LocalPreferenceParsingError),
-    AtomicAggregateError(AtomicAggregateParsingError),
-    AggregatorError(AggregatorParsingError),
-    CommunitiesError(CommunitiesParsingError),
-    MpReachErrorError(MpReachParsingError),
-    MpUnreachErrorError(MpUnreachParsingError),
-    UnknownAttributeError(UnknownAttributeParsingError),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedPathAttributeParsingError<'a> {
-    span: Span<'a>,
-    error: PathAttributeParsingError,
-}
-
-impl<'a> LocatedPathAttributeParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: PathAttributeParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedPathAttributeParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = PathAttributeParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPUpdateMessageParsingError<'a>>
-    for LocatedPathAttributeParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
-        LocatedBGPUpdateMessageParsingError::new(
-            self.span,
-            BGPUpdateMessageParsingError::PathAttributeError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, PathAttributeParsingError>
-    for LocatedPathAttributeParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: PathAttributeParsingError,
-    ) -> Self {
-        LocatedPathAttributeParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedPathAttributeParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedPathAttributeParsingError::new(input, PathAttributeParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
+    NomError(#[from_nom] ErrorKind),
+    OriginError(#[from_located(module = "self")] OriginParsingError),
+    AsPathError(#[from_located(module = "self")] AsPathParsingError),
+    NextHopError(#[from_located(module = "self")] NextHopParsingError),
+    MultiExitDiscriminatorError(
+        #[from_located(module = "self")] MultiExitDiscriminatorParsingError,
+    ),
+    LocalPreferenceError(#[from_located(module = "self")] LocalPreferenceParsingError),
+    AtomicAggregateError(#[from_located(module = "self")] AtomicAggregateParsingError),
+    AggregatorError(#[from_located(module = "self")] AggregatorParsingError),
+    CommunitiesError(#[from_located(module = "self")] CommunitiesParsingError),
+    MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
+    MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
+    UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
 }
 
 pub trait IntoLocatedPathAttributeParsingError<'a> {
@@ -279,69 +219,13 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum OriginParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    InvalidOriginLength(PathAttributeLength),
-    UndefinedOrigin(UndefinedOrigin),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedOriginParsingError<'a> {
-    span: Span<'a>,
-    error: OriginParsingError,
-}
-
-impl<'a> LocatedOriginParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: OriginParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedOriginParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = OriginParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>> for LocatedOriginParsingError<'a> {
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::OriginError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, OriginParsingError> for LocatedOriginParsingError<'a> {
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: OriginParsingError) -> Self {
-        LocatedOriginParsingError::new(input, error)
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedOrigin> for LocatedOriginParsingError<'a> {
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: UndefinedOrigin) -> Self {
-        LocatedOriginParsingError::new(input, OriginParsingError::UndefinedOrigin(error))
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedOriginParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedOriginParsingError::new(input, OriginParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
+    NomError(#[from_nom] ErrorKind),
+    InvalidOriginLength(#[from_external] PathAttributeLength),
+    UndefinedOrigin(#[from_external] UndefinedOrigin),
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Origin {
@@ -368,72 +252,12 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Or
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum AsPathParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    UndefinedAsPathSegmentType(UndefinedAsPathSegmentType),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedAsPathParsingError<'a> {
-    span: Span<'a>,
-    error: AsPathParsingError,
-}
-
-impl<'a> LocatedAsPathParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: AsPathParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedAsPathParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = AsPathParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>> for LocatedAsPathParsingError<'a> {
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::AsPathError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, AsPathParsingError> for LocatedAsPathParsingError<'a> {
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: AsPathParsingError) -> Self {
-        LocatedAsPathParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedAsPathParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedAsPathParsingError::new(input, AsPathParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedAsPathSegmentType> for LocatedAsPathParsingError<'a> {
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedAsPathSegmentType,
-    ) -> Self {
-        LocatedAsPathParsingError::new(input, AsPathParsingError::UndefinedAsPathSegmentType(error))
-    }
+    NomError(#[from_nom] ErrorKind),
+    UndefinedAsPathSegmentType(#[from_external] UndefinedAsPathSegmentType),
 }
 
 impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAsPathParsingError<'a>> for ASPath {
@@ -490,62 +314,12 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for AS
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum NextHopParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidNextHopLength(PathAttributeLength),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedNextHopParsingError<'a> {
-    span: Span<'a>,
-    error: NextHopParsingError,
-}
-
-impl<'a> LocatedNextHopParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: NextHopParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedNextHopParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = NextHopParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>> for LocatedNextHopParsingError<'a> {
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::NextHopError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, NextHopParsingError> for LocatedNextHopParsingError<'a> {
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: NextHopParsingError) -> Self {
-        LocatedNextHopParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedNextHopParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedNextHopParsingError::new(input, NextHopParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedNextHopParsingError<'a>> for NextHop {
@@ -574,73 +348,12 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedNextHopParsingError<'a>> for N
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum MultiExitDiscriminatorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidLength(PathAttributeLength),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedMultiExitDiscriminatorParsingError<'a> {
-    span: Span<'a>,
-    error: MultiExitDiscriminatorParsingError,
-}
-
-impl<'a> LocatedMultiExitDiscriminatorParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: MultiExitDiscriminatorParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedMultiExitDiscriminatorParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = MultiExitDiscriminatorParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
-    for LocatedMultiExitDiscriminatorParsingError<'a>
-{
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::MultiExitDiscriminatorError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, MultiExitDiscriminatorParsingError>
-    for LocatedMultiExitDiscriminatorParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: MultiExitDiscriminatorParsingError,
-    ) -> Self {
-        LocatedMultiExitDiscriminatorParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedMultiExitDiscriminatorParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedMultiExitDiscriminatorParsingError::new(
-            input,
-            MultiExitDiscriminatorParsingError::NomError(kind),
-        )
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMultiExitDiscriminatorParsingError<'a>>
@@ -672,70 +385,12 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMultiExitDiscriminatorParsingE
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum LocalPreferenceParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidLength(PathAttributeLength),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedLocalPreferenceParsingError<'a> {
-    span: Span<'a>,
-    error: LocalPreferenceParsingError,
-}
-
-impl<'a> LocatedLocalPreferenceParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: LocalPreferenceParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedLocalPreferenceParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = LocalPreferenceParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
-    for LocatedLocalPreferenceParsingError<'a>
-{
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::LocalPreferenceError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, LocalPreferenceParsingError>
-    for LocatedLocalPreferenceParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: LocalPreferenceParsingError,
-    ) -> Self {
-        LocatedLocalPreferenceParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedLocalPreferenceParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedLocalPreferenceParsingError::new(input, LocalPreferenceParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a>>
@@ -765,70 +420,12 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum AtomicAggregateParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidLength(PathAttributeLength),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedAtomicAggregateParsingError<'a> {
-    span: Span<'a>,
-    error: AtomicAggregateParsingError,
-}
-
-impl<'a> LocatedAtomicAggregateParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: AtomicAggregateParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedAtomicAggregateParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = AtomicAggregateParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
-    for LocatedAtomicAggregateParsingError<'a>
-{
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::AtomicAggregateError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, AtomicAggregateParsingError>
-    for LocatedAtomicAggregateParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: AtomicAggregateParsingError,
-    ) -> Self {
-        LocatedAtomicAggregateParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedAtomicAggregateParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedAtomicAggregateParsingError::new(input, AtomicAggregateParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a>>
@@ -856,68 +453,12 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum AggregatorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidLength(PathAttributeLength),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedAggregatorParsingError<'a> {
-    span: Span<'a>,
-    error: AggregatorParsingError,
-}
-
-impl<'a> LocatedAggregatorParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: AggregatorParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedAggregatorParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = AggregatorParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
-    for LocatedAggregatorParsingError<'a>
-{
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::AggregatorError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, AggregatorParsingError> for LocatedAggregatorParsingError<'a> {
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: AggregatorParsingError,
-    ) -> Self {
-        LocatedAggregatorParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedAggregatorParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedAggregatorParsingError::new(input, AggregatorParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
 }
 
 impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAggregatorParsingError<'a>>
@@ -990,95 +531,28 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> fo
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum MpReachParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    UndefinedAddressFamily(UndefinedAddressFamily),
-    UndefinedSubsequentAddressFamily(UndefinedSubsequentAddressFamily),
+    NomError(#[from_nom] ErrorKind),
+    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
+    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
     InvalidAddressType(InvalidAddressType),
     /// MP-BGP is not yet implemented for the given address type
     UnknownAddressType(AddressType),
-    Ipv4UnicastError(Ipv4UnicastParsingError),
-    Ipv4MulticastError(Ipv4MulticastParsingError),
-    Ipv6UnicastError(Ipv6UnicastParsingError),
-    Ipv6MulticastError(Ipv6MulticastParsingError),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedMpReachParsingError<'a> {
-    span: Span<'a>,
-    error: MpReachParsingError,
-}
-
-impl<'a> LocatedMpReachParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: MpReachParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedMpReachParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = MpReachParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>> for LocatedMpReachParsingError<'a> {
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::MpReachErrorError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, MpReachParsingError> for LocatedMpReachParsingError<'a> {
-    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: MpReachParsingError) -> Self {
-        LocatedMpReachParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedMpReachParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedMpReachParsingError::new(input, MpReachParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily> for LocatedMpReachParsingError<'a> {
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedAddressFamily,
-    ) -> Self {
-        LocatedMpReachParsingError::new(input, MpReachParsingError::UndefinedAddressFamily(error))
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
-    for LocatedMpReachParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedSubsequentAddressFamily,
-    ) -> Self {
-        LocatedMpReachParsingError::new(
-            input,
-            MpReachParsingError::UndefinedSubsequentAddressFamily(error),
-        )
-    }
+    Ipv4UnicastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4UnicastParsingError,
+    ),
+    Ipv4MulticastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MulticastParsingError,
+    ),
+    Ipv6UnicastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6UnicastParsingError,
+    ),
+    Ipv6MulticastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MulticastParsingError,
+    ),
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for MpReach {
@@ -1248,104 +722,28 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum MpUnreachParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    UndefinedAddressFamily(UndefinedAddressFamily),
-    UndefinedSubsequentAddressFamily(UndefinedSubsequentAddressFamily),
+    NomError(#[from_nom] ErrorKind),
+    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
+    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
     InvalidAddressType(InvalidAddressType),
     /// MP-BGP is not yet implemented for the given address type
     UnknownAddressType(AddressType),
-    Ipv4UnicastError(Ipv4UnicastParsingError),
-    Ipv4MulticastError(Ipv4MulticastParsingError),
-    Ipv6UnicastError(Ipv6UnicastParsingError),
-    Ipv6MulticastError(Ipv6MulticastParsingError),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedMpUnreachParsingError<'a> {
-    span: Span<'a>,
-    error: MpUnreachParsingError,
-}
-
-impl<'a> LocatedMpUnreachParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: MpUnreachParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedMpUnreachParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = MpUnreachParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
-    for LocatedMpUnreachParsingError<'a>
-{
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::MpUnreachErrorError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, MpUnreachParsingError> for LocatedMpUnreachParsingError<'a> {
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: MpUnreachParsingError,
-    ) -> Self {
-        LocatedMpUnreachParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedMpUnreachParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedMpUnreachParsingError::new(input, MpUnreachParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily> for LocatedMpUnreachParsingError<'a> {
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedAddressFamily,
-    ) -> Self {
-        LocatedMpUnreachParsingError::new(
-            input,
-            MpUnreachParsingError::UndefinedAddressFamily(error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
-    for LocatedMpUnreachParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedSubsequentAddressFamily,
-    ) -> Self {
-        LocatedMpUnreachParsingError::new(
-            input,
-            MpUnreachParsingError::UndefinedSubsequentAddressFamily(error),
-        )
-    }
+    Ipv4UnicastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4UnicastParsingError,
+    ),
+    Ipv4MulticastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MulticastParsingError,
+    ),
+    Ipv6UnicastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6UnicastParsingError,
+    ),
+    Ipv6MulticastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MulticastParsingError,
+    ),
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for MpUnreach {
@@ -1476,72 +874,11 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum UnknownAttributeParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedUnknownAttributeParsingError<'a> {
-    span: Span<'a>,
-    error: UnknownAttributeParsingError,
-}
-
-impl<'a> LocatedUnknownAttributeParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: UnknownAttributeParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedUnknownAttributeParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = UnknownAttributeParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
-    for LocatedUnknownAttributeParsingError<'a>
-{
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::UnknownAttributeError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UnknownAttributeParsingError>
-    for LocatedUnknownAttributeParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UnknownAttributeParsingError,
-    ) -> Self {
-        LocatedUnknownAttributeParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedUnknownAttributeParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedUnknownAttributeParsingError::new(
-            input,
-            UnknownAttributeParsingError::NomError(kind),
-        )
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
+    NomError(#[from_nom] ErrorKind),
 }
 
 impl<'a> ReadablePDUWithThreeInputs<'a, bool, bool, bool, LocatedUnknownAttributeParsingError<'a>>
@@ -1571,69 +908,11 @@ impl<'a> ReadablePDUWithThreeInputs<'a, bool, bool, bool, LocatedUnknownAttribut
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum CommunitiesParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedCommunitiesParsingError<'a> {
-    span: Span<'a>,
-    error: CommunitiesParsingError,
-}
-
-impl<'a> LocatedCommunitiesParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: CommunitiesParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedCommunitiesParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = CommunitiesParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedPathAttributeParsingError<'a>>
-    for LocatedCommunitiesParsingError<'a>
-{
-    fn into_located(self) -> LocatedPathAttributeParsingError<'a> {
-        LocatedPathAttributeParsingError::new(
-            self.span,
-            PathAttributeParsingError::CommunitiesError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, CommunitiesParsingError>
-    for LocatedCommunitiesParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: CommunitiesParsingError,
-    ) -> Self {
-        LocatedCommunitiesParsingError::new(input, error)
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedCommunitiesParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedCommunitiesParsingError::new(input, CommunitiesParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
+    NomError(#[from_nom] ErrorKind),
 }
 
 impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedCommunitiesParsingError<'a>> for Communities {
@@ -1655,108 +934,5 @@ impl<'a> ReadablePDU<'a, LocatedCommunitiesParsingError<'a>> for Community {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedCommunitiesParsingError<'a>> {
         let (buf, value) = be_u32(buf)?;
         Ok((buf, Community::new(value)))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use netgauze_parse_utils::Span;
-    use nom::error::ErrorKind;
-
-    #[test]
-    fn test_located_path_attribute_parsing_error() {
-        let span = Span::new(&[1, 1, 3]);
-        let error = PathAttributeParsingError::NomError(ErrorKind::Eof);
-
-        let located = LocatedPathAttributeParsingError::new(span, error.clone());
-
-        assert_eq!(located.span().location_offset(), span.location_offset());
-        assert_eq!(located.span().fragment(), span.fragment());
-        assert_eq!(located.error(), &error);
-    }
-
-    #[test]
-    fn test_located_origin_parsing_error() {
-        let span = Span::new(&[1, 1, 3]);
-        let error = OriginParsingError::NomError(ErrorKind::Eof);
-
-        let located = LocatedOriginParsingError::new(span, error.clone());
-
-        assert_eq!(located.span().location_offset(), span.location_offset());
-        assert_eq!(located.span().fragment(), span.fragment());
-        assert_eq!(located.error(), &error);
-    }
-
-    #[test]
-    fn test_located_as_path_parsing_error() {
-        let span = Span::new(&[1, 1, 3]);
-        let error = AsPathParsingError::NomError(ErrorKind::Eof);
-
-        let located = LocatedAsPathParsingError::new(span, error.clone());
-
-        assert_eq!(located.span().location_offset(), span.location_offset());
-        assert_eq!(located.span().fragment(), span.fragment());
-        assert_eq!(located.error(), &error);
-    }
-
-    #[test]
-    fn test_located_next_hop_parsing_error() {
-        let span = Span::new(&[1, 1, 3]);
-        let error = NextHopParsingError::NomError(ErrorKind::Eof);
-
-        let located = LocatedNextHopParsingError::new(span, error.clone());
-
-        assert_eq!(located.span().location_offset(), span.location_offset());
-        assert_eq!(located.span().fragment(), span.fragment());
-        assert_eq!(located.error(), &error);
-    }
-
-    #[test]
-    fn test_located_med_parsing_error() {
-        let span = Span::new(&[1, 1, 3]);
-        let error = MultiExitDiscriminatorParsingError::NomError(ErrorKind::Eof);
-
-        let located = LocatedMultiExitDiscriminatorParsingError::new(span, error.clone());
-
-        assert_eq!(located.span().location_offset(), span.location_offset());
-        assert_eq!(located.span().fragment(), span.fragment());
-        assert_eq!(located.error(), &error);
-    }
-
-    #[test]
-    fn test_located_atomic_aggregate_parsing_error() {
-        let span = Span::new(&[1, 1, 3]);
-        let error = AtomicAggregateParsingError::NomError(ErrorKind::Eof);
-
-        let located = LocatedAtomicAggregateParsingError::new(span, error.clone());
-
-        assert_eq!(located.span().location_offset(), span.location_offset());
-        assert_eq!(located.span().fragment(), span.fragment());
-        assert_eq!(located.error(), &error);
-    }
-
-    #[test]
-    fn test_located_aggregate_parsing_error() {
-        let span = Span::new(&[1, 1, 3]);
-        let error = AggregatorParsingError::NomError(ErrorKind::Eof);
-
-        let located = LocatedAggregatorParsingError::new(span, error.clone());
-
-        assert_eq!(located.span().location_offset(), span.location_offset());
-        assert_eq!(located.span().fragment(), span.fragment());
-        assert_eq!(located.error(), &error);
-    }
-
-    #[test]
-    fn test_located_unknown_attr_parsing_error() {
-        let span = Span::new(&[1, 1, 3]);
-        let error = UnknownAttributeParsingError::NomError(ErrorKind::Eof);
-
-        let located = LocatedUnknownAttributeParsingError::new(span, error.clone());
-
-        assert_eq!(located.span().location_offset(), span.location_offset());
-        assert_eq!(located.span().fragment(), span.fragment());
-        assert_eq!(located.error(), &error);
     }
 }

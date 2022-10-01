@@ -16,175 +16,39 @@
 use crate::{
     iana::{BGPOpenMessageParameterType, UndefinedBGPOpenMessageParameterType},
     open::BGPOpenMessageParameter,
-    serde::deserializer::{
-        capabilities::BGPCapabilityParsingError, BGPMessageParsingError,
-        LocatedBGPMessageParsingError,
-    },
+    serde::deserializer::capabilities::BGPCapabilityParsingError,
     BGPOpenMessage,
 };
-use netgauze_parse_utils::{
-    parse_till_empty_into_located, IntoLocatedError, LocatedParsingError, ReadablePDU, Span,
-};
+use netgauze_parse_utils::{parse_till_empty_into_located, ReadablePDU, Span};
+use netgauze_serde_macros::LocatedError;
 use nom::{
-    error::{ErrorKind, FromExternalError},
+    error::ErrorKind,
     number::complete::{be_u16, be_u32, be_u8},
     IResult,
 };
 use std::net::Ipv4Addr;
 
 /// BGP Open Message Parsing errors
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPOpenMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     UnsupportedVersionNumber(u8),
-    ParameterError(BGPParameterParsingError),
-}
-
-/// BGP Open Message Parsing errors  with the input location of where it
-/// occurred in the input byte stream being parsed
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedBGPOpenMessageParsingError<'a> {
-    span: Span<'a>,
-    error: BGPOpenMessageParsingError,
-}
-
-impl<'a> LocatedBGPOpenMessageParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: BGPOpenMessageParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedBGPOpenMessageParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = BGPOpenMessageParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPMessageParsingError<'a>>
-    for LocatedBGPOpenMessageParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPMessageParsingError<'a> {
-        LocatedBGPMessageParsingError::new(
-            self.span,
-            BGPMessageParsingError::BGPOpenMessageParsingError(self.error),
-        )
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedBGPOpenMessageParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedBGPOpenMessageParsingError::new(input, BGPOpenMessageParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, BGPOpenMessageParsingError>
-    for LocatedBGPOpenMessageParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: BGPOpenMessageParsingError,
-    ) -> Self {
-        LocatedBGPOpenMessageParsingError::new(input, error)
-    }
+    ParameterError(#[from_located(module = "self")] BGPParameterParsingError),
 }
 
 /// BGP Open Message Parsing errors
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPParameterParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    UndefinedParameterType(UndefinedBGPOpenMessageParameterType),
-    CapabilityError(BGPCapabilityParsingError),
-}
-
-/// BGP Open Parameter Message Parsing errors  with the input location of where
-/// it occurred in the input byte stream being parsed
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedBGPParameterParsingError<'a> {
-    span: Span<'a>,
-    error: BGPParameterParsingError,
-}
-
-impl<'a> LocatedBGPParameterParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: BGPParameterParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedBGPParameterParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = BGPParameterParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPOpenMessageParsingError<'a>>
-    for LocatedBGPParameterParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPOpenMessageParsingError<'a> {
-        LocatedBGPOpenMessageParsingError::new(
-            self.span,
-            BGPOpenMessageParsingError::ParameterError(self.error),
-        )
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedBGPParameterParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedBGPParameterParsingError::new(input, BGPParameterParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, BGPParameterParsingError>
-    for LocatedBGPParameterParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: BGPParameterParsingError,
-    ) -> Self {
-        LocatedBGPParameterParsingError::new(input, error)
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedBGPOpenMessageParameterType>
-    for LocatedBGPParameterParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedBGPOpenMessageParameterType,
-    ) -> Self {
-        LocatedBGPParameterParsingError::new(
-            input,
-            BGPParameterParsingError::UndefinedParameterType(error),
-        )
-    }
+    NomError(#[from_nom] ErrorKind),
+    UndefinedParameterType(#[from_external] UndefinedBGPOpenMessageParameterType),
+    CapabilityError(
+        #[from_located(module = "crate::serde::deserializer::capabilities")]
+        BGPCapabilityParsingError,
+    ),
 }
 
 impl<'a> ReadablePDU<'a, LocatedBGPOpenMessageParsingError<'a>> for BGPOpenMessage {

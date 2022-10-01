@@ -16,96 +16,33 @@
 //! Deserializer for BGP Update message
 
 use crate::{
-    serde::deserializer::{
-        ipv4_network_from_wire, path_attribute::PathAttributeParsingError, BGPMessageParsingError,
-        Ipv4PrefixParsingError, LocatedBGPMessageParsingError,
-    },
+    serde::deserializer::{path_attribute::PathAttributeParsingError, Ipv4PrefixParsingError},
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
     BGPUpdateMessage,
 };
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
-    parse_till_empty_into_located, parse_till_empty_into_with_one_input_located, IntoLocatedError,
-    LocatedParsingError, ReadablePDU, ReadablePDUWithOneInput, Span,
+    parse_into_located, parse_till_empty_into_located,
+    parse_till_empty_into_with_one_input_located, ReadablePDU, ReadablePDUWithOneInput, Span,
 };
-use nom::{
-    error::{ErrorKind, FromExternalError},
-    number::complete::be_u16,
-    IResult,
-};
+use nom::{error::ErrorKind, number::complete::be_u16, IResult};
+
+use netgauze_serde_macros::LocatedError;
 
 /// BGP Open Message Parsing errors
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPUpdateMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    WithdrawRouteError(WithdrawRouteParsingError),
-    PathAttributeError(PathAttributeParsingError),
-    NetworkLayerReachabilityInformationError(NetworkLayerReachabilityInformationParsingError),
-}
-
-/// BGP Open Message Parsing errors  with the input location of where it
-/// occurred in the input byte stream being parsed
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedBGPUpdateMessageParsingError<'a> {
-    span: Span<'a>,
-    error: BGPUpdateMessageParsingError,
-}
-
-impl<'a> LocatedBGPUpdateMessageParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: BGPUpdateMessageParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedBGPUpdateMessageParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = BGPUpdateMessageParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPMessageParsingError<'a>>
-    for LocatedBGPUpdateMessageParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPMessageParsingError<'a> {
-        LocatedBGPMessageParsingError::new(
-            self.span,
-            BGPMessageParsingError::BGPUpdateMessageParsingError(self.error),
-        )
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedBGPUpdateMessageParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedBGPUpdateMessageParsingError::new(
-            input,
-            BGPUpdateMessageParsingError::NomError(kind),
-        )
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, BGPUpdateMessageParsingError>
-    for LocatedBGPUpdateMessageParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: BGPUpdateMessageParsingError,
-    ) -> Self {
-        LocatedBGPUpdateMessageParsingError::new(input, error)
-    }
+    NomError(#[from_nom] ErrorKind),
+    WithdrawRouteError(#[from_located(module = "self")] WithdrawRouteParsingError),
+    PathAttributeError(
+        #[from_located(module = "crate::serde::deserializer::path_attribute")]
+        PathAttributeParsingError,
+    ),
+    NetworkLayerReachabilityInformationError(
+        #[from_located(module = "self")] NetworkLayerReachabilityInformationParsingError,
+    ),
 }
 
 /// Helper function to parse the withdraw routes buffer in an update message
@@ -137,150 +74,37 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPUpdateMessageParsingError<'
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum WithdrawRouteParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    Ipv4PrefixParsingError(Ipv4PrefixParsingError),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedWithdrawRouteParsingError<'a> {
-    span: Span<'a>,
-    error: WithdrawRouteParsingError,
-}
-
-impl<'a> LocatedWithdrawRouteParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: WithdrawRouteParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedWithdrawRouteParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = WithdrawRouteParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPUpdateMessageParsingError<'a>>
-    for LocatedWithdrawRouteParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
-        LocatedBGPUpdateMessageParsingError::new(
-            self.span,
-            BGPUpdateMessageParsingError::WithdrawRouteError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, WithdrawRouteParsingError>
-    for LocatedWithdrawRouteParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: WithdrawRouteParsingError,
-    ) -> Self {
-        LocatedWithdrawRouteParsingError::new(input, error)
-    }
+    NomError(#[from_nom] ErrorKind),
+    Ipv4PrefixParsingError(
+        #[from_located(module = "crate::serde::deserializer")] Ipv4PrefixParsingError,
+    ),
 }
 
 impl<'a> ReadablePDU<'a, LocatedWithdrawRouteParsingError<'a>> for WithdrawRoute {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedWithdrawRouteParsingError<'a>> {
-        let (buf, net) = match ipv4_network_from_wire(buf) {
-            Ok((buf, net)) => (buf, net),
-            Err(err) => {
-                return match err {
-                    nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                    nom::Err::Error(error) => Err(nom::Err::Error(error.into_located())),
-                    nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into_located())),
-                }
-            }
-        };
+        let (buf, net) = parse_into_located(buf)?;
         Ok((buf, WithdrawRoute::new(net)))
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum NetworkLayerReachabilityInformationParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    Ipv4PrefixParsingError(Ipv4PrefixParsingError),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedNetworkLayerReachabilityInformationParsingError<'a> {
-    span: Span<'a>,
-    error: NetworkLayerReachabilityInformationParsingError,
-}
-
-impl<'a> LocatedNetworkLayerReachabilityInformationParsingError<'a> {
-    pub const fn new(
-        span: Span<'a>,
-        error: NetworkLayerReachabilityInformationParsingError,
-    ) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedNetworkLayerReachabilityInformationParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = NetworkLayerReachabilityInformationParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPUpdateMessageParsingError<'a>>
-    for LocatedNetworkLayerReachabilityInformationParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPUpdateMessageParsingError<'a> {
-        LocatedBGPUpdateMessageParsingError::new(
-            self.span,
-            BGPUpdateMessageParsingError::NetworkLayerReachabilityInformationError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, NetworkLayerReachabilityInformationParsingError>
-    for LocatedNetworkLayerReachabilityInformationParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: NetworkLayerReachabilityInformationParsingError,
-    ) -> Self {
-        LocatedNetworkLayerReachabilityInformationParsingError::new(input, error)
-    }
+    NomError(#[from_nom] ErrorKind),
+    Ipv4PrefixParsingError(
+        #[from_located(module = "crate::serde::deserializer")] Ipv4PrefixParsingError,
+    ),
 }
 
 fn parse_nlri_ipv4(
     buf: Span<'_>,
 ) -> IResult<Span<'_>, Ipv4Net, LocatedNetworkLayerReachabilityInformationParsingError<'_>> {
-    let (buf, net) = match ipv4_network_from_wire(buf) {
-        Ok((buf, net)) => (buf, net),
-        Err(err) => {
-            return match err {
-                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-                nom::Err::Error(error) => Err(nom::Err::Error(error.into_located())),
-                nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into_located())),
-            }
-        }
-    };
+    let (buf, net) = parse_into_located(buf)?;
     Ok((buf, net))
 }
 

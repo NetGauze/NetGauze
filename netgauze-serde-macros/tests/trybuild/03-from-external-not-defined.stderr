@@ -1,0 +1,12 @@
+error[E0277]: the trait bound `LocatedTestError<'_>: FromExternalError<netgauze_locate::BinarySpan<&[u8]>, AError>` is not satisfied
+   --> tests/trybuild/03-from-external-not-defined.rs:26:22
+    |
+26  |     let (buf, ret) = nom::combinator::map_res(be_u8, |_| Err(AError::A))(buf)?;
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^ the trait `FromExternalError<netgauze_locate::BinarySpan<&[u8]>, AError>` is not implemented for `LocatedTestError<'_>`
+    |
+    = help: the trait `FromExternalError<netgauze_locate::BinarySpan<&'a [u8]>, TestError>` is implemented for `LocatedTestError<'a>`
+note: required by a bound in `map_res`
+   --> $CARGO/nom-7.1.1/src/combinator/mod.rs
+    |
+    | pub fn map_res<I: Clone, O1, O2, E: FromExternalError<I, E2>, E2, F, G>(
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `map_res`

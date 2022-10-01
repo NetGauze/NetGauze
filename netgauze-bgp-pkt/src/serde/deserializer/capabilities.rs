@@ -23,110 +23,38 @@ use crate::{
         MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
     },
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
-    serde::deserializer::open::{BGPParameterParsingError, LocatedBGPParameterParsingError},
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
-use netgauze_parse_utils::{
-    parse_into_located, parse_till_empty, IntoLocatedError, LocatedParsingError, ReadablePDU, Span,
-};
+use netgauze_parse_utils::{parse_into_located, parse_till_empty, ReadablePDU, Span};
 use nom::{
     error::{ErrorKind, FromExternalError, ParseError},
     number::complete::{be_u16, be_u32, be_u8},
     IResult,
 };
 
+use netgauze_serde_macros::LocatedError;
+
 /// BGP Capability Parsing errors
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    UndefinedCapabilityCode(UndefinedBGPCapabilityCode),
+    NomError(#[from_nom] ErrorKind),
+    UndefinedCapabilityCode(#[from_external] UndefinedBGPCapabilityCode),
     InvalidRouteRefreshLength(u8),
     InvalidEnhancedRouteRefreshLength(u8),
     InvalidExtendedMessageLength(u8),
-    FourOctetASCapabilityError(FourOctetASCapabilityParsingError),
-    MultiProtocolExtensionsCapabilityError(MultiProtocolExtensionsCapabilityParsingError),
-    AddPathCapabilityError(AddPathCapabilityParsingError),
-    ExtendedNextHopEncodingCapabilityError(ExtendedNextHopEncodingCapabilityParsingError),
-}
-
-/// BGP Open Message Parsing errors  with the input location of where it
-/// occurred in the input byte stream being parsed
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedBGPCapabilityParsingError<'a> {
-    span: Span<'a>,
-    error: BGPCapabilityParsingError,
-}
-
-impl<'a> LocatedBGPCapabilityParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: BGPCapabilityParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedBGPCapabilityParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = BGPCapabilityParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPParameterParsingError<'a>>
-    for LocatedBGPCapabilityParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPParameterParsingError<'a> {
-        LocatedBGPParameterParsingError::new(
-            self.span,
-            BGPParameterParsingError::CapabilityError(self.error),
-        )
-    }
-}
-
-impl<'a> ParseError<Span<'a>> for LocatedBGPCapabilityParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedBGPCapabilityParsingError::new(input, BGPCapabilityParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, BGPCapabilityParsingError>
-    for LocatedBGPCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: BGPCapabilityParsingError,
-    ) -> Self {
-        LocatedBGPCapabilityParsingError::new(input, error)
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedBGPCapabilityCode>
-    for LocatedBGPCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedBGPCapabilityCode,
-    ) -> Self {
-        LocatedBGPCapabilityParsingError::new(
-            input,
-            BGPCapabilityParsingError::UndefinedCapabilityCode(error),
-        )
-    }
+    FourOctetASCapabilityError(#[from_located(module = "self")] FourOctetASCapabilityParsingError),
+    MultiProtocolExtensionsCapabilityError(
+        #[from_located(module = "self")] MultiProtocolExtensionsCapabilityParsingError,
+    ),
+    AddPathCapabilityError(#[from_located(module = "self")] AddPathCapabilityParsingError),
+    ExtendedNextHopEncodingCapabilityError(
+        #[from_located(module = "self")] ExtendedNextHopEncodingCapabilityParsingError,
+    ),
 }
 
 fn parse_experimental_capability(
@@ -308,73 +236,12 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum FourOctetASCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidLength(u8),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedFourOctetASCapabilityParsingError<'a> {
-    span: Span<'a>,
-    error: FourOctetASCapabilityParsingError,
-}
-
-impl<'a> LocatedFourOctetASCapabilityParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: FourOctetASCapabilityParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedFourOctetASCapabilityParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = FourOctetASCapabilityParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPCapabilityParsingError<'a>>
-    for LocatedFourOctetASCapabilityParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPCapabilityParsingError<'a> {
-        LocatedBGPCapabilityParsingError::new(
-            self.span,
-            BGPCapabilityParsingError::FourOctetASCapabilityError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, FourOctetASCapabilityParsingError>
-    for LocatedFourOctetASCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: FourOctetASCapabilityParsingError,
-    ) -> Self {
-        LocatedFourOctetASCapabilityParsingError::new(input, error)
-    }
-}
-
-impl<'a> ParseError<Span<'a>> for LocatedFourOctetASCapabilityParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedFourOctetASCapabilityParsingError::new(
-            input,
-            FourOctetASCapabilityParsingError::NomError(kind),
-        )
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
 }
 
 impl<'a> ReadablePDU<'a, LocatedFourOctetASCapabilityParsingError<'a>> for FourOctetASCapability {
@@ -389,106 +256,15 @@ impl<'a> ReadablePDU<'a, LocatedFourOctetASCapabilityParsingError<'a>> for FourO
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum MultiProtocolExtensionsCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidLength(u8),
-    AddressFamilyError(UndefinedAddressFamily),
-    SubsequentAddressFamilyError(UndefinedSubsequentAddressFamily),
+    AddressFamilyError(#[from_external] UndefinedAddressFamily),
+    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
     AddressTypeError(InvalidAddressType),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedMultiProtocolExtensionsCapabilityParsingError<'a> {
-    span: Span<'a>,
-    error: MultiProtocolExtensionsCapabilityParsingError,
-}
-
-impl<'a> LocatedMultiProtocolExtensionsCapabilityParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: MultiProtocolExtensionsCapabilityParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedMultiProtocolExtensionsCapabilityParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = MultiProtocolExtensionsCapabilityParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPCapabilityParsingError<'a>>
-    for LocatedMultiProtocolExtensionsCapabilityParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPCapabilityParsingError<'a> {
-        LocatedBGPCapabilityParsingError::new(
-            self.span,
-            BGPCapabilityParsingError::MultiProtocolExtensionsCapabilityError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, MultiProtocolExtensionsCapabilityParsingError>
-    for LocatedMultiProtocolExtensionsCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: MultiProtocolExtensionsCapabilityParsingError,
-    ) -> Self {
-        LocatedMultiProtocolExtensionsCapabilityParsingError::new(input, error)
-    }
-}
-
-impl<'a> ParseError<Span<'a>> for LocatedMultiProtocolExtensionsCapabilityParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedMultiProtocolExtensionsCapabilityParsingError::new(
-            input,
-            MultiProtocolExtensionsCapabilityParsingError::NomError(kind),
-        )
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily>
-    for LocatedMultiProtocolExtensionsCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedAddressFamily,
-    ) -> Self {
-        LocatedMultiProtocolExtensionsCapabilityParsingError::new(
-            input,
-            MultiProtocolExtensionsCapabilityParsingError::AddressFamilyError(error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
-    for LocatedMultiProtocolExtensionsCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedSubsequentAddressFamily,
-    ) -> Self {
-        LocatedMultiProtocolExtensionsCapabilityParsingError::new(
-            input,
-            MultiProtocolExtensionsCapabilityParsingError::SubsequentAddressFamilyError(error),
-        )
-    }
 }
 
 impl<'a> ReadablePDU<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a>>
@@ -520,106 +296,15 @@ impl<'a> ReadablePDU<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum AddPathCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    AddressFamilyError(UndefinedAddressFamily),
-    SubsequentAddressFamilyError(UndefinedSubsequentAddressFamily),
+    NomError(#[from_nom] ErrorKind),
+    AddressFamilyError(#[from_external] UndefinedAddressFamily),
+    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
     AddressTypeError(InvalidAddressType),
     InvalidAddPathSendReceiveValue(u8),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedAddPathCapabilityParsingError<'a> {
-    span: Span<'a>,
-    error: AddPathCapabilityParsingError,
-}
-
-impl<'a> LocatedAddPathCapabilityParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: AddPathCapabilityParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedAddPathCapabilityParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = AddPathCapabilityParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPCapabilityParsingError<'a>>
-    for LocatedAddPathCapabilityParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPCapabilityParsingError<'a> {
-        LocatedBGPCapabilityParsingError::new(
-            self.span,
-            BGPCapabilityParsingError::AddPathCapabilityError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, AddPathCapabilityParsingError>
-    for LocatedAddPathCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: AddPathCapabilityParsingError,
-    ) -> Self {
-        LocatedAddPathCapabilityParsingError::new(input, error)
-    }
-}
-
-impl<'a> ParseError<Span<'a>> for LocatedAddPathCapabilityParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedAddPathCapabilityParsingError::new(
-            input,
-            AddPathCapabilityParsingError::NomError(kind),
-        )
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily>
-    for LocatedAddPathCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedAddressFamily,
-    ) -> Self {
-        LocatedAddPathCapabilityParsingError::new(
-            input,
-            AddPathCapabilityParsingError::AddressFamilyError(error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
-    for LocatedAddPathCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedSubsequentAddressFamily,
-    ) -> Self {
-        LocatedAddPathCapabilityParsingError::new(
-            input,
-            AddPathCapabilityParsingError::SubsequentAddressFamilyError(error),
-        )
-    }
 }
 
 impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathCapability {
@@ -669,105 +354,14 @@ impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>>
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedNextHopEncodingCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
-    AddressFamilyError(UndefinedAddressFamily),
-    SubsequentAddressFamilyError(UndefinedSubsequentAddressFamily),
+    NomError(#[from_nom] ErrorKind),
+    AddressFamilyError(#[from_external] UndefinedAddressFamily),
+    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
     AddressTypeError(InvalidAddressType),
-}
-
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedExtendedNextHopEncodingCapabilityParsingError<'a> {
-    span: Span<'a>,
-    error: ExtendedNextHopEncodingCapabilityParsingError,
-}
-
-impl<'a> LocatedExtendedNextHopEncodingCapabilityParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: ExtendedNextHopEncodingCapabilityParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedExtendedNextHopEncodingCapabilityParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = ExtendedNextHopEncodingCapabilityParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedBGPCapabilityParsingError<'a>>
-    for LocatedExtendedNextHopEncodingCapabilityParsingError<'a>
-{
-    fn into_located(self) -> LocatedBGPCapabilityParsingError<'a> {
-        LocatedBGPCapabilityParsingError::new(
-            self.span,
-            BGPCapabilityParsingError::ExtendedNextHopEncodingCapabilityError(self.error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, ExtendedNextHopEncodingCapabilityParsingError>
-    for LocatedExtendedNextHopEncodingCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: ExtendedNextHopEncodingCapabilityParsingError,
-    ) -> Self {
-        LocatedExtendedNextHopEncodingCapabilityParsingError::new(input, error)
-    }
-}
-
-impl<'a> ParseError<Span<'a>> for LocatedExtendedNextHopEncodingCapabilityParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedExtendedNextHopEncodingCapabilityParsingError::new(
-            input,
-            ExtendedNextHopEncodingCapabilityParsingError::NomError(kind),
-        )
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedAddressFamily>
-    for LocatedExtendedNextHopEncodingCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedAddressFamily,
-    ) -> Self {
-        LocatedExtendedNextHopEncodingCapabilityParsingError::new(
-            input,
-            ExtendedNextHopEncodingCapabilityParsingError::AddressFamilyError(error),
-        )
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedSubsequentAddressFamily>
-    for LocatedExtendedNextHopEncodingCapabilityParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedSubsequentAddressFamily,
-    ) -> Self {
-        LocatedExtendedNextHopEncodingCapabilityParsingError::new(
-            input,
-            ExtendedNextHopEncodingCapabilityParsingError::SubsequentAddressFamilyError(error),
-        )
-    }
 }
 
 impl<'a> ReadablePDU<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>

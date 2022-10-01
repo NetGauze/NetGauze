@@ -13,6 +13,7 @@ BGP-4 Protocol representation and serde.
 netgauze-iana = { path = "../netgauze-iana" }
 netgauze-locate = { path = "../netgauze-locate", optional = true }
 netgauze-parse-utils = { path = "../netgauze-parse-utils", optional = true }
+netgauze-serde-macros = { path = "../netgauze-serde-macros", optional = true }
 ipnet = "2.5"
 strum = "0.24"
 strum_macros = "0.24"
@@ -22,7 +23,7 @@ criterion = { version = "0.4", optional = true } # Dev dep for bench
 
 [features]
 default = ["serde"]
-serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils"]
+serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
 bench = ["criterion"]
 
 

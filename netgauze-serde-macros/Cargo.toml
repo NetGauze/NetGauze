@@ -1,0 +1,24 @@
+[package]
+name = "netgauze-serde-macros"
+version = "0.0.1"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+
+[lib]
+proc-macro = true
+
+[[test]]
+name = "tests"
+path = "tests/tests.rs"
+
+[dependencies]
+syn = { version = "1", features = ["full", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+
+[dev-dependencies]
+trybuild = { version = "1", features = ["diff"] }
+netgauze-parse-utils = {path = "../netgauze-parse-utils"}
+netgauze-locate = { path = "../netgauze-locate" }
+nom = { version = "7", default-features = false }

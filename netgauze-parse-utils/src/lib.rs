@@ -109,27 +109,16 @@ pub trait LocatedParsingError {
     fn error(&self) -> &Self::Error;
 }
 
-/// Helper trait to convert from one LocatedParsingError to another.
-/// Often used to propagate the error back to the upper PDU.
-pub trait IntoLocatedError<T: LocatedParsingError> {
-    fn into_located(self) -> T;
-}
-
 #[inline]
-pub fn parse_into_located<
-    'a,
-    Lin: IntoLocatedError<L> + Debug,
-    L: LocatedParsingError,
-    T: ReadablePDU<'a, Lin>,
->(
+pub fn parse_into_located<'a, Lin: Debug, L: From<Lin>, T: ReadablePDU<'a, Lin>>(
     buf: Span<'a>,
 ) -> IResult<Span<'a>, T, L> {
     match T::from_wire(buf) {
         Ok((buf, value)) => Ok((buf, value)),
         Err(err) => match err {
             nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-            nom::Err::Error(error) => Err(nom::Err::Error(error.into_located())),
-            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into_located())),
+            nom::Err::Error(error) => Err(nom::Err::Error(error.into())),
+            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into())),
         },
     }
 }
@@ -138,8 +127,8 @@ pub fn parse_into_located<
 pub fn parse_into_located_one_input<
     'a,
     I,
-    Lin: IntoLocatedError<L>,
-    L: LocatedParsingError,
+    Lin: Debug,
+    L: From<Lin>,
     T: ReadablePDUWithOneInput<'a, I, Lin>,
 >(
     buf: Span<'a>,
@@ -149,8 +138,8 @@ pub fn parse_into_located_one_input<
         Ok((buf, value)) => Ok((buf, value)),
         Err(err) => match err {
             nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-            nom::Err::Error(error) => Err(nom::Err::Error(error.into_located())),
-            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into_located())),
+            nom::Err::Error(error) => Err(nom::Err::Error(error.into())),
+            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into())),
         },
     }
 }
@@ -160,9 +149,9 @@ pub fn parse_into_located_two_inputs<
     'a,
     I1,
     I2,
-    L: LocatedParsingError,
-    E: IntoLocatedError<L>,
-    T: ReadablePDUWithTwoInputs<'a, I1, I2, E>,
+    Lin: Debug,
+    L: From<Lin>,
+    T: ReadablePDUWithTwoInputs<'a, I1, I2, Lin>,
 >(
     buf: Span<'a>,
     input1: I1,
@@ -172,8 +161,8 @@ pub fn parse_into_located_two_inputs<
         Ok((buf, value)) => Ok((buf, value)),
         Err(err) => match err {
             nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-            nom::Err::Error(error) => Err(nom::Err::Error(error.into_located())),
-            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into_located())),
+            nom::Err::Error(error) => Err(nom::Err::Error(error.into())),
+            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into())),
         },
     }
 }
@@ -184,9 +173,9 @@ pub fn parse_into_located_three_inputs<
     I1,
     I2,
     I3,
-    L: LocatedParsingError,
-    E: IntoLocatedError<L>,
-    T: ReadablePDUWithThreeInputs<'a, I1, I2, I3, E>,
+    Lin: Debug,
+    L: From<Lin>,
+    T: ReadablePDUWithThreeInputs<'a, I1, I2, I3, Lin>,
 >(
     buf: Span<'a>,
     input1: I1,
@@ -197,8 +186,8 @@ pub fn parse_into_located_three_inputs<
         Ok((buf, value)) => Ok((buf, value)),
         Err(err) => match err {
             nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
-            nom::Err::Error(error) => Err(nom::Err::Error(error.into_located())),
-            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into_located())),
+            nom::Err::Error(error) => Err(nom::Err::Error(error.into())),
+            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into())),
         },
     }
 }
@@ -220,12 +209,7 @@ pub fn parse_till_empty<'a, T: ReadablePDU<'a, E>, E: Debug>(
 
 /// Keep repeating the parser till the buf is empty
 #[inline]
-pub fn parse_till_empty_into_located<
-    'a,
-    Lin: IntoLocatedError<L> + Debug,
-    L: LocatedParsingError,
-    T: ReadablePDU<'a, Lin>,
->(
+pub fn parse_till_empty_into_located<'a, Lin: Debug, L: From<Lin>, T: ReadablePDU<'a, Lin>>(
     //'a, T: ReadablePDU<'a, E>, E: Debug + Clone + Eq + PartialEq>(
     buf: Span<'a>,
 ) -> IResult<Span<'a>, Vec<T>, L> {
@@ -265,8 +249,8 @@ pub fn parse_till_empty_with_one_input<
 pub fn parse_till_empty_into_with_one_input_located<
     'a,
     I: Copy,
-    Lin: IntoLocatedError<L>,
-    L: LocatedParsingError,
+    Lin: Debug,
+    L: From<Lin>,
     T: ReadablePDUWithOneInput<'a, I, Lin>,
 >(
     buf: Span<'a>,

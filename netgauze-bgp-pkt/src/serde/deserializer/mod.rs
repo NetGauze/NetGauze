@@ -27,30 +27,24 @@ use ipnet::{Ipv4Net, Ipv6Net};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use nom::{
-    error::{ErrorKind, FromExternalError},
+    error::ErrorKind,
     number::complete::{be_u128, be_u16, be_u8},
     IResult,
 };
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, IntoLocatedError, LocatedParsingError,
-    ReadablePDUWithOneInput, Span,
+    parse_into_located, parse_into_located_one_input, ReadablePDU, ReadablePDUWithOneInput, Span,
 };
 
 use crate::{
     iana::{BGPMessageType, UndefinedBgpMessageType},
     serde::deserializer::{
-        notification::BGPNotificationMessageParsingError,
-        open::BGPOpenMessageParsingError,
-        route_refresh::BGPRouteRefreshMessageParsingError,
-        update::{
-            BGPUpdateMessageParsingError, LocatedNetworkLayerReachabilityInformationParsingError,
-            LocatedWithdrawRouteParsingError, NetworkLayerReachabilityInformationParsingError,
-            WithdrawRouteParsingError,
-        },
+        notification::BGPNotificationMessageParsingError, open::BGPOpenMessageParsingError,
+        route_refresh::BGPRouteRefreshMessageParsingError, update::BGPUpdateMessageParsingError,
     },
     BGPMessage,
 };
+use netgauze_serde_macros::LocatedError;
 
 /// Min message size in BGP is 19 octets. They're counted from
 /// 16-octets synchronization header, 2-octets length, and 1 octet for type.
@@ -62,68 +56,17 @@ pub const BGP_MIN_MESSAGE_LENGTH: u16 = 19;
 /// [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654)
 pub const BGP_MAX_MESSAGE_LENGTH: u16 = 4096;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv4PrefixParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidIpv4PrefixLen(u8),
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedIpv4PrefixParsingError<'a> {
-    span: Span<'a>,
-    error: Ipv4PrefixParsingError,
-}
-
-impl<'a> LocatedIpv4PrefixParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: Ipv4PrefixParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedIpv4PrefixParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = Ipv4PrefixParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedWithdrawRouteParsingError<'a>>
-    for LocatedIpv4PrefixParsingError<'a>
-{
-    fn into_located(self) -> LocatedWithdrawRouteParsingError<'a> {
-        LocatedWithdrawRouteParsingError::new(
-            self.span,
-            WithdrawRouteParsingError::Ipv4PrefixParsingError(self.error),
-        )
-    }
-}
-
-impl<'a> IntoLocatedError<LocatedNetworkLayerReachabilityInformationParsingError<'a>>
-    for LocatedIpv4PrefixParsingError<'a>
-{
-    fn into_located(self) -> LocatedNetworkLayerReachabilityInformationParsingError<'a> {
-        LocatedNetworkLayerReachabilityInformationParsingError::new(
-            self.span,
-            NetworkLayerReachabilityInformationParsingError::Ipv4PrefixParsingError(self.error),
-        )
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedIpv4PrefixParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedIpv4PrefixParsingError::new(input, Ipv4PrefixParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
+impl<'a> ReadablePDU<'a, LocatedIpv4PrefixParsingError<'a>> for Ipv4Net {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4PrefixParsingError<'a>> {
+        ipv4_network_from_wire(buf)
     }
 }
 
@@ -156,46 +99,17 @@ pub(crate) fn ipv4_network_from_wire(
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6PrefixParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
     InvalidIpv6PrefixLen(u8),
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedIpv6PrefixParsingError<'a> {
-    span: Span<'a>,
-    error: Ipv6PrefixParsingError,
-}
-
-impl<'a> LocatedIpv6PrefixParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: Ipv6PrefixParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedIpv6PrefixParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = Ipv6PrefixParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedIpv6PrefixParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedIpv6PrefixParsingError::new(input, Ipv6PrefixParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
+impl<'a> ReadablePDU<'a, LocatedIpv6PrefixParsingError<'a>> for Ipv6Net {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv6PrefixParsingError<'a>> {
+        ipv6_network_from_wire(buf)
     }
 }
 
@@ -229,11 +143,11 @@ fn ipv6_network_from_wire(
 }
 
 /// BGP Message Parsing errors
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
-    NomError(ErrorKind),
+    NomError(#[from_nom] ErrorKind),
 
     /// The first 16-bytes of a BGP message is NOT all set to `1`
     /// For simplicity, we carry the equivalent [u128] value that was invalid
@@ -242,81 +156,29 @@ pub enum BGPMessageParsingError {
 
     /// Couldn't recognize the type octet in the BGPMessage, see
     /// [UndefinedBgpMessageType]
-    UndefinedBgpMessageType(UndefinedBgpMessageType),
+    UndefinedBgpMessageType(#[from_external] UndefinedBgpMessageType),
 
     /// BGP Message length is not in the defined \[min, max\] range for the
     /// given message type
     BadMessageLength(u16),
 
-    BGPOpenMessageParsingError(BGPOpenMessageParsingError),
+    BGPOpenMessageParsingError(
+        #[from_located(module = "crate::serde::deserializer::open")] BGPOpenMessageParsingError,
+    ),
 
-    BGPUpdateMessageParsingError(BGPUpdateMessageParsingError),
+    BGPUpdateMessageParsingError(
+        #[from_located(module = "crate::serde::deserializer::update")] BGPUpdateMessageParsingError,
+    ),
 
-    BGPNotificationMessageParsingError(BGPNotificationMessageParsingError),
+    BGPNotificationMessageParsingError(
+        #[from_located(module = "crate::serde::deserializer::notification")]
+        BGPNotificationMessageParsingError,
+    ),
 
-    BGPRouteRefreshMessageParsingError(BGPRouteRefreshMessageParsingError),
-}
-
-/// BGP Message Parsing errors  with the input location of where it occurred in
-/// the input byte stream being parsed
-#[derive(Eq, PartialEq, Clone, Debug)]
-pub struct LocatedBGPMessageParsingError<'a> {
-    span: Span<'a>,
-    error: BGPMessageParsingError,
-}
-
-impl<'a> LocatedBGPMessageParsingError<'a> {
-    pub const fn new(span: Span<'a>, error: BGPMessageParsingError) -> Self {
-        Self { span, error }
-    }
-}
-
-impl<'a> LocatedParsingError for LocatedBGPMessageParsingError<'a> {
-    type Span = Span<'a>;
-    type Error = BGPMessageParsingError;
-
-    fn span(&self) -> &Self::Span {
-        &self.span
-    }
-
-    fn error(&self) -> &Self::Error {
-        &self.error
-    }
-}
-
-impl<'a> nom::error::ParseError<Span<'a>> for LocatedBGPMessageParsingError<'a> {
-    fn from_error_kind(input: Span<'a>, kind: ErrorKind) -> Self {
-        LocatedBGPMessageParsingError::new(input, BGPMessageParsingError::NomError(kind))
-    }
-
-    fn append(_input: Span<'a>, _kind: ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, BGPMessageParsingError> for LocatedBGPMessageParsingError<'a> {
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: BGPMessageParsingError,
-    ) -> Self {
-        LocatedBGPMessageParsingError::new(input, error)
-    }
-}
-
-impl<'a> FromExternalError<Span<'a>, UndefinedBgpMessageType>
-    for LocatedBGPMessageParsingError<'a>
-{
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: UndefinedBgpMessageType,
-    ) -> Self {
-        LocatedBGPMessageParsingError::new(
-            input,
-            BGPMessageParsingError::UndefinedBgpMessageType(error),
-        )
-    }
+    BGPRouteRefreshMessageParsingError(
+        #[from_located(module = "crate::serde::deserializer::route_refresh")]
+        BGPRouteRefreshMessageParsingError,
+    ),
 }
 
 /// Parse [BGPMessage] length and type, then check that the length of a BGP
