@@ -184,6 +184,18 @@ pub enum BmpPeerType {
     LocRibInstancePeer {
         filtered: bool,
     },
+    Experimental251 {
+        flags: u8,
+    },
+    Experimental252 {
+        flags: u8,
+    },
+    Experimental253 {
+        flags: u8,
+    },
+    Experimental254 {
+        flags: u8,
+    },
 }
 
 /// The initiation message provides a means for the monitored router to
@@ -203,6 +215,10 @@ pub struct InitiationMessage {
 impl InitiationMessage {
     pub const fn new(information: Vec<InitiationInformation>) -> Self {
         Self { information }
+    }
+
+    pub const fn information(&self) -> &Vec<InitiationInformation> {
+        &self.information
     }
 }
 

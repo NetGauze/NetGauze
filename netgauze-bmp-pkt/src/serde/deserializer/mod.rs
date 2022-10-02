@@ -173,12 +173,50 @@ impl<'a> ReadablePDU<'a, LocatedInitiationInformationParsingError<'a>> for Initi
                 };
                 Ok((reminder, InitiationInformation::SystemName(str)))
             }
-            InitiationInformationTlvType::VrfTableName => todo!(),
-            InitiationInformationTlvType::AdminLabel => todo!(),
-            InitiationInformationTlvType::Experimental65531 => todo!(),
-            InitiationInformationTlvType::Experimental65532 => todo!(),
-            InitiationInformationTlvType::Experimental65533 => todo!(),
-            InitiationInformationTlvType::Experimental65534 => todo!(),
+            InitiationInformationTlvType::VrfTableName => {
+                let str = match String::from_utf8(buf.to_vec()) {
+                    Ok(str) => str,
+                    Err(err) => {
+                        return Err(nom::Err::Error(
+                            LocatedInitiationInformationParsingError::new(
+                                buf,
+                                InitiationInformationParsingError::FromUtf8Error(err),
+                            ),
+                        ))
+                    }
+                };
+                Ok((reminder, InitiationInformation::VrfTableName(str)))
+            }
+            InitiationInformationTlvType::AdminLabel => {
+                let str = match String::from_utf8(buf.to_vec()) {
+                    Ok(str) => str,
+                    Err(err) => {
+                        return Err(nom::Err::Error(
+                            LocatedInitiationInformationParsingError::new(
+                                buf,
+                                InitiationInformationParsingError::FromUtf8Error(err),
+                            ),
+                        ))
+                    }
+                };
+                Ok((reminder, InitiationInformation::AdminLabel(str)))
+            }
+            InitiationInformationTlvType::Experimental65531 => Ok((
+                reminder,
+                InitiationInformation::Experimental65531(buf.to_vec()),
+            )),
+            InitiationInformationTlvType::Experimental65532 => Ok((
+                reminder,
+                InitiationInformation::Experimental65532(buf.to_vec()),
+            )),
+            InitiationInformationTlvType::Experimental65533 => Ok((
+                reminder,
+                InitiationInformation::Experimental65533(buf.to_vec()),
+            )),
+            InitiationInformationTlvType::Experimental65534 => Ok((
+                reminder,
+                InitiationInformation::Experimental65534(buf.to_vec()),
+            )),
         }
     }
 }
@@ -254,7 +292,6 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
         } else {
             None
         };
-
         let peer_header = match peer_type {
             BmpPeerTypeCode::GlobalInstancePeer => PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -303,10 +340,38 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
                 bgp_id,
                 time,
             ),
-            BmpPeerTypeCode::Experimental251 => todo!(),
-            BmpPeerTypeCode::Experimental252 => todo!(),
-            BmpPeerTypeCode::Experimental253 => todo!(),
-            BmpPeerTypeCode::Experimental254 => todo!(),
+            BmpPeerTypeCode::Experimental251 => PeerHeader::new(
+                BmpPeerType::Experimental251 { flags: peer_flags },
+                distinguisher,
+                address,
+                peer_as,
+                bgp_id,
+                time,
+            ),
+            BmpPeerTypeCode::Experimental252 => PeerHeader::new(
+                BmpPeerType::Experimental252 { flags: peer_flags },
+                distinguisher,
+                address,
+                peer_as,
+                bgp_id,
+                time,
+            ),
+            BmpPeerTypeCode::Experimental253 => PeerHeader::new(
+                BmpPeerType::Experimental253 { flags: peer_flags },
+                distinguisher,
+                address,
+                peer_as,
+                bgp_id,
+                time,
+            ),
+            BmpPeerTypeCode::Experimental254 => PeerHeader::new(
+                BmpPeerType::Experimental254 { flags: peer_flags },
+                distinguisher,
+                address,
+                peer_as,
+                bgp_id,
+                time,
+            ),
         };
         Ok((buf, peer_header))
     }

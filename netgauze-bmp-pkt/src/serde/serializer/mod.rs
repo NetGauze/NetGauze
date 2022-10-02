@@ -17,11 +17,11 @@
 
 use crate::{
     iana::{
-        BmpMessageType, BMP_VERSION, PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2,
-        PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6, PEER_FLAGS_IS_POST_POLICY,
+        BmpMessageType, InitiationInformationTlvType, BMP_VERSION, PEER_FLAGS_IS_ADJ_RIB_OUT,
+        PEER_FLAGS_IS_ASN2, PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6, PEER_FLAGS_IS_POST_POLICY,
     },
-    BmpMessage, BmpPeerType, BmpPeerTypeCode, PeerHeader, RouteMirroringMessage,
-    RouteMirroringValue, RouteMonitoringMessage,
+    BmpMessage, BmpPeerType, BmpPeerTypeCode, InitiationInformation, InitiationMessage, PeerHeader,
+    RouteMirroringMessage, RouteMirroringValue, RouteMonitoringMessage,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::{serde::serializer::BGPMessageWritingError, BGPMessage};
@@ -34,6 +34,7 @@ pub enum BmpMessageWritingError {
     StdIOError(#[from_std_io_error] String),
     RouteMonitoringMessageError(#[from] RouteMonitoringMessageWritingError),
     RouteMirroringMessageError(#[from] RouteMirroringMessageWritingError),
+    InitiationMessageError(#[from] InitiationMessageWritingError),
 }
 
 impl WritablePDU<BmpMessageWritingError> for BmpMessage {
@@ -45,13 +46,13 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
             Self::StatisticsReport => todo!(),
             Self::PeerDownNotification => todo!(),
             Self::PeerUpNotification => todo!(),
-            Self::Initiation(_) => todo!(),
+            Self::Initiation(value) => value.len(),
             Self::Termination(_) => todo!(),
             Self::RouteMirroring(value) => value.len(),
-            Self::Experimental251(_) => todo!(),
-            Self::Experimental252(_) => todo!(),
-            Self::Experimental253(_) => todo!(),
-            Self::Experimental254(_) => todo!(),
+            Self::Experimental251(value) => value.len(),
+            Self::Experimental252(value) => value.len(),
+            Self::Experimental253(value) => value.len(),
+            Self::Experimental254(value) => value.len(),
         };
         Self::BASE_LENGTH + len
     }
@@ -67,16 +68,31 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
             Self::StatisticsReport => {}
             Self::PeerDownNotification => {}
             Self::PeerUpNotification => {}
-            Self::Initiation(_) => {}
+            Self::Initiation(value) => {
+                writer.write_u8(BmpMessageType::Initiation.into())?;
+                value.write(writer)?;
+            }
             Self::Termination(_) => {}
             Self::RouteMirroring(value) => {
                 writer.write_u8(BmpMessageType::RouteMirroring.into())?;
                 value.write(writer)?;
             }
-            Self::Experimental251(_) => {}
-            Self::Experimental252(_) => {}
-            Self::Experimental253(_) => {}
-            Self::Experimental254(_) => {}
+            Self::Experimental251(value) => {
+                writer.write_u8(BmpMessageType::Experimental251.into())?;
+                writer.write_all(value)?;
+            }
+            Self::Experimental252(value) => {
+                writer.write_u8(BmpMessageType::Experimental252.into())?;
+                writer.write_all(value)?;
+            }
+            Self::Experimental253(value) => {
+                writer.write_u8(BmpMessageType::Experimental253.into())?;
+                writer.write_all(value)?;
+            }
+            Self::Experimental254(value) => {
+                writer.write_u8(BmpMessageType::Experimental254.into())?;
+                writer.write_all(value)?;
+            }
         }
         Ok(())
     }
@@ -183,6 +199,22 @@ impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
                 let flags = if *filtered { PEER_FLAGS_IS_FILTERED } else { 0 };
                 writer.write_u8(flags)?;
             }
+            BmpPeerType::Experimental251 { flags } => {
+                writer.write_u8(BmpPeerTypeCode::Experimental251.into())?;
+                writer.write_u8(*flags)?;
+            }
+            BmpPeerType::Experimental252 { flags } => {
+                writer.write_u8(BmpPeerTypeCode::Experimental252.into())?;
+                writer.write_u8(*flags)?;
+            }
+            BmpPeerType::Experimental253 { flags } => {
+                writer.write_u8(BmpPeerTypeCode::Experimental253.into())?;
+                writer.write_u8(*flags)?;
+            }
+            BmpPeerType::Experimental254 { flags } => {
+                writer.write_u8(BmpPeerTypeCode::Experimental254.into())?;
+                writer.write_u8(*flags)?;
+            }
         }
         match self.distinguisher() {
             None => writer.write_u64::<NetworkEndian>(0)?,
@@ -253,6 +285,107 @@ impl WritablePDU<RouteMonitoringMessageWritingError> for RouteMonitoringMessage 
         self.peer_header.write(writer)?;
         for update in self.updates() {
             BGPMessage::Update(update.clone()).write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum InitiationMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+    InitiationInformationError(#[from] InitiationInformationWritingError),
+}
+
+impl WritablePDU<InitiationMessageWritingError> for InitiationMessage {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.information().iter().map(|x| x.len()).sum::<usize>()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), InitiationMessageWritingError> {
+        for info in self.information() {
+            info.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum InitiationInformationWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<InitiationInformationWritingError> for InitiationInformation {
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                Self::String(value) => value.len(),
+                Self::SystemDescription(value) => value.len(),
+                Self::SystemName(value) => value.len(),
+                Self::VrfTableName(value) => value.len(),
+                Self::AdminLabel(value) => value.len(),
+                Self::Experimental65531(value) => value.len(),
+                Self::Experimental65532(value) => value.len(),
+                Self::Experimental65533(value) => value.len(),
+                Self::Experimental65534(value) => value.len(),
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), InitiationInformationWritingError> {
+        match self {
+            Self::String(value) => {
+                writer.write_u16::<NetworkEndian>(InitiationInformationTlvType::String.into())?;
+                writer.write_all(value.as_bytes())?;
+            }
+            Self::SystemDescription(value) => {
+                writer.write_u16::<NetworkEndian>(
+                    InitiationInformationTlvType::SystemDescription.into(),
+                )?;
+                writer.write_all(value.as_bytes())?;
+            }
+            Self::SystemName(value) => {
+                writer
+                    .write_u16::<NetworkEndian>(InitiationInformationTlvType::SystemName.into())?;
+                writer.write_all(value.as_bytes())?;
+            }
+            Self::VrfTableName(value) => {
+                writer.write_u16::<NetworkEndian>(
+                    InitiationInformationTlvType::VrfTableName.into(),
+                )?;
+                writer.write_all(value.as_bytes())?;
+            }
+            Self::AdminLabel(value) => {
+                writer
+                    .write_u16::<NetworkEndian>(InitiationInformationTlvType::AdminLabel.into())?;
+                writer.write_all(value.as_bytes())?;
+            }
+            Self::Experimental65531(value) => {
+                writer.write_u16::<NetworkEndian>(
+                    InitiationInformationTlvType::Experimental65531.into(),
+                )?;
+                writer.write_all(value)?;
+            }
+            Self::Experimental65532(value) => {
+                writer.write_u16::<NetworkEndian>(
+                    InitiationInformationTlvType::Experimental65532.into(),
+                )?;
+                writer.write_all(value)?;
+            }
+            Self::Experimental65533(value) => {
+                writer.write_u16::<NetworkEndian>(
+                    InitiationInformationTlvType::Experimental65533.into(),
+                )?;
+                writer.write_all(value)?;
+            }
+            Self::Experimental65534(value) => {
+                writer.write_u16::<NetworkEndian>(
+                    InitiationInformationTlvType::Experimental65534.into(),
+                )?;
+                writer.write_all(value)?;
+            }
         }
         Ok(())
     }
