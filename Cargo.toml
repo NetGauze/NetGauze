@@ -2,6 +2,7 @@
 
 members = [
     "netgauze-bgp-pkt",
+    "netgauze-bmp-pkt",
     "netgauze-iana",
     "netgauze-locate",
     "netgauze-parse-utils",
