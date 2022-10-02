@@ -84,7 +84,7 @@ impl TryFrom<u8> for BmpMessageType {
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
 pub enum BmpPeerTypeCode {
     GlobalInstancePeer = 0,
-    RDInstancePeer = 1,
+    RdInstancePeer = 1,
     LocalInstancePeer = 2,
     LocRibInstancePeer = 3,
     Experimental251 = 251,

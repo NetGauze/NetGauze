@@ -33,6 +33,17 @@ pub mod iana;
 #[cfg(feature = "serde")]
 pub mod serde;
 
+/// ```text
+/// 0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+
+/// |    Version    |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                        Message Length                         |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |   Msg. Type   |
+/// +---------------+
+/// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BmpMessage {
     RouteMonitoring(RouteMonitoringMessage),
@@ -170,7 +181,7 @@ pub enum BmpPeerType {
         asn2: bool,
         adj_rib_out: bool,
     },
-    LocRibInstance {
+    LocRibInstancePeer {
         filtered: bool,
     },
 }
@@ -305,6 +316,14 @@ impl RouteMonitoringMessage {
             updates,
         }
     }
+
+    pub const fn peer_header(&self) -> &PeerHeader {
+        &self.peer_header
+    }
+
+    pub const fn updates(&self) -> &Vec<BGPUpdateMessage> {
+        &self.updates
+    }
 }
 
 /// Route Mirroring messages are used for verbatim duplication of messages as
@@ -321,6 +340,14 @@ impl RouteMirroringMessage {
             peer_header,
             mirrored,
         }
+    }
+
+    pub const fn peer_header(&self) -> &PeerHeader {
+        &self.peer_header
+    }
+
+    pub const fn mirrored(&self) -> &Vec<RouteMirroringValue> {
+        &self.mirrored
     }
 }
 

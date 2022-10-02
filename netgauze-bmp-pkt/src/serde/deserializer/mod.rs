@@ -269,7 +269,7 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
                 bgp_id,
                 time,
             ),
-            BmpPeerTypeCode::RDInstancePeer => PeerHeader::new(
+            BmpPeerTypeCode::RdInstancePeer => PeerHeader::new(
                 BmpPeerType::RdInstancePeer {
                     ipv6,
                     post_policy,
@@ -296,7 +296,7 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
                 time,
             ),
             BmpPeerTypeCode::LocRibInstancePeer => PeerHeader::new(
-                BmpPeerType::LocRibInstance { filtered },
+                BmpPeerType::LocRibInstancePeer { filtered },
                 distinguisher,
                 address,
                 peer_as,

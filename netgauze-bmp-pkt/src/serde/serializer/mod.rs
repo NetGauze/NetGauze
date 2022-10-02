@@ -12,3 +12,248 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+//! Serializer library for BMP's wire protocol
+
+use crate::{
+    iana::{
+        BmpMessageType, BMP_VERSION, PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2,
+        PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6, PEER_FLAGS_IS_POST_POLICY,
+    },
+    BmpMessage, BmpPeerType, BmpPeerTypeCode, PeerHeader, RouteMirroringMessage,
+    RouteMirroringValue, RouteMonitoringMessage,
+};
+use byteorder::{NetworkEndian, WriteBytesExt};
+use netgauze_bgp_pkt::{serde::serializer::BGPMessageWritingError, BGPMessage};
+use netgauze_parse_utils::WritablePDU;
+use netgauze_serde_macros::WritingError;
+use std::{io::Write, net::IpAddr};
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum BmpMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+    RouteMonitoringMessageError(#[from] RouteMonitoringMessageWritingError),
+    RouteMirroringMessageError(#[from] RouteMirroringMessageWritingError),
+}
+
+impl WritablePDU<BmpMessageWritingError> for BmpMessage {
+    const BASE_LENGTH: usize = 5;
+
+    fn len(&self) -> usize {
+        let len = match self {
+            Self::RouteMonitoring(value) => value.len(),
+            Self::StatisticsReport => todo!(),
+            Self::PeerDownNotification => todo!(),
+            Self::PeerUpNotification => todo!(),
+            Self::Initiation(_) => todo!(),
+            Self::Termination(_) => todo!(),
+            Self::RouteMirroring(value) => value.len(),
+            Self::Experimental251(_) => todo!(),
+            Self::Experimental252(_) => todo!(),
+            Self::Experimental253(_) => todo!(),
+            Self::Experimental254(_) => todo!(),
+        };
+        Self::BASE_LENGTH + len
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageWritingError> {
+        writer.write_u8(BMP_VERSION)?;
+        writer.write_u32::<NetworkEndian>(self.len() as u32)?;
+        match self {
+            Self::RouteMonitoring(value) => {
+                writer.write_u8(BmpMessageType::RouteMonitoring.into())?;
+                value.write(writer)?;
+            }
+            Self::StatisticsReport => {}
+            Self::PeerDownNotification => {}
+            Self::PeerUpNotification => {}
+            Self::Initiation(_) => {}
+            Self::Termination(_) => {}
+            Self::RouteMirroring(value) => {
+                writer.write_u8(BmpMessageType::RouteMirroring.into())?;
+                value.write(writer)?;
+            }
+            Self::Experimental251(_) => {}
+            Self::Experimental252(_) => {}
+            Self::Experimental253(_) => {}
+            Self::Experimental254(_) => {}
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum RouteMirroringMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+    PeerHeaderError(#[from] PeerHeaderWritingError),
+}
+
+impl WritablePDU<RouteMirroringMessageWritingError> for RouteMirroringMessage {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.peer_header.len()
+            + self.mirrored().iter().map(|x| x.len()).sum::<usize>()
+    }
+
+    fn write<T: Write>(&self, _writer: &mut T) -> Result<(), RouteMirroringMessageWritingError> {
+        todo!()
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum PeerHeaderWritingError {
+    StdIOError(#[from_std_io_error] String),
+    RouteMirroringValueError(#[from] RouteMirroringValueWritingError),
+}
+
+#[inline]
+const fn compute_peer_flags_value(
+    ipv6: bool,
+    post_policy: bool,
+    asn2: bool,
+    adj_rib_out: bool,
+) -> u8 {
+    let mut flags = 0;
+    if ipv6 {
+        flags |= PEER_FLAGS_IS_IPV6;
+    }
+    if post_policy {
+        flags |= PEER_FLAGS_IS_POST_POLICY;
+    }
+    if asn2 {
+        flags |= PEER_FLAGS_IS_ASN2
+    }
+    if adj_rib_out {
+        flags |= PEER_FLAGS_IS_ADJ_RIB_OUT
+    }
+    flags
+}
+
+impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
+    ///  1-octet peer type
+    ///  1-octet peer flags
+    ///  8-octets peer Distinguisher
+    /// 16-octets peer address
+    ///  4-octets peer AS
+    ///  4-octets peer BGP ID
+    ///  4-octets Timestamp (Seconds)
+    ///  4-octets Timestamp (Microseconds)
+    const BASE_LENGTH: usize = 42;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), PeerHeaderWritingError> {
+        match self.peer_type() {
+            BmpPeerType::GlobalInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            } => {
+                writer.write_u8(BmpPeerTypeCode::GlobalInstancePeer.into())?;
+                let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
+                writer.write_u8(flags)?;
+            }
+            BmpPeerType::RdInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            } => {
+                writer.write_u8(BmpPeerTypeCode::RdInstancePeer.into())?;
+                let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
+                writer.write_u8(flags)?;
+            }
+            BmpPeerType::LocalInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            } => {
+                writer.write_u8(BmpPeerTypeCode::LocalInstancePeer.into())?;
+                let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
+                writer.write_u8(flags)?;
+            }
+            BmpPeerType::LocRibInstancePeer { filtered } => {
+                writer.write_u8(BmpPeerTypeCode::LocRibInstancePeer.into())?;
+                let flags = if *filtered { PEER_FLAGS_IS_FILTERED } else { 0 };
+                writer.write_u8(flags)?;
+            }
+        }
+        match self.distinguisher() {
+            None => writer.write_u64::<NetworkEndian>(0)?,
+            Some(value) => writer.write_u64::<NetworkEndian>(*value)?,
+        }
+        match self.address() {
+            Some(IpAddr::V4(ipv4)) => {
+                writer.write_u64::<NetworkEndian>(0)?;
+                writer.write_u32::<NetworkEndian>(0)?;
+                writer.write_all(&ipv4.octets())?;
+            }
+            Some(IpAddr::V6(ipv6)) => {
+                writer.write_all(&ipv6.octets())?;
+            }
+            None => writer.write_u128::<NetworkEndian>(0)?,
+        }
+        writer.write_u32::<NetworkEndian>(*self.peer_as())?;
+        writer.write_all(&self.bgp_id().octets())?;
+        match self.timestamp() {
+            None => writer.write_u64::<NetworkEndian>(0)?,
+            Some(time) => {
+                writer.write_u32::<NetworkEndian>(time.timestamp() as u32)?;
+                writer.write_u32::<NetworkEndian>(time.timestamp_subsec_micros())?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum RouteMirroringValueWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<RouteMirroringValueWritingError> for RouteMirroringValue {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        todo!()
+    }
+
+    fn write<T: Write>(&self, _writer: &mut T) -> Result<(), RouteMirroringValueWritingError> {
+        todo!()
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum RouteMonitoringMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+    PeerHeaderError(#[from] PeerHeaderWritingError),
+    BGPMessageError(#[from] BGPMessageWritingError),
+}
+
+impl WritablePDU<RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.peer_header.len()
+            + self
+                .updates()
+                .iter()
+                .map(|update| BGPMessage::Update(update.clone()).len())
+                .sum::<usize>()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMonitoringMessageWritingError> {
+        self.peer_header.write(writer)?;
+        for update in self.updates() {
+            BGPMessage::Update(update.clone()).write(writer)?;
+        }
+        Ok(())
+    }
+}

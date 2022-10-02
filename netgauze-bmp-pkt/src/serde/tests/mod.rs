@@ -19,16 +19,147 @@ use netgauze_bgp_pkt::{
     path_attribute::{ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute},
     update::{BGPUpdateMessage, NetworkLayerReachabilityInformation},
 };
-use netgauze_parse_utils::test_helpers::test_parsed_completely;
+use netgauze_parse_utils::test_helpers::{test_parsed_completely, test_write};
 use std::{
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
 
-use crate::{BmpMessage, BmpPeerType, PeerHeader, RouteMonitoringMessage};
+use crate::{
+    serde::serializer::{BmpMessageWritingError, PeerHeaderWritingError},
+    BmpMessage, BmpPeerType, PeerHeader, RouteMonitoringMessage,
+};
 
 #[test]
-fn test_route_monitoring() -> Result<(), ()> {
+fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
+    let good_ipv4_wire = [
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
+    ];
+    let good_ipv6_wire = [
+        0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x01, 0x0d, 0xb8, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
+    ];
+    let good_post_policy_wire = [
+        0x02, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x01, 0x0d, 0xb8, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
+    ];
+    let good_adj_rip_out_wire = [
+        0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
+    ];
+    let good_asn2_wire = [
+        0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
+    ];
+    let good_filtered_wire = [
+        0x03, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
+    ];
+
+    let good_ipv4 = PeerHeader::new(
+        BmpPeerType::GlobalInstancePeer {
+            ipv6: false,
+            post_policy: false,
+            asn2: false,
+            adj_rib_out: false,
+        },
+        None,
+        Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
+        200,
+        Ipv4Addr::new(172, 16, 0, 20),
+        Some(Utc.timestamp(1664656357, 746092000)),
+    );
+
+    let good_ipv6 = PeerHeader::new(
+        BmpPeerType::RdInstancePeer {
+            ipv6: true,
+            post_policy: false,
+            asn2: false,
+            adj_rib_out: false,
+        },
+        None,
+        Some(IpAddr::V6(Ipv6Addr::from_str("2001:db8::ac10:14").unwrap())),
+        200,
+        Ipv4Addr::new(172, 16, 0, 20),
+        Some(Utc.timestamp(1664656357, 746092000)),
+    );
+
+    let good_post_policy = PeerHeader::new(
+        BmpPeerType::LocalInstancePeer {
+            ipv6: true,
+            post_policy: true,
+            asn2: false,
+            adj_rib_out: false,
+        },
+        None,
+        Some(IpAddr::V6(Ipv6Addr::from_str("2001:db8::ac10:14").unwrap())),
+        200,
+        Ipv4Addr::new(172, 16, 0, 20),
+        Some(Utc.timestamp(1664656357, 746092000)),
+    );
+
+    let good_adj_rip_out = PeerHeader::new(
+        BmpPeerType::GlobalInstancePeer {
+            ipv6: false,
+            post_policy: false,
+            asn2: false,
+            adj_rib_out: true,
+        },
+        None,
+        Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
+        200,
+        Ipv4Addr::new(172, 16, 0, 20),
+        Some(Utc.timestamp(1664656357, 746092000)),
+    );
+
+    let good_asn2 = PeerHeader::new(
+        BmpPeerType::GlobalInstancePeer {
+            ipv6: false,
+            post_policy: false,
+            asn2: true,
+            adj_rib_out: false,
+        },
+        None,
+        Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
+        200,
+        Ipv4Addr::new(172, 16, 0, 20),
+        Some(Utc.timestamp(1664656357, 746092000)),
+    );
+
+    let good_filtered = PeerHeader::new(
+        BmpPeerType::LocRibInstancePeer { filtered: true },
+        None,
+        None,
+        200,
+        Ipv4Addr::new(172, 16, 0, 20),
+        Some(Utc.timestamp(1664656357, 746092000)),
+    );
+
+    test_parsed_completely(&good_ipv4_wire, &good_ipv4);
+    test_parsed_completely(&good_ipv6_wire, &good_ipv6);
+    test_parsed_completely(&good_post_policy_wire, &good_post_policy);
+    test_parsed_completely(&good_adj_rip_out_wire, &good_adj_rip_out);
+    test_parsed_completely(&good_asn2_wire, &good_asn2);
+    test_parsed_completely(&good_filtered_wire, &good_filtered);
+
+    test_write(&good_ipv4, &good_ipv4_wire)?;
+    test_write(&good_ipv6, &good_ipv6_wire)?;
+    test_write(&good_post_policy, &good_post_policy_wire)?;
+    test_write(&good_adj_rip_out, &good_adj_rip_out_wire)?;
+    test_write(&good_asn2, &good_asn2_wire)?;
+    test_write(&good_filtered, &good_filtered_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_route_monitoring() -> Result<(), BmpMessageWritingError> {
     let good_wire = [
         0x03, 0x00, 0x00, 0x00, 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10,
@@ -79,6 +210,7 @@ fn test_route_monitoring() -> Result<(), ()> {
     ));
 
     test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
 
     Ok(())
 }
