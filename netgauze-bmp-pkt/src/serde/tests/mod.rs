@@ -16,9 +16,16 @@
 use chrono::{TimeZone, Utc};
 use ipnet::Ipv4Net;
 use netgauze_bgp_pkt::{
+    capabilities::{
+        BGPCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
+        FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
+    },
+    open::{BGPOpenMessage, BGPOpenMessageParameter},
     path_attribute::{ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute},
     update::{BGPUpdateMessage, NetworkLayerReachabilityInformation},
+    BGPMessage,
 };
+use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::test_helpers::{test_parsed_completely, test_write};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -28,7 +35,7 @@ use std::{
 use crate::{
     serde::serializer::{BmpMessageWritingError, PeerHeaderWritingError},
     BmpMessage, BmpPeerType, InitiationInformation, InitiationMessage, PeerHeader,
-    RouteMonitoringMessage,
+    PeerUpNotificationMessage, RouteMonitoringMessage,
 };
 
 #[test]
@@ -229,5 +236,128 @@ fn test_route_monitoring() -> Result<(), BmpMessageWritingError> {
     test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;
 
+    Ok(())
+}
+
+#[test]
+fn test_peer_up_notification() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0xda, 0x03, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0xfc, 0x00, 0x0a, 0x00, 0x00, 0x01, 0x63, 0x3b, 0x2a, 0x42, 0x00,
+        0x09, 0xd9, 0xd9, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x03, 0x00, 0xb3, 0x74, 0x8a, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x4b, 0x01, 0x04, 0xfc, 0x00,
+        0x00, 0xb4, 0x0a, 0x00, 0x00, 0x03, 0x2e, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x80,
+        0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00, 0x02, 0x06, 0x41, 0x04, 0x00, 0x00, 0xfc,
+        0x00, 0x02, 0x14, 0x05, 0x12, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02,
+        0x00, 0x02, 0x00, 0x01, 0x00, 0x80, 0x00, 0x02, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x4b, 0x01, 0x04, 0xfc, 0x00,
+        0x00, 0xb4, 0x0a, 0x00, 0x00, 0x01, 0x2e, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x80,
+        0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00, 0x02, 0x06, 0x41, 0x04, 0x00, 0x00, 0xfc,
+        0x00, 0x02, 0x14, 0x05, 0x12, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x00, 0x02,
+        0x00, 0x02, 0x00, 0x01, 0x00, 0x80, 0x00, 0x02,
+    ];
+
+    let good = BmpMessage::PeerUpNotification(
+        PeerUpNotificationMessage::build(
+            PeerHeader::new(
+                BmpPeerType::GlobalInstancePeer {
+                    ipv6: true,
+                    post_policy: false,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                None,
+                Some(IpAddr::V6(Ipv6Addr::from_str("fc00::1").unwrap())),
+                64512,
+                Ipv4Addr::new(10, 0, 0, 1),
+                Some(Utc.timestamp(1664821826, 645593000)),
+            ),
+            IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap()),
+            Some(179),
+            Some(29834),
+            BGPMessage::Open(BGPOpenMessage::new(
+                64512,
+                180,
+                Ipv4Addr::new(10, 0, 0, 3),
+                vec![
+                    BGPOpenMessageParameter::Capabilities(vec![
+                        BGPCapability::MultiProtocolExtensions(
+                            MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
+                        ),
+                    ]),
+                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+                        UnrecognizedCapability::new(128, vec![]),
+                    )]),
+                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
+                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
+                        FourOctetASCapability::new(64512),
+                    )]),
+                    BGPOpenMessageParameter::Capabilities(vec![
+                        BGPCapability::ExtendedNextHopEncoding(
+                            ExtendedNextHopEncodingCapability::new(vec![
+                                ExtendedNextHopEncoding::new(
+                                    AddressType::Ipv4Unicast,
+                                    AddressFamily::IPv6,
+                                ),
+                                ExtendedNextHopEncoding::new(
+                                    AddressType::Ipv4Multicast,
+                                    AddressFamily::IPv6,
+                                ),
+                                ExtendedNextHopEncoding::new(
+                                    AddressType::Ipv4MplsLabeledVpn,
+                                    AddressFamily::IPv6,
+                                ),
+                            ]),
+                        ),
+                    ]),
+                ],
+            )),
+            BGPMessage::Open(BGPOpenMessage::new(
+                64512,
+                180,
+                Ipv4Addr::new(10, 0, 0, 1),
+                vec![
+                    BGPOpenMessageParameter::Capabilities(vec![
+                        BGPCapability::MultiProtocolExtensions(
+                            MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
+                        ),
+                    ]),
+                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+                        UnrecognizedCapability::new(128, vec![]),
+                    )]),
+                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
+                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
+                        FourOctetASCapability::new(64512),
+                    )]),
+                    BGPOpenMessageParameter::Capabilities(vec![
+                        BGPCapability::ExtendedNextHopEncoding(
+                            ExtendedNextHopEncodingCapability::new(vec![
+                                ExtendedNextHopEncoding::new(
+                                    AddressType::Ipv4Unicast,
+                                    AddressFamily::IPv6,
+                                ),
+                                ExtendedNextHopEncoding::new(
+                                    AddressType::Ipv4Multicast,
+                                    AddressFamily::IPv6,
+                                ),
+                                ExtendedNextHopEncoding::new(
+                                    AddressType::Ipv4MplsLabeledVpn,
+                                    AddressFamily::IPv6,
+                                ),
+                            ]),
+                        ),
+                    ]),
+                ],
+            )),
+            vec![],
+        )
+        .unwrap(),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+
+    test_write(&good, &good_wire)?;
     Ok(())
 }

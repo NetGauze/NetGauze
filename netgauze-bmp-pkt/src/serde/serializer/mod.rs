@@ -20,8 +20,8 @@ use crate::{
         BmpMessageType, InitiationInformationTlvType, BMP_VERSION, PEER_FLAGS_IS_ADJ_RIB_OUT,
         PEER_FLAGS_IS_ASN2, PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6, PEER_FLAGS_IS_POST_POLICY,
     },
-    BmpMessage, BmpPeerType, BmpPeerTypeCode, InitiationInformation, InitiationMessage, PeerHeader,
-    RouteMirroringMessage, RouteMirroringValue, RouteMonitoringMessage,
+    BmpMessage, BmpPeerType, InitiationInformation, InitiationMessage, PeerHeader,
+    PeerUpNotificationMessage, RouteMirroringMessage, RouteMirroringValue, RouteMonitoringMessage,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::{serde::serializer::BGPMessageWritingError, BGPMessage};
@@ -35,6 +35,7 @@ pub enum BmpMessageWritingError {
     RouteMonitoringMessageError(#[from] RouteMonitoringMessageWritingError),
     RouteMirroringMessageError(#[from] RouteMirroringMessageWritingError),
     InitiationMessageError(#[from] InitiationMessageWritingError),
+    PeerUpNotificationMessageError(#[from] PeerUpNotificationMessageWritingError),
 }
 
 impl WritablePDU<BmpMessageWritingError> for BmpMessage {
@@ -45,7 +46,7 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
             Self::RouteMonitoring(value) => value.len(),
             Self::StatisticsReport => todo!(),
             Self::PeerDownNotification => todo!(),
-            Self::PeerUpNotification => todo!(),
+            Self::PeerUpNotification(value) => value.len(),
             Self::Initiation(value) => value.len(),
             Self::Termination(_) => todo!(),
             Self::RouteMirroring(value) => value.len(),
@@ -67,7 +68,10 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
             }
             Self::StatisticsReport => {}
             Self::PeerDownNotification => {}
-            Self::PeerUpNotification => {}
+            Self::PeerUpNotification(value) => {
+                writer.write_u8(BmpMessageType::PeerUpNotification.into())?;
+                value.write(writer)?;
+            }
             Self::Initiation(value) => {
                 writer.write_u8(BmpMessageType::Initiation.into())?;
                 value.write(writer)?;
@@ -169,7 +173,7 @@ impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
                 asn2,
                 adj_rib_out,
             } => {
-                writer.write_u8(BmpPeerTypeCode::GlobalInstancePeer.into())?;
+                writer.write_u8(self.peer_type.get_type().into())?;
                 let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
                 writer.write_u8(flags)?;
             }
@@ -179,7 +183,7 @@ impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
                 asn2,
                 adj_rib_out,
             } => {
-                writer.write_u8(BmpPeerTypeCode::RdInstancePeer.into())?;
+                writer.write_u8(self.peer_type.get_type().into())?;
                 let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
                 writer.write_u8(flags)?;
             }
@@ -189,29 +193,29 @@ impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
                 asn2,
                 adj_rib_out,
             } => {
-                writer.write_u8(BmpPeerTypeCode::LocalInstancePeer.into())?;
+                writer.write_u8(self.peer_type.get_type().into())?;
                 let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
                 writer.write_u8(flags)?;
             }
             BmpPeerType::LocRibInstancePeer { filtered } => {
-                writer.write_u8(BmpPeerTypeCode::LocRibInstancePeer.into())?;
+                writer.write_u8(self.peer_type.get_type().into())?;
                 let flags = if *filtered { PEER_FLAGS_IS_FILTERED } else { 0 };
                 writer.write_u8(flags)?;
             }
             BmpPeerType::Experimental251 { flags } => {
-                writer.write_u8(BmpPeerTypeCode::Experimental251.into())?;
+                writer.write_u8(self.peer_type.get_type().into())?;
                 writer.write_u8(*flags)?;
             }
             BmpPeerType::Experimental252 { flags } => {
-                writer.write_u8(BmpPeerTypeCode::Experimental252.into())?;
+                writer.write_u8(self.peer_type.get_type().into())?;
                 writer.write_u8(*flags)?;
             }
             BmpPeerType::Experimental253 { flags } => {
-                writer.write_u8(BmpPeerTypeCode::Experimental253.into())?;
+                writer.write_u8(self.peer_type.get_type().into())?;
                 writer.write_u8(*flags)?;
             }
             BmpPeerType::Experimental254 { flags } => {
-                writer.write_u8(BmpPeerTypeCode::Experimental254.into())?;
+                writer.write_u8(self.peer_type.get_type().into())?;
                 writer.write_u8(*flags)?;
             }
         }
@@ -399,6 +403,48 @@ impl WritablePDU<InitiationInformationWritingError> for InitiationInformation {
                 writer.write_u16::<NetworkEndian>(value.len() as u16)?;
                 writer.write_all(value)?;
             }
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum PeerUpNotificationMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+    PeerHeaderError(#[from] PeerHeaderWritingError),
+    BGPMessageError(#[from] BGPMessageWritingError),
+    InitiationInformationError(#[from] InitiationInformationWritingError),
+}
+
+impl WritablePDU<PeerUpNotificationMessageWritingError> for PeerUpNotificationMessage {
+    // 16 local addr + 2 local port + 2 remote port
+    const BASE_LENGTH: usize = 21;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.peer_header.len()
+            + self.sent_message.len()
+            + self.received_message.len()
+            + self.information().iter().map(|x| x.len()).sum::<usize>()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), PeerUpNotificationMessageWritingError> {
+        self.peer_header().write(writer)?;
+        match self.local_address {
+            IpAddr::V4(addr) => {
+                writer.write_u64::<NetworkEndian>(0)?;
+                writer.write_u32::<NetworkEndian>(0)?;
+                writer.write_all(&addr.octets())?;
+            }
+            IpAddr::V6(addr) => writer.write_all(&addr.octets())?,
+        }
+        writer.write_u16::<NetworkEndian>(self.local_port.unwrap_or_default())?;
+        writer.write_u16::<NetworkEndian>(self.remote_port.unwrap_or_default())?;
+
+        self.sent_message().write(writer)?;
+        self.received_message.write(writer)?;
+        for info in &self.information {
+            info.write(writer)?;
         }
         Ok(())
     }

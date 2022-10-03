@@ -29,7 +29,7 @@ use nom::{
 };
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_till_empty_into_located,
+    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
     parse_till_empty_into_with_one_input_located, ReadablePDU, Span,
 };
 use netgauze_serde_macros::LocatedError;
@@ -42,7 +42,7 @@ use crate::{
         PEER_FLAGS_IS_POST_POLICY,
     },
     BmpMessage, BmpPeerType, BmpPeerTypeCode, InitiationInformation, InitiationMessage, PeerHeader,
-    RouteMonitoringMessage,
+    PeerUpNotificationMessage, PeerUpNotificationMessageError, RouteMonitoringMessage,
 };
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
@@ -55,6 +55,9 @@ pub enum BmpMessageParsingError {
         #[from_located(module = "self")] RouteMonitoringMessageParsingError,
     ),
     InitiationMessageError(#[from_located(module = "self")] InitiationMessageParsingError),
+    PeerUpNotificationMessageError(
+        #[from_located(module = "self")] PeerUpNotificationMessageParsingError,
+    ),
 }
 
 impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
@@ -77,7 +80,10 @@ impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
             }
             BmpMessageType::StatisticsReport => todo!(),
             BmpMessageType::PeerDownNotification => todo!(),
-            BmpMessageType::PeerUpNotification => todo!(),
+            BmpMessageType::PeerUpNotification => {
+                let (buf, value) = parse_into_located(buf)?;
+                (buf, BmpMessage::PeerUpNotification(value))
+            }
             BmpMessageType::Initiation => {
                 let (buf, init) = parse_into_located(buf)?;
                 (buf, BmpMessage::Initiation(init))
@@ -374,5 +380,101 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
             ),
         };
         Ok((buf, peer_header))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum PeerUpNotificationMessageParsingError {
+    NomError(#[from_nom] ErrorKind),
+    PeerUpMessageError(PeerUpNotificationMessageError),
+    UnexpectedPeerType(BmpPeerTypeCode),
+    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
+    BgpMessageError(
+        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer")] BGPMessageParsingError,
+    ),
+    InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
+}
+
+/// Check if the V flag is enabled in the peer header. Or return error of the
+/// peer type that don't have a peer flag defined. Currently, only
+/// GlobalInstancePeer, RdInstancePeer, and LocalInstancePeer have V flag
+/// defined.
+///
+/// For experimental we assume ipv6 since this will not fail and still parse all
+/// the information
+#[inline]
+const fn check_is_ipv6(peer_header: &PeerHeader) -> Result<bool, BmpPeerTypeCode> {
+    match peer_header.peer_type {
+        BmpPeerType::GlobalInstancePeer { ipv6, .. } => Ok(ipv6),
+        BmpPeerType::RdInstancePeer { ipv6, .. } => Ok(ipv6),
+        BmpPeerType::LocalInstancePeer { ipv6, .. } => Ok(ipv6),
+        BmpPeerType::LocRibInstancePeer { .. } => Err(peer_header.peer_type.get_type()),
+        BmpPeerType::Experimental251 { .. } => Ok(true),
+        BmpPeerType::Experimental252 { .. } => Ok(true),
+        BmpPeerType::Experimental253 { .. } => Ok(true),
+        BmpPeerType::Experimental254 { .. } => Ok(true),
+    }
+}
+impl<'a> ReadablePDU<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
+    for PeerUpNotificationMessage
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedPeerUpNotificationMessageParsingError<'a>> {
+        let input = buf;
+        let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+        let ipv6 = match check_is_ipv6(&peer_header) {
+            Ok(ipv6) => ipv6,
+            Err(code) => {
+                return Err(nom::Err::Error(
+                    LocatedPeerUpNotificationMessageParsingError::new(
+                        input,
+                        PeerUpNotificationMessageParsingError::UnexpectedPeerType(code),
+                    ),
+                ))
+            }
+        };
+        let (buf, address) = be_u128(buf)?;
+        let local_address = if ipv6 {
+            IpAddr::V6(Ipv6Addr::from(address))
+        } else {
+            // the upper bits should be zero and can be ignored
+            IpAddr::V4(Ipv4Addr::from(address as u32))
+        };
+        let (buf, local_port) = be_u16(buf)?;
+        let local_port = if local_port == 0 {
+            None
+        } else {
+            Some(local_port)
+        };
+        let (buf, remote_port) = be_u16(buf)?;
+        let remote_port = if remote_port == 0 {
+            None
+        } else {
+            Some(remote_port)
+        };
+        let (buf, sent_message) = parse_into_located_one_input(buf, true)?;
+        let (buf, received_message) = parse_into_located_one_input(buf, true)?;
+        let (buf, information) = parse_till_empty_into_located(buf)?;
+        let peer_up_msg = PeerUpNotificationMessage::build(
+            peer_header,
+            local_address,
+            local_port,
+            remote_port,
+            sent_message,
+            received_message,
+            information,
+        );
+        match peer_up_msg {
+            Ok(msg) => Ok((buf, msg)),
+            Err(err) => {
+                return Err(nom::Err::Error(
+                    LocatedPeerUpNotificationMessageParsingError::new(
+                        input,
+                        PeerUpNotificationMessageParsingError::PeerUpMessageError(err),
+                    ),
+                ))
+            }
+        }
     }
 }

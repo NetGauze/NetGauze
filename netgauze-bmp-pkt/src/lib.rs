@@ -24,10 +24,13 @@
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::missing_const_for_fn)]
 
-use crate::iana::{BmpPeerTypeCode, PeerTerminationCode};
-use chrono::{DateTime, Utc};
-use netgauze_bgp_pkt::{update::BGPUpdateMessage, BGPMessage};
 use std::net::{IpAddr, Ipv4Addr};
+
+use chrono::{DateTime, Utc};
+
+use netgauze_bgp_pkt::{iana::BGPMessageType, update::BGPUpdateMessage, BGPMessage};
+
+use crate::iana::{BmpPeerTypeCode, PeerTerminationCode};
 
 pub mod iana;
 #[cfg(feature = "serde")]
@@ -49,7 +52,7 @@ pub enum BmpMessage {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport,
     PeerDownNotification,
-    PeerUpNotification,
+    PeerUpNotification(PeerUpNotificationMessage),
     Initiation(InitiationMessage),
     Termination(TerminationMessage),
     RouteMirroring(RouteMirroringMessage),
@@ -196,6 +199,22 @@ pub enum BmpPeerType {
     Experimental254 {
         flags: u8,
     },
+}
+
+impl BmpPeerType {
+    /// Get the IANA Code for the peer type
+    pub const fn get_type(&self) -> BmpPeerTypeCode {
+        match self {
+            Self::GlobalInstancePeer { .. } => BmpPeerTypeCode::GlobalInstancePeer,
+            Self::RdInstancePeer { .. } => BmpPeerTypeCode::RdInstancePeer,
+            Self::LocalInstancePeer { .. } => BmpPeerTypeCode::LocalInstancePeer,
+            Self::LocRibInstancePeer { .. } => BmpPeerTypeCode::LocRibInstancePeer,
+            Self::Experimental251 { .. } => BmpPeerTypeCode::Experimental251,
+            Self::Experimental252 { .. } => BmpPeerTypeCode::Experimental252,
+            Self::Experimental253 { .. } => BmpPeerTypeCode::Experimental253,
+            Self::Experimental254 { .. } => BmpPeerTypeCode::Experimental254,
+        }
+    }
 }
 
 /// The initiation message provides a means for the monitored router to
@@ -392,4 +411,108 @@ pub enum RouteMirroringInformation {
     /// if an implementation runs out of available buffer space to queue
     /// mirroring messages.
     MessagesLost,
+}
+
+/// The Peer Up message is used to indicate that a peering session has
+/// come up (i.e., has transitioned into the Established state).
+///
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                 Local Address (16 bytes)                      |
+/// ~                                                               ~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |         Local Port            |        Remote Port            |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                    Sent OPEN Message                          |
+/// ~                                                               ~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                  Received OPEN Message                        |
+/// ~                                                               ~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                 Information (variable)                        |
+/// ~                                                               ~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PeerUpNotificationMessage {
+    peer_header: PeerHeader,
+    local_address: IpAddr,
+    local_port: Option<u16>,
+    remote_port: Option<u16>,
+    sent_message: BGPMessage,
+    received_message: BGPMessage,
+    information: Vec<InitiationInformation>,
+}
+
+/// Runtime errors when constructing a PeerUpMessage
+/// Peer Up BGP messages should only carry [netgauze_bgp_pkt::BGPMessage::Open],
+/// anything else is an error
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum PeerUpNotificationMessageError {
+    UnexpectedSentMessageType(BGPMessageType),
+    UnexpectedReceivedMessageType(BGPMessageType),
+}
+
+impl PeerUpNotificationMessage {
+    pub fn build(
+        peer_header: PeerHeader,
+        local_address: IpAddr,
+        local_port: Option<u16>,
+        remote_port: Option<u16>,
+        sent_message: BGPMessage,
+        received_message: BGPMessage,
+        information: Vec<InitiationInformation>,
+    ) -> Result<Self, PeerUpNotificationMessageError> {
+        if sent_message.get_type() != BGPMessageType::Open {
+            return Err(PeerUpNotificationMessageError::UnexpectedSentMessageType(
+                sent_message.get_type(),
+            ));
+        }
+        if received_message.get_type() != BGPMessageType::Open {
+            return Err(
+                PeerUpNotificationMessageError::UnexpectedReceivedMessageType(
+                    sent_message.get_type(),
+                ),
+            );
+        }
+        Ok(Self {
+            peer_header,
+            local_address,
+            local_port,
+            remote_port,
+            sent_message,
+            received_message,
+            information,
+        })
+    }
+
+    pub const fn peer_header(&self) -> &PeerHeader {
+        &self.peer_header
+    }
+
+    pub const fn local_address(&self) -> &IpAddr {
+        &self.local_address
+    }
+
+    pub const fn local_port(&self) -> &Option<u16> {
+        &self.local_port
+    }
+
+    pub const fn remote_port(&self) -> &Option<u16> {
+        &self.remote_port
+    }
+
+    pub const fn sent_message(&self) -> &BGPMessage {
+        &self.sent_message
+    }
+
+    pub const fn received_message(&self) -> &BGPMessage {
+        &self.received_message
+    }
+
+    pub const fn information(&self) -> &Vec<InitiationInformation> {
+        &self.information
+    }
 }
