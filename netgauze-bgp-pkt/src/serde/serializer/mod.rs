@@ -29,7 +29,6 @@ use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
 
 use crate::{
-    iana::BGPMessageType,
     serde::{
         deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
         serializer::{
@@ -93,22 +92,22 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
         writer.write_u16::<NetworkEndian>(len as u16)?;
         match self {
             Self::Open(open) => {
-                writer.write_u8(BGPMessageType::Open.into())?;
+                writer.write_u8(self.get_type().into())?;
                 open.write(writer)?;
             }
             Self::Update(update) => {
-                writer.write_u8(BGPMessageType::Update.into())?;
+                writer.write_u8(self.get_type().into())?;
                 update.write(writer)?;
             }
             Self::Notification(notification) => {
-                writer.write_u8(BGPMessageType::Notification.into())?;
+                writer.write_u8(self.get_type().into())?;
                 notification.write(writer)?;
             }
             Self::KeepAlive => {
-                writer.write_u8(BGPMessageType::KeepAlive.into())?;
+                writer.write_u8(self.get_type().into())?;
             }
             Self::RouteRefresh(route_refresh) => {
-                writer.write_u8(BGPMessageType::RouteRefresh.into())?;
+                writer.write_u8(self.get_type().into())?;
                 route_refresh.write(writer)?;
             }
         }

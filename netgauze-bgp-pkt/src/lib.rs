@@ -25,7 +25,7 @@
 #![deny(clippy::missing_const_for_fn)]
 
 use crate::{
-    notification::BGPNotificationMessage, open::BGPOpenMessage,
+    iana::BGPMessageType, notification::BGPNotificationMessage, open::BGPOpenMessage,
     route_refresh::BGPRouteRefreshMessage, update::BGPUpdateMessage,
 };
 
@@ -66,4 +66,17 @@ pub enum BGPMessage {
     Notification(BGPNotificationMessage),
     KeepAlive,
     RouteRefresh(BGPRouteRefreshMessage),
+}
+
+impl BGPMessage {
+    /// Get the BGP message IANA type
+    pub const fn get_type(&self) -> BGPMessageType {
+        match self {
+            Self::Open(_) => BGPMessageType::Open,
+            Self::Update(_) => BGPMessageType::Update,
+            Self::Notification(_) => BGPMessageType::Notification,
+            Self::KeepAlive => BGPMessageType::KeepAlive,
+            Self::RouteRefresh(_) => BGPMessageType::RouteRefresh,
+        }
+    }
 }
