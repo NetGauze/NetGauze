@@ -398,7 +398,7 @@ impl TryFrom<u8> for SubsequentAddressFamily {
 pub enum AddressType {
     Ipv4Unicast,
     Ipv4Multicast,
-    IpPv4MplsLabeledVpn,
+    Ipv4MplsLabeledVpn,
     Ipv4MulticastBgpMplsVpn,
     Ipv4Bgp4over6,
     Ipv4FlowSpec,
@@ -449,7 +449,7 @@ impl AddressType {
         match self {
             Self::Ipv4Unicast => AddressFamily::IPv4,
             Self::Ipv4Multicast => AddressFamily::IPv4,
-            Self::IpPv4MplsLabeledVpn => AddressFamily::IPv4,
+            Self::Ipv4MplsLabeledVpn => AddressFamily::IPv4,
             Self::Ipv4MulticastBgpMplsVpn => AddressFamily::IPv4,
             Self::Ipv4Bgp4over6 => AddressFamily::IPv4,
             Self::Ipv4FlowSpec => AddressFamily::IPv4,
@@ -475,7 +475,7 @@ impl AddressType {
         match self {
             Self::Ipv4Unicast => SubsequentAddressFamily::Unicast,
             Self::Ipv4Multicast => SubsequentAddressFamily::Multicast,
-            Self::IpPv4MplsLabeledVpn => SubsequentAddressFamily::MplsVpn,
+            Self::Ipv4MplsLabeledVpn => SubsequentAddressFamily::MplsVpn,
             Self::Ipv4MulticastBgpMplsVpn => SubsequentAddressFamily::MulticastBgpMplsVpn,
             Self::Ipv4Bgp4over6 => SubsequentAddressFamily::Bgp4over6,
             Self::Ipv4FlowSpec => SubsequentAddressFamily::FlowSpecFilter,
@@ -504,9 +504,7 @@ impl AddressType {
         match (afi, safi) {
             (AddressFamily::IPv4, SubsequentAddressFamily::Unicast) => Ok(Self::Ipv4Unicast),
             (AddressFamily::IPv4, SubsequentAddressFamily::Multicast) => Ok(Self::Ipv4Multicast),
-            (AddressFamily::IPv4, SubsequentAddressFamily::MplsVpn) => {
-                Ok(Self::IpPv4MplsLabeledVpn)
-            }
+            (AddressFamily::IPv4, SubsequentAddressFamily::MplsVpn) => Ok(Self::Ipv4MplsLabeledVpn),
             (AddressFamily::IPv4, SubsequentAddressFamily::MulticastBgpMplsVpn) => {
                 Ok(Self::Ipv4MulticastBgpMplsVpn)
             }
@@ -593,7 +591,7 @@ mod tests {
     fn test_address_type_check_ret_afi_safi() {
         let ipv4_unicast = AddressType::Ipv4Unicast;
         let ipv4_multicast = AddressType::Ipv4Multicast;
-        let ipv4_mpls_vpn = AddressType::IpPv4MplsLabeledVpn;
+        let ipv4_mpls_vpn = AddressType::Ipv4MplsLabeledVpn;
         let ipv4_multicast_mpls_vpn = AddressType::Ipv4MulticastBgpMplsVpn;
         let ipv4_bgp_4_over_6 = AddressType::Ipv4Bgp4over6;
         let ipv4_flow_spec = AddressType::Ipv4FlowSpec;
@@ -699,7 +697,7 @@ mod tests {
         let valid = vec![
             AddressType::Ipv4Unicast,
             AddressType::Ipv4Multicast,
-            AddressType::IpPv4MplsLabeledVpn,
+            AddressType::Ipv4MplsLabeledVpn,
             AddressType::Ipv4MulticastBgpMplsVpn,
             AddressType::Ipv4Bgp4over6,
             AddressType::Ipv4FlowSpec,

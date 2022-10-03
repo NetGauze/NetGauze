@@ -18,7 +18,7 @@ pub fn main() {
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
             )]),
             BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
-                MultiProtocolExtensionsCapability::new(AddressType::IpPv4MplsLabeledVpn),
+                MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
             )]),
             BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
                 UnrecognizedCapability::new(128, vec![]),
@@ -32,7 +32,7 @@ pub fn main() {
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
                     ExtendedNextHopEncoding::new(
-                        AddressType::IpPv4MplsLabeledVpn,
+                        AddressType::Ipv4MplsLabeledVpn,
                         AddressFamily::IPv6,
                     ),
                 ]),

@@ -315,7 +315,7 @@ fn test_extended_next_hop_encoding_capability() -> Result<(), BGPCapabilityWriti
         BGPCapability::ExtendedNextHopEncoding(ExtendedNextHopEncodingCapability::new(vec![
             ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
             ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
-            ExtendedNextHopEncoding::new(AddressType::IpPv4MplsLabeledVpn, AddressFamily::IPv6),
+            ExtendedNextHopEncoding::new(AddressType::Ipv4MplsLabeledVpn, AddressFamily::IPv6),
         ]));
 
     test_parsed_completely(&good_wire, &good);

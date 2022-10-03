@@ -594,10 +594,10 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                 let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
                 Ok((buf, MpReach::Ipv4Multicast { next_hop, nlri }))
             }
-            AddressType::IpPv4MplsLabeledVpn => {
+            AddressType::Ipv4MplsLabeledVpn => {
                 return Err(nom::Err::Error(LocatedMpReachParsingError::new(
                     mp_buf_begin,
-                    MpReachParsingError::UnknownAddressType(AddressType::IpPv4MplsLabeledVpn),
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv4MplsLabeledVpn),
                 )))
             }
             AddressType::Ipv4MulticastBgpMplsVpn => {
@@ -778,10 +778,10 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for
                 let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
                 Ok((buf, MpUnreach::Ipv4Multicast { nlri }))
             }
-            AddressType::IpPv4MplsLabeledVpn => {
+            AddressType::Ipv4MplsLabeledVpn => {
                 return Err(nom::Err::Error(LocatedMpUnreachParsingError::new(
                     mp_buf_begin,
-                    MpUnreachParsingError::UnknownAddressType(AddressType::IpPv4MplsLabeledVpn),
+                    MpUnreachParsingError::UnknownAddressType(AddressType::Ipv4MplsLabeledVpn),
                 )))
             }
             AddressType::Ipv4MulticastBgpMplsVpn => {
