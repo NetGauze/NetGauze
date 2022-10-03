@@ -27,8 +27,25 @@ use std::{
 
 use crate::{
     serde::serializer::{BmpMessageWritingError, PeerHeaderWritingError},
-    BmpMessage, BmpPeerType, PeerHeader, RouteMonitoringMessage,
+    BmpMessage, BmpPeerType, InitiationInformation, InitiationMessage, PeerHeader,
+    RouteMonitoringMessage,
 };
+
+#[test]
+fn test_bmp_init() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x17, 0x04, 0x00, 0x01, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31,
+        0x31, 0x00, 0x02, 0x00, 0x03, 0x50, 0x45, 0x32,
+    ];
+
+    let good = BmpMessage::Initiation(InitiationMessage::new(vec![
+        InitiationInformation::SystemDescription("test11".to_string()),
+        InitiationInformation::SystemName("PE2".to_string()),
+    ]));
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
 
 #[test]
 fn test_peer_header() -> Result<(), PeerHeaderWritingError> {

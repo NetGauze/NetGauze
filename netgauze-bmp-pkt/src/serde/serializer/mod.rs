@@ -296,7 +296,7 @@ pub enum InitiationMessageWritingError {
 }
 
 impl WritablePDU<InitiationMessageWritingError> for InitiationMessage {
-    const BASE_LENGTH: usize = 0;
+    const BASE_LENGTH: usize = 1;
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH + self.information().iter().map(|x| x.len()).sum::<usize>()
@@ -337,52 +337,66 @@ impl WritablePDU<InitiationInformationWritingError> for InitiationInformation {
         match self {
             Self::String(value) => {
                 writer.write_u16::<NetworkEndian>(InitiationInformationTlvType::String.into())?;
-                writer.write_all(value.as_bytes())?;
+                let bytes = value.as_bytes();
+                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(bytes)?;
             }
             Self::SystemDescription(value) => {
                 writer.write_u16::<NetworkEndian>(
                     InitiationInformationTlvType::SystemDescription.into(),
                 )?;
-                writer.write_all(value.as_bytes())?;
+                let bytes = value.as_bytes();
+                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(bytes)?;
             }
             Self::SystemName(value) => {
                 writer
                     .write_u16::<NetworkEndian>(InitiationInformationTlvType::SystemName.into())?;
-                writer.write_all(value.as_bytes())?;
+                let bytes = value.as_bytes();
+                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(bytes)?;
             }
             Self::VrfTableName(value) => {
                 writer.write_u16::<NetworkEndian>(
                     InitiationInformationTlvType::VrfTableName.into(),
                 )?;
-                writer.write_all(value.as_bytes())?;
+                let bytes = value.as_bytes();
+                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(bytes)?;
             }
             Self::AdminLabel(value) => {
                 writer
                     .write_u16::<NetworkEndian>(InitiationInformationTlvType::AdminLabel.into())?;
-                writer.write_all(value.as_bytes())?;
+                let bytes = value.as_bytes();
+                writer.write_u16::<NetworkEndian>(bytes.len() as u16)?;
+                writer.write_all(bytes)?;
             }
             Self::Experimental65531(value) => {
                 writer.write_u16::<NetworkEndian>(
                     InitiationInformationTlvType::Experimental65531.into(),
                 )?;
+                writer.write_u16::<NetworkEndian>(value.len() as u16)?;
                 writer.write_all(value)?;
             }
             Self::Experimental65532(value) => {
                 writer.write_u16::<NetworkEndian>(
                     InitiationInformationTlvType::Experimental65532.into(),
                 )?;
+                writer.write_u16::<NetworkEndian>(value.len() as u16)?;
                 writer.write_all(value)?;
             }
             Self::Experimental65533(value) => {
                 writer.write_u16::<NetworkEndian>(
                     InitiationInformationTlvType::Experimental65533.into(),
                 )?;
+                writer.write_u16::<NetworkEndian>(value.len() as u16)?;
                 writer.write_all(value)?;
             }
             Self::Experimental65534(value) => {
                 writer.write_u16::<NetworkEndian>(
                     InitiationInformationTlvType::Experimental65534.into(),
                 )?;
+                writer.write_u16::<NetworkEndian>(value.len() as u16)?;
                 writer.write_all(value)?;
             }
         }
