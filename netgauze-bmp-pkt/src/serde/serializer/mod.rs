@@ -121,7 +121,6 @@ impl WritablePDU<RouteMirroringMessageWritingError> for RouteMirroringMessage {
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum PeerHeaderWritingError {
     StdIOError(#[from_std_io_error] String),
-    RouteMirroringValueError(#[from] RouteMirroringValueWritingError),
 }
 
 #[inline]
