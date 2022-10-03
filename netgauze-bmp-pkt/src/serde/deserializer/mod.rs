@@ -36,13 +36,14 @@ use netgauze_serde_macros::LocatedError;
 
 use crate::{
     iana::{
-        BmpMessageType, InitiationInformationTlvType, UndefinedBmpMessageType,
-        UndefinedBmpPeerTypeCode, UndefinedInitiationInformationTlvType, BMP_VERSION,
-        PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2, PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6,
-        PEER_FLAGS_IS_POST_POLICY,
+        BmpMessageType, InitiationInformationTlvType, PeerDownReasonCode, UndefinedBmpMessageType,
+        UndefinedBmpPeerTypeCode, UndefinedInitiationInformationTlvType,
+        UndefinedPeerDownReasonCode, BMP_VERSION, PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2,
+        PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6, PEER_FLAGS_IS_POST_POLICY,
     },
-    BmpMessage, BmpPeerType, BmpPeerTypeCode, InitiationInformation, InitiationMessage, PeerHeader,
-    PeerUpNotificationMessage, PeerUpNotificationMessageError, RouteMonitoringMessage,
+    BmpMessage, BmpPeerType, BmpPeerTypeCode, InitiationInformation, InitiationMessage,
+    PeerDownNotificationMessage, PeerDownNotificationMessageError, PeerDownNotificationReason,
+    PeerHeader, PeerUpNotificationMessage, PeerUpNotificationMessageError, RouteMonitoringMessage,
 };
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
@@ -57,6 +58,9 @@ pub enum BmpMessageParsingError {
     InitiationMessageError(#[from_located(module = "self")] InitiationMessageParsingError),
     PeerUpNotificationMessageError(
         #[from_located(module = "self")] PeerUpNotificationMessageParsingError,
+    ),
+    PeerDownNotificationMessageError(
+        #[from_located(module = "self")] PeerDownNotificationMessageParsingError,
     ),
 }
 
@@ -79,7 +83,10 @@ impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
                 (buf, BmpMessage::RouteMonitoring(value))
             }
             BmpMessageType::StatisticsReport => todo!(),
-            BmpMessageType::PeerDownNotification => todo!(),
+            BmpMessageType::PeerDownNotification => {
+                let (buf, value) = parse_into_located(buf)?;
+                (buf, BmpMessage::PeerDownNotification(value))
+            }
             BmpMessageType::PeerUpNotification => {
                 let (buf, value) = parse_into_located(buf)?;
                 (buf, BmpMessage::PeerUpNotification(value))
@@ -415,6 +422,7 @@ const fn check_is_ipv6(peer_header: &PeerHeader) -> Result<bool, BmpPeerTypeCode
         BmpPeerType::Experimental254 { .. } => Ok(true),
     }
 }
+
 impl<'a> ReadablePDU<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
     for PeerUpNotificationMessage
 {
@@ -473,6 +481,125 @@ impl<'a> ReadablePDU<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
                         input,
                         PeerUpNotificationMessageParsingError::PeerUpMessageError(err),
                     ),
+                ))
+            }
+        }
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum PeerDownNotificationMessageParsingError {
+    NomError(#[from_nom] ErrorKind),
+    PeerDownMessageError(PeerDownNotificationMessageError),
+    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
+    PeerDownNotificationReasonError(
+        #[from_located(module = "self")] PeerDownNotificationReasonParsingError,
+    ),
+}
+
+impl<'a> ReadablePDU<'a, LocatedPeerDownNotificationMessageParsingError<'a>>
+    for PeerDownNotificationMessage
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationMessageParsingError<'a>> {
+        let input = buf;
+        let (buf, peer_header) = parse_into_located(buf)?;
+        let (buf, reason) = parse_into_located(buf)?;
+        let msg = PeerDownNotificationMessage::build(peer_header, reason);
+        match msg {
+            Ok(msg) => Ok((buf, msg)),
+            Err(err) => {
+                return Err(nom::Err::Error(
+                    LocatedPeerDownNotificationMessageParsingError::new(
+                        input,
+                        PeerDownNotificationMessageParsingError::PeerDownMessageError(err),
+                    ),
+                ))
+            }
+        }
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum PeerDownNotificationReasonParsingError {
+    NomError(#[from_nom] ErrorKind),
+    UndefinedPeerDownReasonCode(#[from_external] UndefinedPeerDownReasonCode),
+    BgpMessageError(
+        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer")] BGPMessageParsingError,
+    ),
+    InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
+}
+
+impl<'a> ReadablePDU<'a, LocatedPeerDownNotificationReasonParsingError<'a>>
+    for PeerDownNotificationReason
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationReasonParsingError<'a>> {
+        let (buf, reason_code) =
+            nom::combinator::map_res(be_u8, PeerDownReasonCode::try_from)(buf)?;
+        match reason_code {
+            PeerDownReasonCode::LocalSystemClosedNotificationPduFollows => {
+                let (buf, msg) = parse_into_located_one_input(buf, true)?;
+                Ok((
+                    buf,
+                    PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg),
+                ))
+            }
+            PeerDownReasonCode::LocalSystemClosedFsmEventFollows => {
+                let (buf, value) = be_u16(buf)?;
+                Ok((
+                    buf,
+                    PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(value),
+                ))
+            }
+            PeerDownReasonCode::RemoteSystemClosedNotificationPduFollows => {
+                let (buf, msg) = parse_into_located_one_input(buf, true)?;
+                Ok((
+                    buf,
+                    PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(msg),
+                ))
+            }
+            PeerDownReasonCode::RemoteSystemClosedNoData => {
+                Ok((buf, PeerDownNotificationReason::RemoteSystemClosedNoData))
+            }
+            PeerDownReasonCode::PeerDeConfigured => {
+                Ok((buf, PeerDownNotificationReason::PeerDeConfigured))
+            }
+            PeerDownReasonCode::LocalSystemClosedTlvDataFollows => {
+                let (buf, information) = parse_into_located(buf)?;
+                Ok((
+                    buf,
+                    PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(information),
+                ))
+            }
+            PeerDownReasonCode::Experimental65531 => {
+                let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
+                Ok((
+                    buf,
+                    PeerDownNotificationReason::Experimental65531(data.to_vec()),
+                ))
+            }
+            PeerDownReasonCode::Experimental65532 => {
+                let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
+                Ok((
+                    buf,
+                    PeerDownNotificationReason::Experimental65532(data.to_vec()),
+                ))
+            }
+            PeerDownReasonCode::Experimental65533 => {
+                let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
+                Ok((
+                    buf,
+                    PeerDownNotificationReason::Experimental65533(data.to_vec()),
+                ))
+            }
+            PeerDownReasonCode::Experimental65534 => {
+                let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
+                Ok((
+                    buf,
+                    PeerDownNotificationReason::Experimental65534(data.to_vec()),
                 ))
             }
         }

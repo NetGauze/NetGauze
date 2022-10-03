@@ -30,7 +30,10 @@ use chrono::{DateTime, Utc};
 
 use netgauze_bgp_pkt::{iana::BGPMessageType, update::BGPUpdateMessage, BGPMessage};
 
-use crate::iana::{BmpPeerTypeCode, PeerTerminationCode};
+use crate::iana::{
+    BmpMessageType, BmpPeerTypeCode, InitiationInformationTlvType, PeerDownReasonCode,
+    PeerTerminationCode,
+};
 
 pub mod iana;
 #[cfg(feature = "serde")]
@@ -51,7 +54,7 @@ pub mod serde;
 pub enum BmpMessage {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport,
-    PeerDownNotification,
+    PeerDownNotification(PeerDownNotificationMessage),
     PeerUpNotification(PeerUpNotificationMessage),
     Initiation(InitiationMessage),
     Termination(TerminationMessage),
@@ -60,6 +63,25 @@ pub enum BmpMessage {
     Experimental252(Vec<u8>),
     Experimental253(Vec<u8>),
     Experimental254(Vec<u8>),
+}
+
+impl BmpMessage {
+    /// Get IANA type
+    pub const fn get_type(&self) -> BmpMessageType {
+        match self {
+            BmpMessage::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
+            BmpMessage::StatisticsReport => BmpMessageType::StatisticsReport,
+            BmpMessage::PeerDownNotification(_) => BmpMessageType::PeerDownNotification,
+            BmpMessage::PeerUpNotification(_) => BmpMessageType::PeerUpNotification,
+            BmpMessage::Initiation(_) => BmpMessageType::Initiation,
+            BmpMessage::Termination(_) => BmpMessageType::Termination,
+            BmpMessage::RouteMirroring(_) => BmpMessageType::RouteMirroring,
+            BmpMessage::Experimental251(_) => BmpMessageType::Experimental251,
+            BmpMessage::Experimental252(_) => BmpMessageType::Experimental252,
+            BmpMessage::Experimental253(_) => BmpMessageType::Experimental253,
+            BmpMessage::Experimental254(_) => BmpMessageType::Experimental254,
+        }
+    }
 }
 
 ///  The per-peer header follows the common header for most BMP messages.
@@ -292,6 +314,33 @@ pub enum InitiationInformation {
     Experimental65534(Vec<u8>),
 }
 
+impl InitiationInformation {
+    /// Get the IANA type
+    pub const fn get_type(&self) -> InitiationInformationTlvType {
+        match self {
+            InitiationInformation::String(_) => InitiationInformationTlvType::String,
+            InitiationInformation::SystemDescription(_) => {
+                InitiationInformationTlvType::SystemDescription
+            }
+            InitiationInformation::SystemName(_) => InitiationInformationTlvType::SystemName,
+            InitiationInformation::VrfTableName(_) => InitiationInformationTlvType::VrfTableName,
+            InitiationInformation::AdminLabel(_) => InitiationInformationTlvType::AdminLabel,
+            InitiationInformation::Experimental65531(_) => {
+                InitiationInformationTlvType::Experimental65531
+            }
+            InitiationInformation::Experimental65532(_) => {
+                InitiationInformationTlvType::Experimental65532
+            }
+            InitiationInformation::Experimental65533(_) => {
+                InitiationInformationTlvType::Experimental65533
+            }
+            InitiationInformation::Experimental65534(_) => {
+                InitiationInformationTlvType::Experimental65534
+            }
+        }
+    }
+}
+
 /// The termination message provides a way for a monitored router to indicate
 /// why it is terminating a session.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -446,7 +495,7 @@ pub struct PeerUpNotificationMessage {
     information: Vec<InitiationInformation>,
 }
 
-/// Runtime errors when constructing a PeerUpMessage
+/// Runtime errors when constructing a [PeerUpNotificationMessage]
 /// Peer Up BGP messages should only carry [netgauze_bgp_pkt::BGPMessage::Open],
 /// anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -514,5 +563,145 @@ impl PeerUpNotificationMessage {
 
     pub const fn information(&self) -> &Vec<InitiationInformation> {
         &self.information
+    }
+}
+
+/// Runtime errors when constructing a [PeerDownNotificationMessage]
+/// Peer Up BGP messages should only carry
+/// [netgauze_bgp_pkt::BGPMessage::Notification], anything else is an error
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum PeerDownNotificationMessageError {
+    UnexpectedBgpMessageType(BGPMessageType),
+    UnexpectedInitiationInformationTlvType(InitiationInformationTlvType),
+}
+
+/// This message is used to indicate that a peering session was terminated.
+///
+/// ```text
+/// 0                   1                   2                   3
+/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+
+/// |    Reason     |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |            Data (present if Reason = 1, 2 or 3)               |
+/// ~                                                               ~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PeerDownNotificationMessage {
+    peer_header: PeerHeader,
+    reason: PeerDownNotificationReason,
+}
+
+impl PeerDownNotificationMessage {
+    pub fn build(
+        peer_header: PeerHeader,
+        reason: PeerDownNotificationReason,
+    ) -> Result<Self, PeerDownNotificationMessageError> {
+        match &reason {
+            PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg)
+            | PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(msg) => {
+                if msg.get_type() != BGPMessageType::Notification {
+                    return Err(PeerDownNotificationMessageError::UnexpectedBgpMessageType(
+                        msg.get_type(),
+                    ));
+                }
+            }
+            PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(_) => {}
+            PeerDownNotificationReason::RemoteSystemClosedNoData => {}
+            PeerDownNotificationReason::PeerDeConfigured => {}
+            PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(information) => {
+                if information.get_type() != InitiationInformationTlvType::VrfTableName {
+                    return Err(
+                        PeerDownNotificationMessageError::UnexpectedInitiationInformationTlvType(
+                            information.get_type(),
+                        ),
+                    );
+                }
+            }
+            PeerDownNotificationReason::Experimental65531(_) => {}
+            PeerDownNotificationReason::Experimental65532(_) => {}
+            PeerDownNotificationReason::Experimental65533(_) => {}
+            PeerDownNotificationReason::Experimental65534(_) => {}
+        }
+
+        Ok(Self {
+            peer_header,
+            reason,
+        })
+    }
+}
+
+/// Reason indicates why the session was closed and
+/// [PeerDownNotificationMessage] is sent.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum PeerDownNotificationReason {
+    /// The local system closed the session.  Following the
+    /// Reason is a BGP PDU containing a BGP NOTIFICATION message that
+    /// would have been sent to the peer.
+    LocalSystemClosedNotificationPduFollows(BGPMessage),
+
+    /// The local system closed the session. No notification
+    /// message was sent. Following the reason code is a 2-byte field
+    /// containing the code corresponding to the Finite State Machine
+    /// (FSM) Event that caused the system to close the session (see
+    /// Section 8.1 of [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)).
+    /// Two bytes both set to 0 are used to indicate that no relevant Event code
+    /// is defined.
+    LocalSystemClosedFsmEventFollows(u16),
+
+    /// The remote system closed the session with a notification
+    /// message. Following the Reason is a BGP PDU containing the BGP
+    /// NOTIFICATION message as received from the peer.
+    RemoteSystemClosedNotificationPduFollows(BGPMessage),
+
+    /// The remote system closed the session without a
+    /// notification message. This includes any unexpected termination of
+    /// the transport session, so in some cases both the local and remote
+    /// systems might consider this to apply.
+    RemoteSystemClosedNoData,
+
+    /// Information for this peer will no longer be sent to the
+    /// monitoring station for configuration reasons.  This does not,
+    /// strictly speaking, indicate that the peer has gone down, but it
+    /// does indicate that the monitoring station will not receive updates
+    /// for the peer.
+    PeerDeConfigured,
+
+    /// Type = 3: VRF/Table Name. The Information field contains a UTF-8 string
+    /// whose value MUST be equal to the value of the VRF or table name (e.g.,
+    /// RD instance name) being conveyed. The string size MUST be within the
+    /// range of 1 to 255 bytes. The VRF/Table Name informational TLV MUST be
+    /// included if it was in the Peer Up.
+    LocalSystemClosedTlvDataFollows(InitiationInformation),
+
+    Experimental65531(Vec<u8>),
+    Experimental65532(Vec<u8>),
+    Experimental65533(Vec<u8>),
+    Experimental65534(Vec<u8>),
+}
+
+impl PeerDownNotificationReason {
+    pub const fn get_type(&self) -> PeerDownReasonCode {
+        match self {
+            Self::LocalSystemClosedNotificationPduFollows(_) => {
+                PeerDownReasonCode::LocalSystemClosedNotificationPduFollows
+            }
+            Self::LocalSystemClosedFsmEventFollows(_) => {
+                PeerDownReasonCode::LocalSystemClosedFsmEventFollows
+            }
+            Self::RemoteSystemClosedNotificationPduFollows(_) => {
+                PeerDownReasonCode::RemoteSystemClosedNotificationPduFollows
+            }
+            Self::RemoteSystemClosedNoData => PeerDownReasonCode::RemoteSystemClosedNoData,
+            Self::PeerDeConfigured => PeerDownReasonCode::PeerDeConfigured,
+            Self::LocalSystemClosedTlvDataFollows(_) => {
+                PeerDownReasonCode::LocalSystemClosedTlvDataFollows
+            }
+            Self::Experimental65531(_) => PeerDownReasonCode::Experimental65531,
+            Self::Experimental65532(_) => PeerDownReasonCode::Experimental65532,
+            Self::Experimental65533(_) => PeerDownReasonCode::Experimental65533,
+            Self::Experimental65534(_) => PeerDownReasonCode::Experimental65534,
+        }
     }
 }

@@ -34,8 +34,8 @@ use std::{
 
 use crate::{
     serde::serializer::{BmpMessageWritingError, PeerHeaderWritingError},
-    BmpMessage, BmpPeerType, InitiationInformation, InitiationMessage, PeerHeader,
-    PeerUpNotificationMessage, RouteMonitoringMessage,
+    BmpMessage, BmpPeerType, InitiationInformation, InitiationMessage, PeerDownNotificationMessage,
+    PeerDownNotificationReason, PeerHeader, PeerUpNotificationMessage, RouteMonitoringMessage,
 };
 
 #[test]
@@ -359,5 +359,40 @@ fn test_peer_up_notification() -> Result<(), BmpMessageWritingError> {
     test_parsed_completely(&good_wire, &good);
 
     test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_peer_down_notification() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x33, 0x02, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0xfc, 0x00, 0x0a, 0x00, 0x00, 0x01, 0x63, 0x3b, 0x2a, 0x53, 0x00,
+        0x07, 0x71, 0xe3, 0x02, 0x00, 0x02,
+    ];
+
+    let good = BmpMessage::PeerDownNotification(
+        PeerDownNotificationMessage::build(
+            PeerHeader::new(
+                BmpPeerType::GlobalInstancePeer {
+                    ipv6: true,
+                    post_policy: false,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                None,
+                Some(IpAddr::V6(Ipv6Addr::from_str("fc00::1").unwrap())),
+                64512,
+                Ipv4Addr::new(10, 0, 0, 1),
+                Some(Utc.timestamp(1664821843, 487907000)),
+            ),
+            PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
+        )
+        .unwrap(),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+
     Ok(())
 }

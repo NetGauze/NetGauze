@@ -224,7 +224,7 @@ impl TryFrom<u16> for PeerTerminationCode {
 }
 
 /// BMP Peer down Reason codes as registered in IANA [BMP Peer Down Reason Codes](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#peer-down-reason-codes)
-#[repr(u16)]
+#[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
 pub enum PeerDownReasonCode {
     LocalSystemClosedNotificationPduFollows = 1,
@@ -233,27 +233,27 @@ pub enum PeerDownReasonCode {
     RemoteSystemClosedNoData = 4,
     PeerDeConfigured = 5,
     LocalSystemClosedTlvDataFollows = 6,
-    Experimental65531 = 65531,
-    Experimental65532 = 65532,
-    Experimental65533 = 65533,
-    Experimental65534 = 65534,
+    Experimental65531 = 31,
+    Experimental65532 = 32,
+    Experimental65533 = 33,
+    Experimental65534 = 34,
 }
 
 /// BMP Peer down reason code type is not one of [PeerDownReasonCode], the
 /// carried value is the undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct UndefinedPeerDownReasonCode(pub u16);
+pub struct UndefinedPeerDownReasonCode(pub u8);
 
-impl From<PeerDownReasonCode> for u16 {
+impl From<PeerDownReasonCode> for u8 {
     fn from(value: PeerDownReasonCode) -> Self {
-        value as u16
+        value as u8
     }
 }
 
-impl TryFrom<u16> for PeerDownReasonCode {
+impl TryFrom<u8> for PeerDownReasonCode {
     type Error = UndefinedPeerDownReasonCode;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
             None => Err(UndefinedPeerDownReasonCode(value)),
@@ -405,7 +405,7 @@ mod tests {
         let defined_code = 5;
         let defined_value = PeerDownReasonCode::try_from(defined_code);
         let undefined = PeerDownReasonCode::try_from(undefined_code);
-        let defined_code_u16: u16 = PeerDownReasonCode::PeerDeConfigured.into();
+        let defined_code_u16: u8 = PeerDownReasonCode::PeerDeConfigured.into();
         assert_eq!(defined_value, Ok(PeerDownReasonCode::PeerDeConfigured));
         assert_eq!(defined_code_u16, defined_code);
         assert_eq!(undefined, Err(UndefinedPeerDownReasonCode(undefined_code)));
