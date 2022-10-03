@@ -263,7 +263,8 @@ impl InitiationMessage {
     }
 }
 
-///  The Information TLV is used by the [InitiationMessage] and [PeerUpMessage]
+///  The Information TLV is used by the [InitiationMessage] and
+/// [PeerUpNotificationMessage]
 ///
 /// ```text
 ///  0                   1                   2                   3

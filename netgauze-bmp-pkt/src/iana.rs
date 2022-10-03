@@ -93,7 +93,7 @@ pub enum BmpPeerTypeCode {
     Experimental254 = 254,
 }
 
-/// BGP Message type is not one of [BmpPeerType], the carried value is the
+/// BGP Message type is not one of [BmpPeerTypeCode], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct UndefinedBmpPeerTypeCode(pub u8);
