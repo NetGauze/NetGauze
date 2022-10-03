@@ -69,17 +69,17 @@ impl BmpMessage {
     /// Get IANA type
     pub const fn get_type(&self) -> BmpMessageType {
         match self {
-            BmpMessage::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
-            BmpMessage::StatisticsReport => BmpMessageType::StatisticsReport,
-            BmpMessage::PeerDownNotification(_) => BmpMessageType::PeerDownNotification,
-            BmpMessage::PeerUpNotification(_) => BmpMessageType::PeerUpNotification,
-            BmpMessage::Initiation(_) => BmpMessageType::Initiation,
-            BmpMessage::Termination(_) => BmpMessageType::Termination,
-            BmpMessage::RouteMirroring(_) => BmpMessageType::RouteMirroring,
-            BmpMessage::Experimental251(_) => BmpMessageType::Experimental251,
-            BmpMessage::Experimental252(_) => BmpMessageType::Experimental252,
-            BmpMessage::Experimental253(_) => BmpMessageType::Experimental253,
-            BmpMessage::Experimental254(_) => BmpMessageType::Experimental254,
+            Self::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
+            Self::StatisticsReport => BmpMessageType::StatisticsReport,
+            Self::PeerDownNotification(_) => BmpMessageType::PeerDownNotification,
+            Self::PeerUpNotification(_) => BmpMessageType::PeerUpNotification,
+            Self::Initiation(_) => BmpMessageType::Initiation,
+            Self::Termination(_) => BmpMessageType::Termination,
+            Self::RouteMirroring(_) => BmpMessageType::RouteMirroring,
+            Self::Experimental251(_) => BmpMessageType::Experimental251,
+            Self::Experimental252(_) => BmpMessageType::Experimental252,
+            Self::Experimental253(_) => BmpMessageType::Experimental253,
+            Self::Experimental254(_) => BmpMessageType::Experimental254,
         }
     }
 }
