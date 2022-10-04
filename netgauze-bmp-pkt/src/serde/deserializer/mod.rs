@@ -55,6 +55,7 @@ pub enum BmpMessageParsingError {
         #[from_located(module = "self")] PeerDownNotificationMessageParsingError,
     ),
     RouteMirroringMessageError(#[from_located(module = "self")] RouteMirroringMessageParsingError),
+    TerminationMessageError(#[from_located(module = "self")] TerminationMessageParsingError),
 }
 
 impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
@@ -88,7 +89,10 @@ impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
                 let (buf, init) = parse_into_located(buf)?;
                 (buf, BmpMessage::Initiation(init))
             }
-            BmpMessageType::Termination => todo!(),
+            BmpMessageType::Termination => {
+                let (buf, init) = parse_into_located(buf)?;
+                (buf, BmpMessage::Termination(init))
+            }
             BmpMessageType::RouteMirroring => {
                 let (buf, init) = parse_into_located(buf)?;
                 (buf, BmpMessage::RouteMirroring(init))
@@ -605,6 +609,86 @@ impl<'a> ReadablePDU<'a, LocatedRouteMirroringValueParsingError<'a>> for RouteMi
                 LocatedRouteMirroringValueParsingError::new(
                     buf,
                     RouteMirroringValueParsingError::NomError(ErrorKind::NonEmpty),
+                ),
+            ));
+        }
+        Ok((reminder, value))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum TerminationMessageParsingError {
+    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
+    TerminationInformationError(
+        #[from_located(module = "self")] TerminationInformationParsingError,
+    ),
+}
+
+impl<'a> ReadablePDU<'a, LocatedTerminationMessageParsingError<'a>> for TerminationMessage {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedTerminationMessageParsingError<'a>> {
+        let (buf, peer_header) = parse_into_located(buf)?;
+        let (buf, information) = parse_till_empty_into_located(buf)?;
+        Ok((buf, TerminationMessage::new(peer_header, information)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum TerminationInformationParsingError {
+    NomError(#[from_nom] ErrorKind),
+    UndefinedTerminationInformationTlvType(#[from_external] UndefinedTerminationInformationTlvType),
+    UndefinedPeerTerminationCode(#[from_external] UndefinedPeerTerminationCode),
+    FromUtf8Error(#[from_external] FromUtf8Error),
+}
+
+impl<'a> ReadablePDU<'a, LocatedTerminationInformationParsingError<'a>> for TerminationInformation {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedTerminationInformationParsingError<'a>> {
+        let (buf, code) =
+            nom::combinator::map_res(be_u16, TerminationInformationTlvType::try_from)(buf)?;
+        let (_, length): (_, u16) = nom::combinator::peek(be_u16)(buf)?;
+        let (reminder, buf) = nom::multi::length_data(be_u16)(buf)?;
+        let (buf, value) = match code {
+            TerminationInformationTlvType::String => {
+                let (buf, str) =
+                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
+                        String::from_utf8(x.to_vec())
+                    })(buf)?;
+                (buf, TerminationInformation::String(str))
+            }
+            TerminationInformationTlvType::Reason => {
+                let (buf, reason) =
+                    nom::combinator::map_res(be_u16, PeerTerminationCode::try_from)(buf)?;
+                (buf, TerminationInformation::Reason(reason))
+            }
+            TerminationInformationTlvType::Experimental65531 => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                let value = TerminationInformation::Experimental65531(data.to_vec());
+                (buf, value)
+            }
+            TerminationInformationTlvType::Experimental65532 => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                let value = TerminationInformation::Experimental65532(data.to_vec());
+                (buf, value)
+            }
+            TerminationInformationTlvType::Experimental65533 => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                let value = TerminationInformation::Experimental65533(data.to_vec());
+                (buf, value)
+            }
+            TerminationInformationTlvType::Experimental65534 => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                let value = TerminationInformation::Experimental65534(data.to_vec());
+                (buf, value)
+            }
+        };
+        if !buf.is_empty() {
+            return Err(nom::Err::Error(
+                LocatedTerminationInformationParsingError::new(
+                    buf,
+                    TerminationInformationParsingError::NomError(ErrorKind::NonEmpty),
                 ),
             ));
         }

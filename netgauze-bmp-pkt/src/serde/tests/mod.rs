@@ -1022,3 +1022,98 @@ fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
     test_write(&good, &good_wire)?;
     Ok(())
 }
+
+#[test]
+fn test_termination_information() -> Result<(), TerminationInformationWritingError> {
+    let good_string_wire = [0, 0, 0, 4, 116, 101, 115, 116];
+    let good_reason_wire = [0, 1, 0, 2, 0, 0];
+    let good_experimental_65531_wire = [0xff, 0xfb, 0, 4, 116, 101, 115, 116];
+    let good_experimental_65532_wire = [0xff, 0xfc, 0, 4, 116, 101, 115, 116];
+    let good_experimental_65533_wire = [0xff, 0xfd, 0, 4, 116, 101, 115, 116];
+    let good_experimental_65534_wire = [0xff, 0xfe, 0, 4, 116, 101, 115, 116];
+
+    let good_string = TerminationInformation::String("test".to_string());
+    let good_reason = TerminationInformation::Reason(PeerTerminationCode::AdministrativelyClosed);
+    let good_experimental_65531 =
+        TerminationInformation::Experimental65531(vec![116, 101, 115, 116]);
+    let good_experimental_65532 =
+        TerminationInformation::Experimental65532(vec![116, 101, 115, 116]);
+    let good_experimental_65533 =
+        TerminationInformation::Experimental65533(vec![116, 101, 115, 116]);
+    let good_experimental_65534 =
+        TerminationInformation::Experimental65534(vec![116, 101, 115, 116]);
+
+    test_parsed_completely(&good_string_wire, &good_string);
+    test_parsed_completely(&good_reason_wire, &good_reason);
+    test_parsed_completely(&good_experimental_65531_wire, &good_experimental_65531);
+    test_parsed_completely(&good_experimental_65532_wire, &good_experimental_65532);
+    test_parsed_completely(&good_experimental_65533_wire, &good_experimental_65533);
+    test_parsed_completely(&good_experimental_65534_wire, &good_experimental_65534);
+
+    test_write(&good_string, &good_string_wire)?;
+    test_write(&good_reason, &good_reason_wire)?;
+    test_write(&good_experimental_65531, &good_experimental_65531_wire)?;
+    test_write(&good_experimental_65532, &good_experimental_65532_wire)?;
+    test_write(&good_experimental_65533, &good_experimental_65533_wire)?;
+    test_write(&good_experimental_65534, &good_experimental_65534_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_termination_message() -> Result<(), TerminationMessageWritingError> {
+    let good_wire = [
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 172, 16, 0, 20, 0, 0, 0,
+        200, 172, 16, 0, 20, 99, 60, 152, 139, 0, 4, 90, 174, 0, 0, 0, 4, 116, 101, 115, 116,
+    ];
+
+    let good = TerminationMessage::new(
+        PeerHeader::new(
+            BmpPeerType::GlobalInstancePeer {
+                ipv6: false,
+                post_policy: false,
+                asn2: false,
+                adj_rib_out: false,
+            },
+            None,
+            Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
+            200,
+            Ipv4Addr::new(172, 16, 0, 20),
+            Some(Utc.timestamp(1664915595, 285358000)),
+        ),
+        vec![TerminationInformation::String("test".to_string())],
+    );
+    test_parsed_completely(&good_wire, &good);
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        3, 0, 0, 0, 56, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 172,
+        16, 0, 20, 0, 0, 0, 200, 172, 16, 0, 20, 99, 60, 152, 139, 0, 4, 90, 174, 0, 0, 0, 4, 116,
+        101, 115, 116,
+    ];
+
+    let good = BmpMessage::Termination(TerminationMessage::new(
+        PeerHeader::new(
+            BmpPeerType::GlobalInstancePeer {
+                ipv6: false,
+                post_policy: false,
+                asn2: false,
+                adj_rib_out: false,
+            },
+            None,
+            Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
+            200,
+            Ipv4Addr::new(172, 16, 0, 20),
+            Some(Utc.timestamp(1664915595, 285358000)),
+        ),
+        vec![TerminationInformation::String("test".to_string())],
+    ));
+    test_parsed_completely(&good_wire, &good);
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}

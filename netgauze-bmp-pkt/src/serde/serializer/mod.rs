@@ -30,6 +30,7 @@ pub enum BmpMessageWritingError {
     InitiationMessageError(#[from] InitiationMessageWritingError),
     PeerUpNotificationMessageError(#[from] PeerUpNotificationMessageWritingError),
     PeerDownNotificationMessageError(#[from] PeerDownNotificationMessageWritingError),
+    TerminationMessageError(#[from] TerminationMessageWritingError),
 }
 
 impl WritablePDU<BmpMessageWritingError> for BmpMessage {
@@ -42,7 +43,7 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
             Self::PeerDownNotification(value) => value.len() + 1,
             Self::PeerUpNotification(value) => value.len(),
             Self::Initiation(value) => value.len() + 1,
-            Self::Termination(_) => todo!(),
+            Self::Termination(value) => value.len() + 1,
             Self::RouteMirroring(value) => value.len() + 1,
             Self::Experimental251(value) => value.len(),
             Self::Experimental252(value) => value.len(),
@@ -70,7 +71,9 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
             Self::Initiation(value) => {
                 value.write(writer)?;
             }
-            Self::Termination(_) => {}
+            Self::Termination(value) => {
+                value.write(writer)?;
+            }
             Self::RouteMirroring(value) => {
                 value.write(writer)?;
             }
@@ -447,7 +450,6 @@ pub enum PeerDownNotificationMessageWritingError {
 }
 
 impl WritablePDU<PeerDownNotificationMessageWritingError> for PeerDownNotificationMessage {
-    // 1 reason
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -510,6 +512,67 @@ impl WritablePDU<PeerDownNotificationReasonWritingError> for PeerDownNotificatio
             Self::Experimental252(data) => writer.write_all(&data[0..])?,
             Self::Experimental253(data) => writer.write_all(&data[0..])?,
             Self::Experimental254(data) => writer.write_all(&data[0..])?,
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum TerminationMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+    PeerHeaderError(#[from] PeerHeaderWritingError),
+    TerminationInformationError(#[from] TerminationInformationWritingError),
+}
+
+impl WritablePDU<TerminationMessageWritingError> for TerminationMessage {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.peer_header.len()
+            + self.information().iter().map(|x| x.len()).sum::<usize>()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), TerminationMessageWritingError> {
+        self.peer_header.write(writer)?;
+        for info in &self.information {
+            info.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum TerminationInformationWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<TerminationInformationWritingError> for TerminationInformation {
+    /// 2-octet information type + 2-octet information length
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                Self::String(str) => str.len(),
+                Self::Reason(_) => 2, // reasons are 2-octet
+                Self::Experimental65531(value) => value.len(),
+                Self::Experimental65532(value) => value.len(),
+                Self::Experimental65533(value) => value.len(),
+                Self::Experimental65534(value) => value.len(),
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), TerminationInformationWritingError> {
+        writer.write_u16::<NetworkEndian>(self.get_type().into())?;
+        writer.write_u16::<NetworkEndian>((self.len() - Self::BASE_LENGTH) as u16)?;
+        match self {
+            Self::String(str) => writer.write_all(str.as_bytes())?,
+            Self::Reason(reason) => writer.write_u16::<NetworkEndian>((*reason).into())?,
+            Self::Experimental65531(value) => writer.write_all(value)?,
+            Self::Experimental65532(value) => writer.write_all(value)?,
+            Self::Experimental65533(value) => writer.write_all(value)?,
+            Self::Experimental65534(value) => writer.write_all(value)?,
         }
         Ok(())
     }

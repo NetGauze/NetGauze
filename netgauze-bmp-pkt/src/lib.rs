@@ -33,6 +33,7 @@ use netgauze_bgp_pkt::{iana::BGPMessageType, BGPMessage};
 use crate::iana::{
     BmpMessageType, BmpPeerTypeCode, InitiationInformationTlvType, PeerDownReasonCode,
     PeerTerminationCode, RouteMirroringInformation, RouteMirroringTlvType,
+    TerminationInformationTlvType,
 };
 
 pub mod iana;
@@ -357,6 +358,14 @@ impl TerminationMessage {
             information,
         }
     }
+
+    pub const fn peer_header(&self) -> &PeerHeader {
+        &self.peer_header
+    }
+
+    pub const fn information(&self) -> &Vec<TerminationInformation> {
+        &self.information
+    }
 }
 
 ///  The Information TLV is used by the [TerminationMessage]
@@ -379,6 +388,20 @@ pub enum TerminationInformation {
     Experimental65532(Vec<u8>),
     Experimental65533(Vec<u8>),
     Experimental65534(Vec<u8>),
+}
+
+impl TerminationInformation {
+    /// Get IANA code type
+    pub const fn get_type(&self) -> TerminationInformationTlvType {
+        match self {
+            Self::String(_) => TerminationInformationTlvType::String,
+            Self::Reason(_) => TerminationInformationTlvType::Reason,
+            Self::Experimental65531(_) => TerminationInformationTlvType::Experimental65531,
+            Self::Experimental65532(_) => TerminationInformationTlvType::Experimental65532,
+            Self::Experimental65533(_) => TerminationInformationTlvType::Experimental65533,
+            Self::Experimental65534(_) => TerminationInformationTlvType::Experimental65534,
+        }
+    }
 }
 
 /// Runtime errors when constructing a [RouteMonitoringMessage]
