@@ -298,7 +298,7 @@ impl TryFrom<u16> for RouteMirroringTlvType {
 /// [BMP Route Mirroring Information Codes](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#route-mirroring-information-codes)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
-pub enum RouteMirroringInformationCode {
+pub enum RouteMirroringInformation {
     ErroredPdu = 0,
     MessagesLost = 1,
     Experimental65531 = 65531,
@@ -310,21 +310,21 @@ pub enum RouteMirroringInformationCode {
 /// Code is not one of [RouteMirroringInformationCode], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct UndefinedRouteMirroringInformationCode(pub u16);
+pub struct UndefinedRouteMirroringInformation(pub u16);
 
-impl From<RouteMirroringInformationCode> for u16 {
-    fn from(value: RouteMirroringInformationCode) -> Self {
+impl From<RouteMirroringInformation> for u16 {
+    fn from(value: RouteMirroringInformation) -> Self {
         value as u16
     }
 }
 
-impl TryFrom<u16> for RouteMirroringInformationCode {
-    type Error = UndefinedRouteMirroringInformationCode;
+impl TryFrom<u16> for RouteMirroringInformation {
+    type Error = UndefinedRouteMirroringInformation;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UndefinedRouteMirroringInformationCode(value)),
+            None => Err(UndefinedRouteMirroringInformation(value)),
         }
     }
 }
@@ -427,20 +427,17 @@ mod tests {
     }
 
     #[test]
-    fn test_route_mirroring_information_code() {
+    fn test_route_mirroring_information() {
         let undefined_code = 255;
         let defined_code = 1;
-        let defined_value = RouteMirroringInformationCode::try_from(defined_code);
-        let undefined = RouteMirroringInformationCode::try_from(undefined_code);
-        let defined_code_u16: u16 = RouteMirroringInformationCode::MessagesLost.into();
-        assert_eq!(
-            defined_value,
-            Ok(RouteMirroringInformationCode::MessagesLost)
-        );
+        let defined_value = RouteMirroringInformation::try_from(defined_code);
+        let undefined = RouteMirroringInformation::try_from(undefined_code);
+        let defined_code_u16: u16 = RouteMirroringInformation::MessagesLost.into();
+        assert_eq!(defined_value, Ok(RouteMirroringInformation::MessagesLost));
         assert_eq!(defined_code_u16, defined_code);
         assert_eq!(
             undefined,
-            Err(UndefinedRouteMirroringInformationCode(undefined_code))
+            Err(UndefinedRouteMirroringInformation(undefined_code))
         );
     }
 }

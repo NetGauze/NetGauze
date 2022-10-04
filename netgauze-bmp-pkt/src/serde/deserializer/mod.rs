@@ -36,18 +36,7 @@ use netgauze_parse_utils::{
 };
 use netgauze_serde_macros::LocatedError;
 
-use crate::{
-    iana::{
-        BmpMessageType, InitiationInformationTlvType, PeerDownReasonCode, UndefinedBmpMessageType,
-        UndefinedBmpPeerTypeCode, UndefinedInitiationInformationTlvType,
-        UndefinedPeerDownReasonCode, BMP_VERSION, PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2,
-        PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6, PEER_FLAGS_IS_POST_POLICY,
-    },
-    BmpMessage, BmpPeerType, BmpPeerTypeCode, InitiationInformation, InitiationMessage,
-    PeerDownNotificationMessage, PeerDownNotificationMessageError, PeerDownNotificationReason,
-    PeerHeader, PeerUpNotificationMessage, PeerUpNotificationMessageError, RouteMonitoringMessage,
-    RouteMonitoringMessageError,
-};
+use crate::{iana::*, *};
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageParsingError {
@@ -65,6 +54,7 @@ pub enum BmpMessageParsingError {
     PeerDownNotificationMessageError(
         #[from_located(module = "self")] PeerDownNotificationMessageParsingError,
     ),
+    RouteMirroringMessageError(#[from_located(module = "self")] RouteMirroringMessageParsingError),
 }
 
 impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
@@ -99,8 +89,11 @@ impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
                 (buf, BmpMessage::Initiation(init))
             }
             BmpMessageType::Termination => todo!(),
-            BmpMessageType::RouteMirroring => todo!(),
-            BmpMessageType::Experimental251 => (buf, BmpMessage::Experimental251(buf.to_vec())),
+            BmpMessageType::RouteMirroring => {
+                let (buf, init) = parse_into_located(buf)?;
+                (buf, BmpMessage::RouteMirroring(init))
+            }
+            BmpMessageType::Experimental251 => (buf, BmpMessage::Experimental252(buf.to_vec())),
             BmpMessageType::Experimental252 => (buf, BmpMessage::Experimental252(buf.to_vec())),
             BmpMessageType::Experimental253 => (buf, BmpMessage::Experimental253(buf.to_vec())),
             BmpMessageType::Experimental254 => (buf, BmpMessage::Experimental254(buf.to_vec())),
@@ -540,5 +533,81 @@ impl<'a> ReadablePDU<'a, LocatedPeerDownNotificationReasonParsingError<'a>>
                 ))
             }
         }
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum RouteMirroringMessageParsingError {
+    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
+    RouteMirroringValueError(#[from_located(module = "self")] RouteMirroringValueParsingError),
+}
+
+impl<'a> ReadablePDU<'a, LocatedRouteMirroringMessageParsingError<'a>> for RouteMirroringMessage {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedRouteMirroringMessageParsingError<'a>> {
+        let (buf, peer_header) = parse_into_located(buf)?;
+        let (buf, mirrored) = parse_till_empty_into_located(buf)?;
+        Ok((buf, RouteMirroringMessage::new(peer_header, mirrored)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum RouteMirroringValueParsingError {
+    NomError(#[from_nom] ErrorKind),
+    UndefinedRouteMirroringTlvType(#[from_external] UndefinedRouteMirroringTlvType),
+    UndefinedRouteMirroringInformation(#[from_external] UndefinedRouteMirroringInformation),
+    BgpMessageError(
+        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer")] BGPMessageParsingError,
+    ),
+}
+
+impl<'a> ReadablePDU<'a, LocatedRouteMirroringValueParsingError<'a>> for RouteMirroringValue {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedRouteMirroringValueParsingError<'a>> {
+        let (buf, code) = nom::combinator::map_res(be_u16, RouteMirroringTlvType::try_from)(buf)?;
+        let (_, length): (_, u16) = nom::combinator::peek(be_u16)(buf)?;
+        let (reminder, buf) = nom::multi::length_data(be_u16)(buf)?;
+        let (buf, value) = match code {
+            RouteMirroringTlvType::BgpMessage => {
+                let (buf, msg) = parse_into_located_one_input(buf, true)?;
+                (buf, RouteMirroringValue::BgpMessage(msg))
+            }
+            RouteMirroringTlvType::Information => {
+                let (buf, information) =
+                    nom::combinator::map_res(be_u16, RouteMirroringInformation::try_from)(buf)?;
+                (buf, RouteMirroringValue::Information(information))
+            }
+            RouteMirroringTlvType::Experimental65531 => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                let value = RouteMirroringValue::Experimental65531(data.to_vec());
+                (buf, value)
+            }
+            RouteMirroringTlvType::Experimental65532 => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                let value = RouteMirroringValue::Experimental65532(data.to_vec());
+                (buf, value)
+            }
+            RouteMirroringTlvType::Experimental65533 => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                let value = RouteMirroringValue::Experimental65533(data.to_vec());
+                (buf, value)
+            }
+            RouteMirroringTlvType::Experimental65534 => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                let value = RouteMirroringValue::Experimental65534(data.to_vec());
+                (buf, value)
+            }
+        };
+        if !buf.is_empty() {
+            return Err(nom::Err::Error(
+                LocatedRouteMirroringValueParsingError::new(
+                    buf,
+                    RouteMirroringValueParsingError::NomError(ErrorKind::NonEmpty),
+                ),
+            ));
+        }
+        Ok((reminder, value))
     }
 }

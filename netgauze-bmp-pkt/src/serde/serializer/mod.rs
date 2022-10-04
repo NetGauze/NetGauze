@@ -15,15 +15,7 @@
 
 //! Serializer library for BMP's wire protocol
 
-use crate::{
-    iana::{
-        BMP_VERSION, PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2, PEER_FLAGS_IS_FILTERED,
-        PEER_FLAGS_IS_IPV6, PEER_FLAGS_IS_POST_POLICY,
-    },
-    BmpMessage, BmpPeerType, InitiationInformation, InitiationMessage, PeerDownNotificationMessage,
-    PeerDownNotificationReason, PeerHeader, PeerUpNotificationMessage, RouteMirroringMessage,
-    RouteMirroringValue, RouteMonitoringMessage,
-};
+use crate::{iana::*, *};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::serde::serializer::BGPMessageWritingError;
 use netgauze_parse_utils::WritablePDU;
@@ -51,7 +43,7 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
             Self::PeerUpNotification(value) => value.len(),
             Self::Initiation(value) => value.len() + 1,
             Self::Termination(_) => todo!(),
-            Self::RouteMirroring(value) => value.len(),
+            Self::RouteMirroring(value) => value.len() + 1,
             Self::Experimental251(value) => value.len(),
             Self::Experimental252(value) => value.len(),
             Self::Experimental253(value) => value.len(),
@@ -103,6 +95,7 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
 pub enum RouteMirroringMessageWritingError {
     StdIOError(#[from_std_io_error] String),
     PeerHeaderError(#[from] PeerHeaderWritingError),
+    RouteMirroringValueError(#[from] RouteMirroringValueWritingError),
 }
 
 impl WritablePDU<RouteMirroringMessageWritingError> for RouteMirroringMessage {
@@ -114,8 +107,12 @@ impl WritablePDU<RouteMirroringMessageWritingError> for RouteMirroringMessage {
             + self.mirrored().iter().map(|x| x.len()).sum::<usize>()
     }
 
-    fn write<T: Write>(&self, _writer: &mut T) -> Result<(), RouteMirroringMessageWritingError> {
-        todo!()
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMirroringMessageWritingError> {
+        self.peer_header.write(writer)?;
+        for mirrored in &self.mirrored {
+            mirrored.write(writer)?;
+        }
+        Ok(())
     }
 }
 
@@ -247,17 +244,37 @@ impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMirroringValueWritingError {
     StdIOError(#[from_std_io_error] String),
+    BGPMessageError(#[from] BGPMessageWritingError),
 }
 
 impl WritablePDU<RouteMirroringValueWritingError> for RouteMirroringValue {
-    const BASE_LENGTH: usize = 0;
+    /// 2-octet type and 2-octet length
+    const BASE_LENGTH: usize = 4;
 
     fn len(&self) -> usize {
-        todo!()
+        Self::BASE_LENGTH
+            + match self {
+                Self::BgpMessage(msg) => msg.len(),
+                Self::Information(_) => 2, // Information are always 2-octets
+                Self::Experimental65531(value) => value.len(),
+                Self::Experimental65532(value) => value.len(),
+                Self::Experimental65533(value) => value.len(),
+                Self::Experimental65534(value) => value.len(),
+            }
     }
 
-    fn write<T: Write>(&self, _writer: &mut T) -> Result<(), RouteMirroringValueWritingError> {
-        todo!()
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMirroringValueWritingError> {
+        writer.write_u16::<NetworkEndian>(self.get_type().into())?;
+        writer.write_u16::<NetworkEndian>((self.len() - Self::BASE_LENGTH) as u16)?;
+        match self {
+            Self::BgpMessage(msg) => msg.write(writer)?,
+            Self::Information(info) => writer.write_u16::<NetworkEndian>((*info).into())?,
+            Self::Experimental65531(value) => writer.write_all(value)?,
+            Self::Experimental65532(value) => writer.write_all(value)?,
+            Self::Experimental65533(value) => writer.write_all(value)?,
+            Self::Experimental65534(value) => writer.write_all(value)?,
+        }
+        Ok(())
     }
 }
 

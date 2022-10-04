@@ -32,7 +32,7 @@ use netgauze_bgp_pkt::{iana::BGPMessageType, BGPMessage};
 
 use crate::iana::{
     BmpMessageType, BmpPeerTypeCode, InitiationInformationTlvType, PeerDownReasonCode,
-    PeerTerminationCode,
+    PeerTerminationCode, RouteMirroringInformation, RouteMirroringTlvType,
 };
 
 pub mod iana;
@@ -464,21 +464,24 @@ pub enum RouteMirroringValue {
     /// A 2-byte code that provides information about the mirrored message or
     /// message stream.
     Information(RouteMirroringInformation),
+    Experimental65531(Vec<u8>),
+    Experimental65532(Vec<u8>),
+    Experimental65533(Vec<u8>),
+    Experimental65534(Vec<u8>),
 }
 
-/// A 2-byte code that provides information about the mirrored message or
-/// message stream.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum RouteMirroringInformation {
-    /// The contained message was found to have some error that made it
-    /// unusable, causing it to be treated-as- withdraw [RFC7606](https://datatracker.ietf.org/doc/html/rfc7606).
-    /// A BGP Message TLV MUST also occur in the TLV list.
-    ErroredPdu,
-
-    /// One or more messages may have been lost. This could occur, for example,
-    /// if an implementation runs out of available buffer space to queue
-    /// mirroring messages.
-    MessagesLost,
+impl RouteMirroringValue {
+    /// Get IANA type
+    pub const fn get_type(&self) -> RouteMirroringTlvType {
+        match self {
+            Self::BgpMessage(_) => RouteMirroringTlvType::BgpMessage,
+            Self::Information(_) => RouteMirroringTlvType::Information,
+            Self::Experimental65531(_) => RouteMirroringTlvType::Experimental65531,
+            Self::Experimental65532(_) => RouteMirroringTlvType::Experimental65532,
+            Self::Experimental65533(_) => RouteMirroringTlvType::Experimental65533,
+            Self::Experimental65534(_) => RouteMirroringTlvType::Experimental65534,
+        }
+    }
 }
 
 /// The Peer Up message is used to indicate that a peering session has

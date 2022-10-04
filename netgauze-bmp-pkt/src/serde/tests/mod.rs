@@ -40,10 +40,7 @@ use std::{
 };
 
 use crate::{
-    iana::{
-        UndefinedBmpPeerTypeCode, UndefinedInitiationInformationTlvType,
-        UndefinedPeerDownReasonCode,
-    },
+    iana::*,
     serde::{deserializer::*, serializer::*},
     *,
 };
@@ -956,5 +953,72 @@ fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
 
     test_write(&good, &good_wire)?;
 
+    Ok(())
+}
+
+#[test]
+fn test_router_mirroring_value() -> Result<(), RouteMirroringValueWritingError> {
+    let good_bgp_wire = [
+        0x00, 0x00, 0x00, 0x13, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x13, 0x04,
+    ];
+    let good_information_wire = [0, 1, 0, 2, 0, 0];
+    let good_experimental_65531_wire = [0xff, 0xfb, 0, 2, 1, 2];
+    let good_experimental_65532_wire = [0xff, 0xfc, 0, 2, 1, 2];
+    let good_experimental_65533_wire = [0xff, 0xfd, 0, 2, 1, 2];
+    let good_experimental_65534_wire = [0xff, 0xfe, 0, 2, 1, 2];
+
+    let good_bgp = RouteMirroringValue::BgpMessage(BGPMessage::KeepAlive);
+    let good_information = RouteMirroringValue::Information(RouteMirroringInformation::ErroredPdu);
+    let good_experimental_65531 = RouteMirroringValue::Experimental65531(vec![1, 2]);
+    let good_experimental_65532 = RouteMirroringValue::Experimental65532(vec![1, 2]);
+    let good_experimental_65533 = RouteMirroringValue::Experimental65533(vec![1, 2]);
+    let good_experimental_65534 = RouteMirroringValue::Experimental65534(vec![1, 2]);
+
+    test_parsed_completely(&good_bgp_wire, &good_bgp);
+    test_parsed_completely(&good_information_wire, &good_information);
+    test_parsed_completely(&good_experimental_65531_wire, &good_experimental_65531);
+    test_parsed_completely(&good_experimental_65532_wire, &good_experimental_65532);
+    test_parsed_completely(&good_experimental_65533_wire, &good_experimental_65533);
+    test_parsed_completely(&good_experimental_65534_wire, &good_experimental_65534);
+
+    test_write(&good_bgp, &good_bgp_wire)?;
+    test_write(&good_information, &good_information_wire)?;
+    test_write(&good_experimental_65531, &good_experimental_65531_wire)?;
+    test_write(&good_experimental_65532, &good_experimental_65532_wire)?;
+    test_write(&good_experimental_65533, &good_experimental_65533_wire)?;
+    test_write(&good_experimental_65534, &good_experimental_65534_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x47, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10,
+        0x00, 0x14, 0x00, 0x00, 0x00, 0xc8, 0xac, 0x10, 0x00, 0x14, 0x63, 0x3c, 0x98, 0x8b, 0x00,
+        0x04, 0x5a, 0xae, 0x00, 0x00, 0x00, 0x13, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x13, 0x04,
+    ];
+
+    let good = BmpMessage::RouteMirroring(RouteMirroringMessage::new(
+        PeerHeader::new(
+            BmpPeerType::GlobalInstancePeer {
+                ipv6: false,
+                post_policy: false,
+                asn2: false,
+                adj_rib_out: false,
+            },
+            None,
+            Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
+            200,
+            Ipv4Addr::new(172, 16, 0, 20),
+            Some(Utc.timestamp(1664915595, 285358000)),
+        ),
+        vec![RouteMirroringValue::BgpMessage(BGPMessage::KeepAlive)],
+    ));
+    test_parsed_completely(&good_wire, &good);
+
+    test_write(&good, &good_wire)?;
     Ok(())
 }
