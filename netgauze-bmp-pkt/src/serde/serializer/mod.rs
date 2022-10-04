@@ -25,7 +25,7 @@ use crate::{
     RouteMirroringValue, RouteMonitoringMessage,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_bgp_pkt::{serde::serializer::BGPMessageWritingError, BGPMessage};
+use netgauze_bgp_pkt::serde::serializer::BGPMessageWritingError;
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
 use std::{io::Write, net::IpAddr};
@@ -45,7 +45,7 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
 
     fn len(&self) -> usize {
         let len = match self {
-            Self::RouteMonitoring(value) => value.len(),
+            Self::RouteMonitoring(value) => value.len() + 1,
             Self::StatisticsReport => todo!(),
             Self::PeerDownNotification(value) => value.len() + 1,
             Self::PeerUpNotification(value) => value.len(),
@@ -269,22 +269,18 @@ pub enum RouteMonitoringMessageWritingError {
 }
 
 impl WritablePDU<RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
-    const BASE_LENGTH: usize = 1;
+    const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
             + self.peer_header.len()
-            + self
-                .updates()
-                .iter()
-                .map(|update| BGPMessage::Update(update.clone()).len())
-                .sum::<usize>()
+            + self.updates().iter().map(|msg| msg.len()).sum::<usize>()
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMonitoringMessageWritingError> {
         self.peer_header.write(writer)?;
-        for update in self.updates() {
-            BGPMessage::Update(update.clone()).write(writer)?;
+        for msg in self.updates() {
+            msg.write(writer)?;
         }
         Ok(())
     }

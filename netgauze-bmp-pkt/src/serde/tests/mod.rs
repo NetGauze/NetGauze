@@ -20,7 +20,7 @@ use netgauze_bgp_pkt::{
         BGPCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
         FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
-    iana::UndefinedBgpMessageType,
+    iana::{BGPMessageType, UndefinedBgpMessageType},
     notification::{BGPNotificationMessage, CeaseError},
     open::{BGPOpenMessage, BGPOpenMessageParameter},
     path_attribute::{ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute},
@@ -44,26 +44,8 @@ use crate::{
         UndefinedBmpPeerTypeCode, UndefinedInitiationInformationTlvType,
         UndefinedPeerDownReasonCode,
     },
-    serde::{
-        deserializer::{
-            BmpMessageParsingError, BmpPeerTypeParsingError, InitiationInformationParsingError,
-            InitiationMessageParsingError, LocatedBmpMessageParsingError,
-            LocatedBmpPeerTypeParsingError, LocatedInitiationInformationParsingError,
-            LocatedInitiationMessageParsingError, LocatedPeerDownNotificationMessageParsingError,
-            LocatedPeerDownNotificationReasonParsingError, LocatedPeerHeaderParsingError,
-            PeerDownNotificationMessageParsingError, PeerDownNotificationReasonParsingError,
-            PeerHeaderParsingError,
-        },
-        serializer::{
-            BmpMessageWritingError, InitiationInformationWritingError,
-            InitiationMessageWritingError, PeerDownNotificationMessageWritingError,
-            PeerDownNotificationReasonWritingError, PeerHeaderWritingError,
-        },
-    },
-    BmpMessage, BmpPeerType, InitiationInformation, InitiationInformationTlvType,
-    InitiationMessage, PeerDownNotificationMessage,
-    PeerDownNotificationMessageError::UnexpectedInitiationInformationTlvType,
-    PeerDownNotificationReason, PeerHeader, PeerUpNotificationMessage, RouteMonitoringMessage,
+    serde::{deserializer::*, serializer::*},
+    *,
 };
 
 #[test]
@@ -458,18 +440,32 @@ fn test_bmp_initiation_message() -> Result<(), BmpMessageWritingError> {
 }
 
 #[test]
-fn test_bmp_route_monitoring() -> Result<(), BmpMessageWritingError> {
+fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingError> {
     let good_wire = [
-        0x03, 0x00, 0x00, 0x00, 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10,
-        0x00, 0x14, 0x00, 0x00, 0x00, 0xc8, 0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00,
-        0x0b, 0x62, 0x6c, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xff, 0xff, 0xff, 0xff, 0x00, 0x38, 0x02, 0x00, 0x00, 0x00, 0x1d, 0x40, 0x01, 0x01, 0x00,
-        0x50, 0x02, 0x00, 0x0e, 0x02, 0x03, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0xc8, 0x00,
-        0x00, 0x00, 0x64, 0x40, 0x03, 0x04, 0xac, 0x10, 0x00, 0x14, 0x18, 0xac, 0x10, 0x01,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x38,
+        0x02, 0x00, 0x00, 0x00, 0x1d, 0x40, 0x01, 0x01, 0x00, 0x50, 0x02, 0x00, 0x0e, 0x02, 0x03,
+        0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0xc8, 0x00, 0x00, 0x00, 0x64, 0x40, 0x03, 0x04,
+        0xac, 0x10, 0x00, 0x14, 0x18, 0xac, 0x10, 0x01,
+    ];
+    let bad_peer_header_wire = [];
+    let bad_bgp_wire = [
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xee, 0xee,
+    ];
+    let bad_bgp_type_wire = [
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
+        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x15,
+        0x03, 0x06, 0x03,
     ];
 
-    let good = BmpMessage::RouteMonitoring(RouteMonitoringMessage::new(
+    let good = RouteMonitoringMessage::build(
         PeerHeader::new(
             BmpPeerType::GlobalInstancePeer {
                 ipv6: false,
@@ -483,7 +479,7 @@ fn test_bmp_route_monitoring() -> Result<(), BmpMessageWritingError> {
             Ipv4Addr::new(172, 16, 0, 20),
             Some(Utc.timestamp(1664656357, 746092000)),
         ),
-        vec![BGPUpdateMessage::new(
+        vec![BGPMessage::Update(BGPUpdateMessage::new(
             vec![],
             vec![
                 PathAttribute::Origin {
@@ -505,8 +501,102 @@ fn test_bmp_route_monitoring() -> Result<(), BmpMessageWritingError> {
             vec![NetworkLayerReachabilityInformation::new(vec![
                 Ipv4Net::from_str("172.16.1.0/24").unwrap(),
             ])],
-        )],
-    ));
+        ))],
+    )
+    .unwrap();
+    let bad_peer_header = LocatedRouteMonitoringMessageParsingError::new(
+        Span::new(&bad_peer_header_wire),
+        RouteMonitoringMessageParsingError::PeerHeaderError(
+            PeerHeaderParsingError::BmpPeerTypeError(BmpPeerTypeParsingError::NomError(
+                ErrorKind::Eof,
+            )),
+        ),
+    );
+    let bad_bgp = LocatedRouteMonitoringMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(58, &bad_bgp_wire[58..]) },
+        RouteMonitoringMessageParsingError::BgpMessageError(
+            BGPMessageParsingError::BadMessageLength(61166),
+        ),
+    );
+    let bad_bgp_type = LocatedRouteMonitoringMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(42, &bad_bgp_type_wire[42..]) },
+        RouteMonitoringMessageParsingError::RouteMonitoringMessageError(
+            RouteMonitoringMessageError::UnexpectedMessageType(BGPMessageType::Notification),
+        ),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<RouteMonitoringMessage, LocatedRouteMonitoringMessageParsingError<'_>>(
+        &bad_peer_header_wire,
+        &bad_peer_header,
+    );
+    test_parse_error::<RouteMonitoringMessage, LocatedRouteMonitoringMessageParsingError<'_>>(
+        &bad_bgp_wire,
+        &bad_bgp,
+    );
+    test_parse_error::<RouteMonitoringMessage, LocatedRouteMonitoringMessageParsingError<'_>>(
+        &bad_bgp_type_wire,
+        &bad_bgp_type,
+    );
+
+    test_write(&good, &good_wire)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_bmp_route_monitoring() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10,
+        0x00, 0x14, 0x00, 0x00, 0x00, 0xc8, 0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00,
+        0x0b, 0x62, 0x6c, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0x00, 0x38, 0x02, 0x00, 0x00, 0x00, 0x1d, 0x40, 0x01, 0x01, 0x00,
+        0x50, 0x02, 0x00, 0x0e, 0x02, 0x03, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0xc8, 0x00,
+        0x00, 0x00, 0x64, 0x40, 0x03, 0x04, 0xac, 0x10, 0x00, 0x14, 0x18, 0xac, 0x10, 0x01,
+    ];
+
+    let good = BmpMessage::RouteMonitoring(
+        RouteMonitoringMessage::build(
+            PeerHeader::new(
+                BmpPeerType::GlobalInstancePeer {
+                    ipv6: false,
+                    post_policy: false,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                None,
+                Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
+                200,
+                Ipv4Addr::new(172, 16, 0, 20),
+                Some(Utc.timestamp(1664656357, 746092000)),
+            ),
+            vec![BGPMessage::Update(BGPUpdateMessage::new(
+                vec![],
+                vec![
+                    PathAttribute::Origin {
+                        extended_length: false,
+                        value: Origin::IGP,
+                    },
+                    PathAttribute::ASPath {
+                        extended_length: true,
+                        value: ASPath::As4PathSegments(vec![As4PathSegment::new(
+                            AsPathSegmentType::AsSequence,
+                            vec![100, 200, 100],
+                        )]),
+                    },
+                    PathAttribute::NextHop {
+                        extended_length: false,
+                        value: NextHop::new(Ipv4Addr::new(172, 16, 0, 20)),
+                    },
+                ],
+                vec![NetworkLayerReachabilityInformation::new(vec![
+                    Ipv4Net::from_str("172.16.1.0/24").unwrap(),
+                ])],
+            ))],
+        )
+        .unwrap(),
+    );
 
     test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;
@@ -786,7 +876,9 @@ fn test_peer_down_notification() -> Result<(), PeerDownNotificationMessageWritin
     let bad_information = LocatedPeerDownNotificationMessageParsingError::new(
         Span::new(&bad_information_wire),
         PeerDownNotificationMessageParsingError::PeerDownMessageError(
-            UnexpectedInitiationInformationTlvType(InitiationInformationTlvType::String),
+            PeerDownNotificationMessageError::UnexpectedInitiationInformationTlvType(
+                InitiationInformationTlvType::String,
+            ),
         ),
     );
     let bad_peer_header = LocatedPeerDownNotificationMessageParsingError::new(

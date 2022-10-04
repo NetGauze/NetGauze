@@ -21,7 +21,9 @@ use std::{
     string::FromUtf8Error,
 };
 
-use netgauze_bgp_pkt::{serde::deserializer::BGPMessageParsingError, BGPMessage};
+use netgauze_bgp_pkt::{
+    iana::BGPMessageType, serde::deserializer::BGPMessageParsingError, BGPMessage,
+};
 use nom::{
     error::ErrorKind,
     number::complete::{be_u128, be_u16, be_u32, be_u64, be_u8},
@@ -29,8 +31,8 @@ use nom::{
 };
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
-    parse_till_empty_into_with_one_input_located, ReadablePDU, Span,
+    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located, ReadablePDU,
+    Span,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -44,6 +46,7 @@ use crate::{
     BmpMessage, BmpPeerType, BmpPeerTypeCode, InitiationInformation, InitiationMessage,
     PeerDownNotificationMessage, PeerDownNotificationMessageError, PeerDownNotificationReason,
     PeerHeader, PeerUpNotificationMessage, PeerUpNotificationMessageError, RouteMonitoringMessage,
+    RouteMonitoringMessageError,
 };
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
@@ -200,7 +203,7 @@ impl<'a> ReadablePDU<'a, LocatedInitiationInformationParsingError<'a>> for Initi
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMonitoringMessageParsingError {
-    NomError(#[from_nom] ErrorKind),
+    RouteMonitoringMessageError(RouteMonitoringMessageError),
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
     BgpMessageError(
         #[from_located(module = "netgauze_bgp_pkt::serde::deserializer")] BGPMessageParsingError,
@@ -211,22 +214,34 @@ impl<'a> ReadablePDU<'a, LocatedRouteMonitoringMessageParsingError<'a>> for Rout
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMonitoringMessageParsingError<'a>> {
-        let (buf, peer_header) = parse_into_located(buf)?;
-        let (buf, bgp_messages): (Span<'a>, Vec<BGPMessage>) =
-            parse_till_empty_into_with_one_input_located(buf, true)?;
-        let mut updates = vec![];
-        for msg in bgp_messages {
-            match msg {
-                BGPMessage::Open(_) => {}
-                BGPMessage::Update(update) => {
-                    updates.push(update);
-                }
-                BGPMessage::Notification(_) => {}
-                BGPMessage::KeepAlive => {}
-                BGPMessage::RouteRefresh(_) => {}
+        let (mut buf, peer_header) = parse_into_located(buf)?;
+        let input = buf;
+        let mut bgp_messages = vec![];
+        while !buf.is_empty() {
+            let marker = buf;
+            let (t, msg): (Span<'_>, BGPMessage) = parse_into_located_one_input(buf, true)?;
+            if msg.get_type() != BGPMessageType::Update {
+                return Err(nom::Err::Error(
+                    LocatedRouteMonitoringMessageParsingError::new(
+                        marker,
+                        RouteMonitoringMessageParsingError::RouteMonitoringMessageError(
+                            RouteMonitoringMessageError::UnexpectedMessageType(msg.get_type()),
+                        ),
+                    ),
+                ));
             }
+            bgp_messages.push(msg);
+            buf = t;
         }
-        Ok((buf, RouteMonitoringMessage::new(peer_header, updates)))
+        match RouteMonitoringMessage::build(peer_header, bgp_messages) {
+            Ok(msg) => Ok((buf, msg)),
+            Err(err) => Err(nom::Err::Error(
+                LocatedRouteMonitoringMessageParsingError::new(
+                    input,
+                    RouteMonitoringMessageParsingError::RouteMonitoringMessageError(err),
+                ),
+            )),
+        }
     }
 }
 

@@ -28,7 +28,7 @@ use std::net::{IpAddr, Ipv4Addr};
 
 use chrono::{DateTime, Utc};
 
-use netgauze_bgp_pkt::{iana::BGPMessageType, update::BGPUpdateMessage, BGPMessage};
+use netgauze_bgp_pkt::{iana::BGPMessageType, BGPMessage};
 
 use crate::iana::{
     BmpMessageType, BmpPeerTypeCode, InitiationInformationTlvType, PeerDownReasonCode,
@@ -381,6 +381,14 @@ pub enum TerminationInformation {
     Experimental65534(Vec<u8>),
 }
 
+/// Runtime errors when constructing a [RouteMonitoringMessage]
+/// Peer Up BGP messages should only carry
+/// [netgauze_bgp_pkt::BGPMessage::Update], anything else is an error
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum RouteMonitoringMessageError {
+    UnexpectedMessageType(BGPMessageType),
+}
+
 /// Route Monitoring messages are used for initial synchronization of the
 /// ADJ-RIBs-In.  They are also used for ongoing monitoring of the
 /// ADJ-RIB-In state.  Route monitoring messages are state-compressed.
@@ -391,22 +399,32 @@ pub enum TerminationInformation {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
-    updates: Vec<BGPUpdateMessage>,
+    updates: Vec<BGPMessage>,
 }
 
 impl RouteMonitoringMessage {
-    pub const fn new(peer_header: PeerHeader, updates: Vec<BGPUpdateMessage>) -> Self {
-        Self {
+    pub fn build(
+        peer_header: PeerHeader,
+        updates: Vec<BGPMessage>,
+    ) -> Result<Self, RouteMonitoringMessageError> {
+        for update in &updates {
+            if update.get_type() != BGPMessageType::Update {
+                return Err(RouteMonitoringMessageError::UnexpectedMessageType(
+                    update.get_type(),
+                ));
+            }
+        }
+        Ok(Self {
             peer_header,
             updates,
-        }
+        })
     }
 
     pub const fn peer_header(&self) -> &PeerHeader {
         &self.peer_header
     }
 
-    pub const fn updates(&self) -> &Vec<BGPUpdateMessage> {
+    pub const fn updates(&self) -> &Vec<BGPMessage> {
         &self.updates
     }
 }
