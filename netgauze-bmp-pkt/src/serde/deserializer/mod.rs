@@ -267,20 +267,59 @@ impl<'a> ReadablePDU<'a, LocatedRouteMonitoringMessageParsingError<'a>> for Rout
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
-pub enum PeerHeaderParsingError {
+pub enum BmpPeerTypeParsingError {
     NomError(#[from_nom] ErrorKind),
     UndefinedBmpPeerTypeCode(#[from_external] UndefinedBmpPeerTypeCode),
 }
 
+impl<'a> ReadablePDU<'a, LocatedBmpPeerTypeParsingError<'a>> for BmpPeerType {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpPeerTypeParsingError<'a>> {
+        let (buf, peer_type_code) =
+            nom::combinator::map_res(be_u8, BmpPeerTypeCode::try_from)(buf)?;
+        let (buf, flags) = be_u8(buf)?;
+        let ipv6 = flags & PEER_FLAGS_IS_IPV6 == PEER_FLAGS_IS_IPV6;
+        let post_policy = flags & PEER_FLAGS_IS_POST_POLICY == PEER_FLAGS_IS_POST_POLICY;
+        let asn2 = flags & PEER_FLAGS_IS_ASN2 == PEER_FLAGS_IS_ASN2;
+        let adj_rib_out = flags & PEER_FLAGS_IS_ADJ_RIB_OUT == PEER_FLAGS_IS_ADJ_RIB_OUT;
+        let filtered = flags & PEER_FLAGS_IS_FILTERED == PEER_FLAGS_IS_FILTERED;
+        let peer_type = match peer_type_code {
+            BmpPeerTypeCode::GlobalInstancePeer => BmpPeerType::GlobalInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            },
+            BmpPeerTypeCode::RdInstancePeer => BmpPeerType::RdInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            },
+            BmpPeerTypeCode::LocalInstancePeer => BmpPeerType::LocalInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            },
+            BmpPeerTypeCode::LocRibInstancePeer => BmpPeerType::LocRibInstancePeer { filtered },
+            BmpPeerTypeCode::Experimental251 => BmpPeerType::Experimental251 { flags },
+            BmpPeerTypeCode::Experimental252 => BmpPeerType::Experimental252 { flags },
+            BmpPeerTypeCode::Experimental253 => BmpPeerType::Experimental253 { flags },
+            BmpPeerTypeCode::Experimental254 => BmpPeerType::Experimental254 { flags },
+        };
+        Ok((buf, peer_type))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum PeerHeaderParsingError {
+    NomError(#[from_nom] ErrorKind),
+    BmpPeerTypeError(#[from_located(module = "self")] BmpPeerTypeParsingError),
+}
+
 impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedPeerHeaderParsingError<'a>> {
-        let (buf, peer_type) = nom::combinator::map_res(be_u8, BmpPeerTypeCode::try_from)(buf)?;
-        let (buf, peer_flags) = be_u8(buf)?;
-        let ipv6 = peer_flags & PEER_FLAGS_IS_IPV6 == PEER_FLAGS_IS_IPV6;
-        let post_policy = peer_flags & PEER_FLAGS_IS_POST_POLICY == PEER_FLAGS_IS_POST_POLICY;
-        let asn2 = peer_flags & PEER_FLAGS_IS_ASN2 == PEER_FLAGS_IS_ASN2;
-        let adj_rib_out = peer_flags & PEER_FLAGS_IS_ADJ_RIB_OUT == PEER_FLAGS_IS_ADJ_RIB_OUT;
-        let filtered = peer_flags & PEER_FLAGS_IS_FILTERED == PEER_FLAGS_IS_FILTERED;
+        let (buf, peer_type) = parse_into_located(buf)?;
         let (buf, distinguisher) = be_u64(buf)?;
         let distinguisher = if distinguisher == 0 {
             None
@@ -290,7 +329,7 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
         let (buf, peer_address) = be_u128(buf)?;
         let address = if peer_address == 0u128 {
             None
-        } else if ipv6 {
+        } else if check_is_ipv6(&peer_type).unwrap_or(true) {
             Some(IpAddr::V6(Ipv6Addr::from(peer_address)))
         } else {
             Some(IpAddr::V4(Ipv4Addr::from(peer_address as u32)))
@@ -305,87 +344,7 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
         } else {
             None
         };
-        let peer_header = match peer_type {
-            BmpPeerTypeCode::GlobalInstancePeer => PeerHeader::new(
-                BmpPeerType::GlobalInstancePeer {
-                    ipv6,
-                    post_policy,
-                    asn2,
-                    adj_rib_out,
-                },
-                distinguisher,
-                address,
-                peer_as,
-                bgp_id,
-                time,
-            ),
-            BmpPeerTypeCode::RdInstancePeer => PeerHeader::new(
-                BmpPeerType::RdInstancePeer {
-                    ipv6,
-                    post_policy,
-                    asn2,
-                    adj_rib_out,
-                },
-                distinguisher,
-                address,
-                peer_as,
-                bgp_id,
-                time,
-            ),
-            BmpPeerTypeCode::LocalInstancePeer => PeerHeader::new(
-                BmpPeerType::LocalInstancePeer {
-                    ipv6,
-                    post_policy,
-                    asn2,
-                    adj_rib_out,
-                },
-                distinguisher,
-                address,
-                peer_as,
-                bgp_id,
-                time,
-            ),
-            BmpPeerTypeCode::LocRibInstancePeer => PeerHeader::new(
-                BmpPeerType::LocRibInstancePeer { filtered },
-                distinguisher,
-                address,
-                peer_as,
-                bgp_id,
-                time,
-            ),
-            BmpPeerTypeCode::Experimental251 => PeerHeader::new(
-                BmpPeerType::Experimental251 { flags: peer_flags },
-                distinguisher,
-                address,
-                peer_as,
-                bgp_id,
-                time,
-            ),
-            BmpPeerTypeCode::Experimental252 => PeerHeader::new(
-                BmpPeerType::Experimental252 { flags: peer_flags },
-                distinguisher,
-                address,
-                peer_as,
-                bgp_id,
-                time,
-            ),
-            BmpPeerTypeCode::Experimental253 => PeerHeader::new(
-                BmpPeerType::Experimental253 { flags: peer_flags },
-                distinguisher,
-                address,
-                peer_as,
-                bgp_id,
-                time,
-            ),
-            BmpPeerTypeCode::Experimental254 => PeerHeader::new(
-                BmpPeerType::Experimental254 { flags: peer_flags },
-                distinguisher,
-                address,
-                peer_as,
-                bgp_id,
-                time,
-            ),
-        };
+        let peer_header = PeerHeader::new(peer_type, distinguisher, address, peer_as, bgp_id, time);
         Ok((buf, peer_header))
     }
 }
@@ -410,12 +369,12 @@ pub enum PeerUpNotificationMessageParsingError {
 /// For experimental we assume ipv6 since this will not fail and still parse all
 /// the information
 #[inline]
-const fn check_is_ipv6(peer_header: &PeerHeader) -> Result<bool, BmpPeerTypeCode> {
-    match peer_header.peer_type {
-        BmpPeerType::GlobalInstancePeer { ipv6, .. } => Ok(ipv6),
-        BmpPeerType::RdInstancePeer { ipv6, .. } => Ok(ipv6),
-        BmpPeerType::LocalInstancePeer { ipv6, .. } => Ok(ipv6),
-        BmpPeerType::LocRibInstancePeer { .. } => Err(peer_header.peer_type.get_type()),
+const fn check_is_ipv6(peer_type: &BmpPeerType) -> Result<bool, BmpPeerTypeCode> {
+    match peer_type {
+        BmpPeerType::GlobalInstancePeer { ipv6, .. } => Ok(*ipv6),
+        BmpPeerType::RdInstancePeer { ipv6, .. } => Ok(*ipv6),
+        BmpPeerType::LocalInstancePeer { ipv6, .. } => Ok(*ipv6),
+        BmpPeerType::LocRibInstancePeer { .. } => Err(peer_type.get_type()),
         BmpPeerType::Experimental251 { .. } => Ok(true),
         BmpPeerType::Experimental252 { .. } => Ok(true),
         BmpPeerType::Experimental253 { .. } => Ok(true),
@@ -431,7 +390,7 @@ impl<'a> ReadablePDU<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
     ) -> IResult<Span<'a>, Self, LocatedPeerUpNotificationMessageParsingError<'a>> {
         let input = buf;
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
-        let ipv6 = match check_is_ipv6(&peer_header) {
+        let ipv6 = match check_is_ipv6(&peer_header.peer_type) {
             Ok(ipv6) => ipv6,
             Err(code) => {
                 return Err(nom::Err::Error(
@@ -489,7 +448,6 @@ impl<'a> ReadablePDU<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum PeerDownNotificationMessageParsingError {
-    NomError(#[from_nom] ErrorKind),
     PeerDownMessageError(PeerDownNotificationMessageError),
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
     PeerDownNotificationReasonError(
@@ -574,32 +532,32 @@ impl<'a> ReadablePDU<'a, LocatedPeerDownNotificationReasonParsingError<'a>>
                     PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(information),
                 ))
             }
-            PeerDownReasonCode::Experimental65531 => {
+            PeerDownReasonCode::Experimental251 => {
                 let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
                 Ok((
                     buf,
-                    PeerDownNotificationReason::Experimental65531(data.to_vec()),
+                    PeerDownNotificationReason::Experimental251(data.to_vec()),
                 ))
             }
-            PeerDownReasonCode::Experimental65532 => {
+            PeerDownReasonCode::Experimental252 => {
                 let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
                 Ok((
                     buf,
-                    PeerDownNotificationReason::Experimental65532(data.to_vec()),
+                    PeerDownNotificationReason::Experimental252(data.to_vec()),
                 ))
             }
-            PeerDownReasonCode::Experimental65533 => {
+            PeerDownReasonCode::Experimental253 => {
                 let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
                 Ok((
                     buf,
-                    PeerDownNotificationReason::Experimental65533(data.to_vec()),
+                    PeerDownNotificationReason::Experimental253(data.to_vec()),
                 ))
             }
-            PeerDownReasonCode::Experimental65534 => {
+            PeerDownReasonCode::Experimental254 => {
                 let (buf, data) = nom::bytes::complete::take(buf.len())(buf)?;
                 Ok((
                     buf,
-                    PeerDownNotificationReason::Experimental65534(data.to_vec()),
+                    PeerDownNotificationReason::Experimental254(data.to_vec()),
                 ))
             }
         }

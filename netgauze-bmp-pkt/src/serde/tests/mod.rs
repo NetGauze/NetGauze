@@ -20,37 +20,170 @@ use netgauze_bgp_pkt::{
         BGPCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
         FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
+    iana::UndefinedBgpMessageType,
+    notification::{BGPNotificationMessage, CeaseError},
     open::{BGPOpenMessage, BGPOpenMessageParameter},
     path_attribute::{ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute},
+    serde::deserializer::BGPMessageParsingError,
     update::{BGPUpdateMessage, NetworkLayerReachabilityInformation},
     BGPMessage,
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType};
-use netgauze_parse_utils::test_helpers::{test_parsed_completely, test_write};
+use netgauze_parse_utils::{
+    test_helpers::{test_parse_error, test_parsed_completely, test_write},
+    Span,
+};
+use nom::error::ErrorKind;
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
 
 use crate::{
-    serde::serializer::{BmpMessageWritingError, PeerHeaderWritingError},
-    BmpMessage, BmpPeerType, InitiationInformation, InitiationMessage, PeerDownNotificationMessage,
+    iana::{
+        UndefinedBmpPeerTypeCode, UndefinedInitiationInformationTlvType,
+        UndefinedPeerDownReasonCode,
+    },
+    serde::{
+        deserializer::{
+            BmpMessageParsingError, BmpPeerTypeParsingError, InitiationInformationParsingError,
+            LocatedBmpMessageParsingError, LocatedBmpPeerTypeParsingError,
+            LocatedPeerDownNotificationMessageParsingError,
+            LocatedPeerDownNotificationReasonParsingError, PeerDownNotificationMessageParsingError,
+            PeerDownNotificationReasonParsingError, PeerHeaderParsingError,
+        },
+        serializer::{
+            BmpMessageWritingError, PeerDownNotificationMessageWritingError,
+            PeerDownNotificationReasonWritingError, PeerHeaderWritingError,
+        },
+    },
+    BmpMessage, BmpPeerType, InitiationInformation, InitiationInformationTlvType,
+    InitiationMessage, PeerDownNotificationMessage,
+    PeerDownNotificationMessageError::UnexpectedInitiationInformationTlvType,
     PeerDownNotificationReason, PeerHeader, PeerUpNotificationMessage, RouteMonitoringMessage,
 };
 
 #[test]
-fn test_bmp_init() -> Result<(), BmpMessageWritingError> {
-    let good_wire = [
-        0x03, 0x00, 0x00, 0x00, 0x17, 0x04, 0x00, 0x01, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31,
-        0x31, 0x00, 0x02, 0x00, 0x03, 0x50, 0x45, 0x32,
-    ];
+fn test_peer_type() -> Result<(), PeerHeaderWritingError> {
+    let good_global_instance_ipv4_wire = [0x00, 0x00];
+    let good_global_instance_ipv6_wire = [0x00, 0x80];
+    let good_global_instance_post_wire = [0x00, 0x40];
+    let good_global_asn2_wire = [0x00, 0x20];
+    let good_global_adj_out_wire = [0x00, 0x10];
+    let good_rd_instance_all_wire = [0x01, 0xf0];
+    let good_local_instance_all_wire = [0x02, 0xf0];
+    let good_loc_rib_instance_wire = [0x03, 0x00];
+    let good_loc_rib_instance_filtered_wire = [0x03, 0x80];
+    let good_experimental_251_wire = [0xfb, 0xff];
+    let good_experimental_252_wire = [0xfc, 0xff];
+    let good_experimental_253_wire = [0xfd, 0xff];
+    let good_experimental_254_wire = [0xfe, 0xff];
+    let bad_eof_wire = [0x00];
+    let bad_reserved_wire = [0xff, 0xff];
 
-    let good = BmpMessage::Initiation(InitiationMessage::new(vec![
-        InitiationInformation::SystemDescription("test11".to_string()),
-        InitiationInformation::SystemName("PE2".to_string()),
-    ]));
-    test_parsed_completely(&good_wire, &good);
-    test_write(&good, &good_wire)?;
+    let good_global_instance_ipv4 = BmpPeerType::GlobalInstancePeer {
+        ipv6: false,
+        post_policy: false,
+        asn2: false,
+        adj_rib_out: false,
+    };
+    let good_global_instance_ipv6 = BmpPeerType::GlobalInstancePeer {
+        ipv6: true,
+        post_policy: false,
+        asn2: false,
+        adj_rib_out: false,
+    };
+
+    let good_global_instance_post = BmpPeerType::GlobalInstancePeer {
+        ipv6: false,
+        post_policy: true,
+        asn2: false,
+        adj_rib_out: false,
+    };
+
+    let good_global_asn2 = BmpPeerType::GlobalInstancePeer {
+        ipv6: false,
+        post_policy: false,
+        asn2: true,
+        adj_rib_out: false,
+    };
+
+    let good_global_adj_out = BmpPeerType::GlobalInstancePeer {
+        ipv6: false,
+        post_policy: false,
+        asn2: false,
+        adj_rib_out: true,
+    };
+
+    let good_rd_instance_all = BmpPeerType::RdInstancePeer {
+        ipv6: true,
+        post_policy: true,
+        asn2: true,
+        adj_rib_out: true,
+    };
+
+    let good_local_instance_all = BmpPeerType::LocalInstancePeer {
+        ipv6: true,
+        post_policy: true,
+        asn2: true,
+        adj_rib_out: true,
+    };
+
+    let good_loc_rib_instance = BmpPeerType::LocRibInstancePeer { filtered: false };
+    let good_loc_rib_instance_filtered = BmpPeerType::LocRibInstancePeer { filtered: true };
+
+    let good_experimental_251 = BmpPeerType::Experimental251 { flags: 0xff };
+    let good_experimental_252 = BmpPeerType::Experimental252 { flags: 0xff };
+    let good_experimental_253 = BmpPeerType::Experimental253 { flags: 0xff };
+    let good_experimental_254 = BmpPeerType::Experimental254 { flags: 0xff };
+
+    let bad_eof = LocatedBmpPeerTypeParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_eof_wire[1..]) },
+        BmpPeerTypeParsingError::NomError(ErrorKind::Eof),
+    );
+    let bad_reserved = LocatedBmpPeerTypeParsingError::new(
+        Span::new(&bad_reserved_wire),
+        BmpPeerTypeParsingError::UndefinedBmpPeerTypeCode(UndefinedBmpPeerTypeCode(0xff)),
+    );
+
+    test_parsed_completely(&good_global_instance_ipv4_wire, &good_global_instance_ipv4);
+    test_parsed_completely(&good_global_instance_ipv6_wire, &good_global_instance_ipv6);
+    test_parsed_completely(&good_global_instance_post_wire, &good_global_instance_post);
+    test_parsed_completely(&good_global_asn2_wire, &good_global_asn2);
+    test_parsed_completely(&good_global_adj_out_wire, &good_global_adj_out);
+    test_parsed_completely(&good_rd_instance_all_wire, &good_rd_instance_all);
+    test_parsed_completely(&good_loc_rib_instance_wire, &good_loc_rib_instance);
+    test_parsed_completely(&good_local_instance_all_wire, &good_local_instance_all);
+    test_parsed_completely(
+        &good_loc_rib_instance_filtered_wire,
+        &good_loc_rib_instance_filtered,
+    );
+    test_parsed_completely(&good_experimental_251_wire, &good_experimental_251);
+    test_parsed_completely(&good_experimental_252_wire, &good_experimental_252);
+    test_parsed_completely(&good_experimental_253_wire, &good_experimental_253);
+    test_parsed_completely(&good_experimental_254_wire, &good_experimental_254);
+    test_parse_error::<BmpPeerType, LocatedBmpPeerTypeParsingError<'_>>(&bad_eof_wire, &bad_eof);
+    test_parse_error::<BmpPeerType, LocatedBmpPeerTypeParsingError<'_>>(
+        &bad_reserved_wire,
+        &bad_reserved,
+    );
+
+    test_write(&good_global_instance_ipv4, &good_global_instance_ipv4_wire)?;
+    test_write(&good_global_instance_ipv6, &good_global_instance_ipv6_wire)?;
+    test_write(&good_global_instance_post, &good_global_instance_post_wire)?;
+    test_write(&good_global_asn2, &good_global_asn2_wire)?;
+    test_write(&good_global_adj_out, &good_global_adj_out_wire)?;
+    test_write(&good_rd_instance_all, &good_rd_instance_all_wire)?;
+    test_write(&good_local_instance_all, &good_local_instance_all_wire)?;
+    test_write(&good_loc_rib_instance, &good_loc_rib_instance_wire)?;
+    test_write(
+        &good_loc_rib_instance_filtered,
+        &good_loc_rib_instance_filtered_wire,
+    )?;
+    test_write(&good_experimental_251, &good_experimental_251_wire)?;
+    test_write(&good_experimental_252, &good_experimental_252_wire)?;
+    test_write(&good_experimental_253, &good_experimental_253_wire)?;
+    test_write(&good_experimental_254, &good_experimental_254_wire)?;
     Ok(())
 }
 
@@ -183,7 +316,23 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
 }
 
 #[test]
-fn test_route_monitoring() -> Result<(), BmpMessageWritingError> {
+fn test_bmp_init() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x17, 0x04, 0x00, 0x01, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31,
+        0x31, 0x00, 0x02, 0x00, 0x03, 0x50, 0x45, 0x32,
+    ];
+
+    let good = BmpMessage::Initiation(InitiationMessage::new(vec![
+        InitiationInformation::SystemDescription("test11".to_string()),
+        InitiationInformation::SystemName("PE2".to_string()),
+    ]));
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_route_monitoring() -> Result<(), BmpMessageWritingError> {
     let good_wire = [
         0x03, 0x00, 0x00, 0x00, 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10,
@@ -240,7 +389,7 @@ fn test_route_monitoring() -> Result<(), BmpMessageWritingError> {
 }
 
 #[test]
-fn test_peer_up_notification() -> Result<(), BmpMessageWritingError> {
+fn test_bmp_peer_up_notification() -> Result<(), BmpMessageWritingError> {
     let good_wire = [
         0x03, 0x00, 0x00, 0x00, 0xda, 0x03, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -363,13 +512,200 @@ fn test_peer_up_notification() -> Result<(), BmpMessageWritingError> {
 }
 
 #[test]
-fn test_peer_down_notification() -> Result<(), BmpMessageWritingError> {
+fn test_peer_down_reason() -> Result<(), PeerDownNotificationReasonWritingError> {
+    let notif = BGPMessage::Notification(BGPNotificationMessage::CeaseError(
+        CeaseError::PeerDeConfigured { value: vec![] },
+    ));
+    let good_local_pdu_wire = [
+        0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0x00, 0x15, 0x03, 0x06, 0x03,
+    ];
+    let bad_local_pdu_bgp_wire = [
+        0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0x00, 0x15, 0xff, 0x06, 0x03,
+    ];
+    let good_local_fsm_wire = [0x02, 0x00, 0x02];
+    let bad_remote_pdu_bgp_wire = [
+        0x03, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0x00, 0x15, 0x03, 0x06, 0x03,
+    ];
+    let good_remote_no_data_wire = [0x04];
+    let good_peer_de_configured_wire = [0x05];
+    let good_local_system_closed_wire = [0x06, 0x00, 0x03, 0x00, 0x04, 0x76, 0x72, 0x66, 0x31];
+    let bad_local_system_closed_wire = [0x06, 0x00, 0xff, 0x00, 0x04, 0x76, 0x72, 0x66, 0x31];
+    let good_experimental_251_wire = [0xfb, 0x01, 0x03];
+    let good_experimental_252_wire = [0xfc, 0x01, 0x03];
+    let good_experimental_253_wire = [0xfd, 0x01, 0x03];
+    let good_experimental_254_wire = [0xfe, 0x01, 0x03];
+    let bad_eof_wire = [];
+    let bad_undefined_reason_code_wire = [0xff];
+
+    let good_local_fsm = PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2);
+    let good_local_pdu =
+        PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(notif.clone());
+    let good_remote_pdu =
+        PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(notif.clone());
+    let good_remote_no_data = PeerDownNotificationReason::RemoteSystemClosedNoData;
+    let good_peer_de_configured = PeerDownNotificationReason::PeerDeConfigured;
+    let good_local_system_closed = PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(
+        InitiationInformation::VrfTableName("vrf1".to_string()),
+    );
+    let good_experimental_251 = PeerDownNotificationReason::Experimental251(vec![1, 3]);
+    let good_experimental_252 = PeerDownNotificationReason::Experimental252(vec![1, 3]);
+    let good_experimental_253 = PeerDownNotificationReason::Experimental253(vec![1, 3]);
+    let good_experimental_254 = PeerDownNotificationReason::Experimental254(vec![1, 3]);
+
+    let bad_local_pdu_bgp = LocatedPeerDownNotificationReasonParsingError::new(
+        unsafe { Span::new_from_raw_offset(19, &bad_local_pdu_bgp_wire[19..]) },
+        PeerDownNotificationReasonParsingError::BgpMessageError(
+            BGPMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(255)),
+        ),
+    );
+    let bad_local_system_closed = LocatedPeerDownNotificationReasonParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_local_system_closed_wire[1..]) },
+        PeerDownNotificationReasonParsingError::InitiationInformationError(
+            InitiationInformationParsingError::UndefinedType(
+                UndefinedInitiationInformationTlvType(255),
+            ),
+        ),
+    );
+    let bad_eof = LocatedPeerDownNotificationReasonParsingError::new(
+        Span::new(&bad_eof_wire),
+        PeerDownNotificationReasonParsingError::NomError(ErrorKind::Eof),
+    );
+    let bad_undefined_reason_code = LocatedPeerDownNotificationReasonParsingError::new(
+        Span::new(&bad_undefined_reason_code_wire),
+        PeerDownNotificationReasonParsingError::UndefinedPeerDownReasonCode(
+            UndefinedPeerDownReasonCode(255),
+        ),
+    );
+
+    test_parsed_completely(&good_local_fsm_wire, &good_local_fsm);
+    test_parsed_completely(&good_local_pdu_wire, &good_local_pdu);
+    test_parsed_completely(&bad_remote_pdu_bgp_wire, &good_remote_pdu);
+    test_parsed_completely(&good_remote_no_data_wire, &good_remote_no_data);
+    test_parsed_completely(&good_peer_de_configured_wire, &good_peer_de_configured);
+    test_parsed_completely(&good_local_system_closed_wire, &good_local_system_closed);
+    test_parsed_completely(&good_experimental_251_wire, &good_experimental_251);
+    test_parsed_completely(&good_experimental_252_wire, &good_experimental_252);
+    test_parsed_completely(&good_experimental_253_wire, &good_experimental_253);
+    test_parsed_completely(&good_experimental_254_wire, &good_experimental_254);
+
+    test_parse_error::<PeerDownNotificationReason, LocatedPeerDownNotificationReasonParsingError<'_>>(
+        &bad_local_pdu_bgp_wire,
+        &bad_local_pdu_bgp,
+    );
+    test_parse_error::<PeerDownNotificationReason, LocatedPeerDownNotificationReasonParsingError<'_>>(
+        &bad_local_system_closed_wire,
+        &bad_local_system_closed,
+    );
+    test_parse_error::<PeerDownNotificationReason, LocatedPeerDownNotificationReasonParsingError<'_>>(
+        &bad_eof_wire,
+        &bad_eof,
+    );
+    test_parse_error::<PeerDownNotificationReason, LocatedPeerDownNotificationReasonParsingError<'_>>(
+        &bad_undefined_reason_code_wire,
+        &bad_undefined_reason_code,
+    );
+
+    test_write(&good_local_fsm, &good_local_fsm_wire)?;
+    test_write(&good_local_pdu, &good_local_pdu_wire)?;
+    test_write(&good_remote_pdu, &bad_remote_pdu_bgp_wire)?;
+    test_write(&good_remote_no_data, &good_remote_no_data_wire)?;
+    test_write(&good_peer_de_configured, &good_peer_de_configured_wire)?;
+    test_write(&good_local_system_closed, &good_local_system_closed_wire)?;
+    test_write(&good_experimental_251, &good_experimental_251_wire)?;
+    test_write(&good_experimental_252, &good_experimental_252_wire)?;
+    test_write(&good_experimental_253, &good_experimental_253_wire)?;
+    test_write(&good_experimental_254, &good_experimental_254_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_peer_down_notification() -> Result<(), PeerDownNotificationMessageWritingError> {
+    let good_wire = [
+        0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0xfc, 0x00,
+        0x0a, 0x00, 0x00, 0x01, 0x63, 0x3b, 0x2a, 0x53, 0x00, 0x07, 0x71, 0xe3, 0x02, 0x00, 0x02,
+    ];
+    let bad_information_wire = [
+        0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+        252, 0, 10, 0, 0, 1, 99, 59, 42, 83, 0, 7, 113, 227, 6, 0, 0, 0, 1, 101,
+    ];
+    let bad_peer_header_wire = [];
+    let bad_peer_reason_wire = [
+        0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0xfc, 0x00,
+        0x0a, 0x00, 0x00, 0x01, 0x63, 0x3b, 0x2a, 0x53, 0x00, 0x07, 0x71, 0xe3, 0xff, 0x00, 0x02,
+    ];
+
+    let good = PeerDownNotificationMessage::build(
+        PeerHeader::new(
+            BmpPeerType::GlobalInstancePeer {
+                ipv6: true,
+                post_policy: false,
+                asn2: false,
+                adj_rib_out: false,
+            },
+            None,
+            Some(IpAddr::V6(Ipv6Addr::from_str("fc00::1").unwrap())),
+            64512,
+            Ipv4Addr::new(10, 0, 0, 1),
+            Some(Utc.timestamp(1664821843, 487907000)),
+        ),
+        PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
+    )
+    .unwrap();
+
+    let bad_information = LocatedPeerDownNotificationMessageParsingError::new(
+        Span::new(&bad_information_wire),
+        PeerDownNotificationMessageParsingError::PeerDownMessageError(
+            UnexpectedInitiationInformationTlvType(InitiationInformationTlvType::String),
+        ),
+    );
+    let bad_peer_header = LocatedPeerDownNotificationMessageParsingError::new(
+        Span::new(&bad_peer_header_wire),
+        PeerDownNotificationMessageParsingError::PeerHeaderError(
+            PeerHeaderParsingError::BmpPeerTypeError(BmpPeerTypeParsingError::NomError(
+                ErrorKind::Eof,
+            )),
+        ),
+    );
+    let bad_peer_reason = LocatedPeerDownNotificationMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(42, &bad_peer_reason_wire[42..]) },
+        PeerDownNotificationMessageParsingError::PeerDownNotificationReasonError(
+            PeerDownNotificationReasonParsingError::UndefinedPeerDownReasonCode(
+                UndefinedPeerDownReasonCode(255),
+            ),
+        ),
+    );
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<
+        PeerDownNotificationMessage,
+        LocatedPeerDownNotificationMessageParsingError<'_>,
+    >(&bad_information_wire, &bad_information);
+    test_parse_error::<
+        PeerDownNotificationMessage,
+        LocatedPeerDownNotificationMessageParsingError<'_>,
+    >(&bad_peer_header_wire, &bad_peer_header);
+    test_parse_error::<
+        PeerDownNotificationMessage,
+        LocatedPeerDownNotificationMessageParsingError<'_>,
+    >(&bad_peer_reason_wire, &bad_peer_reason);
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
     let good_wire = [
         0x03, 0x00, 0x00, 0x00, 0x33, 0x02, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x01, 0x00, 0x00, 0xfc, 0x00, 0x0a, 0x00, 0x00, 0x01, 0x63, 0x3b, 0x2a, 0x53, 0x00,
         0x07, 0x71, 0xe3, 0x02, 0x00, 0x02,
     ];
+    let bad_eof_wire = [];
 
     let good = BmpMessage::PeerDownNotification(
         PeerDownNotificationMessage::build(
@@ -391,7 +727,15 @@ fn test_peer_down_notification() -> Result<(), BmpMessageWritingError> {
         .unwrap(),
     );
 
+    let bad_eof = LocatedBmpMessageParsingError::new(
+        Span::new(&bad_eof_wire),
+        BmpMessageParsingError::NomError(ErrorKind::Eof),
+    );
+
     test_parsed_completely(&good_wire, &good);
+
+    test_parse_error::<BmpMessage, LocatedBmpMessageParsingError<'_>>(&bad_eof_wire, &bad_eof);
+
     test_write(&good, &good_wire)?;
 
     Ok(())

@@ -233,10 +233,10 @@ pub enum PeerDownReasonCode {
     RemoteSystemClosedNoData = 4,
     PeerDeConfigured = 5,
     LocalSystemClosedTlvDataFollows = 6,
-    Experimental65531 = 31,
-    Experimental65532 = 32,
-    Experimental65533 = 33,
-    Experimental65534 = 34,
+    Experimental251 = 251,
+    Experimental252 = 252,
+    Experimental253 = 253,
+    Experimental254 = 254,
 }
 
 /// BMP Peer down reason code type is not one of [PeerDownReasonCode], the

@@ -47,7 +47,7 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
         let len = match self {
             Self::RouteMonitoring(value) => value.len(),
             Self::StatisticsReport => todo!(),
-            Self::PeerDownNotification(value) => value.len(),
+            Self::PeerDownNotification(value) => value.len() + 1,
             Self::PeerUpNotification(value) => value.len(),
             Self::Initiation(value) => value.len(),
             Self::Termination(_) => todo!(),
@@ -119,11 +119,6 @@ impl WritablePDU<RouteMirroringMessageWritingError> for RouteMirroringMessage {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum PeerHeaderWritingError {
-    StdIOError(#[from_std_io_error] String),
-}
-
 #[inline]
 const fn compute_peer_flags_value(
     ipv6: bool,
@@ -147,6 +142,63 @@ const fn compute_peer_flags_value(
     flags
 }
 
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum BmpPeerTypeWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<BmpPeerTypeWritingError> for BmpPeerType {
+    /// 1-octet type and 1-octet flags
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpPeerTypeWritingError> {
+        writer.write_u8(self.get_type().into())?;
+        match self {
+            Self::GlobalInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            }
+            | Self::RdInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            }
+            | Self::LocalInstancePeer {
+                ipv6,
+                post_policy,
+                asn2,
+                adj_rib_out,
+            } => {
+                let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
+                writer.write_u8(flags)?;
+            }
+            Self::LocRibInstancePeer { filtered } => {
+                let flags = if *filtered { PEER_FLAGS_IS_FILTERED } else { 0 };
+                writer.write_u8(flags)?;
+            }
+            Self::Experimental251 { flags }
+            | Self::Experimental252 { flags }
+            | Self::Experimental253 { flags }
+            | Self::Experimental254 { flags } => {
+                writer.write_u8(*flags)?;
+            }
+        }
+        Ok(())
+    }
+}
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum PeerHeaderWritingError {
+    StdIOError(#[from_std_io_error] String),
+    BmpPeerTypeError(#[from] BmpPeerTypeWritingError),
+}
+
 impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
     ///  1-octet peer type
     ///  1-octet peer flags
@@ -163,59 +215,7 @@ impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), PeerHeaderWritingError> {
-        match self.peer_type() {
-            BmpPeerType::GlobalInstancePeer {
-                ipv6,
-                post_policy,
-                asn2,
-                adj_rib_out,
-            } => {
-                writer.write_u8(self.peer_type.get_type().into())?;
-                let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
-                writer.write_u8(flags)?;
-            }
-            BmpPeerType::RdInstancePeer {
-                ipv6,
-                post_policy,
-                asn2,
-                adj_rib_out,
-            } => {
-                writer.write_u8(self.peer_type.get_type().into())?;
-                let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
-                writer.write_u8(flags)?;
-            }
-            BmpPeerType::LocalInstancePeer {
-                ipv6,
-                post_policy,
-                asn2,
-                adj_rib_out,
-            } => {
-                writer.write_u8(self.peer_type.get_type().into())?;
-                let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
-                writer.write_u8(flags)?;
-            }
-            BmpPeerType::LocRibInstancePeer { filtered } => {
-                writer.write_u8(self.peer_type.get_type().into())?;
-                let flags = if *filtered { PEER_FLAGS_IS_FILTERED } else { 0 };
-                writer.write_u8(flags)?;
-            }
-            BmpPeerType::Experimental251 { flags } => {
-                writer.write_u8(self.peer_type.get_type().into())?;
-                writer.write_u8(*flags)?;
-            }
-            BmpPeerType::Experimental252 { flags } => {
-                writer.write_u8(self.peer_type.get_type().into())?;
-                writer.write_u8(*flags)?;
-            }
-            BmpPeerType::Experimental253 { flags } => {
-                writer.write_u8(self.peer_type.get_type().into())?;
-                writer.write_u8(*flags)?;
-            }
-            BmpPeerType::Experimental254 { flags } => {
-                writer.write_u8(self.peer_type.get_type().into())?;
-                writer.write_u8(*flags)?;
-            }
-        }
+        self.peer_type.write(writer)?;
         match self.distinguisher() {
             None => writer.write_u64::<NetworkEndian>(0)?,
             Some(value) => writer.write_u64::<NetworkEndian>(*value)?,
@@ -435,7 +435,7 @@ pub enum PeerDownNotificationMessageWritingError {
 
 impl WritablePDU<PeerDownNotificationMessageWritingError> for PeerDownNotificationMessage {
     // 1 reason
-    const BASE_LENGTH: usize = 1;
+    const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH + self.peer_header.len() + self.reason.len()
@@ -472,10 +472,10 @@ impl WritablePDU<PeerDownNotificationReasonWritingError> for PeerDownNotificatio
                 Self::RemoteSystemClosedNoData => 0,
                 Self::PeerDeConfigured => 0,
                 Self::LocalSystemClosedTlvDataFollows(info) => info.len(),
-                Self::Experimental65531(data) => data.len(),
-                Self::Experimental65532(data) => data.len(),
-                Self::Experimental65533(data) => data.len(),
-                Self::Experimental65534(data) => data.len(),
+                Self::Experimental251(data) => data.len(),
+                Self::Experimental252(data) => data.len(),
+                Self::Experimental253(data) => data.len(),
+                Self::Experimental254(data) => data.len(),
             }
     }
 
@@ -493,10 +493,10 @@ impl WritablePDU<PeerDownNotificationReasonWritingError> for PeerDownNotificatio
             Self::RemoteSystemClosedNoData => {}
             Self::PeerDeConfigured => {}
             Self::LocalSystemClosedTlvDataFollows(info) => info.write(writer)?,
-            Self::Experimental65531(data) => writer.write_all(&data[0..])?,
-            Self::Experimental65532(data) => writer.write_all(&data[0..])?,
-            Self::Experimental65533(data) => writer.write_all(&data[0..])?,
-            Self::Experimental65534(data) => writer.write_all(&data[0..])?,
+            Self::Experimental251(data) => writer.write_all(&data[0..])?,
+            Self::Experimental252(data) => writer.write_all(&data[0..])?,
+            Self::Experimental253(data) => writer.write_all(&data[0..])?,
+            Self::Experimental254(data) => writer.write_all(&data[0..])?,
         }
         Ok(())
     }

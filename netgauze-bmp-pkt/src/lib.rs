@@ -620,10 +620,10 @@ impl PeerDownNotificationMessage {
                     );
                 }
             }
-            PeerDownNotificationReason::Experimental65531(_) => {}
-            PeerDownNotificationReason::Experimental65532(_) => {}
-            PeerDownNotificationReason::Experimental65533(_) => {}
-            PeerDownNotificationReason::Experimental65534(_) => {}
+            PeerDownNotificationReason::Experimental251(_) => {}
+            PeerDownNotificationReason::Experimental252(_) => {}
+            PeerDownNotificationReason::Experimental253(_) => {}
+            PeerDownNotificationReason::Experimental254(_) => {}
         }
 
         Ok(Self {
@@ -676,10 +676,10 @@ pub enum PeerDownNotificationReason {
     /// included if it was in the Peer Up.
     LocalSystemClosedTlvDataFollows(InitiationInformation),
 
-    Experimental65531(Vec<u8>),
-    Experimental65532(Vec<u8>),
-    Experimental65533(Vec<u8>),
-    Experimental65534(Vec<u8>),
+    Experimental251(Vec<u8>),
+    Experimental252(Vec<u8>),
+    Experimental253(Vec<u8>),
+    Experimental254(Vec<u8>),
 }
 
 impl PeerDownNotificationReason {
@@ -699,10 +699,10 @@ impl PeerDownNotificationReason {
             Self::LocalSystemClosedTlvDataFollows(_) => {
                 PeerDownReasonCode::LocalSystemClosedTlvDataFollows
             }
-            Self::Experimental65531(_) => PeerDownReasonCode::Experimental65531,
-            Self::Experimental65532(_) => PeerDownReasonCode::Experimental65532,
-            Self::Experimental65533(_) => PeerDownReasonCode::Experimental65533,
-            Self::Experimental65534(_) => PeerDownReasonCode::Experimental65534,
+            Self::Experimental251(_) => PeerDownReasonCode::Experimental251,
+            Self::Experimental252(_) => PeerDownReasonCode::Experimental252,
+            Self::Experimental253(_) => PeerDownReasonCode::Experimental253,
+            Self::Experimental254(_) => PeerDownReasonCode::Experimental254,
         }
     }
 }
