@@ -49,7 +49,7 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
             Self::StatisticsReport => todo!(),
             Self::PeerDownNotification(value) => value.len() + 1,
             Self::PeerUpNotification(value) => value.len(),
-            Self::Initiation(value) => value.len(),
+            Self::Initiation(value) => value.len() + 1,
             Self::Termination(_) => todo!(),
             Self::RouteMirroring(value) => value.len(),
             Self::Experimental251(value) => value.len(),
@@ -297,7 +297,7 @@ pub enum InitiationMessageWritingError {
 }
 
 impl WritablePDU<InitiationMessageWritingError> for InitiationMessage {
-    const BASE_LENGTH: usize = 1;
+    const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH + self.information().iter().map(|x| x.len()).sum::<usize>()

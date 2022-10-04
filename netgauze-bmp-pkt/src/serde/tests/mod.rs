@@ -47,13 +47,15 @@ use crate::{
     serde::{
         deserializer::{
             BmpMessageParsingError, BmpPeerTypeParsingError, InitiationInformationParsingError,
-            LocatedBmpMessageParsingError, LocatedBmpPeerTypeParsingError,
-            LocatedPeerDownNotificationMessageParsingError,
+            InitiationMessageParsingError, LocatedBmpMessageParsingError,
+            LocatedBmpPeerTypeParsingError, LocatedInitiationInformationParsingError,
+            LocatedInitiationMessageParsingError, LocatedPeerDownNotificationMessageParsingError,
             LocatedPeerDownNotificationReasonParsingError, PeerDownNotificationMessageParsingError,
             PeerDownNotificationReasonParsingError, PeerHeaderParsingError,
         },
         serializer::{
-            BmpMessageWritingError, PeerDownNotificationMessageWritingError,
+            BmpMessageWritingError, InitiationInformationWritingError,
+            InitiationMessageWritingError, PeerDownNotificationMessageWritingError,
             PeerDownNotificationReasonWritingError, PeerHeaderWritingError,
         },
     },
@@ -316,9 +318,112 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
 }
 
 #[test]
-fn test_bmp_init() -> Result<(), BmpMessageWritingError> {
+fn test_initiation_information() -> Result<(), InitiationInformationWritingError> {
+    let good_string_wire = [0x00, 0x00, 0x00, 0x02, 0x41, 0x42];
+    let good_sys_descr_wire = [0x00, 0x01, 0x00, 0x02, 0x41, 0x42];
+    let good_sys_name_wire = [0x00, 0x02, 0x00, 0x02, 0x41, 0x42];
+    let good_vrf_table_wire = [0x00, 0x03, 0x00, 0x02, 0x41, 0x42];
+    let good_admin_label_wire = [0x00, 0x04, 0x00, 0x02, 0x41, 0x42];
+    let good_experimental_65531_wire = [0xff, 0xfb, 0x00, 0x02, 0x01, 0x02];
+    let good_experimental_65532_wire = [0xff, 0xfc, 0x00, 0x02, 0x01, 0x02];
+    let good_experimental_65533_wire = [0xff, 0xfd, 0x00, 0x02, 0x01, 0x02];
+    let good_experimental_65534_wire = [0xff, 0xfe, 0x00, 0x02, 0x01, 0x02];
+    let bad_eof_wire = [];
+    let bad_undefined_type_wire = [0xff, 0xff];
+
+    let good_string = InitiationInformation::String("AB".to_string());
+    let good_sys_descr = InitiationInformation::SystemDescription("AB".to_string());
+    let good_sys_name = InitiationInformation::SystemName("AB".to_string());
+    let good_vrf_table = InitiationInformation::VrfTableName("AB".to_string());
+    let good_admin_label = InitiationInformation::AdminLabel("AB".to_string());
+    let good_experimental_65531 = InitiationInformation::Experimental65531(vec![0x01, 0x02]);
+    let good_experimental_65532 = InitiationInformation::Experimental65532(vec![0x01, 0x02]);
+    let good_experimental_65533 = InitiationInformation::Experimental65533(vec![0x01, 0x02]);
+    let good_experimental_65534 = InitiationInformation::Experimental65534(vec![0x01, 0x02]);
+
+    let bad_eof = LocatedInitiationInformationParsingError::new(
+        Span::new(&bad_eof_wire),
+        InitiationInformationParsingError::NomError(ErrorKind::Eof),
+    );
+
+    let bad_undefined_type = LocatedInitiationInformationParsingError::new(
+        Span::new(&bad_undefined_type_wire),
+        InitiationInformationParsingError::UndefinedType(UndefinedInitiationInformationTlvType(
+            0xffff,
+        )),
+    );
+
+    test_parsed_completely(&good_string_wire, &good_string);
+    test_parsed_completely(&good_sys_descr_wire, &good_sys_descr);
+    test_parsed_completely(&good_sys_name_wire, &good_sys_name);
+    test_parsed_completely(&good_vrf_table_wire, &good_vrf_table);
+    test_parsed_completely(&good_admin_label_wire, &good_admin_label);
+    test_parsed_completely(&good_experimental_65531_wire, &good_experimental_65531);
+    test_parsed_completely(&good_experimental_65532_wire, &good_experimental_65532);
+    test_parsed_completely(&good_experimental_65533_wire, &good_experimental_65533);
+    test_parsed_completely(&good_experimental_65534_wire, &good_experimental_65534);
+
+    test_parse_error::<InitiationInformation, LocatedInitiationInformationParsingError<'_>>(
+        &bad_eof_wire,
+        &bad_eof,
+    );
+    test_parse_error::<InitiationInformation, LocatedInitiationInformationParsingError<'_>>(
+        &bad_undefined_type_wire,
+        &bad_undefined_type,
+    );
+
+    test_write(&good_string, &good_string_wire)?;
+    test_write(&good_sys_descr, &good_sys_descr_wire)?;
+    test_write(&good_sys_name, &good_sys_name_wire)?;
+    test_write(&good_vrf_table, &good_vrf_table_wire)?;
+    test_write(&good_admin_label, &good_admin_label_wire)?;
+    test_write(&good_experimental_65531, &good_experimental_65531_wire)?;
+    test_write(&good_experimental_65532, &good_experimental_65532_wire)?;
+    test_write(&good_experimental_65533, &good_experimental_65533_wire)?;
+    test_write(&good_experimental_65534, &good_experimental_65534_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_initiation_message() -> Result<(), InitiationMessageWritingError> {
+    let good_wire = [
+        0x00, 0x01, 0x00, 0x02, 0x41, 0x42, 0x00, 0x02, 0x00, 0x02, 0x43, 0x44,
+    ];
+    let bad_info_wire = [0xff, 0xff];
+
+    let good = InitiationMessage::new(vec![
+        InitiationInformation::SystemDescription("AB".to_string()),
+        InitiationInformation::SystemName("CD".to_string()),
+    ]);
+
+    let bad_info = LocatedInitiationMessageParsingError::new(
+        Span::new(&bad_info_wire),
+        InitiationMessageParsingError::InitiationInformationError(
+            InitiationInformationParsingError::UndefinedType(
+                UndefinedInitiationInformationTlvType(0xffff),
+            ),
+        ),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+
+    test_parse_error::<InitiationMessage, LocatedInitiationMessageParsingError<'_>>(
+        &bad_info_wire,
+        &bad_info,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_initiation_message() -> Result<(), BmpMessageWritingError> {
     let good_wire = [
         0x03, 0x00, 0x00, 0x00, 0x17, 0x04, 0x00, 0x01, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31,
+        0x31, 0x00, 0x02, 0x00, 0x03, 0x50, 0x45, 0x32,
+    ];
+    let bad_information_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x17, 0x04, 0xff, 0xff, 0x00, 0x06, 0x74, 0x65, 0x73, 0x74, 0x31,
         0x31, 0x00, 0x02, 0x00, 0x03, 0x50, 0x45, 0x32,
     ];
 
@@ -326,7 +431,21 @@ fn test_bmp_init() -> Result<(), BmpMessageWritingError> {
         InitiationInformation::SystemDescription("test11".to_string()),
         InitiationInformation::SystemName("PE2".to_string()),
     ]));
+    let bad_information = LocatedBmpMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(6, &bad_information_wire[6..]) },
+        BmpMessageParsingError::InitiationMessageError(
+            InitiationMessageParsingError::InitiationInformationError(
+                InitiationInformationParsingError::UndefinedType(
+                    UndefinedInitiationInformationTlvType(0xffff),
+                ),
+            ),
+        ),
+    );
     test_parsed_completely(&good_wire, &good);
+    test_parse_error::<BmpMessage, LocatedBmpMessageParsingError<'_>>(
+        &bad_information_wire,
+        &bad_information,
+    );
     test_write(&good, &good_wire)?;
     Ok(())
 }

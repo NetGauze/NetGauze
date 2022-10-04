@@ -115,7 +115,6 @@ impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum InitiationMessageParsingError {
-    NomError(#[from_nom] ErrorKind),
     InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
 }
 
@@ -132,7 +131,7 @@ impl<'a> ReadablePDU<'a, LocatedInitiationMessageParsingError<'a>> for Initiatio
 pub enum InitiationInformationParsingError {
     NomError(#[from_nom] ErrorKind),
     UndefinedType(#[from_external] UndefinedInitiationInformationTlvType),
-    FromUtf8Error(FromUtf8Error),
+    FromUtf8Error(#[from_external] FromUtf8Error),
 }
 
 impl<'a> ReadablePDU<'a, LocatedInitiationInformationParsingError<'a>> for InitiationInformation {
@@ -145,73 +144,38 @@ impl<'a> ReadablePDU<'a, LocatedInitiationInformationParsingError<'a>> for Initi
         let (reminder, buf) = nom::bytes::complete::take(length)(buf)?;
         match tlv_type {
             InitiationInformationTlvType::String => {
-                let str = match String::from_utf8(buf.to_vec()) {
-                    Ok(str) => str,
-                    Err(err) => {
-                        return Err(nom::Err::Error(
-                            LocatedInitiationInformationParsingError::new(
-                                buf,
-                                InitiationInformationParsingError::FromUtf8Error(err),
-                            ),
-                        ))
-                    }
-                };
+                let (_, str) =
+                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
+                        String::from_utf8(x.to_vec())
+                    })(buf)?;
                 Ok((reminder, InitiationInformation::String(str)))
             }
             InitiationInformationTlvType::SystemDescription => {
-                let str = match String::from_utf8(buf.to_vec()) {
-                    Ok(str) => str,
-                    Err(err) => {
-                        return Err(nom::Err::Error(
-                            LocatedInitiationInformationParsingError::new(
-                                buf,
-                                InitiationInformationParsingError::FromUtf8Error(err),
-                            ),
-                        ))
-                    }
-                };
+                let (_, str) =
+                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
+                        String::from_utf8(x.to_vec())
+                    })(buf)?;
                 Ok((reminder, InitiationInformation::SystemDescription(str)))
             }
             InitiationInformationTlvType::SystemName => {
-                let str = match String::from_utf8(buf.to_vec()) {
-                    Ok(str) => str,
-                    Err(err) => {
-                        return Err(nom::Err::Error(
-                            LocatedInitiationInformationParsingError::new(
-                                buf,
-                                InitiationInformationParsingError::FromUtf8Error(err),
-                            ),
-                        ))
-                    }
-                };
+                let (_, str) =
+                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
+                        String::from_utf8(x.to_vec())
+                    })(buf)?;
                 Ok((reminder, InitiationInformation::SystemName(str)))
             }
             InitiationInformationTlvType::VrfTableName => {
-                let str = match String::from_utf8(buf.to_vec()) {
-                    Ok(str) => str,
-                    Err(err) => {
-                        return Err(nom::Err::Error(
-                            LocatedInitiationInformationParsingError::new(
-                                buf,
-                                InitiationInformationParsingError::FromUtf8Error(err),
-                            ),
-                        ))
-                    }
-                };
+                let (_, str) =
+                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
+                        String::from_utf8(x.to_vec())
+                    })(buf)?;
                 Ok((reminder, InitiationInformation::VrfTableName(str)))
             }
             InitiationInformationTlvType::AdminLabel => {
-                let str = match String::from_utf8(buf.to_vec()) {
-                    Ok(str) => str,
-                    Err(err) => {
-                        return Err(nom::Err::Error(
-                            LocatedInitiationInformationParsingError::new(
-                                buf,
-                                InitiationInformationParsingError::FromUtf8Error(err),
-                            ),
-                        ))
-                    }
-                };
+                let (_, str) =
+                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
+                        String::from_utf8(x.to_vec())
+                    })(buf)?;
                 Ok((reminder, InitiationInformation::AdminLabel(str)))
             }
             InitiationInformationTlvType::Experimental65531 => Ok((
