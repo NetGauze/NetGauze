@@ -50,8 +50,9 @@ use crate::{
             InitiationMessageParsingError, LocatedBmpMessageParsingError,
             LocatedBmpPeerTypeParsingError, LocatedInitiationInformationParsingError,
             LocatedInitiationMessageParsingError, LocatedPeerDownNotificationMessageParsingError,
-            LocatedPeerDownNotificationReasonParsingError, PeerDownNotificationMessageParsingError,
-            PeerDownNotificationReasonParsingError, PeerHeaderParsingError,
+            LocatedPeerDownNotificationReasonParsingError, LocatedPeerHeaderParsingError,
+            PeerDownNotificationMessageParsingError, PeerDownNotificationReasonParsingError,
+            PeerHeaderParsingError,
         },
         serializer::{
             BmpMessageWritingError, InitiationInformationWritingError,
@@ -197,7 +198,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
     ];
     let good_ipv6_wire = [
-        0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x01, 0x0d, 0xb8, 0x00,
+        0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x20, 0x01, 0x0d, 0xb8, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0xc8,
         0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
     ];
@@ -219,8 +220,9 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
     let good_filtered_wire = [
         0x03, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc8,
-        0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c,
+        0xac, 0x10, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
+    let bad_eof_wire = [0x03, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
 
     let good_ipv4 = PeerHeader::new(
         BmpPeerType::GlobalInstancePeer {
@@ -243,7 +245,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
             asn2: false,
             adj_rib_out: false,
         },
-        None,
+        Some(1),
         Some(IpAddr::V6(Ipv6Addr::from_str("2001:db8::ac10:14").unwrap())),
         200,
         Ipv4Addr::new(172, 16, 0, 20),
@@ -298,7 +300,11 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         None,
         200,
         Ipv4Addr::new(172, 16, 0, 20),
-        Some(Utc.timestamp(1664656357, 746092000)),
+        None,
+    );
+    let bad_eof = LocatedPeerHeaderParsingError::new(
+        unsafe { Span::new_from_raw_offset(10, &bad_eof_wire[10..]) },
+        PeerHeaderParsingError::NomError(ErrorKind::Eof),
     );
 
     test_parsed_completely(&good_ipv4_wire, &good_ipv4);
@@ -307,6 +313,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
     test_parsed_completely(&good_adj_rip_out_wire, &good_adj_rip_out);
     test_parsed_completely(&good_asn2_wire, &good_asn2);
     test_parsed_completely(&good_filtered_wire, &good_filtered);
+    test_parse_error::<PeerHeader, LocatedPeerHeaderParsingError<'_>>(&bad_eof_wire, &bad_eof);
 
     test_write(&good_ipv4, &good_ipv4_wire)?;
     test_write(&good_ipv6, &good_ipv6_wire)?;
