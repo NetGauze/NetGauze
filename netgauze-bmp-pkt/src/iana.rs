@@ -329,6 +329,56 @@ impl TryFrom<u16> for RouteMirroringInformation {
     }
 }
 
+/// [BMP Statistics Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#statistics-types)
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum BmpStatisticsType {
+    NumberOfPrefixesRejectedByInboundPolicy = 0,
+    NumberOfDuplicatePrefixAdvertisements = 1,
+    NumberOfDuplicateWithdraws = 2,
+    NumberOfUpdatesInvalidatedDueToClusterListLoop = 3,
+    NumberOfUpdatesInvalidatedDueToAsPathLoop = 4,
+    NumberOfUpdatesInvalidatedDueToOriginatorId = 5,
+    NumberOfUpdatesInvalidatedDueToAsConfederationLoop = 6,
+    NumberOfRoutesInAdjRibIn = 7,
+    NumberOfRoutesInLocRib = 8,
+    NumberOfRoutesInPerAfiSafiAdjRibIn = 9,
+    NumberOfRoutesInPerAfiSafiLocRib = 10,
+    NumberOfUpdatesSubjectedToTreatAsWithdraw = 11,
+    NumberOfPrefixesSubjectedToTreatAsWithdraw = 12,
+    NumberOfDuplicateUpdateMessagesReceived = 13,
+    NumberOfRoutesInPrePolicyAdjRibOut = 14,
+    NumberOfRoutesInPostPolicyAdjRibOut = 15,
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut = 16,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut = 17,
+    Experimental65531 = 65531,
+    Experimental65532 = 65532,
+    Experimental65533 = 65533,
+    Experimental65534 = 65534,
+}
+
+/// Code is not one of [BmpStatisticsType], the carried value is the undefined
+/// code.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct UndefinedBmpStatisticsType(pub u16);
+
+impl From<BmpStatisticsType> for u16 {
+    fn from(value: BmpStatisticsType) -> Self {
+        value as u16
+    }
+}
+
+impl TryFrom<u16> for BmpStatisticsType {
+    type Error = UndefinedBmpStatisticsType;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedBmpStatisticsType(value)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439,5 +489,20 @@ mod tests {
             undefined,
             Err(UndefinedRouteMirroringInformation(undefined_code))
         );
+    }
+
+    #[test]
+    fn test_bmp_statistics_type() {
+        let undefined_code = 65535;
+        let defined_code = 1;
+        let defined_value = BmpStatisticsType::try_from(defined_code);
+        let undefined = BmpStatisticsType::try_from(undefined_code);
+        let defined_code_u16: u16 = BmpStatisticsType::NumberOfDuplicatePrefixAdvertisements.into();
+        assert_eq!(
+            defined_value,
+            Ok(BmpStatisticsType::NumberOfDuplicatePrefixAdvertisements)
+        );
+        assert_eq!(defined_code_u16, defined_code);
+        assert_eq!(undefined, Err(UndefinedBmpStatisticsType(undefined_code)));
     }
 }

@@ -1117,3 +1117,45 @@ fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
     test_write(&good, &good_wire)?;
     Ok(())
 }
+
+#[test]
+fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x6c, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xfd, 0xfd, 0x00, 0x00, 0x00, 0x00, 0x8b, 0xea, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x02, 0x00, 0x00, 0x00, 0xc8, 0xac, 0x10, 0x00, 0x14, 0x63, 0x3c, 0x99, 0x78, 0x00,
+        0x04, 0x73, 0x3f, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0x05, 0x00, 0x04, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x04, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x0b, 0x00, 0x04, 0x00, 0x00, 0x00, 0x06, 0xff, 0xfb, 0x00, 0x04, 0x00,
+        0x00, 0x00, 0x00,
+    ];
+    let good = BmpMessage::StatisticsReport(StatisticsReportMessage::new(
+        PeerHeader::new(
+            BmpPeerType::GlobalInstancePeer {
+                ipv6: true,
+                post_policy: false,
+                asn2: false,
+                adj_rib_out: false,
+            },
+            None,
+            Some(IpAddr::V6(Ipv6Addr::from_str("fdfd:0:0:8bea::2").unwrap())),
+            200,
+            Ipv4Addr::new(172, 16, 0, 20),
+            Some(Utc.timestamp(1664915832, 291647000)),
+        ),
+        vec![
+            StatisticsCounter::NumberOfPrefixesRejectedByInboundPolicy(CounterU32::new(0)),
+            StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsPathLoop(CounterU32::new(2)),
+            StatisticsCounter::NumberOfUpdatesInvalidatedDueToOriginatorId(CounterU32::new(0)),
+            StatisticsCounter::NumberOfUpdatesInvalidatedDueToClusterListLoop(CounterU32::new(0)),
+            StatisticsCounter::NumberOfDuplicateWithdraws(CounterU32::new(0)),
+            StatisticsCounter::NumberOfUpdatesSubjectedToTreatAsWithdraw(CounterU32::new(6)),
+            StatisticsCounter::Experimental65531(vec![0, 0, 0, 0]),
+        ],
+    ));
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+
+    Ok(())
+}

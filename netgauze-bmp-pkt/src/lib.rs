@@ -24,15 +24,19 @@
 #![deny(clippy::trivially_copy_pass_by_ref)]
 #![deny(clippy::missing_const_for_fn)]
 
-use std::net::{IpAddr, Ipv4Addr};
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    ops::Deref,
+};
 
 use chrono::{DateTime, Utc};
 
 use netgauze_bgp_pkt::{iana::BGPMessageType, BGPMessage};
+use netgauze_iana::address_family::AddressType;
 
 use crate::iana::{
-    BmpMessageType, BmpPeerTypeCode, InitiationInformationTlvType, PeerDownReasonCode,
-    PeerTerminationCode, RouteMirroringInformation, RouteMirroringTlvType,
+    BmpMessageType, BmpPeerTypeCode, BmpStatisticsType, InitiationInformationTlvType,
+    PeerDownReasonCode, PeerTerminationCode, RouteMirroringInformation, RouteMirroringTlvType,
     TerminationInformationTlvType,
 };
 
@@ -54,7 +58,7 @@ pub mod serde;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BmpMessage {
     RouteMonitoring(RouteMonitoringMessage),
-    StatisticsReport,
+    StatisticsReport(StatisticsReportMessage),
     PeerDownNotification(PeerDownNotificationMessage),
     PeerUpNotification(PeerUpNotificationMessage),
     Initiation(InitiationMessage),
@@ -71,7 +75,7 @@ impl BmpMessage {
     pub const fn get_type(&self) -> BmpMessageType {
         match self {
             Self::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
-            Self::StatisticsReport => BmpMessageType::StatisticsReport,
+            Self::StatisticsReport(_) => BmpMessageType::StatisticsReport,
             Self::PeerDownNotification(_) => BmpMessageType::PeerDownNotification,
             Self::PeerUpNotification(_) => BmpMessageType::PeerUpNotification,
             Self::Initiation(_) => BmpMessageType::Initiation,
@@ -675,6 +679,14 @@ impl PeerDownNotificationMessage {
             reason,
         })
     }
+
+    pub const fn peer_header(&self) -> &PeerHeader {
+        &self.peer_header
+    }
+
+    pub const fn reason(&self) -> &PeerDownNotificationReason {
+        &self.reason
+    }
 }
 
 /// Reason indicates why the session was closed and
@@ -748,5 +760,197 @@ impl PeerDownNotificationReason {
             Self::Experimental253(_) => PeerDownReasonCode::Experimental253,
             Self::Experimental254(_) => PeerDownReasonCode::Experimental254,
         }
+    }
+}
+
+/// These messages contain information that could be used by the
+/// monitoring station to observe interesting events that occur on the router.
+///
+/// ```text
+/// 0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                        Stats Count                            |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// followed by
+///```text
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct StatisticsReportMessage {
+    peer_header: PeerHeader,
+    counters: Vec<StatisticsCounter>,
+}
+
+impl StatisticsReportMessage {
+    pub const fn new(peer_header: PeerHeader, counters: Vec<StatisticsCounter>) -> Self {
+        Self {
+            peer_header,
+            counters,
+        }
+    }
+
+    pub const fn peer_header(&self) -> &PeerHeader {
+        &self.peer_header
+    }
+
+    pub const fn counters(&self) -> &Vec<StatisticsCounter> {
+        &self.counters
+    }
+}
+
+/// [StatisticsReportMessage] value
+///
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |         Stat Type             |          Stat Len             |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                        Stat Data                              |
+/// ~                                                               ~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum StatisticsCounter {
+    NumberOfPrefixesRejectedByInboundPolicy(CounterU32),
+    NumberOfDuplicatePrefixAdvertisements(CounterU32),
+    NumberOfDuplicateWithdraws(CounterU32),
+    NumberOfUpdatesInvalidatedDueToClusterListLoop(CounterU32),
+    NumberOfUpdatesInvalidatedDueToAsPathLoop(CounterU32),
+    NumberOfUpdatesInvalidatedDueToOriginatorId(CounterU32),
+    NumberOfUpdatesInvalidatedDueToAsConfederationLoop(CounterU32),
+    NumberOfRoutesInAdjRibIn(GaugeU64),
+    NumberOfRoutesInLocRib(GaugeU64),
+    NumberOfRoutesInPerAfiSafiAdjRibIn(AddressType, CounterU32),
+    NumberOfRoutesInPerAfiSafiLocRib(AddressType, CounterU32),
+    NumberOfUpdatesSubjectedToTreatAsWithdraw(CounterU32),
+    NumberOfPrefixesSubjectedToTreatAsWithdraw(CounterU32),
+    NumberOfDuplicateUpdateMessagesReceived(CounterU32),
+    NumberOfRoutesInPrePolicyAdjRibOut(GaugeU64),
+    NumberOfRoutesInPostPolicyAdjRibOut(GaugeU64),
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(AddressType, GaugeU64),
+    Experimental65531(Vec<u8>),
+    Experimental65532(Vec<u8>),
+    Experimental65533(Vec<u8>),
+    Experimental65534(Vec<u8>),
+    Unknown(u16, Vec<u8>),
+}
+
+impl StatisticsCounter {
+    pub const fn get_type(&self) -> Result<BmpStatisticsType, u16> {
+        match self {
+            Self::NumberOfPrefixesRejectedByInboundPolicy(_) => {
+                Ok(BmpStatisticsType::NumberOfPrefixesRejectedByInboundPolicy)
+            }
+            Self::NumberOfDuplicatePrefixAdvertisements(_) => {
+                Ok(BmpStatisticsType::NumberOfDuplicatePrefixAdvertisements)
+            }
+            Self::NumberOfDuplicateWithdraws(_) => {
+                Ok(BmpStatisticsType::NumberOfDuplicateWithdraws)
+            }
+            Self::NumberOfUpdatesInvalidatedDueToClusterListLoop(_) => {
+                Ok(BmpStatisticsType::NumberOfUpdatesInvalidatedDueToClusterListLoop)
+            }
+            Self::NumberOfUpdatesInvalidatedDueToAsPathLoop(_) => {
+                Ok(BmpStatisticsType::NumberOfUpdatesInvalidatedDueToAsPathLoop)
+            }
+            Self::NumberOfUpdatesInvalidatedDueToOriginatorId(_) => {
+                Ok(BmpStatisticsType::NumberOfUpdatesInvalidatedDueToOriginatorId)
+            }
+            Self::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(_) => {
+                Ok(BmpStatisticsType::NumberOfUpdatesInvalidatedDueToAsConfederationLoop)
+            }
+            Self::NumberOfRoutesInAdjRibIn(_) => Ok(BmpStatisticsType::NumberOfRoutesInAdjRibIn),
+            Self::NumberOfRoutesInLocRib(_) => Ok(BmpStatisticsType::NumberOfRoutesInLocRib),
+            Self::NumberOfRoutesInPerAfiSafiAdjRibIn(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiAdjRibIn)
+            }
+            Self::NumberOfRoutesInPerAfiSafiLocRib(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiLocRib)
+            }
+            Self::NumberOfUpdatesSubjectedToTreatAsWithdraw(_) => {
+                Ok(BmpStatisticsType::NumberOfUpdatesSubjectedToTreatAsWithdraw)
+            }
+            Self::NumberOfPrefixesSubjectedToTreatAsWithdraw(_) => {
+                Ok(BmpStatisticsType::NumberOfPrefixesSubjectedToTreatAsWithdraw)
+            }
+            Self::NumberOfDuplicateUpdateMessagesReceived(_) => {
+                Ok(BmpStatisticsType::NumberOfDuplicateUpdateMessagesReceived)
+            }
+            Self::NumberOfRoutesInPrePolicyAdjRibOut(_) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibOut)
+            }
+            Self::NumberOfRoutesInPostPolicyAdjRibOut(_) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibOut)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut)
+            }
+            Self::Experimental65531(_) => Ok(BmpStatisticsType::Experimental65531),
+            Self::Experimental65532(_) => Ok(BmpStatisticsType::Experimental65532),
+            Self::Experimental65533(_) => Ok(BmpStatisticsType::Experimental65533),
+            Self::Experimental65534(_) => Ok(BmpStatisticsType::Experimental65534),
+            Self::Unknown(code, _) => Err(*code),
+        }
+    }
+}
+
+/// A non-negative integer that monotonically increases
+/// until it reaches a maximum value, when it wraps around and starts
+/// increasing again from 0.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct CounterU32(u32);
+
+impl CounterU32 {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(&self) -> u32 {
+        self.0
+    }
+}
+
+impl Deref for CounterU32 {
+    type Target = u32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// Non-negative integer that may increase or decrease,
+/// but shall never exceed a maximum value, nor fall below a minimum one.
+/// The maximum value cannot be greater than 2^64-1 (18446744073709551615
+/// decimal), and the minimum value cannot be smaller than 0. The value
+/// has its maximum value whenever the information being modeled is
+/// greater than or equal to its maximum value, and has its minimum value
+/// whenever the information being modeled is smaller than or equal to
+/// its minimum value. If the information being modeled subsequently
+/// decreases below the maximum value (or increases above the minimum
+/// value), the 64-bit Gauge also decreases (or increases).
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct GaugeU64(u64);
+
+impl GaugeU64 {
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(&self) -> u64 {
+        self.0
+    }
+}
+
+impl Deref for GaugeU64 {
+    type Target = u64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

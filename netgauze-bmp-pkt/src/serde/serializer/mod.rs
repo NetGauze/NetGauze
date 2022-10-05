@@ -31,15 +31,17 @@ pub enum BmpMessageWritingError {
     PeerUpNotificationMessageError(#[from] PeerUpNotificationMessageWritingError),
     PeerDownNotificationMessageError(#[from] PeerDownNotificationMessageWritingError),
     TerminationMessageError(#[from] TerminationMessageWritingError),
+    StatisticsReportMessageError(#[from] StatisticsReportMessageWritingError),
 }
 
 impl WritablePDU<BmpMessageWritingError> for BmpMessage {
+    /// 1-octet version, 4-octets msg length, 1-octet msg type,
     const BASE_LENGTH: usize = 5;
 
     fn len(&self) -> usize {
         let len = match self {
             Self::RouteMonitoring(value) => value.len() + 1,
-            Self::StatisticsReport => todo!(),
+            Self::StatisticsReport(value) => value.len() + 1,
             Self::PeerDownNotification(value) => value.len() + 1,
             Self::PeerUpNotification(value) => value.len(),
             Self::Initiation(value) => value.len() + 1,
@@ -58,37 +60,17 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
         writer.write_u32::<NetworkEndian>(self.len() as u32)?;
         writer.write_u8(self.get_type().into())?;
         match self {
-            Self::RouteMonitoring(value) => {
-                value.write(writer)?;
-            }
-            Self::StatisticsReport => {}
-            Self::PeerDownNotification(value) => {
-                value.write(writer)?;
-            }
-            Self::PeerUpNotification(value) => {
-                value.write(writer)?;
-            }
-            Self::Initiation(value) => {
-                value.write(writer)?;
-            }
-            Self::Termination(value) => {
-                value.write(writer)?;
-            }
-            Self::RouteMirroring(value) => {
-                value.write(writer)?;
-            }
-            Self::Experimental251(value) => {
-                writer.write_all(value)?;
-            }
-            Self::Experimental252(value) => {
-                writer.write_all(value)?;
-            }
-            Self::Experimental253(value) => {
-                writer.write_all(value)?;
-            }
-            Self::Experimental254(value) => {
-                writer.write_all(value)?;
-            }
+            Self::RouteMonitoring(value) => value.write(writer)?,
+            Self::StatisticsReport(value) => value.write(writer)?,
+            Self::PeerDownNotification(value) => value.write(writer)?,
+            Self::PeerUpNotification(value) => value.write(writer)?,
+            Self::Initiation(value) => value.write(writer)?,
+            Self::Termination(value) => value.write(writer)?,
+            Self::RouteMirroring(value) => value.write(writer)?,
+            Self::Experimental251(value) => writer.write_all(value)?,
+            Self::Experimental252(value) => writer.write_all(value)?,
+            Self::Experimental253(value) => writer.write_all(value)?,
+            Self::Experimental254(value) => writer.write_all(value)?,
         }
         Ok(())
     }
@@ -573,6 +555,146 @@ impl WritablePDU<TerminationInformationWritingError> for TerminationInformation 
             Self::Experimental65532(value) => writer.write_all(value)?,
             Self::Experimental65533(value) => writer.write_all(value)?,
             Self::Experimental65534(value) => writer.write_all(value)?,
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum StatisticsReportMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+    PeerHeaderError(#[from] PeerHeaderWritingError),
+    StatisticsCounterMessageError(#[from] StatisticsCounterMessageWritingError),
+}
+
+impl WritablePDU<StatisticsReportMessageWritingError> for StatisticsReportMessage {
+    /// 4-octets Number of counters
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.peer_header.len()
+            + self.counters().iter().map(|x| x.len()).sum::<usize>()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), StatisticsReportMessageWritingError> {
+        self.peer_header.write(writer)?;
+        writer.write_u32::<NetworkEndian>(self.counters.len() as u32)?;
+        for counter in &self.counters {
+            counter.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum StatisticsCounterMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<StatisticsCounterMessageWritingError> for StatisticsCounter {
+    /// 2-octets type and 2-octets length
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                Self::NumberOfPrefixesRejectedByInboundPolicy(_) => 4,
+                Self::NumberOfDuplicatePrefixAdvertisements(_) => 4,
+                Self::NumberOfDuplicateWithdraws(_) => 4,
+                Self::NumberOfUpdatesInvalidatedDueToClusterListLoop(_) => 4,
+                Self::NumberOfUpdatesInvalidatedDueToAsPathLoop(_) => 4,
+                Self::NumberOfUpdatesInvalidatedDueToOriginatorId(_) => 4,
+                Self::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(_) => 4,
+                Self::NumberOfRoutesInAdjRibIn(_) => 4,
+                Self::NumberOfRoutesInLocRib(_) => 4,
+                Self::NumberOfRoutesInPerAfiSafiAdjRibIn(_, _) => 7,
+                Self::NumberOfRoutesInPerAfiSafiLocRib(_, _) => 7,
+                Self::NumberOfUpdatesSubjectedToTreatAsWithdraw(_) => 4,
+                Self::NumberOfPrefixesSubjectedToTreatAsWithdraw(_) => 4,
+                Self::NumberOfDuplicateUpdateMessagesReceived(_) => 4,
+                Self::NumberOfRoutesInPrePolicyAdjRibOut(_) => 4,
+                Self::NumberOfRoutesInPostPolicyAdjRibOut(_) => 4,
+                Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(_, _) => 7,
+                Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(_, _) => 7,
+                Self::Experimental65531(value) => value.len(),
+                Self::Experimental65532(value) => value.len(),
+                Self::Experimental65533(value) => value.len(),
+                Self::Experimental65534(value) => value.len(),
+                Self::Unknown(_, value) => value.len(),
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), StatisticsCounterMessageWritingError> {
+        match self.get_type() {
+            Ok(code) => writer.write_u16::<NetworkEndian>(code.into())?,
+            Err(code) => writer.write_u16::<NetworkEndian>(code)?,
+        }
+        writer.write_u16::<NetworkEndian>((self.len() - Self::BASE_LENGTH) as u16)?;
+        match self {
+            Self::NumberOfPrefixesRejectedByInboundPolicy(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfDuplicatePrefixAdvertisements(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfDuplicateWithdraws(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfUpdatesInvalidatedDueToClusterListLoop(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfUpdatesInvalidatedDueToAsPathLoop(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfUpdatesInvalidatedDueToOriginatorId(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInAdjRibIn(value) => writer.write_u64::<NetworkEndian>(value.0)?,
+            Self::NumberOfRoutesInLocRib(value) => writer.write_u64::<NetworkEndian>(value.0)?,
+            Self::NumberOfRoutesInPerAfiSafiAdjRibIn(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u32::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiLocRib(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u32::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfUpdatesSubjectedToTreatAsWithdraw(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfPrefixesSubjectedToTreatAsWithdraw(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfDuplicateUpdateMessagesReceived(value) => {
+                writer.write_u32::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPrePolicyAdjRibOut(value) => {
+                writer.write_u64::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPostPolicyAdjRibOut(value) => {
+                writer.write_u64::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::Experimental65531(value) => writer.write_all(value)?,
+            Self::Experimental65532(value) => writer.write_all(value)?,
+            Self::Experimental65533(value) => writer.write_all(value)?,
+            Self::Experimental65534(value) => writer.write_all(value)?,
+            Self::Unknown(_, value) => writer.write_all(value)?,
         }
         Ok(())
     }

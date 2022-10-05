@@ -24,6 +24,10 @@ use std::{
 use netgauze_bgp_pkt::{
     iana::BGPMessageType, serde::deserializer::BGPMessageParsingError, BGPMessage,
 };
+use netgauze_iana::address_family::{
+    AddressFamily, InvalidAddressType, SubsequentAddressFamily, UndefinedAddressFamily,
+    UndefinedSubsequentAddressFamily,
+};
 use nom::{
     error::ErrorKind,
     number::complete::{be_u128, be_u16, be_u32, be_u64, be_u8},
@@ -56,6 +60,9 @@ pub enum BmpMessageParsingError {
     ),
     RouteMirroringMessageError(#[from_located(module = "self")] RouteMirroringMessageParsingError),
     TerminationMessageError(#[from_located(module = "self")] TerminationMessageParsingError),
+    StatisticsReportMessageError(
+        #[from_located(module = "self")] StatisticsReportMessageParsingError,
+    ),
 }
 
 impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
@@ -76,7 +83,10 @@ impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
                 let (buf, value) = parse_into_located(buf)?;
                 (buf, BmpMessage::RouteMonitoring(value))
             }
-            BmpMessageType::StatisticsReport => todo!(),
+            BmpMessageType::StatisticsReport => {
+                let (buf, value) = parse_into_located(buf)?;
+                (buf, BmpMessage::StatisticsReport(value))
+            }
             BmpMessageType::PeerDownNotification => {
                 let (buf, value) = parse_into_located(buf)?;
                 (buf, BmpMessage::PeerDownNotification(value))
@@ -693,5 +703,256 @@ impl<'a> ReadablePDU<'a, LocatedTerminationInformationParsingError<'a>> for Term
             ));
         }
         Ok((reminder, value))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum StatisticsReportMessageParsingError {
+    NomError(#[from_nom] ErrorKind),
+    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
+    StatisticsCounterError(#[from_located(module = "self")] StatisticsCounterParsingError),
+}
+
+impl<'a> ReadablePDU<'a, LocatedStatisticsReportMessageParsingError<'a>>
+    for StatisticsReportMessage
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedStatisticsReportMessageParsingError<'a>> {
+        let (buf, peer_header) = parse_into_located(buf)?;
+        let (mut buf, stats_count) = be_u32(buf)?;
+        let mut counters = vec![];
+        for _ in 0..stats_count {
+            let (t, counter) = parse_into_located(buf)?;
+            buf = t;
+            counters.push(counter);
+        }
+        Ok((buf, StatisticsReportMessage::new(peer_header, counters)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum StatisticsCounterParsingError {
+    NomError(#[from_nom] ErrorKind),
+    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
+    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
+    InvalidAddressType(InvalidAddressType),
+}
+
+#[inline]
+fn parse_address_type(
+    buf: Span<'_>,
+) -> IResult<Span<'_>, AddressType, LocatedStatisticsCounterParsingError<'_>> {
+    let input = buf;
+    let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
+    let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+    let address_type = match AddressType::from_afi_safi(afi, safi) {
+        Ok(address_type) => address_type,
+        Err(err) => {
+            return Err(nom::Err::Error(LocatedStatisticsCounterParsingError::new(
+                input,
+                StatisticsCounterParsingError::InvalidAddressType(err),
+            )))
+        }
+    };
+    Ok((buf, address_type))
+}
+
+impl<'a> ReadablePDU<'a, LocatedStatisticsCounterParsingError<'a>> for StatisticsCounter {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedStatisticsCounterParsingError<'a>> {
+        let (buf, code) = be_u16(buf)?;
+        let (buf, length) = nom::combinator::peek(be_u16)(buf)?;
+        let (reminder, buf) = nom::multi::length_data(be_u16)(buf)?;
+        let (buf, counter) = match BmpStatisticsType::try_from(code) {
+            Ok(code) => match code {
+                BmpStatisticsType::NumberOfPrefixesRejectedByInboundPolicy => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfPrefixesRejectedByInboundPolicy(CounterU32(
+                            value,
+                        )),
+                    )
+                }
+                BmpStatisticsType::NumberOfDuplicatePrefixAdvertisements => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfDuplicatePrefixAdvertisements(CounterU32(value)),
+                    )
+                }
+                BmpStatisticsType::NumberOfDuplicateWithdraws => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfDuplicateWithdraws(CounterU32(value)),
+                    )
+                }
+                BmpStatisticsType::NumberOfUpdatesInvalidatedDueToClusterListLoop => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfUpdatesInvalidatedDueToClusterListLoop(
+                            CounterU32(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfUpdatesInvalidatedDueToAsPathLoop => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsPathLoop(CounterU32(
+                            value,
+                        )),
+                    )
+                }
+                BmpStatisticsType::NumberOfUpdatesInvalidatedDueToOriginatorId => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfUpdatesInvalidatedDueToOriginatorId(CounterU32(
+                            value,
+                        )),
+                    )
+                }
+                BmpStatisticsType::NumberOfUpdatesInvalidatedDueToAsConfederationLoop => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(
+                            CounterU32(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInAdjRibIn => {
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfRoutesInAdjRibIn(GaugeU64(value)),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInLocRib => {
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfRoutesInLocRib(GaugeU64(value)),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiAdjRibIn => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(
+                            address_type,
+                            CounterU32::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiLocRib => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(
+                            address_type,
+                            CounterU32::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfUpdatesSubjectedToTreatAsWithdraw => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfUpdatesSubjectedToTreatAsWithdraw(CounterU32(
+                            value,
+                        )),
+                    )
+                }
+                BmpStatisticsType::NumberOfPrefixesSubjectedToTreatAsWithdraw => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfPrefixesSubjectedToTreatAsWithdraw(CounterU32(
+                            value,
+                        )),
+                    )
+                }
+                BmpStatisticsType::NumberOfDuplicateUpdateMessagesReceived => {
+                    let (buf, value) = be_u32(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfDuplicateUpdateMessagesReceived(CounterU32(
+                            value,
+                        )),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibOut => {
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibOut(GaugeU64(value)),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibOut => {
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibOut(GaugeU64(value)),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::Experimental65531 => {
+                    let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                    (buf, StatisticsCounter::Experimental65531(data.to_vec()))
+                }
+                BmpStatisticsType::Experimental65532 => {
+                    let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                    (buf, StatisticsCounter::Experimental65532(data.to_vec()))
+                }
+                BmpStatisticsType::Experimental65533 => {
+                    let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                    (buf, StatisticsCounter::Experimental65533(data.to_vec()))
+                }
+                BmpStatisticsType::Experimental65534 => {
+                    let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                    (buf, StatisticsCounter::Experimental65534(data.to_vec()))
+                }
+            },
+            Err(code) => {
+                let (buf, data) = nom::bytes::complete::take(length)(buf)?;
+                (buf, StatisticsCounter::Unknown(code.0, data.to_vec()))
+            }
+        };
+        if !buf.is_empty() {
+            return Err(nom::Err::Error(LocatedStatisticsCounterParsingError::new(
+                buf,
+                StatisticsCounterParsingError::NomError(ErrorKind::NonEmpty),
+            )));
+        }
+        Ok((reminder, counter))
     }
 }
