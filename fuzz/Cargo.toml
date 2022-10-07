@@ -14,9 +14,16 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 netgauze-parse-utils = {path = "../netgauze-parse-utils"}
 netgauze-bgp-pkt = {path = "../netgauze-bgp-pkt", features = ["serde"]}
+netgauze-bmp-pkt = {path = "../netgauze-bmp-pkt", features = ["serde"]}
 
 [[bin]]
 name = "fuzz-bgp-pkt"
 path = "fuzz_targets/fuzz_bgp_pkt.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz-bmp-pkt"
+path = "fuzz_targets/fuzz_bmp_pkt.rs"
 test = false
 doc = false
