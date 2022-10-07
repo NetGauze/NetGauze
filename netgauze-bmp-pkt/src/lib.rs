@@ -57,6 +57,11 @@ pub mod serde;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BmpMessage {
+    V3(BmpMessageValue),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum BmpMessageValue {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport(StatisticsReportMessage),
     PeerDownNotification(PeerDownNotificationMessage),
@@ -70,7 +75,7 @@ pub enum BmpMessage {
     Experimental254(Vec<u8>),
 }
 
-impl BmpMessage {
+impl BmpMessageValue {
     /// Get IANA type
     pub const fn get_type(&self) -> BmpMessageType {
         match self {

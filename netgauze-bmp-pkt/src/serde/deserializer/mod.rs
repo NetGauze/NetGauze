@@ -15,7 +15,7 @@
 
 //! Deserializer library for BMP's wire protocol
 
-use chrono::{TimeZone, Utc};
+use chrono::{LocalResult, TimeZone, Utc};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     string::FromUtf8Error,
@@ -45,9 +45,46 @@ use crate::{iana::*, *};
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageParsingError {
     NomError(#[from_nom] ErrorKind),
-    UnsupportedBmpVersion(u8),
+    UndefinedBmpVersion(#[from_external] UndefinedBmpVersion),
+    InvalidBmpLength(u32),
+    BmpMessageValueError(#[from_located(module = "self")] BmpMessageValueParsingError),
+}
+
+impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpMessageParsingError<'a>> {
+        let (buf, version) = nom::combinator::map_res(be_u8, BmpVersion::try_from)(buf)?;
+        let input = buf;
+        let (buf, length) = be_u32(buf)?;
+        let base_length = 5;
+        if length < base_length {
+            return Err(nom::Err::Error(LocatedBmpMessageParsingError::new(
+                input,
+                BmpMessageParsingError::InvalidBmpLength(length),
+            )));
+        }
+        let (reminder, buf) = nom::bytes::complete::take(length - 5)(buf)?;
+
+        let (buf, msg) = match version {
+            BmpVersion::Version3 => {
+                let (buf, value) = parse_into_located(buf)?;
+                (buf, BmpMessage::V3(value))
+            }
+        };
+        // Make sure bmp message is fully parsed according to it's length
+        if !buf.is_empty() {
+            return Err(nom::Err::Error(LocatedBmpMessageParsingError::new(
+                buf,
+                BmpMessageParsingError::NomError(ErrorKind::NonEmpty),
+            )));
+        }
+        Ok((reminder, msg))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+pub enum BmpMessageValueParsingError {
+    NomError(#[from_nom] ErrorKind),
     UndefinedBmpMessageType(#[from_external] UndefinedBmpMessageType),
-    UndefinedPeerType(#[from_external] UndefinedBmpPeerTypeCode),
     RouteMonitoringMessageError(
         #[from_located(module = "self")] RouteMonitoringMessageParsingError,
     ),
@@ -65,61 +102,52 @@ pub enum BmpMessageParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpMessageParsingError<'a>> {
-        let input = buf;
-        let (buf, version) = be_u8(buf)?;
-        if version != BMP_VERSION {
-            return Err(nom::Err::Error(LocatedBmpMessageParsingError::new(
-                input,
-                BmpMessageParsingError::UnsupportedBmpVersion(version),
-            )));
-        }
-        let (buf, length) = be_u32(buf)?;
-        let (reminder, buf) = nom::bytes::complete::take(length - 5)(buf)?;
+impl<'a> ReadablePDU<'a, LocatedBmpMessageValueParsingError<'a>> for BmpMessageValue {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpMessageValueParsingError<'a>> {
         let (buf, msg_type) = nom::combinator::map_res(be_u8, BmpMessageType::try_from)(buf)?;
         let (buf, msg) = match msg_type {
             BmpMessageType::RouteMonitoring => {
                 let (buf, value) = parse_into_located(buf)?;
-                (buf, BmpMessage::RouteMonitoring(value))
+                (buf, BmpMessageValue::RouteMonitoring(value))
             }
             BmpMessageType::StatisticsReport => {
                 let (buf, value) = parse_into_located(buf)?;
-                (buf, BmpMessage::StatisticsReport(value))
+                (buf, BmpMessageValue::StatisticsReport(value))
             }
             BmpMessageType::PeerDownNotification => {
                 let (buf, value) = parse_into_located(buf)?;
-                (buf, BmpMessage::PeerDownNotification(value))
+                (buf, BmpMessageValue::PeerDownNotification(value))
             }
             BmpMessageType::PeerUpNotification => {
                 let (buf, value) = parse_into_located(buf)?;
-                (buf, BmpMessage::PeerUpNotification(value))
+                (buf, BmpMessageValue::PeerUpNotification(value))
             }
             BmpMessageType::Initiation => {
                 let (buf, init) = parse_into_located(buf)?;
-                (buf, BmpMessage::Initiation(init))
+                (buf, BmpMessageValue::Initiation(init))
             }
             BmpMessageType::Termination => {
                 let (buf, init) = parse_into_located(buf)?;
-                (buf, BmpMessage::Termination(init))
+                (buf, BmpMessageValue::Termination(init))
             }
             BmpMessageType::RouteMirroring => {
                 let (buf, init) = parse_into_located(buf)?;
-                (buf, BmpMessage::RouteMirroring(init))
+                (buf, BmpMessageValue::RouteMirroring(init))
             }
-            BmpMessageType::Experimental251 => (buf, BmpMessage::Experimental252(buf.to_vec())),
-            BmpMessageType::Experimental252 => (buf, BmpMessage::Experimental252(buf.to_vec())),
-            BmpMessageType::Experimental253 => (buf, BmpMessage::Experimental253(buf.to_vec())),
-            BmpMessageType::Experimental254 => (buf, BmpMessage::Experimental254(buf.to_vec())),
+            BmpMessageType::Experimental251 => {
+                (buf, BmpMessageValue::Experimental252(buf.to_vec()))
+            }
+            BmpMessageType::Experimental252 => {
+                (buf, BmpMessageValue::Experimental252(buf.to_vec()))
+            }
+            BmpMessageType::Experimental253 => {
+                (buf, BmpMessageValue::Experimental253(buf.to_vec()))
+            }
+            BmpMessageType::Experimental254 => {
+                (buf, BmpMessageValue::Experimental254(buf.to_vec()))
+            }
         };
-        // Make sure bmp message is fully parsed according to it's length
-        if !buf.is_empty() {
-            return Err(nom::Err::Error(LocatedBmpMessageParsingError::new(
-                buf,
-                BmpMessageParsingError::NomError(ErrorKind::NonEmpty),
-            )));
-        }
-        Ok((reminder, msg))
+        Ok((buf, msg))
     }
 }
 
@@ -301,6 +329,7 @@ impl<'a> ReadablePDU<'a, LocatedBmpPeerTypeParsingError<'a>> for BmpPeerType {
 pub enum PeerHeaderParsingError {
     NomError(#[from_nom] ErrorKind),
     BmpPeerTypeError(#[from_located(module = "self")] BmpPeerTypeParsingError),
+    InvalidTime(u32, u32),
 }
 
 impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
@@ -323,10 +352,23 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
         let (buf, peer_as) = be_u32(buf)?;
         let (buf, bgp_id) = be_u32(buf)?;
         let bgp_id = Ipv4Addr::from(bgp_id);
+        let input = buf;
         let (buf, timestamp_secs) = be_u32(buf)?;
-        let (buf, timestamp_milli) = be_u32(buf)?;
-        let time = if timestamp_secs != 0 && timestamp_milli != 0 {
-            Some(Utc.timestamp(timestamp_secs.into(), timestamp_milli * 1000))
+        let (buf, timestamp_micro) = be_u32(buf)?;
+        let time = if timestamp_secs != 0 && timestamp_micro != 0 {
+            let time_opt = Utc.timestamp_opt(
+                timestamp_secs.into(),
+                timestamp_micro.checked_mul(1_000).unwrap_or(u32::MAX),
+            );
+            let time = if let LocalResult::Single(time) = time_opt {
+                time
+            } else {
+                return Err(nom::Err::Error(LocatedPeerHeaderParsingError::new(
+                    Span::new(&input),
+                    PeerHeaderParsingError::InvalidTime(timestamp_secs, timestamp_micro),
+                )));
+            };
+            Some(time)
         } else {
             None
         };

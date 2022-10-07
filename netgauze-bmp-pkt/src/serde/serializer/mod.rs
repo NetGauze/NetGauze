@@ -25,6 +25,35 @@ use std::{io::Write, net::IpAddr};
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageWritingError {
     StdIOError(#[from_std_io_error] String),
+    BmpMessageValueError(#[from] BmpMessageValueWritingError),
+}
+
+impl WritablePDU<BmpMessageWritingError> for BmpMessage {
+    /// 1-octet version, 4-octets msg length
+    const BASE_LENGTH: usize = 5;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                Self::V3(value) => value.len(),
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageWritingError> {
+        match self {
+            Self::V3(value) => {
+                writer.write_u8(BmpVersion::Version3.into())?;
+                writer.write_u32::<NetworkEndian>(self.len() as u32)?;
+                value.write(writer)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum BmpMessageValueWritingError {
+    StdIOError(#[from_std_io_error] String),
     RouteMonitoringMessageError(#[from] RouteMonitoringMessageWritingError),
     RouteMirroringMessageError(#[from] RouteMirroringMessageWritingError),
     InitiationMessageError(#[from] InitiationMessageWritingError),
@@ -34,19 +63,19 @@ pub enum BmpMessageWritingError {
     StatisticsReportMessageError(#[from] StatisticsReportMessageWritingError),
 }
 
-impl WritablePDU<BmpMessageWritingError> for BmpMessage {
-    /// 1-octet version, 4-octets msg length, 1-octet msg type,
-    const BASE_LENGTH: usize = 5;
+impl WritablePDU<BmpMessageValueWritingError> for BmpMessageValue {
+    /// 1-octet msg type,
+    const BASE_LENGTH: usize = 1;
 
     fn len(&self) -> usize {
         let len = match self {
-            Self::RouteMonitoring(value) => value.len() + 1,
-            Self::StatisticsReport(value) => value.len() + 1,
-            Self::PeerDownNotification(value) => value.len() + 1,
+            Self::RouteMonitoring(value) => value.len(),
+            Self::StatisticsReport(value) => value.len(),
+            Self::PeerDownNotification(value) => value.len(),
             Self::PeerUpNotification(value) => value.len(),
-            Self::Initiation(value) => value.len() + 1,
-            Self::Termination(value) => value.len() + 1,
-            Self::RouteMirroring(value) => value.len() + 1,
+            Self::Initiation(value) => value.len(),
+            Self::Termination(value) => value.len(),
+            Self::RouteMirroring(value) => value.len(),
             Self::Experimental251(value) => value.len(),
             Self::Experimental252(value) => value.len(),
             Self::Experimental253(value) => value.len(),
@@ -55,9 +84,7 @@ impl WritablePDU<BmpMessageWritingError> for BmpMessage {
         Self::BASE_LENGTH + len
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageWritingError> {
-        writer.write_u8(BMP_VERSION)?;
-        writer.write_u32::<NetworkEndian>(self.len() as u32)?;
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageValueWritingError> {
         writer.write_u8(self.get_type().into())?;
         match self {
             Self::RouteMonitoring(value) => value.write(writer)?,
@@ -391,7 +418,7 @@ pub enum PeerUpNotificationMessageWritingError {
 
 impl WritablePDU<PeerUpNotificationMessageWritingError> for PeerUpNotificationMessage {
     // 16 local addr + 2 local port + 2 remote port
-    const BASE_LENGTH: usize = 21;
+    const BASE_LENGTH: usize = 20;
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH

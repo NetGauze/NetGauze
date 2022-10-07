@@ -17,9 +17,6 @@
 
 use strum_macros::{Display, FromRepr};
 
-/// Currently supported version
-pub const BMP_VERSION: u8 = 3;
-
 /// Corresponds to the V flag. If set indicates that the Peer address is an IPv6
 /// address. See [RFC7854](https://datatracker.ietf.org/doc/html/rfc7854)
 pub const PEER_FLAGS_IS_IPV6: u8 = 0b10000000;
@@ -39,6 +36,35 @@ pub const PEER_FLAGS_IS_ADJ_RIB_OUT: u8 = 0b00010000;
 /// Corresponds to the F flag. If set indicates that the Loc-RIB is filtered.
 /// See [RFC9069](https://datatracker.ietf.org/doc/html/rfc9069)
 pub const PEER_FLAGS_IS_FILTERED: u8 = 0b10000000;
+
+/// Currently supported BMP versions
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum BmpVersion {
+    Version3 = 3,
+}
+
+/// BGP version is not one of [BmpVersion], the carried value is the undefined
+/// code.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct UndefinedBmpVersion(pub u8);
+
+impl From<BmpVersion> for u8 {
+    fn from(value: BmpVersion) -> Self {
+        value as u8
+    }
+}
+
+impl TryFrom<u8> for BmpVersion {
+    type Error = UndefinedBmpVersion;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedBmpVersion(value)),
+        }
+    }
+}
 
 /// BMP Message types as registered in IANA [BMP Message Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#message-types)
 #[repr(u8)]
