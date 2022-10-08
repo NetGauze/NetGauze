@@ -1,0 +1,27 @@
+[package]
+name = "netgauze-bmpd"
+version = "0.0.1"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+description = """
+BMP Protocol Server.
+"""
+
+[dependencies]
+netgauze-bmp-pkt = {path = "../netgauze-bmp-pkt", features=["serde"]}
+netgauze-bgp-pkt = {path = "../netgauze-bgp-pkt", features=["serde"]}
+netgauze-parse-utils = { path = "../netgauze-parse-utils"}
+
+nom = { version = "7.1"}
+byteorder = "1.4"
+tokio = {version = "1", features=["full"]}
+tokio-util = { version = "0.7", features = ["codec"] }
+futures = "0.3"
+futures-core = "0.3"
+bytes = "1.1"
+pin-project = "1.0"
+
+[[bin]]
+name = "netgauze-bmpd"
