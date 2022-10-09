@@ -20,8 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
-        run: cargo build --verbose
+        run: cargo build
       - name: Build tests
-        run: cargo test --no-run
+        run: cargo test --no-run --locked
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test -- --nocapture --quiet
