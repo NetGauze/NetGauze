@@ -1,7 +1,7 @@
 //! Simple example of constructing BMP packet
 //! in addition to serializing and deserializing BGP packet from wire format.
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use netgauze_bgp_pkt::BGPMessage;
 use netgauze_bmp_pkt::{
     iana::RouteMirroringInformation, BmpMessage, BmpMessageValue, BmpPeerType, PeerHeader,
