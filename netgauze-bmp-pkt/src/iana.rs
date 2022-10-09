@@ -333,7 +333,7 @@ pub enum RouteMirroringInformation {
     Experimental65534 = 65534,
 }
 
-/// Code is not one of [RouteMirroringInformationCode], the carried value is the
+/// Code is not one of [RouteMirroringInformation], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct UndefinedRouteMirroringInformation(pub u16);
