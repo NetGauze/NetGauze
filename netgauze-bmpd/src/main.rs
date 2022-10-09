@@ -14,41 +14,39 @@
 // limitations under the License.
 
 use futures::StreamExt;
-use std::{io, net::SocketAddr, time::Duration};
-use tokio::sync::mpsc;
+use std::{convert::Infallible, io, net::SocketAddr, time::Duration};
 
 use tokio::net::TcpListener;
 use tokio_util::codec::FramedRead;
-use tower::ServiceBuilder;
+use tower::{service_fn, ServiceBuilder};
 
-use netgauze_bmpd::{codec::BmpCodec, transport::TaggedFramedStream, AddrInfo, TaggedData};
+use netgauze_bmpd::{codec::BmpCodec, transport::TaggedFramedStream, AddrInfo};
 
 use netgauze_bmp_pkt::BmpMessage;
-use netgauze_bmpd::{codec::BmpCodecDecoderError, service::MpscSenderService};
-use tower::ServiceExt;
+use netgauze_bmpd::{codec::BmpCodecDecoderError, transport::TaggedFramedStreamResult};
+use tower::{buffer::Buffer, ServiceExt};
+use tower_service::Service;
 
-async fn run_server(
-    local_socket: SocketAddr,
-    sender: mpsc::Sender<
-        Result<TaggedData<AddrInfo, BmpMessage>, TaggedData<AddrInfo, BmpCodecDecoderError>>,
-    >,
-) -> io::Result<()>
-where {
+type BmpResult = TaggedFramedStreamResult<AddrInfo, BmpMessage, BmpCodecDecoderError>;
+
+async fn run_server<S>(local_socket: SocketAddr, buffer_svc: Buffer<S, BmpResult>) -> io::Result<()>
+where
+    S: Service<BmpResult> + 'static + Send,
+    S::Error: Send + Sync + std::error::Error,
+    S::Future: Send,
+    <S as Service<BmpResult>>::Response: Send,
+{
     let listener = TcpListener::bind(local_socket).await?;
     loop {
         let (tcp_stream, remote_socket) = listener.accept().await?;
         let (rx, tx) = tcp_stream.into_split();
         let addr_info = AddrInfo::new(local_socket, remote_socket);
         let bmp_stream = TaggedFramedStream::new(addr_info, FramedRead::new(rx, BmpCodec), tx);
-        let sender = sender.clone();
+        let buffer_svc = buffer_svc.clone();
         tokio::spawn(async move {
-            let mut responses = ServiceBuilder::new()
-                .rate_limit(1, Duration::from_secs(10))
-                .service(MpscSenderService::new(sender))
-                .call_all(bmp_stream);
-            while let Some(response) = responses.next().await {
-                println!("MpscSenderService Response {:?}", response);
-            }
+            let mut responses = buffer_svc.call_all(bmp_stream);
+            // Keep the stream going till is closed
+            while (responses.next().await).is_some() {}
         });
     }
 }
@@ -56,23 +54,15 @@ where {
 #[tokio::main]
 async fn main() {
     let local_socket = SocketAddr::from(([0, 0, 0, 0], 33000));
-    let (sender, mut receiver) = mpsc::channel(1000);
-    let server_handler = tokio::spawn(run_server(local_socket, sender));
-    let receiver_handler = tokio::spawn(async move {
-        loop {
-            match receiver.recv().await {
-                None => {
-                    println!("MPSC Receiver closed");
-                    return;
-                }
-                Some(value) => {
-                    println!("MPSC Received value: {:?}", value);
-                }
-            }
-        }
-    });
-    tokio::task::yield_now().await;
-    let (server_ret, receiver_ret) = tokio::join!(server_handler, receiver_handler);
+    let print_svc = ServiceBuilder::new().service(service_fn(|x: BmpResult| async move {
+        println!("Received: {:?}", x);
+        Ok::<(), Infallible>(())
+    }));
+    let pipeline = ServiceBuilder::new()
+        .rate_limit(1, Duration::from_secs(1))
+        .service(print_svc);
+    let buffer_svc = Buffer::new(pipeline, 100);
+    let server_handler = tokio::spawn(run_server(local_socket, buffer_svc));
+    let (server_ret,) = tokio::join!(server_handler);
     server_ret.unwrap().unwrap();
-    receiver_ret.unwrap();
 }

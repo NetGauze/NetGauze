@@ -24,6 +24,9 @@ use std::{
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, FramedRead};
 
+pub type TaggedFramedStreamResult<Tag, Data, Error> =
+    Result<TaggedData<Tag, Data>, TaggedData<Tag, Error>>;
+
 #[derive(Debug)]
 #[pin_project]
 pub struct TaggedFramedStream<
@@ -73,7 +76,7 @@ impl<
 where
     Self: Unpin,
 {
-    type Item = Result<TaggedData<Tag, Data>, TaggedData<Tag, Error>>;
+    type Item = TaggedFramedStreamResult<Tag, Data, Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let tag = self.tag;
