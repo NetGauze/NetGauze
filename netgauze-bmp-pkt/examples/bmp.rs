@@ -1,10 +1,6 @@
-# BMP Monitoring Protocol
+//! Simple example of constructing BMP packet
+//! in addition to serializing and deserializing BGP packet from wire format.
 
-BMP-4 Protocol representation and wire format serialization/deserialization (serde)
-
-## Example
-
-```rust
 use chrono::{DateTime, Utc};
 use netgauze_bgp_pkt::BGPMessage;
 use netgauze_bmp_pkt::{
@@ -52,11 +48,3 @@ fn main() {
     let (_, bmp_msg_back) = BmpMessage::from_wire(Span::new(&buf)).unwrap();
     assert_eq!(bmp_msg, bmp_msg_back);
 }
-```
-
-## Supported BMP Protocol RFCs
-
-1. [RFC 7854](https://datatracker.ietf.org/doc/html/rfc7854) BGP Monitoring Protocol (BMP).
-2. [RFC 8671](https://datatracker.ietf.org/doc/html/rfc8671) Support for Adj-RIB-Out in the BGP Monitoring Protocol (
-   BMP).
-3. [RFC 9069](https://datatracker.ietf.org/doc/html/rfc9069) Support for Local RIB in the BGP Monitoring Protocol (BMP).
