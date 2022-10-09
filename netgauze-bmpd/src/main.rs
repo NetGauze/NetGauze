@@ -20,15 +20,29 @@ use tokio::net::TcpListener;
 use tokio_util::codec::FramedRead;
 use tower::{service_fn, ServiceBuilder};
 
-use netgauze_bmpd::{codec::BmpCodec, transport::TaggedFramedStream, AddrInfo};
+use netgauze_bmpd::{codec::BmpCodec, transport::TaggedFramedReadStream, AddrInfo};
 
 use netgauze_bmp_pkt::BmpMessage;
-use netgauze_bmpd::{codec::BmpCodecDecoderError, transport::TaggedFramedStreamResult};
+use netgauze_bmpd::{codec::BmpCodecDecoderError, transport::TaggedFramedReadStreamResult};
 use tower::{buffer::Buffer, ServiceExt};
 use tower_service::Service;
 
-type BmpResult = TaggedFramedStreamResult<AddrInfo, BmpMessage, BmpCodecDecoderError>;
+type BmpResult = TaggedFramedReadStreamResult<AddrInfo, BmpMessage, BmpCodecDecoderError>;
 
+/// Start a BMP Server listening on a local_socket and then pass all the
+/// incoming messages to a [Buffer] tower service.
+///
+/// Example:
+/// ```rust
+/// let local_socket = SocketAddr::from(([0, 0, 0, 0], 33000));
+/// let print_svc = ServiceBuilder::new().service(service_fn(|x: BmpResult| async move {
+///     println!("Received: {:?}", x);
+///     Ok::<(), Infallible>(())
+/// }));
+/// let buffer_svc = Buffer::new(print_svc, 100);
+/// let server_handler = tokio::spawn(run_server(local_socket, buffer_svc));
+/// tokio::join!(server_handler).0.expect("Server failed");
+/// ```
 async fn run_server<S>(local_socket: SocketAddr, buffer_svc: Buffer<S, BmpResult>) -> io::Result<()>
 where
     S: Service<BmpResult> + 'static + Send,
@@ -41,7 +55,8 @@ where
         let (tcp_stream, remote_socket) = listener.accept().await?;
         let (rx, tx) = tcp_stream.into_split();
         let addr_info = AddrInfo::new(local_socket, remote_socket);
-        let bmp_stream = TaggedFramedStream::new(addr_info, FramedRead::new(rx, BmpCodec), tx);
+        let bmp_stream =
+            TaggedFramedReadStream::new(addr_info, FramedRead::new(rx, BmpCodec), Some(tx));
         let buffer_svc = buffer_svc.clone();
         tokio::spawn(async move {
             let mut responses = buffer_svc.call_all(bmp_stream);

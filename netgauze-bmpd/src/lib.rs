@@ -39,6 +39,7 @@ impl AddrInfo {
     }
 }
 
+/// Associate a value with a tag
 #[derive(Debug, Clone)]
 pub struct TaggedData<T, V> {
     tag: T,
