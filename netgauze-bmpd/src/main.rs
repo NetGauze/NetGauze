@@ -55,8 +55,11 @@ where
         let (tcp_stream, remote_socket) = listener.accept().await?;
         let (rx, tx) = tcp_stream.into_split();
         let addr_info = AddrInfo::new(local_socket, remote_socket);
-        let bmp_stream =
-            TaggedFramedReadStream::new(addr_info, FramedRead::new(rx, BmpCodec), Some(tx));
+        let bmp_stream = TaggedFramedReadStream::new(
+            addr_info,
+            FramedRead::new(rx, BmpCodec::default()),
+            Some(tx),
+        );
         let buffer_svc = buffer_svc.clone();
         tokio::spawn(async move {
             let mut responses = buffer_svc.call_all(bmp_stream);

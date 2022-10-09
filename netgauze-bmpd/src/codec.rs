@@ -18,13 +18,17 @@
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bmp_pkt::{
+    iana::BmpVersion,
     serde::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
     BmpMessage,
 };
 use netgauze_parse_utils::{LocatedParsingError, ReadablePDU, Span, WritablePDU};
 use tokio_util::codec::{Decoder, Encoder};
 
-#[derive(Debug)]
+/// Min length for a valid BMP Message: 1-octet version + 4-octet length
+pub(crate) const BMP_MESSAGE_MIN_LENGTH: usize = 5;
+
+#[derive(Debug, Eq, PartialEq)]
 pub enum BmpCodecDecoderError {
     IoError(String),
     Incomplete(nom::Needed),
@@ -38,8 +42,11 @@ impl From<std::io::Error> for BmpCodecDecoderError {
 }
 
 /// Encoder and Decoder for [BmpMessage]
-#[derive(Debug)]
-pub struct BmpCodec;
+#[derive(Debug, Default)]
+pub struct BmpCodec {
+    /// Helper to track in the decoder if we are inside a BMP message or not
+    in_message: bool,
+}
 
 impl Encoder<BmpMessage> for BmpCodec {
     type Error = BmpMessageWritingError;
@@ -57,26 +64,49 @@ impl Decoder for BmpCodec {
     type Error = BmpCodecDecoderError;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if buf.len() >= 5 {
-            let length = NetworkEndian::read_u32(&buf[1..5]) as usize;
+        if self.in_message || buf.len() >= BMP_MESSAGE_MIN_LENGTH {
+            let version: u8 = buf[0];
+            // Fail early if the version is invalid
+            if let Err(e) = BmpVersion::try_from(version) {
+                buf.advance(1);
+                return Err(BmpCodecDecoderError::BmpMessageParsingError(
+                    BmpMessageParsingError::UndefinedBmpVersion(e),
+                ));
+            }
+            // Read the length, starting form after the version
+            let length = NetworkEndian::read_u32(&buf[1..BMP_MESSAGE_MIN_LENGTH]) as usize;
             if buf.len() < length {
+                // We still didn't read all the bytes for the message yet
+                self.in_message = true;
                 Ok(None)
             } else {
-                let (span, msg) = match BmpMessage::from_wire(Span::new(buf)) {
-                    Ok((span, msg)) => (span, msg),
+                self.in_message = false;
+                let msg = match BmpMessage::from_wire(Span::new(buf)) {
+                    Ok((span, msg)) => {
+                        buf.advance(span.location_offset());
+                        msg
+                    }
                     Err(error) => {
-                        let tmp = match error {
-                            nom::Err::Incomplete(_needed) => todo!(),
-                            nom::Err::Error(error) => error.error().clone(),
-                            nom::Err::Failure(error) => error.error().clone(),
+                        let err = match error {
+                            nom::Err::Incomplete(needed) => {
+                                BmpCodecDecoderError::Incomplete(needed)
+                            }
+                            nom::Err::Error(error) | nom::Err::Failure(error) => {
+                                BmpCodecDecoderError::BmpMessageParsingError(error.error().clone())
+                            }
                         };
-                        return Err(BmpCodecDecoderError::BmpMessageParsingError(tmp));
+                        // Make sure we advance the buffer far enough, so we don't get stuck on an
+                        // error value.
+                        // Unfortunately, BMP doesn't have synchronization values like in BGP
+                        // to understand we are in a new message.
+                        buf.advance(if length < 5 { 5 } else { length });
+                        return Err(err);
                     }
                 };
-                buf.advance(span.location_offset());
                 Ok(Some(msg))
             }
         } else {
+            // We don't have enough data yet to start processing
             Ok(None)
         }
     }
@@ -93,7 +123,7 @@ mod tests {
             InitiationInformation::SystemDescription("test11".to_string()),
             InitiationInformation::SystemName("PE2".to_string()),
         ])));
-        let mut code = BmpCodec;
+        let mut code = BmpCodec::default();
         let mut buf = BytesMut::with_capacity(msg.len());
         let mut empty_buf = BytesMut::with_capacity(msg.len());
         let mut error_buf = BytesMut::from(&[0xffu8, 0x00u8, 0x00u8, 0x00u8, 0x01u8, 0xffu8][..]);

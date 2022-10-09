@@ -27,5 +27,9 @@ tower = {version= "0.4.13", features=["full"] }
 tower-service = "0.3.2"
 tower-layer = "0.3.1"
 
+[dev-dependencies]
+tokio-test = "0.4.2"
+chrono = "0.4.22"
+
 [[bin]]
 name = "netgauze-bmpd"
