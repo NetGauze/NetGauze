@@ -24,14 +24,14 @@ use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug)]
 pub enum BmpCodecDecoderError {
-    IoError(std::io::Error),
+    IoError(String),
     Incomplete(nom::Needed),
     BmpMessageParsingError(BmpMessageParsingError),
 }
 
 impl From<std::io::Error> for BmpCodecDecoderError {
     fn from(error: std::io::Error) -> Self {
-        Self::IoError(error)
+        Self::IoError(error.to_string())
     }
 }
 

@@ -13,7 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::net::SocketAddr;
+use crate::codec::BmpCodecDecoderError;
+use std::{
+    fmt::{Display, Formatter},
+    net::SocketAddr,
+};
 
 pub mod codec;
 pub mod transport;
@@ -53,3 +57,11 @@ impl<T: Copy, V> TaggedData<T, V> {
         &self.value
     }
 }
+
+impl Display for TaggedData<AddrInfo, BmpCodecDecoderError> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for TaggedData<AddrInfo, BmpCodecDecoderError> {}
