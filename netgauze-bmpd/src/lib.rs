@@ -37,6 +37,14 @@ impl AddrInfo {
             remote_socket,
         }
     }
+
+    pub const fn local_socket(&self) -> SocketAddr {
+        self.local_socket
+    }
+
+    pub const fn remote_socket(&self) -> SocketAddr {
+        self.remote_socket
+    }
 }
 
 /// Associate a value with a tag
