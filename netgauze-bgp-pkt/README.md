@@ -107,16 +107,29 @@ pub fn main() {
 
 ### Supported Path Attributes In BGP Update message
 
-| Capability                   | RFCs                                                                                                                    | Well-known | Optional | transitive | Notes |
-|------------------------------|-------------------------------------------------------------------------------------------------------------------------|------------|----------|------------|-------|
-| Origin                       | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | No       | Yes        |       |
-| AS_PATH                      | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271) and [RFC 6793](https://datatracker.ietf.org/doc/html/rfc6793) | Yes        | No       | Yes        |       |
-| NEXT_HOP                     | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | No       | Yes        |       |
-| MultiExitDiscriminator (MED) | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | No         |       |
-| Local Preference (LocalPref) | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        |          | Yes        |       |
-| Atomic Aggregate             | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | Yes        |       |
-| Aggregator                   | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | Yes        |       |
-| Communities                  | [RFC 1997](https://datatracker.ietf.org/doc/html/rfc1997)                                                               | No         | Yes      | Yes        |       |
+| Path Attribute               | RFCs                                                                                                                    | Well-known | Optional | transitive | Notes                                                              |
+|------------------------------|-------------------------------------------------------------------------------------------------------------------------|------------|----------|------------|--------------------------------------------------------------------|
+| Origin                       | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | No       | Yes        |                                                                    |
+| AS_PATH                      | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271) and [RFC 6793](https://datatracker.ietf.org/doc/html/rfc6793) | Yes        | No       | Yes        |                                                                    |
+| NEXT_HOP                     | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | No       | Yes        |                                                                    |
+| MultiExitDiscriminator (MED) | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | No         |                                                                    |
+| Local Preference (LocalPref) | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        |          | Yes        |                                                                    |
+| Atomic Aggregate             | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | Yes        |                                                                    |
+| Aggregator                   | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | Yes        |                                                                    |
+| Communities                  | [RFC 1997](https://datatracker.ietf.org/doc/html/rfc1997)                                                               | No         | Yes      | Yes        |                                                                    |
+| Four Octet AS_PATH           | [RFC 6793](https://datatracker.ietf.org/doc/html/RFC6793)                                                               | No         | Yes      | Yes        |                                                                    |
+| MP_REACH_NLRI                | [RFC 4760](https://datatracker.ietf.org/doc/html/rfc4760)                                                               | No         | Yes      | No         |                                                                    |
+| MP_UNREACH_NLRI              | [RFC 4760](https://datatracker.ietf.org/doc/html/rfc4760)                                                               | No         | Yes      | No         |                                                                    |
+| UnknownAttribute             |                                                                                                                         | N/A        | N/A      | N/A        | Catch all attribute that will read and keep the value as a Vec<u8> |
+
+### MP-BGP supported address families
+
+| Address Family (AFI) | Subsequence Address Family (SAFI) | Notes |
+|----------------------|-----------------------------------|-------|
+| 1 = IPv4             | 1 = Unicast                       |       |
+| 1 = IPv4             | 2 = Multicast                     |       |
+| 2 = IPv6             | 1 = Unicast                       |       |
+| 2 = IPv6             | 2 = Multicast                     |       |
 
 # Development documentation
 

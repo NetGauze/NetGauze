@@ -499,6 +499,12 @@ pub struct AS4Path {
     segments: Vec<As4PathSegment>,
 }
 
+/// This is an optional transitive attribute that
+/// contains the AS path encoded with four-octet AS numbers. The
+/// AS4_PATH attribute has the same semantics and the same encoding as
+/// the [ASPath] attribute, except that it is "optional transitive", and
+/// it carries four-octet AS numbers.
+/// See [RFC6793](https://datatracker.ietf.org/doc/html/RFC6793)
 impl AS4Path {
     pub const fn new(segments: Vec<As4PathSegment>) -> Self {
         Self { segments }
