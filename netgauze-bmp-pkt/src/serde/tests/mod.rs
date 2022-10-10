@@ -24,7 +24,7 @@ use netgauze_bgp_pkt::{
     notification::{BGPNotificationMessage, CeaseError},
     open::{BGPOpenMessage, BGPOpenMessageParameter},
     path_attribute::{ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute},
-    serde::deserializer::BGPMessageParsingError,
+    serde::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
     update::{BGPUpdateMessage, NetworkLayerReachabilityInformation},
     BGPMessage,
 };
@@ -224,7 +224,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
             asn2: false,
             adj_rib_out: false,
         },
-        Some(1),
+        Some(RouteDistinguisher::As2Administrator { asn2: 0, number: 1 }),
         Some(IpAddr::V6(Ipv6Addr::from_str("2001:db8::ac10:14").unwrap())),
         200,
         Ipv4Addr::new(172, 16, 0, 20),
@@ -739,7 +739,9 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
         unsafe { Span::new_from_raw_offset(3, &bad_wire[3..]) },
         BmpMessageValueParsingError::PeerUpNotificationMessageError(
             PeerUpNotificationMessageParsingError::PeerHeaderError(
-                PeerHeaderParsingError::NomError(ErrorKind::Eof),
+                PeerHeaderParsingError::RouteDistinguisherError(
+                    RouteDistinguisherParsingError::NomError(ErrorKind::Eof),
+                ),
             ),
         ),
     );

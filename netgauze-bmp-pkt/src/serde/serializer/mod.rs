@@ -17,7 +17,9 @@
 
 use crate::{iana::*, *};
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_bgp_pkt::serde::serializer::BGPMessageWritingError;
+use netgauze_bgp_pkt::serde::serializer::{
+    nlri::RouteDistinguisherWritingError, BGPMessageWritingError,
+};
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
 use std::{io::Write, net::IpAddr};
@@ -206,6 +208,7 @@ impl WritablePDU<BmpPeerTypeWritingError> for BmpPeerType {
 pub enum PeerHeaderWritingError {
     StdIOError(#[from_std_io_error] String),
     BmpPeerTypeError(#[from] BmpPeerTypeWritingError),
+    RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
 }
 
 impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
@@ -225,9 +228,9 @@ impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), PeerHeaderWritingError> {
         self.peer_type.write(writer)?;
-        match self.distinguisher() {
+        match self.rd() {
             None => writer.write_u64::<NetworkEndian>(0)?,
-            Some(value) => writer.write_u64::<NetworkEndian>(*value)?,
+            Some(value) => value.write(writer)?,
         }
         match self.address() {
             Some(IpAddr::V4(ipv4)) => {

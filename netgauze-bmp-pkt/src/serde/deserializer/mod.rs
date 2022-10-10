@@ -22,7 +22,9 @@ use std::{
 };
 
 use netgauze_bgp_pkt::{
-    iana::BGPMessageType, serde::deserializer::BGPMessageParsingError, BGPMessage,
+    iana::BGPMessageType,
+    serde::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
+    BGPMessage,
 };
 use netgauze_iana::address_family::{
     AddressFamily, InvalidAddressType, SubsequentAddressFamily, UndefinedAddressFamily,
@@ -329,18 +331,19 @@ impl<'a> ReadablePDU<'a, LocatedBmpPeerTypeParsingError<'a>> for BmpPeerType {
 pub enum PeerHeaderParsingError {
     NomError(#[from_nom] ErrorKind),
     BmpPeerTypeError(#[from_located(module = "self")] BmpPeerTypeParsingError),
+    RouteDistinguisherError(
+        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer::nlri")]
+        RouteDistinguisherParsingError,
+    ),
     InvalidTime(u32, u32),
 }
 
 impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedPeerHeaderParsingError<'a>> {
         let (buf, peer_type) = parse_into_located(buf)?;
-        let (buf, distinguisher) = be_u64(buf)?;
-        let distinguisher = if distinguisher == 0 {
-            None
-        } else {
-            Some(distinguisher)
-        };
+        let (buf, rd) = parse_into_located(buf)?;
+        let zero = RouteDistinguisher::As2Administrator { asn2: 0, number: 0 };
+        let rd = if rd == zero { None } else { Some(rd) };
         let (buf, peer_address) = be_u128(buf)?;
         let address = if peer_address == 0u128 {
             None
@@ -372,7 +375,7 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
         } else {
             None
         };
-        let peer_header = PeerHeader::new(peer_type, distinguisher, address, peer_as, bgp_id, time);
+        let peer_header = PeerHeader::new(peer_type, rd, address, peer_as, bgp_id, time);
         Ok((buf, peer_header))
     }
 }

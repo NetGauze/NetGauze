@@ -31,7 +31,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 
-use netgauze_bgp_pkt::{iana::BGPMessageType, BGPMessage};
+use netgauze_bgp_pkt::{iana::BGPMessageType, nlri::RouteDistinguisher, BGPMessage};
 use netgauze_iana::address_family::AddressType;
 
 use crate::iana::{
@@ -122,7 +122,7 @@ impl BmpMessageValue {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PeerHeader {
     peer_type: BmpPeerType,
-    distinguisher: Option<u64>,
+    rd: Option<RouteDistinguisher>,
     address: Option<IpAddr>,
     peer_as: u32,
     bgp_id: Ipv4Addr,
@@ -132,7 +132,7 @@ pub struct PeerHeader {
 impl PeerHeader {
     pub const fn new(
         peer_type: BmpPeerType,
-        distinguisher: Option<u64>,
+        rd: Option<RouteDistinguisher>,
         address: Option<IpAddr>,
         peer_as: u32,
         bgp_id: Ipv4Addr,
@@ -140,7 +140,7 @@ impl PeerHeader {
     ) -> Self {
         Self {
             peer_type,
-            distinguisher,
+            rd,
             address,
             peer_as,
             bgp_id,
@@ -152,8 +152,8 @@ impl PeerHeader {
         &self.peer_type
     }
 
-    pub const fn distinguisher(&self) -> &Option<u64> {
-        &self.distinguisher
+    pub const fn rd(&self) -> &Option<RouteDistinguisher> {
+        &self.rd
     }
 
     pub const fn address(&self) -> &Option<IpAddr> {
