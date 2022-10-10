@@ -627,6 +627,37 @@ impl TryFrom<u8> for RouteRefreshSubcode {
     }
 }
 
+/// [Route Distinguisher Type Field](https://www.iana.org/assignments/route-distinguisher-types/route-distinguisher-types.xhtml)
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+pub enum RouteDistinguisherTypeCode {
+    As2Administrator = 0,
+    Ipv4Administrator = 1,
+    As4Administrator = 2,
+    /// [RFC7524](https://datatracker.ietf.org/doc/html/rfc7524)
+    LeafAdRoutes = 65535,
+}
+
+impl From<RouteDistinguisherTypeCode> for u16 {
+    fn from(value: RouteDistinguisherTypeCode) -> Self {
+        value as u16
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct UndefinedRouteDistinguisherTypeCode(pub u16);
+
+impl TryFrom<u16> for RouteDistinguisherTypeCode {
+    type Error = UndefinedRouteDistinguisherTypeCode;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedRouteDistinguisherTypeCode(value)),
+        }
+    }
+}
+
 /// [BGP Well-known Communities](https://www.iana.org/assignments/bgp-well-known-communities/bgp-well-known-communities.xhtml)
 ///
 /// Out of the total community space defined by [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
@@ -866,5 +897,17 @@ mod tests {
         assert_eq!(ret, Ok(RouteRefreshSubcode::BeginningOfRouteRefresh));
         assert_eq!(valid_u8, valid_code);
         assert_eq!(undefined, Err(UndefinedRouteRefreshSubcode(255)));
+    }
+
+    #[test]
+    fn test_route_distinguisher_type_code() {
+        let undefined_code = 255;
+        let valid_code = 1;
+        let ret = RouteDistinguisherTypeCode::try_from(valid_code);
+        let undefined = RouteDistinguisherTypeCode::try_from(undefined_code);
+        let valid_u16: u16 = RouteDistinguisherTypeCode::Ipv4Administrator.into();
+        assert_eq!(ret, Ok(RouteDistinguisherTypeCode::Ipv4Administrator));
+        assert_eq!(valid_u16, valid_code);
+        assert_eq!(undefined, Err(UndefinedRouteDistinguisherTypeCode(255)));
     }
 }

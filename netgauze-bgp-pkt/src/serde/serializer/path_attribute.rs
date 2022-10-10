@@ -17,7 +17,10 @@
 
 use crate::{
     iana::PathAttributeType,
-    nlri::{Ipv4Multicast, Ipv4Unicast, Ipv6Multicast, Ipv6Unicast, NlriAddressType},
+    nlri::{
+        Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4Unicast, Ipv6MplsVpnUnicast, Ipv6Multicast,
+        Ipv6Unicast, NlriAddressType,
+    },
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
         AtomicAggregate, Communities, Community, LocalPreference, MpReach, MpUnreach,
@@ -25,16 +28,14 @@ use crate::{
         UnknownAttribute,
     },
     serde::serializer::nlri::{
-        Ipv4MulticastWritingError, Ipv4UnicastWritingError, Ipv6MulticastWritingError,
-        Ipv6UnicastWritingError,
+        Ipv4MplsVpnUnicastWritingError, Ipv4MulticastWritingError, Ipv4UnicastWritingError,
+        Ipv6MplsVpnUnicastWritingError, Ipv6MulticastWritingError, Ipv6UnicastWritingError,
+        LabeledNextHopWritingError, IPV4_LEN, IPV6_LEN,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
 use netgauze_serde_macros::WritingError;
-
-const IPV4_LEN: usize = 4;
-const IPV6_LEN: usize = 16;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
@@ -610,6 +611,9 @@ pub enum MpReachWritingError {
     Ipv4MulticastError(#[from] Ipv4MulticastWritingError),
     Ipv6UnicastError(#[from] Ipv6UnicastWritingError),
     Ipv6MulticastError(#[from] Ipv6MulticastWritingError),
+    Ipv4MplsVpnUnicastError(#[from] Ipv4MplsVpnUnicastWritingError),
+    Ipv6MplsVpnUnicastError(#[from] Ipv6MplsVpnUnicastWritingError),
+    LabeledNextHopError(#[from] LabeledNextHopWritingError),
 }
 
 impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
@@ -618,32 +622,45 @@ impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
 
     fn len(&self, extended_length: bool) -> usize {
         // Multiply self.as_numbers().len() by 2 since each is two octets
-        let payload_len = match self {
+        let payload_len: usize = match self {
             Self::Ipv4Unicast { next_hop: _, nlri } => {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
-                IPV4_LEN + 1 + nlri_len
+                IPV4_LEN as usize + 1 + nlri_len
             }
             Self::Ipv4Multicast { next_hop: _, nlri } => {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
-                IPV4_LEN + 1 + nlri_len
+                IPV4_LEN as usize + 1 + nlri_len
+            }
+            Self::Ipv4MplsVpnUnicast { next_hop, nlri } => {
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                next_hop.len() + nlri_len
             }
             Self::Ipv6Unicast {
                 next_hop_global: _,
                 next_hop_local,
                 nlri,
             } => {
-                let local_len: usize = next_hop_local.map(|_| IPV6_LEN).unwrap_or(0);
+                let local_len: usize = next_hop_local.map(|_| IPV6_LEN as usize).unwrap_or(0);
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
-                IPV6_LEN + 1 + local_len + nlri_len
+                IPV6_LEN as usize + 1 + local_len + nlri_len
             }
             Self::Ipv6Multicast {
                 next_hop_global: _,
                 next_hop_local,
                 nlri,
             } => {
-                let local_len: usize = next_hop_local.map(|_| IPV6_LEN).unwrap_or(0);
+                let local_len: usize = next_hop_local.map(|_| IPV6_LEN as usize).unwrap_or(0);
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
-                IPV6_LEN + 1 + local_len + nlri_len
+                IPV6_LEN as usize + 1 + local_len + nlri_len
+            }
+            Self::Ipv6MplsVpnUnicast {
+                next_hop_global,
+                next_hop_local,
+                nlri,
+            } => {
+                let local_len: usize = next_hop_local.map(|x| x.len()).unwrap_or(0);
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                next_hop_global.len() + local_len + nlri_len
             }
         };
         Self::BASE_LENGTH + usize::from(extended_length) + payload_len
@@ -683,6 +700,21 @@ impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
                 )?;
                 writer.write_u8(IPV4_LEN as u8)?;
                 writer.write_all(&next_hop.octets())?;
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::Ipv4MplsVpnUnicast { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    Ipv4MplsVpnUnicast::address_type().address_family().into(),
+                )?;
+                writer.write_u8(
+                    Ipv4MplsVpnUnicast::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
                     nlri.write(writer)?
@@ -734,6 +766,30 @@ impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
                 } else {
                     writer.write_u8(16)?;
                     writer.write_all(&next_hop_global.octets())?;
+                }
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::Ipv6MplsVpnUnicast {
+                next_hop_global,
+                next_hop_local,
+                nlri,
+            } => {
+                writer.write_u16::<NetworkEndian>(
+                    Ipv6MplsVpnUnicast::address_type().address_family().into(),
+                )?;
+                writer.write_u8(
+                    Ipv6MplsVpnUnicast::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                if let Some(local) = next_hop_local {
+                    next_hop_global.write(writer)?;
+                    local.write(writer)?;
+                } else {
+                    next_hop_global.write(writer)?;
                 }
                 writer.write_u8(0)?;
                 for nlri in nlri {

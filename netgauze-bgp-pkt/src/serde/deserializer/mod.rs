@@ -33,7 +33,8 @@ use nom::{
 };
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, ReadablePDU, ReadablePDUWithOneInput, Span,
+    parse_into_located, parse_into_located_one_input, ReadablePDU, ReadablePDUWithOneInput,
+    ReadablePDUWithTwoInputs, Span,
 };
 
 use crate::{
@@ -66,36 +67,43 @@ pub enum Ipv4PrefixParsingError {
 
 impl<'a> ReadablePDU<'a, LocatedIpv4PrefixParsingError<'a>> for Ipv4Net {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4PrefixParsingError<'a>> {
-        ipv4_network_from_wire(buf)
+        let input = buf;
+        let (buf, prefix_len) = be_u8(buf)?;
+        <Self as ReadablePDUWithTwoInputs<u8, Span<'_>, LocatedIpv4PrefixParsingError<'_>>>::from_wire(
+            buf, prefix_len, input
+        )
     }
 }
 
-/// Parse IPv4 prefix
-pub(crate) fn ipv4_network_from_wire(
-    buf: Span<'_>,
-) -> IResult<Span<'_>, Ipv4Net, LocatedIpv4PrefixParsingError<'_>> {
-    let input = buf;
-    let (buf, prefix_len) = be_u8(buf)?;
-    // The prefix value must fall into the octet boundary, even if the prefix_len
-    // doesn't. For example,
-    // prefix_len=24 => prefix_size=24 while prefix_len=19 => prefix_size=24
-    let prefix_size = if prefix_len >= u8::MAX - 7 {
-        u8::MAX
-    } else {
-        (prefix_len + 7) / 8
-    };
-    let (buf, prefix) = nom::bytes::complete::take(prefix_size.min(4))(buf)?;
-    // Fill the rest of bits with zeros if
-    let mut network = [0; 4];
-    prefix.iter().enumerate().for_each(|(i, v)| network[i] = *v);
-    let addr = Ipv4Addr::from(network);
+impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4PrefixParsingError<'a>> for Ipv4Net {
+    /// A second version that assumes the prefix length has been read else where
+    /// in the message Useful for Labeled VPN NLRI
+    fn from_wire(
+        buf: Span<'a>,
+        prefix_len: u8,
+        prefix_location: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedIpv4PrefixParsingError<'a>> {
+        // The prefix value must fall into the octet boundary, even if the prefix_len
+        // doesn't. For example,
+        // prefix_len=24 => prefix_size=24 while prefix_len=19 => prefix_size=24
+        let prefix_size = if prefix_len >= u8::MAX - 7 {
+            u8::MAX
+        } else {
+            (prefix_len + 7) / 8
+        };
+        let (buf, prefix) = nom::bytes::complete::take(prefix_size.min(4))(buf)?;
+        // Fill the rest of bits with zeros if
+        let mut network = [0; 4];
+        prefix.iter().enumerate().for_each(|(i, v)| network[i] = *v);
+        let addr = Ipv4Addr::from(network);
 
-    match Ipv4Net::new(addr, prefix_len) {
-        Ok(net) => Ok((buf, net)),
-        Err(_) => Err(nom::Err::Error(LocatedIpv4PrefixParsingError::new(
-            input,
-            Ipv4PrefixParsingError::InvalidIpv4PrefixLen(prefix_len),
-        ))),
+        match Ipv4Net::new(addr, prefix_len) {
+            Ok(net) => Ok((buf, net)),
+            Err(_) => Err(nom::Err::Error(LocatedIpv4PrefixParsingError::new(
+                prefix_location,
+                Ipv4PrefixParsingError::InvalidIpv4PrefixLen(prefix_len),
+            ))),
+        }
     }
 }
 
@@ -109,36 +117,41 @@ pub enum Ipv6PrefixParsingError {
 
 impl<'a> ReadablePDU<'a, LocatedIpv6PrefixParsingError<'a>> for Ipv6Net {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv6PrefixParsingError<'a>> {
-        ipv6_network_from_wire(buf)
+        let input = buf;
+        let (buf, prefix_len) = be_u8(buf)?;
+        <Self as ReadablePDUWithTwoInputs<u8, Span<'_>, LocatedIpv6PrefixParsingError<'_>>>::from_wire(
+            buf, prefix_len, input
+        )
     }
 }
 
-/// Parse IPv6 prefix
-fn ipv6_network_from_wire(
-    buf: Span<'_>,
-) -> IResult<Span<'_>, Ipv6Net, LocatedIpv6PrefixParsingError<'_>> {
-    let input = buf;
-    let (buf, prefix_len) = be_u8(buf)?;
-    // The prefix value must fall into the octet boundary, even if the prefix_len
-    // doesn't. For example,
-    // prefix_len=24 => prefix_size=24 while prefix_len=19 => prefix_size=24
-    let prefix_size = if prefix_len >= u8::MAX - 7 {
-        u8::MAX
-    } else {
-        (prefix_len + 7) / 8
-    };
-    let (buf, prefix) = nom::bytes::complete::take(prefix_size.min(16))(buf)?;
-    // Fill the rest of bits with zeros if
-    let mut network = [0; 16];
-    prefix.iter().enumerate().for_each(|(i, v)| network[i] = *v);
-    let addr = Ipv6Addr::from(network);
+impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6PrefixParsingError<'a>> for Ipv6Net {
+    fn from_wire(
+        buf: Span<'a>,
+        prefix_len: u8,
+        prefix_location: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedIpv6PrefixParsingError<'a>> {
+        // The prefix value must fall into the octet boundary, even if the prefix_len
+        // doesn't. For example,
+        // prefix_len=24 => prefix_size=24 while prefix_len=19 => prefix_size=24
+        let prefix_size = if prefix_len >= u8::MAX - 7 {
+            u8::MAX
+        } else {
+            (prefix_len + 7) / 8
+        };
+        let (buf, prefix) = nom::bytes::complete::take(prefix_size.min(16))(buf)?;
+        // Fill the rest of bits with zeros if
+        let mut network = [0; 16];
+        prefix.iter().enumerate().for_each(|(i, v)| network[i] = *v);
+        let addr = Ipv6Addr::from(network);
 
-    match Ipv6Net::new(addr, prefix_len) {
-        Ok(net) => Ok((buf, net)),
-        Err(_) => Err(nom::Err::Error(LocatedIpv6PrefixParsingError::new(
-            input,
-            Ipv6PrefixParsingError::InvalidIpv6PrefixLen(prefix_len),
-        ))),
+        match Ipv6Net::new(addr, prefix_len) {
+            Ok(net) => Ok((buf, net)),
+            Err(_) => Err(nom::Err::Error(LocatedIpv6PrefixParsingError::new(
+                prefix_location,
+                Ipv6PrefixParsingError::InvalidIpv6PrefixLen(prefix_len),
+            ))),
+        }
     }
 }
 

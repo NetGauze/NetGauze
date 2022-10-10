@@ -124,12 +124,14 @@ pub fn main() {
 
 ### MP-BGP supported address families
 
-| Address Family (AFI) | Subsequence Address Family (SAFI) | Notes |
-|----------------------|-----------------------------------|-------|
-| 1 = IPv4             | 1 = Unicast                       |       |
-| 1 = IPv4             | 2 = Multicast                     |       |
-| 2 = IPv6             | 1 = Unicast                       |       |
-| 2 = IPv6             | 2 = Multicast                     |       |
+| RFC                                                       | Address Family (AFI) | Subsequence Address Family (SAFI) | Notes |
+|-----------------------------------------------------------|----------------------|-----------------------------------|-------|
+|                                                           | 1 = IPv4             | 1 = Unicast                       |       |
+|                                                           | 1 = IPv4             | 2 = Multicast                     |       |
+| [RFC 4364](https://datatracker.ietf.org/doc/html/RFC4364) | 1 = IPv4             | 128 = MPLS Labeled Unicast        |       |
+|                                                           | 2 = IPv6             | 1 = Unicast                       |       |
+|                                                           | 2 = IPv6             | 2 = Multicast                     |       |
+| [RFC 4659](https://datatracker.ietf.org/doc/html/RFC4659) | 2 = IPv4             | 128 = MPLS Labeled Unicast        |       |
 
 # Development documentation
 

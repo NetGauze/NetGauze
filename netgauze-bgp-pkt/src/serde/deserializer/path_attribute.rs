@@ -24,8 +24,9 @@ use crate::{
         UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
     },
     serde::deserializer::nlri::{
-        Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
-        Ipv6UnicastParsingError,
+        Ipv4MplsVpnUnicastParsingError, Ipv4MulticastParsingError, Ipv4UnicastParsingError,
+        Ipv6MplsVpnUnicastParsingError, Ipv6MulticastParsingError, Ipv6UnicastParsingError,
+        LabeledNextHopParsingError,
     },
 };
 use netgauze_iana::address_family::{
@@ -33,9 +34,9 @@ use netgauze_iana::address_family::{
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located_one_input, parse_into_located_three_inputs, parse_into_located_two_inputs,
-    parse_till_empty, parse_till_empty_into_located, ReadablePDU, ReadablePDUWithOneInput,
-    ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input, parse_into_located_three_inputs,
+    parse_into_located_two_inputs, parse_till_empty, parse_till_empty_into_located, ReadablePDU,
+    ReadablePDUWithOneInput, ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -547,11 +548,20 @@ pub enum MpReachParsingError {
     Ipv4MulticastError(
         #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MulticastParsingError,
     ),
+    Ipv4MplsVpnUnicastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
+    ),
     Ipv6UnicastError(
         #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6UnicastParsingError,
     ),
     Ipv6MulticastError(
         #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MulticastParsingError,
+    ),
+    Ipv6MplsVpnUnicastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MplsVpnUnicastParsingError,
+    ),
+    LabeledNextHopError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] LabeledNextHopParsingError,
     ),
 }
 
@@ -578,9 +588,9 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                 )))
             }
         };
-        let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
         match address_type {
             AddressType::Ipv4Unicast => {
+                let (mp_buf, _next_hop_len) = be_u8(mp_buf)?;
                 let (mp_buf, next_hop) = be_u32(mp_buf)?;
                 let next_hop = Ipv4Addr::from(next_hop);
                 let (mp_buf, _) = be_u8(mp_buf)?;
@@ -588,6 +598,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                 Ok((buf, MpReach::Ipv4Unicast { next_hop, nlri }))
             }
             AddressType::Ipv4Multicast => {
+                let (mp_buf, _next_hop_len) = be_u8(mp_buf)?;
                 let (mp_buf, next_hop) = be_u32(mp_buf)?;
                 let next_hop = Ipv4Addr::from(next_hop);
                 let (mp_buf, _) = be_u8(mp_buf)?;
@@ -595,10 +606,10 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                 Ok((buf, MpReach::Ipv4Multicast { next_hop, nlri }))
             }
             AddressType::Ipv4MplsLabeledVpn => {
-                return Err(nom::Err::Error(LocatedMpReachParsingError::new(
-                    mp_buf_begin,
-                    MpReachParsingError::UnknownAddressType(AddressType::Ipv4MplsLabeledVpn),
-                )))
+                let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpReach::Ipv4MplsVpnUnicast { next_hop, nlri }))
             }
             AddressType::Ipv4MulticastBgpMplsVpn => {
                 return Err(nom::Err::Error(LocatedMpReachParsingError::new(
@@ -631,6 +642,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                 )))
             }
             AddressType::Ipv6Unicast => {
+                let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
                 let (mp_buf, global) = be_u128(mp_buf)?;
                 let next_hop_global = Ipv6Addr::from(global);
                 let (mp_buf, next_hop_local) = if next_hop_len == 32 {
@@ -651,6 +663,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                 ))
             }
             AddressType::Ipv6Multicast => {
+                let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
                 let (mp_buf, global) = be_u128(mp_buf)?;
                 let next_hop_global = Ipv6Addr::from(global);
                 let (mp_buf, next_hop_local) = if next_hop_len == 32 {
@@ -670,10 +683,10 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                     },
                 ))
             }
-            AddressType::Ipv6MPLSLabeledVpn => {
+            AddressType::Ipv6MplsLabeledVpn => {
                 return Err(nom::Err::Error(LocatedMpReachParsingError::new(
                     mp_buf_begin,
-                    MpReachParsingError::UnknownAddressType(AddressType::Ipv6MPLSLabeledVpn),
+                    MpReachParsingError::UnknownAddressType(AddressType::Ipv6MplsLabeledVpn),
                 )))
             }
             AddressType::Ipv6MulticastBgpMplsVpn => {
@@ -822,10 +835,10 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for
                 let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
                 Ok((buf, MpUnreach::Ipv6Multicast { nlri }))
             }
-            AddressType::Ipv6MPLSLabeledVpn => {
+            AddressType::Ipv6MplsLabeledVpn => {
                 return Err(nom::Err::Error(LocatedMpUnreachParsingError::new(
                     mp_buf_begin,
-                    MpUnreachParsingError::UnknownAddressType(AddressType::Ipv6MPLSLabeledVpn),
+                    MpUnreachParsingError::UnknownAddressType(AddressType::Ipv6MplsLabeledVpn),
                 )))
             }
             AddressType::Ipv6MulticastBgpMplsVpn => {

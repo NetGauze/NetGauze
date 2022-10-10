@@ -406,7 +406,7 @@ pub enum AddressType {
     Ipv4NlriMplsLabels,
     Ipv6Unicast,
     Ipv6Multicast,
-    Ipv6MPLSLabeledVpn,
+    Ipv6MplsLabeledVpn,
     Ipv6MulticastBgpMplsVpn,
     Ipv6Bgp6over4,
     Ipv6FlowSpec,
@@ -458,7 +458,7 @@ impl AddressType {
 
             Self::Ipv6Unicast => AddressFamily::IPv6,
             Self::Ipv6Multicast => AddressFamily::IPv6,
-            Self::Ipv6MPLSLabeledVpn => AddressFamily::IPv6,
+            Self::Ipv6MplsLabeledVpn => AddressFamily::IPv6,
             Self::Ipv6MulticastBgpMplsVpn => AddressFamily::IPv6,
             Self::Ipv6Bgp6over4 => AddressFamily::IPv6,
             Self::Ipv6FlowSpec => AddressFamily::IPv6,
@@ -484,7 +484,7 @@ impl AddressType {
 
             Self::Ipv6Unicast => SubsequentAddressFamily::Unicast,
             Self::Ipv6Multicast => SubsequentAddressFamily::Multicast,
-            Self::Ipv6MPLSLabeledVpn => SubsequentAddressFamily::MplsVpn,
+            Self::Ipv6MplsLabeledVpn => SubsequentAddressFamily::MplsVpn,
             Self::Ipv6MulticastBgpMplsVpn => SubsequentAddressFamily::MulticastBgpMplsVpn,
             Self::Ipv6Bgp6over4 => SubsequentAddressFamily::Bgp6over4,
             Self::Ipv6FlowSpec => SubsequentAddressFamily::FlowSpecFilter,
@@ -521,7 +521,7 @@ impl AddressType {
 
             (AddressFamily::IPv6, SubsequentAddressFamily::Unicast) => Ok(Self::Ipv6Unicast),
             (AddressFamily::IPv6, SubsequentAddressFamily::Multicast) => Ok(Self::Ipv6Multicast),
-            (AddressFamily::IPv6, SubsequentAddressFamily::MplsVpn) => Ok(Self::Ipv6MPLSLabeledVpn),
+            (AddressFamily::IPv6, SubsequentAddressFamily::MplsVpn) => Ok(Self::Ipv6MplsLabeledVpn),
             (AddressFamily::IPv6, SubsequentAddressFamily::MulticastBgpMplsVpn) => {
                 Ok(Self::Ipv6MulticastBgpMplsVpn)
             }
@@ -600,7 +600,7 @@ mod tests {
 
         let ipv6_unicast = AddressType::Ipv6Unicast;
         let ipv6_multicast = AddressType::Ipv6Multicast;
-        let ipv6_mpls_vpn = AddressType::Ipv6MPLSLabeledVpn;
+        let ipv6_mpls_vpn = AddressType::Ipv6MplsLabeledVpn;
         let ipv6_multicast_mpls_vpn = AddressType::Ipv6MulticastBgpMplsVpn;
         let ipv6_bgp_6_over_4 = AddressType::Ipv6Bgp6over4;
         let ipv6_flow_spec = AddressType::Ipv6FlowSpec;
@@ -705,7 +705,7 @@ mod tests {
             AddressType::Ipv4NlriMplsLabels,
             AddressType::Ipv6Unicast,
             AddressType::Ipv6Multicast,
-            AddressType::Ipv6MPLSLabeledVpn,
+            AddressType::Ipv6MplsLabeledVpn,
             AddressType::Ipv6MulticastBgpMplsVpn,
             AddressType::Ipv6Bgp6over4,
             AddressType::Ipv6FlowSpec,

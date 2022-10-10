@@ -42,8 +42,9 @@ use crate::{
 
 use crate::{
     nlri::{
-        InvalidIpv6MulticastNetwork, InvalidIpv6UnicastNetwork, Ipv4Multicast, Ipv4Unicast,
-        Ipv6Multicast, Ipv6Unicast,
+        InvalidIpv6MulticastNetwork, InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicast, Ipv4Multicast,
+        Ipv4Unicast, Ipv6Multicast, Ipv6Unicast, LabeledIpv6NextHop, LabeledNextHop, MplsLabel,
+        RouteDistinguisher,
     },
     path_attribute::{MpReach, MpUnreach},
     serde::{
@@ -1329,6 +1330,34 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast(
         &invalid_afi,
     );
 
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x90, 0x0e, 0x00, 0x2c, 0x00, 0x01, 0x80, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x70, 0x00, 0x41, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0xc0, 0xa8, 0x01,
+    ];
+
+    let good = PathAttribute::MpReach {
+        extended_length: true,
+        value: MpReach::Ipv4MplsVpnUnicast {
+            next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
+                RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
+                Ipv6Addr::from_str("fc00::1").unwrap(),
+            )),
+            nlri: vec![Ipv4MplsVpnUnicast::new(
+                RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
+                vec![MplsLabel::new([0, 65, 1])],
+                Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
+            )],
+        },
+    };
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }

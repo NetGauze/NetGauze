@@ -16,7 +16,8 @@
 use crate::{
     nlri::{
         InvalidIpv4MulticastNetwork, InvalidIpv4UnicastNetwork, InvalidIpv6MulticastNetwork,
-        InvalidIpv6UnicastNetwork, Ipv4Multicast, Ipv4Unicast, Ipv6Multicast, Ipv6Unicast,
+        InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4Unicast, Ipv6Multicast,
+        Ipv6Unicast, LabeledIpv6NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
     },
     serde::{
         deserializer::nlri::{
@@ -26,8 +27,9 @@ use crate::{
             LocatedIpv6UnicastParsingError,
         },
         serializer::nlri::{
-            Ipv4MulticastWritingError, Ipv4UnicastWritingError, Ipv6MulticastWritingError,
-            Ipv6UnicastWritingError,
+            Ipv4MplsVpnUnicastWritingError, Ipv4MulticastWritingError, Ipv4UnicastWritingError,
+            Ipv6MulticastWritingError, Ipv6UnicastWritingError, LabeledNextHopWritingError,
+            RouteDistinguisherWritingError,
         },
     },
 };
@@ -36,7 +38,7 @@ use netgauze_parse_utils::{
     test_helpers::{test_parse_error, test_parsed_completely, test_write},
     Span,
 };
-use std::str::FromStr;
+use std::{net::Ipv6Addr, str::FromStr};
 
 #[test]
 fn test_ipv6_unicast() -> Result<(), Ipv6UnicastWritingError> {
@@ -126,6 +128,47 @@ fn test_ipv4_multicast() -> Result<(), Ipv4MulticastWritingError> {
         &bad_unicast_wire,
         &bad_unicast,
     );
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_route_distinguisher() -> Result<(), RouteDistinguisherWritingError> {
+    let good_wire = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+    let good = RouteDistinguisher::As2Administrator { asn2: 0, number: 0 };
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_labeled_ipv6_next_hop() -> Result<(), LabeledNextHopWritingError> {
+    let good_wire = [
+        0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+    ];
+
+    let good = LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
+        RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
+        Ipv6Addr::from_str("fc00::1").unwrap(),
+    ));
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_ipv4_mpls_vpn_unicast() -> Result<(), Ipv4MplsVpnUnicastWritingError> {
+    let good_wire = [
+        0x70, 0x00, 0x41, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0xc0, 0xa8, 0x01,
+    ];
+
+    let good = Ipv4MplsVpnUnicast::new(
+        RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
+        vec![MplsLabel::new([0x00, 0x41, 0x01])],
+        Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
+    );
+    test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }

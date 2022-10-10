@@ -13,12 +13,113 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::iana::RouteDistinguisherTypeCode;
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_iana::address_family::AddressType;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 /// Get the [netgauze_iana::address_family::AddressType] of a given NLRI
 pub trait NlriAddressType {
     fn address_type() -> AddressType;
+}
+
+/// Temporary representation of MPLS Labels
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct MplsLabel([u8; 3]);
+
+impl MplsLabel {
+    pub const fn new(label: [u8; 3]) -> Self {
+        Self(label)
+    }
+
+    pub const fn value(&self) -> &[u8; 3] {
+        &self.0
+    }
+
+    pub const fn is_bottom(&self) -> bool {
+        self.0[2] & 0x01 == 0x01
+    }
+}
+/// Route Distinguisher (RD) is a 8-byte value and encoded as follows:
+///     - Type Field: 2 bytes
+///     - Value Field: 6 bytes
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum RouteDistinguisher {
+    /// The Value field consists of two subfields:
+    ///     - Administrator subfield: ASN2
+    ///     - Assigned Number subfield: 4 bytes
+    As2Administrator { asn2: u16, number: u32 },
+
+    /// The Value field consists of two subfields:
+    ///     - Administrator subfield: Ipv4 address
+    ///     - Assigned Number subfield: 2 bytes
+    Ipv4Administrator { ip: Ipv4Addr, number: u16 },
+
+    /// The Value field consists of two subfields:
+    ///     - Administrator subfield: ASN4
+    ///     - Assigned Number subfield: 2 bytes
+    As4Administrator { asn4: u32, number: u16 },
+
+    /// [RFC7524](https://datatracker.ietf.org/doc/html/rfc7524) defines this value
+    /// to be always ones, so we don't keep its value in memory
+    LeafAdRoutes,
+}
+
+impl RouteDistinguisher {
+    pub const fn get_type(&self) -> RouteDistinguisherTypeCode {
+        match self {
+            Self::As2Administrator { .. } => RouteDistinguisherTypeCode::As2Administrator,
+            Self::Ipv4Administrator { .. } => RouteDistinguisherTypeCode::Ipv4Administrator,
+            Self::As4Administrator { .. } => RouteDistinguisherTypeCode::As4Administrator,
+            Self::LeafAdRoutes => RouteDistinguisherTypeCode::LeafAdRoutes,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct LabeledIpv4NextHop {
+    rd: RouteDistinguisher,
+    next_hop: Ipv4Addr,
+}
+
+impl LabeledIpv4NextHop {
+    pub const fn new(rd: RouteDistinguisher, next_hop: Ipv4Addr) -> Self {
+        Self { rd, next_hop }
+    }
+
+    pub const fn rd(&self) -> &RouteDistinguisher {
+        &self.rd
+    }
+
+    pub const fn next_hop(&self) -> &Ipv4Addr {
+        &self.next_hop
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct LabeledIpv6NextHop {
+    rd: RouteDistinguisher,
+    next_hop: Ipv6Addr,
+}
+
+impl LabeledIpv6NextHop {
+    pub const fn new(rd: RouteDistinguisher, next_hop: Ipv6Addr) -> Self {
+        Self { rd, next_hop }
+    }
+
+    pub const fn rd(&self) -> &RouteDistinguisher {
+        &self.rd
+    }
+
+    pub const fn next_hop(&self) -> &Ipv6Addr {
+        &self.next_hop
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum LabeledNextHop {
+    Ipv4(LabeledIpv4NextHop),
+    Ipv6(LabeledIpv6NextHop),
 }
 
 /// A more restricted version of [ipnet::Ipv4Net] that allows only unicast
@@ -59,6 +160,45 @@ impl TryFrom<Ipv4Net> for Ipv4Unicast {
 impl NlriAddressType for Ipv4Unicast {
     fn address_type() -> AddressType {
         AddressType::Ipv4Unicast
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Ipv4MplsVpnUnicast {
+    rd: RouteDistinguisher,
+    label_stack: Vec<MplsLabel>,
+    network: Ipv4Unicast,
+}
+
+impl Ipv4MplsVpnUnicast {
+    pub const fn new(
+        rd: RouteDistinguisher,
+        label_stack: Vec<MplsLabel>,
+        network: Ipv4Unicast,
+    ) -> Self {
+        Self {
+            rd,
+            label_stack,
+            network,
+        }
+    }
+
+    pub const fn rd(&self) -> &RouteDistinguisher {
+        &self.rd
+    }
+
+    pub const fn label_stack(&self) -> &Vec<MplsLabel> {
+        &self.label_stack
+    }
+
+    pub const fn network(&self) -> &Ipv4Unicast {
+        &self.network
+    }
+}
+
+impl NlriAddressType for Ipv4MplsVpnUnicast {
+    fn address_type() -> AddressType {
+        AddressType::Ipv4MplsLabeledVpn
     }
 }
 
@@ -130,6 +270,45 @@ impl TryFrom<Ipv6Net> for Ipv6Unicast {
 impl NlriAddressType for Ipv6Unicast {
     fn address_type() -> AddressType {
         AddressType::Ipv6Unicast
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Ipv6MplsVpnUnicast {
+    rd: RouteDistinguisher,
+    label_stack: Vec<MplsLabel>,
+    network: Ipv6Unicast,
+}
+
+impl Ipv6MplsVpnUnicast {
+    pub const fn new(
+        rd: RouteDistinguisher,
+        label_stack: Vec<MplsLabel>,
+        network: Ipv6Unicast,
+    ) -> Self {
+        Self {
+            rd,
+            label_stack,
+            network,
+        }
+    }
+
+    pub const fn rd(&self) -> &RouteDistinguisher {
+        &self.rd
+    }
+
+    pub const fn label_stack(&self) -> &Vec<MplsLabel> {
+        &self.label_stack
+    }
+
+    pub const fn network(&self) -> &Ipv6Unicast {
+        &self.network
+    }
+}
+
+impl NlriAddressType for Ipv6MplsVpnUnicast {
+    fn address_type() -> AddressType {
+        AddressType::Ipv6MplsLabeledVpn
     }
 }
 

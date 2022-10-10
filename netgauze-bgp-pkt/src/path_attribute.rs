@@ -16,10 +16,7 @@
 //! Contains the extensible definitions for various [PathAttribute] that can be
 //! used in [crate::update::BGPUpdateMessage].
 
-use crate::{
-    iana::WellKnownCommunity,
-    nlri::{Ipv4Multicast, Ipv4Unicast, Ipv6Multicast, Ipv6Unicast},
-};
+use crate::{iana::WellKnownCommunity, nlri::*};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
 
@@ -819,6 +816,10 @@ pub enum MpReach {
         next_hop: Ipv4Addr,
         nlri: Vec<Ipv4Multicast>,
     },
+    Ipv4MplsVpnUnicast {
+        next_hop: LabeledNextHop,
+        nlri: Vec<Ipv4MplsVpnUnicast>,
+    },
     Ipv6Unicast {
         next_hop_global: Ipv6Addr,
         next_hop_local: Option<Ipv6Addr>,
@@ -828,6 +829,11 @@ pub enum MpReach {
         next_hop_global: Ipv6Addr,
         next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv6Multicast>,
+    },
+    Ipv6MplsVpnUnicast {
+        next_hop_global: LabeledNextHop,
+        next_hop_local: Option<LabeledNextHop>,
+        nlri: Vec<Ipv6MplsVpnUnicast>,
     },
 }
 
