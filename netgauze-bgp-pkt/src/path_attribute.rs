@@ -870,8 +870,10 @@ impl MpReach {
 pub enum MpUnreach {
     Ipv4Unicast { nlri: Vec<Ipv4Unicast> },
     Ipv4Multicast { nlri: Vec<Ipv4Multicast> },
+    Ipv4MplsVpnUnicast { nlri: Vec<Ipv4MplsVpnUnicast> },
     Ipv6Unicast { nlri: Vec<Ipv6Unicast> },
     Ipv6Multicast { nlri: Vec<Ipv6Multicast> },
+    Ipv6MplsVpnUnicast { nlri: Vec<Ipv6MplsVpnUnicast> },
 }
 
 impl MpUnreach {

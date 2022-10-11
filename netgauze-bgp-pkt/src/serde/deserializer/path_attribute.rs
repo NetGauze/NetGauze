@@ -751,11 +751,17 @@ pub enum MpUnreachParsingError {
     Ipv4MulticastError(
         #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MulticastParsingError,
     ),
+    Ipv4MplsVpnUnicastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
+    ),
     Ipv6UnicastError(
         #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6UnicastParsingError,
     ),
     Ipv6MulticastError(
         #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MulticastParsingError,
+    ),
+    Ipv6MplsVpnUnicastError(
+        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MplsVpnUnicastParsingError,
     ),
 }
 
@@ -792,10 +798,8 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for
                 Ok((buf, MpUnreach::Ipv4Multicast { nlri }))
             }
             AddressType::Ipv4MplsLabeledVpn => {
-                return Err(nom::Err::Error(LocatedMpUnreachParsingError::new(
-                    mp_buf_begin,
-                    MpUnreachParsingError::UnknownAddressType(AddressType::Ipv4MplsLabeledVpn),
-                )))
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpUnreach::Ipv4MplsVpnUnicast { nlri }))
             }
             AddressType::Ipv4MulticastBgpMplsVpn => {
                 return Err(nom::Err::Error(LocatedMpUnreachParsingError::new(
@@ -836,10 +840,8 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for
                 Ok((buf, MpUnreach::Ipv6Multicast { nlri }))
             }
             AddressType::Ipv6MplsLabeledVpn => {
-                return Err(nom::Err::Error(LocatedMpUnreachParsingError::new(
-                    mp_buf_begin,
-                    MpUnreachParsingError::UnknownAddressType(AddressType::Ipv6MplsLabeledVpn),
-                )))
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpUnreach::Ipv6MplsVpnUnicast { nlri }))
             }
             AddressType::Ipv6MulticastBgpMplsVpn => {
                 return Err(nom::Err::Error(LocatedMpUnreachParsingError::new(
