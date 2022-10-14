@@ -165,6 +165,9 @@ mod tests {
         let msg = BmpMessage::V3(BmpMessageValue::Initiation(InitiationMessage::new(vec![])));
         client.send(msg).await.unwrap();
         handle.shutdown();
+        // yield to let the server handle the shutdown signal
+        tokio::task::yield_now().await;
+        assert!(server.is_finished());
     }
 
     #[tokio::test]
@@ -178,6 +181,7 @@ mod tests {
         tokio::task::yield_now().await;
         // No clients should be able to connect
         assert!(client.send(msg).await.is_err());
+        assert!(server.is_finished());
     }
 
     fn get_free_socket() -> SocketAddr {

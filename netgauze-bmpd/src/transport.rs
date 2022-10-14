@@ -16,7 +16,8 @@
 //! Generic Transport tooling
 
 //! Example
-//! ```rust
+//! ```no_run
+//! use futures_util::StreamExt;
 //! use netgauze_bmp_pkt::BmpMessage;
 //! use netgauze_bmpd::{
 //!     codec::{BmpCodec, BmpCodecDecoderError},
@@ -24,53 +25,29 @@
 //!     transport::{TaggedFramedReadStream, TaggedFramedReadStreamResult},
 //!     AddrInfo,
 //! };
-//! use std::{convert::Infallible, net::SocketAddr};
+//! use std::net::SocketAddr;
 //! use tokio::net::TcpListener;
 //! use tokio_util::codec::FramedRead;
-//! use tower::{buffer::Buffer, service_fn, ServiceBuilder, ServiceExt};
-//! use tower_service::Service;
 //!
 //! type BmpResult = TaggedFramedReadStreamResult<AddrInfo, BmpMessage, BmpCodecDecoderError>;
 //!
-//! async fn run_server<S>(
-//!     local_socket: SocketAddr,
-//!     buffer_svc: Buffer<S, BmpResult>,
-//! ) -> std::io::Result<()>
-//! where
-//!     S: Service<BmpResult, Response = Option<BmpServerResponse>> + 'static + Send,
-//!     S::Error: Send + Sync + std::error::Error,
-//!     S::Future: Send,
-//!     <S as Service<BmpResult>>::Response: Send,
-//! {
-//!     use tokio_stream::StreamExt;
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+//!     let local_socket = SocketAddr::from(([0, 0, 0, 0], 33000));
 //!     let listener = TcpListener::bind(local_socket).await?;
 //!     loop {
 //!         let (tcp_stream, remote_socket) = listener.accept().await?;
 //!         let (rx, tx) = tcp_stream.into_split();
 //!         let addr_info = AddrInfo::new(local_socket, remote_socket);
-//!         let bmp_stream = TaggedFramedReadStream::new(
+//!         let mut bmp_stream = TaggedFramedReadStream::new(
 //!             addr_info,
 //!             FramedRead::new(rx, BmpCodec::default()),
 //!             Some(tx),
 //!         );
-//!         let buffer_svc = buffer_svc.clone();
-//!         tokio::spawn(async move {
-//!             let mut responses = buffer_svc.call_all(bmp_stream);
-//!             // Keep the stream going till is closed
-//!             while (responses.next().await).is_some() {}
-//!         });
+//!         while let Some(tagged) = bmp_stream.next().await {
+//!             println!("Received message: {:?}", tagged);
+//!         }
 //!     }
-//! }
-//!
-//! async fn main() {
-//!     let local_socket = SocketAddr::from(([0, 0, 0, 0], 33000));
-//!     let print_svc = ServiceBuilder::new().service(service_fn(|x: BmpResult| async move {
-//!         println!("Received: {:?}", x);
-//!         Ok::<(), Infallible>(())
-//!     }));
-//!     let buffer_svc = Buffer::new(print_svc, 100);
-//!     let server_handler = tokio::spawn(run_server(local_socket, buffer_svc));
-//!     let _ = tokio::join!(server_handler);
 //! }
 //! ```
 
@@ -173,7 +150,6 @@ mod tests {
     };
     use std::net::{IpAddr, Ipv4Addr};
     use tokio_test::io::Builder;
-    use tokio_util::codec::Framed;
 
     #[tokio::test]
     async fn read() {

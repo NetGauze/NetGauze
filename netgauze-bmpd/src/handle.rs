@@ -47,7 +47,7 @@ impl NotifyOnce {
     }
 
     /// If not notified before, then call [tokio::sync::Notify::notified]
-    pub async fn notified(&self) {
+    pub(crate) async fn notified(&self) {
         if !self.triggered.load(Ordering::SeqCst) {
             self.notify.notified().await;
         }
