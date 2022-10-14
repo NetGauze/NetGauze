@@ -21,8 +21,19 @@ use tower::buffer::Buffer;
 
 use netgauze_bmpd::handle::BmpServerHandle;
 
+fn init_tracing() {
+    // Very simple setup at the moment to validate the instrumentation in the code
+    // is working in the future that should be configured automatically based on
+    // configuration options
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    init_tracing();
     let local_socket = SocketAddr::from(([0, 0, 0, 0], 33000));
     let print_svc = ServiceBuilder::new().service(service_fn(|x: BmpRequest| async move {
         println!("Received: {:?}", x);

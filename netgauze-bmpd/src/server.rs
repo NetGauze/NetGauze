@@ -45,6 +45,11 @@ impl BmpServer {
         Self { local_addr, handle }
     }
 
+    pub const fn local_addr(&self) -> SocketAddr {
+        self.local_addr
+    }
+
+    #[tracing::instrument(skip(self,service), fields(local_addr=format!("{}", self.local_addr)))]
     pub async fn serve<S, E>(self, service: S) -> io::Result<()>
     where
         S: Service<BmpRequest, Response = Option<BmpServerResponse>, Error = E>
@@ -56,56 +61,73 @@ impl BmpServer {
         E: Debug,
     {
         let local_addr = self.local_addr;
+        tracing::info!("binding on socket");
         let listener = TcpListener::bind(local_addr).await?;
         let handle = self.handle;
         handle.notify_listening();
+        tracing::info!("started listening");
         let accept_loop_future = async {
             loop {
-                println!("Waiting for connection at: {:?}", local_addr);
                 let (tcp_stream, remote_addr) = tokio::select! {
                     biased;
                     result = listener.accept() => {
-                        println!("Accept shutdown");
-                        result?
+                        let (tcp_stream, remote_addr) = result?;
+                        tracing::info!("accepted new connection: {:?}", remote_addr);
+                        (tcp_stream, remote_addr)
                     },
                     _ = handle.wait_graceful_shutdown() => {
-                        println!("Graceful shutdown");
+                        tracing::info!("graceful_shutdown");
                         return Ok::<(), io::Error>(())
                     },
                 };
-                println!("Accepted connection");
                 let addr_info = AddrInfo::new(local_addr, remote_addr);
                 let framed = Framed::new(tcp_stream, BmpCodec::default());
                 let svc = service.clone();
                 let watcher = handle.watcher();
                 let _ = tokio::spawn(async move {
+                    tracing::trace_span!("client_worker");
+                    tracing::info!("worker_started");
                     tokio::select! {
                         biased;
-                        _ = watcher.wait_shutdown() => {},
+                        _ = watcher.wait_shutdown() => {
+                             tracing::info!("worker_shutdown: {:?}", addr_info);
+                        },
                         ret = Self::handle_connection(svc.clone(), addr_info, framed) =>{
-                            println!("[{:?}] Connection closed and service ret: {:?}", addr_info, ret);
+                            tracing::info!("worker closed {:?} and service ret: {:?}", addr_info, ret);
                         },
                     };
+                    tracing::info!("worker_ended");
                 });
             }
         };
         tokio::select! {
             biased;
             _ = handle.wait_shutdown() => {
-                println!("Shutdown");
+                tracing::info!("server is shutting down on request by handle");
                 return Ok(())
             },
             result = accept_loop_future => {
-                println!("Loop ended Shutdown");
+                tracing::info!("server is shutting down due to: {:?}", result);
                 result
             },
         }?;
 
+        tracing::info!(
+            "waiting on connections to be cleanly closed. remaining connections: {}",
+            handle.connection_count()
+        );
         handle.wait_connections_end().await;
-        println!("Server closed");
+        tracing::info!("server closed");
         Ok(())
     }
 
+    #[tracing::instrument(
+        skip(service, addr_info, framed),
+        fields(
+            local_socket=format!("{}", addr_info.local_socket()),
+            remote_socket=format!("{}", addr_info.remote_socket())
+        )
+    )]
     async fn handle_connection<S, E>(
         mut service: S,
         addr_info: AddrInfo,
@@ -191,7 +213,6 @@ mod tests {
     }
 
     async fn connect(addr: SocketAddr) -> Framed<TcpStream, BmpCodec> {
-        println!("Connecting to: {:?}", addr);
         let stream = TcpStream::connect(addr).await.unwrap();
         Framed::new(stream, BmpCodec::default())
     }

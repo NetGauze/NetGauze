@@ -105,7 +105,6 @@ impl BmpServerHandle {
     }
 
     pub fn shutdown(&self) {
-        println!("Shutdown signal is received");
         self.inner.shutdown.notify_waiters();
     }
 
