@@ -13,74 +13,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::StreamExt;
-use std::{convert::Infallible, io, net::SocketAddr, time::Duration};
-
-use tokio::net::TcpListener;
-use tokio_util::codec::FramedRead;
+use std::{convert::Infallible, net::SocketAddr, time::Duration};
 use tower::{service_fn, ServiceBuilder};
 
-use netgauze_bmpd::{codec::BmpCodec, transport::TaggedFramedReadStream, AddrInfo};
+use netgauze_bmpd::server::{BmpRequest, BmpServer, BmpServerResponse};
+use tower::buffer::Buffer;
 
-use netgauze_bmp_pkt::BmpMessage;
-use netgauze_bmpd::{codec::BmpCodecDecoderError, transport::TaggedFramedReadStreamResult};
-use tower::{buffer::Buffer, ServiceExt};
-use tower_service::Service;
-
-type BmpResult = TaggedFramedReadStreamResult<AddrInfo, BmpMessage, BmpCodecDecoderError>;
-
-/// Start a BMP Server listening on a local_socket and then pass all the
-/// incoming messages to a [Buffer] tower service.
-///
-/// Example:
-/// ```rust
-/// let local_socket = SocketAddr::from(([0, 0, 0, 0], 33000));
-/// let print_svc = ServiceBuilder::new().service(service_fn(|x: BmpResult| async move {
-///     println!("Received: {:?}", x);
-///     Ok::<(), Infallible>(())
-/// }));
-/// let buffer_svc = Buffer::new(print_svc, 100);
-/// let server_handler = tokio::spawn(run_server(local_socket, buffer_svc));
-/// tokio::join!(server_handler).0.expect("Server failed");
-/// ```
-async fn run_server<S>(local_socket: SocketAddr, buffer_svc: Buffer<S, BmpResult>) -> io::Result<()>
-where
-    S: Service<BmpResult> + 'static + Send,
-    S::Error: Send + Sync + std::error::Error,
-    S::Future: Send,
-    <S as Service<BmpResult>>::Response: Send,
-{
-    let listener = TcpListener::bind(local_socket).await?;
-    loop {
-        let (tcp_stream, remote_socket) = listener.accept().await?;
-        let (rx, tx) = tcp_stream.into_split();
-        let addr_info = AddrInfo::new(local_socket, remote_socket);
-        let bmp_stream = TaggedFramedReadStream::new(
-            addr_info,
-            FramedRead::new(rx, BmpCodec::default()),
-            Some(tx),
-        );
-        let buffer_svc = buffer_svc.clone();
-        tokio::spawn(async move {
-            let mut responses = buffer_svc.call_all(bmp_stream);
-            // Keep the stream going till is closed
-            while (responses.next().await).is_some() {}
-        });
-    }
-}
+use netgauze_bmpd::handle::BmpServerHandle;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     let local_socket = SocketAddr::from(([0, 0, 0, 0], 33000));
-    let print_svc = ServiceBuilder::new().service(service_fn(|x: BmpResult| async move {
+    let print_svc = ServiceBuilder::new().service(service_fn(|x: BmpRequest| async move {
         println!("Received: {:?}", x);
-        Ok::<(), Infallible>(())
+        Ok::<Option<BmpServerResponse>, Infallible>(None)
     }));
     let pipeline = ServiceBuilder::new()
-        .rate_limit(1, Duration::from_secs(1))
+        //.rate_limit(1, Duration::from_secs(30))
         .service(print_svc);
     let buffer_svc = Buffer::new(pipeline, 100);
-    let server_handler = tokio::spawn(run_server(local_socket, buffer_svc));
-    let (server_ret,) = tokio::join!(server_handler);
-    server_ret.unwrap().unwrap();
+
+    let handle = BmpServerHandle::default();
+    let handle_clone = handle.clone();
+    let server_handle = tokio::spawn(async move {
+        let server = BmpServer::new(local_socket, handle_clone);
+        server.serve(buffer_svc).await.unwrap();
+    });
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    handle.shutdown();
+    let (_server_ret,) = tokio::join!(server_handle);
+
+    Ok(())
 }

@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate core;
+
 use crate::codec::BmpCodecDecoderError;
 use std::{
     fmt::{Display, Formatter},
@@ -20,6 +22,8 @@ use std::{
 };
 
 pub mod codec;
+pub mod handle;
+pub mod server;
 pub mod service;
 pub mod transport;
 
