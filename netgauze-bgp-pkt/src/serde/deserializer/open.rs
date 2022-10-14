@@ -16,7 +16,7 @@
 use crate::{
     iana::{BGPOpenMessageParameterType, UndefinedBGPOpenMessageParameterType},
     open::BGPOpenMessageParameter,
-    serde::deserializer::capabilities::BGPCapabilityParsingError,
+    serde::deserializer::{capabilities::BGPCapabilityParsingError, ErrorKindSerdeDeref},
     BGPOpenMessage,
 };
 use netgauze_parse_utils::{parse_till_empty_into_located, ReadablePDU, Span};
@@ -26,23 +26,26 @@ use nom::{
     number::complete::{be_u16, be_u32, be_u8},
     IResult,
 };
+use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BGPOpenMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UnsupportedVersionNumber(u8),
     ParameterError(#[from_located(module = "self")] BGPParameterParsingError),
 }
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BGPParameterParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedParameterType(#[from_external] UndefinedBGPOpenMessageParameterType),
     CapabilityError(

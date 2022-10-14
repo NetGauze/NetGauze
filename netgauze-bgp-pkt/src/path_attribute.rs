@@ -17,6 +17,7 @@
 //! used in [crate::update::BGPUpdateMessage].
 
 use crate::{iana::WellKnownCommunity, nlri::*};
+use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
 
@@ -29,7 +30,7 @@ use strum_macros::{Display, FromRepr};
 /// |  Attr. Flags  |Attr. Type Code| Path value (variable)
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PathAttribute {
     Origin {
         extended_length: bool,
@@ -322,7 +323,7 @@ impl PathAttribute {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Origin {
     IGP = 0,
     EGP = 1,
@@ -351,7 +352,7 @@ impl From<Origin> for u8 {
 
 /// Error type used in `[TryFrom] for [Origin].
 /// The value carried is the undefined value being parsed
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedOrigin(pub u8);
 
 impl TryFrom<u8> for Origin {
@@ -369,7 +370,7 @@ impl TryFrom<u8> for Origin {
 /// of a sequence of AS path segments.  Each AS path segment is
 /// represented by a triple <path segment type, path segment
 /// length, path segment value>.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ASPath {
     As2PathSegments(Vec<As2PathSegment>),
     As4PathSegments(Vec<As4PathSegment>),
@@ -399,7 +400,7 @@ impl ASPath {
 /// +-+-+-+-+-+-+-+-+
 /// ```
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum AsPathSegmentType {
     AsSet = 1,
     AsSequence = 2,
@@ -413,7 +414,7 @@ impl From<AsPathSegmentType> for u8 {
 
 /// Error type used in `[TryFrom] for [AsPathSegmentType].
 /// The value carried is the undefined value being parsed
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedAsPathSegmentType(pub u8);
 
 impl TryFrom<u8> for AsPathSegmentType {
@@ -443,7 +444,7 @@ impl TryFrom<u8> for AsPathSegmentType {
 /// | len.  as number (2 octets)    |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct As2PathSegment {
     segment_type: AsPathSegmentType,
     as_numbers: Vec<u16>,
@@ -468,7 +469,7 @@ impl As2PathSegment {
 
 ///  Each AS path segment is represented by a triple:
 /// <path segment type, path segment length, path segment value>.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct As4PathSegment {
     segment_type: AsPathSegmentType,
     as_numbers: Vec<u32>,
@@ -491,7 +492,7 @@ impl As4PathSegment {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AS4Path {
     segments: Vec<As4PathSegment>,
 }
@@ -526,7 +527,7 @@ impl AS4Path {
 /// (unicast) IP address of the router that SHOULD be used as
 /// the next hop to the destinations listed in the Network Layer
 /// Reachability Information field of the UPDATE message.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NextHop {
     next_hop: Ipv4Addr,
 }
@@ -559,7 +560,7 @@ impl NextHop {
 /// MAY be used by a BGP speaker's Decision Process to
 /// discriminate among multiple entry points to a neighboring
 /// autonomous system.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MultiExitDiscriminator {
     metric: u32,
 }
@@ -590,7 +591,7 @@ impl MultiExitDiscriminator {
 /// unsigned integer. A BGP speaker uses it to inform its other
 /// internal peers of the advertising speaker's degree of
 /// preference for an advertised route.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LocalPreference {
     metric: u32,
 }
@@ -620,7 +621,7 @@ impl LocalPreference {
 }
 
 /// ATOMIC_AGGREGATE is a well-known discretionary attribute of length 0.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AtomicAggregate;
 
 impl AtomicAggregate {
@@ -643,7 +644,7 @@ impl AtomicAggregate {
 /// address of the BGP speaker that formed the aggregate route
 /// (encoded as 4 octets). This SHOULD be the same address as
 /// the one used for the BGP Identifier of the speaker.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct As2Aggregator {
     asn: u16,
     origin: Ipv4Addr,
@@ -662,7 +663,7 @@ impl As2Aggregator {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct As4Aggregator {
     asn: u32,
     origin: Ipv4Addr,
@@ -686,7 +687,7 @@ impl As4Aggregator {
 /// address of the BGP speaker that formed the aggregate route.
 /// This SHOULD be the same address as the one used for the BGP Identifier of
 /// the speaker.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Aggregator {
     As2Aggregator(As2Aggregator),
     As4Aggregator(As4Aggregator),
@@ -703,7 +704,7 @@ impl Aggregator {
 }
 
 /// Path attribute can be of size `u8` or `u16` based on `extended_length` bit.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum PathAttributeLength {
     U8(u8),
     U16(u16),
@@ -724,7 +725,7 @@ impl From<PathAttributeLength> for u16 {
 /// communities listed in the attribute.
 ///
 /// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Communities {
     communities: Vec<Community>,
 }
@@ -752,7 +753,7 @@ impl Communities {
 /// Four octet values to specify a community.
 ///
 /// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Community(u32);
 
 impl Community {
@@ -806,7 +807,7 @@ impl Community {
 /// | Network Layer Reachability Information (variable)       |
 /// +---------------------------------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MpReach {
     Ipv4Unicast {
         next_hop: Ipv4Addr,
@@ -866,7 +867,7 @@ impl MpReach {
 /// | Withdrawn Routes (variable)                             |
 /// +---------------------------------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MpUnreach {
     Ipv4Unicast { nlri: Vec<Ipv4Unicast> },
     Ipv4Multicast { nlri: Vec<Ipv4Multicast> },
@@ -893,7 +894,7 @@ impl MpUnreach {
 /// Path Attribute that is not recognized.
 /// BGP Allows parsing unrecognized attributes as is, and then only consider
 /// the transitive and partial bits of the attribute.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UnknownAttribute {
     optional: bool,
     transitive: bool,

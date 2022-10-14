@@ -17,6 +17,7 @@
 
 use crate::iana::RouteRefreshSubcode;
 use netgauze_iana::address_family::AddressType;
+use serde::{Deserialize, Serialize};
 
 /// Route Refresh message as defined in
 /// Route Refresh Capability for BGP-4 [RFC2918](https://datatracker.ietf.org/doc/html/rfc2918)
@@ -29,7 +30,7 @@ use netgauze_iana::address_family::AddressType;
 /// |      AFI      | S. typ.| SAFI  |
 /// +-------+-------+-------+-------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BGPRouteRefreshMessage {
     address_type: AddressType,
     operation_type: RouteRefreshSubcode,

@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde::{Deserialize, Serialize};
+
 /// BGP Notification message
 ///
 ///```text
@@ -22,7 +24,7 @@
 ///  | Error code    | Error subcode |   Data (variable)             |
 ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BGPNotificationMessage {
     MessageHeaderError(MessageHeaderError),
     OpenMessageError(OpenMessageError),
@@ -33,7 +35,7 @@ pub enum BGPNotificationMessage {
     RouteRefreshError(RouteRefreshError),
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum MessageHeaderError {
     Unspecific { value: Vec<u8> },
     ConnectionNotSynchronized { value: Vec<u8> },
@@ -42,7 +44,7 @@ pub enum MessageHeaderError {
 }
 
 /// See [crate::iana::OpenMessageErrorSubCode] for full documentation
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum OpenMessageError {
     Unspecific { value: Vec<u8> },
     UnsupportedVersionNumber { value: Vec<u8> },
@@ -55,7 +57,7 @@ pub enum OpenMessageError {
 }
 
 /// See [crate::iana::UpdateMessageErrorSubCode] for full documentation
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum UpdateMessageError {
     Unspecific { value: Vec<u8> },
     MalformedAttributeList { value: Vec<u8> },
@@ -70,13 +72,13 @@ pub enum UpdateMessageError {
     MalformedASPath { value: Vec<u8> },
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum HoldTimerExpiredError {
     Unspecific { sub_code: u8, value: Vec<u8> },
 }
 
 /// See [crate::iana::FiniteStateMachineErrorSubCode] for full documentation
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum FiniteStateMachineError {
     Unspecific { value: Vec<u8> },
     ReceiveUnexpectedMessageInOpenSentState { value: Vec<u8> },
@@ -85,7 +87,7 @@ pub enum FiniteStateMachineError {
 }
 
 /// See [crate::iana::CeaseErrorSubCode] for full documentation
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum CeaseError {
     MaximumNumberOfPrefixesReached { value: Vec<u8> },
     AdministrativeShutdown { value: Vec<u8> },
@@ -100,7 +102,7 @@ pub enum CeaseError {
 }
 
 /// See [crate::iana::RouteRefreshMessageErrorSubCode] for full documentation
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RouteRefreshError {
     InvalidMessageLength { value: Vec<u8> },
 }

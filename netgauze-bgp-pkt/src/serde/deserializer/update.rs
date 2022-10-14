@@ -26,14 +26,17 @@ use netgauze_parse_utils::{
     parse_till_empty_into_with_one_input_located, ReadablePDU, ReadablePDUWithOneInput, Span,
 };
 use nom::{error::ErrorKind, number::complete::be_u16, IResult};
+use serde::{Deserialize, Serialize};
 
+use crate::serde::deserializer::ErrorKindSerdeDeref;
 use netgauze_serde_macros::LocatedError;
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BGPUpdateMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     WithdrawRouteError(#[from_located(module = "self")] WithdrawRouteParsingError),
     PathAttributeError(
@@ -74,10 +77,11 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPUpdateMessageParsingError<'
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum WithdrawRouteParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     Ipv4PrefixParsingError(
         #[from_located(module = "crate::serde::deserializer")] Ipv4PrefixParsingError,
@@ -91,10 +95,11 @@ impl<'a> ReadablePDU<'a, LocatedWithdrawRouteParsingError<'a>> for WithdrawRoute
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum NetworkLayerReachabilityInformationParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     Ipv4PrefixParsingError(
         #[from_located(module = "crate::serde::deserializer")] Ipv4PrefixParsingError,

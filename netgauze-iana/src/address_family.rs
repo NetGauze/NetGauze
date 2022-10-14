@@ -41,6 +41,7 @@
 //! );
 //! ```
 
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
 
 /// Address families identifiers (AFI) registered at IANA [Address Family Number](https://www.iana.org/assignments/address-family-numbers/address-family-numbers.xhtml)
@@ -55,7 +56,7 @@ use strum_macros::{Display, FromRepr};
 /// assert_eq!(undefined, Err(UndefinedAddressFamily(65000)));
 /// ```
 #[repr(u16)]
-#[derive(FromRepr, Display, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(FromRepr, Display, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum AddressFamily {
     IPv4 = 1,
     IPv6 = 2,
@@ -180,7 +181,7 @@ pub enum AddressFamily {
 /// Error type used in `[TryFrom] for [AddressFamily].
 /// The value carried is the undefined value being parsed
 #[repr(C)]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedAddressFamily(pub u16);
 
 impl From<AddressFamily> for u16 {
@@ -214,7 +215,7 @@ impl TryFrom<u16> for AddressFamily {
 /// assert_eq!(undefined, Err(UndefinedSubsequentAddressFamily(0)));
 /// ```
 #[repr(u8)]
-#[derive(FromRepr, Display, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(FromRepr, Display, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum SubsequentAddressFamily {
     /// Network Layer Reachability Information used for unicast forwarding
     /// [RFC4760](https://datatracker.ietf.org/doc/html/RFC4760)
@@ -371,7 +372,7 @@ pub enum SubsequentAddressFamily {
 /// Error type used in `[TryFrom] for [SubsequentAddressFamily].
 /// The value carried is the undefined value being parsed
 #[repr(C)]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedSubsequentAddressFamily(pub u8);
 
 impl From<SubsequentAddressFamily> for u8 {
@@ -394,7 +395,7 @@ impl TryFrom<u8> for SubsequentAddressFamily {
 /// Since not all [AddressFamily] and [SubsequentAddressFamily] are valid
 /// combinations, this enum defines a set of valid combination to ensure only
 /// valid AFI/SAFI are used at compile time.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum AddressType {
     Ipv4Unicast,
     Ipv4Multicast,
@@ -418,7 +419,7 @@ pub enum AddressType {
 
 /// Error type used in `[TryFrom] for [AddressType].
 /// The value carried is the undefined value being parsed
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct InvalidAddressType {
     address_family: AddressFamily,
     subsequent_address_family: SubsequentAddressFamily,

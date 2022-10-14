@@ -31,6 +31,7 @@ use nom::{
     number::complete::{be_u128, be_u16, be_u8},
     IResult,
 };
+use serde::{Deserialize, Serialize};
 
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, ReadablePDU, ReadablePDUWithOneInput,
@@ -57,10 +58,69 @@ pub const BGP_MIN_MESSAGE_LENGTH: u16 = 19;
 /// [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654)
 pub const BGP_MAX_MESSAGE_LENGTH: u16 = 4096;
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(remote = "ErrorKind")]
+pub(crate) enum ErrorKindSerdeDeref {
+    Tag,
+    MapRes,
+    MapOpt,
+    Alt,
+    IsNot,
+    IsA,
+    SeparatedList,
+    SeparatedNonEmptyList,
+    Many0,
+    Many1,
+    ManyTill,
+    Count,
+    TakeUntil,
+    LengthValue,
+    TagClosure,
+    Alpha,
+    Digit,
+    HexDigit,
+    OctDigit,
+    AlphaNumeric,
+    Space,
+    MultiSpace,
+    LengthValueFn,
+    Eof,
+    Switch,
+    TagBits,
+    OneOf,
+    NoneOf,
+    Char,
+    CrLf,
+    RegexpMatch,
+    RegexpMatches,
+    RegexpFind,
+    RegexpCapture,
+    RegexpCaptures,
+    TakeWhile1,
+    Complete,
+    Fix,
+    Escaped,
+    EscapedTransform,
+    NonEmpty,
+    ManyMN,
+    Not,
+    Permutation,
+    Verify,
+    TakeTill1,
+    TakeWhileMN,
+    TooLarge,
+    Many0Count,
+    Many1Count,
+    Float,
+    Satisfy,
+    Fail,
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4PrefixParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidIpv4PrefixLen(u8),
 }
@@ -107,10 +167,11 @@ impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4PrefixParsingErro
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6PrefixParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidIpv6PrefixLen(u8),
 }
@@ -156,10 +217,11 @@ impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6PrefixParsingErro
 }
 
 /// BGP Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BGPMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
 
     /// The first 16-bytes of a BGP message is NOT all set to `1`

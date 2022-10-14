@@ -16,7 +16,7 @@ use strum_macros::{Display, FromRepr};
 // Make sure the type is represented the same way it would be in the PDU, here it's a one unassigned octet.
 // Derive [strum_macros::FromRepr] to make it easier to create the enum from a numerical value 
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum OuterPDUType {
     APdu = 1,
     BPdu = 2,
@@ -31,7 +31,7 @@ impl From<OuterPDUType> for u8 {
 }
 
 // Always create meaningful error types
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct InvalidOuterPDUType(pub u8);
 
 // The idea here, is to always use TryFrom when deserializing the PDU type,
@@ -54,7 +54,7 @@ pub enum OuterPDU {
 }
 
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum APdu {
     Val1,
     Val2,
@@ -69,7 +69,7 @@ impl From<APdu> for u8 {
 }
 
 // Always create meaningful error types
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct InvalidAPduType(pub u8);
 
 // The idea here, is to always use TryFrom when deserializing the PDU type,
@@ -86,7 +86,7 @@ impl TryFrom<u8> for APdu {
 }
 
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BPdu {
     value: u16
 }

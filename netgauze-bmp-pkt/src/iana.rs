@@ -15,6 +15,7 @@
 
 //! Contains BMP codes that are registered at IANA [BGP Monitoring Protocol (BMP) Parameters](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml)
 
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
 
 /// Corresponds to the V flag. If set indicates that the Peer address is an IPv6
@@ -39,14 +40,14 @@ pub const PEER_FLAGS_IS_FILTERED: u8 = 0b10000000;
 
 /// Currently supported BMP versions
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BmpVersion {
     Version3 = 3,
 }
 
 /// BGP version is not one of [BmpVersion], the carried value is the undefined
 /// code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBmpVersion(pub u8);
 
 impl From<BmpVersion> for u8 {
@@ -68,7 +69,7 @@ impl TryFrom<u8> for BmpVersion {
 
 /// BMP Message types as registered in IANA [BMP Message Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#message-types)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BmpMessageType {
     RouteMonitoring = 0,
     StatisticsReport = 1,
@@ -85,7 +86,7 @@ pub enum BmpMessageType {
 
 /// BGP Message type is not one of [BmpMessageType], the carried value is the
 /// undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBmpMessageType(pub u8);
 
 impl From<BmpMessageType> for u8 {
@@ -107,7 +108,7 @@ impl TryFrom<u8> for BmpMessageType {
 
 /// BMP Message types as registered in IANA [BMP Message Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#message-types)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BmpPeerTypeCode {
     GlobalInstancePeer = 0,
     RdInstancePeer = 1,
@@ -121,7 +122,7 @@ pub enum BmpPeerTypeCode {
 
 /// BGP Message type is not one of [BmpPeerTypeCode], the carried value is the
 /// undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBmpPeerTypeCode(pub u8);
 
 impl From<BmpPeerTypeCode> for u8 {
@@ -143,7 +144,7 @@ impl TryFrom<u8> for BmpPeerTypeCode {
 
 /// BMP InformationTLV types as registered in IANA [BMP Initiation and Peer Up Information TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#initiation-peer-up-tlvs)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum InitiationInformationTlvType {
     String = 0,
     SystemDescription = 1,
@@ -158,7 +159,7 @@ pub enum InitiationInformationTlvType {
 
 /// BMP InformationTLV type is not one of [InitiationInformationTlvType], the
 /// carried value is the undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedInitiationInformationTlvType(pub u16);
 
 impl From<InitiationInformationTlvType> for u16 {
@@ -180,7 +181,7 @@ impl TryFrom<u16> for InitiationInformationTlvType {
 
 /// BMP Termination InformationTLV types as registered in IANA [BMP Termination Message TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#termination-message-tlvs)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum TerminationInformationTlvType {
     String = 0,
     Reason = 1,
@@ -192,7 +193,7 @@ pub enum TerminationInformationTlvType {
 
 /// BMP InformationTLV type is not one of [TerminationInformationTlvType], the
 /// carried value is the undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedTerminationInformationTlvType(pub u16);
 
 impl From<TerminationInformationTlvType> for u16 {
@@ -214,7 +215,7 @@ impl TryFrom<u16> for TerminationInformationTlvType {
 
 /// BMP peer termination Reason codes as registered in IANA [BMP Termination Message Reason Codes](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#termination-message-reason-codes)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum PeerTerminationCode {
     AdministrativelyClosed = 0,
     UnspecifiedReason = 1,
@@ -229,7 +230,7 @@ pub enum PeerTerminationCode {
 
 /// BMP termination reason code type is not one of [PeerTerminationCode], the
 /// carried value is the undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedPeerTerminationCode(pub u16);
 
 impl From<PeerTerminationCode> for u16 {
@@ -251,7 +252,7 @@ impl TryFrom<u16> for PeerTerminationCode {
 
 /// BMP Peer down Reason codes as registered in IANA [BMP Peer Down Reason Codes](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#peer-down-reason-codes)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum PeerDownReasonCode {
     LocalSystemClosedNotificationPduFollows = 1,
     LocalSystemClosedFsmEventFollows = 2,
@@ -267,7 +268,7 @@ pub enum PeerDownReasonCode {
 
 /// BMP Peer down reason code type is not one of [PeerDownReasonCode], the
 /// carried value is the undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedPeerDownReasonCode(pub u8);
 
 impl From<PeerDownReasonCode> for u8 {
@@ -289,7 +290,7 @@ impl TryFrom<u8> for PeerDownReasonCode {
 
 /// [BMP Route Mirroring TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#route-mirroring-tlvs)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RouteMirroringTlvType {
     BgpMessage = 0,
     Information = 1,
@@ -301,7 +302,7 @@ pub enum RouteMirroringTlvType {
 
 /// BMP type is not one of [RouteMirroringTlvType], the carried value is the
 /// undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedRouteMirroringTlvType(pub u16);
 
 impl From<RouteMirroringTlvType> for u16 {
@@ -323,7 +324,7 @@ impl TryFrom<u16> for RouteMirroringTlvType {
 
 /// [BMP Route Mirroring Information Codes](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#route-mirroring-information-codes)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RouteMirroringInformation {
     ErroredPdu = 0,
     MessagesLost = 1,
@@ -335,7 +336,7 @@ pub enum RouteMirroringInformation {
 
 /// Code is not one of [RouteMirroringInformation], the carried value is the
 /// undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedRouteMirroringInformation(pub u16);
 
 impl From<RouteMirroringInformation> for u16 {
@@ -357,7 +358,7 @@ impl TryFrom<u16> for RouteMirroringInformation {
 
 /// [BMP Statistics Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#statistics-types)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BmpStatisticsType {
     NumberOfPrefixesRejectedByInboundPolicy = 0,
     NumberOfDuplicatePrefixAdvertisements = 1,
@@ -385,7 +386,7 @@ pub enum BmpStatisticsType {
 
 /// Code is not one of [BmpStatisticsType], the carried value is the undefined
 /// code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBmpStatisticsType(pub u16);
 
 impl From<BmpStatisticsType> for u16 {

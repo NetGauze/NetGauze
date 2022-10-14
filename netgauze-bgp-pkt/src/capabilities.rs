@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use netgauze_iana::address_family::{AddressFamily, AddressType};
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
 
 /// Enhanced route refresh have fixed length as per RFC2918
@@ -49,7 +50,7 @@ pub(crate) const EXTENDED_NEXT_HOP_ENCODING_LENGTH: u8 = 6;
 /// ~                              ~
 /// +------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BGPCapability {
     /// Defined in [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
     MultiProtocolExtensions(MultiProtocolExtensionsCapability),
@@ -76,7 +77,7 @@ pub enum BGPCapability {
 
 /// Generic struct to carry all the unsupported BGP capabilities
 #[repr(C)]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UnrecognizedCapability {
     code: u8,
     value: Vec<u8>,
@@ -98,7 +99,7 @@ impl UnrecognizedCapability {
 
 /// Experimental Capabilities Codes as defined by [RFC8810](https://datatracker.ietf.org/doc/html/RFC8810)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum ExperimentalCapabilityCode {
     Experimental239 = 239,
     Experimental240 = 240,
@@ -120,7 +121,7 @@ pub enum ExperimentalCapabilityCode {
 
 /// Generic struct to carry all capabilities that are designated as experimental
 /// by IANA See [RFC8810](https://datatracker.ietf.org/doc/html/RFC8810)
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExperimentalCapability {
     code: ExperimentalCapabilityCode,
     value: Vec<u8>,
@@ -149,7 +150,7 @@ impl ExperimentalCapability {
 /// |      AFI      | Res.  | SAFI  |
 /// +-------+-------+-------+-------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MultiProtocolExtensionsCapability {
     address_type: AddressType,
 }
@@ -165,7 +166,7 @@ impl MultiProtocolExtensionsCapability {
 }
 
 /// Defined in [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793)
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FourOctetASCapability {
     asn4: u32,
 }
@@ -181,7 +182,7 @@ impl FourOctetASCapability {
 }
 
 /// See [RFC7911](https://datatracker.ietf.org/doc/html/RFC7911)
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AddPathCapability {
     address_families: Vec<AddPathCapabilityAddressFamily>,
 }
@@ -196,7 +197,7 @@ impl AddPathCapability {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AddPathCapabilityAddressFamily {
     address_type: AddressType,
     send: bool,
@@ -247,7 +248,7 @@ impl AddPathCapabilityAddressFamily {
 /// | Nexthop AFI - N (2 octets)                          |
 /// +-----------------------------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExtendedNextHopEncodingCapability {
     encodings: Vec<ExtendedNextHopEncoding>,
 }
@@ -262,7 +263,7 @@ impl ExtendedNextHopEncodingCapability {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExtendedNextHopEncoding {
     address_type: AddressType,
     next_hop_afi: AddressFamily,

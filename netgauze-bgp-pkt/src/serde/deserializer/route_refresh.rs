@@ -29,12 +29,16 @@ use nom::{
     number::complete::{be_u16, be_u8},
     IResult,
 };
+use serde::{Deserialize, Serialize};
 
 use netgauze_serde_macros::LocatedError;
 
+use crate::serde::deserializer::ErrorKindSerdeDeref;
+
 /// BGP Route Refresh Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BGPRouteRefreshMessageParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedOperation(#[from_external] UndefinedRouteRefreshSubcode),
     UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),

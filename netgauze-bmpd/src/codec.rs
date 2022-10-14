@@ -23,15 +23,17 @@ use netgauze_bmp_pkt::{
     BmpMessage,
 };
 use netgauze_parse_utils::{LocatedParsingError, ReadablePDU, Span, WritablePDU};
+use nom::Needed;
+use serde::{Deserialize, Serialize};
 use tokio_util::codec::{Decoder, Encoder};
 
 /// Min length for a valid BMP Message: 1-octet version + 4-octet length
 pub(crate) const BMP_MESSAGE_MIN_LENGTH: usize = 5;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BmpCodecDecoderError {
     IoError(String),
-    Incomplete(nom::Needed),
+    Incomplete(Option<usize>),
     BmpMessageParsingError(BmpMessageParsingError),
 }
 
@@ -89,6 +91,10 @@ impl Decoder for BmpCodec {
                     Err(error) => {
                         let err = match error {
                             nom::Err::Incomplete(needed) => {
+                                let needed = match needed {
+                                    Needed::Unknown => None,
+                                    Needed::Size(size) => Some(size.get()),
+                                };
                                 BmpCodecDecoderError::Incomplete(needed)
                             }
                             nom::Err::Error(error) | nom::Err::Failure(error) => {

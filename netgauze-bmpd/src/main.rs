@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     init_tracing();
     let local_socket = SocketAddr::from(([0, 0, 0, 0], 33000));
     let print_svc = ServiceBuilder::new().service(service_fn(|x: BmpRequest| async move {
-        println!("Received: {:?}", x);
+        println!("Received: {}", serde_json::to_string(&x).unwrap());
         Ok::<Option<BmpServerResponse>, Infallible>(None)
     }));
     let pipeline = ServiceBuilder::new()

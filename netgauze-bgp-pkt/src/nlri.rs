@@ -16,6 +16,7 @@
 use crate::iana::RouteDistinguisherTypeCode;
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_iana::address_family::AddressType;
+use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 /// Get the [netgauze_iana::address_family::AddressType] of a given NLRI
@@ -24,7 +25,7 @@ pub trait NlriAddressType {
 }
 
 /// Temporary representation of MPLS Labels
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MplsLabel([u8; 3]);
 
 impl MplsLabel {
@@ -43,7 +44,7 @@ impl MplsLabel {
 /// Route Distinguisher (RD) is a 8-byte value and encoded as follows:
 ///     - Type Field: 2 bytes
 ///     - Value Field: 6 bytes
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RouteDistinguisher {
     /// The Value field consists of two subfields:
     ///     - Administrator subfield: ASN2
@@ -76,7 +77,7 @@ impl RouteDistinguisher {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LabeledIpv4NextHop {
     rd: RouteDistinguisher,
     next_hop: Ipv4Addr,
@@ -96,7 +97,7 @@ impl LabeledIpv4NextHop {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LabeledIpv6NextHop {
     rd: RouteDistinguisher,
     next_hop: Ipv6Addr,
@@ -116,7 +117,7 @@ impl LabeledIpv6NextHop {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum LabeledNextHop {
     Ipv4(LabeledIpv4NextHop),
     Ipv6(LabeledIpv6NextHop),
@@ -124,11 +125,11 @@ pub enum LabeledNextHop {
 
 /// A more restricted version of [ipnet::Ipv4Net] that allows only unicast
 /// networks
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4Unicast(Ipv4Net);
 
 /// Raised when the network is not a unicast range
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct InvalidIpv4UnicastNetwork(pub Ipv4Net);
 
 impl Ipv4Unicast {
@@ -163,7 +164,7 @@ impl NlriAddressType for Ipv4Unicast {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4MplsVpnUnicast {
     rd: RouteDistinguisher,
     label_stack: Vec<MplsLabel>,
@@ -204,10 +205,10 @@ impl NlriAddressType for Ipv4MplsVpnUnicast {
 
 /// A more restricted version of `ipnet::Ipv4Net` that allows only multicast
 /// networks
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4Multicast(Ipv4Net);
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct InvalidIpv4MulticastNetwork(pub Ipv4Net);
 
 impl Ipv4Multicast {
@@ -240,10 +241,10 @@ impl NlriAddressType for Ipv4Multicast {
 
 /// A more restricted version of `ipnet::Ipv6Net` that allows only unicast
 /// networks
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6Unicast(Ipv6Net);
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct InvalidIpv6UnicastNetwork(pub Ipv6Net);
 
 impl Ipv6Unicast {
@@ -273,7 +274,7 @@ impl NlriAddressType for Ipv6Unicast {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6MplsVpnUnicast {
     rd: RouteDistinguisher,
     label_stack: Vec<MplsLabel>,
@@ -314,10 +315,10 @@ impl NlriAddressType for Ipv6MplsVpnUnicast {
 
 /// A more restricted version of `ipnet::Ipv6Net` that allows only multicast
 /// networks
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6Multicast(Ipv6Net);
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct InvalidIpv6MulticastNetwork(pub Ipv6Net);
 
 impl Ipv6Multicast {

@@ -31,7 +31,7 @@ use netgauze_iana::address_family::{
     UndefinedSubsequentAddressFamily,
 };
 use nom::{
-    error::ErrorKind,
+    error::{ErrorKind, FromExternalError},
     number::complete::{be_u128, be_u16, be_u32, be_u64, be_u8},
     IResult,
 };
@@ -44,8 +44,9 @@ use netgauze_serde_macros::LocatedError;
 
 use crate::{iana::*, *};
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpMessageParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedBmpVersion(#[from_external] UndefinedBmpVersion),
     InvalidBmpLength(u32),
@@ -83,8 +84,9 @@ impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpMessageValueParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedBmpMessageType(#[from_external] UndefinedBmpMessageType),
     RouteMonitoringMessageError(
@@ -153,7 +155,7 @@ impl<'a> ReadablePDU<'a, LocatedBmpMessageValueParsingError<'a>> for BmpMessageV
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum InitiationMessageParsingError {
     InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
 }
@@ -167,11 +169,23 @@ impl<'a> ReadablePDU<'a, LocatedInitiationMessageParsingError<'a>> for Initiatio
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum InitiationInformationParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedType(#[from_external] UndefinedInitiationInformationTlvType),
-    FromUtf8Error(#[from_external] FromUtf8Error),
+    FromUtf8Error(String),
+}
+
+impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
+    for LocatedInitiationInformationParsingError<'a>
+{
+    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: FromUtf8Error) -> Self {
+        LocatedInitiationInformationParsingError::new(
+            input,
+            InitiationInformationParsingError::FromUtf8Error(error.to_string()),
+        )
+    }
 }
 
 impl<'a> ReadablePDU<'a, LocatedInitiationInformationParsingError<'a>> for InitiationInformation {
@@ -238,7 +252,7 @@ impl<'a> ReadablePDU<'a, LocatedInitiationInformationParsingError<'a>> for Initi
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteMonitoringMessageParsingError {
     RouteMonitoringMessageError(RouteMonitoringMessageError),
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
@@ -282,8 +296,9 @@ impl<'a> ReadablePDU<'a, LocatedRouteMonitoringMessageParsingError<'a>> for Rout
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpPeerTypeParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedBmpPeerTypeCode(#[from_external] UndefinedBmpPeerTypeCode),
 }
@@ -327,8 +342,9 @@ impl<'a> ReadablePDU<'a, LocatedBmpPeerTypeParsingError<'a>> for BmpPeerType {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum PeerHeaderParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     BmpPeerTypeError(#[from_located(module = "self")] BmpPeerTypeParsingError),
     RouteDistinguisherError(
@@ -380,8 +396,9 @@ impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum PeerUpNotificationMessageParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     PeerUpMessageError(PeerUpNotificationMessageError),
     UnexpectedPeerType(BmpPeerTypeCode),
@@ -477,7 +494,7 @@ impl<'a> ReadablePDU<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum PeerDownNotificationMessageParsingError {
     PeerDownMessageError(PeerDownNotificationMessageError),
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
@@ -510,8 +527,9 @@ impl<'a> ReadablePDU<'a, LocatedPeerDownNotificationMessageParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum PeerDownNotificationReasonParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedPeerDownReasonCode(#[from_external] UndefinedPeerDownReasonCode),
     BgpMessageError(
@@ -595,7 +613,7 @@ impl<'a> ReadablePDU<'a, LocatedPeerDownNotificationReasonParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteMirroringMessageParsingError {
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
     RouteMirroringValueError(#[from_located(module = "self")] RouteMirroringValueParsingError),
@@ -611,8 +629,9 @@ impl<'a> ReadablePDU<'a, LocatedRouteMirroringMessageParsingError<'a>> for Route
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteMirroringValueParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedRouteMirroringTlvType(#[from_external] UndefinedRouteMirroringTlvType),
     UndefinedRouteMirroringInformation(#[from_external] UndefinedRouteMirroringInformation),
@@ -671,7 +690,7 @@ impl<'a> ReadablePDU<'a, LocatedRouteMirroringValueParsingError<'a>> for RouteMi
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum TerminationMessageParsingError {
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
     TerminationInformationError(
@@ -689,12 +708,24 @@ impl<'a> ReadablePDU<'a, LocatedTerminationMessageParsingError<'a>> for Terminat
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum TerminationInformationParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedTerminationInformationTlvType(#[from_external] UndefinedTerminationInformationTlvType),
     UndefinedPeerTerminationCode(#[from_external] UndefinedPeerTerminationCode),
-    FromUtf8Error(#[from_external] FromUtf8Error),
+    FromUtf8Error(String),
+}
+
+impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
+    for LocatedTerminationInformationParsingError<'a>
+{
+    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: FromUtf8Error) -> Self {
+        LocatedTerminationInformationParsingError::new(
+            input,
+            TerminationInformationParsingError::FromUtf8Error(error.to_string()),
+        )
+    }
 }
 
 impl<'a> ReadablePDU<'a, LocatedTerminationInformationParsingError<'a>> for TerminationInformation {
@@ -751,8 +782,9 @@ impl<'a> ReadablePDU<'a, LocatedTerminationInformationParsingError<'a>> for Term
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum StatisticsReportMessageParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
     StatisticsCounterError(#[from_located(module = "self")] StatisticsCounterParsingError),
@@ -776,8 +808,9 @@ impl<'a> ReadablePDU<'a, LocatedStatisticsReportMessageParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum StatisticsCounterParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
     UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
@@ -1000,4 +1033,62 @@ impl<'a> ReadablePDU<'a, LocatedStatisticsCounterParsingError<'a>> for Statistic
         }
         Ok((reminder, counter))
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(remote = "ErrorKind")]
+pub(crate) enum ErrorKindSerdeDeref {
+    Tag,
+    MapRes,
+    MapOpt,
+    Alt,
+    IsNot,
+    IsA,
+    SeparatedList,
+    SeparatedNonEmptyList,
+    Many0,
+    Many1,
+    ManyTill,
+    Count,
+    TakeUntil,
+    LengthValue,
+    TagClosure,
+    Alpha,
+    Digit,
+    HexDigit,
+    OctDigit,
+    AlphaNumeric,
+    Space,
+    MultiSpace,
+    LengthValueFn,
+    Eof,
+    Switch,
+    TagBits,
+    OneOf,
+    NoneOf,
+    Char,
+    CrLf,
+    RegexpMatch,
+    RegexpMatches,
+    RegexpFind,
+    RegexpCapture,
+    RegexpCaptures,
+    TakeWhile1,
+    Complete,
+    Fix,
+    Escaped,
+    EscapedTransform,
+    NonEmpty,
+    ManyMN,
+    Not,
+    Permutation,
+    Verify,
+    TakeTill1,
+    TakeWhileMN,
+    TooLarge,
+    Many0Count,
+    Many1Count,
+    Float,
+    Satisfy,
+    Fail,
 }

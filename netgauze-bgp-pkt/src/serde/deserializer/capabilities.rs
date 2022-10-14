@@ -34,14 +34,18 @@ use nom::{
     number::complete::{be_u16, be_u32, be_u8},
     IResult,
 };
+use serde::{Deserialize, Serialize};
 
 use netgauze_serde_macros::LocatedError;
 
+use crate::serde::deserializer::ErrorKindSerdeDeref;
+
 /// BGP Capability Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BGPCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedCapabilityCode(#[from_external] UndefinedBGPCapabilityCode),
     InvalidRouteRefreshLength(u8),
@@ -236,10 +240,11 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FourOctetASCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidLength(u8),
 }
@@ -256,10 +261,11 @@ impl<'a> ReadablePDU<'a, LocatedFourOctetASCapabilityParsingError<'a>> for FourO
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MultiProtocolExtensionsCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidLength(u8),
     AddressFamilyError(#[from_external] UndefinedAddressFamily),
@@ -296,10 +302,11 @@ impl<'a> ReadablePDU<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum AddPathCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     AddressFamilyError(#[from_external] UndefinedAddressFamily),
     SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
@@ -354,10 +361,11 @@ impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExtendedNextHopEncodingCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     AddressFamilyError(#[from_external] UndefinedAddressFamily),
     SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),

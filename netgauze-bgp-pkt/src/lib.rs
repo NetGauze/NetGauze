@@ -28,6 +28,7 @@ use crate::{
     iana::BGPMessageType, notification::BGPNotificationMessage, open::BGPOpenMessage,
     route_refresh::BGPRouteRefreshMessage, update::BGPUpdateMessage,
 };
+use ::serde::{Deserialize, Serialize};
 
 pub mod capabilities;
 pub mod iana;
@@ -59,7 +60,7 @@ pub mod update;
 /// |          Length               |      Type     |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BGPMessage {
     Open(BGPOpenMessage),
     Update(BGPUpdateMessage),

@@ -28,17 +28,20 @@ use crate::{
         CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
+    serde::deserializer::ErrorKindSerdeDeref,
     BGPNotificationMessage,
 };
 use netgauze_parse_utils::{parse_into_located, ReadablePDU, Span};
 use netgauze_serde_macros::LocatedError;
 use nom::{error::ErrorKind, number::complete::be_u8, IResult};
+use serde::{Deserialize, Serialize};
 
 /// BGP Notification Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BGPNotificationMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedBGPErrorNotificationCode(#[from_external] UndefinedBGPErrorNotificationCode),
     MessageHeaderError(#[from_located(module = "self")] MessageHeaderErrorParsingError),
@@ -89,10 +92,11 @@ impl<'a> ReadablePDU<'a, LocatedBGPNotificationMessageParsingError<'a>> for BGPN
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MessageHeaderErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedMessageHeaderErrorType(#[from_external] UndefinedMessageHeaderErrorSubCode),
 }
@@ -134,10 +138,11 @@ impl<'a> ReadablePDU<'a, LocatedMessageHeaderErrorParsingError<'a>> for MessageH
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum OpenMessageErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedOpenMessageErrorSubCode(#[from_external] UndefinedOpenMessageErrorSubCode),
 }
@@ -203,10 +208,11 @@ impl<'a> ReadablePDU<'a, LocatedOpenMessageErrorParsingError<'a>> for OpenMessag
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum UpdateMessageErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedUpdateMessageErrorSubCode(#[from_external] UndefinedUpdateMessageErrorSubCode),
 }
@@ -290,10 +296,11 @@ impl<'a> ReadablePDU<'a, LocatedUpdateMessageErrorParsingError<'a>> for UpdateMe
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum HoldTimerExpiredErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
 }
 
@@ -313,10 +320,11 @@ impl<'a> ReadablePDU<'a, LocatedHoldTimerExpiredErrorParsingError<'a>> for HoldT
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FiniteStateMachineErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     Undefined(#[from_external] UndefinedFiniteStateMachineErrorSubCode),
 }
@@ -360,10 +368,11 @@ impl<'a> ReadablePDU<'a, LocatedFiniteStateMachineErrorParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum CeaseErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     Undefined(#[from_external] UndefinedCeaseErrorSubCode),
 }
@@ -438,10 +447,11 @@ impl<'a> ReadablePDU<'a, LocatedCeaseErrorParsingError<'a>> for CeaseError {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteRefreshErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     Undefined(#[from_external] UndefinedRouteRefreshMessageError),
 }

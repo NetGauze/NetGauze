@@ -15,6 +15,8 @@
 
 extern crate core;
 
+use serde::{Deserialize, Serialize};
+
 use crate::codec::BmpCodecDecoderError;
 use std::{
     fmt::{Display, Formatter},
@@ -28,7 +30,7 @@ pub mod service;
 pub mod transport;
 
 /// Capture the address of both sides of a socket
-#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct AddrInfo {
     local_socket: SocketAddr,
     remote_socket: SocketAddr,
@@ -52,7 +54,7 @@ impl AddrInfo {
 }
 
 /// Associate a value with a tag
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TaggedData<T, V> {
     tag: T,
     value: V,

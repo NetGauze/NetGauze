@@ -40,6 +40,9 @@ use crate::iana::{
     TerminationInformationTlvType,
 };
 
+extern crate serde as crate_serde;
+use crate_serde::{Deserialize, Serialize};
+
 pub mod iana;
 #[cfg(feature = "serde")]
 pub mod serde;
@@ -55,12 +58,12 @@ pub mod serde;
 /// |   Msg. Type   |
 /// +---------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BmpMessage {
     V3(BmpMessageValue),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BmpMessageValue {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport(StatisticsReportMessage),
@@ -119,7 +122,7 @@ impl BmpMessageValue {
 ///  |                  Timestamp (microseconds)                     |
 ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerHeader {
     peer_type: BmpPeerType,
     rd: Option<RouteDistinguisher>,
@@ -196,7 +199,7 @@ impl PeerHeader {
 ///    when used with route mirroring messages.
 ///  - filtered: The F flag indicates that the Loc-RIB is filtered. This MUST be
 ///    set when a filter is applied to Loc-RIB routes sent to the BMP collector.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BmpPeerType {
     GlobalInstancePeer {
         ipv6: bool,
@@ -258,7 +261,7 @@ impl BmpPeerType {
 /// The [InitiationInformation::SystemDescription] and
 /// [InitiationInformation::SystemName] Information TLVs MUST be sent, any
 /// others are optional. The string TLV MAY be included multiple times.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct InitiationMessage {
     information: Vec<InitiationInformation>,
 }
@@ -286,7 +289,7 @@ impl InitiationMessage {
 /// ~                                                               ~
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum InitiationInformation {
     /// The Information field contains a free-form UTF-8 string whose length is
     /// given by the Information Length field.
@@ -354,7 +357,7 @@ impl InitiationInformation {
 
 /// The termination message provides a way for a monitored router to indicate
 /// why it is terminating a session.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TerminationMessage {
     peer_header: PeerHeader,
     information: Vec<TerminationInformation>,
@@ -389,7 +392,7 @@ impl TerminationMessage {
 /// ~                                                               ~
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TerminationInformation {
     String(String),
     Reason(PeerTerminationCode),
@@ -416,7 +419,7 @@ impl TerminationInformation {
 /// Runtime errors when constructing a [RouteMonitoringMessage]
 /// Peer Up BGP messages should only carry
 /// [netgauze_bgp_pkt::BGPMessage::Update], anything else is an error
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RouteMonitoringMessageError {
     UnexpectedMessageType(BGPMessageType),
 }
@@ -428,7 +431,7 @@ pub enum RouteMonitoringMessageError {
 //
 /// Following the common BMP header and per-peer header is a BGP Update
 /// PDU.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
     updates: Vec<BGPMessage>,
@@ -463,7 +466,7 @@ impl RouteMonitoringMessage {
 
 /// Route Mirroring messages are used for verbatim duplication of messages as
 /// received.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteMirroringMessage {
     peer_header: PeerHeader,
     mirrored: Vec<RouteMirroringValue>,
@@ -486,7 +489,7 @@ impl RouteMirroringMessage {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RouteMirroringValue {
     /// A BGP PDU.  This PDU may or may not be an Update message.
     /// If the BGP Message TLV occurs in the Route Mirroring message,
@@ -538,7 +541,7 @@ impl RouteMirroringValue {
 /// ~                                                               ~
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerUpNotificationMessage {
     peer_header: PeerHeader,
     local_address: IpAddr,
@@ -552,7 +555,7 @@ pub struct PeerUpNotificationMessage {
 /// Runtime errors when constructing a [PeerUpNotificationMessage]
 /// Peer Up BGP messages should only carry [netgauze_bgp_pkt::BGPMessage::Open],
 /// anything else is an error
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerUpNotificationMessageError {
     UnexpectedSentMessageType(BGPMessageType),
     UnexpectedReceivedMessageType(BGPMessageType),
@@ -623,7 +626,7 @@ impl PeerUpNotificationMessage {
 /// Runtime errors when constructing a [PeerDownNotificationMessage]
 /// Peer Up BGP messages should only carry
 /// [netgauze_bgp_pkt::BGPMessage::Notification], anything else is an error
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerDownNotificationMessageError {
     UnexpectedBgpMessageType(BGPMessageType),
     UnexpectedInitiationInformationTlvType(InitiationInformationTlvType),
@@ -641,7 +644,7 @@ pub enum PeerDownNotificationMessageError {
 /// ~                                                               ~
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerDownNotificationMessage {
     peer_header: PeerHeader,
     reason: PeerDownNotificationReason,
@@ -696,7 +699,7 @@ impl PeerDownNotificationMessage {
 
 /// Reason indicates why the session was closed and
 /// [PeerDownNotificationMessage] is sent.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerDownNotificationReason {
     /// The local system closed the session.  Following the
     /// Reason is a BGP PDU containing a BGP NOTIFICATION message that
@@ -781,7 +784,7 @@ impl PeerDownNotificationReason {
 /// followed by
 ///```text
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct StatisticsReportMessage {
     peer_header: PeerHeader,
     counters: Vec<StatisticsCounter>,
@@ -816,7 +819,7 @@ impl StatisticsReportMessage {
 /// ~                                                               ~
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum StatisticsCounter {
     NumberOfPrefixesRejectedByInboundPolicy(CounterU32),
     NumberOfDuplicatePrefixAdvertisements(CounterU32),
@@ -908,7 +911,7 @@ impl StatisticsCounter {
 /// A non-negative integer that monotonically increases
 /// until it reaches a maximum value, when it wraps around and starts
 /// increasing again from 0.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CounterU32(u32);
 
 impl CounterU32 {
@@ -939,7 +942,7 @@ impl Deref for CounterU32 {
 /// its minimum value. If the information being modeled subsequently
 /// decreases below the maximum value (or increases above the minimum
 /// value), the 64-bit Gauge also decreases (or increases).
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct GaugeU64(u64);
 
 impl GaugeU64 {

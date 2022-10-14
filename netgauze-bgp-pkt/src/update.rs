@@ -15,6 +15,7 @@
 
 use crate::path_attribute::PathAttribute;
 use ipnet::Ipv4Net;
+use serde::{Deserialize, Serialize};
 
 /// UPDATE messages are used to transfer routing information between BGP peers
 /// as defined by [RFC4271](https://datatracker.ietf.org/doc/html/RFC4271).
@@ -32,7 +33,7 @@ use ipnet::Ipv4Net;
 /// |   Network Layer Reachability Information (variable) |
 /// +-----------------------------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BGPUpdateMessage {
     withdrawn_routes: Vec<WithdrawRoute>,
     path_attributes: Vec<PathAttribute>,
@@ -68,7 +69,7 @@ impl BGPUpdateMessage {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WithdrawRoute {
     prefix: Ipv4Net,
 }
@@ -83,7 +84,7 @@ impl WithdrawRoute {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NetworkLayerReachabilityInformation(Vec<Ipv4Net>);
 
 impl NetworkLayerReachabilityInformation {

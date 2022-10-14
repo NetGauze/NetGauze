@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::capabilities::BGPCapability;
+use crate::{capabilities::BGPCapability, Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 pub const BGP_VERSION: u8 = 4;
@@ -38,7 +38,7 @@ pub const BGP_VERSION: u8 = 4;
 /// |                                                               |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BGPOpenMessage {
     version: u8,
     my_as: u16,
@@ -103,7 +103,7 @@ impl BGPOpenMessage {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-...
 /// |  Parm. Type   | Parm. Length  |  Parameter Value (variable)
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-...
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BGPOpenMessageParameter {
     /// Capabilities Advertisement
     Capabilities(Vec<BGPCapability>),

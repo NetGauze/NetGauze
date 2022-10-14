@@ -15,11 +15,12 @@
 
 //! Contains BGP codes that are registered at IANA [BGP Parameters](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml)
 
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
 
 /// BGP Message types as registered in IANA [BGP Message Types](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-1)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BGPMessageType {
     Open = 1,
     Update = 2,
@@ -31,7 +32,7 @@ pub enum BGPMessageType {
 
 /// BGP Message type is not one of [BGPMessageType], the carried value is the
 /// undefined code.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBgpMessageType(pub u8);
 
 impl From<BGPMessageType> for u8 {
@@ -53,7 +54,7 @@ impl TryFrom<u8> for BGPMessageType {
 
 /// BGP Path Attributes as defined by IANA [BGP Path Attributes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-2)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum PathAttributeType {
     /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
     Origin = 1,
@@ -155,7 +156,7 @@ impl From<PathAttributeType> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedPathAttributeType(pub u8);
 
 impl TryFrom<u8> for PathAttributeType {
@@ -171,7 +172,7 @@ impl TryFrom<u8> for PathAttributeType {
 
 /// BGP Error (Notification) Codes as defined by IANA [BGP Error (Notification) Codes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-3)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BGPErrorNotificationCode {
     /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
     MessageHeaderError = 1,
@@ -201,7 +202,7 @@ impl From<BGPErrorNotificationCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBGPErrorNotificationCode(pub u8);
 
 impl TryFrom<u8> for BGPErrorNotificationCode {
@@ -217,7 +218,7 @@ impl TryFrom<u8> for BGPErrorNotificationCode {
 
 /// Message Header Error sub-codes for [BGPErrorNotificationCode::MessageHeaderError] as defined by IANA [Message Header Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-5)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum MessageHeaderErrorSubCode {
     /// [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493)
     Unspecific = 0,
@@ -232,7 +233,7 @@ impl From<MessageHeaderErrorSubCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedMessageHeaderErrorSubCode(pub u8);
 
 impl TryFrom<u8> for MessageHeaderErrorSubCode {
@@ -248,7 +249,7 @@ impl TryFrom<u8> for MessageHeaderErrorSubCode {
 
 /// OPEN Message Error sub-codes for [BGPErrorNotificationCode::OpenMessageError] as defined by IANA [OPEN Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-6)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum OpenMessageErrorSubCode {
     /// [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493)
     Unspecific = 0,
@@ -271,7 +272,7 @@ impl From<OpenMessageErrorSubCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedOpenMessageErrorSubCode(pub u8);
 
 impl TryFrom<u8> for OpenMessageErrorSubCode {
@@ -287,7 +288,7 @@ impl TryFrom<u8> for OpenMessageErrorSubCode {
 
 /// UPDATE Message Error sub-codes for [BGPErrorNotificationCode::UpdateMessageError] as defined by IANA [UPDATE Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-7)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum UpdateMessageErrorSubCode {
     /// [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493)
     Unspecific = 0,
@@ -309,7 +310,7 @@ impl From<UpdateMessageErrorSubCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedUpdateMessageErrorSubCode(pub u8);
 
 impl TryFrom<u8> for UpdateMessageErrorSubCode {
@@ -325,7 +326,7 @@ impl TryFrom<u8> for UpdateMessageErrorSubCode {
 
 /// BGP Finite State Machine Error sub-codes for [BGPErrorNotificationCode::FiniteStateMachineError] as defined by IANA [BGP Finite State Machine Error Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-finite-state-machine-error-subcodes)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum FiniteStateMachineErrorSubCode {
     /// [RFC6608](https://datatracker.ietf.org/doc/html/rfc6608)
     UnspecifiedError = 0,
@@ -346,7 +347,7 @@ impl From<FiniteStateMachineErrorSubCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedFiniteStateMachineErrorSubCode(pub u8);
 
 impl TryFrom<u8> for FiniteStateMachineErrorSubCode {
@@ -362,7 +363,7 @@ impl TryFrom<u8> for FiniteStateMachineErrorSubCode {
 
 /// BGP Cease NOTIFICATION message Error sub-codes for [BGPErrorNotificationCode::Cease] as defined by IANA [BGP Cease NOTIFICATION message subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-8)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum CeaseErrorSubCode {
     /// [RFC4486](https://datatracker.ietf.org/doc/html/rfc4486)
     MaximumNumberOfPrefixesReached = 1,
@@ -401,7 +402,7 @@ impl From<CeaseErrorSubCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedCeaseErrorSubCode(pub u8);
 
 impl TryFrom<u8> for CeaseErrorSubCode {
@@ -417,7 +418,7 @@ impl TryFrom<u8> for CeaseErrorSubCode {
 
 /// BGP ROUTE-REFRESH Message Error subcodes for [BGPErrorNotificationCode::RouteRefreshMessageError] as defined by IANA [BGP ROUTE-REFRESH Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-error-subcodes)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RouteRefreshMessageErrorSubCode {
     /// [RFC7313](https://datatracker.ietf.org/doc/html/rfc7313)
     InvalidMessageLength = 1,
@@ -429,7 +430,7 @@ impl From<RouteRefreshMessageErrorSubCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedRouteRefreshMessageError(pub u8);
 
 impl TryFrom<u8> for RouteRefreshMessageErrorSubCode {
@@ -445,7 +446,7 @@ impl TryFrom<u8> for RouteRefreshMessageErrorSubCode {
 
 /// [BGP OPEN Optional Parameter Types](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-11)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BGPOpenMessageParameterType {
     /// [RFC5492](https://datatracker.ietf.org/doc/html/rfc5492)
     Capability = 2,
@@ -460,7 +461,7 @@ impl From<BGPOpenMessageParameterType> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBGPOpenMessageParameterType(pub u8);
 
 impl TryFrom<u8> for BGPOpenMessageParameterType {
@@ -476,7 +477,7 @@ impl TryFrom<u8> for BGPOpenMessageParameterType {
 
 /// [BGP Capabilities Codes](https://www.iana.org/assignments/capability-codes/capability-codes.xhtml)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BGPCapabilityCode {
     /// [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
     MultiProtocolExtensions = 1,
@@ -584,7 +585,7 @@ impl From<BGPCapabilityCode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBGPCapabilityCode(pub u8);
 
 impl TryFrom<u8> for BGPCapabilityCode {
@@ -600,7 +601,7 @@ impl TryFrom<u8> for BGPCapabilityCode {
 
 /// [BGP Route Refresh Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-subcodes)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RouteRefreshSubcode {
     NormalRequest = 0,
     BeginningOfRouteRefresh = 1,
@@ -613,7 +614,7 @@ impl From<RouteRefreshSubcode> for u8 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedRouteRefreshSubcode(pub u8);
 
 impl TryFrom<u8> for RouteRefreshSubcode {
@@ -629,7 +630,7 @@ impl TryFrom<u8> for RouteRefreshSubcode {
 
 /// [Route Distinguisher Type Field](https://www.iana.org/assignments/route-distinguisher-types/route-distinguisher-types.xhtml)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RouteDistinguisherTypeCode {
     As2Administrator = 0,
     Ipv4Administrator = 1,
@@ -644,7 +645,7 @@ impl From<RouteDistinguisherTypeCode> for u16 {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedRouteDistinguisherTypeCode(pub u16);
 
 impl TryFrom<u16> for RouteDistinguisherTypeCode {
@@ -668,7 +669,7 @@ impl TryFrom<u16> for RouteDistinguisherTypeCode {
 /// the first two octets encoding the autonomous system value as described by
 /// the RFC.
 #[repr(u32)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum WellKnownCommunity {
     /// [RFC8326](https://datatracker.ietf.org/doc/html/rfc8326)
     GracefulShutdown = 0xFFFF0000,
@@ -697,7 +698,7 @@ pub enum WellKnownCommunity {
 /// Standard (outbound) communities and their encodings for export to BGP route
 /// collectors defined by [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BGPDataCollectionCommunityValueCode {
     CustomerRoutes = 0b0000000000000001,
     PeerRoutes = 0b0000000000000010,
@@ -711,7 +712,7 @@ pub enum BGPDataCollectionCommunityValueCode {
 ///
 /// Region Identifiers defined [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
 #[repr(u16)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BGPDataCollectionCommunityRegionIdentifierCode {
     Africa = 0b00001,
     Oceania = 0b00010,

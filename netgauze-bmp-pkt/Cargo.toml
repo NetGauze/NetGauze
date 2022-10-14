@@ -17,11 +17,12 @@ netgauze-parse-utils = { path = "../netgauze-parse-utils", optional = true }
 netgauze-serde-macros = { path = "../netgauze-serde-macros", optional = true }
 strum = "0.24"
 strum_macros = "0.24"
-chrono = "0.4"
-ipnet = "2.5"
+chrono = {version="0.4", features=["serde"]}
+ipnet = { version = "2.5", features=["serde"] }
 nom = { version = "7.1", optional = true }
 byteorder = { version = "1.4", optional = true }
 criterion = { version = "0.4", optional = true } # Dev dep for bench
+serde = { version = "1.0", features = ["derive"] }
 
 [features]
 default = ["serde"]
