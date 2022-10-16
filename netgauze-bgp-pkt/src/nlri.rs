@@ -44,7 +44,7 @@ impl MplsLabel {
 /// Route Distinguisher (RD) is a 8-byte value and encoded as follows:
 ///     - Type Field: 2 bytes
 ///     - Value Field: 6 bytes
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Hash, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RouteDistinguisher {
     /// The Value field consists of two subfields:
     ///     - Administrator subfield: ASN2
