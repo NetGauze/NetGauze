@@ -9,6 +9,7 @@ readme = "README.md"
 [dependencies]
 netgauze-locate = { path = "../netgauze-locate" }
 nom = { version = "7", default-features = false }
+serde = { version = "1", features = ["derive"] }
 
 [features]
 test-helpers = []

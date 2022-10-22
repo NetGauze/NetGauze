@@ -22,12 +22,13 @@ use crate::{
         LabeledNextHop, MplsLabel, RouteDistinguisher,
     },
     wire::{
-        deserializer::{ErrorKindSerdeDeref, Ipv4PrefixParsingError, Ipv6PrefixParsingError},
+        deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError},
         serializer::nlri::{LABELED_IPV4_LEN, LABELED_IPV6_LEN, RD_LEN},
     },
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_two_inputs, ReadablePDU, ReadablePDUWithTwoInputs, Span,
+    parse_into_located, parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePDU,
+    ReadablePDUWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{

@@ -603,7 +603,7 @@ pub fn generate_ie_deserializer(rust_type: &str, name_prefix: &String, ie_name: 
     std_error.push_str("#[allow(non_camel_case_types)]\n");
     std_error.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
     std_error.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
-    std_error.push_str("    #[serde(with = \"super::super::ErrorKindSerdeDeref\")]\n");
+    std_error.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     std_error.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     std_error.push_str("    InvalidLength(u16),\n");
     std_error.push_str("}\n\n");
@@ -828,7 +828,8 @@ pub fn generate_ie_deserializer(rust_type: &str, name_prefix: &String, ie_name: 
             string_error.push_str("#[allow(non_camel_case_types)]\n");
             string_error.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
             string_error.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
-            string_error.push_str("    #[serde(with = \"super::super::ErrorKindSerdeDeref\")]\n");
+            string_error
+                .push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
             string_error.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
             string_error.push_str("    FromUtf8Error(String),\n");
             string_error.push_str("}\n\n");
@@ -858,7 +859,7 @@ pub fn generate_ie_deserializer(rust_type: &str, name_prefix: &String, ie_name: 
             ret.push_str("            nom::combinator::map_res(nom::bytes::complete::take(length), |x: netgauze_parse_utils::Span<'_>| {\n");
             ret.push_str("                String::from_utf8(x.to_vec())\n");
             ret.push_str("            })(buf)?;\n");
-            ret.push_str(format!("        Ok((buf, {}(String::from(value))))\n", ty_name).as_str());
+            ret.push_str(format!("        Ok((buf, {}(value)))\n", ty_name).as_str());
             ret.push_str("    }\n");
             ret.push_str("}\n");
         }

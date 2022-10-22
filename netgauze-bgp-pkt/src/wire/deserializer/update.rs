@@ -28,7 +28,7 @@ use netgauze_parse_utils::{
 use nom::{error::ErrorKind, number::complete::be_u16, IResult};
 use serde::{Deserialize, Serialize};
 
-use crate::wire::deserializer::ErrorKindSerdeDeref;
+use netgauze_parse_utils::ErrorKindSerdeDeref;
 use netgauze_serde_macros::LocatedError;
 
 /// BGP Open Message Parsing errors

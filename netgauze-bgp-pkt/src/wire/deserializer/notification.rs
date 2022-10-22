@@ -28,10 +28,9 @@ use crate::{
         CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
-    wire::deserializer::ErrorKindSerdeDeref,
     BGPNotificationMessage,
 };
-use netgauze_parse_utils::{parse_into_located, ReadablePDU, Span};
+use netgauze_parse_utils::{parse_into_located, ErrorKindSerdeDeref, ReadablePDU, Span};
 use netgauze_serde_macros::LocatedError;
 use nom::{error::ErrorKind, number::complete::be_u8, IResult};
 use serde::{Deserialize, Serialize};

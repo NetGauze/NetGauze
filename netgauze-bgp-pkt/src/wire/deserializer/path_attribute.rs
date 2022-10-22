@@ -23,7 +23,7 @@ use crate::{
         MpUnreach, MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
         UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
     },
-    wire::deserializer::{nlri::*, ErrorKindSerdeDeref},
+    wire::deserializer::nlri::*,
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
@@ -31,8 +31,9 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_three_inputs,
-    parse_into_located_two_inputs, parse_till_empty, parse_till_empty_into_located, ReadablePDU,
-    ReadablePDUWithOneInput, ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs, Span,
+    parse_into_located_two_inputs, parse_till_empty, parse_till_empty_into_located,
+    ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs,
+    ReadablePDUWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{

@@ -40,7 +40,6 @@ use crate::iana::{
     TerminationInformationTlvType,
 };
 
-
 use serde::{Deserialize, Serialize};
 
 pub mod iana;

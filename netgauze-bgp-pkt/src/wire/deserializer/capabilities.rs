@@ -28,7 +28,9 @@ use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
-use netgauze_parse_utils::{parse_into_located, parse_till_empty, ReadablePDU, Span};
+use netgauze_parse_utils::{
+    parse_into_located, parse_till_empty, ErrorKindSerdeDeref, ReadablePDU, Span,
+};
 use nom::{
     error::{ErrorKind, FromExternalError, ParseError},
     number::complete::{be_u16, be_u32, be_u8},
@@ -37,8 +39,6 @@ use nom::{
 use serde::{Deserialize, Serialize};
 
 use netgauze_serde_macros::LocatedError;
-
-use crate::wire::deserializer::ErrorKindSerdeDeref;
 
 /// BGP Capability Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]

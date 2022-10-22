@@ -37,8 +37,8 @@ use nom::{
 };
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located, ReadablePDU,
-    Span,
+    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
+    ErrorKindSerdeDeref, ReadablePDU, Span,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -1033,62 +1033,4 @@ impl<'a> ReadablePDU<'a, LocatedStatisticsCounterParsingError<'a>> for Statistic
         }
         Ok((reminder, counter))
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(remote = "ErrorKind")]
-pub(crate) enum ErrorKindSerdeDeref {
-    Tag,
-    MapRes,
-    MapOpt,
-    Alt,
-    IsNot,
-    IsA,
-    SeparatedList,
-    SeparatedNonEmptyList,
-    Many0,
-    Many1,
-    ManyTill,
-    Count,
-    TakeUntil,
-    LengthValue,
-    TagClosure,
-    Alpha,
-    Digit,
-    HexDigit,
-    OctDigit,
-    AlphaNumeric,
-    Space,
-    MultiSpace,
-    LengthValueFn,
-    Eof,
-    Switch,
-    TagBits,
-    OneOf,
-    NoneOf,
-    Char,
-    CrLf,
-    RegexpMatch,
-    RegexpMatches,
-    RegexpFind,
-    RegexpCapture,
-    RegexpCaptures,
-    TakeWhile1,
-    Complete,
-    Fix,
-    Escaped,
-    EscapedTransform,
-    NonEmpty,
-    ManyMN,
-    Not,
-    Permutation,
-    Verify,
-    TakeTill1,
-    TakeWhileMN,
-    TooLarge,
-    Many0Count,
-    Many1Count,
-    Float,
-    Satisfy,
-    Fail,
 }

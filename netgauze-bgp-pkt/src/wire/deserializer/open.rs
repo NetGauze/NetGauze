@@ -16,10 +16,10 @@
 use crate::{
     iana::{BGPOpenMessageParameterType, UndefinedBGPOpenMessageParameterType},
     open::BGPOpenMessageParameter,
-    wire::deserializer::{capabilities::BGPCapabilityParsingError, ErrorKindSerdeDeref},
+    wire::deserializer::capabilities::BGPCapabilityParsingError,
     BGPOpenMessage,
 };
-use netgauze_parse_utils::{parse_till_empty_into_located, ReadablePDU, Span};
+use netgauze_parse_utils::{parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePDU, Span};
 use netgauze_serde_macros::LocatedError;
 use nom::{
     error::ErrorKind,

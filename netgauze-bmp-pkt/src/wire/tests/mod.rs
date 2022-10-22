@@ -24,8 +24,8 @@ use netgauze_bgp_pkt::{
     notification::{BGPNotificationMessage, CeaseError},
     open::{BGPOpenMessage, BGPOpenMessageParameter},
     path_attribute::{ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute},
-    wire::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
     update::{BGPUpdateMessage, NetworkLayerReachabilityInformation},
+    wire::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
     BGPMessage,
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType};
