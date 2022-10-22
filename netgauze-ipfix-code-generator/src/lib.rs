@@ -486,17 +486,16 @@ pub fn generate_ie_value_converters(
     ie_name: &String,
 ) -> String {
     let mut ret = String::new();
+    let ty_name = format!("{}{}", name_prefix, ie_name);
     match rust_type {
         "u8" => {
-            ret.push_str(
-                format!("impl From<&[u8; 1]> for {}{}{{\n", name_prefix, ie_name).as_str(),
-            );
+            ret.push_str(format!("impl From<&[u8; 1]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: &[u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0])\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<u8> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<u8> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: u8) -> Self {\n");
             ret.push_str("        Self(value)\n");
             ret.push_str("    }\n");
@@ -504,21 +503,19 @@ pub fn generate_ie_value_converters(
             ret.push('\n');
         }
         "u16" => {
-            ret.push_str(
-                format!("impl From<&[u8; 1]> for {}{}{{\n", name_prefix, ie_name).as_str(),
-            );
+            ret.push_str(format!("impl From<&[u8; 1]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: &[u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u16)\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 2]> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 2]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: [u8; 2]) -> Self {\n");
             ret.push_str("        Self(u16::from_be_bytes(value))\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<u16> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<u16> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: u16) -> Self {\n");
             ret.push_str("        Self(value)\n");
             ret.push_str("    }\n");
@@ -526,28 +523,26 @@ pub fn generate_ie_value_converters(
             ret.push('\n');
         }
         "u32" => {
-            ret.push_str(
-                format!("impl From<&[u8; 1]> for {}{}{{\n", name_prefix, ie_name).as_str(),
-            );
+            ret.push_str(format!("impl From<&[u8; 1]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: &[u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u32)\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 2]> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 2]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: [u8; 2]) -> Self {\n");
             ret.push_str("        let tmp = u16::from_be_bytes(value);\n");
             ret.push_str("        Self(tmp as u32)\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 4]> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 4]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: [u8; 4]) -> Self {\n");
             ret.push_str("        Self(u32::from_be_bytes(value))\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<u32> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<u32> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: u32) -> Self {\n");
             ret.push_str("        Self(value)\n");
             ret.push_str("    }\n");
@@ -555,35 +550,33 @@ pub fn generate_ie_value_converters(
             ret.push('\n');
         }
         "u64" => {
-            ret.push_str(
-                format!("impl From<&[u8; 1]> for {}{}{{\n", name_prefix, ie_name).as_str(),
-            );
+            ret.push_str(format!("impl From<&[u8; 1]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: &[u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u64)\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 2]> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 2]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: [u8; 2]) -> Self {\n");
             ret.push_str("        let tmp = u16::from_be_bytes(value);\n");
             ret.push_str("        Self(tmp as u64)\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 4]> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 4]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: [u8; 4]) -> Self {\n");
             ret.push_str("        let tmp = u32::from_be_bytes(value);\n");
             ret.push_str("        Self(tmp as u64)\n");
             ret.push_str("    }\n");
-            ret.push_str("}\n");
+            ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 8]> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 8]> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: [u8; 8]) -> Self {\n");
             ret.push_str("        Self(u64::from_be_bytes(value))\n");
             ret.push_str("    }\n");
             ret.push_str("}\n");
 
-            ret.push_str(format!("impl From<u64> for {}{}{{\n", name_prefix, ie_name).as_str());
+            ret.push_str(format!("impl From<u64> for {} {{\n", ty_name).as_str());
             ret.push_str("    fn from(value: u64) -> Self {\n");
             ret.push_str("        Self(value)\n");
             ret.push_str("    }\n");
