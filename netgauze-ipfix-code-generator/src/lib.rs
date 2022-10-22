@@ -489,8 +489,8 @@ pub fn generate_ie_value_converters(
     let ty_name = format!("{}{}", name_prefix, ie_name);
     match rust_type {
         "u8" => {
-            ret.push_str(format!("impl From<&[u8; 1]> for {} {{\n", ty_name).as_str());
-            ret.push_str("    fn from(value: &[u8; 1]) -> Self {\n");
+            ret.push_str(format!("impl From<[u8; 1]> for {} {{\n", ty_name).as_str());
+            ret.push_str("    fn from(value: [u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0])\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
@@ -503,8 +503,8 @@ pub fn generate_ie_value_converters(
             ret.push('\n');
         }
         "u16" => {
-            ret.push_str(format!("impl From<&[u8; 1]> for {} {{\n", ty_name).as_str());
-            ret.push_str("    fn from(value: &[u8; 1]) -> Self {\n");
+            ret.push_str(format!("impl From<[u8; 1]> for {} {{\n", ty_name).as_str());
+            ret.push_str("    fn from(value: [u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u16)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
@@ -523,8 +523,8 @@ pub fn generate_ie_value_converters(
             ret.push('\n');
         }
         "u32" => {
-            ret.push_str(format!("impl From<&[u8; 1]> for {} {{\n", ty_name).as_str());
-            ret.push_str("    fn from(value: &[u8; 1]) -> Self {\n");
+            ret.push_str(format!("impl From<[u8; 1]> for {} {{\n", ty_name).as_str());
+            ret.push_str("    fn from(value: [u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u32)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
@@ -550,8 +550,8 @@ pub fn generate_ie_value_converters(
             ret.push('\n');
         }
         "u64" => {
-            ret.push_str(format!("impl From<&[u8; 1]> for {} {{\n", ty_name).as_str());
-            ret.push_str("    fn from(value: &[u8; 1]) -> Self {\n");
+            ret.push_str(format!("impl From<[u8; 1]> for {} {{\n", ty_name).as_str());
+            ret.push_str("    fn from(value: [u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u64)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
