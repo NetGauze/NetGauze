@@ -84,6 +84,11 @@ pub fn parse_simple_registry<'a, 'input>(node: &'input Node<'a, 'input>) -> Vec<
         let comments = get_string_child(child, (IANA_NAMESPACE, "comments").into());
         let xref = parse_xref(child);
         if let (Some(Ok(value)), Some(description)) = (value, description) {
+            let description = if description.trim() == "4-octet words" {
+                "fourOctetWords".to_string()
+            } else {
+                description
+            };
             ret.push(SimpleRegistry {
                 value,
                 description,
@@ -170,6 +175,13 @@ pub fn parse_information_elements<'a, 'input>(
         };
         let xrefs = parse_xref(child);
         let units = get_string_child(child, (IANA_NAMESPACE, "units").into());
+        let units = units.map(|x| {
+            if x == "4-octet words" {
+                "fourOctetWords".to_string()
+            } else {
+                x
+            }
+        });
         let range = get_string_child(child, (IANA_NAMESPACE, "range").into());
 
         if Some(true) == name.as_ref().map(|x| x.as_str() == ASSIGNED_FOR_NF_V9) {
