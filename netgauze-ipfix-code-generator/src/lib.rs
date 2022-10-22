@@ -825,7 +825,7 @@ pub fn generate_ie_deserializer(rust_type: &str, name_prefix: &String, ie_name: 
         }
         "String" => {
             let mut string_error = String::new();
-            std_error.push_str("#[allow(non_camel_case_types)]\n");
+            string_error.push_str("#[allow(non_camel_case_types)]\n");
             string_error.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
             string_error.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
             string_error.push_str("    #[serde(with = \"super::super::ErrorKindSerdeDeref\")]\n");
