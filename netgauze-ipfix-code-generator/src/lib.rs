@@ -20,6 +20,10 @@ pub const DEFAULT_STRUCT_DERIVE: &str =
     "#[derive(Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
 pub const STRUCT_DERIVE_NO_COPY: &str =
     "#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
+pub const STRUCT_DERIVE_NO_COPY_NO_EQ: &str =
+    "#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]\n";
+pub const DEFAULT_STRUCT_DERIVE_NO_EQ: &str =
+    "#[derive(Copy, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]\n";
 
 /// Represent Information Element as read form a registry
 #[derive(Debug, Clone)]
@@ -445,7 +449,7 @@ fn generate_ie_template_trait_for_ie(name_prefixes: &Vec<(String, String, u32)>)
 fn generate_ie_record_enum_for_ie(name_prefixes: &Vec<(String, String, u32)>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(STRUCT_DERIVE_NO_COPY);
+    ret.push_str(STRUCT_DERIVE_NO_COPY_NO_EQ);
     ret.push_str("pub enum Record {\n");
     ret.push_str("    Unknown(Vec<u8>),\n");
     for (name, pkg, _) in name_prefixes {
@@ -480,11 +484,7 @@ pub fn generate_ie_ids(name_prefixes: Vec<(String, String, u32)>) -> String {
     ret
 }
 
-pub fn generate_ie_value_converters(
-    rust_type: &str,
-    name_prefix: &String,
-    ie_name: &String,
-) -> String {
+fn generate_ie_value_converters(rust_type: &str, name_prefix: &String, ie_name: &String) -> String {
     let mut ret = String::new();
     let ty_name = format!("{}{}", name_prefix, ie_name);
     match rust_type {
@@ -593,7 +593,7 @@ pub fn generate_ie_value_converters(
 fn generate_records_enum(name_prefix: &String, ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(DEFAULT_STRUCT_DERIVE);
+    ret.push_str(STRUCT_DERIVE_NO_COPY_NO_EQ);
     ret.push_str(format!("pub enum {}Record {{\n", name_prefix).as_str());
     for ie in ies {
         ret.push_str(format!("    {}({}{}),\n", ie.name, name_prefix, ie.name).as_str());
@@ -602,37 +602,42 @@ fn generate_records_enum(name_prefix: &String, ies: &Vec<InformationElement>) ->
     ret
 }
 
+fn get_rust_type(data_type: &str) -> String {
+    let rust_type = match data_type {
+        "octetArray" => "Vec<u8>",
+        "unsigned8" => "u8",
+        "unsigned16" => "u16",
+        "unsigned32" => "u32",
+        "unsigned64" => "u64",
+        "signed8" => "i8",
+        "signed16" => "i16",
+        "signed32" => "i32",
+        "signed64" => "i64",
+        "float32" => "f32",
+        "float64" => "f64",
+        "boolean" => "bool",
+        "macAddress" => "[u8; 6]",
+        "string" => "String",
+        "dateTimeSeconds" => "chrono::DateTime<chrono::Utc>",
+        "dateTimeMilliseconds" => "chrono::DateTime<chrono::Utc>",
+        "dateTimeMicroseconds" => "chrono::DateTime<chrono::Utc>",
+        "dateTimeNanoseconds" => "chrono::DateTime<chrono::Utc>",
+        "ipv4Address" => "std::net::Ipv4Addr",
+        "ipv6Address" => "std::net::Ipv6Addr",
+        "basicList" => "String",
+        "subTemplateList" => "String",
+        "subTemplateMultiList" => "String",
+        other => todo!("Implement rust data type conversion for {}", other),
+    };
+    rust_type.to_string()
+}
+
 pub fn generate_ie_values(name_prefix: String, ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     for ie in ies {
-        let rust_type = match ie.data_type.as_str() {
-            "octetArray" => "Vec<u8>",
-            "unsigned8" => "u8",
-            "unsigned16" => "u16",
-            "unsigned32" => "u32",
-            "unsigned64" => "u64",
-            "signed8" => "i8",
-            "signed16" => "i16",
-            "signed32" => "i32",
-            "signed64" => "i64",
-            "float32" => "f32",
-            "float64" => "f64",
-            "boolean" => "bool",
-            "macAddress" => "[u8; 6]",
-            "string" => "String",
-            "dateTimeSeconds" => "chrono::DateTime<chrono::Utc>",
-            "dateTimeMilliseconds" => "chrono::DateTime<chrono::Utc>",
-            "dateTimeMicroseconds" => "chrono::DateTime<chrono::Utc>",
-            "dateTimeNanoseconds" => "chrono::DateTime<chrono::Utc>",
-            "ipv4Address" => "std::net::Ipv4Addr",
-            "ipv6Address" => "std::net::Ipv6Addr",
-            "basicList" => "String",
-            "subTemplateList" => "String",
-            "subTemplateMultiList" => "String",
-            other => todo!("Implement rust data type conversion for {}", other),
-        };
+        let rust_type = get_rust_type(&ie.data_type);
         ret.push_str("#[allow(non_camel_case_types)]\n");
-        ret.push_str(DEFAULT_STRUCT_DERIVE);
+        ret.push_str(STRUCT_DERIVE_NO_COPY_NO_EQ);
         ret.push_str(
             format!(
                 "pub struct {}{}(pub {});\n\n",
@@ -641,7 +646,7 @@ pub fn generate_ie_values(name_prefix: String, ies: &Vec<InformationElement>) ->
             .as_str(),
         );
 
-        ret.push_str(generate_ie_value_converters(rust_type, &name_prefix, &ie.name).as_str());
+        ret.push_str(generate_ie_value_converters(&rust_type, &name_prefix, &ie.name).as_str());
     }
     ret.push_str(generate_records_enum(&name_prefix, ies).as_str());
     ret
