@@ -18,6 +18,8 @@ pub mod xml_parser;
 pub const DEFAULT_ENUM_DERIVE: &str = "#[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
 pub const DEFAULT_STRUCT_DERIVE: &str =
     "#[derive(Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
+pub const STRUCT_DERIVE_NO_COPY: &str =
+    "#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
 
 /// Represent Information Element as read form a registry
 #[derive(Debug, Clone)]
@@ -324,9 +326,7 @@ pub fn generate_information_element_ids(
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u16)]\n");
-    ret.push_str(
-        "#[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n",
-    );
+    ret.push_str(DEFAULT_ENUM_DERIVE);
     ret.push_str(format!("pub enum {}InformationElementId {{\n", name_prefix).as_str());
     for ie in ie {
         for line in ie.description.split('\n') {
@@ -354,9 +354,7 @@ pub fn generate_ie_status() -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(
-        "#[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n",
-    );
+    ret.push_str(DEFAULT_ENUM_DERIVE);
     ret.push_str("pub enum InformationElementStatus {\n");
     ret.push_str("    current = 0,\n");
     ret.push_str("    deprecated = 1,\n");
@@ -444,6 +442,19 @@ fn generate_ie_template_trait_for_ie(name_prefixes: &Vec<(String, String, u32)>)
     ret
 }
 
+fn generate_ie_record_enum_for_ie(name_prefixes: &Vec<(String, String, u32)>) -> String {
+    let mut ret = String::new();
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str(STRUCT_DERIVE_NO_COPY);
+    ret.push_str("pub enum Record {\n");
+    ret.push_str("    Unknown(Vec<u8>),\n");
+    for (name, pkg, _) in name_prefixes {
+        ret.push_str(format!("    {}({}::Record),\n", name, pkg).as_str());
+    }
+    ret.push_str("}\n\n");
+    ret
+}
+
 pub fn generate_ie_ids(name_prefixes: Vec<(String, String, u32)>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
@@ -464,6 +475,7 @@ pub fn generate_ie_ids(name_prefixes: Vec<(String, String, u32)>) -> String {
 
     ret.push_str(generate_ie_try_from_pen_code(&name_prefixes).as_str());
     ret.push_str(generate_ie_template_trait_for_ie(&name_prefixes).as_str());
+    ret.push_str(generate_ie_record_enum_for_ie(&name_prefixes).as_str());
 
     ret
 }
@@ -585,6 +597,18 @@ pub fn generate_ie_value_converters(
     ret
 }
 
+fn generate_records_enum(name_prefix: &String, ies: &Vec<InformationElement>) -> String {
+    let mut ret = String::new();
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str(DEFAULT_STRUCT_DERIVE);
+    ret.push_str(format!("pub enum {}Record {{\n", name_prefix).as_str());
+    for ie in ies {
+        ret.push_str(format!("    {}({}{}),\n", ie.name, name_prefix, ie.name).as_str());
+    }
+    ret.push_str("}\n");
+    ret
+}
+
 pub fn generate_ie_values(name_prefix: String, ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     for ie in ies {
@@ -626,5 +650,6 @@ pub fn generate_ie_values(name_prefix: String, ies: &Vec<InformationElement>) ->
 
         ret.push_str(generate_ie_value_converters(rust_type, &name_prefix, &ie.name).as_str());
     }
+    ret.push_str(generate_records_enum(&name_prefix, ies).as_str());
     ret
 }
