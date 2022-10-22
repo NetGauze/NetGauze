@@ -41,7 +41,7 @@ use std::{
 
 use crate::{
     iana::*,
-    serde::{deserializer::*, serializer::*},
+    wire::{deserializer::*, serializer::*},
     *,
 };
 

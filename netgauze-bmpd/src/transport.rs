@@ -146,7 +146,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use futures::StreamExt;
     use netgauze_bmp_pkt::{
-        iana::UndefinedBmpVersion, serde::deserializer::BmpMessageParsingError, *,
+        iana::UndefinedBmpVersion, wire::deserializer::BmpMessageParsingError, *,
     };
     use std::net::{IpAddr, Ipv4Addr};
     use tokio_test::io::Builder;

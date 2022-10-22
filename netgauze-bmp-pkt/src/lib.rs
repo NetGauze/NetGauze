@@ -40,12 +40,12 @@ use crate::iana::{
     TerminationInformationTlvType,
 };
 
-extern crate serde as crate_serde;
-use crate_serde::{Deserialize, Serialize};
+
+use serde::{Deserialize, Serialize};
 
 pub mod iana;
 #[cfg(feature = "serde")]
-pub mod serde;
+pub mod wire;
 
 /// ```text
 /// 0                   1                   2                   3

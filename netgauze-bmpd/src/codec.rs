@@ -19,7 +19,7 @@ use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bmp_pkt::{
     iana::BmpVersion,
-    serde::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
+    wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
     BmpMessage,
 };
 use netgauze_parse_utils::{LocatedParsingError, ReadablePDU, Span, WritablePDU};
