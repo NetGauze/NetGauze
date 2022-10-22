@@ -164,34 +164,8 @@ pub fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
     ret
 }
 
-/// Generate an enum of InformationElementIDs.
-/// The name of the enum includes a `name_prefix` to distinguish between
-/// different names spaces; i.e. IANA vs enterprise space.
-pub fn generate_information_element_ids(
-    name_prefix: String,
-    ie: &Vec<InformationElement>,
-) -> String {
+fn generate_impl_ie_template_for_ie(name_prefix: &String, ie: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
-    ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str("#[repr(u16)]\n");
-    ret.push_str(
-        "#[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n",
-    );
-    ret.push_str(format!("pub enum {}InformationElementId {{\n", name_prefix).as_str());
-    for ie in ie {
-        for line in ie.description.split('\n') {
-            ret.push_str(format!("    /// {}\n", line.trim()).as_str());
-        }
-        if !ie.description.is_empty() && !ie.xrefs.is_empty() {
-            ret.push_str("    ///\n");
-        }
-        for xref in ie.xrefs.iter().filter_map(generate_xref_link) {
-            ret.push_str(format!("    /// Reference: {}\n", xref).as_str());
-        }
-        ret.push_str(format!("    {} = {},\n", ie.name, ie.element_id).as_str());
-    }
-    ret.push_str("}\n\n");
-
     ret.push_str(
         format!(
             "impl super::InformationElementTemplate for {}InformationElementId {{\n",
@@ -278,6 +252,11 @@ pub fn generate_information_element_ids(
     ret.push_str("    }\n\n");
 
     ret.push_str("}\n");
+    ret
+}
+
+fn generate_from_for_ie(name_prefix: &String) -> String {
+    let mut ret = String::new();
     ret.push_str(DEFAULT_STRUCT_DERIVE);
     ret.push_str(
         format!(
@@ -332,6 +311,39 @@ pub fn generate_information_element_ids(
     ret.push_str("       }\n");
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
+    ret
+}
+
+/// Generate an enum of InformationElementIDs.
+/// The name of the enum includes a `name_prefix` to distinguish between
+/// different names spaces; i.e. IANA vs enterprise space.
+pub fn generate_information_element_ids(
+    name_prefix: String,
+    ie: &Vec<InformationElement>,
+) -> String {
+    let mut ret = String::new();
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[repr(u16)]\n");
+    ret.push_str(
+        "#[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n",
+    );
+    ret.push_str(format!("pub enum {}InformationElementId {{\n", name_prefix).as_str());
+    for ie in ie {
+        for line in ie.description.split('\n') {
+            ret.push_str(format!("    /// {}\n", line.trim()).as_str());
+        }
+        if !ie.description.is_empty() && !ie.xrefs.is_empty() {
+            ret.push_str("    ///\n");
+        }
+        for xref in ie.xrefs.iter().filter_map(generate_xref_link) {
+            ret.push_str(format!("    /// Reference: {}\n", xref).as_str());
+        }
+        ret.push_str(format!("    {} = {},\n", ie.name, ie.element_id).as_str());
+    }
+    ret.push_str("}\n\n");
+
+    ret.push_str(generate_impl_ie_template_for_ie(&name_prefix, ie).as_str());
+    ret.push_str(generate_from_for_ie(&name_prefix).as_str());
 
     ret
 }
