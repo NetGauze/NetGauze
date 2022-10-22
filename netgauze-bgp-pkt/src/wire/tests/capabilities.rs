@@ -19,17 +19,7 @@ use crate::{
         ExperimentalCapabilityCode, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
         FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
-    serde::{
-        deserializer::capabilities::{
-            AddPathCapabilityParsingError, BGPCapabilityParsingError,
-            ExtendedNextHopEncodingCapabilityParsingError, FourOctetASCapabilityParsingError,
-            LocatedBGPCapabilityParsingError, LocatedExtendedNextHopEncodingCapabilityParsingError,
-            MultiProtocolExtensionsCapabilityParsingError,
-        },
-        serializer::capabilities::{
-            BGPCapabilityWritingError, ExtendedNextHopEncodingCapabilityWritingError,
-        },
-    },
+    wire::{deserializer::capabilities::*, serializer::capabilities::*},
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, UndefinedAddressFamily, UndefinedSubsequentAddressFamily,

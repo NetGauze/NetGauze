@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    serde::{serializer::BGPMessageWritingError, tests::BGP_MARKER},
+    wire::{serializer::BGPMessageWritingError, tests::BGP_MARKER},
     BGPMessage,
 };
 use netgauze_parse_utils::test_helpers::{

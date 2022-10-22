@@ -40,7 +40,7 @@ use netgauze_parse_utils::{
 
 use crate::{
     iana::{BGPMessageType, UndefinedBgpMessageType},
-    serde::deserializer::{
+    wire::deserializer::{
         notification::BGPNotificationMessageParsingError, open::BGPOpenMessageParsingError,
         route_refresh::BGPRouteRefreshMessageParsingError, update::BGPUpdateMessageParsingError,
     },
@@ -238,20 +238,20 @@ pub enum BGPMessageParsingError {
     BadMessageLength(u16),
 
     BGPOpenMessageParsingError(
-        #[from_located(module = "crate::serde::deserializer::open")] BGPOpenMessageParsingError,
+        #[from_located(module = "crate::wire::deserializer::open")] BGPOpenMessageParsingError,
     ),
 
     BGPUpdateMessageParsingError(
-        #[from_located(module = "crate::serde::deserializer::update")] BGPUpdateMessageParsingError,
+        #[from_located(module = "crate::wire::deserializer::update")] BGPUpdateMessageParsingError,
     ),
 
     BGPNotificationMessageParsingError(
-        #[from_located(module = "crate::serde::deserializer::notification")]
+        #[from_located(module = "crate::wire::deserializer::notification")]
         BGPNotificationMessageParsingError,
     ),
 
     BGPRouteRefreshMessageParsingError(
-        #[from_located(module = "crate::serde::deserializer::route_refresh")]
+        #[from_located(module = "crate::wire::deserializer::route_refresh")]
         BGPRouteRefreshMessageParsingError,
     ),
 }

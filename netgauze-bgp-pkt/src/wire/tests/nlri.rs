@@ -19,19 +19,7 @@ use crate::{
         InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4Unicast, Ipv6Multicast,
         Ipv6Unicast, LabeledIpv6NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
     },
-    serde::{
-        deserializer::nlri::{
-            Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
-            Ipv6UnicastParsingError, LocatedIpv4MulticastParsingError,
-            LocatedIpv4UnicastParsingError, LocatedIpv6MulticastParsingError,
-            LocatedIpv6UnicastParsingError,
-        },
-        serializer::nlri::{
-            Ipv4MplsVpnUnicastWritingError, Ipv4MulticastWritingError, Ipv4UnicastWritingError,
-            Ipv6MulticastWritingError, Ipv6UnicastWritingError, LabeledNextHopWritingError,
-            RouteDistinguisherWritingError,
-        },
-    },
+    wire::{deserializer::nlri::*, serializer::nlri::*},
 };
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_parse_utils::{

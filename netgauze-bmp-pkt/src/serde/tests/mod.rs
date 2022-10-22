@@ -24,7 +24,7 @@ use netgauze_bgp_pkt::{
     notification::{BGPNotificationMessage, CeaseError},
     open::{BGPOpenMessage, BGPOpenMessageParameter},
     path_attribute::{ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute},
-    serde::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
+    wire::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
     update::{BGPUpdateMessage, NetworkLayerReachabilityInformation},
     BGPMessage,
 };

@@ -24,24 +24,7 @@ use crate::{
         CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
-    serde::{
-        deserializer::notification::{
-            BGPNotificationMessageParsingError, CeaseErrorParsingError,
-            FiniteStateMachineErrorParsingError, HoldTimerExpiredErrorParsingError,
-            LocatedBGPNotificationMessageParsingError, LocatedCeaseErrorParsingError,
-            LocatedFiniteStateMachineErrorParsingError, LocatedHoldTimerExpiredErrorParsingError,
-            LocatedMessageHeaderErrorParsingError, LocatedOpenMessageErrorParsingError,
-            LocatedRouteRefreshErrorParsingError, LocatedUpdateMessageErrorParsingError,
-            MessageHeaderErrorParsingError, OpenMessageErrorParsingError,
-            RouteRefreshErrorParsingError, UpdateMessageErrorParsingError,
-        },
-        serializer::notification::{
-            BGPNotificationMessageWritingError, CeaseErrorWritingError,
-            FiniteStateMachineErrorWritingError, HoldTimerExpiredErrorWritingError,
-            MessageHeaderErrorWritingError, OpenMessageErrorWritingError,
-            RouteRefreshErrorWritingError, UpdateMessageErrorWritingError,
-        },
-    },
+    wire::{deserializer::notification::*, serializer::notification::*},
     BGPNotificationMessage,
 };
 use netgauze_parse_utils::{

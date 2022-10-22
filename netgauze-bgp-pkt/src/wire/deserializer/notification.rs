@@ -28,7 +28,7 @@ use crate::{
         CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
-    serde::deserializer::ErrorKindSerdeDeref,
+    wire::deserializer::ErrorKindSerdeDeref,
     BGPNotificationMessage,
 };
 use netgauze_parse_utils::{parse_into_located, ReadablePDU, Span};

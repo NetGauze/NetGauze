@@ -22,7 +22,7 @@ use std::net::Ipv4Addr;
 use crate::{
     capabilities::BGPCapability,
     open::{BGPOpenMessageParameter, BGP_VERSION},
-    serde::{
+    wire::{
         deserializer::open::{BGPOpenMessageParsingError, LocatedBGPOpenMessageParsingError},
         serializer::open::BGPOpenMessageWritingError,
         tests::{BGP_ID, HOLD_TIME, MY_AS},

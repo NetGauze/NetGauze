@@ -14,40 +14,14 @@
 // limitations under the License.
 
 use crate::{
-    path_attribute::{
-        AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AsPathSegmentType, AtomicAggregate, Communities, Community, LocalPreference,
-        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
-        UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
-    },
-    serde::{
-        deserializer::path_attribute::{
-            AggregatorParsingError, AsPathParsingError, AtomicAggregateParsingError,
-            CommunitiesParsingError, LocalPreferenceParsingError, LocatedAggregatorParsingError,
-            LocatedAsPathParsingError, LocatedAtomicAggregateParsingError,
-            LocatedCommunitiesParsingError, LocatedLocalPreferenceParsingError,
-            LocatedMultiExitDiscriminatorParsingError, LocatedNextHopParsingError,
-            LocatedOriginParsingError, LocatedPathAttributeParsingError,
-            MultiExitDiscriminatorParsingError, NextHopParsingError, OriginParsingError,
-            PathAttributeParsingError, UnknownAttributeParsingError,
-        },
-        serializer::path_attribute::{
-            AggregatorWritingError, AsPathWritingError, AtomicAggregateWritingError,
-            CommunitiesWritingError, LocalPreferenceWritingError,
-            MultiExitDiscriminatorWritingError, NextHopWritingError, OriginWritingError,
-            PathAttributeWritingError, UnknownAttributeWritingError,
-        },
-    },
+    path_attribute::*,
+    wire::{deserializer::path_attribute::*, serializer::path_attribute::*},
 };
 
 use crate::{
-    nlri::{
-        InvalidIpv6MulticastNetwork, InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicast, Ipv4Multicast,
-        Ipv4Unicast, Ipv6Multicast, Ipv6Unicast, LabeledIpv6NextHop, LabeledNextHop, MplsLabel,
-        RouteDistinguisher,
-    },
+    nlri::*,
     path_attribute::{MpReach, MpUnreach},
-    serde::{
+    wire::{
         deserializer::{
             nlri::{
                 Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
@@ -66,15 +40,8 @@ use netgauze_iana::address_family::{
     AddressFamily, InvalidAddressType, SubsequentAddressFamily, UndefinedAddressFamily,
     UndefinedSubsequentAddressFamily,
 };
-use netgauze_parse_utils::{
-    test_helpers::{
-        test_parse_error, test_parse_error_with_one_input, test_parse_error_with_two_inputs,
-        test_parsed_completely, test_parsed_completely_with_one_input,
-        test_parsed_completely_with_three_inputs, test_parsed_completely_with_two_inputs,
-        test_write, test_write_with_one_input,
-    },
-    Span,
-};
+use netgauze_parse_utils::{test_helpers::*, Span};
+
 use nom::error::ErrorKind;
 use std::{
     net::{Ipv4Addr, Ipv6Addr},

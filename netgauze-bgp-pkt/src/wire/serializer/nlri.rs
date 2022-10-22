@@ -19,7 +19,7 @@ use crate::{
         Ipv6Unicast, LabeledIpv4NextHop, LabeledIpv6NextHop, LabeledNextHop, MplsLabel,
         RouteDistinguisher,
     },
-    serde::serializer::round_len,
+    wire::serializer::round_len,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;

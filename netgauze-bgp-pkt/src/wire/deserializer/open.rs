@@ -16,7 +16,7 @@
 use crate::{
     iana::{BGPOpenMessageParameterType, UndefinedBGPOpenMessageParameterType},
     open::BGPOpenMessageParameter,
-    serde::deserializer::{capabilities::BGPCapabilityParsingError, ErrorKindSerdeDeref},
+    wire::deserializer::{capabilities::BGPCapabilityParsingError, ErrorKindSerdeDeref},
     BGPOpenMessage,
 };
 use netgauze_parse_utils::{parse_till_empty_into_located, ReadablePDU, Span};
@@ -49,7 +49,7 @@ pub enum BGPParameterParsingError {
     NomError(#[from_nom] ErrorKind),
     UndefinedParameterType(#[from_external] UndefinedBGPOpenMessageParameterType),
     CapabilityError(
-        #[from_located(module = "crate::serde::deserializer::capabilities")]
+        #[from_located(module = "crate::wire::deserializer::capabilities")]
         BGPCapabilityParsingError,
     ),
 }

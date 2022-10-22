@@ -16,8 +16,8 @@
 //! Deserializer for BGP Update message
 
 use crate::{
-    serde::deserializer::{path_attribute::PathAttributeParsingError, Ipv4PrefixParsingError},
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
+    wire::deserializer::{path_attribute::PathAttributeParsingError, Ipv4PrefixParsingError},
     BGPUpdateMessage,
 };
 use ipnet::Ipv4Net;
@@ -28,7 +28,7 @@ use netgauze_parse_utils::{
 use nom::{error::ErrorKind, number::complete::be_u16, IResult};
 use serde::{Deserialize, Serialize};
 
-use crate::serde::deserializer::ErrorKindSerdeDeref;
+use crate::wire::deserializer::ErrorKindSerdeDeref;
 use netgauze_serde_macros::LocatedError;
 
 /// BGP Open Message Parsing errors
@@ -40,7 +40,7 @@ pub enum BGPUpdateMessageParsingError {
     NomError(#[from_nom] ErrorKind),
     WithdrawRouteError(#[from_located(module = "self")] WithdrawRouteParsingError),
     PathAttributeError(
-        #[from_located(module = "crate::serde::deserializer::path_attribute")]
+        #[from_located(module = "crate::wire::deserializer::path_attribute")]
         PathAttributeParsingError,
     ),
     NetworkLayerReachabilityInformationError(
@@ -84,7 +84,7 @@ pub enum WithdrawRouteParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     Ipv4PrefixParsingError(
-        #[from_located(module = "crate::serde::deserializer")] Ipv4PrefixParsingError,
+        #[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError,
     ),
 }
 
@@ -102,7 +102,7 @@ pub enum NetworkLayerReachabilityInformationParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     Ipv4PrefixParsingError(
-        #[from_located(module = "crate::serde::deserializer")] Ipv4PrefixParsingError,
+        #[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError,
     ),
 }
 

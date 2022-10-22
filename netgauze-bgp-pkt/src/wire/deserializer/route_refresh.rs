@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 
 use netgauze_serde_macros::LocatedError;
 
-use crate::serde::deserializer::ErrorKindSerdeDeref;
+use crate::wire::deserializer::ErrorKindSerdeDeref;
 
 /// BGP Route Refresh Message Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]

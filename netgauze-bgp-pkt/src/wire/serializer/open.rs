@@ -22,7 +22,7 @@ use netgauze_serde_macros::WritingError;
 
 use crate::{
     capabilities::BGPCapability, iana::BGPOpenMessageParameterType, open::BGPOpenMessageParameter,
-    serde::serializer::capabilities::BGPCapabilityWritingError, BGPOpenMessage,
+    wire::serializer::capabilities::BGPCapabilityWritingError, BGPOpenMessage,
 };
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]

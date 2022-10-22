@@ -29,7 +29,7 @@ use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
 
 use crate::{
-    serde::{
+    wire::{
         deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
         serializer::{
             notification::BGPNotificationMessageWritingError, open::BGPOpenMessageWritingError,

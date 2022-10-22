@@ -23,7 +23,7 @@ use std::{
 
 use netgauze_bgp_pkt::{
     iana::BGPMessageType,
-    serde::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
+    wire::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
     BGPMessage,
 };
 use netgauze_iana::address_family::{
@@ -257,7 +257,7 @@ pub enum RouteMonitoringMessageParsingError {
     RouteMonitoringMessageError(RouteMonitoringMessageError),
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
     BgpMessageError(
-        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer")] BGPMessageParsingError,
+        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BGPMessageParsingError,
     ),
 }
 
@@ -348,7 +348,7 @@ pub enum PeerHeaderParsingError {
     NomError(#[from_nom] ErrorKind),
     BmpPeerTypeError(#[from_located(module = "self")] BmpPeerTypeParsingError),
     RouteDistinguisherError(
-        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer::nlri")]
+        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer::nlri")]
         RouteDistinguisherParsingError,
     ),
     InvalidTime(u32, u32),
@@ -404,7 +404,7 @@ pub enum PeerUpNotificationMessageParsingError {
     UnexpectedPeerType(BmpPeerTypeCode),
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
     BgpMessageError(
-        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer")] BGPMessageParsingError,
+        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BGPMessageParsingError,
     ),
     InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
 }
@@ -533,7 +533,7 @@ pub enum PeerDownNotificationReasonParsingError {
     NomError(#[from_nom] ErrorKind),
     UndefinedPeerDownReasonCode(#[from_external] UndefinedPeerDownReasonCode),
     BgpMessageError(
-        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer")] BGPMessageParsingError,
+        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BGPMessageParsingError,
     ),
     InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
 }
@@ -636,7 +636,7 @@ pub enum RouteMirroringValueParsingError {
     UndefinedRouteMirroringTlvType(#[from_external] UndefinedRouteMirroringTlvType),
     UndefinedRouteMirroringInformation(#[from_external] UndefinedRouteMirroringInformation),
     BgpMessageError(
-        #[from_located(module = "netgauze_bgp_pkt::serde::deserializer")] BGPMessageParsingError,
+        #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BGPMessageParsingError,
     ),
 }
 

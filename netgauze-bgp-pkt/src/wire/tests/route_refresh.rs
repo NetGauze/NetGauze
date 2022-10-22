@@ -15,7 +15,7 @@
 
 use crate::{
     iana::{RouteRefreshSubcode, UndefinedRouteRefreshSubcode},
-    serde::{
+    wire::{
         deserializer::route_refresh::{
             BGPRouteRefreshMessageParsingError, LocatedBGPRouteRefreshMessageParsingError,
         },

@@ -23,14 +23,7 @@ use crate::{
         MpUnreach, MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
         UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
     },
-    serde::deserializer::{
-        nlri::{
-            Ipv4MplsVpnUnicastParsingError, Ipv4MulticastParsingError, Ipv4UnicastParsingError,
-            Ipv6MplsVpnUnicastParsingError, Ipv6MulticastParsingError, Ipv6UnicastParsingError,
-            LabeledNextHopParsingError,
-        },
-        ErrorKindSerdeDeref,
-    },
+    wire::deserializer::{nlri::*, ErrorKindSerdeDeref},
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
@@ -556,25 +549,25 @@ pub enum MpReachParsingError {
     /// MP-BGP is not yet implemented for the given address type
     UnknownAddressType(AddressType),
     Ipv4UnicastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4UnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
     ),
     Ipv4MulticastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MulticastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MulticastParsingError,
     ),
     Ipv4MplsVpnUnicastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
     ),
     Ipv6UnicastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6UnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastParsingError,
     ),
     Ipv6MulticastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MulticastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MulticastParsingError,
     ),
     Ipv6MplsVpnUnicastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MplsVpnUnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MplsVpnUnicastParsingError,
     ),
     LabeledNextHopError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] LabeledNextHopParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] LabeledNextHopParsingError,
     ),
 }
 
@@ -760,22 +753,22 @@ pub enum MpUnreachParsingError {
     /// MP-BGP is not yet implemented for the given address type
     UnknownAddressType(AddressType),
     Ipv4UnicastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4UnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
     ),
     Ipv4MulticastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MulticastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MulticastParsingError,
     ),
     Ipv4MplsVpnUnicastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
     ),
     Ipv6UnicastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6UnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastParsingError,
     ),
     Ipv6MulticastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MulticastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MulticastParsingError,
     ),
     Ipv6MplsVpnUnicastError(
-        #[from_located(module = "crate::serde::deserializer::nlri")] Ipv6MplsVpnUnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MplsVpnUnicastParsingError,
     ),
 }
 

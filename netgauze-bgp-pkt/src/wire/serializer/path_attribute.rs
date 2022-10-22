@@ -27,7 +27,7 @@ use crate::{
         MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
         UnknownAttribute,
     },
-    serde::serializer::nlri::{
+    wire::serializer::nlri::{
         Ipv4MplsVpnUnicastWritingError, Ipv4MulticastWritingError, Ipv4UnicastWritingError,
         Ipv6MplsVpnUnicastWritingError, Ipv6MulticastWritingError, Ipv6UnicastWritingError,
         LabeledNextHopWritingError, IPV4_LEN, IPV6_LEN,

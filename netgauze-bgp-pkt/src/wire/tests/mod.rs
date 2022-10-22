@@ -24,7 +24,7 @@ use crate::{
     },
     notification::CeaseError,
     open::{BGPOpenMessageParameter, BGP_VERSION},
-    serde::{
+    wire::{
         deserializer::{
             notification::{BGPNotificationMessageParsingError, CeaseErrorParsingError},
             route_refresh::BGPRouteRefreshMessageParsingError,

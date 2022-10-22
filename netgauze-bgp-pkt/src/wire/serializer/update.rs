@@ -16,8 +16,8 @@
 //! Serializer for BGP Update message
 
 use crate::{
-    serde::serializer::{path_attribute::PathAttributeWritingError, round_len},
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
+    wire::serializer::{path_attribute::PathAttributeWritingError, round_len},
     BGPUpdateMessage,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};

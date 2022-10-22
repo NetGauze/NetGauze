@@ -21,7 +21,7 @@ use crate::{
         Ipv6MplsVpnUnicast, Ipv6Multicast, Ipv6Unicast, LabeledIpv4NextHop, LabeledIpv6NextHop,
         LabeledNextHop, MplsLabel, RouteDistinguisher,
     },
-    serde::{
+    wire::{
         deserializer::{ErrorKindSerdeDeref, Ipv4PrefixParsingError, Ipv6PrefixParsingError},
         serializer::nlri::{LABELED_IPV4_LEN, LABELED_IPV6_LEN, RD_LEN},
     },
@@ -254,7 +254,7 @@ impl<'a> ReadablePDU<'a, LocatedIpv6MplsVpnUnicastParsingError<'a>> for Ipv6Mpls
 pub enum Ipv6UnicastParsingError {
     Ipv6PrefixError(
         #[from_external]
-        #[from_located(module = "crate::serde::deserializer")]
+        #[from_located(module = "crate::wire::deserializer")]
         Ipv6PrefixParsingError,
     ),
     InvalidUnicastNetwork(#[from_external] InvalidIpv6UnicastNetwork),
@@ -289,7 +289,7 @@ pub enum Ipv6MulticastParsingError {
     /// additional information.
     Ipv6PrefixError(
         #[from_external]
-        #[from_located(module = "crate::serde::deserializer")]
+        #[from_located(module = "crate::wire::deserializer")]
         Ipv6PrefixParsingError,
     ),
     InvalidMulticastNetwork(#[from_external] InvalidIpv6MulticastNetwork),
@@ -308,7 +308,7 @@ pub enum Ipv4UnicastParsingError {
     /// additional information.
     Ipv4PrefixError(
         #[from_external]
-        #[from_located(module = "crate::serde::deserializer")]
+        #[from_located(module = "crate::wire::deserializer")]
         Ipv4PrefixParsingError,
     ),
     InvalidUnicastNetwork(#[from_external] InvalidIpv4UnicastNetwork),
@@ -343,7 +343,7 @@ pub enum Ipv4MulticastParsingError {
     /// additional information.
     Ipv4PrefixError(
         #[from_external]
-        #[from_located(module = "crate::serde::deserializer")]
+        #[from_located(module = "crate::wire::deserializer")]
         Ipv4PrefixParsingError,
     ),
     InvalidMulticastNetwork(#[from_external] InvalidIpv4MulticastNetwork),

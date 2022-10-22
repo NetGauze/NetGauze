@@ -17,7 +17,7 @@
 
 use crate::{iana::*, *};
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_bgp_pkt::serde::serializer::{
+use netgauze_bgp_pkt::wire::serializer::{
     nlri::RouteDistinguisherWritingError, BGPMessageWritingError,
 };
 use netgauze_parse_utils::WritablePDU;

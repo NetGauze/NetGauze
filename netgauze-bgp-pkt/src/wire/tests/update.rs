@@ -14,7 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    serde::{
+    update::{NetworkLayerReachabilityInformation, WithdrawRoute},
+    wire::{
         deserializer::{
             update::{LocatedWithdrawRouteParsingError, WithdrawRouteParsingError},
             Ipv4PrefixParsingError,
@@ -24,7 +25,6 @@ use crate::{
             BGPMessageWritingError,
         },
     },
-    update::{NetworkLayerReachabilityInformation, WithdrawRoute},
     BGPMessage, BGPUpdateMessage,
 };
 use ipnet::Ipv4Net;
