@@ -17,11 +17,20 @@
 
 use crate::{InformationElement, SimpleRegistry, Xref};
 
-const DEFAULT_ENUM_DERIVE: &str = "#[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
-const DEFAULT_STRUCT_DERIVE: &str =
-    "#[derive(Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
-const STRUCT_DERIVE_NO_COPY_NO_EQ: &str =
-    "#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]\n";
+fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
+    let mut base = "".to_string();
+    if num_enum {
+        base.push_str("strum_macros::Display, strum_macros::FromRepr, ");
+    }
+    if copy {
+        base.push_str("Copy, ");
+    }
+    if eq {
+        base.push_str("Eq, ");
+    }
+    base.push_str("Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize");
+    format!("#[derive({})]\n", base)
+}
 
 /// Convert [Xref] to markdown link
 fn generate_xref_link(xref: &Xref) -> Option<String> {
@@ -47,7 +56,7 @@ pub(crate) fn generate_ie_data_type(data_types: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(DEFAULT_ENUM_DERIVE);
+    ret.push_str(generate_derive(true, true, true).as_str());
     ret.push_str("pub enum InformationElementDataType {\n");
     for x in data_types.iter() {
         for xref in x.xref.iter().filter_map(generate_xref_link) {
@@ -64,7 +73,7 @@ pub(crate) fn generate_ie_units(entries: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(DEFAULT_ENUM_DERIVE);
+    ret.push_str(generate_derive(true, true, true).as_str());
     ret.push_str("pub enum InformationElementUnits {\n");
     for entry in entries.iter() {
         ret.push('\n');
@@ -92,7 +101,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(DEFAULT_ENUM_DERIVE);
+    ret.push_str(generate_derive(true, true, true).as_str());
     ret.push_str("pub enum InformationElementSemantics {\n");
     for x in data_types.iter() {
         ret.push('\n');
@@ -172,10 +181,17 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
                         for part in x.split('-') {
                             parts.push(part)
                         }
+                        let start = parts.first().expect("Couldn't parse units range");
+                        let end = parts.get(1).unwrap().trim();
+                        let end = if end.starts_with("0x") {
+                            u64::from_str_radix(end.trim_start_matches("0x"), 16).unwrap()
+                        } else {
+                            end.parse::<u64>().unwrap()
+                        };
                         format!(
-                            "Some(std::ops::Range{{start: {}, end: {} + 1}})",
-                            parts.first().unwrap(),
-                            parts.get(1).unwrap()
+                            "Some(std::ops::Range{{start: {}, end: {}}})",
+                            start,
+                            end + 1
                         )
                     })
                     .unwrap_or_else(|| "None".to_string())
@@ -192,7 +208,7 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
 
 fn generate_from_for_ie() -> String {
     let mut ret = String::new();
-    ret.push_str(DEFAULT_STRUCT_DERIVE);
+    ret.push_str(generate_derive(false, true, true).as_str());
     ret.push_str("pub struct UndefinedInformationElementId(pub u16);\n");
 
     ret.push_str("impl From<InformationElementId> for u16 {\n");
@@ -219,7 +235,7 @@ pub(crate) fn generate_information_element_ids(ie: &Vec<InformationElement>) -> 
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u16)]\n");
-    ret.push_str(DEFAULT_ENUM_DERIVE);
+    ret.push_str(generate_derive(true, true, true).as_str());
     ret.push_str("pub enum InformationElementId {\n");
     for ie in ie {
         for line in ie.description.split('\n') {
@@ -247,7 +263,7 @@ pub(crate) fn generate_ie_status() -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(DEFAULT_ENUM_DERIVE);
+    ret.push_str(generate_derive(true, true, true).as_str());
     ret.push_str("pub enum InformationElementStatus {\n");
     ret.push_str("    current = 0,\n");
     ret.push_str("    deprecated = 1,\n");
@@ -288,9 +304,7 @@ fn generate_ie_try_from_pen_code(name_prefixes: &Vec<(String, String, u32)>) -> 
         ret.push_str("                }\n");
         ret.push_str("            }\n");
     }
-    ret.push_str(
-        "           unknown => Ok(InformationElementId::Unknown{pen: unknown, code: code}),\n",
-    );
+    ret.push_str("           unknown => Ok(InformationElementId::Unknown{pen: unknown, code}),\n");
     ret.push_str("       }\n");
     ret.push_str("   }\n");
     ret.push_str("}\n");
@@ -343,7 +357,7 @@ fn generate_ie_template_trait_for_ie(name_prefixes: &Vec<(String, String, u32)>)
 fn generate_ie_record_enum_for_ie(name_prefixes: &Vec<(String, String, u32)>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(STRUCT_DERIVE_NO_COPY_NO_EQ);
+    ret.push_str(generate_derive(false, false, false).as_str());
     ret.push_str("pub enum Record {\n");
     ret.push_str("    Unknown(Vec<u8>),\n");
     for (name, pkg, _) in name_prefixes {
@@ -356,7 +370,7 @@ fn generate_ie_record_enum_for_ie(name_prefixes: &Vec<(String, String, u32)>) ->
 pub(crate) fn generate_ie_ids(name_prefixes: &Vec<(String, String, u32)>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(DEFAULT_STRUCT_DERIVE);
+    ret.push_str(generate_derive(false, true, true).as_str());
     ret.push_str("pub enum InformationElementId {\n");
     for (name, pkg, _) in name_prefixes {
         ret.push_str("    Unknown{pen: u32, code: u16},\n");
@@ -364,7 +378,7 @@ pub(crate) fn generate_ie_ids(name_prefixes: &Vec<(String, String, u32)>) -> Str
     }
     ret.push_str("}\n");
 
-    ret.push_str(DEFAULT_STRUCT_DERIVE);
+    ret.push_str(generate_derive(false, true, true).as_str());
     ret.push_str("pub enum InformationElementIdError {\n");
     for (name, pkg, _) in name_prefixes {
         ret.push_str(format!("    {}({}::UndefinedInformationElementId),\n", name, pkg).as_str());
@@ -378,6 +392,8 @@ pub(crate) fn generate_ie_ids(name_prefixes: &Vec<(String, String, u32)>) -> Str
     ret
 }
 
+/// Held out temporary, we might not need this
+#[allow(dead_code)]
 fn generate_ie_value_converters(rust_type: &str, ie_name: &String) -> String {
     let mut ret = String::new();
     match rust_type {
@@ -831,7 +847,7 @@ pub(crate) fn generate_pkg_ie_deserializers(ies: &Vec<InformationElement>) -> St
 fn generate_records_enum(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(STRUCT_DERIVE_NO_COPY_NO_EQ);
+    ret.push_str(generate_derive(false, false, false).as_str());
     ret.push_str("pub enum Record {\n");
     for ie in ies {
         ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
@@ -875,10 +891,17 @@ pub(crate) fn generate_ie_values(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         let rust_type = get_rust_type(&ie.data_type);
         ret.push_str("#[allow(non_camel_case_types)]\n");
-        ret.push_str(STRUCT_DERIVE_NO_COPY_NO_EQ);
+        let generate_derive = generate_derive(
+            false,
+            rust_type != "Vec<u8>" && rust_type != "String",
+            rust_type != "f32" && rust_type != "f64",
+        );
+        ret.push_str(generate_derive.as_str());
         ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
 
-        ret.push_str(generate_ie_value_converters(&rust_type, &ie.name).as_str());
+        // TODO: check if value converters are needed
+        //ret.push_str(generate_ie_value_converters(&rust_type,
+        // &ie.name).as_str());
     }
     ret.push_str(generate_records_enum(ies).as_str());
     ret
