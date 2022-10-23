@@ -28,16 +28,10 @@ use nom::{
     IResult,
 };
 
-#[allow(non_camel_case_types)]
-#[derive(
-    netgauze_serde_macros::LocatedError,
-    Eq,
-    PartialEq,
-    Clone,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-)]
+use netgauze_serde_macros::LocatedError;
+use serde::{Deserialize, Serialize};
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FieldParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -80,16 +74,7 @@ impl<'a> ReadablePDU<'a, LocatedFieldParsingError<'a>> for FieldSpecifier {
     }
 }
 
-#[allow(non_camel_case_types)]
-#[derive(
-    netgauze_serde_macros::LocatedError,
-    Eq,
-    PartialEq,
-    Clone,
-    Debug,
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FlowParsingError {
     RecordError(#[from_located(module = "")] ie::RecordParsingError),
 }
