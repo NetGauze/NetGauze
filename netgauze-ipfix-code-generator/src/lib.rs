@@ -1068,8 +1068,6 @@ pub fn generate_ie_values_deserializers(
         }
         let value_name = format!("{}{}", name_prefix, ie.name);
         ret.push_str(format!("            InformationElementId::{} => {{\n", value_name).as_str());
-        //ret.push_str("                let (buf, value) =
-        // netgauze_parse_utils::parse_into_located(buf)?;\n");
         ret.push_str(format!("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input::<'_, u16, Located{}ParsingError<'_>, Located{}ParsingError<'_>, {}>(buf, length)?;\n", value_name, ty_name, value_name).as_str());
         ret.push_str(format!("                (buf, Record::{}(value))\n", value_name).as_str());
         ret.push_str("            }\n");
