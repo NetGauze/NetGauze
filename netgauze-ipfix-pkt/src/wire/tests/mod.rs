@@ -13,11 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    ie,
-    wire::deserializer::{ie as ie_desr, FieldParsingError},
-    Field, InformationElementTemplate,
-};
+use crate::{ie, wire::deserializer::ie as ie_desr, Field};
 use netgauze_parse_utils::{test_helpers::*, Span};
 
 #[test]
