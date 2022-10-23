@@ -940,7 +940,10 @@ pub fn generate_ie_deserializer(rust_type: &str, name_prefix: &String, ie_name: 
     ret
 }
 
-pub fn generate_ie_deserializers(name_prefix: &String, ies: &Vec<InformationElement>) -> String {
+pub fn generate_pkg_ie_deserializers(
+    name_prefix: &String,
+    ies: &Vec<InformationElement>,
+) -> String {
     let mut ret = String::new();
     ret.push_str(format!("use crate::ie::{}::*;\n\n", "iana").as_str());
 
@@ -1075,6 +1078,63 @@ pub fn generate_ie_values_deserializers(
     ret.push_str("            _ => todo!(\"Handle deser for IE\")\n");
     ret.push_str("        };\n");
     ret.push_str("       Ok((buf, value))\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n");
+    ret
+}
+
+pub fn generate_ie_record_enum_for_ie_deserializer(
+    name_prefixes: &Vec<(String, String, u32)>,
+) -> String {
+    let mut ret = String::new();
+    let ty_name = "Record";
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
+    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
+    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
+    for (name, pkg, _) in name_prefixes {
+        let value_name = format!("{}::RecordParsingError", pkg);
+        ret.push_str(
+            format!(
+                "    {}Error(#[from_located(module = \"\")] {}),\n",
+                name, value_name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("}\n");
+    ret.push_str("\n\n");
+
+    ret.push_str("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, LocatedRecordParsingError<'a>>\n");
+    ret.push_str("for Record {\n");
+    ret.push_str("    fn from_wire(\n");
+    ret.push_str("        buf: netgauze_parse_utils::Span<'a>,\n");
+    ret.push_str("        ie: &InformationElementId,\n");
+    ret.push_str("        length: u16,\n");
+    ret.push_str("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedRecordParsingError<'a>> {\n");
+    ret.push_str("        let (buf, value) = match ie {\n");
+    for (name, _, _) in name_prefixes {
+        ret.push_str(
+            format!(
+                "            InformationElementId::{}(value_ie) => {{\n",
+                name
+            )
+            .as_str(),
+        );
+        ret.push_str("                let (buf, value) = netgauze_parse_utils::parse_into_located_two_inputs(buf, value_ie, length)?;\n");
+        ret.push_str(
+            format!(
+                "                (buf, crate::ie::Record::{}(value))\n",
+                name
+            )
+            .as_str(),
+        );
+        ret.push_str("            }\n");
+    }
+    ret.push_str("            _ => todo!(),\n");
+    ret.push_str("        };\n");
+    ret.push_str("        Ok((buf, value))\n");
     ret.push_str("    }\n");
     ret.push_str("}\n");
     ret
