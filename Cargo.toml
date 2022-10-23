@@ -6,6 +6,7 @@ members = [
     "netgauze-bmp-pkt",
     "netgauze-iana",
     "netgauze-ipfix-code-generator",
+    "netgauze-ipfix-pkt",
     "netgauze-locate",
     "netgauze-parse-utils",
     "netgauze-serde-macros",
