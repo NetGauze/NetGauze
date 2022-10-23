@@ -943,10 +943,13 @@ pub fn generate_ie_deserializer(rust_type: &str, name_prefix: &String, ie_name: 
 pub fn generate_ie_deserializers(name_prefix: &String, ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str(format!("use crate::ie::{}::*;\n\n", "iana").as_str());
+
     for ie in ies {
         let rust_type = get_rust_type(&ie.data_type);
         ret.push_str(generate_ie_deserializer(&rust_type, name_prefix, &ie.name).as_str());
     }
+
+    ret.push_str(generate_ie_values_deserializers(name_prefix, ies).as_str());
     ret
 }
 
@@ -1009,5 +1012,72 @@ pub fn generate_ie_values(name_prefix: String, ies: &Vec<InformationElement>) ->
         ret.push_str(generate_ie_value_converters(&rust_type, &name_prefix, &ie.name).as_str());
     }
     ret.push_str(generate_records_enum(&name_prefix, ies).as_str());
+    ret
+}
+
+pub fn generate_ie_values_deserializers(
+    name_prefix: &str,
+    ies: &Vec<InformationElement>,
+) -> String {
+    let mut ret = String::new();
+    let ty_name = format!("{}Record", name_prefix);
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
+    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
+    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
+    for ie in ies {
+        // TODO don't skip data types once we deserialize all of them
+        let rust_type = get_rust_type(&ie.data_type);
+        if rust_type.as_str() == "std::net::Ipv4Addr"
+            || rust_type.as_str() == "std::net::Ipv6Addr"
+            || rust_type.as_str() == "chrono::DateTime<chrono::Utc>"
+            || rust_type.as_str() == "Vec<u8>"
+        {
+            continue;
+        }
+        let value_name = format!("{}{}", name_prefix, ie.name);
+        ret.push_str(
+            format!(
+                "    {}Error(#[from_located(module = \"self\")] {}ParsingError),\n",
+                value_name, value_name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("}\n");
+    ret.push_str("\n\n");
+
+    ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, Located{}ParsingError<'a>>\n", ty_name).as_str());
+    ret.push_str(format!("for {} {{\n", ty_name).as_str());
+    ret.push_str("    fn from_wire(\n");
+    ret.push_str("        buf: netgauze_parse_utils::Span<'a>,\n");
+    ret.push_str("        ie: &InformationElementId,\n");
+    ret.push_str("        length: u16,\n");
+    ret.push_str(format!("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{}ParsingError<'a>> {{\n", ty_name).as_str());
+    ret.push_str("        let (buf, value) = match ie {\n");
+    for ie in ies {
+        // TODO don't skip data types once we deserialize all of them
+        let rust_type = get_rust_type(&ie.data_type);
+        if rust_type.as_str() == "std::net::Ipv4Addr"
+            || rust_type.as_str() == "std::net::Ipv6Addr"
+            || rust_type.as_str() == "chrono::DateTime<chrono::Utc>"
+            || rust_type.as_str() == "Vec<u8>"
+        {
+            continue;
+        }
+        let value_name = format!("{}{}", name_prefix, ie.name);
+        ret.push_str(format!("            InformationElementId::{} => {{\n", value_name).as_str());
+        //ret.push_str("                let (buf, value) =
+        // netgauze_parse_utils::parse_into_located(buf)?;\n");
+        ret.push_str(format!("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input::<'_, u16, Located{}ParsingError<'_>, Located{}ParsingError<'_>, {}>(buf, length)?;\n", value_name, ty_name, value_name).as_str());
+        ret.push_str(format!("                (buf, Record::{}(value))\n", value_name).as_str());
+        ret.push_str("            }\n");
+    }
+    ret.push_str("            _ => todo!(\"Handle deser for IE\")\n");
+    ret.push_str("        };\n");
+    ret.push_str("       Ok((buf, value))\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n");
     ret
 }
