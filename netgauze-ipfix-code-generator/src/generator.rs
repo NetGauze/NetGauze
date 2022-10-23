@@ -17,10 +17,10 @@
 
 use crate::{InformationElement, SimpleRegistry, Xref};
 
-pub const DEFAULT_ENUM_DERIVE: &str = "#[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
-pub const DEFAULT_STRUCT_DERIVE: &str =
+const DEFAULT_ENUM_DERIVE: &str = "#[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
+const DEFAULT_STRUCT_DERIVE: &str =
     "#[derive(Copy, Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]\n";
-pub const STRUCT_DERIVE_NO_COPY_NO_EQ: &str =
+const STRUCT_DERIVE_NO_COPY_NO_EQ: &str =
     "#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]\n";
 
 /// Convert [Xref] to markdown link
