@@ -402,8 +402,8 @@ fn test_data_packet() {
                     ie::Record::IANA(ie::iana::Record::flowEndSysUpTime(
                         ie::iana::flowEndSysUpTime(0xb3f9af3c),
                     )),
-                    ie::Record::IANA(ie::iana::Record::sourceIPv4PrefixLength(
-                        ie::iana::sourceIPv4PrefixLength(Ipv4Addr::new(204, 42, 110, 189)),
+                    ie::Record::IANA(ie::iana::Record::ipNextHopIPv4Address(
+                        ie::iana::ipNextHopIPv4Address(Ipv4Addr::new(204, 42, 110, 189)),
                     )),
                     ie::Record::IANA(ie::iana::Record::sourceIPv4PrefixLength(
                         ie::iana::sourceIPv4PrefixLength(24),
