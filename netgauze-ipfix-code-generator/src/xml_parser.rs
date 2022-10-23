@@ -16,19 +16,18 @@
 use crate::{InformationElement, SimpleRegistry, Xref};
 use roxmltree::{ExpandedName, Node};
 
-pub const IPFIX_URL: &str = "https://www.iana.org/assignments/ipfix/ipfix.xml";
-pub const IANA_NAMESPACE: &str = "http://www.iana.org/assignments";
-pub const ID_IE_DATA_TYPES: &str = "ipfix-information-element-data-types";
-pub const ID_IE: &str = "ipfix-information-elements";
-pub const ID_SEMANTICS: &str = "ipfix-information-element-semantics";
-pub const ID_UNITS: &str = "ipfix-information-element-units";
-pub const UNASSIGNED: &str = "Unassigned";
-pub const RESERVED: &str = "Reserved";
-pub const ASSIGNED_FOR_NF_V9: &str = "Assigned for NetFlow v9 compatibility";
+const IANA_NAMESPACE: &str = "http://www.iana.org/assignments";
+const ID_IE_DATA_TYPES: &str = "ipfix-information-element-data-types";
+pub(crate) const ID_IE: &str = "ipfix-information-elements";
+const ID_SEMANTICS: &str = "ipfix-information-element-semantics";
+const ID_UNITS: &str = "ipfix-information-element-units";
+const UNASSIGNED: &str = "Unassigned";
+const RESERVED: &str = "Reserved";
+const ASSIGNED_FOR_NF_V9: &str = "Assigned for NetFlow v9 compatibility";
 
 /// Find descendant node by it's ID
 /// If multiple nodes with the same ID exists, the first one is returned
-pub fn find_node_by_id<'a, 'input>(
+pub(crate) fn find_node_by_id<'a, 'input>(
     node: &'input Node<'a, 'input>,
     id: &str,
 ) -> Option<Node<'a, 'input>> {
@@ -38,7 +37,7 @@ pub fn find_node_by_id<'a, 'input>(
 /// Get the text value of an XML node if applicable
 /// For example `<a>bb</a>` returns `Some("bb".to_string())`,
 /// while `<a><b/></a>` returns `None`
-pub fn get_string_child<'a, 'input>(
+fn get_string_child<'a, 'input>(
     node: &'input Node<'a, 'input>,
     tag_name: ExpandedName,
 ) -> Option<String> {
@@ -49,7 +48,7 @@ pub fn get_string_child<'a, 'input>(
 }
 
 /// Parse tags such as `<xref type="rfc">rfc1233</xref>`
-pub fn parse_xref<'a, 'input>(node: &'input Node<'a, 'input>) -> Vec<Xref> {
+fn parse_xref<'a, 'input>(node: &'input Node<'a, 'input>) -> Vec<Xref> {
     let children = node
         .children()
         .filter(|x| x.tag_name() == (IANA_NAMESPACE, "xref").into())
@@ -68,7 +67,9 @@ pub fn parse_xref<'a, 'input>(node: &'input Node<'a, 'input>) -> Vec<Xref> {
 /// Parse simple registries with just value, name (description), and optionally
 /// a comment [IPFIX Information Element Data Types](https://www.iana.org/assignments/ipfix/ipfix.xml#ipfix-information-element-data-types)
 /// And [IPFIX Information Element Semantics](https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-information-element-semantics)
-pub fn parse_simple_registry<'a, 'input>(node: &'input Node<'a, 'input>) -> Vec<SimpleRegistry> {
+pub(crate) fn parse_simple_registry<'a, 'input>(
+    node: &'input Node<'a, 'input>,
+) -> Vec<SimpleRegistry> {
     let children = node
         .children()
         .filter(|x| x.tag_name() == (IANA_NAMESPACE, "record").into())
@@ -135,7 +136,7 @@ pub fn parse_description_string<'a, 'input>(node: &'input Node<'a, 'input>) -> O
     }
 }
 
-pub fn parse_information_elements<'a, 'input>(
+pub(crate) fn parse_information_elements<'a, 'input>(
     node: &'input Node<'a, 'input>,
 ) -> Vec<InformationElement> {
     let children = node
@@ -219,7 +220,7 @@ pub fn parse_information_elements<'a, 'input>(
 }
 
 /// Parse data types, data type semantics, and units registries
-pub fn parse_iana_common_values<'a, 'input>(
+pub(crate) fn parse_iana_common_values<'a, 'input>(
     iana_root: &'input Node<'a, 'input>,
 ) -> (
     Vec<SimpleRegistry>,
