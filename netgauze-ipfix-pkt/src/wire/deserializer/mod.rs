@@ -16,9 +16,12 @@
 pub mod ie;
 
 use crate::{
-    ie::InformationElementTemplate, Field, InformationElementId, InformationElementIdError,
+    ie::InformationElementTemplate, FieldSpecifier, Flow, InformationElementId,
+    InformationElementIdError,
 };
-use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePDU, Span};
+use netgauze_parse_utils::{
+    parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, Span,
+};
 use nom::{
     error::ErrorKind,
     number::complete::{be_u16, be_u32},
@@ -42,7 +45,7 @@ pub enum FieldParsingError {
     InvalidLength(u16),
 }
 
-impl<'a> ReadablePDU<'a, LocatedFieldParsingError<'a>> for Field {
+impl<'a> ReadablePDU<'a, LocatedFieldParsingError<'a>> for FieldSpecifier {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedFieldParsingError<'a>> {
         let input = buf;
         let (buf, code) = be_u16(buf)?;
@@ -73,6 +76,37 @@ impl<'a> ReadablePDU<'a, LocatedFieldParsingError<'a>> for Field {
                 FieldParsingError::InvalidLength(length),
             )));
         }
-        Ok((buf, Field::new(ie, length)))
+        Ok((buf, FieldSpecifier::new(ie, length)))
+    }
+}
+
+#[allow(non_camel_case_types)]
+#[derive(
+    netgauze_serde_macros::LocatedError,
+    Eq,
+    PartialEq,
+    Clone,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum FlowParsingError {
+    RecordError(#[from_located(module = "")] ie::RecordParsingError),
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, &[FieldSpecifier], LocatedFlowParsingError<'a>> for Flow {
+    fn from_wire(
+        buf: Span<'a>,
+        fields: &[FieldSpecifier],
+    ) -> IResult<Span<'a>, Self, LocatedFlowParsingError<'a>> {
+        let mut buf = buf;
+        let mut records = Vec::<crate::ie::Record>::with_capacity(fields.len());
+        for field in fields {
+            let (t, record) =
+                parse_into_located_two_inputs(buf, &field.element_id(), field.length)?;
+            buf = t;
+            records.push(record);
+        }
+        Ok((buf, Flow::new(records)))
     }
 }
