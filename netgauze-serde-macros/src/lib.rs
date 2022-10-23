@@ -161,13 +161,28 @@ impl LocatedError {
                     if let syn::Type::Path(path) = &field.ty {
                         let located_variants = variant.ident.clone();
                         let ident = path.path.get_ident();
-                        let located_ident = match ident {
-                            Some(ident) => format_ident!("Located{}", ident.clone()),
+                        let (ident_module, located_ident) = match ident {
+                            Some(ident) => (None, format_ident!("Located{}", ident.clone())),
                             None => {
-                                return Err(syn::Error::new(
-                                    attr.span(),
-                                    "Couldn't find identifier for this attribute",
-                                ))
+                                let path = path
+                                    .path
+                                    .segments
+                                    .iter()
+                                    .map(|x| x.ident.to_string())
+                                    .collect::<Vec<String>>();
+                                let ident_string = path.join("::");
+                                let ident_module = ident_string
+                                    [..ident_string.rfind("::").unwrap_or(0)]
+                                    .to_string();
+                                let ident_module = if ident_module.is_empty() {
+                                    None
+                                } else {
+                                    Some(ident_module)
+                                };
+                                let located_ident = ident_string
+                                    [ident_string.rfind("::").map(|x| x + 2).unwrap_or(0)..]
+                                    .to_string();
+                                (ident_module, format_ident!("Located{}", located_ident))
                             }
                         };
 
@@ -193,8 +208,14 @@ impl LocatedError {
                                                     format!("Only accepts one attribute 'module', found {:?}", name_value.ident),
                                                 ));
                                         }
-                                        name_value
-                                            .value
+                                        let mut module_path = name_value.value.clone();
+                                        if let Some(path) = ident_module {
+                                            if !module_path.is_empty() {
+                                                module_path.push_str("::");
+                                            }
+                                            module_path.push_str(path.as_str());
+                                        }
+                                        module_path
                                             .split("::")
                                             .map(|part| format_ident!("{}", part))
                                             .collect()
