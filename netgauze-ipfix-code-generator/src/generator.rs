@@ -920,10 +920,23 @@ fn generate_date_time_micro(ie_name: &String) -> String {
     ret
 }
 
+fn generate_vec_u8_deserializer(ie_name: &String) -> String {
+    let mut ret = String::new();
+    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let header = get_deserializer_header(ie_name.as_str());
+    ret.push_str(std_error.as_str());
+    ret.push_str(header.as_str());
+    ret.push_str("        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;\n");
+    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
 fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
     let mut ret = String::new();
     let gen = match data_type {
-        "octetArray" => "".to_string(),
+        "octetArray" => generate_vec_u8_deserializer(ie_name),
         "unsigned8" => generate_u8_deserializer(ie_name),
         "unsigned16" => generate_u16_deserializer(ie_name),
         "unsigned32" => generate_u32_deserializer(ie_name),
@@ -945,9 +958,10 @@ fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
         "dateTimeNanoseconds" => generate_date_time_micro(ie_name),
         "ipv4Address" => generate_ipv4_deserializer(ie_name),
         "ipv6Address" => generate_ipv6_deserializer(ie_name),
-        "basicList" => "".to_string(),
-        "subTemplateList" => "".to_string(),
-        "subTemplateMultiList" => "".to_string(),
+        // TODO: better parsing for IPFIX structured Data
+        "basicList" => generate_vec_u8_deserializer(ie_name),
+        "subTemplateList" => generate_vec_u8_deserializer(ie_name),
+        "subTemplateMultiList" => generate_vec_u8_deserializer(ie_name),
         ty => todo!("Unsupported deserialization for type: {}", ty),
     };
     ret.push_str(gen.as_str());
@@ -1039,11 +1053,6 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     for ie in ies {
-        // TODO don't skip data types once we deserialize all of them
-        let rust_type = get_rust_type(&ie.data_type);
-        if rust_type.as_str() == "Vec<u8>" {
-            continue;
-        }
         ret.push_str(
             format!(
                 "    {}Error(#[from_located(module = \"self\")] {}ParsingError),\n",
@@ -1064,17 +1073,11 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     ret.push_str(format!("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{}ParsingError<'a>> {{\n", ty_name).as_str());
     ret.push_str("        let (buf, value) = match ie {\n");
     for ie in ies {
-        // TODO don't skip data types once we deserialize all of them
-        let rust_type = get_rust_type(&ie.data_type);
-        if rust_type.as_str() == "Vec<u8>" {
-            continue;
-        }
         ret.push_str(format!("            InformationElementId::{} => {{\n", ie.name).as_str());
         ret.push_str(format!("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input::<'_, u16, Located{}ParsingError<'_>, Located{}ParsingError<'_>, {}>(buf, length)?;\n", ie.name, ty_name, ie.name).as_str());
         ret.push_str(format!("                (buf, Record::{}(value))\n", ie.name).as_str());
         ret.push_str("            }\n");
     }
-    ret.push_str("            _ => todo!(\"Handle deser for IE\")\n");
     ret.push_str("        };\n");
     ret.push_str("       Ok((buf, value))\n");
     ret.push_str("    }\n");
