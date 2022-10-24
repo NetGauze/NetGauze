@@ -866,6 +866,60 @@ fn generate_ipv6_deserializer(ie_name: &String) -> String {
     ret
 }
 
+fn generate_date_time_seconds(ie_name: &String) -> String {
+    let mut ret = String::new();
+    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let header = get_deserializer_header(ie_name.as_str());
+    ret.push_str(std_error.as_str());
+    ret.push_str(header.as_str());
+    ret.push_str("        if length != 4 {\n");
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str("        };\n");
+    ret.push_str("        let (buf, secs) = nom::number::complete::be_u32(buf)?;\n");
+    ret.push_str("        let value = chrono::Utc.timestamp(secs as i64, 0);\n");
+    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_date_time_milli(ie_name: &String) -> String {
+    let mut ret = String::new();
+    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let header = get_deserializer_header(ie_name.as_str());
+    ret.push_str(std_error.as_str());
+    ret.push_str(header.as_str());
+    ret.push_str("        if length != 8 {\n");
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str("        };\n");
+    ret.push_str("        let (buf, millis) = nom::number::complete::be_u64(buf)?;\n");
+    ret.push_str("        let value = chrono::Utc.timestamp_millis(millis as i64);\n");
+    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_date_time_micro(ie_name: &String) -> String {
+    let mut ret = String::new();
+    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let header = get_deserializer_header(ie_name.as_str());
+    ret.push_str(std_error.as_str());
+    ret.push_str(header.as_str());
+    ret.push_str("        if length != 8 {\n");
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str("        };\n");
+    ret.push_str("        let (buf, seconds) = nom::number::complete::be_u32(buf)?;\n");
+    ret.push_str("        let (buf, fraction) = nom::number::complete::be_u32(buf)?;\n");
+    ret.push_str("        // Convert 1/2^32s of a second to nanoseconds\n");
+    ret.push_str("        let fraction: u32 = (1_000_000_000f64 * (fraction as f64 / u32::MAX as f64)) as u32;\n");
+    ret.push_str("        let value = chrono::Utc.timestamp(seconds as i64, fraction);\n");
+    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
 fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
     let mut ret = String::new();
     let gen = match data_type {
@@ -883,10 +937,12 @@ fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
         "boolean" => generate_bool_deserializer(ie_name),
         "macAddress" => generate_mac_address_deserializer(ie_name),
         "string" => generate_string_deserializer(ie_name),
-        "dateTimeSeconds" => "".to_string(),
-        "dateTimeMilliseconds" => "".to_string(),
-        "dateTimeMicroseconds" => "".to_string(),
-        "dateTimeNanoseconds" => "".to_string(),
+        "dateTimeSeconds" => generate_date_time_seconds(ie_name),
+        "dateTimeMilliseconds" => generate_date_time_milli(ie_name),
+        "dateTimeMicroseconds" => generate_date_time_micro(ie_name),
+        // Nano and micro are using the same representation,
+        // see https://www.rfc-editor.org/rfc/rfc7011.html#section-6.1.9
+        "dateTimeNanoseconds" => generate_date_time_micro(ie_name),
         "ipv4Address" => generate_ipv4_deserializer(ie_name),
         "ipv6Address" => generate_ipv6_deserializer(ie_name),
         "basicList" => "".to_string(),
@@ -900,6 +956,7 @@ fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
 
 pub(crate) fn generate_pkg_ie_deserializers(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
+    ret.push_str("use chrono::TimeZone;\n");
     ret.push_str(format!("use crate::ie::{}::*;\n\n", "iana").as_str());
 
     for ie in ies {
@@ -984,8 +1041,7 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         // TODO don't skip data types once we deserialize all of them
         let rust_type = get_rust_type(&ie.data_type);
-        if rust_type.as_str() == "chrono::DateTime<chrono::Utc>" || rust_type.as_str() == "Vec<u8>"
-        {
+        if rust_type.as_str() == "Vec<u8>" {
             continue;
         }
         ret.push_str(
@@ -1010,8 +1066,7 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         // TODO don't skip data types once we deserialize all of them
         let rust_type = get_rust_type(&ie.data_type);
-        if rust_type.as_str() == "chrono::DateTime<chrono::Utc>" || rust_type.as_str() == "Vec<u8>"
-        {
+        if rust_type.as_str() == "Vec<u8>" {
             continue;
         }
         ret.push_str(format!("            InformationElementId::{} => {{\n", ie.name).as_str());
