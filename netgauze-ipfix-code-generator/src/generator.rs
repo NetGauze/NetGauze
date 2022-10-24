@@ -866,27 +866,32 @@ fn generate_ipv6_deserializer(ie_name: &String) -> String {
     ret
 }
 
-fn generate_ie_deserializer(rust_type: &str, ie_name: &String) -> String {
+fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
     let mut ret = String::new();
-
-    let gen = match rust_type {
-        "u8" => generate_u8_deserializer(ie_name),
-        "u16" => generate_u16_deserializer(ie_name),
-        "u32" => generate_u32_deserializer(ie_name),
-        "u64" => generate_u64_deserializer(ie_name),
-        "i8" => generate_i8_deserializer(ie_name),
-        "i16" => generate_i16_deserializer(ie_name),
-        "i32" => generate_i32_deserializer(ie_name),
-        "i64" => generate_i64_deserializer(ie_name),
-        "f32" => generate_f32_deserializer(ie_name),
-        "f64" => generate_f64_deserializer(ie_name),
-        "bool" => generate_bool_deserializer(ie_name),
-        "super::MacAddress" => generate_mac_address_deserializer(ie_name),
-        "String" => generate_string_deserializer(ie_name),
-        "chrono::DateTime<chrono::Utc>" => "".to_string(),
-        "std::net::Ipv4Addr" => generate_ipv4_deserializer(ie_name),
-        "std::net::Ipv6Addr" => generate_ipv6_deserializer(ie_name),
-        "Vec<u8>" => "".to_string(),
+    let gen = match data_type {
+        "octetArray" => "".to_string(),
+        "unsigned8" => generate_u8_deserializer(ie_name),
+        "unsigned16" => generate_u16_deserializer(ie_name),
+        "unsigned32" => generate_u32_deserializer(ie_name),
+        "unsigned64" => generate_u64_deserializer(ie_name),
+        "signed8" => generate_i8_deserializer(ie_name),
+        "signed16" => generate_i16_deserializer(ie_name),
+        "signed32" => generate_i32_deserializer(ie_name),
+        "signed64" => generate_i64_deserializer(ie_name),
+        "float32" => generate_f32_deserializer(ie_name),
+        "float64" => generate_f64_deserializer(ie_name),
+        "boolean" => generate_bool_deserializer(ie_name),
+        "macAddress" => generate_mac_address_deserializer(ie_name),
+        "string" => generate_string_deserializer(ie_name),
+        "dateTimeSeconds" => "".to_string(),
+        "dateTimeMilliseconds" => "".to_string(),
+        "dateTimeMicroseconds" => "".to_string(),
+        "dateTimeNanoseconds" => "".to_string(),
+        "ipv4Address" => generate_ipv4_deserializer(ie_name),
+        "ipv6Address" => generate_ipv6_deserializer(ie_name),
+        "basicList" => "".to_string(),
+        "subTemplateList" => "".to_string(),
+        "subTemplateMultiList" => "".to_string(),
         ty => todo!("Unsupported deserialization for type: {}", ty),
     };
     ret.push_str(gen.as_str());
@@ -898,8 +903,7 @@ pub(crate) fn generate_pkg_ie_deserializers(ies: &Vec<InformationElement>) -> St
     ret.push_str(format!("use crate::ie::{}::*;\n\n", "iana").as_str());
 
     for ie in ies {
-        let rust_type = get_rust_type(&ie.data_type);
-        ret.push_str(generate_ie_deserializer(&rust_type, &ie.name).as_str());
+        ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
     }
 
     ret.push_str(generate_ie_values_deserializers(ies).as_str());
