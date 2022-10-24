@@ -138,6 +138,7 @@ pub fn parse_description_string<'a, 'input>(node: &'input Node<'a, 'input>) -> O
 
 pub(crate) fn parse_information_elements<'a, 'input>(
     node: &'input Node<'a, 'input>,
+    pen: u32,
 ) -> Vec<InformationElement> {
     let children = node
         .children()
@@ -199,6 +200,7 @@ pub(crate) fn parse_information_elements<'a, 'input>(
             continue;
         }
         let ie = InformationElement {
+            pen,
             name: name.unwrap(),
             data_type: data_type.unwrap(),
             group,

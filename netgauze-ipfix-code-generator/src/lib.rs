@@ -30,6 +30,7 @@ const GENERATED_VENDOR_DESER_SUFFIX: &str = "deser_generated.rs";
 /// Represent Information Element as read form a registry
 #[derive(Debug, Clone)]
 pub struct InformationElement {
+    pub pen: u32,
     pub name: String,
     pub data_type: String,
     pub group: Option<String>,
@@ -217,7 +218,7 @@ fn generate_iana(
     let units_generated = generate_ie_units(&units_parsed);
 
     let iana_ie_node = find_node_by_id(&root, ID_IE).unwrap();
-    let iana_ie_node_parsed = parse_information_elements(&iana_ie_node);
+    let iana_ie_node_parsed = parse_information_elements(&iana_ie_node, 0);
     let iana_ie_generated = generate_information_element_ids(&iana_ie_node_parsed);
 
     let iana_deser_generated = generate_pkg_ie_deserializers(&iana_ie_node_parsed);

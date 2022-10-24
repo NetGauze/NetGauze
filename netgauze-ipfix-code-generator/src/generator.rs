@@ -202,6 +202,14 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
     ret.push_str("        }\n");
     ret.push_str("    }\n\n");
 
+    ret.push_str("    fn id(&self) -> u16 {\n");
+    ret.push_str("        (*self) as u16\n");
+    ret.push_str("    }\n\n");
+
+    ret.push_str("    fn pen(&self) -> u32 {\n");
+    ret.push_str(format!("        {}\n", ie.first().unwrap().pen).as_str());
+    ret.push_str("    }\n\n");
+
     ret.push_str("}\n");
     ret
 }
@@ -304,7 +312,9 @@ fn generate_ie_try_from_pen_code(name_prefixes: &Vec<(String, String, u32)>) -> 
         ret.push_str("                }\n");
         ret.push_str("            }\n");
     }
-    ret.push_str("           unknown => Ok(InformationElementId::Unknown{pen: unknown, code}),\n");
+    ret.push_str(
+        "           unknown => Ok(InformationElementId::Unknown{pen: unknown, id: code}),\n",
+    );
     ret.push_str("       }\n");
     ret.push_str("   }\n");
     ret.push_str("}\n");
@@ -350,6 +360,24 @@ fn generate_ie_template_trait_for_ie(name_prefixes: &Vec<(String, String, u32)>)
     ret.push_str("        }\n");
     ret.push_str("    }\n");
 
+    ret.push_str("    fn id(&self) -> u16 {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::Unknown{id, ..} => *id,\n");
+    for (name, _, _) in name_prefixes {
+        ret.push_str(format!("            Self::{}(ie) => ie.id(),\n", name).as_str());
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+
+    ret.push_str("    fn pen(&self) -> u32 {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::Unknown{pen, ..} => *pen,\n");
+    for (name, _, _) in name_prefixes {
+        ret.push_str(format!("            Self::{}(ie) => ie.pen(),\n", name).as_str());
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+
     ret.push_str("}\n\n");
     ret
 }
@@ -373,7 +401,7 @@ pub(crate) fn generate_ie_ids(name_prefixes: &Vec<(String, String, u32)>) -> Str
     ret.push_str(generate_derive(false, true, true).as_str());
     ret.push_str("pub enum InformationElementId {\n");
     for (name, pkg, _) in name_prefixes {
-        ret.push_str("    Unknown{pen: u32, code: u16},\n");
+        ret.push_str("    Unknown{pen: u32, id: u16},\n");
         ret.push_str(format!("    {}({}::InformationElementId),\n", name, pkg).as_str());
     }
     ret.push_str("}\n");

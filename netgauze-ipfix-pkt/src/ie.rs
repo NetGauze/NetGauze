@@ -145,6 +145,13 @@ pub trait InformationElementTemplate {
     }
     fn value_range(&self) -> Option<std::ops::Range<u64>>;
     fn units(&self) -> Option<InformationElementUnits>;
+
+    /// Returns the numerical ID for the IE.
+    fn id(&self) -> u16;
+
+    /// Returns the private enterprise number for the given IE.
+    /// IANA is assigned to zero.
+    fn pen(&self) -> u32;
 }
 
 include!(concat!(env!("OUT_DIR"), "/ie_generated.rs"));
