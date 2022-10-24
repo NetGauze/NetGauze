@@ -128,13 +128,13 @@ pub trait InformationElementTemplate {
                 Some(std::ops::Range { start: 4, end: 5 })
             }
             InformationElementDataType::dateTimeMilliseconds => {
-                Some(std::ops::Range { start: 4, end: 5 })
+                Some(std::ops::Range { start: 8, end: 9 })
             }
             InformationElementDataType::dateTimeMicroseconds => {
-                Some(std::ops::Range { start: 4, end: 5 })
+                Some(std::ops::Range { start: 8, end: 9 })
             }
             InformationElementDataType::dateTimeNanoseconds => {
-                Some(std::ops::Range { start: 1, end: 2 })
+                Some(std::ops::Range { start: 8, end: 9 })
             }
             InformationElementDataType::ipv4Address => Some(std::ops::Range { start: 4, end: 5 }),
             InformationElementDataType::ipv6Address => Some(std::ops::Range { start: 16, end: 17 }),
