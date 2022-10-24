@@ -832,6 +832,40 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     ret
 }
 
+fn generate_ipv4_deserializer(ie_name: &String) -> String {
+    let mut ret = String::new();
+    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let header = get_deserializer_header(ie_name.as_str());
+    ret.push_str(std_error.as_str());
+    ret.push_str(header.as_str());
+    ret.push_str("        if length != 4 {\n");
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str("        };\n");
+    ret.push_str("        let (buf, ip) = nom::number::complete::be_u32(buf)?;\n");
+    ret.push_str("        let value = std::net::Ipv4Addr::from(ip);\n");
+    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_ipv6_deserializer(ie_name: &String) -> String {
+    let mut ret = String::new();
+    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let header = get_deserializer_header(ie_name.as_str());
+    ret.push_str(std_error.as_str());
+    ret.push_str(header.as_str());
+    ret.push_str("        if length != 16 {\n");
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str("        };\n");
+    ret.push_str("        let (buf, ip) = nom::number::complete::be_u128(buf)?;\n");
+    ret.push_str("        let value = std::net::Ipv6Addr::from(ip);\n");
+    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
 fn generate_ie_deserializer(rust_type: &str, ie_name: &String) -> String {
     let mut ret = String::new();
 
@@ -850,8 +884,8 @@ fn generate_ie_deserializer(rust_type: &str, ie_name: &String) -> String {
         "super::MacAddress" => generate_mac_address_deserializer(ie_name),
         "String" => generate_string_deserializer(ie_name),
         "chrono::DateTime<chrono::Utc>" => "".to_string(),
-        "std::net::Ipv4Addr" => "".to_string(),
-        "std::net::Ipv6Addr" => "".to_string(),
+        "std::net::Ipv4Addr" => generate_ipv4_deserializer(ie_name),
+        "std::net::Ipv6Addr" => generate_ipv6_deserializer(ie_name),
         "Vec<u8>" => "".to_string(),
         ty => todo!("Unsupported deserialization for type: {}", ty),
     };
