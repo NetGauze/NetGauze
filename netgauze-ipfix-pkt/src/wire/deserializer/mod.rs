@@ -16,13 +16,13 @@
 pub mod ie;
 
 use crate::{
-    ie::InformationElementTemplate, FieldSpecifier, Flow, InformationElementId,
+    ie::InformationElementTemplate, DataRecord, FieldSpecifier, Flow, InformationElementId,
     InformationElementIdError, IpfixHeader, TemplateRecord, IPFIX_VERSION,
 };
 use chrono::{TimeZone, Utc};
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePDU,
-    ReadablePDUWithOneInput, Span,
+    parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
+    ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
 };
 use nom::{
     error::ErrorKind,
@@ -167,5 +167,35 @@ impl<'a> ReadablePDU<'a, LocatedTemplateRecordParsingError<'a>> for TemplateReco
             buf = t;
         }
         Ok((buf, TemplateRecord::new(template_id, fields)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum DataRecordParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    FlowError(#[from_located(module = "self")] FlowParsingError),
+}
+
+impl<'a> ReadablePDUWithTwoInputs<'a, &[FieldSpecifier], usize, LocatedDataRecordParsingError<'a>>
+    for DataRecord
+{
+    fn from_wire(
+        buf: Span<'a>,
+        fields: &[FieldSpecifier],
+        padding: usize,
+    ) -> IResult<Span<'a>, Self, LocatedDataRecordParsingError<'a>> {
+        let (buf, id) = be_u16(buf)?;
+        let (buf, length) = be_u16(buf)?;
+        let (reminder, mut buf) = nom::bytes::complete::take(length)(buf)?;
+        let mut flows = vec![];
+        while buf.len() > padding {
+            let (t, flow) = parse_into_located_one_input(buf, fields)?;
+            flows.push(flow);
+            buf = t;
+        }
+        // TODO: check if padding handled correctly according to the spec
+        let (buf, _) = nom::bytes::complete::take(padding)(reminder)?;
+        Ok((buf, DataRecord::new(id, flows)))
     }
 }

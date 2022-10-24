@@ -225,6 +225,51 @@ fn test_record_value() {
 }
 
 #[test]
+fn test_data_record() {
+    let good_wire = [
+        0x04, 0x00, 0x00, 0x0c, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69,
+        0x32,
+    ];
+    let good_with_padding_wire = [
+        0x04, 0x00, 0x00, 0x0c, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69,
+        0x32, 0x00, 0x00,
+    ];
+    let flow = Flow::new(vec![
+        ie::Record::IANA(ie::iana::Record::sourceMacAddress(
+            ie::iana::sourceMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]),
+        )),
+        ie::Record::IANA(ie::iana::Record::destinationMacAddress(
+            ie::iana::destinationMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]),
+        )),
+    ]);
+    let fields = [
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::sourceMacAddress),
+            6,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::destinationMacAddress),
+            6,
+        ),
+    ];
+    let good = DataRecord::new(1024, vec![flow]);
+
+    test_parsed_completely_with_two_inputs::<
+        DataRecord,
+        &[FieldSpecifier],
+        usize,
+        crate::wire::deserializer::LocatedDataRecordParsingError<'_>,
+    >(&good_wire, &fields, 0, &good);
+
+    test_parsed_completely_with_two_inputs::<
+        DataRecord,
+        &[FieldSpecifier],
+        usize,
+        crate::wire::deserializer::LocatedDataRecordParsingError<'_>,
+    >(&good_with_padding_wire, &fields, 2, &good);
+}
+
+#[test]
 fn test_flow_value() {
     let value_wire = [
         0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32,
