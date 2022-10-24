@@ -17,11 +17,12 @@ pub mod ie;
 
 use crate::{
     ie::InformationElementTemplate, DataRecord, FieldSpecifier, Flow, InformationElementId,
-    InformationElementIdError, IpfixHeader, TemplateRecord, IPFIX_VERSION,
+    InformationElementIdError, IpfixHeader, Set, SetPayload, TemplateRecord, IPFIX_VERSION,
 };
 use chrono::{TimeZone, Utc};
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
+    parse_till_empty_into_located, parse_till_empty_into_with_two_inputs_located,
     ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
 };
 use nom::{
@@ -197,5 +198,59 @@ impl<'a> ReadablePDUWithTwoInputs<'a, &[FieldSpecifier], usize, LocatedDataRecor
         // TODO: check if padding handled correctly according to the spec
         let (buf, _) = nom::bytes::complete::take(padding)(reminder)?;
         Ok((buf, DataRecord::new(id, flows)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum SetParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidLength(u16),
+    InvalidSetId(u16),
+    FieldSpecifierIsNotDefined,
+    TemplateRecordError(#[from_located(module = "self")] TemplateRecordParsingError),
+    DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, Option<&[FieldSpecifier]>, LocatedSetParsingError<'a>>
+    for Set
+{
+    fn from_wire(
+        buf: Span<'a>,
+        fields: Option<&[FieldSpecifier]>,
+    ) -> IResult<Span<'a>, Self, LocatedSetParsingError<'a>> {
+        let (buf, id) = be_u16(buf)?;
+        let input = buf;
+        let (buf, length) = be_u16(buf)?;
+        if length < 4 {
+            return Err(nom::Err::Error(LocatedSetParsingError::new(
+                input,
+                SetParsingError::InvalidLength(length),
+            )));
+        }
+        let (reminder, buf) = nom::bytes::complete::take(length - 4)(buf)?;
+        let (_buf, payload) = if id == 2 {
+            let (buf, templates) = parse_till_empty_into_located(buf)?;
+            (buf, SetPayload::Template(templates))
+        } else if id == 3 {
+            todo!("Handle Options Template")
+        } else if id == 0 || id == 1 {
+            todo!("Handle Netflow sets")
+        } else if id >= 4 || id <= 255 {
+            return Err(nom::Err::Error(LocatedSetParsingError::new(
+                input,
+                SetParsingError::InvalidSetId(id),
+            )));
+        } else if let Some(fields) = fields {
+            // TODO: handle padding calculations
+            let (buf, data) = parse_till_empty_into_with_two_inputs_located(buf, fields, 0usize)?;
+            (buf, SetPayload::Data(data))
+        } else {
+            return Err(nom::Err::Error(LocatedSetParsingError::new(
+                input,
+                SetParsingError::FieldSpecifierIsNotDefined,
+            )));
+        };
+        Ok((reminder, Set::new(id, payload)))
     }
 }

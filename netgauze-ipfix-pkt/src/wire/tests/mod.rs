@@ -302,6 +302,159 @@ fn test_flow_value() {
 }
 
 #[test]
+fn test_set_template() {
+    let good_wire = [
+        0x00, 0x02, 0x00, 0x64, 0x01, 0x33, 0x00, 0x17, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c, 0x00,
+        0x04, 0x00, 0x05, 0x00, 0x01, 0x00, 0x04, 0x00, 0x01, 0x00, 0x07, 0x00, 0x02, 0x00, 0x0b,
+        0x00, 0x02, 0x00, 0x20, 0x00, 0x02, 0x00, 0x0a, 0x00, 0x04, 0x00, 0x10, 0x00, 0x04, 0x00,
+        0x11, 0x00, 0x04, 0x00, 0x12, 0x00, 0x04, 0x00, 0x0e, 0x00, 0x04, 0x00, 0x01, 0x00, 0x04,
+        0x00, 0x02, 0x00, 0x04, 0x00, 0x16, 0x00, 0x04, 0x00, 0x15, 0x00, 0x04, 0x00, 0x0f, 0x00,
+        0x04, 0x00, 0x09, 0x00, 0x01, 0x00, 0x0d, 0x00, 0x01, 0x00, 0x06, 0x00, 0x01, 0x00, 0x3c,
+        0x00, 0x01, 0x00, 0x98, 0x00, 0x08, 0x00, 0x99, 0x00, 0x08,
+    ];
+
+    let good = Set::new(
+        2,
+        SetPayload::Template(vec![TemplateRecord::new(
+            307,
+            vec![
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::sourceIPv4Address,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::destinationIPv4Address,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::ipClassOfService,
+                    ),
+                    1,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::protocolIdentifier,
+                    ),
+                    1,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::sourceTransportPort,
+                    ),
+                    2,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::destinationTransportPort,
+                    ),
+                    2,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::icmpTypeCodeIPv4,
+                    ),
+                    2,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::ingressInterface,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::bgpSourceAsNumber,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::bgpDestinationAsNumber,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::bgpNextHopIPv4Address,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(ie::iana::InformationElementId::egressInterface),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(ie::iana::InformationElementId::octetDeltaCount),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::packetDeltaCount,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::flowStartSysUpTime,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::flowEndSysUpTime,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::ipNextHopIPv4Address,
+                    ),
+                    4,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::sourceIPv4PrefixLength,
+                    ),
+                    1,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::destinationIPv4PrefixLength,
+                    ),
+                    1,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(ie::iana::InformationElementId::tcpControlBits),
+                    1,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(ie::iana::InformationElementId::ipVersion),
+                    1,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::flowStartMilliseconds,
+                    ),
+                    8,
+                ),
+                FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::flowEndMilliseconds,
+                    ),
+                    8,
+                ),
+            ],
+        )]),
+    );
+    test_parsed_completely_with_one_input(&good_wire, None, &good);
+}
+
+#[test]
 fn test_data_template_packet() {
     let _good_wire = [
         0x00, 0x0a, 0x00, 0x60, 0x58, 0x3d, 0xe0, 0x59, 0x00, 0x00, 0x0e, 0xe4, 0x00, 0x00, 0x00,
@@ -396,7 +549,7 @@ fn test_data_template_packet() {
                         ie::InformationElementId::IANA(
                             ie::iana::InformationElementId::octetDeltaCount,
                         ),
-                        1,
+                        4,
                     ),
                     FieldSpecifier::new(
                         ie::InformationElementId::IANA(
