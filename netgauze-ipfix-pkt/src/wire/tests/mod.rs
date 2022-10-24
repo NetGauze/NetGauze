@@ -18,9 +18,51 @@ use netgauze_parse_utils::{test_helpers::*, Span};
 use std::net::Ipv4Addr;
 
 use crate::{
-    ie, wire::deserializer::ie as ie_desr, DataRecord, FieldSpecifier, Flow, IpfixHeader,
-    IpfixPacket, Set, SetPayload, TemplateRecord,
+    ie,
+    wire::{
+        deserializer::{ie as ie_desr, *},
+        serializer::*,
+    },
+    DataRecord, FieldSpecifier, Flow, IpfixHeader, IpfixPacket, Set, SetPayload, TemplateRecord,
 };
+
+#[test]
+fn test_ipfix_header() -> Result<(), IpfixHeaderWritingError> {
+    let good_wire = [
+        0x00, 0x0a, 0x00, 0x10, 0x63, 0x4a, 0xe2, 0x9d, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
+        0x01,
+    ];
+    let bad_version_wire = [
+        0x00, 0x00, 0x00, 0x10, 0x63, 0x4a, 0xe2, 0x9d, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
+        0x01,
+    ];
+    let bad_length_wire = [
+        0x00, 0x0a, 0x00, 0x00, 0x63, 0x4a, 0xe2, 0x9d, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
+        0x01,
+    ];
+
+    let good = IpfixHeader::new(Utc.ymd(2022, 10, 15).and_hms(16, 41, 01), 6, 1);
+    let bad_version = LocatedIpfixHeaderParsingError::new(
+        Span::new(&bad_version_wire),
+        IpfixHeaderParsingError::UnsupportedVersion(0),
+    );
+    let bad_length = LocatedIpfixHeaderParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &bad_length_wire[2..]) },
+        IpfixHeaderParsingError::InvalidLength(0),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<IpfixHeader, LocatedIpfixHeaderParsingError<'_>>(
+        &bad_version_wire,
+        &bad_version,
+    );
+    test_parse_error::<IpfixHeader, LocatedIpfixHeaderParsingError<'_>>(
+        &bad_length_wire,
+        &bad_length,
+    );
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
 
 #[test]
 fn test_field() {

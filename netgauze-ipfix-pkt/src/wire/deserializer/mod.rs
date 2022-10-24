@@ -17,8 +17,9 @@ pub mod ie;
 
 use crate::{
     ie::InformationElementTemplate, FieldSpecifier, Flow, InformationElementId,
-    InformationElementIdError,
+    InformationElementIdError, IpfixHeader, IPFIX_VERSION,
 };
+use chrono::{TimeZone, Utc};
 use netgauze_parse_utils::{
     parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, Span,
 };
@@ -30,6 +31,47 @@ use nom::{
 
 use netgauze_serde_macros::LocatedError;
 use serde::{Deserialize, Serialize};
+
+/// 2-octets version, 2-octets length, 4-octets * 3 (export time, seq no,
+/// observation domain id)
+const IPFIX_HEADER_LENGTH: u16 = 16;
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum IpfixHeaderParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    UnsupportedVersion(u16),
+    InvalidLength(u16),
+}
+
+impl<'a> ReadablePDU<'a, LocatedIpfixHeaderParsingError<'a>> for IpfixHeader {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpfixHeaderParsingError<'a>> {
+        let input = buf;
+        let (buf, version) = be_u16(buf)?;
+        if version != IPFIX_VERSION {
+            return Err(nom::Err::Error(LocatedIpfixHeaderParsingError::new(
+                input,
+                IpfixHeaderParsingError::UnsupportedVersion(version),
+            )));
+        }
+        let input = buf;
+        let (buf, length) = be_u16(buf)?;
+        if length < IPFIX_HEADER_LENGTH {
+            return Err(nom::Err::Error(LocatedIpfixHeaderParsingError::new(
+                input,
+                IpfixHeaderParsingError::InvalidLength(length),
+            )));
+        }
+        let (buf, export_time) = be_u32(buf)?;
+        let export_time = Utc.timestamp(export_time as i64, 0);
+        let (buf, seq_number) = be_u32(buf)?;
+        let (buf, observation_domain_id) = be_u32(buf)?;
+        Ok((
+            buf,
+            IpfixHeader::new(export_time, seq_number, observation_domain_id),
+        ))
+    }
+}
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FieldParsingError {
