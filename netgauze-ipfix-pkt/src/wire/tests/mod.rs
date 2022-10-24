@@ -65,13 +65,53 @@ fn test_ipfix_header() -> Result<(), IpfixHeaderWritingError> {
 }
 
 #[test]
-fn test_field() {
+fn test_template_record() -> Result<(), TemplateRecordWritingError> {
+    let good_wire = [
+        0x08, 0x01, 0x00, 0x02, 0x00, 0x1b, 0x00, 0x10, 0x00, 0x1c, 0x00, 0x10,
+    ];
+    let bad_template_id_wire = [
+        0x00, 0x00, 0x00, 0x02, 0x00, 0x1b, 0x00, 0x10, 0x00, 0x1c, 0x00, 0x10,
+    ];
+
+    let good = TemplateRecord::new(
+        2049,
+        vec![
+            FieldSpecifier::new(
+                ie::InformationElementId::IANA(ie::iana::InformationElementId::sourceIPv6Address),
+                16,
+            ),
+            FieldSpecifier::new(
+                ie::InformationElementId::IANA(
+                    ie::iana::InformationElementId::destinationIPv6Address,
+                ),
+                16,
+            ),
+        ],
+    );
+
+    let bad_template_id = LocatedTemplateRecordParsingError::new(
+        Span::new(&bad_template_id_wire),
+        TemplateRecordParsingError::InvalidTemplateId(0),
+    );
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<TemplateRecord, LocatedTemplateRecordParsingError<'_>>(
+        &bad_template_id_wire,
+        &bad_template_id,
+    );
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_field() -> Result<(), FieldSpecifierWritingError> {
     let good_ipv4_src_wire = [0x00, 0x08, 0x00, 0x04];
     let good_ipv4_src = FieldSpecifier::new(
         ie::InformationElementId::IANA(ie::iana::InformationElementId::sourceIPv4Address),
         4,
     );
     test_parsed_completely(&good_ipv4_src_wire, &good_ipv4_src);
+    test_write(&good_ipv4_src, &good_ipv4_src_wire)?;
+    Ok(())
 }
 
 #[test]
@@ -232,7 +272,7 @@ fn test_data_template_packet() {
         IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 55), 3791, 0),
         vec![Set::new(
             2,
-            vec![SetPayload::Template(TemplateRecord::new(
+            SetPayload::Template(vec![TemplateRecord::new(
                 307,
                 vec![
                     FieldSpecifier::new(
@@ -372,7 +412,7 @@ fn test_data_template_packet() {
                         8,
                     ),
                 ],
-            ))],
+            )]),
         )],
     );
 }
@@ -393,7 +433,7 @@ fn test_data_packet() {
         IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 57), 3812, 0),
         vec![Set::new(
             307,
-            vec![SetPayload::Data(DataRecord::new(
+            SetPayload::Data(vec![DataRecord::new(
                 307,
                 vec![Flow::new(vec![
                     ie::Record::IANA(ie::iana::Record::sourceIPv4Address(
@@ -468,7 +508,7 @@ fn test_data_packet() {
                         ),
                     )),
                 ])],
-            ))],
+            )]),
         )],
     );
 }

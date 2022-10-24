@@ -17,11 +17,12 @@ pub mod ie;
 
 use crate::{
     ie::InformationElementTemplate, FieldSpecifier, Flow, InformationElementId,
-    InformationElementIdError, IpfixHeader, IPFIX_VERSION,
+    InformationElementIdError, IpfixHeader, TemplateRecord, IPFIX_VERSION,
 };
 use chrono::{TimeZone, Utc};
 use netgauze_parse_utils::{
-    parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, Span,
+    parse_into_located, parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePDU,
+    ReadablePDUWithOneInput, Span,
 };
 use nom::{
     error::ErrorKind,
@@ -135,5 +136,36 @@ impl<'a> ReadablePDUWithOneInput<'a, &[FieldSpecifier], LocatedFlowParsingError<
             records.push(record);
         }
         Ok((buf, Flow::new(records)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum TemplateRecordParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidTemplateId(u16),
+    FieldError(#[from_located(module = "self")] FieldParsingError),
+}
+
+impl<'a> ReadablePDU<'a, LocatedTemplateRecordParsingError<'a>> for TemplateRecord {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedTemplateRecordParsingError<'a>> {
+        let input = buf;
+        let (buf, template_id) = be_u16(buf)?;
+        // from RFC7011: Each Template Record is given a unique Template ID in the range
+        // 256 to 65535.
+        if template_id < 256 {
+            return Err(nom::Err::Error(LocatedTemplateRecordParsingError::new(
+                input,
+                TemplateRecordParsingError::InvalidTemplateId(template_id),
+            )));
+        }
+        let (mut buf, field_count) = be_u16(buf)?;
+        let mut fields = Vec::with_capacity(field_count as usize);
+        for _ in 0..field_count {
+            let (t, field) = parse_into_located(buf)?;
+            fields.push(field);
+            buf = t;
+        }
+        Ok((buf, TemplateRecord::new(template_id, fields)))
     }
 }

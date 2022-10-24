@@ -21,7 +21,7 @@ use crate::ie::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-pub const IPFIX_VERSION: u16 = 10;
+pub(crate) const IPFIX_VERSION: u16 = 10;
 
 ///
 /// ```text
@@ -106,7 +106,9 @@ impl IpfixHeader {
     }
 }
 
-/// Every Set contains a common header.
+/// Every Set contains a common header. The Sets can be any of these three
+/// possible types: Data Set, Template Set, or Options Template Set.
+///
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -117,11 +119,11 @@ impl IpfixHeader {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Set {
     id: u16,
-    payload: Vec<SetPayload>,
+    payload: SetPayload,
 }
 
 impl Set {
-    pub const fn new(id: u16, payload: Vec<SetPayload>) -> Self {
+    pub const fn new(id: u16, payload: SetPayload) -> Self {
         Self { id, payload }
     }
 
@@ -129,15 +131,15 @@ impl Set {
         self.id
     }
 
-    pub const fn payload(&self) -> &Vec<SetPayload> {
+    pub const fn payload(&self) -> &SetPayload {
         &self.payload
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SetPayload {
-    Data(DataRecord),
-    Template(TemplateRecord),
+    Data(Vec<DataRecord>),
+    Template(Vec<TemplateRecord>),
     OptionsTemplate(),
 }
 

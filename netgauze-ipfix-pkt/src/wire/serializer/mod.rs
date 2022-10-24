@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::IpfixHeader;
+use crate::{ie, ie::InformationElementTemplate, FieldSpecifier, IpfixHeader, TemplateRecord};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
@@ -39,6 +39,59 @@ impl WritablePDU<IpfixHeaderWritingError> for IpfixHeader {
         writer.write_u32::<NetworkEndian>(self.export_time.timestamp() as u32)?;
         writer.write_u32::<NetworkEndian>(self.sequence_number)?;
         writer.write_u32::<NetworkEndian>(self.observation_domain_id)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum FieldSpecifierWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<FieldSpecifierWritingError> for FieldSpecifier {
+    /// 2-octets field id, 2-octets length
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + if let ie::InformationElementId::IANA(_) = self.element_id {
+                0
+            } else {
+                4
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), FieldSpecifierWritingError> {
+        writer.write_u16::<NetworkEndian>(self.element_id.id())?;
+        writer.write_u16::<NetworkEndian>(self.length)?;
+        let pen = self.element_id.pen();
+        if pen != 0 {
+            writer.write_u32::<NetworkEndian>(pen)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum TemplateRecordWritingError {
+    StdIOError(#[from_std_io_error] String),
+    FieldSpecifierError(#[from] FieldSpecifierWritingError),
+}
+
+impl WritablePDU<TemplateRecordWritingError> for TemplateRecord {
+    /// 2-octets template_id, 2-octets field count
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.field_specifiers.iter().map(|x| x.len()).sum::<usize>()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), TemplateRecordWritingError> {
+        writer.write_u16::<NetworkEndian>(self.id)?;
+        writer.write_u16::<NetworkEndian>(self.field_specifiers.len() as u16)?;
+        for field in &self.field_specifiers {
+            field.write(writer)?;
+        }
         Ok(())
     }
 }
