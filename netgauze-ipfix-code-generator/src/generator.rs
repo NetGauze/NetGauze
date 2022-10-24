@@ -980,10 +980,7 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         // TODO don't skip data types once we deserialize all of them
         let rust_type = get_rust_type(&ie.data_type);
-        if rust_type.as_str() == "std::net::Ipv4Addr"
-            || rust_type.as_str() == "std::net::Ipv6Addr"
-            || rust_type.as_str() == "chrono::DateTime<chrono::Utc>"
-            || rust_type.as_str() == "Vec<u8>"
+        if rust_type.as_str() == "chrono::DateTime<chrono::Utc>" || rust_type.as_str() == "Vec<u8>"
         {
             continue;
         }
@@ -1009,10 +1006,7 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         // TODO don't skip data types once we deserialize all of them
         let rust_type = get_rust_type(&ie.data_type);
-        if rust_type.as_str() == "std::net::Ipv4Addr"
-            || rust_type.as_str() == "std::net::Ipv6Addr"
-            || rust_type.as_str() == "chrono::DateTime<chrono::Utc>"
-            || rust_type.as_str() == "Vec<u8>"
+        if rust_type.as_str() == "chrono::DateTime<chrono::Utc>" || rust_type.as_str() == "Vec<u8>"
         {
             continue;
         }
