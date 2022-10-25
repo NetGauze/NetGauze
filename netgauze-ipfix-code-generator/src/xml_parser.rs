@@ -195,7 +195,7 @@ pub(crate) fn parse_information_elements<'a, 'input>(
             continue;
         }
 
-        if None == name {
+        if name.is_none() {
             log::info!("Skipping a child with no name: {:?}", child);
             continue;
         }
