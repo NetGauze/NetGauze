@@ -252,7 +252,7 @@ pub enum SetParsingError {
     NomError(#[from_nom] ErrorKind),
     InvalidLength(u16),
     InvalidSetId(u16),
-    FieldSpecifierIsNotDefined,
+    NoTemplateDefinedFor(u16),
     TemplateRecordError(#[from_located(module = "self")] TemplateRecordParsingError),
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
 }
@@ -294,7 +294,14 @@ impl<'a>
         } else {
             // TODO: handle padding calculations
             let binding = templates_map.borrow();
-            let fields = binding.get(&id).unwrap();
+            let fields = if let Some(fields) = binding.get(&id) {
+                fields
+            } else {
+                return Err(nom::Err::Error(LocatedSetParsingError::new(
+                    input,
+                    SetParsingError::NoTemplateDefinedFor(id),
+                )));
+            };
             let (buf, data) =
                 parse_till_empty_into_with_two_inputs_located(buf, fields.clone(), 0usize)?;
             (buf, SetPayload::Data(data))
