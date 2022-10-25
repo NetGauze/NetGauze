@@ -21,11 +21,13 @@ lazy_static = "1.4"
 chrono = {version="0.4", features=["serde"]}
 nom = { version = "7.1", optional = true }
 byteorder = { version = "1.4", optional = true }
+criterion = { version = "0.4", optional = true } # Dev dep for bench
 
 
 [features]
 default = ["serde"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
+bench = ["criterion"]
 
 
 [dev-dependencies]
@@ -36,3 +38,9 @@ netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-hel
 reqwest = { version = "0.11", features = ["blocking"] }
 roxmltree = "0.15"
 netgauze-ipfix-code-generator = {path = "../netgauze-ipfix-code-generator"}
+
+
+[[bench]]
+name = "serde_benchmark"
+harness = false
+required-features = ["bench"]
