@@ -17,18 +17,24 @@ pub mod ie;
 
 use crate::{
     ie::InformationElementTemplate, DataRecord, FieldSpecifier, Flow, InformationElementId,
-    InformationElementIdError, IpfixHeader, Set, SetPayload, TemplateRecord, IPFIX_VERSION,
+    InformationElementIdError, IpfixHeader, IpfixPacket, Set, SetPayload, TemplateRecord,
+    IPFIX_VERSION,
 };
 use chrono::{TimeZone, Utc};
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    parse_till_empty_into_located, parse_till_empty_into_with_two_inputs_located,
+    parse_till_empty_into_with_one_input_located, parse_till_empty_into_with_two_inputs_located,
     ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
 };
 use nom::{
     error::ErrorKind,
     number::complete::{be_u16, be_u32},
     IResult,
+};
+use std::{
+    cell::{RefCell, RefMut},
+    collections::HashMap,
+    rc::Rc,
 };
 
 use netgauze_serde_macros::LocatedError;
@@ -37,6 +43,31 @@ use serde::{Deserialize, Serialize};
 /// 2-octets version, 2-octets length, 4-octets * 3 (export time, seq no,
 /// observation domain id)
 const IPFIX_HEADER_LENGTH: u16 = 16;
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum IpfixPacketParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    IpfixHeaderError(#[from_located(module = "self")] IpfixHeaderParsingError),
+    SetParsingError(#[from_located(module = "self")] SetParsingError),
+}
+
+impl<'a>
+    ReadablePDUWithOneInput<
+        'a,
+        Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
+        LocatedIpfixPacketParsingError<'a>,
+    > for IpfixPacket
+{
+    fn from_wire(
+        buf: Span<'a>,
+        templates_map: Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
+    ) -> IResult<Span<'a>, Self, LocatedIpfixPacketParsingError<'a>> {
+        let (buf, header) = parse_into_located(buf)?;
+        let (buf, payload) = parse_till_empty_into_with_one_input_located(buf, templates_map)?;
+        Ok((buf, IpfixPacket::new(header, payload)))
+    }
+}
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum IpfixHeaderParsingError {
@@ -123,14 +154,16 @@ pub enum FlowParsingError {
     RecordError(#[from_located(module = "")] ie::RecordParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, &[FieldSpecifier], LocatedFlowParsingError<'a>> for Flow {
+impl<'a> ReadablePDUWithOneInput<'a, Rc<Vec<FieldSpecifier>>, LocatedFlowParsingError<'a>>
+    for Flow
+{
     fn from_wire(
         buf: Span<'a>,
-        fields: &[FieldSpecifier],
+        fields: Rc<Vec<FieldSpecifier>>,
     ) -> IResult<Span<'a>, Self, LocatedFlowParsingError<'a>> {
         let mut buf = buf;
         let mut records = Vec::<crate::ie::Record>::with_capacity(fields.len());
-        for field in fields {
+        for field in fields.as_ref() {
             let (t, record) =
                 parse_into_located_two_inputs(buf, &field.element_id(), field.length)?;
             buf = t;
@@ -148,8 +181,17 @@ pub enum TemplateRecordParsingError {
     FieldError(#[from_located(module = "self")] FieldParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedTemplateRecordParsingError<'a>> for TemplateRecord {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedTemplateRecordParsingError<'a>> {
+impl<'a>
+    ReadablePDUWithOneInput<
+        'a,
+        Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
+        LocatedTemplateRecordParsingError<'a>,
+    > for TemplateRecord
+{
+    fn from_wire(
+        buf: Span<'a>,
+        templates_map: Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
+    ) -> IResult<Span<'a>, Self, LocatedTemplateRecordParsingError<'a>> {
         let input = buf;
         let (buf, template_id) = be_u16(buf)?;
         // from RFC7011: Each Template Record is given a unique Template ID in the range
@@ -167,6 +209,10 @@ impl<'a> ReadablePDU<'a, LocatedTemplateRecordParsingError<'a>> for TemplateReco
             fields.push(field);
             buf = t;
         }
+        {
+            let mut map: RefMut<_> = templates_map.borrow_mut();
+            map.insert(template_id, Rc::new(fields.clone()));
+        }
         Ok((buf, TemplateRecord::new(template_id, fields)))
     }
 }
@@ -176,28 +222,27 @@ pub enum DataRecordParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     FlowError(#[from_located(module = "self")] FlowParsingError),
+    InvalidTemplateId(u16),
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, &[FieldSpecifier], usize, LocatedDataRecordParsingError<'a>>
+impl<'a>
+    ReadablePDUWithTwoInputs<'a, Rc<Vec<FieldSpecifier>>, usize, LocatedDataRecordParsingError<'a>>
     for DataRecord
 {
     fn from_wire(
-        buf: Span<'a>,
-        fields: &[FieldSpecifier],
+        mut buf: Span<'a>,
+        fields: Rc<Vec<FieldSpecifier>>,
         padding: usize,
     ) -> IResult<Span<'a>, Self, LocatedDataRecordParsingError<'a>> {
-        let (buf, id) = be_u16(buf)?;
-        let (buf, length) = be_u16(buf)?;
-        let (reminder, mut buf) = nom::bytes::complete::take(length)(buf)?;
         let mut flows = vec![];
         while buf.len() > padding {
-            let (t, flow) = parse_into_located_one_input(buf, fields)?;
+            let (t, flow) = parse_into_located_one_input(buf, fields.clone())?;
             flows.push(flow);
             buf = t;
         }
-        // TODO: check if padding handled correctly according to the spec
-        let (buf, _) = nom::bytes::complete::take(padding)(reminder)?;
-        Ok((buf, DataRecord::new(id, flows)))
+        // TODO: handle padding calculations
+        let (buf, _) = nom::bytes::complete::take(padding)(buf)?;
+        Ok((buf, DataRecord::new(flows)))
     }
 }
 
@@ -212,12 +257,16 @@ pub enum SetParsingError {
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, Option<&[FieldSpecifier]>, LocatedSetParsingError<'a>>
-    for Set
+impl<'a>
+    ReadablePDUWithOneInput<
+        'a,
+        Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
+        LocatedSetParsingError<'a>,
+    > for Set
 {
     fn from_wire(
         buf: Span<'a>,
-        fields: Option<&[FieldSpecifier]>,
+        templates_map: Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
     ) -> IResult<Span<'a>, Self, LocatedSetParsingError<'a>> {
         let (buf, id) = be_u16(buf)?;
         let input = buf;
@@ -230,26 +279,25 @@ impl<'a> ReadablePDUWithOneInput<'a, Option<&[FieldSpecifier]>, LocatedSetParsin
         }
         let (reminder, buf) = nom::bytes::complete::take(length - 4)(buf)?;
         let (_buf, payload) = if id == 2 {
-            let (buf, templates) = parse_till_empty_into_located(buf)?;
+            let (buf, templates) =
+                parse_till_empty_into_with_one_input_located(buf, templates_map)?;
             (buf, SetPayload::Template(templates))
         } else if id == 3 {
             todo!("Handle Options Template")
         } else if id == 0 || id == 1 {
             todo!("Handle Netflow sets")
-        } else if id >= 4 || id <= 255 {
+        } else if (4..=255).contains(&id) {
             return Err(nom::Err::Error(LocatedSetParsingError::new(
                 input,
                 SetParsingError::InvalidSetId(id),
             )));
-        } else if let Some(fields) = fields {
-            // TODO: handle padding calculations
-            let (buf, data) = parse_till_empty_into_with_two_inputs_located(buf, fields, 0usize)?;
-            (buf, SetPayload::Data(data))
         } else {
-            return Err(nom::Err::Error(LocatedSetParsingError::new(
-                input,
-                SetParsingError::FieldSpecifierIsNotDefined,
-            )));
+            // TODO: handle padding calculations
+            let binding = templates_map.borrow();
+            let fields = binding.get(&id).unwrap();
+            let (buf, data) =
+                parse_till_empty_into_with_two_inputs_located(buf, fields.clone(), 0usize)?;
+            (buf, SetPayload::Data(data))
         };
         Ok((reminder, Set::new(id, payload)))
     }

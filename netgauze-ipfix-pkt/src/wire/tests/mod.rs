@@ -15,7 +15,7 @@
 
 use chrono::{TimeZone, Utc};
 use netgauze_parse_utils::{test_helpers::*, Span};
-use std::net::Ipv4Addr;
+use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};
 
 use crate::{
     ie,
@@ -93,11 +93,13 @@ fn test_template_record() -> Result<(), TemplateRecordWritingError> {
         Span::new(&bad_template_id_wire),
         TemplateRecordParsingError::InvalidTemplateId(0),
     );
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<TemplateRecord, LocatedTemplateRecordParsingError<'_>>(
-        &bad_template_id_wire,
-        &bad_template_id,
-    );
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
+    test_parse_error_with_one_input::<
+        TemplateRecord,
+        Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
+        LocatedTemplateRecordParsingError<'_>,
+    >(&bad_template_id_wire, templates_map, &bad_template_id);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -227,12 +229,10 @@ fn test_record_value() {
 #[test]
 fn test_data_record() {
     let good_wire = [
-        0x04, 0x00, 0x00, 0x0c, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69,
-        0x32,
+        0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32,
     ];
     let good_with_padding_wire = [
-        0x04, 0x00, 0x00, 0x0c, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69,
-        0x32, 0x00, 0x00,
+        0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x00, 0x00,
     ];
     let flow = Flow::new(vec![
         ie::Record::IANA(ie::iana::Record::sourceMacAddress(
@@ -242,7 +242,7 @@ fn test_data_record() {
             ie::iana::destinationMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]),
         )),
     ]);
-    let fields = [
+    let fields = Rc::new(vec![
         FieldSpecifier::new(
             ie::InformationElementId::IANA(ie::iana::InformationElementId::sourceMacAddress),
             6,
@@ -251,22 +251,23 @@ fn test_data_record() {
             ie::InformationElementId::IANA(ie::iana::InformationElementId::destinationMacAddress),
             6,
         ),
-    ];
-    let good = DataRecord::new(1024, vec![flow]);
+    ]);
+
+    let good = DataRecord::new(vec![flow]);
 
     test_parsed_completely_with_two_inputs::<
         DataRecord,
-        &[FieldSpecifier],
+        Rc<Vec<FieldSpecifier>>,
         usize,
         crate::wire::deserializer::LocatedDataRecordParsingError<'_>,
-    >(&good_wire, &fields, 0, &good);
+    >(&good_wire, fields.clone(), 0, &good);
 
     test_parsed_completely_with_two_inputs::<
         DataRecord,
-        &[FieldSpecifier],
+        Rc<Vec<FieldSpecifier>>,
         usize,
         crate::wire::deserializer::LocatedDataRecordParsingError<'_>,
-    >(&good_with_padding_wire, &fields, 2, &good);
+    >(&good_with_padding_wire, fields.clone(), 2, &good);
 }
 
 #[test]
@@ -284,7 +285,7 @@ fn test_flow_value() {
         )),
     ]);
 
-    let fields = [
+    let fields = Rc::new(vec![
         FieldSpecifier::new(
             ie::InformationElementId::IANA(ie::iana::InformationElementId::sourceMacAddress),
             6,
@@ -293,12 +294,12 @@ fn test_flow_value() {
             ie::InformationElementId::IANA(ie::iana::InformationElementId::destinationMacAddress),
             6,
         ),
-    ];
+    ]);
     test_parsed_completely_with_one_input::<
         Flow,
-        &[FieldSpecifier],
+        Rc<Vec<FieldSpecifier>>,
         crate::wire::deserializer::LocatedFlowParsingError<'_>,
-    >(&value_wire, &fields, &flow);
+    >(&value_wire, fields, &flow);
 }
 
 #[test]
@@ -451,23 +452,29 @@ fn test_set_template() {
             ],
         )]),
     );
-    test_parsed_completely_with_one_input(&good_wire, None, &good);
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
 }
 
 #[test]
-fn test_data_template_packet() {
-    let _good_wire = [
-        0x00, 0x0a, 0x00, 0x60, 0x58, 0x3d, 0xe0, 0x59, 0x00, 0x00, 0x0e, 0xe4, 0x00, 0x00, 0x00,
-        0x00, 0x01, 0x33, 0x00, 0x50, 0x46, 0x01, 0x73, 0x01, 0x32, 0x00, 0x47, 0x01, 0x00, 0x3d,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x3b, 0x00, 0x00, 0x00, 0x02, 0x00,
-        0x00, 0x00, 0x03, 0xcc, 0x2a, 0x6e, 0x65, 0x00, 0x00, 0x03, 0x56, 0x00, 0x00, 0x05, 0x20,
-        0x00, 0x00, 0x00, 0x09, 0xb3, 0xf9, 0x06, 0xee, 0xb3, 0xfb, 0xaf, 0x3c, 0xcc, 0x2a, 0x6e,
-        0xbd, 0x18, 0x18, 0x00, 0x04, 0x00, 0x00, 0x01, 0x58, 0xb1, 0xb1, 0x38, 0xff, 0x00, 0x00,
-        0x01, 0x58, 0xb1, 0xb3, 0xe1, 0x4d,
+fn test_template_packet() {
+    let good_wire = [
+        0x00, 0x0a, // Version
+        0x00, 0x60, // Length
+        0x58, 0x3d, 0xe0, 0x59, // Export time
+        0x00, 0x00, 0x0e, 0xe4, // Seq number
+        0x00, 0x00, 0x00, 0x00, // Observation domain
+        0x00, 0x02, 0x00, 0x64, 0x01, 0x33, 0x00, 0x17, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c, 0x00,
+        0x04, 0x00, 0x05, 0x00, 0x01, 0x00, 0x04, 0x00, 0x01, 0x00, 0x07, 0x00, 0x02, 0x00, 0x0b,
+        0x00, 0x02, 0x00, 0x20, 0x00, 0x02, 0x00, 0x0a, 0x00, 0x04, 0x00, 0x10, 0x00, 0x04, 0x00,
+        0x11, 0x00, 0x04, 0x00, 0x12, 0x00, 0x04, 0x00, 0x0e, 0x00, 0x04, 0x00, 0x01, 0x00, 0x04,
+        0x00, 0x02, 0x00, 0x04, 0x00, 0x16, 0x00, 0x04, 0x00, 0x15, 0x00, 0x04, 0x00, 0x0f, 0x00,
+        0x04, 0x00, 0x09, 0x00, 0x01, 0x00, 0x0d, 0x00, 0x01, 0x00, 0x06, 0x00, 0x01, 0x00, 0x3c,
+        0x00, 0x01, 0x00, 0x98, 0x00, 0x08, 0x00, 0x99, 0x00, 0x08,
     ];
 
-    let _good = IpfixPacket::new(
-        IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 55), 3791, 0),
+    let good = IpfixPacket::new(
+        IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 57), 3812, 0),
         vec![Set::new(
             2,
             SetPayload::Template(vec![TemplateRecord::new(
@@ -613,100 +620,206 @@ fn test_data_template_packet() {
             )]),
         )],
     );
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
+    assert!(templates_map.borrow().contains_key(&307))
 }
 
 #[test]
 fn test_data_packet() {
-    let _good_wire = [
-        0x00, 0x0a, 0x00, 0x60, 0x58, 0x3d, 0xe0, 0x59, 0x00, 0x00, 0x0e, 0xe4, 0x00, 0x00, 0x00,
-        0x00, 0x01, 0x33, 0x00, 0x50, 0x46, 0x01, 0x73, 0x01, 0x32, 0x00, 0x47, 0x01, 0x00, 0x3d,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x3b, 0x00, 0x00, 0x00, 0x02, 0x00,
-        0x00, 0x00, 0x03, 0xcc, 0x2a, 0x6e, 0x65, 0x00, 0x00, 0x03, 0x56, 0x00, 0x00, 0x05, 0x20,
-        0x00, 0x00, 0x00, 0x09, 0xb3, 0xf9, 0x06, 0xee, 0xb3, 0xfb, 0xaf, 0x3c, 0xcc, 0x2a, 0x6e,
-        0xbd, 0x18, 0x18, 0x00, 0x04, 0x00, 0x00, 0x01, 0x58, 0xb1, 0xb1, 0x38, 0xff, 0x00, 0x00,
-        0x01, 0x58, 0xb1, 0xb3, 0xe1, 0x4d,
+    let good_wire = [
+        0x00, 0x0a, // Version
+        0x00, 0x60, // Length
+        0x58, 0x3d, 0xe0, 0x59, // Export time
+        0x00, 0x00, 0x0e, 0xe4, 0x00, 0x00, 0x00, 0x00, 0x01, 0x33, // Set ID
+        0x00, 0x50, // Flow Set Length
+        0x46, 0x01, 0x73, 0x01, // Source IP
+        0x32, 0x00, 0x47, 0x01, // Dest IP
+        0x00, 0x3d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x3b, 0x00, 0x00, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x03, 0xcc, 0x2a, 0x6e, 0x65, 0x00, 0x00, 0x03, 0x56, 0x00, 0x00,
+        0x05, 0x20, 0x00, 0x00, 0x00, 0x09, 0xb3, 0xf9, 0x06, 0xee, 0xb3, 0xfb, 0xaf, 0x3c, 0xcc,
+        0x2a, 0x6e, 0xbd, 0x18, 0x18, 0x00, 0x04, 0x00, 0x00, 0x01, 0x58, 0xb1, 0xb1, 0x38, 0xff,
+        0x00, 0x00, 0x01, 0x58, 0xb1, 0xb3, 0xe1, 0x4d,
     ];
 
-    let _good = IpfixPacket::new(
+    let fields = Rc::new(vec![
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::sourceIPv4Address),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::destinationIPv4Address),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::ipClassOfService),
+            1,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::protocolIdentifier),
+            1,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::sourceTransportPort),
+            2,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(
+                ie::iana::InformationElementId::destinationTransportPort,
+            ),
+            2,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::icmpTypeCodeIPv4),
+            2,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::ingressInterface),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::bgpSourceAsNumber),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::bgpDestinationAsNumber),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::bgpNextHopIPv4Address),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::egressInterface),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::octetDeltaCount),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::packetDeltaCount),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::flowStartSysUpTime),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::flowEndSysUpTime),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::ipNextHopIPv4Address),
+            4,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::sourceIPv4PrefixLength),
+            1,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(
+                ie::iana::InformationElementId::destinationIPv4PrefixLength,
+            ),
+            1,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::tcpControlBits),
+            1,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::ipVersion),
+            1,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::flowStartMilliseconds),
+            8,
+        ),
+        FieldSpecifier::new(
+            ie::InformationElementId::IANA(ie::iana::InformationElementId::flowEndMilliseconds),
+            8,
+        ),
+    ]);
+    let templates_map = Rc::new(RefCell::new(HashMap::from([(307, fields)])));
+    let good = IpfixPacket::new(
         IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 57), 3812, 0),
         vec![Set::new(
             307,
-            SetPayload::Data(vec![DataRecord::new(
-                307,
-                vec![Flow::new(vec![
-                    ie::Record::IANA(ie::iana::Record::sourceIPv4Address(
-                        ie::iana::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1)),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::destinationIPv4Address(
-                        ie::iana::destinationIPv4Address(Ipv4Addr::new(50, 0, 71, 1)),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::ipClassOfService(
-                        ie::iana::ipClassOfService(0),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::protocolIdentifier(
-                        ie::iana::protocolIdentifier(61),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::sourceTransportPort(
-                        ie::iana::sourceTransportPort(0),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::destinationTransportPort(
-                        ie::iana::destinationTransportPort(0),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::icmpTypeCodeIPv4(
-                        ie::iana::icmpTypeCodeIPv4(0),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::ingressInterface(
-                        ie::iana::ingressInterface(827),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::bgpSourceAsNumber(
-                        ie::iana::bgpSourceAsNumber(2),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::bgpDestinationAsNumber(
-                        ie::iana::bgpDestinationAsNumber(3),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::bgpNextHopIPv4Address(
-                        ie::iana::bgpNextHopIPv4Address(Ipv4Addr::new(204, 42, 110, 101)),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::egressInterface(
-                        ie::iana::egressInterface(854),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::octetDeltaCount(
-                        ie::iana::octetDeltaCount(1312),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::packetDeltaCount(
-                        ie::iana::packetDeltaCount(9),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::flowStartSysUpTime(
-                        ie::iana::flowStartSysUpTime(0xb3f906ee),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::flowEndSysUpTime(
-                        ie::iana::flowEndSysUpTime(0xb3f9af3c),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::ipNextHopIPv4Address(
-                        ie::iana::ipNextHopIPv4Address(Ipv4Addr::new(204, 42, 110, 189)),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::sourceIPv4PrefixLength(
-                        ie::iana::sourceIPv4PrefixLength(24),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::destinationIPv4PrefixLength(
-                        ie::iana::destinationIPv4PrefixLength(24),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::tcpControlBits(ie::iana::tcpControlBits(
-                        0,
-                    ))),
-                    ie::Record::IANA(ie::iana::Record::ipVersion(ie::iana::ipVersion(4))),
-                    ie::Record::IANA(ie::iana::Record::flowStartMilliseconds(
-                        ie::iana::flowStartMilliseconds(
-                            Utc.ymd(2016, 11, 29).and_hms_milli(20, 05, 31, 519),
-                        ),
-                    )),
-                    ie::Record::IANA(ie::iana::Record::flowEndMilliseconds(
-                        ie::iana::flowEndMilliseconds(
-                            Utc.ymd(2016, 11, 29).and_hms_milli(20, 08, 25, 677),
-                        ),
-                    )),
-                ])],
-            )]),
+            SetPayload::Data(vec![DataRecord::new(vec![Flow::new(vec![
+                ie::Record::IANA(ie::iana::Record::sourceIPv4Address(
+                    ie::iana::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1)),
+                )),
+                ie::Record::IANA(ie::iana::Record::destinationIPv4Address(
+                    ie::iana::destinationIPv4Address(Ipv4Addr::new(50, 0, 71, 1)),
+                )),
+                ie::Record::IANA(ie::iana::Record::ipClassOfService(
+                    ie::iana::ipClassOfService(0),
+                )),
+                ie::Record::IANA(ie::iana::Record::protocolIdentifier(
+                    ie::iana::protocolIdentifier(61),
+                )),
+                ie::Record::IANA(ie::iana::Record::sourceTransportPort(
+                    ie::iana::sourceTransportPort(0),
+                )),
+                ie::Record::IANA(ie::iana::Record::destinationTransportPort(
+                    ie::iana::destinationTransportPort(0),
+                )),
+                ie::Record::IANA(ie::iana::Record::icmpTypeCodeIPv4(
+                    ie::iana::icmpTypeCodeIPv4(0),
+                )),
+                ie::Record::IANA(ie::iana::Record::ingressInterface(
+                    ie::iana::ingressInterface(827),
+                )),
+                ie::Record::IANA(ie::iana::Record::bgpSourceAsNumber(
+                    ie::iana::bgpSourceAsNumber(2),
+                )),
+                ie::Record::IANA(ie::iana::Record::bgpDestinationAsNumber(
+                    ie::iana::bgpDestinationAsNumber(3),
+                )),
+                ie::Record::IANA(ie::iana::Record::bgpNextHopIPv4Address(
+                    ie::iana::bgpNextHopIPv4Address(Ipv4Addr::new(204, 42, 110, 101)),
+                )),
+                ie::Record::IANA(ie::iana::Record::egressInterface(
+                    ie::iana::egressInterface(854),
+                )),
+                ie::Record::IANA(ie::iana::Record::octetDeltaCount(
+                    ie::iana::octetDeltaCount(1312),
+                )),
+                ie::Record::IANA(ie::iana::Record::packetDeltaCount(
+                    ie::iana::packetDeltaCount(9),
+                )),
+                ie::Record::IANA(ie::iana::Record::flowStartSysUpTime(
+                    ie::iana::flowStartSysUpTime(0xb3f906ee),
+                )),
+                ie::Record::IANA(ie::iana::Record::flowEndSysUpTime(
+                    ie::iana::flowEndSysUpTime(0xb3fbaf3c),
+                )),
+                ie::Record::IANA(ie::iana::Record::ipNextHopIPv4Address(
+                    ie::iana::ipNextHopIPv4Address(Ipv4Addr::new(204, 42, 110, 189)),
+                )),
+                ie::Record::IANA(ie::iana::Record::sourceIPv4PrefixLength(
+                    ie::iana::sourceIPv4PrefixLength(24),
+                )),
+                ie::Record::IANA(ie::iana::Record::destinationIPv4PrefixLength(
+                    ie::iana::destinationIPv4PrefixLength(24),
+                )),
+                ie::Record::IANA(ie::iana::Record::tcpControlBits(ie::iana::tcpControlBits(
+                    0,
+                ))),
+                ie::Record::IANA(ie::iana::Record::ipVersion(ie::iana::ipVersion(4))),
+                ie::Record::IANA(ie::iana::Record::flowStartMilliseconds(
+                    ie::iana::flowStartMilliseconds(
+                        Utc.ymd(2016, 11, 29).and_hms_milli(20, 05, 31, 519),
+                    ),
+                )),
+                ie::Record::IANA(ie::iana::Record::flowEndMilliseconds(
+                    ie::iana::flowEndMilliseconds(
+                        Utc.ymd(2016, 11, 29).and_hms_milli(20, 08, 25, 677),
+                    ),
+                )),
+            ])])]),
         )],
     );
+    test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
 }

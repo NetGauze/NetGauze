@@ -226,17 +226,12 @@ impl FieldSpecifier {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DataRecord {
-    id: u16,
     flows: Vec<Flow>,
 }
 
 impl DataRecord {
-    pub const fn new(id: u16, flows: Vec<Flow>) -> Self {
-        Self { id, flows }
-    }
-
-    pub const fn id(&self) -> u16 {
-        self.id
+    pub const fn new(flows: Vec<Flow>) -> Self {
+        Self { flows }
     }
 
     pub const fn flows(&self) -> &Vec<Flow> {
