@@ -15,6 +15,7 @@ libfuzzer-sys = "0.4"
 netgauze-parse-utils = {path = "../netgauze-parse-utils"}
 netgauze-bgp-pkt = {path = "../netgauze-bgp-pkt", features = ["serde"]}
 netgauze-bmp-pkt = {path = "../netgauze-bmp-pkt", features = ["serde"]}
+netgauze-ipfix-pkt = {path = "../netgauze-ipfix-pkt", features = ["serde"]}
 
 [[bin]]
 name = "fuzz-bgp-pkt"
@@ -25,5 +26,12 @@ doc = false
 [[bin]]
 name = "fuzz-bmp-pkt"
 path = "fuzz_targets/fuzz_bmp_pkt.rs"
+test = false
+doc = false
+
+
+[[bin]]
+name = "fuzz-ipfix-pkt"
+path = "fuzz_targets/fuzz_ipfix_pkt.rs"
 test = false
 doc = false
