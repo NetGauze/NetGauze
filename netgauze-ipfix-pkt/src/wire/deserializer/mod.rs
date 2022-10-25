@@ -13,32 +13,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod ie;
-
-use crate::{
-    ie::InformationElementTemplate, DataRecord, FieldSpecifier, Flow, InformationElementId,
-    InformationElementIdError, IpfixHeader, IpfixPacket, Set, SetPayload, TemplateRecord,
-    IPFIX_VERSION,
-};
-use chrono::{TimeZone, Utc};
-use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    parse_till_empty_into_with_one_input_located, parse_till_empty_into_with_two_inputs_located,
-    ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
-};
-use nom::{
-    error::ErrorKind,
-    number::complete::{be_u16, be_u32},
-    IResult,
-};
 use std::{
     cell::{RefCell, RefMut},
     collections::HashMap,
     rc::Rc,
 };
 
-use netgauze_serde_macros::LocatedError;
+use chrono::{TimeZone, Utc};
+use nom::{
+    error::ErrorKind,
+    number::complete::{be_u16, be_u32, be_u8},
+    IResult,
+};
 use serde::{Deserialize, Serialize};
+
+use netgauze_parse_utils::{
+    parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
+    parse_till_empty_into_with_one_input_located, parse_till_empty_into_with_two_inputs_located,
+    ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
+};
+use netgauze_serde_macros::LocatedError;
+
+use crate::{
+    ie::InformationElementTemplate, DataRecord, FieldSpecifier, Flow, InformationElementId,
+    InformationElementIdError, IpfixHeader, IpfixPacket, OptionsTemplateRecord, Set, SetPayload,
+    TemplateRecord, IPFIX_VERSION,
+};
+
+pub mod ie;
 
 /// 2-octets version, 2-octets length, 4-octets * 3 (export time, seq no,
 /// observation domain id)
@@ -111,7 +113,7 @@ pub enum FieldParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InformationElementIdError(InformationElementIdError),
-    InvalidLength(u16),
+    InvalidLength(InformationElementId, u16),
 }
 
 impl<'a> ReadablePDU<'a, LocatedFieldParsingError<'a>> for FieldSpecifier {
@@ -142,7 +144,7 @@ impl<'a> ReadablePDU<'a, LocatedFieldParsingError<'a>> for FieldSpecifier {
         {
             return Err(nom::Err::Error(LocatedFieldParsingError::new(
                 input,
-                FieldParsingError::InvalidLength(length),
+                FieldParsingError::InvalidLength(ie, length),
             )));
         }
         Ok((buf, FieldSpecifier::new(ie, length)))
@@ -218,6 +220,57 @@ impl<'a>
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum OptionsTemplateRecordParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidTemplateId(u16),
+    FieldError(#[from_located(module = "self")] FieldParsingError),
+}
+
+impl<'a>
+    ReadablePDUWithOneInput<
+        'a,
+        Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
+        LocatedOptionsTemplateRecordParsingError<'a>,
+    > for OptionsTemplateRecord
+{
+    fn from_wire(
+        buf: Span<'a>,
+        templates_map: Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>,
+    ) -> IResult<Span<'a>, Self, LocatedOptionsTemplateRecordParsingError<'a>> {
+        let input = buf;
+        let (buf, template_id) = be_u16(buf)?;
+        // from RFC7011: Each Template Record is given a unique Template ID in the range
+        // 256 to 65535.
+        if template_id < 256 {
+            return Err(nom::Err::Error(
+                LocatedOptionsTemplateRecordParsingError::new(
+                    input,
+                    OptionsTemplateRecordParsingError::InvalidTemplateId(template_id),
+                ),
+            ));
+        }
+        let (buf, total_fields_count) = be_u16(buf)?;
+        let (mut buf, scope_fields_count) = be_u16(buf)?;
+        let mut fields = Vec::with_capacity(total_fields_count as usize);
+        for _ in 0..total_fields_count {
+            let (t, field) = parse_into_located(buf)?;
+            fields.push(field);
+            buf = t;
+        }
+        {
+            let mut map: RefMut<_> = templates_map.borrow_mut();
+            map.insert(template_id, Rc::new(fields.clone()));
+        }
+        let (scope, normal) = fields.split_at(scope_fields_count as usize);
+        Ok((
+            buf,
+            OptionsTemplateRecord::new(template_id, scope.to_vec(), normal.to_vec()),
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum DataRecordParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -254,6 +307,7 @@ pub enum SetParsingError {
     InvalidSetId(u16),
     NoTemplateDefinedFor(u16),
     TemplateRecordError(#[from_located(module = "self")] TemplateRecordParsingError),
+    OptionsTemplateRecordError(#[from_located(module = "self")] OptionsTemplateRecordParsingError),
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
 }
 
@@ -277,13 +331,24 @@ impl<'a>
                 SetParsingError::InvalidLength(length),
             )));
         }
-        let (reminder, buf) = nom::bytes::complete::take(length - 4)(buf)?;
+        let (reminder, mut buf) = nom::bytes::complete::take(length - 4)(buf)?;
         let (_buf, payload) = if id == 2 {
             let (buf, templates) =
                 parse_till_empty_into_with_one_input_located(buf, templates_map)?;
             (buf, SetPayload::Template(templates))
         } else if id == 3 {
-            todo!("Handle Options Template")
+            let mut option_templates = vec![];
+            // THE RFC is not super clear about padding length allowed in the Options
+            // Template set. Like Wireshark implementation, we assume anything
+            // less than 4-octets (min field size) is padding
+            while buf.len() > 3 {
+                let (t, option_template) =
+                    parse_into_located_one_input(buf, templates_map.clone())?;
+                buf = t;
+                option_templates.push(option_template);
+            }
+            let (buf, _) = nom::multi::many0(be_u8)(buf)?;
+            (buf, SetPayload::OptionsTemplate(option_templates))
         } else if id == 0 || id == 1 {
             todo!("Handle Netflow sets")
         } else if (4..=255).contains(&id) {

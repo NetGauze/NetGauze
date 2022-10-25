@@ -140,7 +140,7 @@ impl Set {
 pub enum SetPayload {
     Data(Vec<DataRecord>),
     Template(Vec<TemplateRecord>),
-    OptionsTemplate(),
+    OptionsTemplate(Vec<OptionsTemplateRecord>),
 }
 
 /// Template Records allow the Collecting Process to process
@@ -221,6 +221,98 @@ impl FieldSpecifier {
 
     pub const fn length(&self) -> u16 {
         self.length
+    }
+}
+
+/// An Options Template Record contains any combination of IANA-assigned
+/// and/or enterprise-specific Information Element identifiers.
+/// ```text
+/// +--------------------------------------------------+
+/// | Options Template Record Header                   |
+/// +--------------------------------------------------+
+/// | Field Specifier                                  |
+/// +--------------------------------------------------+
+/// | Field Specifier                                  |
+/// +--------------------------------------------------+
+///  ...
+/// +--------------------------------------------------+
+/// | Field Specifier                                  |
+/// +--------------------------------------------------+
+/// ```
+///
+///
+/// The format of the Options Template Record Header:
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |         Template ID (> 255)   |         Field Count           |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |      Scope Field Count        |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+///
+/// An The example in Figure shows an Options Template Set with mixed
+/// IANA-assigned and enterprise-specific Information Elements.
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |          Set ID = 3           |          Length               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |         Template ID = 258     |         Field Count = N + M   |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |     Scope Field Count = N     |0|  Scope 1 Infor. Element id. |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |     Scope 1 Field Length      |0|  Scope 2 Infor. Element id. |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |     Scope 2 Field Length      |             ...               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |            ...                |1|  Scope N Infor. Element id. |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |     Scope N Field Length      |   Scope N Enterprise Number  ...
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ..  Scope N Enterprise Number   |1| Option 1 Infor. Element id. |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |    Option 1 Field Length      |  Option 1 Enterprise Number  ...
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// .. Option 1 Enterprise Number   |              ...              |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |             ...               |0| Option M Infor. Element id. |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |     Option M Field Length     |      Padding (optional)       |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OptionsTemplateRecord {
+    id: u16,
+    scope_field_specifiers: Vec<FieldSpecifier>,
+    field_specifiers: Vec<FieldSpecifier>,
+}
+
+impl OptionsTemplateRecord {
+    pub const fn new(
+        id: u16,
+        scope_field_specifiers: Vec<FieldSpecifier>,
+        field_specifiers: Vec<FieldSpecifier>,
+    ) -> Self {
+        Self {
+            id,
+            scope_field_specifiers,
+            field_specifiers,
+        }
+    }
+
+    pub const fn id(&self) -> u16 {
+        self.id
+    }
+
+    pub const fn scope_field_specifiers(&self) -> &Vec<FieldSpecifier> {
+        &self.scope_field_specifiers
+    }
+
+    pub const fn field_specifiers(&self) -> &Vec<FieldSpecifier> {
+        &self.field_specifiers
     }
 }
 

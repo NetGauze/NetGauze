@@ -23,7 +23,8 @@ use crate::{
         deserializer::{ie as ie_desr, *},
         serializer::*,
     },
-    DataRecord, FieldSpecifier, Flow, IpfixHeader, IpfixPacket, Set, SetPayload, TemplateRecord,
+    DataRecord, FieldSpecifier, Flow, IpfixHeader, IpfixPacket, OptionsTemplateRecord, Set,
+    SetPayload, TemplateRecord,
 };
 
 #[test]
@@ -821,5 +822,47 @@ fn test_data_packet() {
             ])])]),
         )],
     );
+    test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
+}
+
+#[test]
+fn test_options_template_packet() {
+    let good_wire = [
+        0x00, 0x0a, 0x00, 0x28, 0x58, 0x3d, 0xe0, 0x57, 0x00, 0x00, 0x0e, 0xcf, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x03, 0x00, 0x18, 0x01, 0x34, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0x00, 0x01,
+        0x00, 0x24, 0x00, 0x02, 0x00, 0x25, 0x00, 0x02, 0x00, 0x00,
+    ];
+
+    let good = IpfixPacket::new(
+        IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 55), 3791, 0),
+        vec![Set::new(
+            3,
+            SetPayload::OptionsTemplate(vec![OptionsTemplateRecord::new(
+                308,
+                vec![FieldSpecifier::new(
+                    ie::InformationElementId::IANA(
+                        ie::iana::InformationElementId::ipClassOfService,
+                    ),
+                    1,
+                )],
+                vec![
+                    FieldSpecifier::new(
+                        ie::InformationElementId::IANA(
+                            ie::iana::InformationElementId::flowActiveTimeout,
+                        ),
+                        2,
+                    ),
+                    FieldSpecifier::new(
+                        ie::InformationElementId::IANA(
+                            ie::iana::InformationElementId::flowIdleTimeout,
+                        ),
+                        2,
+                    ),
+                ],
+            )]),
+        )],
+    );
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
 }
