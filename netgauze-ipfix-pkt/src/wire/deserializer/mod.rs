@@ -224,6 +224,8 @@ pub enum OptionsTemplateRecordParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidTemplateId(u16),
+    /// Scope fields count must be less than the total fields count
+    InvalidScopeFieldsCount(u16),
     FieldError(#[from_located(module = "self")] FieldParsingError),
 }
 
@@ -251,7 +253,16 @@ impl<'a>
             ));
         }
         let (buf, total_fields_count) = be_u16(buf)?;
+        let input = buf;
         let (mut buf, scope_fields_count) = be_u16(buf)?;
+        if scope_fields_count > total_fields_count {
+            return Err(nom::Err::Error(
+                LocatedOptionsTemplateRecordParsingError::new(
+                    input,
+                    OptionsTemplateRecordParsingError::InvalidScopeFieldsCount(scope_fields_count),
+                ),
+            ));
+        }
         let mut fields = Vec::with_capacity(total_fields_count as usize);
         for _ in 0..total_fields_count {
             let (t, field) = parse_into_located(buf)?;
