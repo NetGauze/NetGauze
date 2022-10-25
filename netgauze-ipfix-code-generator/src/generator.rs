@@ -400,8 +400,8 @@ pub(crate) fn generate_ie_ids(name_prefixes: &Vec<(String, String, u32)>) -> Str
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str(generate_derive(false, true, true).as_str());
     ret.push_str("pub enum InformationElementId {\n");
+    ret.push_str("    Unknown{pen: u32, id: u16},\n");
     for (name, pkg, _) in name_prefixes {
-        ret.push_str("    Unknown{pen: u32, id: u16},\n");
         ret.push_str(format!("    {}({}::InformationElementId),\n", name, pkg).as_str());
     }
     ret.push_str("}\n");
