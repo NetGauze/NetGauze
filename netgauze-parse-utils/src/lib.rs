@@ -227,7 +227,7 @@ pub fn parse_till_empty_into_located<'a, Lin: Debug, L: From<Lin>, T: ReadablePD
 #[inline]
 pub fn parse_till_empty_with_one_input<
     'a,
-    I: Copy,
+    I: Clone,
     T: ReadablePDUWithOneInput<'a, I, E>,
     E: Debug,
 >(
@@ -237,7 +237,7 @@ pub fn parse_till_empty_with_one_input<
     let mut buf = buf;
     let mut ret = Vec::new();
     while !buf.is_empty() {
-        let (tmp, element) = T::from_wire(buf, input)?;
+        let (tmp, element) = T::from_wire(buf, input.clone())?;
         ret.push(element);
         buf = tmp;
     }
@@ -248,7 +248,7 @@ pub fn parse_till_empty_with_one_input<
 #[inline]
 pub fn parse_till_empty_into_with_one_input_located<
     'a,
-    I: Copy,
+    I: Clone,
     Lin: Debug,
     L: From<Lin>,
     T: ReadablePDUWithOneInput<'a, I, Lin>,
@@ -259,7 +259,7 @@ pub fn parse_till_empty_into_with_one_input_located<
     let mut buf = buf;
     let mut ret = Vec::new();
     while !buf.is_empty() {
-        let (tmp, element) = parse_into_located_one_input(buf, input)?;
+        let (tmp, element) = parse_into_located_one_input(buf, input.clone())?;
         ret.push(element);
         buf = tmp;
     }
@@ -270,8 +270,8 @@ pub fn parse_till_empty_into_with_one_input_located<
 #[inline]
 pub fn parse_till_empty_into_with_two_inputs_located<
     'a,
-    I1: Copy,
-    I2: Copy,
+    I1: Clone,
+    I2: Clone,
     Lin: Debug,
     L: From<Lin>,
     T: ReadablePDUWithTwoInputs<'a, I1, I2, Lin>,
@@ -283,7 +283,7 @@ pub fn parse_till_empty_into_with_two_inputs_located<
     let mut buf = buf;
     let mut ret = Vec::new();
     while !buf.is_empty() {
-        let (tmp, element) = parse_into_located_two_inputs(buf, input1, input2)?;
+        let (tmp, element) = parse_into_located_two_inputs(buf, input1.clone(), input2.clone())?;
         ret.push(element);
         buf = tmp;
     }
