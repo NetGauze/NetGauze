@@ -182,10 +182,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| test_parse(mixed_span, templates_map.clone()))
     });
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
     // Initialize the templates
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
     IpfixPacket::from_wire(mixed_span, templates_map.clone()).unwrap();
-
     c.bench_function("IPFIX mixed with data only", |b| {
         b.iter(|| test_parse(data_span, templates_map.clone()))
     });
