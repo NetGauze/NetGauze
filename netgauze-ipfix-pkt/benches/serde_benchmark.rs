@@ -166,24 +166,27 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let options_template_span = Span::new(&IPFIX_PKT_OPTIONS_TEMPLATE_RAW);
     let mixed_span = Span::new(&IPFIX_PKT_MIXED);
     let data_span = Span::new(&IPFIX_PKT_DATA_PKT_ONLY);
+
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
     c.bench_function("IPFIX pkt with template only pkt", |b| {
         b.iter(|| test_parse(template_span, templates_map.clone()))
     });
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
     c.bench_function("IPFIX with options template only pkt", |b| {
-        let templates_map = Rc::new(RefCell::new(HashMap::new()));
         b.iter(|| test_parse(options_template_span, templates_map.clone()))
     });
 
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
     c.bench_function("IPFIX mixed with all set types", |b| {
-        let templates_map = Rc::new(RefCell::new(HashMap::new()));
         b.iter(|| test_parse(mixed_span, templates_map.clone()))
     });
 
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    // Initialize the templates
+    IpfixPacket::from_wire(mixed_span, templates_map.clone()).unwrap();
+
     c.bench_function("IPFIX mixed with data only", |b| {
-        let templates_map = Rc::new(RefCell::new(HashMap::new()));
-        // Initialize the templates
-        IpfixPacket::from_wire(mixed_span, templates_map.clone()).unwrap();
         b.iter(|| test_parse(data_span, templates_map.clone()))
     });
 }
