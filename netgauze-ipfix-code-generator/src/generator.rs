@@ -45,6 +45,7 @@ fn generate_xref_link(xref: &Xref) -> Option<String> {
             xref.data, xref.data,
         )),
         "person" => None,
+        "html" => Some(format!("[{}]({})", xref.data, xref.data)),
         other => todo!("Handle xref of type {}", other),
     }
 }
@@ -92,7 +93,7 @@ pub(crate) fn generate_ie_units(entries: &[SimpleRegistry]) -> String {
         };
         ret.push_str(format!("  {} = {},\n", description, entry.value).as_str());
     }
-    ret.push_str("}\n");
+    ret.push_str("}\n\n");
     ret
 }
 
@@ -110,7 +111,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
         }
         ret.push_str(format!("  {} = {},\n", x.description, x.value).as_str());
     }
-    ret.push_str("}\n");
+    ret.push_str("}\n\n");
     ret
 }
 
@@ -275,7 +276,7 @@ pub(crate) fn generate_ie_status() -> String {
     ret.push_str("pub enum InformationElementStatus {\n");
     ret.push_str("    current = 0,\n");
     ret.push_str("    deprecated = 1,\n");
-    ret.push_str("}\n");
+    ret.push_str("}\n\n");
     ret
 }
 
@@ -285,13 +286,30 @@ pub(crate) fn generate_common_types() -> String {
 }
 
 /// `TryFrom` block for  InformationElementId
-fn generate_ie_try_from_pen_code(name_prefixes: &Vec<(String, String, u32)>) -> String {
+fn generate_ie_try_from_pen_code(
+    iana_ies: &Vec<InformationElement>,
+    name_prefixes: &Vec<(String, String, u32)>,
+) -> String {
     let mut ret = String::new();
     ret.push_str("impl TryFrom<(u32, u16)> for InformationElementId {\n");
     ret.push_str("    type Error = InformationElementIdError;\n\n");
     ret.push_str("    fn try_from(value: (u32, u16)) -> Result<Self, Self::Error> {\n");
     ret.push_str("        let (pen, code) = value;\n");
     ret.push_str("        match pen {\n");
+    ret.push_str("            0 => {\n");
+    ret.push_str("                match code {\n");
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "                    {} =>  Ok(InformationElementId::{}),\n",
+                ie.element_id, ie.name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("                    _ =>  Err(InformationElementIdError::UndefinedIANAInformationElementId(code)),\n");
+    ret.push_str("                }\n");
+    ret.push_str("            }\n");
     for (name, pkg, pen) in name_prefixes {
         ret.push_str(format!("            {} => {{\n", pen).as_str());
         ret.push_str(
@@ -317,105 +335,208 @@ fn generate_ie_try_from_pen_code(name_prefixes: &Vec<(String, String, u32)>) -> 
     );
     ret.push_str("       }\n");
     ret.push_str("   }\n");
-    ret.push_str("}\n");
+    ret.push_str("}\n\n");
     ret
 }
 
-fn generate_ie_template_trait_for_ie(name_prefixes: &Vec<(String, String, u32)>) -> String {
+fn generate_ie_template_trait_for_main(
+    iana_ies: &Vec<InformationElement>,
+    vendors: &Vec<(String, String, u32)>,
+) -> String {
     let mut ret = String::new();
     ret.push_str("impl super::InformationElementTemplate for InformationElementId {\n");
     ret.push_str("    fn semantics(&self) -> Option<InformationElementSemantics> {\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => None,\n");
-    for (name, _, _) in name_prefixes {
+    for (name, _, _) in vendors {
         ret.push_str(format!("            Self::{}(ie) => ie.semantics(),\n", name).as_str());
     }
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "            Self::{} => {},\n",
+                ie.name,
+                ie.data_type_semantics
+                    .as_ref()
+                    .map(|x| format!("Some(InformationElementSemantics::{})", x))
+                    .unwrap_or_else(|| "None".to_string())
+            )
+            .as_str(),
+        );
+    }
     ret.push_str("        }\n");
-    ret.push_str("    }\n");
+    ret.push_str("    }\n\n");
 
     ret.push_str("    fn data_type(&self) -> InformationElementDataType {\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => InformationElementDataType::octetArray,\n");
-    for (name, _, _) in name_prefixes {
+    for (name, _, _) in vendors {
         ret.push_str(format!("            Self::{}(ie) => ie.data_type(),\n", name).as_str());
     }
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "            Self::{} => InformationElementDataType::{},\n",
+                ie.name, ie.data_type
+            )
+            .as_str(),
+        );
+    }
     ret.push_str("        }\n");
-    ret.push_str("    }\n");
+    ret.push_str("    }\n\n");
 
     ret.push_str("    fn units(&self) -> Option<InformationElementUnits> {\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => None,\n");
-    for (name, _, _) in name_prefixes {
+    for (name, _, _) in vendors {
         ret.push_str(format!("            Self::{}(ie) => ie.units(),\n", name).as_str());
     }
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "            Self::{} => {},\n",
+                ie.name,
+                ie.units
+                    .as_ref()
+                    .map(|x| format!("Some(super::InformationElementUnits::{})", x))
+                    .unwrap_or_else(|| "None".to_string())
+            )
+            .as_str(),
+        );
+    }
     ret.push_str("        }\n");
-    ret.push_str("    }\n");
+    ret.push_str("    }\n\n");
 
     ret.push_str("    fn value_range(&self) -> Option<std::ops::Range<u64>> {\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => None,\n");
-    for (name, _, _) in name_prefixes {
+    for (name, _, _) in vendors {
         ret.push_str(format!("            Self::{}(ie) => ie.value_range(),\n", name).as_str());
     }
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "            Self::{} => {},\n",
+                ie.name,
+                ie.range
+                    .as_ref()
+                    .map(|x| {
+                        let mut parts = vec![];
+                        for part in x.split('-') {
+                            parts.push(part)
+                        }
+                        let start = parts.first().expect("Couldn't parse units range");
+                        let end = parts.get(1).unwrap().trim();
+                        let end = if end.starts_with("0x") {
+                            u64::from_str_radix(end.trim_start_matches("0x"), 16).unwrap()
+                        } else {
+                            end.parse::<u64>().unwrap()
+                        };
+                        format!(
+                            "Some(std::ops::Range{{start: {}, end: {}}})",
+                            start,
+                            end + 1
+                        )
+                    })
+                    .unwrap_or_else(|| "None".to_string())
+            )
+            .as_str(),
+        );
+    }
     ret.push_str("        }\n");
-    ret.push_str("    }\n");
+    ret.push_str("    }\n\n");
 
-    ret.push_str("    fn id(&self) -> u16 {\n");
+    ret.push_str("    fn id(&self) -> u16{\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{id, ..} => *id,\n");
-    for (name, _, _) in name_prefixes {
-        ret.push_str(format!("            Self::{}(ie) => ie.id(),\n", name).as_str());
+    for (name, _pkg, _) in vendors {
+        ret.push_str(
+            format!("            Self::{}(vendor_ie) => vendor_ie.id(),\n", name).as_str(),
+        );
+    }
+    for ie in iana_ies {
+        ret.push_str(format!("            Self::{} => {},\n", ie.name, ie.element_id).as_str());
     }
     ret.push_str("        }\n");
-    ret.push_str("    }\n");
+    ret.push_str("    }\n\n");
 
-    ret.push_str("    fn pen(&self) -> u32 {\n");
+    ret.push_str("    fn pen(&self) -> u32{\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{pen, ..} => *pen,\n");
-    for (name, _, _) in name_prefixes {
-        ret.push_str(format!("            Self::{}(ie) => ie.pen(),\n", name).as_str());
+    for (name, _pkg, _) in vendors {
+        ret.push_str(
+            format!(
+                "            Self::{}(vendor_ie) => vendor_ie.pen(),\n",
+                name
+            )
+            .as_str(),
+        );
     }
+    // Rest is IANA with PEN 0
+    ret.push_str("            _ => 0,\n");
     ret.push_str("        }\n");
-    ret.push_str("    }\n");
+    ret.push_str("    }\n\n");
 
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_ie_record_enum_for_ie(name_prefixes: &Vec<(String, String, u32)>) -> String {
+fn generate_ie_record_enum_for_ie(
+    iana_ies: &Vec<InformationElement>,
+    vendors: &Vec<(String, String, u32)>,
+) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str(generate_derive(false, false, false).as_str());
     ret.push_str("pub enum Record {\n");
     ret.push_str("    Unknown(Vec<u8>),\n");
-    for (name, pkg, _) in name_prefixes {
+    for (name, pkg, _) in vendors {
         ret.push_str(format!("    {}({}::Record),\n", name, pkg).as_str());
+    }
+    for ie in iana_ies {
+        ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
     }
     ret.push_str("}\n\n");
     ret
 }
 
-pub(crate) fn generate_ie_ids(name_prefixes: &Vec<(String, String, u32)>) -> String {
+pub(crate) fn generate_ie_ids(
+    iana_ies: &Vec<InformationElement>,
+    vendors: &Vec<(String, String, u32)>,
+) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str(generate_derive(false, true, true).as_str());
     ret.push_str("pub enum InformationElementId {\n");
     ret.push_str("    Unknown{pen: u32, id: u16},\n");
-    for (name, pkg, _) in name_prefixes {
+    for (name, pkg, _) in vendors {
         ret.push_str(format!("    {}({}::InformationElementId),\n", name, pkg).as_str());
     }
-    ret.push_str("}\n");
+    for ie in iana_ies {
+        for line in ie.description.split('\n') {
+            ret.push_str(format!("    /// {}\n", line.trim()).as_str());
+        }
+        if !ie.description.is_empty() && !ie.xrefs.is_empty() {
+            ret.push_str("    ///\n");
+        }
+        for xref in ie.xrefs.iter().filter_map(generate_xref_link) {
+            ret.push_str(format!("    /// Reference: {}\n", xref).as_str());
+        }
+        ret.push_str(format!("    {},\n", ie.name).as_str());
+    }
+    ret.push_str("}\n\n");
 
     ret.push_str(generate_derive(false, true, true).as_str());
     ret.push_str("pub enum InformationElementIdError {\n");
-    for (name, pkg, _) in name_prefixes {
+    ret.push_str("    UndefinedIANAInformationElementId(u16),\n");
+    for (name, pkg, _) in vendors {
         ret.push_str(format!("    {}({}::UndefinedInformationElementId),\n", name, pkg).as_str());
     }
-    ret.push_str("}\n");
+    ret.push_str("}\n\n");
 
-    ret.push_str(generate_ie_try_from_pen_code(name_prefixes).as_str());
-    ret.push_str(generate_ie_template_trait_for_ie(name_prefixes).as_str());
-    ret.push_str(generate_ie_record_enum_for_ie(name_prefixes).as_str());
+    ret.push_str(generate_ie_try_from_pen_code(iana_ies, vendors).as_str());
+    ret.push_str(generate_ie_template_trait_for_main(iana_ies, vendors).as_str());
+    ret.push_str(generate_ie_record_enum_for_ie(iana_ies, vendors).as_str());
 
     ret
 }
@@ -968,10 +1089,16 @@ fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
     ret
 }
 
-pub(crate) fn generate_pkg_ie_deserializers(ies: &Vec<InformationElement>) -> String {
+pub(crate) fn generate_pkg_ie_deserializers(
+    vendor_mod: &str,
+    ies: &Vec<InformationElement>,
+) -> String {
     let mut ret = String::new();
-    ret.push_str("use chrono::TimeZone;\n");
-    ret.push_str(format!("use crate::ie::{}::*;\n\n", "iana").as_str());
+    // Not every vendor is using time based values
+    if ies.iter().any(|x| x.data_type.contains("chrono")) {
+        ret.push_str("use chrono::TimeZone;\n");
+    }
+    ret.push_str(format!("use crate::ie::{}::*;\n\n", vendor_mod).as_str());
 
     for ie in ies {
         ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
@@ -981,10 +1108,16 @@ pub(crate) fn generate_pkg_ie_deserializers(ies: &Vec<InformationElement>) -> St
     ret
 }
 
-fn generate_records_enum(ies: &Vec<InformationElement>) -> String {
+pub(crate) fn generate_records_enum(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(generate_derive(false, false, false).as_str());
+    let not_copy = ies.iter().any(|x| {
+        get_rust_type(&x.data_type) == "Vec<u8>" || get_rust_type(&x.data_type) == "String"
+    });
+    let not_eq = ies
+        .iter()
+        .any(|x| get_rust_type(&x.data_type) == "f32" || get_rust_type(&x.data_type) == "f64");
+    ret.push_str(generate_derive(false, !not_copy, !not_eq).as_str());
     ret.push_str("pub enum Record {\n");
     for ie in ies {
         ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
@@ -1040,7 +1173,6 @@ pub(crate) fn generate_ie_values(ies: &Vec<InformationElement>) -> String {
         //ret.push_str(generate_ie_value_converters(&rust_type,
         // &ie.name).as_str());
     }
-    ret.push_str(generate_records_enum(ies).as_str());
     ret
 }
 
@@ -1085,22 +1217,38 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     ret
 }
 
-pub(crate) fn generate_ie_record_enum_for_ie_deserializer(
-    name_prefixes: &Vec<(String, String, u32)>,
+pub(crate) fn generate_ie_deser_main(
+    iana_ies: &Vec<InformationElement>,
+    vendor_prefixes: &Vec<(String, String, u32)>,
 ) -> String {
     let mut ret = String::new();
+    ret.push_str("use chrono::TimeZone;\n\n\n");
+    // Generate IANA Deser
+    for ie in iana_ies {
+        ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
+    }
+
     let ty_name = "Record";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
     ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
-    for (name, pkg, _) in name_prefixes {
+    for (name, pkg, _) in vendor_prefixes {
         let value_name = format!("{}::RecordParsingError", pkg);
         ret.push_str(
             format!(
                 "    {}Error(#[from_located(module = \"\")] {}),\n",
                 name, value_name
+            )
+            .as_str(),
+        );
+    }
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "    {}Error(#[from_located(module = \"self\")] {}ParsingError),\n",
+                ie.name, ie.name
             )
             .as_str(),
         );
@@ -1116,7 +1264,7 @@ pub(crate) fn generate_ie_record_enum_for_ie_deserializer(
     ret.push_str("        length: u16,\n");
     ret.push_str("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedRecordParsingError<'a>> {\n");
     ret.push_str("        let (buf, value) = match ie {\n");
-    for (name, _, _) in name_prefixes {
+    for (name, _, _) in vendor_prefixes {
         ret.push_str(
             format!(
                 "            InformationElementId::{}(value_ie) => {{\n",
@@ -1134,7 +1282,19 @@ pub(crate) fn generate_ie_record_enum_for_ie_deserializer(
         );
         ret.push_str("            }\n");
     }
-    ret.push_str("            _ => todo!(),\n");
+    for ie in iana_ies {
+        ret.push_str(format!("            InformationElementId::{} => {{\n", ie.name).as_str());
+        ret.push_str("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input(buf, length)?;\n");
+        ret.push_str(
+            format!(
+                "                (buf, crate::ie::Record::{}(value))\n",
+                ie.name
+            )
+            .as_str(),
+        );
+        ret.push_str("            }\n");
+    }
+    ret.push_str("            _ => todo!(\"Handle unknown IEs\")\n");
     ret.push_str("        };\n");
     ret.push_str("        Ok((buf, value))\n");
     ret.push_str("    }\n");

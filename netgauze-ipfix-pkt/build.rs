@@ -20,6 +20,15 @@ const IPFIX_URL: &str = "https://www.iana.org/assignments/ipfix/ipfix.xml";
 
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
+    let nokia_source = SourceConfig::new(
+        RegistrySource::File(
+            "/Users/ahassany/repos/netgauze/netgauze-ipfix-pkt/registry/nokia.xml".to_string(),
+        ),
+        RegistryType::IanaXML,
+        637,
+        "nokia".to_string(),
+        "Nokia".to_string(),
+    );
     let iana_source = SourceConfig::new(
         RegistrySource::Http(IPFIX_URL.to_string()),
         RegistryType::IanaXML,
@@ -27,7 +36,7 @@ fn main() {
         "iana".to_string(),
         "IANA".to_string(),
     );
-    let configs = Config::new(iana_source, vec![]);
+    let configs = Config::new(iana_source, vec![nokia_source]);
     generate(&out_dir, &configs).unwrap();
 
     println!("cargo:rerun-if-changed=build.rs");

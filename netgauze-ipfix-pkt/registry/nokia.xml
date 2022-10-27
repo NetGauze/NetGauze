@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="ipfix.xsl"?>
+<?xml-model href="ipfix.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
+<registry xmlns="http://www.iana.org/assignments" id="ipfix">
+    <registry id="ipfix-information-elements">
+        <title>Nokia IPFIX Information Elements</title>
+        <record>
+            <name>aluInsideServiceId</name>
+            <dataType>unsigned16</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>91</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    The 16-bit service ID representing the inside service ID.
+                    This field is not applicable in L2-Aware NAT and is set to NULL in this case.
+                </paragraph>
+            </description>
+            <units>octets</units>
+            <xref type="html" data="https://infocenter.nokia.com/public/7750SR225R1A/index.jsp?topic=%2Fcom.nokia.Multiservice_ISA_and_ESA_Guide%2Ftemplate_format-ai9jxkmf6f.html"/>
+            <revision>0</revision>
+            <date>2022-01-01</date>
+        </record>
+
+        <record>
+            <name>aluOutsideServiceId</name>
+            <dataType>unsigned16</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>92</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    The 16-bit service ID representing the outside service ID.
+                </paragraph>
+            </description>
+            <xref type="html" data="https://infocenter.nokia.com/public/7750SR225R1A/index.jsp?topic=%2Fcom.nokia.Multiservice_ISA_and_ESA_Guide%2Ftemplate_format-ai9jxkmf6f.html"/>
+            <revision>0</revision>
+            <date>2022-01-01</date>
+        </record>
+
+        <record>
+            <name>aluNatSubString</name>
+            <dataType>string</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>93</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    A variable 8B aligned string that represents the NAT subscriber construct
+                    (as currently used in the tools>dump>service>nat> session commands).
+                    The original IP source address, before NAT is performed is included in this string.
+                    For example:
+                    LSN-Host@10.10.10.101
+                </paragraph>
+            </description>
+            <xref type="html" data="https://infocenter.nokia.com/public/7750SR225R1A/index.jsp?topic=%2Fcom.nokia.Multiservice_ISA_and_ESA_Guide%2Ftemplate_format-ai9jxkmf6f.html"/>
+            <revision>0</revision>
+            <date>2022-01-01</date>
+        </record>
+        
+    </registry>
+</registry>

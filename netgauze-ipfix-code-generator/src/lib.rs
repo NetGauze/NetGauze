@@ -200,10 +200,10 @@ pub enum GenerateIanaConfigError {
 
 /// Specifically generate the IANA configs, unlike vendor specific registries,
 /// IANA generate more types related to the IPFIX protocol itself
-fn generate_iana(
+fn generate_vendor_ie(
     out_dir: &OsString,
     config: &SourceConfig,
-) -> Result<String, GenerateIanaConfigError> {
+) -> Result<(), GenerateIanaConfigError> {
     if config.registry_type != RegistryType::IanaXML {
         return Err(GenerateIanaConfigError::UnsupportedRegistryType(
             config.registry_type.clone(),
@@ -213,32 +213,32 @@ fn generate_iana(
     let xml_doc = roxmltree::Document::parse(xml_string.as_str())?;
     let root = xml_doc.root();
 
-    let (_data_types_parsed, semantics_parsed, units_parsed) = parse_iana_common_values(&root);
-    let semantics_generated = generate_ie_semantics(&semantics_parsed);
-    let units_generated = generate_ie_units(&units_parsed);
+    let ie_node = find_node_by_id(&root, ID_IE).unwrap();
+    let ie_node_parsed = parse_information_elements(&ie_node, 0);
+    let ie_generated = generate_information_element_ids(&ie_node_parsed);
 
-    let iana_ie_node = find_node_by_id(&root, ID_IE).unwrap();
-    let iana_ie_node_parsed = parse_information_elements(&iana_ie_node, 0);
-    let iana_ie_generated = generate_information_element_ids(&iana_ie_node_parsed);
+    let deser_generated = generate_pkg_ie_deserializers(config.mod_name.as_str(), &ie_node_parsed);
 
-    let iana_deser_generated = generate_pkg_ie_deserializers(&iana_ie_node_parsed);
+    let mut output = String::new();
+    output.push_str(ie_generated.as_str());
+    output.push_str("\n\n");
 
-    let mut iana_output = String::new();
-    iana_output.push_str(iana_ie_generated.as_str());
-    iana_output.push_str("\n\n");
-    iana_output.push_str(generate_ie_values(&iana_ie_node_parsed).as_str());
+    output.push_str(generate_ie_values(&ie_node_parsed).as_str());
+    output.push_str(generate_records_enum(&ie_node_parsed).as_str());
 
-    let iana_dest_path = Path::new(&out_dir).join(format!("iana_{}", GENERATED_VENDOR_MAIN_SUFFIX));
-    fs::write(&iana_dest_path, iana_output)?;
+    let dest_path = Path::new(&out_dir).join(format!(
+        "{}_{}",
+        config.mod_name, GENERATED_VENDOR_MAIN_SUFFIX
+    ));
+    fs::write(&dest_path, output)?;
 
-    let iana_deser_dest_path =
-        Path::new(&out_dir).join(format!("iana_{}", GENERATED_VENDOR_DESER_SUFFIX));
-    fs::write(&iana_deser_dest_path, iana_deser_generated)?;
+    let deser_dest_path = Path::new(&out_dir).join(format!(
+        "{}_{}",
+        config.mod_name, GENERATED_VENDOR_DESER_SUFFIX
+    ));
+    fs::write(&deser_dest_path, deser_generated)?;
 
-    let mut ret = String::new();
-    ret.push_str(semantics_generated.as_str());
-    ret.push_str(units_generated.as_str());
-    Ok(ret)
+    Ok(())
 }
 
 #[derive(Error, Debug)]
@@ -248,48 +248,51 @@ pub enum GenerateError {
 
     #[error("error in generating IANA configs")]
     GenerateIanaConfigError(#[from] GenerateIanaConfigError),
+
+    #[error("error getting registry data from the source")]
+    SourceError(#[from] GetStringSourceError),
+
+    #[error("error parsing xml data from the given source")]
+    XmlParsingError(#[from] roxmltree::Error),
+
+    #[error("registry type is not supported")]
+    UnsupportedRegistryType(RegistryType),
 }
 
 pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError> {
-    let iana_gen = generate_iana(out_dir, config.iana())?;
+    //let iana_gen = generate_iana(out_dir, config.iana())?;
 
     let mut ie_output = String::new();
     ie_output.push_str(generate_common_types().as_str());
     ie_output.push_str(generate_ie_status().as_str());
 
-    ie_output.push_str(iana_gen.as_str());
+    // Start parsing the IANA registry
+    let xml_string = get_string_source(&config.iana.source)?;
+    let xml_doc = roxmltree::Document::parse(xml_string.as_str())?;
+    let iana_root = xml_doc.root();
+
+    let (_data_types_parsed, semantics_parsed, units_parsed) = parse_iana_common_values(&iana_root);
+    let semantics_generated = generate_ie_semantics(&semantics_parsed);
+    let units_generated = generate_ie_units(&units_parsed);
+    ie_output.push_str(semantics_generated.as_str());
+    ie_output.push_str(units_generated.as_str());
+
+    let iana_ie_node = find_node_by_id(&iana_root, ID_IE).unwrap();
+    let iana_ie_node_parsed = parse_information_elements(&iana_ie_node, 0);
+
+    let mut vendors = vec![];
+    for vendor in &config.vendors {
+        vendors.push((vendor.name.clone(), vendor.mod_name.clone(), vendor.pen));
+        generate_vendor_ie(out_dir, vendor)?;
+    }
+
+    // Generate IANA IE and reference to vendor specific IEs
+    ie_output.push_str(generate_ie_ids(&iana_ie_node_parsed, &vendors).as_str());
+    ie_output.push_str(generate_ie_values(&iana_ie_node_parsed).as_str());
 
     let mut ie_deser = String::new();
     ie_deser.push_str("use crate::ie::*;\n\n");
 
-    let mut names = vec![(
-        config.iana.name.clone(),
-        config.iana.mod_name.clone(),
-        config.iana.pen(),
-    )];
-    for vendor in &config.vendors {
-        names.push((vendor.name.clone(), vendor.mod_name.clone(), vendor.pen));
-    }
-    ie_output.push_str(generate_ie_ids(&names).as_str());
-
-    ie_output.push_str(
-        format!(
-            "pub mod {} {{include!(concat!(env!(\"OUT_DIR\"), \"/{}_{}\"));}}\n\n",
-            config.iana.mod_name(),
-            config.iana.mod_name(),
-            GENERATED_VENDOR_MAIN_SUFFIX
-        )
-        .as_str(),
-    );
-    ie_deser.push_str(
-        format!(
-            "pub mod {} {{include!(concat!(env!(\"OUT_DIR\"), \"/{}_{}\"));}}\n\n",
-            config.iana.mod_name(),
-            config.iana.mod_name(),
-            GENERATED_VENDOR_DESER_SUFFIX
-        )
-        .as_str(),
-    );
     for vendor in &config.vendors {
         ie_output.push_str(
             format!(
@@ -311,7 +314,8 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
         );
     }
 
-    ie_deser.push_str(generate_ie_record_enum_for_ie_deserializer(&names).as_str());
+    ie_deser.push_str(generate_ie_deser_main(&iana_ie_node_parsed, &vendors).as_str());
+
     let ie_dest_path = Path::new(&out_dir).join("ie_generated.rs");
     fs::write(&ie_dest_path, ie_output)?;
 

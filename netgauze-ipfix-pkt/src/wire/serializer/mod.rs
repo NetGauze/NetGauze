@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{ie, ie::InformationElementTemplate, FieldSpecifier, IpfixHeader, TemplateRecord};
+use crate::{ie::InformationElementTemplate, FieldSpecifier, IpfixHeader, TemplateRecord};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
@@ -53,12 +53,7 @@ impl WritablePDU<FieldSpecifierWritingError> for FieldSpecifier {
     const BASE_LENGTH: usize = 4;
 
     fn len(&self) -> usize {
-        Self::BASE_LENGTH
-            + if let ie::InformationElementId::IANA(_) = self.element_id {
-                0
-            } else {
-                4
-            }
+        Self::BASE_LENGTH + if self.element_id.pen() == 0 { 0 } else { 4 }
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), FieldSpecifierWritingError> {
