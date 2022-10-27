@@ -19,11 +19,16 @@ use std::env;
 const IPFIX_URL: &str = "https://www.iana.org/assignments/ipfix/ipfix.xml";
 
 fn main() {
-    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let out_dir = env::var_os("OUT_DIR").expect("Couldn't find OUT_DIR in OS env variables");
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let registry_path = std::path::Path::new(&manifest_dir).join("registry");
+    let nokia_path = registry_path
+        .join("nokia.xml")
+        .into_os_string()
+        .into_string()
+        .expect("Couldn't load nokia registry file");
     let nokia_source = SourceConfig::new(
-        RegistrySource::File(
-            "/Users/ahassany/repos/netgauze/netgauze-ipfix-pkt/registry/nokia.xml".to_string(),
-        ),
+        RegistrySource::File(nokia_path),
         RegistryType::IanaXML,
         637,
         "nokia".to_string(),
