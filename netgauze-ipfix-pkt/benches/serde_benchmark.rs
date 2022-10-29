@@ -1,9 +1,9 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use netgauze_ipfix_pkt::{FieldSpecifier, IpfixPacket};
-use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePDUWithOneInput, Span, WritablePDUWithOneInput};
 
 const IPFIX_PKT_TEMPLATE_RAW: &[u8] = &[
     0x00, 0x0a, // Version
@@ -161,6 +161,10 @@ pub fn test_parse(span: Span, templates_map: Rc<RefCell<HashMap<u16, Rc<Vec<Fiel
     x.unwrap();
 }
 
+pub fn test_serialize(pkt: &IpfixPacket, cursor: &mut Cursor<&mut [u8]>) {
+    let _x = pkt.write(cursor, None);
+}
+
 pub fn criterion_benchmark(c: &mut Criterion) {
     let template_span = Span::new(&IPFIX_PKT_TEMPLATE_RAW);
     let options_template_span = Span::new(&IPFIX_PKT_OPTIONS_TEMPLATE_RAW);
@@ -168,25 +172,65 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let data_span = Span::new(&IPFIX_PKT_DATA_PKT_ONLY);
 
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    c.bench_function("IPFIX pkt with template only pkt", |b| {
+    c.bench_function("Deserialize IPFIX pkt with template only pkt", |b| {
         b.iter(|| test_parse(template_span, templates_map.clone()))
     });
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    c.bench_function("IPFIX with options template only pkt", |b| {
-        b.iter(|| test_parse(options_template_span, templates_map.clone()))
+    let (_, pkt) =
+        IpfixPacket::from_wire(template_span, Rc::new(RefCell::new(HashMap::new()))).unwrap();
+    let mut buf: [u8; 1024] = [0; 1024];
+    c.bench_function("Serialize IPFIX pkt with template only pkt", |b| {
+        b.iter(|| {
+            let mut cursor = Cursor::new(&mut buf[..]);
+            test_serialize(&pkt, &mut cursor)
+        })
     });
 
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    c.bench_function("IPFIX mixed with all set types", |b| {
+    c.bench_function("Deserialize IPFIX with options template only pkt", |b| {
+        b.iter(|| test_parse(options_template_span, templates_map.clone()))
+    });
+
+    let (_, pkt) =
+        IpfixPacket::from_wire(options_template_span, Rc::new(RefCell::new(HashMap::new())))
+            .unwrap();
+    let mut buf: [u8; 1024] = [0; 1024];
+    c.bench_function("Serialize IPFIX with options template only pkt", |b| {
+        b.iter(|| {
+            let mut cursor = Cursor::new(&mut buf[..]);
+            test_serialize(&pkt, &mut cursor)
+        })
+    });
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    c.bench_function("Deserialize IPFIX mixed with all set types", |b| {
         b.iter(|| test_parse(mixed_span, templates_map.clone()))
+    });
+
+    let (_, pkt) =
+        IpfixPacket::from_wire(mixed_span, Rc::new(RefCell::new(HashMap::new()))).unwrap();
+    let mut buf: [u8; 1024] = [0; 1024];
+    c.bench_function("Serialize IPFIX  IPFIX mixed with all set types", |b| {
+        b.iter(|| {
+            let mut cursor = Cursor::new(&mut buf[..]);
+            test_serialize(&pkt, &mut cursor)
+        })
     });
 
     // Initialize the templates
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
     IpfixPacket::from_wire(mixed_span, templates_map.clone()).unwrap();
-    c.bench_function("IPFIX mixed with data only", |b| {
+    c.bench_function("Deserialize IPFIX mixed with data only", |b| {
         b.iter(|| test_parse(data_span, templates_map.clone()))
+    });
+
+    let (_, pkt) = IpfixPacket::from_wire(data_span, templates_map).unwrap();
+    let mut buf: [u8; 1024] = [0; 1024];
+    c.bench_function("Serialize IPFIX mixed with data only", |b| {
+        b.iter(|| {
+            let mut cursor = Cursor::new(&mut buf[..]);
+            test_serialize(&pkt, &mut cursor)
+        })
     });
 }
 
