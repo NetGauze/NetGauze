@@ -123,6 +123,43 @@ fn filter_attribute_by_name(
     Ok((variants, idents))
 }
 
+#[allow(clippy::type_complexity)]
+fn filter_attribute_by_name_with_module(
+    enum_data: &syn::DataEnum,
+    filter: &str,
+) -> syn::Result<(Vec<syn::Ident>, Vec<(Vec<syn::Ident>, syn::Ident)>)> {
+    let mut variants = vec![];
+    let mut idents = vec![];
+    for variant in enum_data.variants.iter() {
+        for field in variant.fields.iter() {
+            for _attr in field.attrs.iter().filter(|attr| {
+                attr.path
+                    .segments
+                    .iter()
+                    .any(|seg| seg.ident == syn::Ident::new(filter, seg.span()))
+            }) {
+                if let syn::Type::Path(path) = &field.ty {
+                    variants.push(variant.ident.clone());
+                    let ident = path.path.get_ident();
+                    match ident {
+                        Some(ident) => idents.push((vec![format_ident!("self")], ident.clone())),
+                        None => {
+                            let segments = path.path.segments.iter().collect::<Vec<_>>();
+                            let module_path = segments.as_slice()[0..segments.len() - 1]
+                                .iter()
+                                .map(|x| x.ident.clone())
+                                .collect::<Vec<_>>();
+                            let from_ident = segments.last().unwrap().ident.clone();
+                            idents.push((module_path, from_ident));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok((variants, idents))
+}
+
 #[derive(Debug)]
 struct LocatedError {}
 
@@ -355,17 +392,10 @@ impl WritingError {
             }
         };
         let ident = input.ident.clone();
-        let (from_variants, from_idents) = filter_attribute_by_name(en, "from")?;
+        let (from_variants, from_idents) = filter_attribute_by_name_with_module(en, "from")?;
         let (from_std_io_error_variants, _) = filter_attribute_by_name(en, "from_std_io_error")?;
-        let output = quote! {
-            #(
-                #[automatically_derived]
-                impl From<#from_idents> for #ident {
-                    fn from(err: #from_idents) -> Self {
-                        #ident::#from_variants(err)
-                    }
-                }
-            )*
+
+        let mut output = quote! {
             #(
                 #[automatically_derived]
                 impl From<std::io::Error> for #ident {
@@ -375,6 +405,20 @@ impl WritingError {
                 }
             )*
         };
+        for (index, variant) in from_variants.iter().enumerate() {
+            let (from_module_path, from_ident) = from_idents
+                .get(index)
+                .expect("Error in generating WritingError");
+            let tmp = quote! {
+                #[automatically_derived]
+                impl From<#(#from_module_path)::*::#from_ident> for #ident {
+                    fn from(err: #(#from_module_path)::*::#from_ident) -> Self {
+                        #ident::#variant(err)
+                    }
+                }
+            };
+            output.append_all(tmp);
+        }
         Ok(proc_macro::TokenStream::from(output))
     }
 }
