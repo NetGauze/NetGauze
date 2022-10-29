@@ -28,7 +28,7 @@ use crate::{
 };
 
 #[test]
-fn test_ipfix_header() -> Result<(), IpfixHeaderWritingError> {
+fn test_ipfix_header() {
     let good_wire = [
         0x00, 0x0a, 0x00, 0x10, 0x63, 0x4a, 0xe2, 0x9d, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
         0x01,
@@ -61,8 +61,6 @@ fn test_ipfix_header() -> Result<(), IpfixHeaderWritingError> {
         &bad_length_wire,
         &bad_length,
     );
-    test_write(&good, &good_wire)?;
-    Ok(())
 }
 
 #[test]

@@ -16,8 +16,7 @@
 pub mod ie;
 use crate::{
     ie::InformationElementTemplate, wire::serializer::ie::RecordWritingError, DataRecord,
-    FieldSpecifier, Flow, IpfixHeader, IpfixPacket, OptionsTemplateRecord, Set, SetPayload,
-    TemplateRecord,
+    FieldSpecifier, Flow, IpfixPacket, OptionsTemplateRecord, Set, SetPayload, TemplateRecord,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
@@ -27,7 +26,6 @@ use std::io::Write;
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum IpfixPacketWritingError {
     StdIOError(#[from_std_io_error] String),
-    IpfixHeaderError(#[from] IpfixHeaderWritingError),
     SetError(#[from] SetWritingError),
 }
 
@@ -53,30 +51,6 @@ impl WritablePDUWithOneInput<Option<&[Option<u16>]>, IpfixPacketWritingError> fo
         for set in &self.payload {
             set.write(writer, lengths)?;
         }
-        Ok(())
-    }
-}
-
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum IpfixHeaderWritingError {
-    StdIOError(#[from_std_io_error] String),
-}
-
-impl WritablePDU<IpfixHeaderWritingError> for IpfixHeader {
-    /// 2-octets version, 2-octets length, 4-octets * 3 (export time, seq no,
-    /// observation domain id)
-    const BASE_LENGTH: usize = 16;
-
-    fn len(&self) -> usize {
-        Self::BASE_LENGTH
-    }
-
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), IpfixHeaderWritingError> {
-        writer.write_u16::<NetworkEndian>(self.version)?;
-        writer.write_u16::<NetworkEndian>(self.len() as u16)?;
-        writer.write_u32::<NetworkEndian>(self.export_time.timestamp() as u32)?;
-        writer.write_u32::<NetworkEndian>(self.sequence_number)?;
-        writer.write_u32::<NetworkEndian>(self.observation_domain_id)?;
         Ok(())
     }
 }
