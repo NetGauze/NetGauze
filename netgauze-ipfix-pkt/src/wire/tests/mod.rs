@@ -620,6 +620,91 @@ fn test_u16_reduced_size_encoding() -> Result<(), ie_ser::RecordWritingError> {
 }
 
 #[test]
+fn test_i32_reduced_size_encoding() -> Result<(), ie_ser::RecordWritingError> {
+    let u32_max_wire = [0x7f, 0xff, 0xff, 0xff];
+    let u32_min_wire = [0x80, 0x00, 0x00, 0x00];
+    let u24_pos_wire = [0x00, 0x7f, 0xff];
+    let u24_neg_wire = [0xff, 0x80, 0x00];
+    let u16_max_wire = [0x7f, 0xff];
+    let u16_min_wire = [0x80, 0x00];
+    let u8_max_wire = [0x7f];
+    let u8_min_wire = [0x80];
+
+    let length_four = Some(4);
+    let length_three = Some(3);
+    let length_two = Some(2);
+    let length_one = Some(1);
+
+    let u32_max = ie::Record::mibObjectValueInteger(ie::mibObjectValueInteger(i32::MAX));
+    let u32_min = ie::Record::mibObjectValueInteger(ie::mibObjectValueInteger(i32::MIN));
+    let u16_max = ie::Record::mibObjectValueInteger(ie::mibObjectValueInteger(i16::MAX as i32));
+    let u24_pos = ie::Record::mibObjectValueInteger(ie::mibObjectValueInteger(i16::MAX as i32));
+    let u16_neg = ie::Record::mibObjectValueInteger(ie::mibObjectValueInteger(i16::MIN as i32));
+    let u24_min = ie::Record::mibObjectValueInteger(ie::mibObjectValueInteger(i16::MIN as i32));
+    let u8_max = ie::Record::mibObjectValueInteger(ie::mibObjectValueInteger(i8::MAX as i32));
+    let u8_min = ie::Record::mibObjectValueInteger(ie::mibObjectValueInteger(i8::MIN as i32));
+
+    test_parsed_completely_with_two_inputs(
+        &u32_max_wire,
+        &ie::InformationElementId::mibObjectValueInteger,
+        4,
+        &u32_max,
+    );
+    test_parsed_completely_with_two_inputs(
+        &u32_min_wire,
+        &ie::InformationElementId::mibObjectValueInteger,
+        4,
+        &u32_min,
+    );
+    test_parsed_completely_with_two_inputs(
+        &u24_pos_wire,
+        &ie::InformationElementId::mibObjectValueInteger,
+        3,
+        &u24_pos,
+    );
+    test_parsed_completely_with_two_inputs(
+        &u24_neg_wire,
+        &ie::InformationElementId::mibObjectValueInteger,
+        3,
+        &u24_min,
+    );
+    test_parsed_completely_with_two_inputs(
+        &u16_max_wire,
+        &ie::InformationElementId::mibObjectValueInteger,
+        2,
+        &u16_max,
+    );
+    test_parsed_completely_with_two_inputs(
+        &u16_min_wire,
+        &ie::InformationElementId::mibObjectValueInteger,
+        2,
+        &u16_neg,
+    );
+    test_parsed_completely_with_two_inputs(
+        &u8_max_wire,
+        &ie::InformationElementId::mibObjectValueInteger,
+        1,
+        &u8_max,
+    );
+    test_parsed_completely_with_two_inputs(
+        &u8_min_wire,
+        &ie::InformationElementId::mibObjectValueInteger,
+        1,
+        &u8_min,
+    );
+
+    test_write_with_one_input(&u32_max, length_four, &u32_max_wire)?;
+    test_write_with_one_input(&u32_min, length_four, &u32_min_wire)?;
+    test_write_with_one_input(&u24_pos, length_three, &u24_pos_wire)?;
+    test_write_with_one_input(&u24_min, length_three, &u24_neg_wire)?;
+    test_write_with_one_input(&u16_max, length_two, &u16_max_wire)?;
+    test_write_with_one_input(&u16_neg, length_two, &u16_min_wire)?;
+    test_write_with_one_input(&u8_max, length_one, &u8_max_wire)?;
+    test_write_with_one_input(&u8_min, length_one, &u8_min_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
     let good_wire = [
         0x00, 0x0a, // Version
