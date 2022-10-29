@@ -26,6 +26,7 @@ pub mod xml_parser;
 const APP_USER_AGENT: &str = "curl/7.79.1";
 const GENERATED_VENDOR_MAIN_SUFFIX: &str = "generated.rs";
 const GENERATED_VENDOR_DESER_SUFFIX: &str = "deser_generated.rs";
+const GENERATED_VENDOR_SER_SUFFIX: &str = "ser_generated.rs";
 
 /// Represent Information Element as read form a registry
 #[derive(Debug, Clone)]
@@ -218,6 +219,7 @@ fn generate_vendor_ie(
     let ie_generated = generate_information_element_ids(&ie_node_parsed);
 
     let deser_generated = generate_pkg_ie_deserializers(config.mod_name.as_str(), &ie_node_parsed);
+    let ser_generated = String::new();
 
     let mut output = String::new();
     output.push_str(ie_generated.as_str());
@@ -237,6 +239,12 @@ fn generate_vendor_ie(
         config.mod_name, GENERATED_VENDOR_DESER_SUFFIX
     ));
     fs::write(&deser_dest_path, deser_generated)?;
+
+    let ser_dest_path = Path::new(&out_dir).join(format!(
+        "{}_{}",
+        config.mod_name, GENERATED_VENDOR_SER_SUFFIX
+    ));
+    fs::write(&ser_dest_path, ser_generated)?;
 
     Ok(())
 }
@@ -291,7 +299,9 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
     ie_output.push_str(generate_ie_values(&iana_ie_node_parsed).as_str());
 
     let mut ie_deser = String::new();
+    let mut ie_ser = String::new();
     ie_deser.push_str("use crate::ie::*;\n\n");
+    ie_ser.push_str("use crate::ie::*;\n\n");
 
     for vendor in &config.vendors {
         ie_output.push_str(
@@ -312,14 +322,27 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
             )
             .as_str(),
         );
+        ie_ser.push_str(
+            format!(
+                "pub mod {} {{include!(concat!(env!(\"OUT_DIR\"), \"/{}_{}\"));}}\n\n",
+                vendor.mod_name(),
+                vendor.mod_name(),
+                GENERATED_VENDOR_SER_SUFFIX
+            )
+            .as_str(),
+        );
     }
 
     ie_deser.push_str(generate_ie_deser_main(&iana_ie_node_parsed, &vendors).as_str());
+    ie_ser.push_str(generate_ie_ser_main(&iana_ie_node_parsed, &vendors).as_str());
 
     let ie_dest_path = Path::new(&out_dir).join("ie_generated.rs");
     fs::write(&ie_dest_path, ie_output)?;
 
     let ie_deser_dest_path = Path::new(&out_dir).join("ie_deser_generated.rs");
     fs::write(&ie_deser_dest_path, ie_deser)?;
+
+    let ie_ser_dest_path = Path::new(&out_dir).join("ie_ser_generated.rs");
+    fs::write(&ie_ser_dest_path, ie_ser)?;
     Ok(())
 }

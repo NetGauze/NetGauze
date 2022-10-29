@@ -21,7 +21,7 @@ use crate::{
     ie,
     wire::{
         deserializer::{ie as ie_desr, *},
-        serializer::*,
+        serializer::{ie as ie_ser, *},
     },
     DataRecord, FieldSpecifier, Flow, IpfixHeader, IpfixPacket, OptionsTemplateRecord, Set,
     SetPayload, TemplateRecord,
@@ -107,7 +107,7 @@ fn test_field() -> Result<(), FieldSpecifierWritingError> {
 }
 
 #[test]
-fn test_u8_value() {
+fn test_u8_value() -> Result<(), ie_ser::protocolIdentifierWritingError> {
     let value_wire = [123];
     let value = ie::protocolIdentifier(123);
     let invalid_length = ie_desr::LocatedprotocolIdentifierParsingError::new(
@@ -120,10 +120,12 @@ fn test_u8_value() {
         u16,
         ie_desr::LocatedprotocolIdentifierParsingError<'_>,
     >(&value_wire, 2, &invalid_length);
+    test_write_with_one_input(&value, None, &value_wire)?;
+    Ok(())
 }
 
 #[test]
-fn test_mac_address_value() {
+fn test_mac_address_value() -> Result<(), ie_ser::sourceMacAddressWritingError> {
     let value_wire = [0x12, 0xc6, 0x21, 0x12, 0x69, 0x32];
     let value = ie::sourceMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]);
     let invalid_length = ie_desr::LocatedsourceMacAddressParsingError::new(
@@ -140,10 +142,34 @@ fn test_mac_address_value() {
         u16,
         ie_desr::LocatedsourceMacAddressParsingError<'_>,
     >(&value_wire, 2u16, &invalid_length);
+    test_write_with_one_input(&value, None, &value_wire)?;
+    Ok(())
 }
 
 #[test]
-fn test_pkg_record_value() {
+fn test_ipv4_address_value() -> Result<(), ie_ser::sourceIPv4AddressWritingError> {
+    let good_wire = [0x46, 0x01, 0x73, 0x01];
+    let value = ie::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1));
+    let invalid_length = ie_desr::LocatedsourceIPv4AddressParsingError::new(
+        Span::new(&good_wire),
+        ie_desr::sourceIPv4AddressParsingError::InvalidLength(2),
+    );
+    test_parsed_completely_with_one_input::<
+        ie::sourceIPv4Address,
+        u16,
+        ie_desr::LocatedsourceIPv4AddressParsingError<'_>,
+    >(&good_wire, 4u16, &value);
+    test_parse_error_with_one_input::<
+        ie::sourceIPv4Address,
+        u16,
+        ie_desr::LocatedsourceIPv4AddressParsingError<'_>,
+    >(&good_wire, 2u16, &invalid_length);
+    test_write_with_one_input(&value, None, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_pkg_record_value() -> Result<(), ie_ser::RecordWritingError> {
     let value_wire = [0x12, 0xc6, 0x21, 0x12, 0x69, 0x32];
     let value =
         ie::Record::sourceMacAddress(ie::sourceMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]));
@@ -175,10 +201,49 @@ fn test_pkg_record_value() {
         2u16,
         invalid_length,
     );
+
+    test_write_with_one_input(&value, None, &value_wire)?;
+    Ok(())
 }
 
 #[test]
-fn test_record_value() {
+fn test_milli_value() -> Result<(), ie_ser::flowStartMillisecondsWritingError> {
+    let good_wire = [0, 0, 1, 88, 177, 177, 56, 255];
+    let good = ie::flowStartMilliseconds(Utc.ymd(2016, 11, 29).and_hms_milli(20, 05, 31, 519));
+    test_parsed_completely_with_one_input(&good_wire, 8, &good);
+    test_write_with_one_input(&good, None, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_time_fraction_value() -> Result<(), ie_ser::flowStartMicrosecondsWritingError> {
+    let good_full_wire = [0x58, 0x3d, 0xdf, 0x8b, 0xff, 0xff, 0xff, 0xff];
+    let good_half_wire = [0x58, 0x3d, 0xdf, 0x8b, 0x7f, 0xff, 0xff, 0xff];
+    let good_zero_wire = [0x58, 0x3d, 0xdf, 0x8b, 0x00, 0x00, 0x00, 0x00];
+
+    let good_full =
+        ie::flowStartMicroseconds(
+            Utc.ymd(2016, 11, 29)
+                .and_hms_nano(20, 05, 31, 1_000_000_000),
+        );
+    let good_half =
+        ie::flowStartMicroseconds(Utc.ymd(2016, 11, 29).and_hms_nano(20, 05, 31, 500_000_000));
+    // Due to floating point errors, we cannot retrieve the original value.
+    let good_half_rounded =
+        ie::flowStartMicroseconds(Utc.ymd(2016, 11, 29).and_hms_nano(20, 05, 31, 499_999_999));
+    let good_zero = ie::flowStartMicroseconds(Utc.ymd(2016, 11, 29).and_hms_nano(20, 05, 31, 0));
+
+    test_parsed_completely_with_one_input(&good_full_wire, 8, &good_full);
+    test_parsed_completely_with_one_input(&good_half_wire, 8, &good_half_rounded);
+    test_parsed_completely_with_one_input(&good_zero_wire, 8, &good_zero);
+    test_write_with_one_input(&good_full, None, &good_full_wire)?;
+    test_write_with_one_input(&good_half, None, &good_half_wire)?;
+    test_write_with_one_input(&good_zero, None, &good_zero_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_record_value() -> Result<(), ie_ser::RecordWritingError> {
     let value_wire = [0x12, 0xc6, 0x21, 0x12, 0x69, 0x32];
     let value =
         ie::Record::sourceMacAddress(ie::sourceMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32]));
@@ -210,10 +275,12 @@ fn test_record_value() {
         2u16,
         invalid_length,
     );
+    test_write_with_one_input(&value, None, &value_wire)?;
+    Ok(())
 }
 
 #[test]
-fn test_data_record() {
+fn test_data_record() -> Result<(), DataRecordWritingError> {
     let good_wire = [
         0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32,
     ];
@@ -246,10 +313,12 @@ fn test_data_record() {
         usize,
         crate::wire::deserializer::LocatedDataRecordParsingError<'_>,
     >(&good_with_padding_wire, fields.clone(), 2, &good);
+    test_write_with_one_input(&good, None, &good_wire)?;
+    Ok(())
 }
 
 #[test]
-fn test_flow_value() {
+fn test_flow_value() -> Result<(), FlowWritingError> {
     let value_wire = [
         0x12, 0xc6, 0x21, 0x12, 0x69, 0x32, 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32,
     ];
@@ -270,10 +339,12 @@ fn test_flow_value() {
         Rc<Vec<FieldSpecifier>>,
         crate::wire::deserializer::LocatedFlowParsingError<'_>,
     >(&value_wire, fields, &flow);
+    test_write_with_one_input(&flow, None, &value_wire)?;
+    Ok(())
 }
 
 #[test]
-fn test_set_template() {
+fn test_set_template() -> Result<(), SetWritingError> {
     let good_wire = [
         0x00, 0x02, 0x00, 0x64, 0x01, 0x33, 0x00, 0x17, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c, 0x00,
         0x04, 0x00, 0x05, 0x00, 0x01, 0x00, 0x04, 0x00, 0x01, 0x00, 0x07, 0x00, 0x02, 0x00, 0x0b,
@@ -317,13 +388,15 @@ fn test_set_template() {
     );
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
+    test_write_with_one_input(&good, None, &good_wire)?;
+    Ok(())
 }
 
 #[test]
-fn test_template_packet() {
+fn test_template_packet() -> Result<(), IpfixPacketWritingError> {
     let good_wire = [
         0x00, 0x0a, // Version
-        0x00, 0x60, // Length
+        0x00, 0x74, // Length
         0x58, 0x3d, 0xe0, 0x59, // Export time
         0x00, 0x00, 0x0e, 0xe4, // Seq number
         0x00, 0x00, 0x00, 0x00, // Observation domain
@@ -373,11 +446,181 @@ fn test_template_packet() {
 
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    assert!(templates_map.borrow().contains_key(&307))
+    assert!(templates_map.borrow().contains_key(&307));
+
+    test_write_with_one_input(&good, None, &good_wire)?;
+    Ok(())
 }
 
 #[test]
-fn test_data_packet() {
+fn test_u64_reduced_size_encoding() -> Result<(), ie_ser::RecordWritingError> {
+    let full_wire = [0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88];
+    let seven_wire = [0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99];
+    let six_wire = [0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa];
+    let five_wire = [0xff, 0xee, 0xdd, 0xcc, 0xbb];
+    let four_wire = [0xff, 0xee, 0xdd, 0xcc];
+    let three_wire = [0xff, 0xee, 0xdd];
+    let two_wire = [0xff, 0xee];
+    let one_wire = [0xff];
+
+    let field_full = Some(8);
+    let field_seven = Some(7);
+    let field_six = Some(6);
+    let field_five = Some(5);
+    let field_four = Some(4);
+    let field_three = Some(3);
+    let field_two = Some(2);
+    let field_one = Some(1);
+
+    let full = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffeeddccbbaa9988));
+    let seven = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffeeddccbbaa99));
+    let six = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffeeddccbbaa));
+    let five = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffeeddccbb));
+    let four = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffeeddcc));
+    let three = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffeedd));
+    let two = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffee));
+    let one = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xff));
+
+    test_parsed_completely_with_two_inputs(
+        &full_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        8,
+        &full,
+    );
+    test_parsed_completely_with_two_inputs(
+        &seven_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        7,
+        &seven,
+    );
+    test_parsed_completely_with_two_inputs(
+        &six_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        6,
+        &six,
+    );
+    test_parsed_completely_with_two_inputs(
+        &five_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        5,
+        &five,
+    );
+    test_parsed_completely_with_two_inputs(
+        &four_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        4,
+        &four,
+    );
+    test_parsed_completely_with_two_inputs(
+        &three_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        3,
+        &three,
+    );
+    test_parsed_completely_with_two_inputs(
+        &two_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        2,
+        &two,
+    );
+    test_parsed_completely_with_two_inputs(
+        &one_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        1,
+        &one,
+    );
+
+    test_write_with_one_input(&full, field_full, &full_wire)?;
+    test_write_with_one_input(&seven, field_seven, &seven_wire)?;
+    test_write_with_one_input(&six, field_six, &six_wire)?;
+    test_write_with_one_input(&five, field_five, &five_wire)?;
+    test_write_with_one_input(&four, field_four, &four_wire)?;
+    test_write_with_one_input(&three, field_three, &three_wire)?;
+    test_write_with_one_input(&two, field_two, &two_wire)?;
+    test_write_with_one_input(&one, field_one, &one_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_u32_reduced_size_encoding() -> Result<(), ie_ser::RecordWritingError> {
+    let four_wire = [0xff, 0xee, 0xdd, 0xcc];
+    let three_wire = [0xff, 0xee, 0xdd];
+    let two_wire = [0xff, 0xee];
+    let one_wire = [0xff];
+
+    let field_four = Some(4);
+    let field_three = Some(3);
+    let field_two = Some(2);
+    let field_one = Some(1);
+
+    let four = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffeeddcc));
+    let three = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffeedd));
+    let two = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffee));
+    let one = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xff));
+
+    test_parsed_completely_with_two_inputs(
+        &four_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        4,
+        &four,
+    );
+    test_parsed_completely_with_two_inputs(
+        &three_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        3,
+        &three,
+    );
+    test_parsed_completely_with_two_inputs(
+        &two_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        2,
+        &two,
+    );
+    test_parsed_completely_with_two_inputs(
+        &one_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        1,
+        &one,
+    );
+
+    test_write_with_one_input(&four, field_four, &four_wire)?;
+    test_write_with_one_input(&three, field_three, &three_wire)?;
+    test_write_with_one_input(&two, field_two, &two_wire)?;
+    test_write_with_one_input(&one, field_one, &one_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_u16_reduced_size_encoding() -> Result<(), ie_ser::RecordWritingError> {
+    let two_wire = [0xff, 0xee];
+    let one_wire = [0xff];
+
+    let field_two = Some(2);
+    let field_one = Some(1);
+
+    let two = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xffee));
+    let one = ie::Record::packetDeltaCount(ie::packetDeltaCount(0xff));
+
+    test_parsed_completely_with_two_inputs(
+        &two_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        2,
+        &two,
+    );
+    test_parsed_completely_with_two_inputs(
+        &one_wire,
+        &ie::InformationElementId::packetDeltaCount,
+        1,
+        &one,
+    );
+
+    test_write_with_one_input(&two, field_two, &two_wire)?;
+    test_write_with_one_input(&one, field_one, &one_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
     let good_wire = [
         0x00, 0x0a, // Version
         0x00, 0x60, // Length
@@ -393,7 +636,7 @@ fn test_data_packet() {
         0x00, 0x00, 0x01, 0x58, 0xb1, 0xb3, 0xe1, 0x4d,
     ];
 
-    let fields = Rc::new(vec![
+    let f = vec![
         FieldSpecifier::new(ie::InformationElementId::sourceIPv4Address, 4),
         FieldSpecifier::new(ie::InformationElementId::destinationIPv4Address, 4),
         FieldSpecifier::new(ie::InformationElementId::ipClassOfService, 1),
@@ -417,7 +660,8 @@ fn test_data_packet() {
         FieldSpecifier::new(ie::InformationElementId::ipVersion, 1),
         FieldSpecifier::new(ie::InformationElementId::flowStartMilliseconds, 8),
         FieldSpecifier::new(ie::InformationElementId::flowEndMilliseconds, 8),
-    ]);
+    ];
+    let fields = Rc::new(f.clone());
     let templates_map = Rc::new(RefCell::new(HashMap::from([(307, fields)])));
     let good = IpfixPacket::new(
         IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 57), 3812, 0),
@@ -461,14 +705,40 @@ fn test_data_packet() {
         )],
     );
     test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
+    test_write_with_one_input(
+        &good,
+        Some(&f.iter().map(|x| Some(x.length)).collect::<Vec<_>>()),
+        &good_wire,
+    )?;
+    Ok(())
 }
 
 #[test]
-fn test_options_template_packet() {
+fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
     let good_wire = [
-        0x00, 0x0a, 0x00, 0x28, 0x58, 0x3d, 0xe0, 0x57, 0x00, 0x00, 0x0e, 0xcf, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x03, 0x00, 0x18, 0x01, 0x34, 0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0x00, 0x01,
-        0x00, 0x24, 0x00, 0x02, 0x00, 0x25, 0x00, 0x02, 0x00, 0x00,
+        0x00, 0x0a, // version
+        0x00, 0x28, // length
+        0x58, 0x3d, 0xe0, 0x57, // timestamp
+        0x00, 0x00, 0x0e, 0xcf, // Seq
+        0x00, 0x00, 0x00, 0x00, // Domain
+        0x00, 0x03, // Set ID
+        0x00, 0x18, // Set length
+        0x01, 0x34, // Template ID
+        0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0x00, 0x01, 0x00, 0x24, 0x00, 0x02, 0x00, 0x25, 0x00,
+        0x02, 0x00, 0x00,
+    ];
+
+    let good_no_padding_wire = [
+        0x00, 0x0a, // version
+        0x00, 0x26, // length
+        0x58, 0x3d, 0xe0, 0x57, // timestamp
+        0x00, 0x00, 0x0e, 0xcf, // Seq
+        0x00, 0x00, 0x00, 0x00, // Domain
+        0x00, 0x03, // Set ID
+        0x00, 0x16, // Set length
+        0x01, 0x34, // Template ID
+        0x00, 0x03, 0x00, 0x01, 0x00, 0x05, 0x00, 0x01, 0x00, 0x24, 0x00, 0x02, 0x00, 0x25, 0x00,
+        0x02,
     ];
 
     let good = IpfixPacket::new(
@@ -490,12 +760,15 @@ fn test_options_template_packet() {
     );
 
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
+    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
+    test_parsed_completely_with_one_input(&good_no_padding_wire, templates_map, &good);
+    test_write_with_one_input(&good, None, &good_no_padding_wire)?;
+    Ok(())
 }
 
 #[test]
 #[rustfmt::skip]
-fn test_complex_sequence() {
+fn test_complex_sequence() -> Result<(), IpfixPacketWritingError> {
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
     let pkt1_wire = [
      0x00, 0x0a, 0x02, 0x24, 0x63, 0x4a, 0xe2, 0x9d, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00,
@@ -624,6 +897,9 @@ fn test_complex_sequence() {
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc3, 0xc8, 0x80, 0xe8,
     0x06, 0x02, 0x04, 0x00];
 
-    IpfixPacket::from_wire(Span::new(&pkt1_wire), templates_map.clone()).unwrap();
-    IpfixPacket::from_wire(Span::new(&pkt2_wire), templates_map.clone()).unwrap();
+    let (_, _pkt1) = IpfixPacket::from_wire(Span::new(&pkt1_wire), templates_map.clone()).unwrap();
+    let (_, _pkt2)  = IpfixPacket::from_wire(Span::new(&pkt2_wire), templates_map.clone()).unwrap();
+
+    // TODO: test writing complex packets
+    Ok(())
 }

@@ -14,7 +14,6 @@
 // limitations under the License.
 
 //! Generate Rust code for the given Netflow/IPFIX definitions
-
 use crate::{InformationElement, SimpleRegistry, Xref};
 
 fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
@@ -708,19 +707,15 @@ fn generate_u32_deserializer(ie_name: &String) -> String {
     let header = get_deserializer_header(ie_name.as_str());
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = match length {\n");
-    ret.push_str("            1 => {\n");
-    ret.push_str("                let (buf, value) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("                (buf, value as u32)\n");
-    ret.push_str("            }\n");
-    ret.push_str("            2 => {\n");
-    ret.push_str("                let (buf, value) = nom::number::complete::be_u16(buf)?;\n");
-    ret.push_str("                (buf, value as u32)\n");
-    ret.push_str("            }\n");
-    ret.push_str("            4 => nom::number::complete::be_u32(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str("        let len = length as usize;\n");
+    ret.push_str("        if length > 4 || buf.input_len() < len {\n");
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str("        }\n");
+    ret.push_str("        let mut res = 0u32;\n");
+    ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
+    ret.push_str("            res = (res << 8) + byte as u32;\n");
+    ret.push_str("        }\n");
+    ret.push_str(format!("        Ok((buf.slice(len..), {}(res)))\n", ie_name).as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -732,23 +727,15 @@ fn generate_u64_deserializer(ie_name: &String) -> String {
     let header = get_deserializer_header(ie_name.as_str());
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = match length {\n");
-    ret.push_str("            1 => {\n");
-    ret.push_str("                let (buf, value) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("                (buf, value as u64)\n");
-    ret.push_str("            }\n");
-    ret.push_str("            2 => {\n");
-    ret.push_str("                let (buf, value) = nom::number::complete::be_u16(buf)?;\n");
-    ret.push_str("                (buf, value as u64)\n");
-    ret.push_str("            }\n");
-    ret.push_str("            4 => {\n");
-    ret.push_str("                let (buf, value) = nom::number::complete::be_u32(buf)?;\n");
-    ret.push_str("                (buf, value as u64)\n");
-    ret.push_str("            }\n");
-    ret.push_str("            8 => nom::number::complete::be_u64(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str("        let len = length as usize;\n");
+    ret.push_str("        if length > 8 || buf.input_len() < len {\n");
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str("        }\n");
+    ret.push_str("        let mut res = 0u64;\n");
+    ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
+    ret.push_str("            res = (res << 8) + byte as u64;\n");
+    ret.push_str("        }\n");
+    ret.push_str(format!("        Ok((buf.slice(len..), {}(res)))\n", ie_name).as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1032,7 +1019,7 @@ fn generate_date_time_micro(ie_name: &String) -> String {
     ret.push_str("        };\n");
     ret.push_str("        let (buf, seconds) = nom::number::complete::be_u32(buf)?;\n");
     ret.push_str("        let (buf, fraction) = nom::number::complete::be_u32(buf)?;\n");
-    ret.push_str("        // Convert 1/2^32s of a second to nanoseconds\n");
+    ret.push_str("        // Convert 1/2^32 of a second to nanoseconds\n");
     ret.push_str("        let fraction: u32 = (1_000_000_000f64 * (fraction as f64 / u32::MAX as f64)) as u32;\n");
     ret.push_str("        let value = chrono::Utc.timestamp(seconds as i64, fraction);\n");
     ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
@@ -1222,6 +1209,7 @@ pub(crate) fn generate_ie_deser_main(
     vendor_prefixes: &Vec<(String, String, u32)>,
 ) -> String {
     let mut ret = String::new();
+    ret.push_str("use nom::{InputLength, InputIter, Slice};\n");
     ret.push_str("use chrono::TimeZone;\n\n\n");
     // Generate IANA Deser
     for ie in iana_ies {
@@ -1299,5 +1287,337 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str("        Ok((buf, value))\n");
     ret.push_str("    }\n");
     ret.push_str("}\n");
+    ret
+}
+
+fn get_std_serializer_error(ty_name: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
+    ret.push_str(format!("pub enum {}WritingError {{\n", ty_name).as_str());
+    ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_num8_serializer(num_type: &str, ie_name: &String) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 1;\n\n");
+    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
+    ret.push_str("         Self::BASE_LENGTH\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("         writer.write_{}(self.0)?;\n", num_type).as_str());
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_num_serializer(num_type: &str, length: u16, ie_name: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str(format!("    const BASE_LENGTH: usize = {};\n\n", length).as_str());
+    ret.push_str("     fn len(&self, length: Option<u16>) -> usize {\n");
+    ret.push_str("         match length {\n");
+    ret.push_str("             None => Self::BASE_LENGTH,\n");
+    ret.push_str("             Some(len) => len as usize,\n");
+    ret.push_str("         }\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+
+    ret.push_str("         match length {\n");
+    ret.push_str(
+        format!(
+            "             None => writer.write_{}::<byteorder::NetworkEndian>(self.0)?,\n",
+            num_type
+        )
+        .as_str(),
+    );
+    ret.push_str("             Some(len) => {\n");
+    ret.push_str("                 let be_bytes = self.0.to_be_bytes();\n");
+    ret.push_str("                 let begin_offset = be_bytes.len() - len as usize;\n");
+    ret.push_str("                 writer.write_all(&be_bytes[begin_offset..])?;\n");
+    ret.push_str("             }");
+    ret.push_str("         }\n");
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_array_serializer(ie_name: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
+    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
+    ret.push_str("         self.0.len()\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str("         writer.write_all(&self.0)?;\n");
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_ip_serializer(length: u16, ie_name: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str(format!("    const BASE_LENGTH: usize = {};\n\n", length).as_str());
+    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
+    ret.push_str("         Self::BASE_LENGTH\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str("         writer.write_all(&self.0.octets())?;\n");
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_string_serializer(ie_name: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
+    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
+    ret.push_str("         self.0.len()\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str("         writer.write_all(self.0.as_bytes())?;\n");
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_bool_serializer(ie_name: &String) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 1;\n\n");
+    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
+    ret.push_str("         Self::BASE_LENGTH\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str("         writer.write_u8(self.0.into())?;\n");
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_seconds_serializer(ie_name: &String) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 4;\n\n");
+    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
+    ret.push_str("         Self::BASE_LENGTH\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(
+        "         writer.write_u32::<byteorder::NetworkEndian>(self.0.timestamp() as u32)?;\n",
+    );
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_milli_seconds_serializer(ie_name: &String) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 8;\n\n");
+    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
+    ret.push_str("         Self::BASE_LENGTH\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(
+        "         writer.write_u64::<byteorder::NetworkEndian>(self.0.timestamp_millis() as u64)?;\n",
+    );
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_fraction_serializer(ie_name: &String) -> String {
+    let mut ret = String::new();
+    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ie_name, ie_name
+        )
+        .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 8;\n\n");
+    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
+    ret.push_str("         Self::BASE_LENGTH\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(
+        "         writer.write_u32::<byteorder::NetworkEndian>(self.0.timestamp() as u32)?;\n",
+    );
+    ret.push_str("         let nanos = self.0.timestamp_subsec_nanos();\n");
+    ret.push_str("         // Convert 1/2**32 of a second to a fraction of a nano second\n");
+    ret.push_str("         let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;\n");
+    ret.push_str("         writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;\n");
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn generate_ie_serializer(data_type: &str, ie_name: &String) -> String {
+    let mut ret = String::new();
+    let gen = match data_type {
+        "octetArray" => generate_array_serializer(ie_name),
+        "unsigned8" => generate_num8_serializer("u8", ie_name),
+        "unsigned16" => generate_num_serializer("u16", 2, ie_name),
+        "unsigned32" => generate_num_serializer("u32", 4, ie_name),
+        "unsigned64" => generate_num_serializer("u64", 8, ie_name),
+        "signed8" => generate_num8_serializer("i8", ie_name),
+        "signed16" => generate_num_serializer("i16", 2, ie_name),
+        "signed32" => generate_num_serializer("i32", 4, ie_name),
+        "signed64" => generate_num_serializer("i64", 8, ie_name),
+        "float32" => generate_num_serializer("f32", 4, ie_name),
+        "float64" => generate_num_serializer("f64", 8, ie_name),
+        "boolean" => generate_bool_serializer(ie_name),
+        "macAddress" => generate_array_serializer(ie_name),
+        "string" => generate_string_serializer(ie_name),
+        "dateTimeSeconds" => generate_seconds_serializer(ie_name),
+        "dateTimeMilliseconds" => generate_milli_seconds_serializer(ie_name),
+        "dateTimeMicroseconds" => generate_fraction_serializer(ie_name),
+        //// Nano and micro are using the same representation,
+        //// see https://www.rfc-editor.org/rfc/rfc7011.html#section-6.1.9
+        "dateTimeNanoseconds" => generate_fraction_serializer(ie_name),
+        "ipv4Address" => generate_ip_serializer(4, ie_name),
+        "ipv6Address" => generate_ip_serializer(16, ie_name),
+        //// TODO: better parsing for IPFIX structured Data
+        "basicList" => generate_array_serializer(ie_name),
+        "subTemplateList" => generate_array_serializer(ie_name),
+        "subTemplateMultiList" => generate_array_serializer(ie_name),
+        ty => todo!("Unsupported serialization for type: {}", ty),
+    };
+    ret.push_str(gen.as_str());
+    ret
+}
+
+pub(crate) fn generate_ie_ser_main(
+    iana_ies: &Vec<InformationElement>,
+    _vendor_prefixes: &[(String, String, u32)],
+) -> String {
+    let mut ret = String::new();
+    ret.push_str("use byteorder::WriteBytesExt;\n\n\n");
+
+    for ie in iana_ies {
+        ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
+    }
+
+    let ty_name = "Record";
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
+    ret.push_str(format!("pub enum {}WritingError {{\n", ty_name).as_str());
+    ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
+    for ie in iana_ies {
+        ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
+    }
+    ret.push_str("}\n\n");
+
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ty_name, ty_name
+        )
+        .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
+    ret.push_str("    fn len(&self, length: Option<u16>) -> usize {\n");
+    ret.push_str("        match self {\n");
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "            Self::{}(value) => value.len(length),\n",
+                ie.name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("            _ => todo!(),\n");
+    ret.push_str("         }\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {}WritingError> {{\n",ty_name).as_str());
+    ret.push_str("        match self {\n");
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "            Self::{}(value) => value.write(writer, length)?,\n",
+                ie.name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("            _ => todo!(),\n");
+    ret.push_str("         }\n");
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
     ret
 }
