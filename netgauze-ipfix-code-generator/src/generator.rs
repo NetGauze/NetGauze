@@ -1353,7 +1353,7 @@ fn generate_num_serializer(num_type: &str, length: u16, ie_name: &str) -> String
     ret.push_str("                 let be_bytes = self.0.to_be_bytes();\n");
     ret.push_str("                 let begin_offset = be_bytes.len() - len as usize;\n");
     ret.push_str("                 writer.write_all(&be_bytes[begin_offset..])?;\n");
-    ret.push_str("             }");
+    ret.push_str("             }\n");
     ret.push_str("         }\n");
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
