@@ -1104,6 +1104,67 @@ pub(crate) fn generate_pkg_ie_deserializers(
     ret
 }
 
+pub(crate) fn generate_pkg_ie_serializers(
+    vendor_mod: &str,
+    ies: &Vec<InformationElement>,
+) -> String {
+    let mut ret = String::new();
+    ret.push_str("use byteorder::WriteBytesExt;\n");
+    ret.push_str(format!("use crate::ie::{}::*;\n\n", vendor_mod).as_str());
+
+    for ie in ies {
+        ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
+    }
+    let ty_name = "Record";
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
+    ret.push_str(format!("pub enum {}WritingError {{\n", ty_name).as_str());
+    ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
+    for ie in ies {
+        ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
+    }
+    ret.push_str("}\n\n");
+    ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
+            ty_name, ty_name
+        )
+            .as_str(),
+    );
+    ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
+    ret.push_str("    fn len(&self, length: Option<u16>) -> usize {\n");
+    ret.push_str("        match self {\n");
+    for ie in ies {
+        ret.push_str(
+            format!(
+                "            Self::{}(value) => value.len(length),\n",
+                ie.name
+            )
+            .as_str(),
+        );
+    }
+
+    ret.push_str("         }\n");
+    ret.push_str("     }\n\n");
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {}WritingError> {{\n",ty_name).as_str());
+    ret.push_str("        match self {\n");
+    for ie in ies {
+        ret.push_str(
+            format!(
+                "            Self::{}(value) => value.write(writer, length)?,\n",
+                ie.name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("         }\n");
+    ret.push_str("         Ok(())\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+
+    ret
+}
+
 pub(crate) fn generate_records_enum(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
@@ -1571,7 +1632,7 @@ fn generate_ie_serializer(data_type: &str, ie_name: &String) -> String {
 
 pub(crate) fn generate_ie_ser_main(
     iana_ies: &Vec<InformationElement>,
-    _vendor_prefixes: &[(String, String, u32)],
+    vendor_prefixes: &[(String, String, u32)],
 ) -> String {
     let mut ret = String::new();
     ret.push_str("use byteorder::WriteBytesExt;\n\n\n");
@@ -1585,6 +1646,9 @@ pub(crate) fn generate_ie_ser_main(
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
     ret.push_str(format!("pub enum {}WritingError {{\n", ty_name).as_str());
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
+    for (name, pkg, _) in vendor_prefixes {
+        ret.push_str(format!("    {}Error(#[from] {}::RecordWritingError),\n", name, pkg).as_str());
+    }
     for ie in iana_ies {
         ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
     }
@@ -1600,6 +1664,10 @@ pub(crate) fn generate_ie_ser_main(
     ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
     ret.push_str("    fn len(&self, length: Option<u16>) -> usize {\n");
     ret.push_str("        match self {\n");
+    ret.push_str("            Self::Unknown(value) => value.len(),\n");
+    for (name, _, _) in vendor_prefixes {
+        ret.push_str(format!("            Self::{}(value) => value.len(length),\n", name).as_str());
+    }
     for ie in iana_ies {
         ret.push_str(
             format!(
@@ -1609,11 +1677,21 @@ pub(crate) fn generate_ie_ser_main(
             .as_str(),
         );
     }
-    ret.push_str("            _ => todo!(),\n");
+
     ret.push_str("         }\n");
     ret.push_str("     }\n\n");
     ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {}WritingError> {{\n",ty_name).as_str());
     ret.push_str("        match self {\n");
+    ret.push_str("            Self::Unknown(value) => writer.write_all(value)?,\n");
+    for (name, _pkg, _) in vendor_prefixes {
+        ret.push_str(
+            format!(
+                "            Self::{}(value) => value.write(writer, length)?,\n",
+                name
+            )
+            .as_str(),
+        );
+    }
     for ie in iana_ies {
         ret.push_str(
             format!(
@@ -1623,7 +1701,6 @@ pub(crate) fn generate_ie_ser_main(
             .as_str(),
         );
     }
-    ret.push_str("            _ => todo!(),\n");
     ret.push_str("         }\n");
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");

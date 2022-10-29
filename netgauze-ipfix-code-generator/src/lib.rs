@@ -219,7 +219,7 @@ fn generate_vendor_ie(
     let ie_generated = generate_information_element_ids(&ie_node_parsed);
 
     let deser_generated = generate_pkg_ie_deserializers(config.mod_name.as_str(), &ie_node_parsed);
-    let ser_generated = String::new();
+    let ser_generated = generate_pkg_ie_serializers(config.mod_name.as_str(), &ie_node_parsed);
 
     let mut output = String::new();
     output.push_str(ie_generated.as_str());
