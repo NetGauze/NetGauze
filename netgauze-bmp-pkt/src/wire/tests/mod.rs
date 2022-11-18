@@ -217,7 +217,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
         200,
         Ipv4Addr::new(172, 16, 0, 20),
-        Some(Utc.timestamp(1664656357, 746092000)),
+        Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
     );
 
     let good_ipv6 = PeerHeader::new(
@@ -231,7 +231,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         Some(IpAddr::V6(Ipv6Addr::from_str("2001:db8::ac10:14").unwrap())),
         200,
         Ipv4Addr::new(172, 16, 0, 20),
-        Some(Utc.timestamp(1664656357, 746092000)),
+        Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
     );
 
     let good_post_policy = PeerHeader::new(
@@ -245,7 +245,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         Some(IpAddr::V6(Ipv6Addr::from_str("2001:db8::ac10:14").unwrap())),
         200,
         Ipv4Addr::new(172, 16, 0, 20),
-        Some(Utc.timestamp(1664656357, 746092000)),
+        Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
     );
 
     let good_adj_rip_out = PeerHeader::new(
@@ -259,7 +259,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
         200,
         Ipv4Addr::new(172, 16, 0, 20),
-        Some(Utc.timestamp(1664656357, 746092000)),
+        Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
     );
 
     let good_asn2 = PeerHeader::new(
@@ -273,7 +273,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
         200,
         Ipv4Addr::new(172, 16, 0, 20),
-        Some(Utc.timestamp(1664656357, 746092000)),
+        Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
     );
 
     let good_filtered = PeerHeader::new(
@@ -477,7 +477,7 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
             Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
             200,
             Ipv4Addr::new(172, 16, 0, 20),
-            Some(Utc.timestamp(1664656357, 746092000)),
+            Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
         ),
         vec![BGPMessage::Update(BGPUpdateMessage::new(
             vec![],
@@ -587,7 +587,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                 Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
                 200,
                 Ipv4Addr::new(172, 16, 0, 20),
-                Some(Utc.timestamp(1664656357, 746092000)),
+                Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
             ),
             vec![BGPMessage::Update(BGPUpdateMessage::new(
                 vec![],

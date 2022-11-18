@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{TimeZone, Utc};
+use chrono::{TimeZone, Timelike, Utc};
 use netgauze_parse_utils::{test_helpers::*, ReadablePDUWithOneInput, Span};
 use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};
 
@@ -42,7 +42,11 @@ fn test_ipfix_header() {
         0x01,
     ];
 
-    let good = IpfixHeader::new(Utc.ymd(2022, 10, 15).and_hms(16, 41, 01), 6, 1);
+    let good = IpfixHeader::new(
+        Utc.with_ymd_and_hms(2022, 10, 15, 16, 41, 01).unwrap(),
+        6,
+        1,
+    );
     let bad_version = LocatedIpfixHeaderParsingError::new(
         Span::new(&bad_version_wire),
         IpfixHeaderParsingError::UnsupportedVersion(0),
@@ -207,7 +211,12 @@ fn test_pkg_record_value() -> Result<(), ie_ser::RecordWritingError> {
 #[test]
 fn test_milli_value() -> Result<(), ie_ser::flowStartMillisecondsWritingError> {
     let good_wire = [0, 0, 1, 88, 177, 177, 56, 255];
-    let good = ie::flowStartMilliseconds(Utc.ymd(2016, 11, 29).and_hms_milli(20, 05, 31, 519));
+    let good = ie::flowStartMilliseconds(
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+            .unwrap()
+            .with_nanosecond(519_000_000)
+            .unwrap(),
+    );
     test_parsed_completely_with_one_input(&good_wire, 8, &good);
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
@@ -219,17 +228,31 @@ fn test_time_fraction_value() -> Result<(), ie_ser::flowStartMicrosecondsWriting
     let good_half_wire = [0x58, 0x3d, 0xdf, 0x8b, 0x7f, 0xff, 0xff, 0xff];
     let good_zero_wire = [0x58, 0x3d, 0xdf, 0x8b, 0x00, 0x00, 0x00, 0x00];
 
-    let good_full =
-        ie::flowStartMicroseconds(
-            Utc.ymd(2016, 11, 29)
-                .and_hms_nano(20, 05, 31, 1_000_000_000),
-        );
-    let good_half =
-        ie::flowStartMicroseconds(Utc.ymd(2016, 11, 29).and_hms_nano(20, 05, 31, 500_000_000));
+    let good_full = ie::flowStartMicroseconds(
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+            .unwrap()
+            .with_nanosecond(1_000_000_000)
+            .unwrap(),
+    );
+    let good_half = ie::flowStartMicroseconds(
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+            .unwrap()
+            .with_nanosecond(500_000_000)
+            .unwrap(),
+    );
     // Due to floating point errors, we cannot retrieve the original value.
-    let good_half_rounded =
-        ie::flowStartMicroseconds(Utc.ymd(2016, 11, 29).and_hms_nano(20, 05, 31, 499_999_999));
-    let good_zero = ie::flowStartMicroseconds(Utc.ymd(2016, 11, 29).and_hms_nano(20, 05, 31, 0));
+    let good_half_rounded = ie::flowStartMicroseconds(
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+            .unwrap()
+            .with_nanosecond(499_999_999)
+            .unwrap(),
+    );
+    let good_zero = ie::flowStartMicroseconds(
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+            .unwrap()
+            .with_nanosecond(0)
+            .unwrap(),
+    );
 
     test_parsed_completely_with_one_input(&good_full_wire, 8, &good_full);
     test_parsed_completely_with_one_input(&good_half_wire, 8, &good_half_rounded);
@@ -408,7 +431,11 @@ fn test_template_packet() -> Result<(), IpfixPacketWritingError> {
     ];
 
     let good = IpfixPacket::new(
-        IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 57), 3812, 0),
+        IpfixHeader::new(
+            Utc.with_ymd_and_hms(2016, 11, 29, 20, 08, 57).unwrap(),
+            3812,
+            0,
+        ),
         vec![Set::new(
             2,
             SetPayload::Template(vec![TemplateRecord::new(
@@ -747,7 +774,11 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
     let fields = Rc::new(f.clone());
     let templates_map = Rc::new(RefCell::new(HashMap::from([(307, fields)])));
     let good = IpfixPacket::new(
-        IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 57), 3812, 0),
+        IpfixHeader::new(
+            Utc.with_ymd_and_hms(2016, 11, 29, 20, 08, 57).unwrap(),
+            3812,
+            0,
+        ),
         vec![Set::new(
             307,
             SetPayload::Data(vec![DataRecord::new(vec![Flow::new(vec![
@@ -779,10 +810,16 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
                 ie::Record::tcpControlBits(ie::tcpControlBits(0)),
                 ie::Record::ipVersion(ie::ipVersion(4)),
                 ie::Record::flowStartMilliseconds(ie::flowStartMilliseconds(
-                    Utc.ymd(2016, 11, 29).and_hms_milli(20, 05, 31, 519),
+                    Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+                        .unwrap()
+                        .with_nanosecond(519_000_000)
+                        .unwrap(),
                 )),
                 ie::Record::flowEndMilliseconds(ie::flowEndMilliseconds(
-                    Utc.ymd(2016, 11, 29).and_hms_milli(20, 08, 25, 677),
+                    Utc.with_ymd_and_hms(2016, 11, 29, 20, 08, 25)
+                        .unwrap()
+                        .with_nanosecond(677_000_000)
+                        .unwrap(),
                 )),
             ])])]),
         )],
@@ -825,7 +862,11 @@ fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
     ];
 
     let good = IpfixPacket::new(
-        IpfixHeader::new(Utc.ymd(2016, 11, 29).and_hms(20, 08, 55), 3791, 0),
+        IpfixHeader::new(
+            Utc.with_ymd_and_hms(2016, 11, 29, 20, 08, 55).unwrap(),
+            3791,
+            0,
+        ),
         vec![Set::new(
             3,
             SetPayload::OptionsTemplate(vec![OptionsTemplateRecord::new(
