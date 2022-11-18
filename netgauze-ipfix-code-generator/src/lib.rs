@@ -232,19 +232,19 @@ fn generate_vendor_ie(
         "{}_{}",
         config.mod_name, GENERATED_VENDOR_MAIN_SUFFIX
     ));
-    fs::write(&dest_path, output)?;
+    fs::write(dest_path, output)?;
 
     let deser_dest_path = Path::new(&out_dir).join(format!(
         "{}_{}",
         config.mod_name, GENERATED_VENDOR_DESER_SUFFIX
     ));
-    fs::write(&deser_dest_path, deser_generated)?;
+    fs::write(deser_dest_path, deser_generated)?;
 
     let ser_dest_path = Path::new(&out_dir).join(format!(
         "{}_{}",
         config.mod_name, GENERATED_VENDOR_SER_SUFFIX
     ));
-    fs::write(&ser_dest_path, ser_generated)?;
+    fs::write(ser_dest_path, ser_generated)?;
 
     Ok(())
 }
@@ -337,12 +337,12 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
     ie_ser.push_str(generate_ie_ser_main(&iana_ie_node_parsed, &vendors).as_str());
 
     let ie_dest_path = Path::new(&out_dir).join("ie_generated.rs");
-    fs::write(&ie_dest_path, ie_output)?;
+    fs::write(ie_dest_path, ie_output)?;
 
     let ie_deser_dest_path = Path::new(&out_dir).join("ie_deser_generated.rs");
-    fs::write(&ie_deser_dest_path, ie_deser)?;
+    fs::write(ie_deser_dest_path, ie_deser)?;
 
     let ie_ser_dest_path = Path::new(&out_dir).join("ie_ser_generated.rs");
-    fs::write(&ie_ser_dest_path, ie_ser)?;
+    fs::write(ie_ser_dest_path, ie_ser)?;
     Ok(())
 }
