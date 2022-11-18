@@ -23,7 +23,10 @@ use netgauze_bgp_pkt::{
     iana::{BGPMessageType, UndefinedBgpMessageType},
     notification::{BGPNotificationMessage, CeaseError},
     open::{BGPOpenMessage, BGPOpenMessageParameter},
-    path_attribute::{ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute},
+    path_attribute::{
+        ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute,
+        PathAttributeValue,
+    },
     update::{BGPUpdateMessage, NetworkLayerReachabilityInformation},
     wire::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
     BGPMessage,
@@ -479,21 +482,33 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
         vec![BGPMessage::Update(BGPUpdateMessage::new(
             vec![],
             vec![
-                PathAttribute::Origin {
-                    extended_length: false,
-                    value: Origin::IGP,
-                },
-                PathAttribute::ASPath {
-                    extended_length: true,
-                    value: ASPath::As4PathSegments(vec![As4PathSegment::new(
+                PathAttribute::from(
+                    false,
+                    true,
+                    false,
+                    false,
+                    PathAttributeValue::Origin(Origin::IGP),
+                )
+                .unwrap(),
+                PathAttribute::from(
+                    false,
+                    true,
+                    false,
+                    true,
+                    PathAttributeValue::ASPath(ASPath::As4PathSegments(vec![As4PathSegment::new(
                         AsPathSegmentType::AsSequence,
                         vec![100, 200, 100],
-                    )]),
-                },
-                PathAttribute::NextHop {
-                    extended_length: false,
-                    value: NextHop::new(Ipv4Addr::new(172, 16, 0, 20)),
-                },
+                    )])),
+                )
+                .unwrap(),
+                PathAttribute::from(
+                    false,
+                    true,
+                    false,
+                    false,
+                    PathAttributeValue::NextHop(NextHop::new(Ipv4Addr::new(172, 16, 0, 20))),
+                )
+                .unwrap(),
             ],
             vec![NetworkLayerReachabilityInformation::new(vec![
                 Ipv4Net::from_str("172.16.1.0/24").unwrap(),
@@ -577,21 +592,32 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
             vec![BGPMessage::Update(BGPUpdateMessage::new(
                 vec![],
                 vec![
-                    PathAttribute::Origin {
-                        extended_length: false,
-                        value: Origin::IGP,
-                    },
-                    PathAttribute::ASPath {
-                        extended_length: true,
-                        value: ASPath::As4PathSegments(vec![As4PathSegment::new(
-                            AsPathSegmentType::AsSequence,
-                            vec![100, 200, 100],
-                        )]),
-                    },
-                    PathAttribute::NextHop {
-                        extended_length: false,
-                        value: NextHop::new(Ipv4Addr::new(172, 16, 0, 20)),
-                    },
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::Origin(Origin::IGP),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        true,
+                        PathAttributeValue::ASPath(ASPath::As4PathSegments(vec![
+                            As4PathSegment::new(AsPathSegmentType::AsSequence, vec![100, 200, 100]),
+                        ])),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::NextHop(NextHop::new(Ipv4Addr::new(172, 16, 0, 20))),
+                    )
+                    .unwrap(),
                 ],
                 vec![NetworkLayerReachabilityInformation::new(vec![
                     Ipv4Net::from_str("172.16.1.0/24").unwrap(),

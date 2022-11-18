@@ -107,14 +107,22 @@ fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
     let bad_extended_wire = [0x50, 0x01, 0x00, 0x01, 0x03];
     let bad_incomplete_wire = [0x40, 0x01, 0x01];
 
-    let good = PathAttribute::Origin {
-        extended_length: false,
-        value: Origin::IGP,
-    };
-    let good_extended = PathAttribute::Origin {
-        extended_length: true,
-        value: Origin::IGP,
-    };
+    let good = PathAttribute::from(
+        false,
+        true,
+        false,
+        false,
+        PathAttributeValue::Origin(Origin::IGP),
+    )
+    .unwrap();
+    let good_extended = PathAttribute::from(
+        false,
+        true,
+        false,
+        true,
+        PathAttributeValue::Origin(Origin::IGP),
+    )
+    .unwrap();
 
     let bad_extended = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(4, &bad_extended_wire[4..]) },
@@ -310,20 +318,28 @@ fn test_path_attribute_as2_path() -> Result<(), PathAttributeWritingError> {
     let good_wire_extended = [0x50, 0x02, 0x00, 0x06, 0x02, 0x02, 0x00, 0x64, 0x01, 0x2c];
     let undefined_segment_type_wire = [0x50, 0x02, 0x00, 0x06, 0x00, 0x00, 0x00, 0x64, 0x01, 0x2c];
 
-    let good = PathAttribute::ASPath {
-        extended_length: false,
-        value: ASPath::As2PathSegments(vec![As2PathSegment::new(
+    let good = PathAttribute::from(
+        false,
+        true,
+        false,
+        false,
+        PathAttributeValue::ASPath(ASPath::As2PathSegments(vec![As2PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
-        )]),
-    };
-    let good_extended = PathAttribute::ASPath {
-        extended_length: true,
-        value: ASPath::As2PathSegments(vec![As2PathSegment::new(
+        )])),
+    )
+    .unwrap();
+    let good_extended = PathAttribute::from(
+        false,
+        true,
+        false,
+        true,
+        PathAttributeValue::ASPath(ASPath::As2PathSegments(vec![As2PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
-        )]),
-    };
+        )])),
+    )
+    .unwrap();
 
     let undefined_segment_type = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(4, &undefined_segment_type_wire[4..]) },
@@ -352,20 +368,29 @@ fn test_path_attribute_as4_path() -> Result<(), PathAttributeWritingError> {
         0x50, 0x02, 0x00, 0x0a, 0x02, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x01, 0x2c,
     ];
 
-    let good = PathAttribute::ASPath {
-        extended_length: false,
-        value: ASPath::As4PathSegments(vec![As4PathSegment::new(
+    let good = PathAttribute::from(
+        false,
+        true,
+        false,
+        false,
+        PathAttributeValue::ASPath(ASPath::As4PathSegments(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
-        )]),
-    };
-    let good_extended = PathAttribute::ASPath {
-        extended_length: true,
-        value: ASPath::As4PathSegments(vec![As4PathSegment::new(
+        )])),
+    )
+    .unwrap();
+
+    let good_extended = PathAttribute::from(
+        false,
+        true,
+        false,
+        true,
+        PathAttributeValue::ASPath(ASPath::As4PathSegments(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
-        )]),
-    };
+        )])),
+    )
+    .unwrap();
 
     test_parsed_completely_with_one_input(&good_wire, true, &good);
     test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
@@ -386,30 +411,39 @@ fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritin
         0xf0, 0x11, 0x00, 0x0a, 0x02, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x01, 0x2c,
     ];
 
-    let good = PathAttribute::AS4Path {
-        partial: false,
-        extended_length: false,
-        value: AS4Path::new(vec![As4PathSegment::new(
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::AS4Path(AS4Path::new(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
-        )]),
-    };
-    let good_extended = PathAttribute::AS4Path {
-        partial: false,
-        extended_length: true,
-        value: AS4Path::new(vec![As4PathSegment::new(
+        )])),
+    )
+    .unwrap();
+    let good_extended = PathAttribute::from(
+        true,
+        true,
+        false,
+        true,
+        PathAttributeValue::AS4Path(AS4Path::new(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
-        )]),
-    };
-    let good_partial = PathAttribute::AS4Path {
-        partial: true,
-        extended_length: true,
-        value: AS4Path::new(vec![As4PathSegment::new(
+        )])),
+    )
+    .unwrap();
+    let good_partial = PathAttribute::from(
+        true,
+        true,
+        true,
+        true,
+        PathAttributeValue::AS4Path(AS4Path::new(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
-        )]),
-    };
+        )])),
+    )
+    .unwrap();
 
     test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
@@ -447,14 +481,22 @@ fn test_path_attribute_next_hop() -> Result<(), PathAttributeWritingError> {
     let good_wire_extended = [0x50, 0x03, 0x00, 0x04, 0xac, 0x10, 0x03, 0x01];
     let bad_wire = [0x50, 0x03, 0x00, 0x03, 0xac, 0x10, 0x03, 0x01];
 
-    let good = PathAttribute::NextHop {
-        extended_length: false,
-        value: NextHop::new(Ipv4Addr::new(172, 16, 3, 1)),
-    };
-    let good_extended = PathAttribute::NextHop {
-        extended_length: true,
-        value: NextHop::new(Ipv4Addr::new(172, 16, 3, 1)),
-    };
+    let good = PathAttribute::from(
+        false,
+        true,
+        false,
+        false,
+        PathAttributeValue::NextHop(NextHop::new(Ipv4Addr::new(172, 16, 3, 1))),
+    )
+    .unwrap();
+    let good_extended = PathAttribute::from(
+        false,
+        true,
+        false,
+        true,
+        PathAttributeValue::NextHop(NextHop::new(Ipv4Addr::new(172, 16, 3, 1))),
+    )
+    .unwrap();
     let bad = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(2, &bad_wire[2..]) },
         PathAttributeParsingError::NextHopError(NextHopParsingError::InvalidNextHopLength(
@@ -504,14 +546,22 @@ fn test_path_attribute_multi_exit_discriminator() -> Result<(), PathAttributeWri
     let good_wire_extended = [0x90, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01];
     let bad_eof_wire = [0x80, 0x04, 0x04, 0x00, 0x00, 0x00];
 
-    let good = PathAttribute::MultiExitDiscriminator {
-        extended_length: false,
-        value: MultiExitDiscriminator::new(1),
-    };
-    let good_extended = PathAttribute::MultiExitDiscriminator {
-        extended_length: true,
-        value: MultiExitDiscriminator::new(1),
-    };
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        false,
+        PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(1)),
+    )
+    .unwrap();
+    let good_extended = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(1)),
+    )
+    .unwrap();
     let bad_eof = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(3, &bad_eof_wire[3..]) },
         PathAttributeParsingError::MultiExitDiscriminatorError(
@@ -573,14 +623,22 @@ fn test_path_attribute_local_preference() -> Result<(), PathAttributeWritingErro
     let good_wire = [0x40, 0x05, 0x04, 0x00, 0x00, 0x00, 0x64];
     let good_extended_wire = [0x50, 0x05, 0x00, 0x04, 0x00, 0x00, 0x00, 0x64];
 
-    let good = PathAttribute::LocalPreference {
-        extended_length: false,
-        value: LocalPreference::new(100),
-    };
-    let good_extended = PathAttribute::LocalPreference {
-        extended_length: true,
-        value: LocalPreference::new(100),
-    };
+    let good = PathAttribute::from(
+        false,
+        true,
+        false,
+        false,
+        PathAttributeValue::LocalPreference(LocalPreference::new(100)),
+    )
+    .unwrap();
+    let good_extended = PathAttribute::from(
+        false,
+        true,
+        false,
+        true,
+        PathAttributeValue::LocalPreference(LocalPreference::new(100)),
+    )
+    .unwrap();
 
     test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
@@ -632,14 +690,23 @@ fn test_path_attribute_atomic_aggregate() -> Result<(), PathAttributeWritingErro
     let bad_length_wire = [0xc0, 0x06, 0x01];
     let bad_extended_length_wire = [0xd0, 0x06, 0x00, 0x01];
 
-    let good = PathAttribute::AtomicAggregate {
-        extended_length: false,
-        value: AtomicAggregate,
-    };
-    let good_extended = PathAttribute::AtomicAggregate {
-        extended_length: true,
-        value: AtomicAggregate,
-    };
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::AtomicAggregate(AtomicAggregate),
+    )
+    .unwrap();
+
+    let good_extended = PathAttribute::from(
+        true,
+        true,
+        false,
+        true,
+        PathAttributeValue::AtomicAggregate(AtomicAggregate),
+    )
+    .unwrap();
     let bad_length = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(2, &bad_length_wire[2..]) },
         PathAttributeParsingError::AtomicAggregateError(
@@ -756,27 +823,54 @@ fn test_path_attribute_as2_aggregator() -> Result<(), PathAttributeWritingError>
     let bad_length_wire = [0xc0, 0x07, 0x08, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a];
     let bad_incomplete_wire = [0xc0, 0x07, 0x06, 0x00, 0x64, 0xac, 0x10, 0x00];
 
-    let good = PathAttribute::Aggregator {
-        partial: false,
-        extended_length: false,
-        value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
-    };
-    let good_partial = PathAttribute::Aggregator {
-        partial: true,
-        extended_length: false,
-        value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
-    };
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::Aggregator(Aggregator::As2Aggregator(As2Aggregator::new(
+            100,
+            Ipv4Addr::new(172, 16, 0, 10),
+        ))),
+    )
+    .unwrap();
 
-    let good_extended = PathAttribute::Aggregator {
-        partial: false,
-        extended_length: true,
-        value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
-    };
-    let good_partial_extended = PathAttribute::Aggregator {
-        partial: true,
-        extended_length: true,
-        value: Aggregator::As2Aggregator(As2Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
-    };
+    let good_partial = PathAttribute::from(
+        true,
+        true,
+        true,
+        false,
+        PathAttributeValue::Aggregator(Aggregator::As2Aggregator(As2Aggregator::new(
+            100,
+            Ipv4Addr::new(172, 16, 0, 10),
+        ))),
+    )
+    .unwrap();
+
+    let good_extended = PathAttribute::from(
+        true,
+        true,
+        false,
+        true,
+        PathAttributeValue::Aggregator(Aggregator::As2Aggregator(As2Aggregator::new(
+            100,
+            Ipv4Addr::new(172, 16, 0, 10),
+        ))),
+    )
+    .unwrap();
+
+    let good_partial_extended = PathAttribute::from(
+        true,
+        true,
+        true,
+        true,
+        PathAttributeValue::Aggregator(Aggregator::As2Aggregator(As2Aggregator::new(
+            100,
+            Ipv4Addr::new(172, 16, 0, 10),
+        ))),
+    )
+    .unwrap();
+
     let bad_length = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(2, &bad_length_wire[2..]) },
         PathAttributeParsingError::AggregatorError(AggregatorParsingError::InvalidLength(
@@ -832,27 +926,53 @@ fn test_parse_path_attribute_as4_aggregator() -> Result<(), PathAttributeWriting
         0xf0, 0x07, 0x00, 0x08, 0x00, 0x00, 0x00, 0x64, 0xac, 0x10, 0x00, 0x0a,
     ];
 
-    let good = PathAttribute::Aggregator {
-        partial: false,
-        extended_length: false,
-        value: Aggregator::As4Aggregator(As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
-    };
-    let good_partial = PathAttribute::Aggregator {
-        partial: true,
-        extended_length: false,
-        value: Aggregator::As4Aggregator(As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
-    };
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::Aggregator(Aggregator::As4Aggregator(As4Aggregator::new(
+            100,
+            Ipv4Addr::new(172, 16, 0, 10),
+        ))),
+    )
+    .unwrap();
 
-    let good_extended = PathAttribute::Aggregator {
-        partial: false,
-        extended_length: true,
-        value: Aggregator::As4Aggregator(As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
-    };
-    let good_partial_extended = PathAttribute::Aggregator {
-        partial: true,
-        extended_length: true,
-        value: Aggregator::As4Aggregator(As4Aggregator::new(100, Ipv4Addr::new(172, 16, 0, 10))),
-    };
+    let good_partial = PathAttribute::from(
+        true,
+        true,
+        true,
+        false,
+        PathAttributeValue::Aggregator(Aggregator::As4Aggregator(As4Aggregator::new(
+            100,
+            Ipv4Addr::new(172, 16, 0, 10),
+        ))),
+    )
+    .unwrap();
+
+    let good_extended = PathAttribute::from(
+        true,
+        true,
+        false,
+        true,
+        PathAttributeValue::Aggregator(Aggregator::As4Aggregator(As4Aggregator::new(
+            100,
+            Ipv4Addr::new(172, 16, 0, 10),
+        ))),
+    )
+    .unwrap();
+
+    let good_partial_extended = PathAttribute::from(
+        true,
+        true,
+        true,
+        true,
+        PathAttributeValue::Aggregator(Aggregator::As4Aggregator(As4Aggregator::new(
+            100,
+            Ipv4Addr::new(172, 16, 0, 10),
+        ))),
+    )
+    .unwrap();
 
     test_parsed_completely_with_one_input(&good_wire, true, &good);
     test_parsed_completely_with_one_input(&good_partial_wire, true, &good_partial);
@@ -902,29 +1022,47 @@ fn test_parse_path_attribute_communities() -> Result<(), PathAttributeWritingErr
         0xd0, 0x08, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,
     ];
 
-    let good_zero = PathAttribute::Communities {
-        partial: false,
-        extended_length: false,
-        value: Communities::new(vec![]),
-    };
+    let good_zero = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::Communities(Communities::new(vec![])),
+    )
+    .unwrap();
 
-    let good_one = PathAttribute::Communities {
-        partial: false,
-        extended_length: false,
-        value: Communities::new(vec![Community::new(1)]),
-    };
+    let good_one = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::Communities(Communities::new(vec![Community::new(1)])),
+    )
+    .unwrap();
 
-    let good_two = PathAttribute::Communities {
-        partial: false,
-        extended_length: false,
-        value: Communities::new(vec![Community::new(1), Community::new(2)]),
-    };
+    let good_two = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::Communities(Communities::new(vec![
+            Community::new(1),
+            Community::new(2),
+        ])),
+    )
+    .unwrap();
 
-    let good_two_extended = PathAttribute::Communities {
-        partial: false,
-        extended_length: true,
-        value: Communities::new(vec![Community::new(1), Community::new(2)]),
-    };
+    let good_two_extended = PathAttribute::from(
+        true,
+        true,
+        false,
+        true,
+        PathAttributeValue::Communities(Communities::new(vec![
+            Community::new(1),
+            Community::new(2),
+        ])),
+    )
+    .unwrap();
 
     test_parsed_completely_with_one_input(&good_zero_wire, false, &good_zero);
     test_parsed_completely_with_one_input(&good_one_wire, false, &good_one);
@@ -1043,15 +1181,19 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_unicast() -> Result<(), PathAttr
         0x00,
     ];
 
-    let good = PathAttribute::MpReach {
-        extended_length: true,
-        value: MpReach::Ipv4Unicast {
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpReach(MpReach::Ipv4Unicast {
             next_hop: Ipv4Addr::new(172, 16, 0, 20),
             nlri: vec![
                 Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.0.0/16").unwrap()).unwrap(),
             ],
-        },
-    };
+        }),
+    )
+    .unwrap();
 
     let invalid = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(14, &invalid_wire[14..]) },
@@ -1085,15 +1227,19 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_multicast() -> Result<(), PathAt
         0x00,
     ];
 
-    let good = PathAttribute::MpReach {
-        extended_length: true,
-        value: MpReach::Ipv4Multicast {
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpReach(MpReach::Ipv4Multicast {
             next_hop: Ipv4Addr::new(172, 16, 0, 20),
             nlri: vec![
                 Ipv4Multicast::from_net(Ipv4Net::from_str("224.0.0.0/16").unwrap()).unwrap(),
             ],
-        },
-    };
+        }),
+    )
+    .unwrap();
 
     let invalid = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(14, &invalid_wire[14..]) },
@@ -1132,9 +1278,12 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_unicast() -> Result<(), PathAttr
         0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x00,
     ];
 
-    let good = PathAttribute::MpReach {
-        extended_length: false,
-        value: MpReach::Ipv6Unicast {
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        false,
+        PathAttributeValue::MpReach(MpReach::Ipv6Unicast {
             next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
             next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
             nlri: vec![
@@ -1142,8 +1291,9 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_unicast() -> Result<(), PathAttr
                 Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:1::/64").unwrap()).unwrap(),
                 Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
             ],
-        },
-    };
+        }),
+    )
+    .unwrap();
 
     let invalid = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(40, &invalid_addr_wire[40..]) },
@@ -1184,9 +1334,12 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
         0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x00,
     ];
 
-    let good = PathAttribute::MpReach {
-        extended_length: false,
-        value: MpReach::Ipv6Multicast {
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        false,
+        PathAttributeValue::MpReach(MpReach::Ipv6Multicast {
             next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
             next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
             nlri: vec![
@@ -1194,8 +1347,9 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
                 Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1:1::/64").unwrap()).unwrap(),
                 Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1::/64").unwrap()).unwrap(),
             ],
-        },
-    };
+        }),
+    )
+    .unwrap();
 
     let invalid = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(40, &invalid_addr_wire[40..]) },
@@ -1229,15 +1383,19 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_unicast() -> Result<(), PathAt
         0x00, 0x00, 0x00, 0x00, 0x8b, 0xea,
     ];
 
-    let good = PathAttribute::MpUnreach {
-        extended_length: true,
-        value: MpUnreach::Ipv6Unicast {
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpUnreach(MpUnreach::Ipv6Unicast {
             nlri: vec![
                 Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8::/32").unwrap()).unwrap(),
                 Ipv6Unicast::from_net(Ipv6Net::from_str("fdfd:0:0:8bea::/64").unwrap()).unwrap(),
             ],
-        },
-    };
+        }),
+    )
+    .unwrap();
 
     let invalid_afi = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
@@ -1271,15 +1429,19 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast(
         0x00, 0x00, 0x00, 0x00, 0x8b, 0xea,
     ];
 
-    let good = PathAttribute::MpUnreach {
-        extended_length: true,
-        value: MpUnreach::Ipv6Multicast {
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast {
             nlri: vec![
                 Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8::/32").unwrap()).unwrap(),
                 Ipv6Multicast::from_net(Ipv6Net::from_str("fffd:0:0:8bea::/64").unwrap()).unwrap(),
             ],
-        },
-    };
+        }),
+    )
+    .unwrap();
 
     let invalid_afi = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
@@ -1310,9 +1472,12 @@ fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
         0xc0, 0xa8, 0x01,
     ];
 
-    let good = PathAttribute::MpReach {
-        extended_length: true,
-        value: MpReach::Ipv4MplsVpnUnicast {
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpReach(MpReach::Ipv4MplsVpnUnicast {
             next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
                 RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
                 Ipv6Addr::from_str("fc00::1").unwrap(),
@@ -1322,8 +1487,10 @@ fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
                 vec![MplsLabel::new([0, 65, 1])],
                 Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
             )],
-        },
-    };
+        }),
+    )
+    .unwrap();
+
     test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_write(&good, &good_wire)?;
     Ok(())
@@ -1334,32 +1501,13 @@ fn test_unknown_attribute() -> Result<(), UnknownAttributeWritingError> {
     let good_wire = [0x00, 0x04, 0xac, 0x10, 0x03, 0x02];
     let good_extended_wire = [0x00, 0x00, 0x04, 0xac, 0x10, 0x03, 0x02];
 
-    let good = UnknownAttribute::new(
-        true,
-        false,
-        0,
-        PathAttributeLength::U8(4),
-        vec![0xac, 0x10, 0x03, 0x02],
-    );
-    let good_extended = UnknownAttribute::new(
-        true,
-        false,
-        0,
-        PathAttributeLength::U16(4),
-        vec![0xac, 0x10, 0x03, 0x02],
-    );
+    let good = UnknownAttribute::new(0, vec![0xac, 0x10, 0x03, 0x02]);
+    let good_extended = UnknownAttribute::new(0, vec![0xac, 0x10, 0x03, 0x02]);
 
-    test_parsed_completely_with_three_inputs(&good_wire, true, false, false, &good);
-    test_parsed_completely_with_three_inputs(
-        &good_extended_wire,
-        true,
-        false,
-        true,
-        &good_extended,
-    );
-
-    test_write(&good, &good_wire)?;
-    test_write(&good_extended, &good_extended_wire)?;
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_write_with_one_input(&good, false, &good_wire)?;
+    test_write_with_one_input(&good_extended, true, &good_extended_wire)?;
     Ok(())
 }
 
@@ -1369,26 +1517,24 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
     let good_extended_wire = [0xd0, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x64];
     let bad_incomplete_wire = [0xc0, 0x00, 0x04, 0x00, 0x00, 0x00];
 
-    let good = PathAttribute::UnknownAttribute {
-        partial: false,
-        value: UnknownAttribute::new(
-            true,
-            true,
-            0,
-            PathAttributeLength::U8(4),
-            good_wire[3..].into(),
-        ),
-    };
-    let good_extended = PathAttribute::UnknownAttribute {
-        partial: false,
-        value: UnknownAttribute::new(
-            true,
-            true,
-            0,
-            PathAttributeLength::U16(4),
-            good_wire[3..].into(),
-        ),
-    };
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::UnknownAttribute(UnknownAttribute::new(0, good_wire[3..].into())),
+    )
+    .unwrap();
+
+    let good_extended = PathAttribute::from(
+        true,
+        true,
+        false,
+        true,
+        PathAttributeValue::UnknownAttribute(UnknownAttribute::new(0, good_wire[3..].into())),
+    )
+    .unwrap();
+
     let bad_incomplete = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(3, &bad_incomplete_wire[3..]) },
         PathAttributeParsingError::UnknownAttributeError(UnknownAttributeParsingError::NomError(

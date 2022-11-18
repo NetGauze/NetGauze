@@ -75,7 +75,7 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
             Self::KeepAlive => 0,
             Self::RouteRefresh(route_refresh) => route_refresh.len(),
         };
-        Self::BASE_LENGTH as usize + body_len
+        Self::BASE_LENGTH + body_len
     }
 
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), BGPMessageWritingError> {

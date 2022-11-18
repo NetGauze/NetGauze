@@ -19,9 +19,10 @@ use crate::{
     iana::{PathAttributeType, UndefinedPathAttributeType},
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AsPathSegmentType, AtomicAggregate, Communities, Community, LocalPreference, MpReach,
-        MpUnreach, MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
-        UndefinedAsPathSegmentType, UndefinedOrigin, UnknownAttribute,
+        AsPathSegmentType, AtomicAggregate, Communities, Community, InvalidPathAttribute,
+        LocalPreference, MpReach, MpUnreach, MultiExitDiscriminator, NextHop, Origin,
+        PathAttribute, PathAttributeLength, PathAttributeValue, UndefinedAsPathSegmentType,
+        UndefinedOrigin, UnknownAttribute,
     },
     wire::deserializer::nlri::*,
 };
@@ -30,10 +31,9 @@ use netgauze_iana::address_family::{
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_into_located_three_inputs,
-    parse_into_located_two_inputs, parse_till_empty, parse_till_empty_into_located,
-    ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs,
-    ReadablePDUWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
+    parse_till_empty, parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePDU,
+    ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -83,6 +83,7 @@ pub enum PathAttributeParsingError {
     MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
+    InvalidPathAttribute(InvalidPathAttribute),
 }
 
 pub trait IntoLocatedPathAttributeParsingError<'a> {
@@ -103,119 +104,84 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
         let partial = attributes & PARTIAL_PATH_ATTRIBUTE_MASK == PARTIAL_PATH_ATTRIBUTE_MASK;
         let extended_length =
             attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
-        match PathAttributeType::try_from(code) {
+        let (buf, value) = match PathAttributeType::try_from(code) {
             Ok(PathAttributeType::Origin) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::Origin {
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::Origin(value);
+                (buf, value)
             }
             Ok(PathAttributeType::ASPath) => {
                 let (buf, value) = parse_into_located_two_inputs(buf, extended_length, asn4)?;
-                let path_attr = PathAttribute::ASPath {
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::ASPath(value);
+                (buf, value)
             }
             Ok(PathAttributeType::AS4Path) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::AS4Path {
-                    partial,
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::AS4Path(value);
+                (buf, value)
             }
             Ok(PathAttributeType::NextHop) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::NextHop {
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::NextHop(value);
+                (buf, value)
             }
             Ok(PathAttributeType::MultiExitDiscriminator) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::MultiExitDiscriminator {
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::MultiExitDiscriminator(value);
+                (buf, value)
             }
             Ok(PathAttributeType::LocalPreference) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::LocalPreference {
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::LocalPreference(value);
+                (buf, value)
             }
             Ok(PathAttributeType::AtomicAggregate) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::AtomicAggregate {
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::AtomicAggregate(value);
+                (buf, value)
             }
             Ok(PathAttributeType::Aggregator) => {
                 let (buf, value) = parse_into_located_two_inputs(buf, extended_length, asn4)?;
-                let path_attr = PathAttribute::Aggregator {
-                    partial,
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::Aggregator(value);
+                (buf, value)
             }
             Ok(PathAttributeType::Communities) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::Communities {
-                    partial,
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::Communities(value);
+                (buf, value)
             }
             Ok(PathAttributeType::MPReachNLRI) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::MpReach {
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::MpReach(value);
+                (buf, value)
             }
             Ok(PathAttributeType::MPUnreachNLRI) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let path_attr = PathAttribute::MpUnreach {
-                    extended_length,
-                    value,
-                };
-                Ok((buf, path_attr))
+                let value = PathAttributeValue::MpUnreach(value);
+                (buf, value)
             }
             Ok(_code) => {
-                let (buf, value) = parse_into_located_three_inputs(
-                    buf_before_code,
-                    optional,
-                    transitive,
-                    extended_length,
-                )?;
-                let path_attr = PathAttribute::UnknownAttribute { partial, value };
-                Ok((buf, path_attr))
+                let (buf, value) = parse_into_located_one_input(buf_before_code, extended_length)?;
+                let value = PathAttributeValue::UnknownAttribute(value);
+                (buf, value)
             }
             Err(UndefinedPathAttributeType(_code)) => {
-                let (buf, value) = parse_into_located_three_inputs(
-                    buf_before_code,
-                    optional,
-                    transitive,
-                    extended_length,
-                )?;
-                let path_attr = PathAttribute::UnknownAttribute { partial, value };
-                Ok((buf, path_attr))
+                let (buf, value) = parse_into_located_one_input(buf_before_code, extended_length)?;
+                let value = PathAttributeValue::UnknownAttribute(value);
+                (buf, value)
             }
-        }
+        };
+        let attr = match PathAttribute::from(optional, transitive, partial, extended_length, value)
+        {
+            Ok(attr) => attr,
+            Err(err) => {
+                return Err(nom::Err::Error(LocatedPathAttributeParsingError::new(
+                    buf,
+                    PathAttributeParsingError::InvalidPathAttribute(err),
+                )))
+            }
+        };
+        Ok((buf, attr))
     }
 }
 
@@ -905,13 +871,11 @@ pub enum UnknownAttributeParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDUWithThreeInputs<'a, bool, bool, bool, LocatedUnknownAttributeParsingError<'a>>
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'a>>
     for UnknownAttribute
 {
     fn from_wire(
         buf: Span<'a>,
-        optional: bool,
-        transitive: bool,
         extended_length: bool,
     ) -> IResult<Span<'a>, Self, LocatedUnknownAttributeParsingError<'a>> {
         let (buf, code) = be_u8(buf)?;
@@ -925,10 +889,7 @@ impl<'a> ReadablePDUWithThreeInputs<'a, bool, bool, bool, LocatedUnknownAttribut
         let length: u16 = len.into();
         let (buf, value) = nom::bytes::complete::take(length)(buf)?;
 
-        Ok((
-            buf,
-            UnknownAttribute::new(optional, transitive, code, len, (*value.fragment()).into()),
-        ))
+        Ok((buf, UnknownAttribute::new(code, (*value.fragment()).into())))
     }
 }
 

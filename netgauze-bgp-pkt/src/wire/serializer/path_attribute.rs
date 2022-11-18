@@ -24,7 +24,7 @@ use crate::{
     path_attribute::{
         AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
         AtomicAggregate, Communities, Community, LocalPreference, MpReach, MpUnreach,
-        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeLength,
+        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeValue,
         UnknownAttribute,
     },
     wire::serializer::nlri::{
@@ -57,58 +57,19 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
     const BASE_LENGTH: usize = 2;
 
     fn len(&self) -> usize {
-        let value_len = match self {
-            Self::Origin {
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::ASPath {
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::AS4Path {
-                partial: _,
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::NextHop {
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::MultiExitDiscriminator {
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::LocalPreference {
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::AtomicAggregate {
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::Aggregator {
-                partial: _,
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::Communities {
-                partial: _,
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::MpReach {
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::MpUnreach {
-                extended_length,
-                value,
-            } => value.len(*extended_length),
-            Self::UnknownAttribute { partial: _, value } => value.len() - 1, /* Unlike the rest,
-                                                                              * Unknown computes
-                                                                              * the code into the
-                                                                              * value length, */
+        let value_len = match self.value() {
+            PathAttributeValue::Origin(value) => value.len(self.extended_length()),
+            PathAttributeValue::ASPath(value) => value.len(self.extended_length()),
+            PathAttributeValue::AS4Path(value) => value.len(self.extended_length()),
+            PathAttributeValue::NextHop(value) => value.len(self.extended_length()),
+            PathAttributeValue::MultiExitDiscriminator(value) => value.len(self.extended_length()),
+            PathAttributeValue::LocalPreference(value) => value.len(self.extended_length()),
+            PathAttributeValue::AtomicAggregate(value) => value.len(self.extended_length()),
+            PathAttributeValue::Aggregator(value) => value.len(self.extended_length()),
+            PathAttributeValue::Communities(value) => value.len(self.extended_length()),
+            PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
+            PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
+            PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
         };
         Self::BASE_LENGTH + value_len
     }
@@ -128,89 +89,53 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             attributes |= 0b00010000;
         }
         writer.write_u8(attributes)?;
-        match self {
-            Self::Origin {
-                extended_length,
-                value,
-            } => {
+        match self.value() {
+            PathAttributeValue::Origin(value) => {
                 writer.write_u8(PathAttributeType::Origin.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::ASPath {
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::ASPath(value) => {
                 writer.write_u8(PathAttributeType::ASPath.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::AS4Path {
-                partial: _,
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::AS4Path(value) => {
                 writer.write_u8(PathAttributeType::AS4Path.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::NextHop {
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::NextHop(value) => {
                 writer.write_u8(PathAttributeType::NextHop.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::MultiExitDiscriminator {
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::MultiExitDiscriminator(value) => {
                 writer.write_u8(PathAttributeType::MultiExitDiscriminator.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::LocalPreference {
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::LocalPreference(value) => {
                 writer.write_u8(PathAttributeType::LocalPreference.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::AtomicAggregate {
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::AtomicAggregate(value) => {
                 writer.write_u8(PathAttributeType::AtomicAggregate.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::Aggregator {
-                partial: _,
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::Aggregator(value) => {
                 writer.write_u8(PathAttributeType::Aggregator.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::Communities {
-                partial: _,
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::Communities(value) => {
                 writer.write_u8(PathAttributeType::Communities.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::MpReach {
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::MpReach(value) => {
                 writer.write_u8(PathAttributeType::MPReachNLRI.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::MpUnreach {
-                extended_length,
-                value,
-            } => {
+            PathAttributeValue::MpUnreach(value) => {
                 writer.write_u8(PathAttributeType::MPUnreachNLRI.into())?;
-                value.write(writer, *extended_length)?;
+                value.write(writer, self.extended_length())?;
             }
-            Self::UnknownAttribute { partial: _, value } => {
-                value.write(writer)?;
+            PathAttributeValue::UnknownAttribute(value) => {
+                value.write(writer, self.extended_length())?;
             }
         }
         Ok(())
@@ -536,26 +461,25 @@ pub enum UnknownAttributeWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<UnknownAttributeWritingError> for UnknownAttribute {
+impl WritablePDUWithOneInput<bool, UnknownAttributeWritingError> for UnknownAttribute {
     // One octet length (if extended is not enabled) and one octet for code
     const BASE_LENGTH: usize = 2;
 
-    fn len(&self) -> usize {
-        match self.length() {
-            PathAttributeLength::U8(len) => Self::BASE_LENGTH + len as usize,
-            PathAttributeLength::U16(len) => Self::BASE_LENGTH + 1 + len as usize,
-        }
+    fn len(&self, extended_length: bool) -> usize {
+        Self::BASE_LENGTH + self.value().len() + usize::from(extended_length)
     }
 
-    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), UnknownAttributeWritingError> {
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), UnknownAttributeWritingError> {
         writer.write_u8(self.code())?;
-        match self.length() {
-            PathAttributeLength::U8(len) => {
-                writer.write_u8(len)?;
-            }
-            PathAttributeLength::U16(len) => {
-                writer.write_u16::<NetworkEndian>(len)?;
-            }
+        let len = self.len(extended_length) - Self::BASE_LENGTH;
+        if extended_length || len > u8::MAX.into() {
+            writer.write_u16::<NetworkEndian>((len - 1) as u16)?;
+        } else {
+            writer.write_u8(len as u8)?;
         }
         writer.write_all(self.value())?;
         Ok(())
@@ -682,7 +606,7 @@ impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
                         .subsequent_address_family()
                         .into(),
                 )?;
-                writer.write_u8(IPV4_LEN as u8)?;
+                writer.write_u8(IPV4_LEN)?;
                 writer.write_all(&next_hop.octets())?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
@@ -698,7 +622,7 @@ impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
                         .subsequent_address_family()
                         .into(),
                 )?;
-                writer.write_u8(IPV4_LEN as u8)?;
+                writer.write_u8(IPV4_LEN)?;
                 writer.write_all(&next_hop.octets())?;
                 writer.write_u8(0)?;
                 for nlri in nlri {

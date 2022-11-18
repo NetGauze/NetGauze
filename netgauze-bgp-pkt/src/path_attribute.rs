@@ -21,6 +21,34 @@ use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
 
+/// General properties to check the validity of a given path attribute value
+pub trait PathAttributeValueProperties {
+    /// Check the validity of the `optional` bit in the [PathAttribute]:
+    ///  - `Some(true)` optional must be set to `true`.
+    ///  - `Some(false)` optional must be set to `false`.
+    ///  - `None` optional can be set to either `true` or `false`.
+    fn can_be_optional() -> Option<bool>;
+
+    /// Check the validity of the `transitive` bit in the [PathAttribute]:
+    ///  - `Some(true)` transitive must be set to `true`.
+    ///  - `Some(false)` transitive must be set to `false`.
+    ///  - `None` transitive can be set to either `true` or `false`.
+    fn can_be_transitive() -> Option<bool>;
+
+    /// Check the validity of the `partial` bit in the [PathAttribute]:
+    ///  - `Some(true)` partial must be set to `true`.
+    ///  - `Some(false)` partial must be set to `false`.
+    ///  - `None` partial can be set to either `true` or `false`.
+    fn can_be_partial() -> Option<bool>;
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum InvalidPathAttribute {
+    InvalidOptionalFlagValue(bool),
+    InvalidTransitiveFlagValue(bool),
+    InvalidPartialFlagValue(bool),
+}
+
 /// PathAttribute
 ///
 /// ```text
@@ -31,170 +59,65 @@ use strum_macros::{Display, FromRepr};
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum PathAttribute {
-    Origin {
-        extended_length: bool,
-        value: Origin,
-    },
-    ASPath {
-        extended_length: bool,
-        value: ASPath,
-    },
-    AS4Path {
-        partial: bool,
-        extended_length: bool,
-        value: AS4Path,
-    },
-    NextHop {
-        extended_length: bool,
-        value: NextHop,
-    },
-    MultiExitDiscriminator {
-        extended_length: bool,
-        value: MultiExitDiscriminator,
-    },
-    LocalPreference {
-        extended_length: bool,
-        value: LocalPreference,
-    },
-    AtomicAggregate {
-        extended_length: bool,
-        value: AtomicAggregate,
-    },
-    Aggregator {
-        partial: bool,
-        extended_length: bool,
-        value: Aggregator,
-    },
-    Communities {
-        partial: bool,
-        extended_length: bool,
-        value: Communities,
-    },
-    MpReach {
-        extended_length: bool,
-        value: MpReach,
-    },
-    MpUnreach {
-        extended_length: bool,
-        value: MpUnreach,
-    },
-    UnknownAttribute {
-        partial: bool,
-        value: UnknownAttribute,
-    },
-}
-
-impl PathAttribute {
+pub struct PathAttribute {
     /// Optional bit defines whether the attribute is optional (if set to
     /// `true`) or well-known (if set to `false`).
-    pub const fn optional(&self) -> bool {
-        match self {
-            Self::Origin {
-                extended_length: _,
-                value: _,
-            } => Origin::optional(),
-            Self::ASPath {
-                extended_length: _,
-                value: _,
-            } => ASPath::optional(),
-            Self::AS4Path {
-                partial: _,
-                extended_length: _,
-                value: _,
-            } => AS4Path::optional(),
-            Self::NextHop {
-                extended_length: _,
-                value: _,
-            } => NextHop::optional(),
-            Self::MultiExitDiscriminator {
-                extended_length: _,
-                value: _,
-            } => MultiExitDiscriminator::optional(),
-            Self::LocalPreference {
-                extended_length: _,
-                value: _,
-            } => LocalPreference::optional(),
-            Self::AtomicAggregate {
-                extended_length: _,
-                value: _,
-            } => AtomicAggregate::optional(),
-            Self::Aggregator {
-                partial: _,
-                extended_length: _,
-                value: _,
-            } => Aggregator::optional(),
-            Self::Communities {
-                partial: _,
-                extended_length: _,
-                value: _,
-            } => Communities::optional(),
-            Self::MpReach {
-                extended_length: _,
-                value: _,
-            } => MpReach::optional(),
-            Self::MpUnreach {
-                extended_length: _,
-                value: _,
-            } => MpUnreach::optional(),
-            Self::UnknownAttribute { partial: _, value } => value.optional(),
-        }
-    }
+    optional: bool,
 
     /// Transitive bit defines whether an optional attribute is transitive (if
     /// set to `true`) or non-transitive (if set to `false`). For well-known
     /// attributes, the Transitive bit MUST be set to `true`.
-    pub const fn transitive(&self) -> bool {
-        match self {
-            Self::Origin {
-                extended_length: _,
-                value: _,
-            } => Origin::transitive(),
-            Self::ASPath {
-                extended_length: _,
-                value: _,
-            } => ASPath::transitive(),
-            Self::AS4Path {
-                partial: _,
-                extended_length: _,
-                value: _,
-            } => AS4Path::transitive(),
-            Self::NextHop {
-                extended_length: _,
-                value: _,
-            } => NextHop::transitive(),
-            Self::MultiExitDiscriminator {
-                extended_length: _,
-                value: _,
-            } => MultiExitDiscriminator::transitive(),
-            Self::LocalPreference {
-                extended_length: _,
-                value: _,
-            } => LocalPreference::transitive(),
-            Self::AtomicAggregate {
-                extended_length: _,
-                value: _,
-            } => AtomicAggregate::transitive(),
-            Self::Aggregator {
-                partial: _,
-                extended_length: _,
-                value: _,
-            } => Aggregator::transitive(),
-            Self::Communities {
-                partial: _,
-                extended_length: _,
-                value: _,
-            } => Communities::transitive(),
-            Self::MpReach {
-                extended_length: _,
-                value: _,
-            } => MpReach::transitive(),
-            Self::MpUnreach {
-                extended_length: _,
-                value: _,
-            } => MpUnreach::transitive(),
-            Self::UnknownAttribute { partial: _, value } => value.transitive(),
+    transitive: bool,
+    partial: bool,
+    extended_length: bool,
+    value: PathAttributeValue,
+}
+
+impl PathAttribute {
+    pub fn from(
+        optional: bool,
+        transitive: bool,
+        partial: bool,
+        extended_length: bool,
+        value: PathAttributeValue,
+    ) -> Result<PathAttribute, InvalidPathAttribute> {
+        if value
+            .can_be_optional()
+            .map(|x| x != optional)
+            .unwrap_or(false)
+        {
+            return Err(InvalidPathAttribute::InvalidOptionalFlagValue(optional));
         }
+        if value
+            .can_be_transitive()
+            .map(|x| x != transitive)
+            .unwrap_or(false)
+        {
+            return Err(InvalidPathAttribute::InvalidTransitiveFlagValue(transitive));
+        }
+        if value
+            .can_be_partial()
+            .map(|x| x != partial)
+            .unwrap_or(false)
+        {
+            return Err(InvalidPathAttribute::InvalidPartialFlagValue(partial));
+        }
+
+        Ok(PathAttribute {
+            optional,
+            transitive,
+            partial,
+            extended_length,
+            value,
+        })
+    }
+
+    pub const fn value(&self) -> &PathAttributeValue {
+        &self.value
+    }
+
+    pub const fn optional(&self) -> bool {
+        self.optional
     }
 
     /// Partial bit defines whether the information contained in the optional
@@ -204,110 +127,85 @@ impl PathAttribute {
     /// For well-known attributes and for optional non-transitive attributes,
     /// the Partial bit MUST be set to `false`.
     pub const fn partial(&self) -> bool {
+        self.partial
+    }
+
+    pub const fn transitive(&self) -> bool {
+        self.transitive
+    }
+
+    ///// Extended Length bit defines whether the Attribute Length is one octet
+    ///// (if set to `false`) or two octets (if set to `true`).
+    pub const fn extended_length(&self) -> bool {
+        self.extended_length
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum PathAttributeValue {
+    Origin(Origin),
+    ASPath(ASPath),
+    AS4Path(AS4Path),
+    NextHop(NextHop),
+    MultiExitDiscriminator(MultiExitDiscriminator),
+    LocalPreference(LocalPreference),
+    AtomicAggregate(AtomicAggregate),
+    Aggregator(Aggregator),
+    Communities(Communities),
+    MpReach(MpReach),
+    MpUnreach(MpUnreach),
+    UnknownAttribute(UnknownAttribute),
+}
+
+impl PathAttributeValue {
+    pub fn can_be_optional(&self) -> Option<bool> {
         match self {
-            Self::Origin {
-                extended_length: _,
-                value: _,
-            } => Origin::partial(),
-            Self::ASPath {
-                extended_length: _,
-                value: _,
-            } => ASPath::partial(),
-            Self::AS4Path {
-                partial,
-                extended_length: _,
-                value: _,
-            } => *partial,
-            Self::NextHop {
-                extended_length: _,
-                value: _,
-            } => NextHop::partial(),
-            Self::MultiExitDiscriminator {
-                extended_length: _,
-                value: _,
-            } => MultiExitDiscriminator::partial(),
-            Self::LocalPreference {
-                extended_length: _,
-                value: _,
-            } => LocalPreference::partial(),
-            Self::AtomicAggregate {
-                extended_length: _,
-                value: _,
-            } => AtomicAggregate::partial(),
-            Self::Aggregator {
-                partial,
-                extended_length: _,
-                value: _,
-            } => *partial,
-            Self::Communities {
-                partial,
-                extended_length: _,
-                value: _,
-            } => *partial,
-            Self::MpReach {
-                extended_length: _,
-                value: _,
-            } => MpReach::partial(),
-            Self::MpUnreach {
-                extended_length: _,
-                value: _,
-            } => MpUnreach::partial(),
-            Self::UnknownAttribute { partial, value: _ } => *partial,
+            Self::Origin(_) => Origin::can_be_optional(),
+            Self::ASPath(_) => ASPath::can_be_optional(),
+            Self::AS4Path(_) => AS4Path::can_be_optional(),
+            Self::NextHop(_) => NextHop::can_be_optional(),
+            Self::MultiExitDiscriminator(_) => MultiExitDiscriminator::can_be_optional(),
+            Self::LocalPreference(_) => LocalPreference::can_be_optional(),
+            Self::AtomicAggregate(_) => AtomicAggregate::can_be_optional(),
+            Self::Aggregator(_) => Aggregator::can_be_optional(),
+            Self::Communities(_) => Communities::can_be_optional(),
+            Self::MpReach(_) => MpReach::can_be_optional(),
+            Self::MpUnreach(_) => MpUnreach::can_be_optional(),
+            Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
         }
     }
 
-    /// Extended Length bit defines whether the Attribute Length is one octet
-    /// (if set to `false`) or two octets (if set to `true`).
-    pub const fn extended_length(&self) -> bool {
+    pub fn can_be_transitive(&self) -> Option<bool> {
         match self {
-            Self::Origin {
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::ASPath {
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::AS4Path {
-                partial: _,
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::NextHop {
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::MultiExitDiscriminator {
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::LocalPreference {
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::AtomicAggregate {
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::Aggregator {
-                partial: _,
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::Communities {
-                partial: _,
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::MpReach {
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::MpUnreach {
-                extended_length,
-                value: _,
-            } => *extended_length,
-            Self::UnknownAttribute { partial: _, value } => value.extended_length(),
+            Self::Origin(_) => Origin::can_be_transitive(),
+            Self::ASPath(_) => ASPath::can_be_transitive(),
+            Self::AS4Path(_) => AS4Path::can_be_transitive(),
+            Self::NextHop(_) => NextHop::can_be_transitive(),
+            Self::MultiExitDiscriminator(_) => MultiExitDiscriminator::can_be_transitive(),
+            Self::LocalPreference(_) => LocalPreference::can_be_transitive(),
+            Self::AtomicAggregate(_) => AtomicAggregate::can_be_transitive(),
+            Self::Aggregator(_) => Aggregator::can_be_transitive(),
+            Self::Communities(_) => Communities::can_be_transitive(),
+            Self::MpReach(_) => MpReach::can_be_transitive(),
+            Self::MpUnreach(_) => MpUnreach::can_be_transitive(),
+            Self::UnknownAttribute(_) => UnknownAttribute::can_be_transitive(),
+        }
+    }
+
+    pub fn can_be_partial(&self) -> Option<bool> {
+        match self {
+            Self::Origin(_) => Origin::can_be_partial(),
+            Self::ASPath(_) => ASPath::can_be_partial(),
+            Self::AS4Path(_) => AS4Path::can_be_partial(),
+            Self::NextHop(_) => NextHop::can_be_partial(),
+            Self::MultiExitDiscriminator(_) => MultiExitDiscriminator::can_be_partial(),
+            Self::LocalPreference(_) => LocalPreference::can_be_partial(),
+            Self::AtomicAggregate(_) => AtomicAggregate::can_be_partial(),
+            Self::Aggregator(_) => Aggregator::can_be_partial(),
+            Self::Communities(_) => Communities::can_be_partial(),
+            Self::MpReach(_) => MpReach::can_be_partial(),
+            Self::MpUnreach(_) => MpUnreach::can_be_partial(),
+            Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
         }
     }
 }
@@ -330,17 +228,17 @@ pub enum Origin {
     Incomplete = 2,
 }
 
-impl Origin {
-    pub const fn optional() -> bool {
-        false
+impl PathAttributeValueProperties for Origin {
+    fn can_be_optional() -> Option<bool> {
+        Some(false)
     }
 
-    pub const fn transitive() -> bool {
-        true
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn partial() -> bool {
-        false
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
     }
 }
 
@@ -376,17 +274,17 @@ pub enum ASPath {
     As4PathSegments(Vec<As4PathSegment>),
 }
 
-impl ASPath {
-    pub const fn optional() -> bool {
-        false
+impl PathAttributeValueProperties for ASPath {
+    fn can_be_optional() -> Option<bool> {
+        Some(false)
     }
 
-    pub const fn transitive() -> bool {
-        true
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn partial() -> bool {
-        false
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
     }
 }
 
@@ -513,13 +411,17 @@ impl AS4Path {
     }
 }
 
-impl AS4Path {
-    pub const fn optional() -> bool {
-        true
+impl PathAttributeValueProperties for AS4Path {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn transitive() -> bool {
-        true
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        None
     }
 }
 
@@ -541,17 +443,17 @@ impl NextHop {
     }
 }
 
-impl NextHop {
-    pub const fn optional() -> bool {
-        false
+impl PathAttributeValueProperties for NextHop {
+    fn can_be_optional() -> Option<bool> {
+        Some(false)
     }
 
-    pub const fn transitive() -> bool {
-        true
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn partial() -> bool {
-        false
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
     }
 }
 
@@ -573,17 +475,19 @@ impl MultiExitDiscriminator {
     pub const fn metric(&self) -> u32 {
         self.metric
     }
+}
 
-    pub const fn optional() -> bool {
-        true
+impl PathAttributeValueProperties for MultiExitDiscriminator {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn transitive() -> bool {
-        false
+    fn can_be_transitive() -> Option<bool> {
+        Some(false)
     }
 
-    pub const fn partial() -> bool {
-        false
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
     }
 }
 
@@ -606,17 +510,17 @@ impl LocalPreference {
     }
 }
 
-impl LocalPreference {
-    pub const fn optional() -> bool {
-        false
+impl PathAttributeValueProperties for LocalPreference {
+    fn can_be_optional() -> Option<bool> {
+        Some(false)
     }
 
-    pub const fn transitive() -> bool {
-        true
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn partial() -> bool {
-        false
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
     }
 }
 
@@ -624,20 +528,19 @@ impl LocalPreference {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AtomicAggregate;
 
-impl AtomicAggregate {
-    pub const fn optional() -> bool {
-        true
+impl PathAttributeValueProperties for AtomicAggregate {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn transitive() -> bool {
-        true
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn partial() -> bool {
-        false
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
     }
 }
-
 /// AGGREGATOR is an optional transitive attribute of length 6.
 /// The attribute contains the last AS number that formed the
 /// aggregate route (encoded as 2 octets), followed by the IP
@@ -693,13 +596,17 @@ pub enum Aggregator {
     As4Aggregator(As4Aggregator),
 }
 
-impl Aggregator {
-    pub const fn optional() -> bool {
-        true
+impl PathAttributeValueProperties for Aggregator {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn transitive() -> bool {
-        true
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        None
     }
 }
 
@@ -740,13 +647,17 @@ impl Communities {
     }
 }
 
-impl Communities {
-    pub const fn optional() -> bool {
-        true
+impl PathAttributeValueProperties for Communities {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn transitive() -> bool {
-        true
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        None
     }
 }
 
@@ -838,17 +749,17 @@ pub enum MpReach {
     },
 }
 
-impl MpReach {
-    pub const fn optional() -> bool {
-        true
+impl PathAttributeValueProperties for MpReach {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn transitive() -> bool {
-        false
+    fn can_be_transitive() -> Option<bool> {
+        Some(false)
     }
 
-    pub const fn partial() -> bool {
-        false
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
     }
 }
 
@@ -877,17 +788,17 @@ pub enum MpUnreach {
     Ipv6MplsVpnUnicast { nlri: Vec<Ipv6MplsVpnUnicast> },
 }
 
-impl MpUnreach {
-    pub const fn optional() -> bool {
-        true
+impl PathAttributeValueProperties for MpUnreach {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
     }
 
-    pub const fn transitive() -> bool {
-        false
+    fn can_be_transitive() -> Option<bool> {
+        Some(false)
     }
 
-    pub const fn partial() -> bool {
-        false
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
     }
 }
 
@@ -896,28 +807,13 @@ impl MpUnreach {
 /// the transitive and partial bits of the attribute.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct UnknownAttribute {
-    optional: bool,
-    transitive: bool,
     code: u8,
-    length: PathAttributeLength,
     value: Vec<u8>,
 }
 
 impl UnknownAttribute {
-    pub const fn new(
-        optional: bool,
-        transitive: bool,
-        code: u8,
-        len: PathAttributeLength,
-        value: Vec<u8>,
-    ) -> Self {
-        Self {
-            optional,
-            transitive,
-            code,
-            length: len,
-            value,
-        }
+    pub const fn new(code: u8, value: Vec<u8>) -> Self {
+        Self { code, value }
     }
 
     /// Attribute Type code
@@ -925,28 +821,23 @@ impl UnknownAttribute {
         self.code
     }
 
-    pub const fn length(&self) -> PathAttributeLength {
-        self.length
-    }
-
     /// Raw u8 vector of the value carried in the attribute
     pub const fn value(&self) -> &Vec<u8> {
         &self.value
     }
+}
 
-    pub const fn optional(&self) -> bool {
-        self.optional
+impl PathAttributeValueProperties for UnknownAttribute {
+    fn can_be_optional() -> Option<bool> {
+        None
     }
 
-    pub const fn transitive(&self) -> bool {
-        self.transitive
+    fn can_be_transitive() -> Option<bool> {
+        None
     }
 
-    pub const fn extended_length(&self) -> bool {
-        match self.length {
-            PathAttributeLength::U8(_) => false,
-            PathAttributeLength::U16(_) => true,
-        }
+    fn can_be_partial() -> Option<bool> {
+        None
     }
 }
 
@@ -956,7 +847,8 @@ mod tests {
         iana::WellKnownCommunity,
         path_attribute::{
             AS4Path, ASPath, Aggregator, AsPathSegmentType, Community, LocalPreference, MpReach,
-            MultiExitDiscriminator, NextHop, Origin, UndefinedAsPathSegmentType, UndefinedOrigin,
+            MultiExitDiscriminator, NextHop, Origin, PathAttributeValueProperties,
+            UndefinedAsPathSegmentType, UndefinedOrigin,
         },
     };
 
@@ -989,30 +881,30 @@ mod tests {
 
     #[test]
     fn test_path_attributes_well_known_mandatory() {
-        assert!(!Origin::optional());
-        assert!(Origin::transitive());
-        assert!(!ASPath::optional());
-        assert!(ASPath::transitive());
-        assert!(!NextHop::optional());
-        assert!(NextHop::transitive());
-        assert!(!LocalPreference::optional());
-        assert!(LocalPreference::transitive());
+        assert!(!Origin::can_be_optional().unwrap_or(false));
+        assert!(Origin::can_be_transitive().unwrap_or(false));
+        assert!(!ASPath::can_be_optional().unwrap_or(false));
+        assert!(ASPath::can_be_transitive().unwrap_or(false));
+        assert!(!NextHop::can_be_optional().unwrap_or(false));
+        assert!(NextHop::can_be_transitive().unwrap_or(false));
+        assert!(!LocalPreference::can_be_optional().unwrap_or(false));
+        assert!(LocalPreference::can_be_transitive().unwrap_or(false));
     }
 
     #[test]
     fn test_path_attributes_well_known_discretionary() {
-        assert!(MultiExitDiscriminator::optional());
-        assert!(!MultiExitDiscriminator::transitive());
+        assert!(MultiExitDiscriminator::can_be_optional().unwrap_or(false));
+        assert!(!MultiExitDiscriminator::can_be_transitive().unwrap_or(false));
     }
 
     #[test]
     fn test_path_attributes_optional() {
-        assert!(AS4Path::optional());
-        assert!(AS4Path::transitive());
-        assert!(Aggregator::optional());
-        assert!(Aggregator::transitive());
-        assert!(MpReach::optional());
-        assert!(!MpReach::transitive());
+        assert!(AS4Path::can_be_optional().unwrap_or(false));
+        assert!(AS4Path::can_be_transitive().unwrap_or(false));
+        assert!(Aggregator::can_be_optional().unwrap_or(false));
+        assert!(Aggregator::can_be_transitive().unwrap_or(false));
+        assert!(MpReach::can_be_optional().unwrap_or(false));
+        assert!(!MpReach::can_be_transitive().unwrap_or(false));
     }
 
     #[test]
