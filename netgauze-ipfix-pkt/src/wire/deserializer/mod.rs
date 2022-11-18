@@ -19,7 +19,7 @@ use std::{
     rc::Rc,
 };
 
-use chrono::{TimeZone, Utc};
+use chrono::{LocalResult, TimeZone, Utc};
 use nom::{
     error::ErrorKind,
     number::complete::{be_u16, be_u32, be_u8},
@@ -77,6 +77,7 @@ pub enum IpfixHeaderParsingError {
     NomError(#[from_nom] ErrorKind),
     UnsupportedVersion(u16),
     InvalidLength(u16),
+    InvalidExportTime(u32),
 }
 
 impl<'a> ReadablePDU<'a, LocatedIpfixHeaderParsingError<'a>> for IpfixHeader {
@@ -98,7 +99,15 @@ impl<'a> ReadablePDU<'a, LocatedIpfixHeaderParsingError<'a>> for IpfixHeader {
             )));
         }
         let (buf, export_time) = be_u32(buf)?;
-        let export_time = Utc.timestamp(export_time as i64, 0);
+        let export_time = match Utc.timestamp_opt(export_time as i64, 0) {
+            LocalResult::Single(time) => time,
+            _ => {
+                return Err(nom::Err::Error(LocatedIpfixHeaderParsingError::new(
+                    input,
+                    IpfixHeaderParsingError::InvalidExportTime(export_time),
+                )));
+            }
+        };
         let (buf, seq_number) = be_u32(buf)?;
         let (buf, observation_domain_id) = be_u32(buf)?;
         Ok((

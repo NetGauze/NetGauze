@@ -659,6 +659,45 @@ fn get_std_deserializer_error(ty_name: &str) -> String {
     ret
 }
 
+fn get_time_millis_deserializer_error(ty_name: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
+    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
+    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
+    ret.push_str("    InvalidLength(u16),\n");
+    ret.push_str("    InvalidTimestampMillis(u64),\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn get_timestamp_deserializer_error(ty_name: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
+    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
+    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
+    ret.push_str("    InvalidLength(u16),\n");
+    ret.push_str("    InvalidTimestamp(u32),\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
+fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
+    let mut ret = String::new();
+    ret.push_str("#[allow(non_camel_case_types)]\n");
+    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
+    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
+    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
+    ret.push_str("    InvalidLength(u16),\n");
+    ret.push_str("    InvalidTimestamp(u32, u32),\n");
+    ret.push_str("}\n\n");
+    ret
+}
+
 fn get_deserializer_header(ty_name: &str) -> String {
     let mut header = format!("impl<'a> netgauze_parse_utils::ReadablePDUWithOneInput<'a, u16, Located{}ParsingError<'a>> for {} {{\n", ty_name, ty_name);
     header.push_str(format!("    fn from_wire(buf: netgauze_parse_utils::Span<'a>, length: u16) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{}ParsingError<'a>> {{\n", ty_name).as_str());
@@ -985,7 +1024,7 @@ fn generate_ipv6_deserializer(ie_name: &String) -> String {
 
 fn generate_date_time_seconds(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let std_error = get_timestamp_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
@@ -993,7 +1032,12 @@ fn generate_date_time_seconds(ie_name: &String) -> String {
     ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
     ret.push_str("        };\n");
     ret.push_str("        let (buf, secs) = nom::number::complete::be_u32(buf)?;\n");
-    ret.push_str("        let value = chrono::Utc.timestamp(secs as i64, 0);\n");
+    ret.push_str("        let value = match chrono::Utc.timestamp_opt(secs as i64, 0) {\n");
+    ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
+    ret.push_str("            _ => {\n");
+    ret.push_str(format!("                  return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidTimestamp(secs))));\n", ie_name, ie_name).as_str());
+    ret.push_str("            }\n");
+    ret.push_str("        };\n");
     ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
@@ -1002,7 +1046,7 @@ fn generate_date_time_seconds(ie_name: &String) -> String {
 
 fn generate_date_time_milli(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let std_error = get_time_millis_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
@@ -1010,7 +1054,12 @@ fn generate_date_time_milli(ie_name: &String) -> String {
     ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
     ret.push_str("        };\n");
     ret.push_str("        let (buf, millis) = nom::number::complete::be_u64(buf)?;\n");
-    ret.push_str("        let value = chrono::Utc.timestamp_millis(millis as i64);\n");
+    ret.push_str("        let value = match chrono::Utc.timestamp_millis_opt(millis as i64) {\n");
+    ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
+    ret.push_str("            _ => {\n");
+    ret.push_str(format!("                  return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidTimestampMillis(millis))));\n", ie_name, ie_name).as_str());
+    ret.push_str("            }\n");
+    ret.push_str("        };\n");
     ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
@@ -1019,7 +1068,7 @@ fn generate_date_time_milli(ie_name: &String) -> String {
 
 fn generate_date_time_micro(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
+    let std_error = get_timestamp_fraction_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
@@ -1029,8 +1078,15 @@ fn generate_date_time_micro(ie_name: &String) -> String {
     ret.push_str("        let (buf, seconds) = nom::number::complete::be_u32(buf)?;\n");
     ret.push_str("        let (buf, fraction) = nom::number::complete::be_u32(buf)?;\n");
     ret.push_str("        // Convert 1/2^32 of a second to nanoseconds\n");
-    ret.push_str("        let fraction: u32 = (1_000_000_000f64 * (fraction as f64 / u32::MAX as f64)) as u32;\n");
-    ret.push_str("        let value = chrono::Utc.timestamp(seconds as i64, fraction);\n");
+    ret.push_str(
+        "        let f: u32 = (1_000_000_000f64 * (fraction as f64 / u32::MAX as f64)) as u32;\n",
+    );
+    ret.push_str("        let value = match chrono::Utc.timestamp_opt(seconds as i64, f) {\n");
+    ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
+    ret.push_str("            _ => {\n");
+    ret.push_str(format!("                  return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidTimestamp(seconds, fraction))));\n", ie_name, ie_name).as_str());
+    ret.push_str("            }\n");
+    ret.push_str("        };\n");
     ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
