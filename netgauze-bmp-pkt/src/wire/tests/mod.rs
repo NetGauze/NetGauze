@@ -677,7 +677,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                 Some(IpAddr::V6(Ipv6Addr::from_str("fc00::1").unwrap())),
                 64512,
                 Ipv4Addr::new(10, 0, 0, 1),
-                Some(Utc.timestamp(1664821826, 645593000)),
+                Some(Utc.timestamp_opt(1664821826, 645593000).unwrap()),
             ),
             IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap()),
             Some(179),
@@ -918,7 +918,7 @@ fn test_peer_down_notification() -> Result<(), PeerDownNotificationMessageWritin
             Some(IpAddr::V6(Ipv6Addr::from_str("fc00::1").unwrap())),
             64512,
             Ipv4Addr::new(10, 0, 0, 1),
-            Some(Utc.timestamp(1664821843, 487907000)),
+            Some(Utc.timestamp_opt(1664821843, 487907000).unwrap()),
         ),
         PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
     )
@@ -989,7 +989,7 @@ fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
                 Some(IpAddr::V6(Ipv6Addr::from_str("fc00::1").unwrap())),
                 64512,
                 Ipv4Addr::new(10, 0, 0, 1),
-                Some(Utc.timestamp(1664821843, 487907000)),
+                Some(Utc.timestamp_opt(1664821843, 487907000).unwrap()),
             ),
             PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
         )
@@ -1070,7 +1070,7 @@ fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
             Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
             200,
             Ipv4Addr::new(172, 16, 0, 20),
-            Some(Utc.timestamp(1664915595, 285358000)),
+            Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
         ),
         vec![RouteMirroringValue::BgpMessage(BGPMessage::KeepAlive)],
     )));
@@ -1135,7 +1135,7 @@ fn test_termination_message() -> Result<(), TerminationMessageWritingError> {
             Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
             200,
             Ipv4Addr::new(172, 16, 0, 20),
-            Some(Utc.timestamp(1664915595, 285358000)),
+            Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
         ),
         vec![TerminationInformation::String("test".to_string())],
     );
@@ -1165,7 +1165,7 @@ fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
             Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
             200,
             Ipv4Addr::new(172, 16, 0, 20),
-            Some(Utc.timestamp(1664915595, 285358000)),
+            Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
         ),
         vec![TerminationInformation::String("test".to_string())],
     )));
@@ -1200,7 +1200,7 @@ fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
                 Some(IpAddr::V6(Ipv6Addr::from_str("fdfd:0:0:8bea::2").unwrap())),
                 200,
                 Ipv4Addr::new(172, 16, 0, 20),
-                Some(Utc.timestamp(1664915832, 291647000)),
+                Some(Utc.timestamp_opt(1664915832, 291647000).unwrap()),
             ),
             vec![
                 StatisticsCounter::NumberOfPrefixesRejectedByInboundPolicy(CounterU32::new(0)),

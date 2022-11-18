@@ -170,7 +170,7 @@ mod tests {
                 Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
                 200,
                 Ipv4Addr::new(172, 16, 0, 20),
-                Some(Utc.timestamp(1664915595, 285358000)),
+                Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
             ),
             vec![TerminationInformation::String("test".to_string())],
         )));
