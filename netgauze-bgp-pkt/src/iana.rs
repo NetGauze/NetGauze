@@ -723,6 +723,112 @@ pub enum BGPDataCollectionCommunityRegionIdentifierCode {
     NorthAmerica = 0b00111,
 }
 
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpTransitiveExtendedCommunityType {
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    TransitiveTwoOctetExtendedCommunity = 0x00,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    TransitiveIpv4ExtendedCommunity = 0x01,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    TransitiveFourOctetExtendedCommunity = 0x02,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    TransitiveOpaqueExtendedCommunity = 0x03,
+
+    QosMarking = 0x04,
+
+    CosCapability = 0x05,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Evpn = 0x06,
+
+    /// [draft-ietf-idr-flowspec-interfaceset](https://datatracker.ietf.org/doc/draft-ietf-idr-flowspec-interfaceset/)
+    FlowSpec = 0x07,
+
+    /// [draft-simpson-idr-flowspec-redirect](https://datatracker.ietf.org/doc/draft-simpson-idr-flowspec-redirect/)
+    FlowSpecNextHop = 0x08,
+
+    /// [draft-ietf-idr-flowspec-path-redirect](https://datatracker.ietf.org/doc/draft-ietf-idr-flowspec-path-redirect/)
+    FlowSpecIndirectionId = 0x09,
+
+    /// [draft-kaliraj-idr-bgp-classful-transport-planes](https://datatracker.ietf.org/doc/draft-kaliraj-idr-bgp-classful-transport-planes/)
+    TransportClass = 0x0a,
+
+    /// [RFC9015](https://datatracker.ietf.org/doc/html/rfc9015)
+    ServiceFunctionChain = 0x0b,
+
+    /// [draft-mpmz-bess-mup-safi](https://datatracker.ietf.org/doc/draft-mpmz-bess-mup-safi/)
+    Srv6MobileUserPlane = 0x0c,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    /// and [RFC9184](https://datatracker.ietf.org/doc/html/rfc9184)
+    GenericPart1 = 0x80,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    /// and [RFC9184](https://datatracker.ietf.org/doc/html/rfc9184)
+    GenericPart2 = 0x81,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    /// and [RFC9184](https://datatracker.ietf.org/doc/html/rfc9184)
+    GenericPart3 = 0x82,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental83 = 0x83,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental84 = 0x84,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental85 = 0x85,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental86 = 0x86,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental87 = 0x87,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental88 = 0x88,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental89 = 0x89,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental8a = 0x8a,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental8b = 0x8b,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental8c = 0x8c,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental8d = 0x8d,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental8e = 0x8e,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Experimental8f = 0x8f,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedBgpTransitiveExtendedCommunityType(pub u8);
+
+impl TryFrom<u8> for BgpTransitiveExtendedCommunityType {
+    type Error = UndefinedBgpTransitiveExtendedCommunityType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedBgpTransitiveExtendedCommunityType(value)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

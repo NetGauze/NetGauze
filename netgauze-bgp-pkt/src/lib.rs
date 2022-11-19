@@ -31,6 +31,7 @@ use crate::{
 use ::serde::{Deserialize, Serialize};
 
 pub mod capabilities;
+pub mod community;
 pub mod iana;
 pub mod nlri;
 pub mod notification;
