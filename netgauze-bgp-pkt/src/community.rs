@@ -89,6 +89,21 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ExtendedCommunities {
+    communities: Vec<ExtendedCommunity>,
+}
+
+impl ExtendedCommunities {
+    pub const fn new(communities: Vec<ExtendedCommunity>) -> Self {
+        Self { communities }
+    }
+
+    pub const fn communities(&self) -> &Vec<ExtendedCommunity> {
+        &self.communities
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum TransitiveTwoOctetExtendedCommunityValue {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
@@ -245,18 +260,24 @@ impl ExtendedCommunityProperties for NonTransitiveTwoOctetExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct TransitiveIpv4ExtendedCommunity {
-    sub_type: u8,
     global_admin: Ipv4Addr,
-    local_admin: u16,
+    value: TransitiveIpv4ExtendedCommunityValue,
 }
 
 impl TransitiveIpv4ExtendedCommunity {
-    pub const fn new(sub_type: u8, global_admin: Ipv4Addr, local_admin: u16) -> Self {
+    pub const fn new(global_admin: Ipv4Addr, value: TransitiveIpv4ExtendedCommunityValue) -> Self {
         Self {
-            sub_type,
             global_admin,
-            local_admin,
+            value,
         }
+    }
+
+    pub const fn global_admin(&self) -> &Ipv4Addr {
+        &self.global_admin
+    }
+
+    pub const fn value(&self) -> &TransitiveIpv4ExtendedCommunityValue {
+        &self.value
     }
 }
 
@@ -268,6 +289,51 @@ impl ExtendedCommunityProperties for TransitiveIpv4ExtendedCommunity {
     fn transitive(&self) -> bool {
         true
     }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransitiveIpv4ExtendedCommunityValue {
+    /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
+    RouteTarget(u32),
+
+    /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
+    RouteOrigin(u32),
+
+    /// [draft-ietf-idr-bgp-ifit-capabilities](https://datatracker.ietf.org/doc/draft-ietf-idr-bgp-ifit-capabilities)
+    Ipv4Ifit,
+
+    /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
+    OspfDomainIdentifier(u32),
+
+    /// [draft-dong-idr-node-target-ext-comm](https://datatracker.ietf.org/doc/draft-dong-idr-node-target-ext-comm)
+    NodeTarget(u32),
+
+    /// [RFC6074](https://datatracker.ietf.org/doc/html/rfc6074)
+    L2vpnIdentifier(u32),
+
+    /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
+    VrfRouteImport(u32),
+
+    /// [draft-ietf-idr-flowspec-redirect](https://datatracker.ietf.org/doc/html/draft-ietf-idr-flowspec-redirect)
+    FlowRedirect(u32),
+
+    CiscoVpnDistinguisher(u32),
+
+    /// [RFC7524](https://datatracker.ietf.org/doc/rfc7524)
+    InterAreaP2MpSegmentedNextHop(u32),
+
+    /// [draft-ietf-bess-service-chaining](https://datatracker.ietf.org/doc/draft-ietf-bess-service-chaining/)
+    RouteTargetRecord(u32),
+
+    VrfRecursiveNextHop(u32),
+
+    /// [draft-zzhang-idr-rt-derived-community](https://datatracker.ietf.org/doc/draft-zzhang-idr-rt-derived-community/)
+    RtDerivedEc(u32),
+
+    /// [RFC9081](https://datatracker.ietf.org/doc/rfc9081)
+    MulticastVpnRpAddress(u32),
+
+    Unassigned(UnassignedTransitiveTwoOctetExtendedCommunityValue),
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -371,7 +437,7 @@ impl UnknownExtendedCommunity {
 
 impl ExtendedCommunityProperties for UnknownExtendedCommunity {
     fn iana_defined(&self) -> bool {
-        self.code & 0x80 == 1
+        self.code & 0x80 != 0
     }
 
     fn transitive(&self) -> bool {
