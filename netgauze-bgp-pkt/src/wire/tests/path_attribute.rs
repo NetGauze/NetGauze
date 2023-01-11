@@ -42,6 +42,7 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{test_helpers::*, Span};
 
+use crate::community::{ExtendedCommunity, UnknownExtendedCommunity};
 use nom::error::ErrorKind;
 use std::{
     net::{Ipv4Addr, Ipv6Addr},
@@ -1488,6 +1489,27 @@ fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
                 Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
             )],
         }),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_unknown_extended_community() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0xc0, 0x10, 0x08, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    ];
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
+            ExtendedCommunity::Unknown(UnknownExtendedCommunity::new(0, 2, [0, 1, 0, 0, 0, 1])),
+        ])),
     )
     .unwrap();
 

@@ -16,15 +16,10 @@
 //! Deserializer for BGP Path Attributes
 
 use crate::{
+    community::ExtendedCommunity,
     iana::{PathAttributeType, UndefinedPathAttributeType},
-    path_attribute::{
-        AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AsPathSegmentType, AtomicAggregate, Communities, Community, InvalidPathAttribute,
-        LocalPreference, MpReach, MpUnreach, MultiExitDiscriminator, NextHop, Origin,
-        PathAttribute, PathAttributeLength, PathAttributeValue, UndefinedAsPathSegmentType,
-        UndefinedOrigin, UnknownAttribute,
-    },
-    wire::deserializer::nlri::*,
+    path_attribute::*,
+    wire::deserializer::{community::UnknownExtendedCommunityParsingError, nlri::*},
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
@@ -80,6 +75,7 @@ pub enum PathAttributeParsingError {
     AtomicAggregateError(#[from_located(module = "self")] AtomicAggregateParsingError),
     AggregatorError(#[from_located(module = "self")] AggregatorParsingError),
     CommunitiesError(#[from_located(module = "self")] CommunitiesParsingError),
+    ExtendedCommunitiesError(#[from_located(module = "self")] ExtendedCommunitiesParsingError),
     MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
@@ -148,6 +144,11 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
             Ok(PathAttributeType::Communities) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::Communities(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::ExtendedCommunities) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::ExtendedCommunities(value);
                 (buf, value)
             }
             Ok(PathAttributeType::MPReachNLRI) => {
@@ -920,5 +921,50 @@ impl<'a> ReadablePDU<'a, LocatedCommunitiesParsingError<'a>> for Community {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedCommunitiesParsingError<'a>> {
         let (buf, value) = be_u32(buf)?;
         Ok((buf, Community::new(value)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum ExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    UnknownExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        UnknownExtendedCommunityParsingError,
+    ),
+}
+
+impl<'a> ReadablePDU<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedCommunity {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedExtendedCommunityParsingError<'a>> {
+        let (buf, code) = be_u8(buf)?;
+        let (buf, value) = parse_into_located_one_input(buf, code)?;
+        let ret = ExtendedCommunity::Unknown(value);
+        Ok((buf, ret))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum ExtendedCommunitiesParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    ExtendedCommunityError(#[from_located(module = "self")] ExtendedCommunityParsingError),
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedExtendedCommunitiesParsingError<'a>>
+    for ExtendedCommunities
+{
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedExtendedCommunitiesParsingError<'a>> {
+        let (buf, communities_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (_, communities) = parse_till_empty_into_located(communities_buf)?;
+        Ok((buf, ExtendedCommunities::new(communities)))
     }
 }

@@ -89,21 +89,6 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ExtendedCommunities {
-    communities: Vec<ExtendedCommunity>,
-}
-
-impl ExtendedCommunities {
-    pub const fn new(communities: Vec<ExtendedCommunity>) -> Self {
-        Self { communities }
-    }
-
-    pub const fn communities(&self) -> &Vec<ExtendedCommunity> {
-        &self.communities
-    }
-}
-
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum TransitiveTwoOctetExtendedCommunityValue {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)

@@ -46,6 +46,7 @@ use nom::error::ErrorKind;
 use std::net::Ipv4Addr;
 
 mod capabilities;
+mod community;
 mod keepalive;
 mod nlri;
 mod notification;

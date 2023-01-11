@@ -16,7 +16,7 @@
 //! Contains the extensible definitions for various [PathAttribute] that can be
 //! used in [crate::update::BGPUpdateMessage].
 
-use crate::{iana::WellKnownCommunity, nlri::*};
+use crate::{community::ExtendedCommunity, iana::WellKnownCommunity, nlri::*};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
@@ -152,6 +152,7 @@ pub enum PathAttributeValue {
     AtomicAggregate(AtomicAggregate),
     Aggregator(Aggregator),
     Communities(Communities),
+    ExtendedCommunities(ExtendedCommunities),
     MpReach(MpReach),
     MpUnreach(MpUnreach),
     UnknownAttribute(UnknownAttribute),
@@ -169,6 +170,7 @@ impl PathAttributeValue {
             Self::AtomicAggregate(_) => AtomicAggregate::can_be_optional(),
             Self::Aggregator(_) => Aggregator::can_be_optional(),
             Self::Communities(_) => Communities::can_be_optional(),
+            Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_optional(),
             Self::MpReach(_) => MpReach::can_be_optional(),
             Self::MpUnreach(_) => MpUnreach::can_be_optional(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -186,6 +188,7 @@ impl PathAttributeValue {
             Self::AtomicAggregate(_) => AtomicAggregate::can_be_transitive(),
             Self::Aggregator(_) => Aggregator::can_be_transitive(),
             Self::Communities(_) => Communities::can_be_transitive(),
+            Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_transitive(),
             Self::MpReach(_) => MpReach::can_be_transitive(),
             Self::MpUnreach(_) => MpUnreach::can_be_transitive(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_transitive(),
@@ -203,6 +206,7 @@ impl PathAttributeValue {
             Self::AtomicAggregate(_) => AtomicAggregate::can_be_partial(),
             Self::Aggregator(_) => Aggregator::can_be_partial(),
             Self::Communities(_) => Communities::can_be_partial(),
+            Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_partial(),
             Self::MpReach(_) => MpReach::can_be_partial(),
             Self::MpUnreach(_) => MpUnreach::can_be_partial(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -648,6 +652,35 @@ impl Communities {
 }
 
 impl PathAttributeValueProperties for Communities {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        None
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ExtendedCommunities {
+    communities: Vec<ExtendedCommunity>,
+}
+
+impl ExtendedCommunities {
+    pub const fn new(communities: Vec<ExtendedCommunity>) -> Self {
+        Self { communities }
+    }
+
+    pub const fn communities(&self) -> &Vec<ExtendedCommunity> {
+        &self.communities
+    }
+}
+
+impl PathAttributeValueProperties for ExtendedCommunities {
     fn can_be_optional() -> Option<bool> {
         Some(true)
     }

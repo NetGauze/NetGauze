@@ -16,22 +16,11 @@
 //! Serializer for BGP Path Attributes
 
 use crate::{
+    community::ExtendedCommunity,
     iana::PathAttributeType,
-    nlri::{
-        Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4Unicast, Ipv6MplsVpnUnicast, Ipv6Multicast,
-        Ipv6Unicast, NlriAddressType,
-    },
-    path_attribute::{
-        AS4Path, ASPath, Aggregator, As2Aggregator, As2PathSegment, As4Aggregator, As4PathSegment,
-        AtomicAggregate, Communities, Community, LocalPreference, MpReach, MpUnreach,
-        MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeValue,
-        UnknownAttribute,
-    },
-    wire::serializer::nlri::{
-        Ipv4MplsVpnUnicastWritingError, Ipv4MulticastWritingError, Ipv4UnicastWritingError,
-        Ipv6MplsVpnUnicastWritingError, Ipv6MulticastWritingError, Ipv6UnicastWritingError,
-        LabeledNextHopWritingError, IPV4_LEN, IPV6_LEN,
-    },
+    nlri::*,
+    path_attribute::*,
+    wire::serializer::{community::UnknownExtendedCommunityWritingError, nlri::*},
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
@@ -48,6 +37,7 @@ pub enum PathAttributeWritingError {
     AtomicAggregateError(#[from] AtomicAggregateWritingError),
     AggregatorError(#[from] AggregatorWritingError),
     CommunitiesError(#[from] CommunitiesWritingError),
+    ExtendedCommunitiesError(#[from] ExtendedCommunitiesWritingError),
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
@@ -67,6 +57,7 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::AtomicAggregate(value) => value.len(self.extended_length()),
             PathAttributeValue::Aggregator(value) => value.len(self.extended_length()),
             PathAttributeValue::Communities(value) => value.len(self.extended_length()),
+            PathAttributeValue::ExtendedCommunities(value) => value.len(self.extended_length()),
             PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
             PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
@@ -124,6 +115,10 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             }
             PathAttributeValue::Communities(value) => {
                 writer.write_u8(PathAttributeType::Communities.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::ExtendedCommunities(value) => {
+                writer.write_u8(PathAttributeType::ExtendedCommunities.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MpReach(value) => {
@@ -524,6 +519,77 @@ impl WritablePDUWithOneInput<bool, CommunitiesWritingError> for Communities {
         for community in self.communities() {
             community.write(writer)?;
         }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum ExtendedCommunitiesWritingError {
+    StdIOError(#[from_std_io_error] String),
+    ExtendedCommunityError(#[from] ExtendedCommunityWritingError),
+}
+
+impl WritablePDUWithOneInput<bool, ExtendedCommunitiesWritingError> for ExtendedCommunities {
+    // One octet length (if extended is not enabled)
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let base = Self::BASE_LENGTH + usize::from(extended_length);
+        let value_len = self.communities().iter().map(|x| x.len()).sum::<usize>();
+        base + value_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), ExtendedCommunitiesWritingError> {
+        write_length(self, extended_length, writer)?;
+        for community in self.communities() {
+            community.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum ExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+    UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityWritingError),
+}
+
+impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::TransitiveIpv4ExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::TransitiveOpaqueExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::Unknown(value) => value.len(),
+            }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), ExtendedCommunityWritingError> {
+        match self {
+            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::TransitiveIpv4ExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::TransitiveOpaqueExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::Unknown(value) => {
+                writer.write_u8(value.code())?;
+                value.write(writer)?;
+            }
+        };
         Ok(())
     }
 }
