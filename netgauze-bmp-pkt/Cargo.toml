@@ -17,7 +17,7 @@ netgauze-parse-utils = { path = "../netgauze-parse-utils", optional = true }
 netgauze-serde-macros = { path = "../netgauze-serde-macros", optional = true }
 strum = "0.24"
 strum_macros = "0.24"
-chrono = {version="0.4", features=["serde"]}
+chrono = {version="0.4", default-features = false, features=["std", "serde"]}
 ipnet = { version = "2.7", features=["serde"] }
 nom = { version = "7.1", optional = true }
 byteorder = { version = "1.4", optional = true }
@@ -31,3 +31,4 @@ bench = ["criterion"]
 
 [dev-dependencies]
 netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-helpers"] }
+chrono = {version="0.4", default-features = false, features=["std", "serde", "clock"]}

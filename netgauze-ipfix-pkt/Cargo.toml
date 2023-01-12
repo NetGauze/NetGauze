@@ -18,7 +18,7 @@ strum = "0.24"
 strum_macros = "0.24"
 ipnet = { version = "2.7", features=["serde"] }
 lazy_static = "1.4"
-chrono = {version="0.4", features=["serde"]}
+chrono = {version="0.4", default-features = false, features=["std", "serde"]}
 nom = { version = "7.1", optional = true }
 byteorder = { version = "1.4", optional = true }
 criterion = { version = "0.4", optional = true } # Dev dep for bench
