@@ -212,7 +212,7 @@ fn test_pkg_record_value() -> Result<(), ie_ser::RecordWritingError> {
 fn test_milli_value() -> Result<(), ie_ser::flowStartMillisecondsWritingError> {
     let good_wire = [0, 0, 1, 88, 177, 177, 56, 255];
     let good = ie::flowStartMilliseconds(
-        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
             .unwrap()
             .with_nanosecond(519_000_000)
             .unwrap(),
@@ -229,26 +229,26 @@ fn test_time_fraction_value() -> Result<(), ie_ser::flowStartMicrosecondsWriting
     let good_zero_wire = [0x58, 0x3d, 0xdf, 0x8b, 0x00, 0x00, 0x00, 0x00];
 
     let good_full = ie::flowStartMicroseconds(
-        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
             .unwrap()
             .with_nanosecond(1_000_000_000)
             .unwrap(),
     );
     let good_half = ie::flowStartMicroseconds(
-        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
             .unwrap()
             .with_nanosecond(500_000_000)
             .unwrap(),
     );
     // Due to floating point errors, we cannot retrieve the original value.
     let good_half_rounded = ie::flowStartMicroseconds(
-        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
             .unwrap()
             .with_nanosecond(499_999_999)
             .unwrap(),
     );
     let good_zero = ie::flowStartMicroseconds(
-        Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
             .unwrap()
             .with_nanosecond(0)
             .unwrap(),
@@ -333,7 +333,7 @@ fn test_data_record() -> Result<(), DataRecordWritingError> {
         Rc<Vec<FieldSpecifier>>,
         usize,
         crate::wire::deserializer::LocatedDataRecordParsingError<'_>,
-    >(&good_with_padding_wire, fields.clone(), 2, &good);
+    >(&good_with_padding_wire, fields, 2, &good);
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
 }
@@ -432,7 +432,7 @@ fn test_template_packet() -> Result<(), IpfixPacketWritingError> {
 
     let good = IpfixPacket::new(
         IpfixHeader::new(
-            Utc.with_ymd_and_hms(2016, 11, 29, 20, 08, 57).unwrap(),
+            Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
             3812,
             0,
         ),
@@ -775,7 +775,7 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
     let templates_map = Rc::new(RefCell::new(HashMap::from([(307, fields)])));
     let good = IpfixPacket::new(
         IpfixHeader::new(
-            Utc.with_ymd_and_hms(2016, 11, 29, 20, 08, 57).unwrap(),
+            Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
             3812,
             0,
         ),
@@ -810,13 +810,13 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
                 ie::Record::tcpControlBits(ie::tcpControlBits(0)),
                 ie::Record::ipVersion(ie::ipVersion(4)),
                 ie::Record::flowStartMilliseconds(ie::flowStartMilliseconds(
-                    Utc.with_ymd_and_hms(2016, 11, 29, 20, 05, 31)
+                    Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
                         .unwrap()
                         .with_nanosecond(519_000_000)
                         .unwrap(),
                 )),
                 ie::Record::flowEndMilliseconds(ie::flowEndMilliseconds(
-                    Utc.with_ymd_and_hms(2016, 11, 29, 20, 08, 25)
+                    Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 25)
                         .unwrap()
                         .with_nanosecond(677_000_000)
                         .unwrap(),
@@ -863,7 +863,7 @@ fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
 
     let good = IpfixPacket::new(
         IpfixHeader::new(
-            Utc.with_ymd_and_hms(2016, 11, 29, 20, 08, 55).unwrap(),
+            Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 55).unwrap(),
             3791,
             0,
         ),
@@ -1022,7 +1022,7 @@ fn test_complex_sequence() -> Result<(), IpfixPacketWritingError> {
     0x06, 0x02, 0x04, 0x00];
 
     let (_, _pkt1) = IpfixPacket::from_wire(Span::new(&pkt1_wire), templates_map.clone()).unwrap();
-    let (_, _pkt2)  = IpfixPacket::from_wire(Span::new(&pkt2_wire), templates_map.clone()).unwrap();
+    let (_, _pkt2)  = IpfixPacket::from_wire(Span::new(&pkt2_wire), templates_map).unwrap();
 
     // TODO: test writing complex packets
     Ok(())

@@ -34,7 +34,7 @@ fn it_should_convert_from_u8_successfully() {
 
 #[test]
 fn it_should_call_new_for_str_successfully() {
-    let input = &"foobar"[..];
+    let input = "foobar";
     let output = StrSpan {
         offset: 0,
         fragment: input,
@@ -45,7 +45,7 @@ fn it_should_call_new_for_str_successfully() {
 
 #[test]
 fn it_should_convert_from_str_successfully() {
-    let input = &"foobar"[..];
+    let input = "foobar";
     assert_eq!(StrSpan::new(input), input.into());
 }
 

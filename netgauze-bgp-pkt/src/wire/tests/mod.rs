@@ -55,10 +55,10 @@ mod path_attribute;
 mod route_refresh;
 mod update;
 
-pub(crate) const BGP_MARKER: &'static [u8] = &[0xff; 16];
-pub(crate) const MY_AS: &'static [u8] = &[0x01, 0x02];
-pub(crate) const HOLD_TIME: &'static [u8] = &[0x03, 0x04];
-pub(crate) const BGP_ID: &'static [u8] = &[0xFF, 0x00, 0x00, 0x01];
+pub(crate) const BGP_MARKER: &[u8] = &[0xff; 16];
+pub(crate) const MY_AS: &[u8] = &[0x01, 0x02];
+pub(crate) const HOLD_TIME: &[u8] = &[0x03, 0x04];
+pub(crate) const BGP_ID: &[u8] = &[0xFF, 0x00, 0x00, 0x01];
 
 #[test]
 fn test_bgp_message_not_synchronized_marker() {
@@ -79,28 +79,28 @@ fn test_bgp_message_not_synchronized_marker() {
 #[test]
 fn test_bgp_message_length_bounds() {
     // The shortest message is a keepalive message to test with
-    let good_wire = combine(vec![&BGP_MARKER, &[0x00, 0x13, 0x04]]);
+    let good_wire = combine(vec![BGP_MARKER, &[0x00, 0x13, 0x04]]);
 
     // Available input is less than the stated input in the message
-    let open_underflow_wire = combine(vec![&BGP_MARKER, &[0x00, 0x14, 0x01]]);
+    let open_underflow_wire = combine(vec![BGP_MARKER, &[0x00, 0x14, 0x01]]);
 
     // The length is less the min BGP length
-    let open_less_than_min_wire = combine(vec![&BGP_MARKER, &[0x00, 0x12, 0x01]]);
-    let update_less_than_min_wire = combine(vec![&BGP_MARKER, &[0x00, 0x12, 0x02]]);
-    let notification_less_than_min_wire = combine(vec![&BGP_MARKER, &[0x00, 0x12, 0x03]]);
-    let keepalive_less_than_min_wire = combine(vec![&BGP_MARKER, &[0x00, 0x12, 0x04]]);
-    let route_refresh_less_than_min_wire = combine(vec![&BGP_MARKER, &[0x00, 0x12, 0x05]]);
+    let open_less_than_min_wire = combine(vec![BGP_MARKER, &[0x00, 0x12, 0x01]]);
+    let update_less_than_min_wire = combine(vec![BGP_MARKER, &[0x00, 0x12, 0x02]]);
+    let notification_less_than_min_wire = combine(vec![BGP_MARKER, &[0x00, 0x12, 0x03]]);
+    let keepalive_less_than_min_wire = combine(vec![BGP_MARKER, &[0x00, 0x12, 0x04]]);
+    let route_refresh_less_than_min_wire = combine(vec![BGP_MARKER, &[0x00, 0x12, 0x05]]);
 
     // The message length contains more data than is actually parsed
-    let overflow_wire = combine(vec![&BGP_MARKER, &[0x00, 0x14, 0x04, 0x00]]);
+    let overflow_wire = combine(vec![BGP_MARKER, &[0x00, 0x14, 0x04, 0x00]]);
 
     // Using length more than 4,096 for keepalive message
     let keepalive_overflow_extended_wire =
-        combine(vec![&BGP_MARKER, &[0x10, 0x01, 0x04], &[0x00; 0x0fee]]);
+        combine(vec![BGP_MARKER, &[0x10, 0x01, 0x04], &[0x00; 0x0fee]]);
 
     // Using length more than 4,096 for keepalive message
     let open_overflow_extended_wire =
-        combine(vec![&BGP_MARKER, &[0x10, 0x01, 0x01], &[0x00; 0x0fee]]);
+        combine(vec![BGP_MARKER, &[0x10, 0x01, 0x01], &[0x00; 0x0fee]]);
 
     let good = BGPMessage::KeepAlive;
     let open_underflow = LocatedBGPMessageParsingError::new(
@@ -192,7 +192,7 @@ fn test_bgp_message_length_bounds() {
 
 #[test]
 fn test_bgp_message_undefined_message_type() {
-    let invalid_wire = combine(vec![&BGP_MARKER, &[0x00, 0x13, 0xff]]);
+    let invalid_wire = combine(vec![BGP_MARKER, &[0x00, 0x13, 0xff]]);
     let invalid = LocatedBGPMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(18, &invalid_wire[18..]) },
         BGPMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(0xff)),
@@ -216,15 +216,15 @@ fn test_bgp_message_open_no_params() -> Result<(), BGPMessageWritingError> {
 #[test]
 fn test_bgp_message_notification() -> Result<(), BGPMessageWritingError> {
     let good_cease_wire = combine(vec![
-        &BGP_MARKER,
+        BGP_MARKER,
         &[0x00, 0x17, 0x03, 0x06, 0x09, 0x06, 0x03],
     ]);
     let bad_undefined_notif_wire = combine(vec![
-        &BGP_MARKER,
+        BGP_MARKER,
         &[0x00, 0x17, 0x03, 0xff, 0x09, 0x06, 0x03],
     ]);
     let bad_undefined_cease_wire = combine(vec![
-        &BGP_MARKER,
+        BGP_MARKER,
         &[0x00, 0x17, 0x03, 0x06, 0xff, 0x06, 0x03],
     ]);
 

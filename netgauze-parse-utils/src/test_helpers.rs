@@ -39,14 +39,13 @@ where
     E: Debug,
 {
     let parsed = <T as ReadablePDU<E>>::from_wire(Span::new(input));
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
+    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     assert_eq!(
         span.fragment().len(),
         0,
-        "Not all the input is consumed by the parser, didn't consume: {:?}",
-        span
+        "Not all the input is consumed by the parser, didn't consume: {span:?}",
     );
     value
 }
@@ -62,14 +61,13 @@ where
     E: Debug,
 {
     let parsed = <T as ReadablePDUWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
+    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     assert_eq!(
         span.fragment().len(),
         0,
-        "Not all the input is consumed by the parser, didn't consume: {:?}",
-        span
+        "Not all the input is consumed by the parser, didn't consume: {span:?}",
     );
     value
 }
@@ -90,14 +88,13 @@ where
         parser_input1,
         parser_input2,
     );
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
+    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     assert_eq!(
         span.fragment().len(),
         0,
-        "Not all the input is consumed by the parser, didn't consume: {:?}",
-        span
+        "Not all the input is consumed by the parser, didn't consume: {span:?}",
     );
     value
 }
@@ -120,14 +117,13 @@ where
         parser_input2,
         parser_input3,
     );
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {:?}\n\tParsed msg: {:?}", expected, parsed);
+    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     assert_eq!(
         span.fragment().len(),
         0,
-        "Not all the input is consumed by the parser, didn't consume: {:?}",
-        span
+        "Not all the input is consumed by the parser, didn't consume: {span:?}",
     );
     value
 }
@@ -142,17 +138,14 @@ where
         <T as ReadablePDU<E>>::from_wire(Span::new(input));
     assert!(
         parsed.is_err(),
-        "Message was parsed, while expecting it to fail.\n\tExpected : {:?}\n\tParsed msg: {:?}",
-        expected_err,
-        parsed
+        "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
     );
 
     if let Err(nom::Err::Error(parsed_error)) = parsed {
         assert_eq!(&parsed_error, expected_err);
     } else {
         panic!(
-            "Expected the test to fail with Err(nom::Err:Err(x)) but it didn't. Got {:?} instead",
-            parsed
+            "Expected the test to fail with Err(nom::Err:Err(x)) but it didn't. Got {parsed:?} instead"
         );
     }
 }
@@ -170,17 +163,14 @@ pub fn test_parse_error_with_one_input<'a, T, I, E>(
         <T as ReadablePDUWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
     assert!(
         parsed.is_err(),
-        "Message was parsed, while expecting it to fail.\n\tExpected : {:?}\n\tParsed msg: {:?}",
-        expected_err,
-        parsed
+        "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
     );
 
     if let Err(nom::Err::Error(parsed_error)) = parsed {
         assert_eq!(&parsed_error, expected_err);
     } else {
         panic!(
-            "Expected the test to fail with Err(nom::Err:Err(x)) but it didn't. Got {:?} instead",
-            parsed
+            "Expected the test to fail with Err(nom::Err:Err(x)) but it didn't. Got {parsed:?} instead"
         );
     }
 }
@@ -203,9 +193,7 @@ pub fn test_parse_error_with_two_inputs<'a, T, I, K, E>(
         );
     assert!(
         parsed.is_err(),
-        "Message was parsed, while expecting it to fail.\n\tExpected : {:?}\n\tParsed msg: {:?}",
-        expected_err,
-        parsed
+        "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
     );
 
     assert_eq!(parsed.err().unwrap(), expected_err);

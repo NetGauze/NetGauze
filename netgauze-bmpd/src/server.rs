@@ -84,7 +84,7 @@ impl BmpServer {
                 let framed = Framed::new(tcp_stream, BmpCodec::default());
                 let svc = service.clone();
                 let watcher = handle.watcher();
-                let _ = tokio::spawn(async move {
+                tokio::spawn(async move {
                     tracing::trace_span!("client_worker");
                     tracing::info!("worker_started");
                     tokio::select! {

@@ -76,7 +76,7 @@ impl<T: Copy, V> TaggedData<T, V> {
 
 impl Display for TaggedData<AddrInfo, BmpCodecDecoderError> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

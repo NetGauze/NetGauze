@@ -28,7 +28,7 @@ fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
         base.push_str("Eq, ");
     }
     base.push_str("Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize");
-    format!("#[derive({})]\n", base)
+    format!("#[derive({base})]\n")
 }
 
 /// Convert [Xref] to markdown link
@@ -60,7 +60,7 @@ pub(crate) fn generate_ie_data_type(data_types: &[SimpleRegistry]) -> String {
     ret.push_str("pub enum InformationElementDataType {\n");
     for x in data_types.iter() {
         for xref in x.xref.iter().filter_map(generate_xref_link) {
-            ret.push_str(format!("  /// {}\n", xref).as_str());
+            ret.push_str(format!("  /// {xref}\n").as_str());
         }
         ret.push_str(format!("  {} = {},\n", x.description, x.value).as_str());
     }
@@ -78,11 +78,11 @@ pub(crate) fn generate_ie_units(entries: &[SimpleRegistry]) -> String {
     for entry in entries.iter() {
         ret.push('\n');
         if let Some(comments) = entry.comments.as_ref() {
-            ret.push_str(format!("  /// {}\n", comments).as_str());
+            ret.push_str(format!("  /// {comments}\n").as_str());
             ret.push_str("  ///\n");
         }
         for xref in entry.xref.iter().filter_map(generate_xref_link) {
-            ret.push_str(format!("  /// {}\n", xref).as_str());
+            ret.push_str(format!("  /// {xref}\n").as_str());
         }
         // Note: this an special exception, since `4-octet words` is not valid rust id
         let description = if entry.description == "4-octet words" {
@@ -106,7 +106,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
     for x in data_types.iter() {
         ret.push('\n');
         for xref in x.xref.iter().filter_map(generate_xref_link) {
-            ret.push_str(format!("  /// {}\n", xref).as_str());
+            ret.push_str(format!("  /// {xref}\n").as_str());
         }
         ret.push_str(format!("  {} = {},\n", x.description, x.value).as_str());
     }
@@ -126,7 +126,7 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
                 ie.name,
                 ie.data_type_semantics
                     .as_ref()
-                    .map(|x| format!("Some(super::InformationElementSemantics::{})", x))
+                    .map(|x| format!("Some(super::InformationElementSemantics::{x})"))
                     .unwrap_or_else(|| "None".to_string())
             )
             .as_str(),
@@ -158,7 +158,7 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
                 ie.name,
                 ie.units
                     .as_ref()
-                    .map(|x| format!("Some(super::InformationElementUnits::{})", x))
+                    .map(|x| format!("Some(super::InformationElementUnits::{x})"))
                     .unwrap_or_else(|| "None".to_string())
             )
             .as_str(),
@@ -253,7 +253,7 @@ pub(crate) fn generate_information_element_ids(ie: &Vec<InformationElement>) -> 
             ret.push_str("    ///\n");
         }
         for xref in ie.xrefs.iter().filter_map(generate_xref_link) {
-            ret.push_str(format!("    /// Reference: {}\n", xref).as_str());
+            ret.push_str(format!("    /// Reference: {xref}\n").as_str());
         }
         ret.push_str(format!("    {} = {},\n", ie.name, ie.element_id).as_str());
     }
@@ -310,19 +310,15 @@ fn generate_ie_try_from_pen_code(
     ret.push_str("                }\n");
     ret.push_str("            }\n");
     for (name, pkg, pen) in name_prefixes {
-        ret.push_str(format!("            {} => {{\n", pen).as_str());
+        ret.push_str(format!("            {pen} => {{\n").as_str());
         ret.push_str(
-            format!(
-                "                match {}::InformationElementId::try_from(code) {{\n",
-                pkg
-            )
-            .as_str(),
+            format!("                match {pkg}::InformationElementId::try_from(code) {{\n")
+                .as_str(),
         );
-        ret.push_str(format!("                    Ok(ie) => Ok(Self::{}(ie)),\n", name).as_str());
+        ret.push_str(format!("                    Ok(ie) => Ok(Self::{name}(ie)),\n").as_str());
         ret.push_str(
             format!(
-                "                    Err(err) => Err(InformationElementIdError::{}(err)),\n",
-                name
+                "                    Err(err) => Err(InformationElementIdError::{name}(err)),\n"
             )
             .as_str(),
         );
@@ -348,7 +344,7 @@ fn generate_ie_template_trait_for_main(
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => None,\n");
     for (name, _, _) in vendors {
-        ret.push_str(format!("            Self::{}(ie) => ie.semantics(),\n", name).as_str());
+        ret.push_str(format!("            Self::{name}(ie) => ie.semantics(),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(
@@ -357,7 +353,7 @@ fn generate_ie_template_trait_for_main(
                 ie.name,
                 ie.data_type_semantics
                     .as_ref()
-                    .map(|x| format!("Some(InformationElementSemantics::{})", x))
+                    .map(|x| format!("Some(InformationElementSemantics::{x})"))
                     .unwrap_or_else(|| "None".to_string())
             )
             .as_str(),
@@ -370,7 +366,7 @@ fn generate_ie_template_trait_for_main(
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => InformationElementDataType::octetArray,\n");
     for (name, _, _) in vendors {
-        ret.push_str(format!("            Self::{}(ie) => ie.data_type(),\n", name).as_str());
+        ret.push_str(format!("            Self::{name}(ie) => ie.data_type(),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(
@@ -388,7 +384,7 @@ fn generate_ie_template_trait_for_main(
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => None,\n");
     for (name, _, _) in vendors {
-        ret.push_str(format!("            Self::{}(ie) => ie.units(),\n", name).as_str());
+        ret.push_str(format!("            Self::{name}(ie) => ie.units(),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(
@@ -397,7 +393,7 @@ fn generate_ie_template_trait_for_main(
                 ie.name,
                 ie.units
                     .as_ref()
-                    .map(|x| format!("Some(super::InformationElementUnits::{})", x))
+                    .map(|x| format!("Some(super::InformationElementUnits::{x})"))
                     .unwrap_or_else(|| "None".to_string())
             )
             .as_str(),
@@ -410,7 +406,7 @@ fn generate_ie_template_trait_for_main(
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => None,\n");
     for (name, _, _) in vendors {
-        ret.push_str(format!("            Self::{}(ie) => ie.value_range(),\n", name).as_str());
+        ret.push_str(format!("            Self::{name}(ie) => ie.value_range(),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(
@@ -449,9 +445,7 @@ fn generate_ie_template_trait_for_main(
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{id, ..} => *id,\n");
     for (name, _pkg, _) in vendors {
-        ret.push_str(
-            format!("            Self::{}(vendor_ie) => vendor_ie.id(),\n", name).as_str(),
-        );
+        ret.push_str(format!("            Self::{name}(vendor_ie) => vendor_ie.id(),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(format!("            Self::{} => {},\n", ie.name, ie.element_id).as_str());
@@ -463,13 +457,7 @@ fn generate_ie_template_trait_for_main(
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{pen, ..} => *pen,\n");
     for (name, _pkg, _) in vendors {
-        ret.push_str(
-            format!(
-                "            Self::{}(vendor_ie) => vendor_ie.pen(),\n",
-                name
-            )
-            .as_str(),
-        );
+        ret.push_str(format!("            Self::{name}(vendor_ie) => vendor_ie.pen(),\n").as_str());
     }
     // Rest is IANA with PEN 0
     ret.push_str("            _ => 0,\n");
@@ -490,7 +478,7 @@ fn generate_ie_record_enum_for_ie(
     ret.push_str("pub enum Record {\n");
     ret.push_str("    Unknown(Vec<u8>),\n");
     for (name, pkg, _) in vendors {
-        ret.push_str(format!("    {}({}::Record),\n", name, pkg).as_str());
+        ret.push_str(format!("    {name}({pkg}::Record),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
@@ -509,7 +497,7 @@ pub(crate) fn generate_ie_ids(
     ret.push_str("pub enum InformationElementId {\n");
     ret.push_str("    Unknown{pen: u32, id: u16},\n");
     for (name, pkg, _) in vendors {
-        ret.push_str(format!("    {}({}::InformationElementId),\n", name, pkg).as_str());
+        ret.push_str(format!("    {name}({pkg}::InformationElementId),\n").as_str());
     }
     for ie in iana_ies {
         for line in ie.description.split('\n') {
@@ -519,7 +507,7 @@ pub(crate) fn generate_ie_ids(
             ret.push_str("    ///\n");
         }
         for xref in ie.xrefs.iter().filter_map(generate_xref_link) {
-            ret.push_str(format!("    /// Reference: {}\n", xref).as_str());
+            ret.push_str(format!("    /// Reference: {xref}\n").as_str());
         }
         ret.push_str(format!("    {},\n", ie.name).as_str());
     }
@@ -529,7 +517,7 @@ pub(crate) fn generate_ie_ids(
     ret.push_str("pub enum InformationElementIdError {\n");
     ret.push_str("    UndefinedIANAInformationElementId(u16),\n");
     for (name, pkg, _) in vendors {
-        ret.push_str(format!("    {}({}::UndefinedInformationElementId),\n", name, pkg).as_str());
+        ret.push_str(format!("    {name}({pkg}::UndefinedInformationElementId),\n").as_str());
     }
     ret.push_str("}\n\n");
 
@@ -546,13 +534,13 @@ fn generate_ie_value_converters(rust_type: &str, ie_name: &String) -> String {
     let mut ret = String::new();
     match rust_type {
         "u8" => {
-            ret.push_str(format!("impl From<[u8; 1]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 1]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0])\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<u8> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<u8> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: u8) -> Self {\n");
             ret.push_str("        Self(value)\n");
             ret.push_str("    }\n");
@@ -560,19 +548,19 @@ fn generate_ie_value_converters(rust_type: &str, ie_name: &String) -> String {
             ret.push('\n');
         }
         "u16" => {
-            ret.push_str(format!("impl From<[u8; 1]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 1]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u16)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 2]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 2]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 2]) -> Self {\n");
             ret.push_str("        Self(u16::from_be_bytes(value))\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<u16> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<u16> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: u16) -> Self {\n");
             ret.push_str("        Self(value)\n");
             ret.push_str("    }\n");
@@ -580,26 +568,26 @@ fn generate_ie_value_converters(rust_type: &str, ie_name: &String) -> String {
             ret.push('\n');
         }
         "u32" => {
-            ret.push_str(format!("impl From<[u8; 1]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 1]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u32)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 2]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 2]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 2]) -> Self {\n");
             ret.push_str("        let tmp = u16::from_be_bytes(value);\n");
             ret.push_str("        Self(tmp as u32)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 4]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 4]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 4]) -> Self {\n");
             ret.push_str("        Self(u32::from_be_bytes(value))\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<u32> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<u32> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: u32) -> Self {\n");
             ret.push_str("        Self(value)\n");
             ret.push_str("    }\n");
@@ -607,33 +595,33 @@ fn generate_ie_value_converters(rust_type: &str, ie_name: &String) -> String {
             ret.push('\n');
         }
         "u64" => {
-            ret.push_str(format!("impl From<[u8; 1]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 1]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 1]) -> Self {\n");
             ret.push_str("        Self(value[0] as u64)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 2]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 2]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 2]) -> Self {\n");
             ret.push_str("        let tmp = u16::from_be_bytes(value);\n");
             ret.push_str("        Self(tmp as u64)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 4]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 4]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 4]) -> Self {\n");
             ret.push_str("        let tmp = u32::from_be_bytes(value);\n");
             ret.push_str("        Self(tmp as u64)\n");
             ret.push_str("    }\n");
             ret.push_str("}\n\n");
 
-            ret.push_str(format!("impl From<[u8; 8]> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<[u8; 8]> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: [u8; 8]) -> Self {\n");
             ret.push_str("        Self(u64::from_be_bytes(value))\n");
             ret.push_str("    }\n");
             ret.push_str("}\n");
 
-            ret.push_str(format!("impl From<u64> for {} {{\n", ie_name).as_str());
+            ret.push_str(format!("impl From<u64> for {ie_name} {{\n").as_str());
             ret.push_str("    fn from(value: u64) -> Self {\n");
             ret.push_str("        Self(value)\n");
             ret.push_str("    }\n");
@@ -651,7 +639,7 @@ fn get_std_deserializer_error(ty_name: &str) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     ret.push_str("    InvalidLength(u16),\n");
@@ -663,7 +651,7 @@ fn get_time_millis_deserializer_error(ty_name: &str) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     ret.push_str("    InvalidLength(u16),\n");
@@ -676,7 +664,7 @@ fn get_timestamp_deserializer_error(ty_name: &str) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     ret.push_str("    InvalidLength(u16),\n");
@@ -689,7 +677,7 @@ fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     ret.push_str("    InvalidLength(u16),\n");
@@ -699,8 +687,8 @@ fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
 }
 
 fn get_deserializer_header(ty_name: &str) -> String {
-    let mut header = format!("impl<'a> netgauze_parse_utils::ReadablePDUWithOneInput<'a, u16, Located{}ParsingError<'a>> for {} {{\n", ty_name, ty_name);
-    header.push_str(format!("    fn from_wire(buf: netgauze_parse_utils::Span<'a>, length: u16) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{}ParsingError<'a>> {{\n", ty_name).as_str());
+    let mut header = format!("impl<'a> netgauze_parse_utils::ReadablePDUWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n");
+    header.push_str(format!("    fn from_wire(buf: netgauze_parse_utils::Span<'a>, length: u16) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
     header
 }
 
@@ -712,9 +700,9 @@ fn generate_u8_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let (buf, value) = match length {\n");
     ret.push_str("            1 => nom::number::complete::be_u8(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -732,9 +720,9 @@ fn generate_u16_deserializer(ie_name: &String) -> String {
     ret.push_str("                (buf, value as u16)\n");
     ret.push_str("            }\n");
     ret.push_str("            2 => nom::number::complete::be_u16(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -748,13 +736,13 @@ fn generate_u32_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let len = length as usize;\n");
     ret.push_str("        if length > 4 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        }\n");
     ret.push_str("        let mut res = 0u32;\n");
     ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
     ret.push_str("            res = (res << 8) + byte as u32;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {}(res)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -768,13 +756,13 @@ fn generate_u64_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let len = length as usize;\n");
     ret.push_str("        if length > 8 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        }\n");
     ret.push_str("        let mut res = 0u64;\n");
     ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
     ret.push_str("            res = (res << 8) + byte as u64;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {}(res)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -788,9 +776,9 @@ fn generate_i8_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let (buf, value) = match length {\n");
     ret.push_str("            1 => nom::number::complete::be_i8(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -804,7 +792,7 @@ fn generate_i16_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let len = length as usize;\n");
     ret.push_str("        if length > 2 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        }\n");
     ret.push_str("        let mut res = 0u16;\n");
     ret.push_str("        let mut first = true;\n");
@@ -817,7 +805,7 @@ fn generate_i16_deserializer(ie_name: &String) -> String {
     ret.push_str("            }\n");
     ret.push_str("            res = (res << 8) + byte as u16;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {}(res as i16)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res as i16)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -831,7 +819,7 @@ fn generate_i32_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let len = length as usize;\n");
     ret.push_str("        if length > 4 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        }\n");
     ret.push_str("        let mut res = 0u32;\n");
     ret.push_str("        let mut first = true;\n");
@@ -844,7 +832,7 @@ fn generate_i32_deserializer(ie_name: &String) -> String {
     ret.push_str("            }\n");
     ret.push_str("            res = (res << 8) + byte as u32;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {}(res as i32)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res as i32)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -858,7 +846,7 @@ fn generate_i64_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let len = length as usize;\n");
     ret.push_str("        if length > 8 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        }\n");
     ret.push_str("        let mut res = 0u64;\n");
     ret.push_str("        let mut first = true;\n");
@@ -871,7 +859,7 @@ fn generate_i64_deserializer(ie_name: &String) -> String {
     ret.push_str("            }\n");
     ret.push_str("            res = (res << 8) + byte as u64;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {}(res as i64)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res as i64)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -885,9 +873,9 @@ fn generate_f32_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let (buf, value) = match length {\n");
     ret.push_str("            1 => nom::number::complete::be_f32(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -901,9 +889,9 @@ fn generate_f64_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let (buf, value) = match length {\n");
     ret.push_str("            1 => nom::number::complete::be_f64(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -917,9 +905,9 @@ fn generate_bool_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
     ret.push_str("        let (buf, value) = match length {\n");
     ret.push_str("            1 => nom::number::complete::be_u8(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))))\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value != 0)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value != 0)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -932,7 +920,7 @@ fn generate_mac_address_deserializer(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        if length != 6 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
     ret.push_str("        };\n");
     ret.push_str("        let (buf, b0) = nom::number::complete::be_u8(buf)?;\n");
     ret.push_str("        let (buf, b1) = nom::number::complete::be_u8(buf)?;\n");
@@ -940,7 +928,7 @@ fn generate_mac_address_deserializer(ie_name: &String) -> String {
     ret.push_str("        let (buf, b3) = nom::number::complete::be_u8(buf)?;\n");
     ret.push_str("        let (buf, b4) = nom::number::complete::be_u8(buf)?;\n");
     ret.push_str("        let (buf, b5) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str(format!("        Ok((buf, {}([b0, b1, b2, b3, b4, b5])))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}([b0, b1, b2, b3, b4, b5])))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -952,24 +940,20 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     let mut string_error = String::new();
     string_error.push_str("#[allow(non_camel_case_types)]\n");
     string_error.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    string_error.push_str(format!("pub enum {}ParsingError {{\n", ie_name).as_str());
+    string_error.push_str(format!("pub enum {ie_name}ParsingError {{\n").as_str());
     string_error.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     string_error.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     string_error.push_str("    FromUtf8Error(String),\n");
     string_error.push_str("}\n\n");
 
     string_error.push_str("impl<'a> nom::error::FromExternalError<netgauze_parse_utils::Span<'a>, std::string::FromUtf8Error>\n");
-    string_error.push_str(format!("for Located{}ParsingError<'a>\n", ie_name).as_str());
+    string_error.push_str(format!("for Located{ie_name}ParsingError<'a>\n").as_str());
     string_error.push_str("{\n");
     string_error.push_str("    fn from_external_error(input: netgauze_parse_utils::Span<'a>, _kind: nom::error::ErrorKind, error: std::string::FromUtf8Error) -> Self {\n");
-    string_error.push_str(format!("        Located{}ParsingError::new(\n", ie_name).as_str());
+    string_error.push_str(format!("        Located{ie_name}ParsingError::new(\n").as_str());
     string_error.push_str("            input,\n");
     string_error.push_str(
-        format!(
-            "            {}ParsingError::FromUtf8Error(error.to_string()),\n",
-            ie_name
-        )
-        .as_str(),
+        format!("            {ie_name}ParsingError::FromUtf8Error(error.to_string()),\n").as_str(),
     );
     string_error.push_str("        )\n");
     string_error.push_str("    }\n");
@@ -982,7 +966,7 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     ret.push_str("            nom::combinator::map_res(nom::bytes::complete::take(length), |x: netgauze_parse_utils::Span<'_>| {\n");
     ret.push_str("                String::from_utf8(x.to_vec())\n");
     ret.push_str("            })(buf)?;\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n");
     ret
@@ -995,11 +979,11 @@ fn generate_ipv4_deserializer(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        if length != 4 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
     ret.push_str("        };\n");
     ret.push_str("        let (buf, ip) = nom::number::complete::be_u32(buf)?;\n");
     ret.push_str("        let value = std::net::Ipv4Addr::from(ip);\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1012,11 +996,11 @@ fn generate_ipv6_deserializer(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        if length != 16 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
     ret.push_str("        };\n");
     ret.push_str("        let (buf, ip) = nom::number::complete::be_u128(buf)?;\n");
     ret.push_str("        let value = std::net::Ipv6Addr::from(ip);\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1029,16 +1013,16 @@ fn generate_date_time_seconds(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        if length != 4 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
     ret.push_str("        };\n");
     ret.push_str("        let (buf, secs) = nom::number::complete::be_u32(buf)?;\n");
     ret.push_str("        let value = match chrono::Utc.timestamp_opt(secs as i64, 0) {\n");
     ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
     ret.push_str("            _ => {\n");
-    ret.push_str(format!("                  return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidTimestamp(secs))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("                  return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidTimestamp(secs))));\n").as_str());
     ret.push_str("            }\n");
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1051,16 +1035,16 @@ fn generate_date_time_milli(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        if length != 8 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
     ret.push_str("        };\n");
     ret.push_str("        let (buf, millis) = nom::number::complete::be_u64(buf)?;\n");
     ret.push_str("        let value = match chrono::Utc.timestamp_millis_opt(millis as i64) {\n");
     ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
     ret.push_str("            _ => {\n");
-    ret.push_str(format!("                  return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidTimestampMillis(millis))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("                  return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidTimestampMillis(millis))));\n").as_str());
     ret.push_str("            }\n");
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1073,7 +1057,7 @@ fn generate_date_time_micro(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        if length != 8 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidLength(length))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
     ret.push_str("        };\n");
     ret.push_str("        let (buf, seconds) = nom::number::complete::be_u32(buf)?;\n");
     ret.push_str("        let (buf, fraction) = nom::number::complete::be_u32(buf)?;\n");
@@ -1084,10 +1068,10 @@ fn generate_date_time_micro(ie_name: &String) -> String {
     ret.push_str("        let value = match chrono::Utc.timestamp_opt(seconds as i64, f) {\n");
     ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
     ret.push_str("            _ => {\n");
-    ret.push_str(format!("                  return Err(nom::Err::Error(Located{}ParsingError::new(buf, {}ParsingError::InvalidTimestamp(seconds, fraction))));\n", ie_name, ie_name).as_str());
+    ret.push_str(format!("                  return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidTimestamp(seconds, fraction))));\n").as_str());
     ret.push_str("            }\n");
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1100,7 +1084,7 @@ fn generate_vec_u8_deserializer(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;\n");
-    ret.push_str(format!("        Ok((buf, {}(value)))\n", ie_name).as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1150,7 +1134,7 @@ pub(crate) fn generate_pkg_ie_deserializers(
     if ies.iter().any(|x| x.data_type.contains("chrono")) {
         ret.push_str("use chrono::TimeZone;\n");
     }
-    ret.push_str(format!("use crate::ie::{}::*;\n\n", vendor_mod).as_str());
+    ret.push_str(format!("use crate::ie::{vendor_mod}::*;\n\n").as_str());
 
     for ie in ies {
         ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
@@ -1166,7 +1150,7 @@ pub(crate) fn generate_pkg_ie_serializers(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("use byteorder::WriteBytesExt;\n");
-    ret.push_str(format!("use crate::ie::{}::*;\n\n", vendor_mod).as_str());
+    ret.push_str(format!("use crate::ie::{vendor_mod}::*;\n\n").as_str());
 
     for ie in ies {
         ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
@@ -1174,7 +1158,7 @@ pub(crate) fn generate_pkg_ie_serializers(
     let ty_name = "Record";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
-    ret.push_str(format!("pub enum {}WritingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
     for ie in ies {
         ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
@@ -1182,8 +1166,7 @@ pub(crate) fn generate_pkg_ie_serializers(
     ret.push_str("}\n\n");
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ty_name, ty_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
         )
             .as_str(),
     );
@@ -1202,7 +1185,7 @@ pub(crate) fn generate_pkg_ie_serializers(
 
     ret.push_str("         }\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {}WritingError> {{\n",ty_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ty_name}WritingError> {{\n").as_str());
     ret.push_str("        match self {\n");
     for ie in ies {
         ret.push_str(
@@ -1294,7 +1277,7 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     let ty_name = "Record";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     for ie in ies {
@@ -1309,13 +1292,13 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
-    ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, Located{}ParsingError<'a>>\n", ty_name).as_str());
-    ret.push_str(format!("for {} {{\n", ty_name).as_str());
+    ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, Located{ty_name}ParsingError<'a>>\n").as_str());
+    ret.push_str(format!("for {ty_name} {{\n").as_str());
     ret.push_str("    fn from_wire(\n");
     ret.push_str("        buf: netgauze_parse_utils::Span<'a>,\n");
     ret.push_str("        ie: &InformationElementId,\n");
     ret.push_str("        length: u16,\n");
-    ret.push_str(format!("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{}ParsingError<'a>> {{\n", ty_name).as_str());
+    ret.push_str(format!("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
     ret.push_str("        let (buf, value) = match ie {\n");
     for ie in ies {
         ret.push_str(format!("            InformationElementId::{} => {{\n", ie.name).as_str());
@@ -1345,17 +1328,13 @@ pub(crate) fn generate_ie_deser_main(
     let ty_name = "Record";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {}ParsingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     for (name, pkg, _) in vendor_prefixes {
-        let value_name = format!("{}::RecordParsingError", pkg);
+        let value_name = format!("{pkg}::RecordParsingError");
         ret.push_str(
-            format!(
-                "    {}Error(#[from_located(module = \"\")] {}),\n",
-                name, value_name
-            )
-            .as_str(),
+            format!("    {name}Error(#[from_located(module = \"\")] {value_name}),\n").as_str(),
         );
     }
     for ie in iana_ies {
@@ -1380,20 +1359,10 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str("        let (buf, value) = match ie {\n");
     for (name, _, _) in vendor_prefixes {
         ret.push_str(
-            format!(
-                "            InformationElementId::{}(value_ie) => {{\n",
-                name
-            )
-            .as_str(),
+            format!("            InformationElementId::{name}(value_ie) => {{\n").as_str(),
         );
         ret.push_str("                let (buf, value) = netgauze_parse_utils::parse_into_located_two_inputs(buf, value_ie, length)?;\n");
-        ret.push_str(
-            format!(
-                "                (buf, crate::ie::Record::{}(value))\n",
-                name
-            )
-            .as_str(),
-        );
+        ret.push_str(format!("                (buf, crate::ie::Record::{name}(value))\n").as_str());
         ret.push_str("            }\n");
     }
     for ie in iana_ies {
@@ -1420,7 +1389,7 @@ fn get_std_serializer_error(ty_name: &str) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
-    ret.push_str(format!("pub enum {}WritingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
     ret.push_str("}\n\n");
     ret
@@ -1431,8 +1400,7 @@ fn generate_num8_serializer(num_type: &str, ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1440,8 +1408,8 @@ fn generate_num8_serializer(num_type: &str, ie_name: &String) -> String {
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
-    ret.push_str(format!("         writer.write_{}(self.0)?;\n", num_type).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
+    ret.push_str(format!("         writer.write_{num_type}(self.0)?;\n").as_str());
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
     ret.push_str("}\n\n");
@@ -1453,25 +1421,23 @@ fn generate_num_serializer(num_type: &str, length: u16, ie_name: &str) -> String
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
-    ret.push_str(format!("    const BASE_LENGTH: usize = {};\n\n", length).as_str());
+    ret.push_str(format!("    const BASE_LENGTH: usize = {length};\n\n").as_str());
     ret.push_str("     fn len(&self, length: Option<u16>) -> usize {\n");
     ret.push_str("         match length {\n");
     ret.push_str("             None => Self::BASE_LENGTH,\n");
     ret.push_str("             Some(len) => len as usize,\n");
     ret.push_str("         }\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
 
     ret.push_str("         match length {\n");
     ret.push_str(
         format!(
-            "             None => writer.write_{}::<byteorder::NetworkEndian>(self.0)?,\n",
-            num_type
+            "             None => writer.write_{num_type}::<byteorder::NetworkEndian>(self.0)?,\n"
         )
         .as_str(),
     );
@@ -1492,8 +1458,7 @@ fn generate_array_serializer(ie_name: &str) -> String {
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1501,7 +1466,7 @@ fn generate_array_serializer(ie_name: &str) -> String {
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         self.0.len()\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
     ret.push_str("         writer.write_all(&self.0)?;\n");
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
@@ -1514,16 +1479,15 @@ fn generate_ip_serializer(length: u16, ie_name: &str) -> String {
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
-    ret.push_str(format!("    const BASE_LENGTH: usize = {};\n\n", length).as_str());
+    ret.push_str(format!("    const BASE_LENGTH: usize = {length};\n\n").as_str());
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
     ret.push_str("         writer.write_all(&self.0.octets())?;\n");
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
@@ -1536,8 +1500,7 @@ fn generate_string_serializer(ie_name: &str) -> String {
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1545,7 +1508,7 @@ fn generate_string_serializer(ie_name: &str) -> String {
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         self.0.len()\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
     ret.push_str("         writer.write_all(self.0.as_bytes())?;\n");
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
@@ -1558,8 +1521,7 @@ fn generate_bool_serializer(ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1567,7 +1529,7 @@ fn generate_bool_serializer(ie_name: &String) -> String {
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
     ret.push_str("         writer.write_u8(self.0.into())?;\n");
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
@@ -1580,8 +1542,7 @@ fn generate_seconds_serializer(ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1589,7 +1550,7 @@ fn generate_seconds_serializer(ie_name: &String) -> String {
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
     ret.push_str(
         "         writer.write_u32::<byteorder::NetworkEndian>(self.0.timestamp() as u32)?;\n",
     );
@@ -1604,8 +1565,7 @@ fn generate_milli_seconds_serializer(ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1613,7 +1573,7 @@ fn generate_milli_seconds_serializer(ie_name: &String) -> String {
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
     ret.push_str(
         "         writer.write_u64::<byteorder::NetworkEndian>(self.0.timestamp_millis() as u64)?;\n",
     );
@@ -1628,8 +1588,7 @@ fn generate_fraction_serializer(ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ie_name, ie_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1637,7 +1596,7 @@ fn generate_fraction_serializer(ie_name: &String) -> String {
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {}WritingError> {{\n", ie_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
     ret.push_str(
         "         writer.write_u32::<byteorder::NetworkEndian>(self.0.timestamp() as u32)?;\n",
     );
@@ -1700,10 +1659,10 @@ pub(crate) fn generate_ie_ser_main(
     let ty_name = "Record";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
-    ret.push_str(format!("pub enum {}WritingError {{\n", ty_name).as_str());
+    ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
     for (name, pkg, _) in vendor_prefixes {
-        ret.push_str(format!("    {}Error(#[from] {}::RecordWritingError),\n", name, pkg).as_str());
+        ret.push_str(format!("    {name}Error(#[from] {pkg}::RecordWritingError),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
@@ -1712,8 +1671,7 @@ pub(crate) fn generate_ie_ser_main(
 
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {}WritingError> for {} {{\n",
-            ty_name, ty_name
+            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
         )
         .as_str(),
     );
@@ -1722,7 +1680,7 @@ pub(crate) fn generate_ie_ser_main(
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown(value) => value.len(),\n");
     for (name, _, _) in vendor_prefixes {
-        ret.push_str(format!("            Self::{}(value) => value.len(length),\n", name).as_str());
+        ret.push_str(format!("            Self::{name}(value) => value.len(length),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(
@@ -1736,16 +1694,12 @@ pub(crate) fn generate_ie_ser_main(
 
     ret.push_str("         }\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {}WritingError> {{\n",ty_name).as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ty_name}WritingError> {{\n").as_str());
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown(value) => writer.write_all(value)?,\n");
     for (name, _pkg, _) in vendor_prefixes {
         ret.push_str(
-            format!(
-                "            Self::{}(value) => value.write(writer, length)?,\n",
-                name
-            )
-            .as_str(),
+            format!("            Self::{name}(value) => value.write(writer, length)?,\n").as_str(),
         );
     }
     for ie in iana_ies {

@@ -811,7 +811,7 @@ fn test_peer_down_reason() -> Result<(), PeerDownNotificationReasonWritingError>
     let good_local_pdu =
         PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(notif.clone());
     let good_remote_pdu =
-        PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(notif.clone());
+        PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(notif);
     let good_remote_no_data = PeerDownNotificationReason::RemoteSystemClosedNoData;
     let good_peer_de_configured = PeerDownNotificationReason::PeerDeConfigured;
     let good_local_system_closed = PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(
