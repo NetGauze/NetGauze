@@ -16,7 +16,7 @@ netgauze-serde-macros = { path = "../netgauze-serde-macros", optional = true }
 serde = {version = "1.0", features = ["derive"]}
 strum = "0.24"
 strum_macros = "0.24"
-ipnet = { version = "2.5", features=["serde"] }
+ipnet = { version = "2.7", features=["serde"] }
 lazy_static = "1.4"
 chrono = {version="0.4", features=["serde"]}
 nom = { version = "7.1", optional = true }
@@ -36,7 +36,7 @@ netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-hel
 
 [build-dependencies]
 reqwest = { version = "0.11", features = ["blocking"] }
-roxmltree = "0.15"
+roxmltree = "0.17"
 netgauze-ipfix-code-generator = {path = "../netgauze-ipfix-code-generator"}
 
 

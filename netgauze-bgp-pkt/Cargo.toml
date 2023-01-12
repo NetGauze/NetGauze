@@ -14,7 +14,7 @@ netgauze-iana = { path = "../netgauze-iana" }
 netgauze-locate = { path = "../netgauze-locate", optional = true }
 netgauze-parse-utils = { path = "../netgauze-parse-utils", optional = true }
 netgauze-serde-macros = { path = "../netgauze-serde-macros", optional = true }
-ipnet = { version = "2.5", features=["serde"] }
+ipnet = { version = "2.7", features=["serde"] }
 strum = "0.24"
 strum_macros = "0.24"
 serde = { version = "1.0", features = ["derive"] }
