@@ -725,29 +725,44 @@ pub enum BGPDataCollectionCommunityRegionIdentifierCode {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BgpTransitiveExtendedCommunityType {
+pub enum BgpExtendedCommunityType {
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
     TransitiveTwoOctetExtendedCommunity = 0x00,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    NonTransitiveTwoOctetExtendedCommunity = 0x40,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
     TransitiveIpv4ExtendedCommunity = 0x01,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    NonTransitiveIpv4ExtendedCommunity = 0x41,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
     TransitiveFourOctetExtendedCommunity = 0x02,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    NonTransitiveFourOctetExtendedCommunity = 0x42,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
     TransitiveOpaqueExtendedCommunity = 0x03,
 
-    QosMarking = 0x04,
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    NonTransitiveOpaqueExtendedCommunity = 0x43,
+
+    TransitiveQosMarking = 0x04,
+
+    NonTransitiveQosMarking = 0x44,
 
     CosCapability = 0x05,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
     Evpn = 0x06,
 
-    /// [draft-ietf-idr-flowspec-interfaceset](https://datatracker.ietf.org/doc/draft-ietf-idr-flowspec-interfaceset/)
-    FlowSpec = 0x07,
-
+    // Expired draft
+    // /// [draft-ietf-idr-flowspec-interfaceset](https://datatracker.ietf.org/doc/draft-ietf-idr-flowspec-interfaceset/)
+    //TransitiveFlowSpec = 0x07,
+    //NonTransitiveFlowSpec = 0x47,
     /// [draft-simpson-idr-flowspec-redirect](https://datatracker.ietf.org/doc/draft-simpson-idr-flowspec-redirect/)
     FlowSpecNextHop = 0x08,
 
@@ -755,7 +770,10 @@ pub enum BgpTransitiveExtendedCommunityType {
     FlowSpecIndirectionId = 0x09,
 
     /// [draft-kaliraj-idr-bgp-classful-transport-planes](https://datatracker.ietf.org/doc/draft-kaliraj-idr-bgp-classful-transport-planes/)
-    TransportClass = 0x0a,
+    TransitiveTransportClass = 0x0a,
+
+    /// [draft-kaliraj-idr-bgp-classful-transport-planes](https://datatracker.ietf.org/doc/draft-kaliraj-idr-bgp-classful-transport-planes/)
+    NonTransitiveTransportClass = 0x4a,
 
     /// [RFC9015](https://datatracker.ietf.org/doc/html/rfc9015)
     ServiceFunctionChain = 0x0b,
@@ -797,34 +815,52 @@ pub enum BgpTransitiveExtendedCommunityType {
     Experimental89 = 0x89,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    Experimental8a = 0x8a,
+    Experimental8A = 0x8a,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    Experimental8b = 0x8b,
+    Experimental8B = 0x8b,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    Experimental8c = 0x8c,
+    Experimental8C = 0x8c,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    Experimental8d = 0x8d,
+    Experimental8D = 0x8d,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    Experimental8e = 0x8e,
+    Experimental8E = 0x8e,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    Experimental8f = 0x8f,
+    Experimental8F = 0x8f,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    ExperimentalC0 = 0xc0,
+    ExperimentalC1 = 0xc1,
+    ExperimentalC2 = 0xc2,
+    ExperimentalC3 = 0xc3,
+    ExperimentalC4 = 0xc4,
+    ExperimentalC5 = 0xc5,
+    ExperimentalC6 = 0xc6,
+    ExperimentalC7 = 0xc7,
+    ExperimentalC8 = 0xc8,
+    ExperimentalC9 = 0xc9,
+    ExperimentalCa = 0xca,
+    ExperimentalCb = 0xcb,
+    ExperimentalCc = 0xcc,
+    ExperimentalCd = 0xcd,
+    ExperimentalCe = 0xce,
+    ExperimentalCf = 0xcf,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UndefinedBgpTransitiveExtendedCommunityType(pub u8);
+pub struct UndefinedBgpExtendedCommunityType(pub u8);
 
-impl TryFrom<u8> for BgpTransitiveExtendedCommunityType {
-    type Error = UndefinedBgpTransitiveExtendedCommunityType;
+impl TryFrom<u8> for BgpExtendedCommunityType {
+    type Error = UndefinedBgpExtendedCommunityType;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UndefinedBgpTransitiveExtendedCommunityType(value)),
+            None => Err(UndefinedBgpExtendedCommunityType(value)),
         }
     }
 }
