@@ -60,6 +60,9 @@ pub enum ExtendedCommunity {
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     NonTransitiveOpaqueExtendedCommunity(NonTransitiveOpaqueExtendedCommunity),
+
+    Experimental(ExperimentalExtendedCommunity),
+
     Unknown(UnknownExtendedCommunity),
 }
 
@@ -72,6 +75,7 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
             Self::NonTransitiveIpv4ExtendedCommunity(value) => value.iana_defined(),
             Self::TransitiveOpaqueExtendedCommunity(value) => value.iana_defined(),
             Self::NonTransitiveOpaqueExtendedCommunity(value) => value.iana_defined(),
+            Self::Experimental(value) => value.iana_defined(),
             Self::Unknown(value) => value.iana_defined(),
         }
     }
@@ -84,6 +88,7 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
             Self::NonTransitiveIpv4ExtendedCommunity(value) => value.transitive(),
             Self::TransitiveOpaqueExtendedCommunity(value) => value.transitive(),
             Self::NonTransitiveOpaqueExtendedCommunity(value) => value.transitive(),
+            Self::Experimental(value) => value.transitive(),
             Self::Unknown(value) => value.transitive(),
         }
     }
@@ -393,6 +398,45 @@ impl ExtendedCommunityProperties for NonTransitiveOpaqueExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct ExperimentalExtendedCommunity {
+    code: u8,
+    sub_type: u8,
+    value: [u8; 6],
+}
+
+impl ExperimentalExtendedCommunity {
+    pub const fn new(code: u8, sub_type: u8, value: [u8; 6]) -> Self {
+        Self {
+            code,
+            sub_type,
+            value,
+        }
+    }
+
+    pub const fn code(&self) -> u8 {
+        self.code
+    }
+
+    pub const fn sub_type(&self) -> u8 {
+        self.sub_type
+    }
+
+    pub const fn value(&self) -> &[u8; 6] {
+        &self.value
+    }
+}
+
+impl ExtendedCommunityProperties for ExperimentalExtendedCommunity {
+    fn iana_defined(&self) -> bool {
+        self.code & 0x80 != 0
+    }
+
+    fn transitive(&self) -> bool {
+        self.code & 0x40 == 0
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UnknownExtendedCommunity {
     code: u8,
     sub_type: u8,
@@ -411,6 +455,7 @@ impl UnknownExtendedCommunity {
     pub const fn code(&self) -> u8 {
         self.code
     }
+
     pub const fn sub_type(&self) -> u8 {
         self.sub_type
     }

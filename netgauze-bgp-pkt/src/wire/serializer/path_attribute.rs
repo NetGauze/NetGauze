@@ -20,7 +20,12 @@ use crate::{
     iana::PathAttributeType,
     nlri::*,
     path_attribute::*,
-    wire::serializer::{community::UnknownExtendedCommunityWritingError, nlri::*},
+    wire::serializer::{
+        community::{
+            ExperimentalExtendedCommunityWritingError, UnknownExtendedCommunityWritingError,
+        },
+        nlri::*,
+    },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
@@ -555,6 +560,7 @@ impl WritablePDUWithOneInput<bool, ExtendedCommunitiesWritingError> for Extended
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
+    ExperimentalExtendedCommunityError(#[from] ExperimentalExtendedCommunityWritingError),
     UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityWritingError),
 }
 
@@ -570,6 +576,7 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
                 ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(_) => todo!(),
                 ExtendedCommunity::TransitiveOpaqueExtendedCommunity(_) => todo!(),
                 ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::Experimental(value) => value.len(),
                 ExtendedCommunity::Unknown(value) => value.len(),
             }
     }
@@ -585,6 +592,10 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
             ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(_) => todo!(),
             ExtendedCommunity::TransitiveOpaqueExtendedCommunity(_) => todo!(),
             ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::Experimental(value) => {
+                writer.write_u8(value.code())?;
+                value.write(writer)?;
+            }
             ExtendedCommunity::Unknown(value) => {
                 writer.write_u8(value.code())?;
                 value.write(writer)?;

@@ -17,9 +17,14 @@
 
 use crate::{
     community::ExtendedCommunity,
-    iana::{PathAttributeType, UndefinedPathAttributeType},
+    iana::{BgpExtendedCommunityType, PathAttributeType, UndefinedPathAttributeType},
     path_attribute::*,
-    wire::deserializer::{community::UnknownExtendedCommunityParsingError, nlri::*},
+    wire::deserializer::{
+        community::{
+            ExperimentalExtendedCommunityParsingError, UnknownExtendedCommunityParsingError,
+        },
+        nlri::*,
+    },
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
@@ -928,6 +933,10 @@ impl<'a> ReadablePDU<'a, LocatedCommunitiesParsingError<'a>> for Community {
 pub enum ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    ExperimentalExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        ExperimentalExtendedCommunityParsingError,
+    ),
     UnknownExtendedCommunityError(
         #[from_located(module = "crate::wire::deserializer::community")]
         UnknownExtendedCommunityParsingError,
@@ -939,8 +948,66 @@ impl<'a> ReadablePDU<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedC
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedExtendedCommunityParsingError<'a>> {
         let (buf, code) = be_u8(buf)?;
-        let (buf, value) = parse_into_located_one_input(buf, code)?;
-        let ret = ExtendedCommunity::Unknown(value);
+        let comm_type = BgpExtendedCommunityType::try_from(code);
+        let (buf, ret) = match comm_type {
+            Ok(BgpExtendedCommunityType::TransitiveTwoOctetExtendedCommunity) => todo!(),
+            Ok(BgpExtendedCommunityType::NonTransitiveTwoOctetExtendedCommunity) => todo!(),
+            Ok(BgpExtendedCommunityType::TransitiveIpv4ExtendedCommunity) => todo!(),
+            Ok(BgpExtendedCommunityType::NonTransitiveIpv4ExtendedCommunity) => todo!(),
+            Ok(BgpExtendedCommunityType::TransitiveFourOctetExtendedCommunity) => todo!(),
+            Ok(BgpExtendedCommunityType::NonTransitiveFourOctetExtendedCommunity) => todo!(),
+            Ok(BgpExtendedCommunityType::TransitiveOpaqueExtendedCommunity) => todo!(),
+            Ok(BgpExtendedCommunityType::NonTransitiveOpaqueExtendedCommunity) => todo!(),
+            Ok(BgpExtendedCommunityType::TransitiveQosMarking) => todo!(),
+            Ok(BgpExtendedCommunityType::NonTransitiveQosMarking) => todo!(),
+            Ok(BgpExtendedCommunityType::CosCapability) => todo!(),
+            Ok(BgpExtendedCommunityType::Evpn) => todo!(),
+            Ok(BgpExtendedCommunityType::FlowSpecNextHop) => todo!(),
+            Ok(BgpExtendedCommunityType::FlowSpecIndirectionId) => todo!(),
+            Ok(BgpExtendedCommunityType::TransitiveTransportClass) => todo!(),
+            Ok(BgpExtendedCommunityType::NonTransitiveTransportClass) => todo!(),
+            Ok(BgpExtendedCommunityType::ServiceFunctionChain) => todo!(),
+            Ok(BgpExtendedCommunityType::Srv6MobileUserPlane) => todo!(),
+            Ok(BgpExtendedCommunityType::GenericPart1) => todo!(),
+            Ok(BgpExtendedCommunityType::GenericPart2) => todo!(),
+            Ok(BgpExtendedCommunityType::GenericPart3) => todo!(),
+            Ok(BgpExtendedCommunityType::Experimental83)
+            | Ok(BgpExtendedCommunityType::Experimental84)
+            | Ok(BgpExtendedCommunityType::Experimental85)
+            | Ok(BgpExtendedCommunityType::Experimental86)
+            | Ok(BgpExtendedCommunityType::Experimental87)
+            | Ok(BgpExtendedCommunityType::Experimental88)
+            | Ok(BgpExtendedCommunityType::Experimental89)
+            | Ok(BgpExtendedCommunityType::Experimental8A)
+            | Ok(BgpExtendedCommunityType::Experimental8B)
+            | Ok(BgpExtendedCommunityType::Experimental8C)
+            | Ok(BgpExtendedCommunityType::Experimental8D)
+            | Ok(BgpExtendedCommunityType::Experimental8E)
+            | Ok(BgpExtendedCommunityType::Experimental8F)
+            | Ok(BgpExtendedCommunityType::ExperimentalC0)
+            | Ok(BgpExtendedCommunityType::ExperimentalC1)
+            | Ok(BgpExtendedCommunityType::ExperimentalC2)
+            | Ok(BgpExtendedCommunityType::ExperimentalC3)
+            | Ok(BgpExtendedCommunityType::ExperimentalC4)
+            | Ok(BgpExtendedCommunityType::ExperimentalC5)
+            | Ok(BgpExtendedCommunityType::ExperimentalC6)
+            | Ok(BgpExtendedCommunityType::ExperimentalC7)
+            | Ok(BgpExtendedCommunityType::ExperimentalC8)
+            | Ok(BgpExtendedCommunityType::ExperimentalC9)
+            | Ok(BgpExtendedCommunityType::ExperimentalCa)
+            | Ok(BgpExtendedCommunityType::ExperimentalCb)
+            | Ok(BgpExtendedCommunityType::ExperimentalCc)
+            | Ok(BgpExtendedCommunityType::ExperimentalCd)
+            | Ok(BgpExtendedCommunityType::ExperimentalCe)
+            | Ok(BgpExtendedCommunityType::ExperimentalCf) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Experimental(value))
+            }
+            Err(err) => {
+                let (buf, value) = parse_into_located_one_input(buf, err.0)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+        };
         Ok((buf, ret))
     }
 }

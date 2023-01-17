@@ -19,7 +19,38 @@ use serde::{Deserialize, Serialize};
 use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePDUWithOneInput, Span};
 use netgauze_serde_macros::LocatedError;
 
-use crate::community::UnknownExtendedCommunity;
+use crate::community::{ExperimentalExtendedCommunity, UnknownExtendedCommunity};
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum ExperimentalExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidValueLength(usize),
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, u8, LocatedExperimentalExtendedCommunityParsingError<'a>>
+    for ExperimentalExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+        code: u8,
+    ) -> IResult<Span<'a>, Self, LocatedExperimentalExtendedCommunityParsingError<'a>> {
+        let (buf, sub_type) = be_u8(buf)?;
+        let input = buf;
+        let (buf, value) = nom::multi::count(be_u8, 6)(buf)?;
+        let len = value.len();
+        let value: [u8; 6] = value.try_into().map_err(|_| {
+            nom::Err::Error(LocatedExperimentalExtendedCommunityParsingError::new(
+                input,
+                ExperimentalExtendedCommunityParsingError::InvalidValueLength(len),
+            ))
+        })?;
+        Ok((
+            buf,
+            ExperimentalExtendedCommunity::new(code, sub_type, value),
+        ))
+    }
+}
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum UnknownExtendedCommunityParsingError {

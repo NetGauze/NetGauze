@@ -1500,7 +1500,7 @@ fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
 #[test]
 fn test_unknown_extended_community() -> Result<(), PathAttributeWritingError> {
     let good_wire = [
-        0xc0, 0x10, 0x08, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0xc0, 0x10, 0x08, 0x33, 0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
     ];
     let good = PathAttribute::from(
         true,
@@ -1508,7 +1508,7 @@ fn test_unknown_extended_community() -> Result<(), PathAttributeWritingError> {
         false,
         false,
         PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
-            ExtendedCommunity::Unknown(UnknownExtendedCommunity::new(0, 2, [0, 1, 0, 0, 0, 1])),
+            ExtendedCommunity::Unknown(UnknownExtendedCommunity::new(0x33, 2, [0, 1, 0, 0, 0, 1])),
         ])),
     )
     .unwrap();
