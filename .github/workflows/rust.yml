@@ -29,4 +29,4 @@ jobs:
       - name: Build tests
         run: cargo test --no-run --locked
       - name: Run tests
-        run: cargo test -- --nocapture --quiet
+        run: TRYBUILD=overwrite cargo test -- --nocapture --quiet
