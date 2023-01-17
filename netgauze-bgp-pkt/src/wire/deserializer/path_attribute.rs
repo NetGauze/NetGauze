@@ -950,27 +950,90 @@ impl<'a> ReadablePDU<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedC
         let (buf, code) = be_u8(buf)?;
         let comm_type = BgpExtendedCommunityType::try_from(code);
         let (buf, ret) = match comm_type {
-            Ok(BgpExtendedCommunityType::TransitiveTwoOctetExtendedCommunity) => todo!(),
-            Ok(BgpExtendedCommunityType::NonTransitiveTwoOctetExtendedCommunity) => todo!(),
-            Ok(BgpExtendedCommunityType::TransitiveIpv4ExtendedCommunity) => todo!(),
-            Ok(BgpExtendedCommunityType::NonTransitiveIpv4ExtendedCommunity) => todo!(),
-            Ok(BgpExtendedCommunityType::TransitiveFourOctetExtendedCommunity) => todo!(),
-            Ok(BgpExtendedCommunityType::NonTransitiveFourOctetExtendedCommunity) => todo!(),
-            Ok(BgpExtendedCommunityType::TransitiveOpaqueExtendedCommunity) => todo!(),
-            Ok(BgpExtendedCommunityType::NonTransitiveOpaqueExtendedCommunity) => todo!(),
-            Ok(BgpExtendedCommunityType::TransitiveQosMarking) => todo!(),
-            Ok(BgpExtendedCommunityType::NonTransitiveQosMarking) => todo!(),
-            Ok(BgpExtendedCommunityType::CosCapability) => todo!(),
-            Ok(BgpExtendedCommunityType::Evpn) => todo!(),
-            Ok(BgpExtendedCommunityType::FlowSpecNextHop) => todo!(),
-            Ok(BgpExtendedCommunityType::FlowSpecIndirectionId) => todo!(),
-            Ok(BgpExtendedCommunityType::TransitiveTransportClass) => todo!(),
-            Ok(BgpExtendedCommunityType::NonTransitiveTransportClass) => todo!(),
-            Ok(BgpExtendedCommunityType::ServiceFunctionChain) => todo!(),
-            Ok(BgpExtendedCommunityType::Srv6MobileUserPlane) => todo!(),
-            Ok(BgpExtendedCommunityType::GenericPart1) => todo!(),
-            Ok(BgpExtendedCommunityType::GenericPart2) => todo!(),
-            Ok(BgpExtendedCommunityType::GenericPart3) => todo!(),
+            Ok(BgpExtendedCommunityType::TransitiveTwoOctetExtendedCommunity) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::NonTransitiveTwoOctetExtendedCommunity) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::TransitiveIpv4ExtendedCommunity) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::NonTransitiveIpv4ExtendedCommunity) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::TransitiveFourOctetExtendedCommunity) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::NonTransitiveFourOctetExtendedCommunity) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::TransitiveOpaqueExtendedCommunity) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::NonTransitiveOpaqueExtendedCommunity) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::TransitiveQosMarking) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::NonTransitiveQosMarking) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::CosCapability) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::Evpn) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::FlowSpecNextHop) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::FlowSpecIndirectionId) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::TransitiveTransportClass) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::NonTransitiveTransportClass) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::ServiceFunctionChain) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::Srv6MobileUserPlane) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::GenericPart1) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::GenericPart2) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
+            Ok(BgpExtendedCommunityType::GenericPart3) => {
+                let (buf, value) = parse_into_located_one_input(buf, code)?;
+                (buf, ExtendedCommunity::Unknown(value))
+            }
             Ok(BgpExtendedCommunityType::Experimental83)
             | Ok(BgpExtendedCommunityType::Experimental84)
             | Ok(BgpExtendedCommunityType::Experimental85)
