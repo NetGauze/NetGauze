@@ -43,10 +43,7 @@ impl WritablePDU<TransitiveTwoOctetExtendedCommunityWritingError>
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), TransitiveTwoOctetExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), TransitiveTwoOctetExtendedCommunityWritingError> {
         let (sub_type, global_admin, local_admin) = match self {
             Self::RouteTarget {
                 global_admin,
@@ -159,10 +156,7 @@ impl WritablePDU<NonTransitiveTwoOctetExtendedCommunityWritingError>
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), NonTransitiveTwoOctetExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), NonTransitiveTwoOctetExtendedCommunityWritingError> {
         let (sub_type, global_admin, local_admin) = match self {
             Self::LinkBandwidth {
                 global_admin,
@@ -209,10 +203,7 @@ impl WritablePDU<TransitiveIpv4ExtendedCommunityWritingError> for TransitiveIpv4
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), TransitiveIpv4ExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), TransitiveIpv4ExtendedCommunityWritingError> {
         let (sub_type, global_admin, local_admin) = match self {
             Self::RouteTarget {
                 global_admin,
@@ -365,10 +356,7 @@ impl WritablePDU<NonTransitiveIpv4ExtendedCommunityWritingError>
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), NonTransitiveIpv4ExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), NonTransitiveIpv4ExtendedCommunityWritingError> {
         let (sub_type, global_admin, local_admin) = match self {
             Self::Unassigned {
                 sub_type,
@@ -401,10 +389,7 @@ impl WritablePDU<TransitiveFourOctetExtendedCommunityWritingError>
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), TransitiveFourOctetExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), TransitiveFourOctetExtendedCommunityWritingError> {
         let (sub_type, global_admin, local_admin) = match self {
             Self::RouteTarget {
                 global_admin,
@@ -501,10 +486,7 @@ impl WritablePDU<NonTransitiveFourOctetExtendedCommunityWritingError>
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), NonTransitiveFourOctetExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), NonTransitiveFourOctetExtendedCommunityWritingError> {
         let (sub_type, global_admin, local_admin) = match self {
             Self::Unassigned {
                 sub_type,
@@ -537,10 +519,7 @@ impl WritablePDU<TransitiveOpaqueExtendedCommunityWritingError>
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), TransitiveOpaqueExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), TransitiveOpaqueExtendedCommunityWritingError> {
         match self {
             Self::Unassigned { sub_type, value } => {
                 writer.write_u8(*sub_type)?;
@@ -569,10 +548,7 @@ impl WritablePDU<NonTransitiveOpaqueExtendedCommunityWritingError>
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), NonTransitiveOpaqueExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), NonTransitiveOpaqueExtendedCommunityWritingError> {
         match self {
             Self::Unassigned { sub_type, value } => {
                 writer.write_u8(*sub_type)?;
@@ -599,10 +575,7 @@ impl WritablePDU<ExperimentalExtendedCommunityWritingError> for ExperimentalExte
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), ExperimentalExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), ExperimentalExtendedCommunityWritingError> {
         writer.write_u8(self.sub_type())?;
         writer.write_all(self.value())?;
         Ok(())
@@ -625,10 +598,7 @@ impl WritablePDU<UnknownExtendedCommunityWritingError> for UnknownExtendedCommun
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), UnknownExtendedCommunityWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), UnknownExtendedCommunityWritingError> {
         writer.write_u8(self.sub_type())?;
         writer.write_all(self.value())?;
         Ok(())
