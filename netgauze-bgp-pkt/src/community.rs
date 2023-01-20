@@ -306,20 +306,12 @@ pub enum TransitiveIpv4ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct NonTransitiveIpv4ExtendedCommunity {
-    sub_type: u8,
-    global_admin: Ipv4Addr,
-    local_admin: u16,
-}
-
-impl NonTransitiveIpv4ExtendedCommunity {
-    pub const fn new(sub_type: u8, global_admin: Ipv4Addr, local_admin: u16) -> Self {
-        Self {
-            sub_type,
-            global_admin,
-            local_admin,
-        }
-    }
+pub enum NonTransitiveIpv4ExtendedCommunity {
+    Unassigned {
+        sub_type: u8,
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 }
 
 impl ExtendedCommunityProperties for NonTransitiveIpv4ExtendedCommunity {
@@ -333,15 +325,8 @@ impl ExtendedCommunityProperties for NonTransitiveIpv4ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct TransitiveOpaqueExtendedCommunity {
-    sub_type: u8,
-    value: [u8; 6],
-}
-
-impl TransitiveOpaqueExtendedCommunity {
-    pub const fn new(sub_type: u8, value: [u8; 6]) -> Self {
-        Self { sub_type, value }
-    }
+pub enum TransitiveOpaqueExtendedCommunity {
+    Unassigned { sub_type: u8, value: [u8; 6] },
 }
 
 impl ExtendedCommunityProperties for TransitiveOpaqueExtendedCommunity {
@@ -355,15 +340,8 @@ impl ExtendedCommunityProperties for TransitiveOpaqueExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct NonTransitiveOpaqueExtendedCommunity {
-    sub_type: u8,
-    value: [u8; 6],
-}
-
-impl NonTransitiveOpaqueExtendedCommunity {
-    pub const fn new(sub_type: u8, value: [u8; 6]) -> Self {
-        Self { sub_type, value }
-    }
+pub enum NonTransitiveOpaqueExtendedCommunity {
+    Unassigned { sub_type: u8, value: [u8; 6] },
 }
 
 impl ExtendedCommunityProperties for NonTransitiveOpaqueExtendedCommunity {

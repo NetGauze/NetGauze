@@ -562,6 +562,11 @@ pub enum ExtendedCommunityWritingError {
         #[from] NonTransitiveTwoOctetExtendedCommunityWritingError,
     ),
     TransitiveIpv4ExtendedCommunityError(#[from] TransitiveIpv4ExtendedCommunityWritingError),
+    NonTransitiveIpv4ExtendedCommunityError(#[from] NonTransitiveIpv4ExtendedCommunityWritingError),
+    TransitiveOpaqueExtendedCommunityError(#[from] TransitiveOpaqueExtendedCommunityWritingError),
+    NonTransitiveOpaqueExtendedCommunityError(
+        #[from] NonTransitiveOpaqueExtendedCommunityWritingError,
+    ),
     ExperimentalExtendedCommunityError(#[from] ExperimentalExtendedCommunityWritingError),
     UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityWritingError),
 }
@@ -575,9 +580,9 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
                 ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(value) => value.len(),
                 ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(value) => value.len(),
                 ExtendedCommunity::TransitiveIpv4ExtendedCommunity(value) => value.len(),
-                ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(_) => todo!(),
-                ExtendedCommunity::TransitiveOpaqueExtendedCommunity(_) => todo!(),
-                ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(value) => value.len(),
+                ExtendedCommunity::TransitiveOpaqueExtendedCommunity(value) => value.len(),
+                ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(value) => value.len(),
                 ExtendedCommunity::Experimental(value) => value.len(),
                 ExtendedCommunity::Unknown(value) => value.len(),
             }
@@ -604,9 +609,22 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
                 writer.write_u8(BgpExtendedCommunityType::TransitiveIpv4ExtendedCommunity as u8)?;
                 value.write(writer)?;
             }
-            ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(_) => todo!(),
-            ExtendedCommunity::TransitiveOpaqueExtendedCommunity(_) => todo!(),
-            ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(value) => {
+                writer
+                    .write_u8(BgpExtendedCommunityType::NonTransitiveIpv4ExtendedCommunity as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::TransitiveOpaqueExtendedCommunity(value) => {
+                writer
+                    .write_u8(BgpExtendedCommunityType::TransitiveOpaqueExtendedCommunity as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(value) => {
+                writer.write_u8(
+                    BgpExtendedCommunityType::NonTransitiveOpaqueExtendedCommunity as u8,
+                )?;
+                value.write(writer)?;
+            }
             ExtendedCommunity::Experimental(value) => {
                 writer.write_u8(value.code())?;
                 value.write(writer)?;

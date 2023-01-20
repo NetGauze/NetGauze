@@ -279,6 +279,97 @@ impl<'a> ReadablePDU<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum NonTransitiveIpv4ExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    Ipv4UnicastError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
+    ),
+}
+
+impl<'a> ReadablePDU<'a, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'a>>
+    for NonTransitiveIpv4ExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'a>> {
+        let (buf, sub_type) = be_u8(buf)?;
+        let (buf, global_admin) = be_u32(buf)?;
+        let global_admin = Ipv4Addr::from(global_admin);
+        let (buf, local_admin) = be_u16(buf)?;
+
+        let ret = NonTransitiveIpv4ExtendedCommunity::Unassigned {
+            sub_type,
+            global_admin,
+            local_admin,
+        };
+        Ok((buf, ret))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum TransitiveOpaqueExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidValueLength(usize),
+}
+
+impl<'a> ReadablePDU<'a, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a>>
+    for TransitiveOpaqueExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a>> {
+        let (buf, sub_type) = be_u8(buf)?;
+        let input = buf;
+        let (buf, value) = nom::multi::count(be_u8, 6)(buf)?;
+        let len = value.len();
+        let value: [u8; 6] = value.try_into().map_err(|_| {
+            nom::Err::Error(LocatedTransitiveOpaqueExtendedCommunityParsingError::new(
+                input,
+                TransitiveOpaqueExtendedCommunityParsingError::InvalidValueLength(len),
+            ))
+        })?;
+        Ok((
+            buf,
+            TransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value },
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum NonTransitiveOpaqueExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidValueLength(usize),
+}
+
+impl<'a> ReadablePDU<'a, LocatedNonTransitiveOpaqueExtendedCommunityParsingError<'a>>
+    for NonTransitiveOpaqueExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveOpaqueExtendedCommunityParsingError<'a>> {
+        let (buf, sub_type) = be_u8(buf)?;
+        let input = buf;
+        let (buf, value) = nom::multi::count(be_u8, 6)(buf)?;
+        let len = value.len();
+        let value: [u8; 6] = value.try_into().map_err(|_| {
+            nom::Err::Error(
+                LocatedNonTransitiveOpaqueExtendedCommunityParsingError::new(
+                    input,
+                    NonTransitiveOpaqueExtendedCommunityParsingError::InvalidValueLength(len),
+                ),
+            )
+        })?;
+        Ok((
+            buf,
+            NonTransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value },
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExperimentalExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

@@ -19,7 +19,6 @@ use crate::{
         NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveIpv4ExtendedCommunitySubType,
         TransitiveTwoOctetExtendedCommunitySubType,
     },
-    wire::serializer::nlri::Ipv4UnicastWritingError,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
@@ -196,7 +195,6 @@ impl WritablePDU<NonTransitiveTwoOctetExtendedCommunityWritingError>
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum TransitiveIpv4ExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
-    Ipv4UnicastError(#[from] Ipv4UnicastWritingError),
 }
 
 impl WritablePDU<TransitiveIpv4ExtendedCommunityWritingError> for TransitiveIpv4ExtendedCommunity {
@@ -344,6 +342,106 @@ impl WritablePDU<TransitiveIpv4ExtendedCommunityWritingError> for TransitiveIpv4
         writer.write_u8(sub_type)?;
         writer.write_all(&global_admin.octets())?;
         writer.write_u16::<NetworkEndian>(*local_admin)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum NonTransitiveIpv4ExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<NonTransitiveIpv4ExtendedCommunityWritingError>
+    for NonTransitiveIpv4ExtendedCommunity
+{
+    // 1-octet subtype + 4-octets global admin + 2-octets local admin
+    const BASE_LENGTH: usize = 7;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), NonTransitiveIpv4ExtendedCommunityWritingError>
+    where
+        Self: Sized,
+    {
+        let (sub_type, global_admin, local_admin) = match self {
+            Self::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            } => (*sub_type, global_admin, local_admin),
+        };
+        writer.write_u8(sub_type)?;
+        writer.write_all(&global_admin.octets())?;
+        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum TransitiveOpaqueExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<TransitiveOpaqueExtendedCommunityWritingError>
+    for TransitiveOpaqueExtendedCommunity
+{
+    // 1-octet subtype + 6-octets value
+    const BASE_LENGTH: usize = 7;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), TransitiveOpaqueExtendedCommunityWritingError>
+    where
+        Self: Sized,
+    {
+        match self {
+            Self::Unassigned { sub_type, value } => {
+                writer.write_u8(*sub_type)?;
+                writer.write_all(value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum NonTransitiveOpaqueExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<NonTransitiveOpaqueExtendedCommunityWritingError>
+    for NonTransitiveOpaqueExtendedCommunity
+{
+    // 1-octet subtype + 6-octets value
+    const BASE_LENGTH: usize = 7;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), NonTransitiveOpaqueExtendedCommunityWritingError>
+    where
+        Self: Sized,
+    {
+        match self {
+            Self::Unassigned { sub_type, value } => {
+                writer.write_u8(*sub_type)?;
+                writer.write_all(value)?;
+            }
+        }
         Ok(())
     }
 }
