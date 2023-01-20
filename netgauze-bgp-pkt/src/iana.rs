@@ -865,6 +865,137 @@ impl TryFrom<u8> for BgpExtendedCommunityType {
     }
 }
 
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransitiveTwoOctetExtendedCommunitySubType {
+    /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
+    RouteTarget = 0x02,
+    /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
+    RouteOrigin = 0x03,
+
+    /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
+    OspfDomainIdentifier = 0x05,
+
+    /// [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    BgpDataCollection = 0x08,
+
+    /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
+    SourceAs = 0x09,
+
+    /// [RFC6074](https://datatracker.ietf.org/doc/html/rfc6074)
+    L2VpnIdentifier = 0x0a,
+
+    CiscoVpnDistinguisher = 0x10,
+
+    /// [draft-ietf-bess-service-chaining](https://datatracker.ietf.org/doc/html/draft-ietf-bess-service-chaining)
+    RouteTargetRecord = 0x13,
+
+    /// [draft-zzhang-idr-rt-derived-community-00](https://datatracker.ietf.org/doc/html/draft-zzhang-idr-rt-derived-community-00)
+    RtDerivedEc = 0x15,
+
+    VirtualNetworkIdentifier = 0x80,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedTransitiveTwoOctetExtendedCommunitySubType(pub u8);
+
+impl TryFrom<u8> for TransitiveTwoOctetExtendedCommunitySubType {
+    type Error = UndefinedTransitiveTwoOctetExtendedCommunitySubType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedTransitiveTwoOctetExtendedCommunitySubType(value)),
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum NonTransitiveTwoOctetExtendedCommunitySubType {
+    /// [draft-ietf-idr-link-bandwidth](https://datatracker.ietf.org/doc/draft-ietf-idr-link-bandwidth/)
+    LinkBandwidth = 0x04,
+
+    /// [draft-drao-bgp-l3vpn-virtual-network-overlays](https://datatracker.ietf.org/doc/draft-drao-bgp-l3vpn-virtual-network-overlays/)
+    VirtualNetworkIdentifier = 0x80,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedNonTransitiveTwoOctetExtendedCommunitySubType(pub u8);
+
+impl TryFrom<u8> for NonTransitiveTwoOctetExtendedCommunitySubType {
+    type Error = UndefinedNonTransitiveTwoOctetExtendedCommunitySubType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedNonTransitiveTwoOctetExtendedCommunitySubType(
+                value,
+            )),
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransitiveIpv4ExtendedCommunitySubType {
+    /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
+    RouteTarget = 0x02,
+    /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
+    RouteOrigin = 0x03,
+
+    /// [draft-wang-idr-bgp-ifit-capabilities](https://datatracker.ietf.org/doc/html/draft-wang-idr-bgp-ifit-capabilities)
+    Ipv4Ifit = 0x04,
+
+    /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
+    OspfDomainIdentifier = 0x05,
+
+    /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
+    OspfRouteID = 0x08,
+
+    /// [draft-ietf-idr-node-target-ext-comm](https://datatracker.ietf.org/doc/html/draft-ietf-idr-node-target-ext-comm)
+    NodeTarget = 0x09,
+
+    /// [RFC6074](https://datatracker.ietf.org/doc/html/rfc6074)
+    L2VpnIdentifier = 0x0a,
+
+    /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
+    VrfRouteImport = 0x0b,
+
+    /// [draft-dong-idr-node-target-ext-comm](https://datatracker.ietf.org/doc/draft-dong-idr-node-target-ext-comm/03/)
+    FlowSpecRedirectToIpv4 = 0x0c,
+
+    CiscoVpnDistinguisher = 0x10,
+
+    /// [RFC7524](https://datatracker.ietf.org/doc/html/rfc7524])
+    InterAreaP2MpSegmentedNextHop = 0x12,
+
+    /// [draft-ietf-bess-service-chaining](https://datatracker.ietf.org/doc/html/draft-ietf-bess-service-chaining)
+    RouteTargetRecord = 0x13,
+
+    VrfRecursiveNextHop = 0x14,
+
+    /// [draft-zzhang-idr-rt-derived-community-00](https://datatracker.ietf.org/doc/html/draft-zzhang-idr-rt-derived-community-00)
+    RtDerivedEc = 0x15,
+
+    /// [RFC9081](https://datatracker.ietf.org/doc/html/rfc9081])
+    MulticastVpnRpAddress = 0x80,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedTransitiveIpv4ExtendedCommunitySubType(pub u8);
+
+impl TryFrom<u8> for TransitiveIpv4ExtendedCommunitySubType {
+    type Error = UndefinedTransitiveIpv4ExtendedCommunitySubType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedTransitiveIpv4ExtendedCommunitySubType(value)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
