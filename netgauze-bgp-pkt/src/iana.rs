@@ -727,28 +727,28 @@ pub enum BGPDataCollectionCommunityRegionIdentifierCode {
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BgpExtendedCommunityType {
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    TransitiveTwoOctetExtendedCommunity = 0x00,
+    TransitiveTwoOctet = 0x00,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    NonTransitiveTwoOctetExtendedCommunity = 0x40,
+    NonTransitiveTwoOctet = 0x40,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    TransitiveIpv4ExtendedCommunity = 0x01,
+    TransitiveIpv4 = 0x01,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    NonTransitiveIpv4ExtendedCommunity = 0x41,
+    NonTransitiveIpv4 = 0x41,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    TransitiveFourOctetExtendedCommunity = 0x02,
+    TransitiveFourOctet = 0x02,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    NonTransitiveFourOctetExtendedCommunity = 0x42,
+    NonTransitiveFourOctet = 0x42,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    TransitiveOpaqueExtendedCommunity = 0x03,
+    TransitiveOpaque = 0x03,
 
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
-    NonTransitiveOpaqueExtendedCommunity = 0x43,
+    NonTransitiveOpaque = 0x43,
 
     TransitiveQosMarking = 0x04,
 

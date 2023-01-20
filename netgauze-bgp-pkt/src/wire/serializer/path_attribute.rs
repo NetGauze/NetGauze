@@ -583,14 +583,14 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
     fn len(&self) -> usize {
         Self::BASE_LENGTH
             + match self {
-                ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(value) => value.len(),
-                ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(value) => value.len(),
-                ExtendedCommunity::TransitiveIpv4ExtendedCommunity(value) => value.len(),
-                ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(value) => value.len(),
-                ExtendedCommunity::TransitiveFourOctetExtendedCommunity(value) => value.len(),
-                ExtendedCommunity::NonTransitiveFourOctetExtendedCommunity(value) => value.len(),
-                ExtendedCommunity::TransitiveOpaqueExtendedCommunity(value) => value.len(),
-                ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(value) => value.len(),
+                ExtendedCommunity::TransitiveTwoOctet(value) => value.len(),
+                ExtendedCommunity::NonTransitiveTwoOctet(value) => value.len(),
+                ExtendedCommunity::TransitiveIpv4(value) => value.len(),
+                ExtendedCommunity::NonTransitiveIpv4(value) => value.len(),
+                ExtendedCommunity::TransitiveFourOctet(value) => value.len(),
+                ExtendedCommunity::NonTransitiveFourOctet(value) => value.len(),
+                ExtendedCommunity::TransitiveOpaque(value) => value.len(),
+                ExtendedCommunity::NonTransitiveOpaque(value) => value.len(),
                 ExtendedCommunity::Experimental(value) => value.len(),
                 ExtendedCommunity::Unknown(value) => value.len(),
             }
@@ -601,48 +601,36 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
         writer: &mut T,
     ) -> Result<(), ExtendedCommunityWritingError> {
         match self {
-            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(value) => {
-                writer.write_u8(
-                    BgpExtendedCommunityType::TransitiveTwoOctetExtendedCommunity as u8,
-                )?;
+            ExtendedCommunity::TransitiveTwoOctet(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveTwoOctet as u8)?;
                 value.write(writer)?;
             }
-            ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(value) => {
-                writer.write_u8(
-                    BgpExtendedCommunityType::NonTransitiveTwoOctetExtendedCommunity as u8,
-                )?;
+            ExtendedCommunity::NonTransitiveTwoOctet(value) => {
+                writer.write_u8(BgpExtendedCommunityType::NonTransitiveTwoOctet as u8)?;
                 value.write(writer)?;
             }
-            ExtendedCommunity::TransitiveIpv4ExtendedCommunity(value) => {
-                writer.write_u8(BgpExtendedCommunityType::TransitiveIpv4ExtendedCommunity as u8)?;
+            ExtendedCommunity::TransitiveIpv4(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveIpv4 as u8)?;
                 value.write(writer)?;
             }
-            ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(value) => {
-                writer
-                    .write_u8(BgpExtendedCommunityType::NonTransitiveIpv4ExtendedCommunity as u8)?;
+            ExtendedCommunity::NonTransitiveIpv4(value) => {
+                writer.write_u8(BgpExtendedCommunityType::NonTransitiveIpv4 as u8)?;
                 value.write(writer)?;
             }
-            ExtendedCommunity::TransitiveFourOctetExtendedCommunity(value) => {
-                writer.write_u8(
-                    BgpExtendedCommunityType::TransitiveFourOctetExtendedCommunity as u8,
-                )?;
+            ExtendedCommunity::TransitiveFourOctet(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveFourOctet as u8)?;
                 value.write(writer)?;
             }
-            ExtendedCommunity::NonTransitiveFourOctetExtendedCommunity(value) => {
-                writer.write_u8(
-                    BgpExtendedCommunityType::NonTransitiveFourOctetExtendedCommunity as u8,
-                )?;
+            ExtendedCommunity::NonTransitiveFourOctet(value) => {
+                writer.write_u8(BgpExtendedCommunityType::NonTransitiveFourOctet as u8)?;
                 value.write(writer)?;
             }
-            ExtendedCommunity::TransitiveOpaqueExtendedCommunity(value) => {
-                writer
-                    .write_u8(BgpExtendedCommunityType::TransitiveOpaqueExtendedCommunity as u8)?;
+            ExtendedCommunity::TransitiveOpaque(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveOpaque as u8)?;
                 value.write(writer)?;
             }
-            ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(value) => {
-                writer.write_u8(
-                    BgpExtendedCommunityType::NonTransitiveOpaqueExtendedCommunity as u8,
-                )?;
+            ExtendedCommunity::NonTransitiveOpaque(value) => {
+                writer.write_u8(BgpExtendedCommunityType::NonTransitiveOpaque as u8)?;
                 value.write(writer)?;
             }
             ExtendedCommunity::Experimental(value) => {

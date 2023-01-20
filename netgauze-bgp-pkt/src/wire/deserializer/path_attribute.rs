@@ -977,61 +977,37 @@ impl<'a> ReadablePDU<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedC
         let (buf, code) = be_u8(buf)?;
         let comm_type = BgpExtendedCommunityType::try_from(code);
         let (buf, ret) = match comm_type {
-            Ok(BgpExtendedCommunityType::TransitiveTwoOctetExtendedCommunity) => {
+            Ok(BgpExtendedCommunityType::TransitiveTwoOctet) => {
                 let (buf, value) = parse_into_located(buf)?;
-                (
-                    buf,
-                    ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(value),
-                )
+                (buf, ExtendedCommunity::TransitiveTwoOctet(value))
             }
-            Ok(BgpExtendedCommunityType::NonTransitiveTwoOctetExtendedCommunity) => {
+            Ok(BgpExtendedCommunityType::NonTransitiveTwoOctet) => {
                 let (buf, value) = parse_into_located(buf)?;
-                (
-                    buf,
-                    ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(value),
-                )
+                (buf, ExtendedCommunity::NonTransitiveTwoOctet(value))
             }
-            Ok(BgpExtendedCommunityType::TransitiveIpv4ExtendedCommunity) => {
+            Ok(BgpExtendedCommunityType::TransitiveIpv4) => {
                 let (buf, value) = parse_into_located(buf)?;
-                (
-                    buf,
-                    ExtendedCommunity::TransitiveIpv4ExtendedCommunity(value),
-                )
+                (buf, ExtendedCommunity::TransitiveIpv4(value))
             }
-            Ok(BgpExtendedCommunityType::NonTransitiveIpv4ExtendedCommunity) => {
+            Ok(BgpExtendedCommunityType::NonTransitiveIpv4) => {
                 let (buf, value) = parse_into_located(buf)?;
-                (
-                    buf,
-                    ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(value),
-                )
+                (buf, ExtendedCommunity::NonTransitiveIpv4(value))
             }
-            Ok(BgpExtendedCommunityType::TransitiveFourOctetExtendedCommunity) => {
+            Ok(BgpExtendedCommunityType::TransitiveFourOctet) => {
                 let (buf, value) = parse_into_located(buf)?;
-                (
-                    buf,
-                    ExtendedCommunity::TransitiveFourOctetExtendedCommunity(value),
-                )
+                (buf, ExtendedCommunity::TransitiveFourOctet(value))
             }
-            Ok(BgpExtendedCommunityType::NonTransitiveFourOctetExtendedCommunity) => {
+            Ok(BgpExtendedCommunityType::NonTransitiveFourOctet) => {
                 let (buf, value) = parse_into_located(buf)?;
-                (
-                    buf,
-                    ExtendedCommunity::NonTransitiveFourOctetExtendedCommunity(value),
-                )
+                (buf, ExtendedCommunity::NonTransitiveFourOctet(value))
             }
-            Ok(BgpExtendedCommunityType::TransitiveOpaqueExtendedCommunity) => {
+            Ok(BgpExtendedCommunityType::TransitiveOpaque) => {
                 let (buf, value) = parse_into_located(buf)?;
-                (
-                    buf,
-                    ExtendedCommunity::TransitiveOpaqueExtendedCommunity(value),
-                )
+                (buf, ExtendedCommunity::TransitiveOpaque(value))
             }
-            Ok(BgpExtendedCommunityType::NonTransitiveOpaqueExtendedCommunity) => {
+            Ok(BgpExtendedCommunityType::NonTransitiveOpaque) => {
                 let (buf, value) = parse_into_located(buf)?;
-                (
-                    buf,
-                    ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(value),
-                )
+                (buf, ExtendedCommunity::NonTransitiveOpaque(value))
             }
             Ok(BgpExtendedCommunityType::TransitiveQosMarking) => {
                 let (buf, value) = parse_into_located_one_input(buf, code)?;

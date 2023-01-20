@@ -44,28 +44,28 @@ pub trait ExtendedCommunityProperties {
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum ExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    TransitiveTwoOctetExtendedCommunity(TransitiveTwoOctetExtendedCommunity),
+    TransitiveTwoOctet(TransitiveTwoOctetExtendedCommunity),
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    NonTransitiveTwoOctetExtendedCommunity(NonTransitiveTwoOctetExtendedCommunity),
+    NonTransitiveTwoOctet(NonTransitiveTwoOctetExtendedCommunity),
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    TransitiveIpv4ExtendedCommunity(TransitiveIpv4ExtendedCommunity),
+    TransitiveIpv4(TransitiveIpv4ExtendedCommunity),
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    NonTransitiveIpv4ExtendedCommunity(NonTransitiveIpv4ExtendedCommunity),
+    NonTransitiveIpv4(NonTransitiveIpv4ExtendedCommunity),
 
     /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
-    TransitiveFourOctetExtendedCommunity(TransitiveFourOctetExtendedCommunity),
+    TransitiveFourOctet(TransitiveFourOctetExtendedCommunity),
 
     /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
-    NonTransitiveFourOctetExtendedCommunity(NonTransitiveFourOctetExtendedCommunity),
+    NonTransitiveFourOctet(NonTransitiveFourOctetExtendedCommunity),
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    TransitiveOpaqueExtendedCommunity(TransitiveOpaqueExtendedCommunity),
+    TransitiveOpaque(TransitiveOpaqueExtendedCommunity),
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    NonTransitiveOpaqueExtendedCommunity(NonTransitiveOpaqueExtendedCommunity),
+    NonTransitiveOpaque(NonTransitiveOpaqueExtendedCommunity),
 
     Experimental(ExperimentalExtendedCommunity),
 
@@ -75,14 +75,14 @@ pub enum ExtendedCommunity {
 impl ExtendedCommunityProperties for ExtendedCommunity {
     fn iana_defined(&self) -> bool {
         match self {
-            Self::TransitiveTwoOctetExtendedCommunity(value) => value.iana_defined(),
-            Self::NonTransitiveTwoOctetExtendedCommunity(value) => value.iana_defined(),
-            Self::TransitiveIpv4ExtendedCommunity(value) => value.iana_defined(),
-            Self::NonTransitiveIpv4ExtendedCommunity(value) => value.iana_defined(),
-            Self::TransitiveFourOctetExtendedCommunity(value) => value.iana_defined(),
-            Self::NonTransitiveFourOctetExtendedCommunity(value) => value.iana_defined(),
-            Self::TransitiveOpaqueExtendedCommunity(value) => value.iana_defined(),
-            Self::NonTransitiveOpaqueExtendedCommunity(value) => value.iana_defined(),
+            Self::TransitiveTwoOctet(value) => value.iana_defined(),
+            Self::NonTransitiveTwoOctet(value) => value.iana_defined(),
+            Self::TransitiveIpv4(value) => value.iana_defined(),
+            Self::NonTransitiveIpv4(value) => value.iana_defined(),
+            Self::TransitiveFourOctet(value) => value.iana_defined(),
+            Self::NonTransitiveFourOctet(value) => value.iana_defined(),
+            Self::TransitiveOpaque(value) => value.iana_defined(),
+            Self::NonTransitiveOpaque(value) => value.iana_defined(),
             Self::Experimental(value) => value.iana_defined(),
             Self::Unknown(value) => value.iana_defined(),
         }
@@ -90,14 +90,14 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
 
     fn transitive(&self) -> bool {
         match self {
-            Self::TransitiveTwoOctetExtendedCommunity(value) => value.transitive(),
-            Self::NonTransitiveTwoOctetExtendedCommunity(value) => value.transitive(),
-            Self::TransitiveIpv4ExtendedCommunity(value) => value.transitive(),
-            Self::NonTransitiveIpv4ExtendedCommunity(value) => value.transitive(),
-            Self::TransitiveFourOctetExtendedCommunity(value) => value.transitive(),
-            Self::NonTransitiveFourOctetExtendedCommunity(value) => value.transitive(),
-            Self::TransitiveOpaqueExtendedCommunity(value) => value.transitive(),
-            Self::NonTransitiveOpaqueExtendedCommunity(value) => value.transitive(),
+            Self::TransitiveTwoOctet(value) => value.transitive(),
+            Self::NonTransitiveTwoOctet(value) => value.transitive(),
+            Self::TransitiveIpv4(value) => value.transitive(),
+            Self::NonTransitiveIpv4(value) => value.transitive(),
+            Self::TransitiveFourOctet(value) => value.transitive(),
+            Self::NonTransitiveFourOctet(value) => value.transitive(),
+            Self::TransitiveOpaque(value) => value.transitive(),
+            Self::NonTransitiveOpaque(value) => value.transitive(),
             Self::Experimental(value) => value.transitive(),
             Self::Unknown(value) => value.transitive(),
         }

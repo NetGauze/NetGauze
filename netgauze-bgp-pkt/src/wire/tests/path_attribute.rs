@@ -1508,7 +1508,7 @@ fn test_transitive_two_octet_extended_community() -> Result<(), PathAttributeWri
         false,
         false,
         PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
-            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(
+            ExtendedCommunity::TransitiveTwoOctet(
                 TransitiveTwoOctetExtendedCommunity::RouteTarget {
                     global_admin: 1,
                     local_admin: 1,
@@ -1534,7 +1534,7 @@ fn test_non_transitive_two_octet_extended_community() -> Result<(), PathAttribut
         false,
         false,
         PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
-            ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(
+            ExtendedCommunity::NonTransitiveTwoOctet(
                 NonTransitiveTwoOctetExtendedCommunity::LinkBandwidth {
                     global_admin: 1,
                     local_admin: 1,
@@ -1560,12 +1560,10 @@ fn test_transitive_ipv4_extended_community() -> Result<(), PathAttributeWritingE
         false,
         false,
         PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
-            ExtendedCommunity::TransitiveIpv4ExtendedCommunity(
-                TransitiveIpv4ExtendedCommunity::RouteTarget {
-                    global_admin: Ipv4Addr::new(10, 11, 12, 8),
-                    local_admin: 45,
-                },
-            ),
+            ExtendedCommunity::TransitiveIpv4(TransitiveIpv4ExtendedCommunity::RouteTarget {
+                global_admin: Ipv4Addr::new(10, 11, 12, 8),
+                local_admin: 45,
+            }),
         ])),
     )
     .unwrap();
@@ -1608,25 +1606,23 @@ fn test_multiple_extended_communities() -> Result<(), PathAttributeWritingError>
         false,
         false,
         PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
-            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(
+            ExtendedCommunity::TransitiveTwoOctet(
                 TransitiveTwoOctetExtendedCommunity::RouteOrigin {
                     global_admin: 100,
                     local_admin: 200,
                 },
             ),
-            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(
+            ExtendedCommunity::TransitiveTwoOctet(
                 TransitiveTwoOctetExtendedCommunity::Unassigned {
                     sub_type: 4,
                     global_admin: 100,
                     local_admin: 1309148302,
                 },
             ),
-            ExtendedCommunity::TransitiveIpv4ExtendedCommunity(
-                TransitiveIpv4ExtendedCommunity::RouteTarget {
-                    global_admin: Ipv4Addr::new(10, 10, 8, 8),
-                    local_admin: 45,
-                },
-            ),
+            ExtendedCommunity::TransitiveIpv4(TransitiveIpv4ExtendedCommunity::RouteTarget {
+                global_admin: Ipv4Addr::new(10, 10, 8, 8),
+                local_admin: 45,
+            }),
         ])),
     )
     .unwrap();
