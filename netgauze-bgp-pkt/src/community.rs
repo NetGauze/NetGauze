@@ -95,82 +95,70 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum TransitiveTwoOctetExtendedCommunityValue {
+pub enum TransitiveTwoOctetExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    RouteTarget(u32),
+    RouteTarget {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    RouteOrigin(u32),
+    RouteOrigin {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
     /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
-    OspfDomainIdentifier(u32),
+    OspfDomainIdentifier {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
     /// [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
-    BgpDataCollection(u32),
+    BgpDataCollection {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
     /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
-    SourceAs(u32),
+    SourceAs {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
     /// [RFC6074](https://datatracker.ietf.org/doc/html/rfc6074)
-    L2vpnIdentifier(u32),
+    L2VpnIdentifier {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
-    CiscoVpnDistinguisher(u32),
+    CiscoVpnDistinguisher {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
     /// [draft-ietf-bess-service-chaining](https://datatracker.ietf.org/doc/draft-ietf-bess-service-chaining/)
-    RouteTargetRecord(u32),
+    RouteTargetRecord {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
     /// [draft-zzhang-idr-rt-derived-community](https://datatracker.ietf.org/doc/draft-zzhang-idr-rt-derived-community/)
-    RtDerivedEc(u32),
+    RtDerivedEc {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
-    VirtualNetworkIdentifier(u32),
+    VirtualNetworkIdentifier {
+        global_admin: u16,
+        local_admin: u32,
+    },
 
-    Unassigned(UnassignedTransitiveTwoOctetExtendedCommunityValue),
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnassignedTransitiveTwoOctetExtendedCommunityValue {
-    sub_type: u8,
-    local_admin: u32,
-}
-
-impl UnassignedTransitiveTwoOctetExtendedCommunityValue {
-    pub const fn new(sub_type: u8, local_admin: u32) -> Self {
-        Self {
-            sub_type,
-            local_admin,
-        }
-    }
-
-    pub const fn sub_type(&self) -> u8 {
-        self.sub_type
-    }
-
-    pub const fn local_admin(&self) -> u32 {
-        self.local_admin
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct TransitiveTwoOctetExtendedCommunity {
-    global_admin: u16,
-    value: TransitiveTwoOctetExtendedCommunityValue,
-}
-
-impl TransitiveTwoOctetExtendedCommunity {
-    pub const fn new(global_admin: u16, value: TransitiveTwoOctetExtendedCommunityValue) -> Self {
-        Self {
-            global_admin,
-            value,
-        }
-    }
-
-    pub const fn global_admin(&self) -> u16 {
-        self.global_admin
-    }
-
-    pub const fn value(&self) -> &TransitiveTwoOctetExtendedCommunityValue {
-        &self.value
-    }
+    Unassigned {
+        sub_type: u8,
+        global_admin: u16,
+        local_admin: u32,
+    },
 }
 
 impl ExtendedCommunityProperties for TransitiveTwoOctetExtendedCommunity {
@@ -184,58 +172,20 @@ impl ExtendedCommunityProperties for TransitiveTwoOctetExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum NonTransitiveTwoOctetExtendedCommunityValue {
-    LinkBandwidth(u32),
-    VirtualNetworkIdentifier(u32),
-    Unassigned(UnassignedNonTransitiveTwoOctetExtendedCommunityValue),
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnassignedNonTransitiveTwoOctetExtendedCommunityValue {
-    sub_type: u8,
-    local_admin: u32,
-}
-
-impl UnassignedNonTransitiveTwoOctetExtendedCommunityValue {
-    pub const fn new(sub_type: u8, local_admin: u32) -> Self {
-        Self {
-            sub_type,
-            local_admin,
-        }
-    }
-
-    pub const fn sub_type(&self) -> u8 {
-        self.sub_type
-    }
-
-    pub const fn local_admin(&self) -> u32 {
-        self.local_admin
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct NonTransitiveTwoOctetExtendedCommunity {
-    global_admin: u16,
-    value: NonTransitiveTwoOctetExtendedCommunityValue,
-}
-
-impl NonTransitiveTwoOctetExtendedCommunity {
-    pub const fn new(
+pub enum NonTransitiveTwoOctetExtendedCommunity {
+    LinkBandwidth {
         global_admin: u16,
-        value: NonTransitiveTwoOctetExtendedCommunityValue,
-    ) -> Self {
-        Self {
-            global_admin,
-            value,
-        }
-    }
-    pub const fn global_admin(&self) -> u16 {
-        self.global_admin
-    }
-
-    pub const fn value(&self) -> &NonTransitiveTwoOctetExtendedCommunityValue {
-        &self.value
-    }
+        local_admin: u32,
+    },
+    VirtualNetworkIdentifier {
+        global_admin: u16,
+        local_admin: u32,
+    },
+    Unassigned {
+        sub_type: u8,
+        global_admin: u16,
+        local_admin: u32,
+    },
 }
 
 impl ExtendedCommunityProperties for NonTransitiveTwoOctetExtendedCommunity {
@@ -245,29 +195,6 @@ impl ExtendedCommunityProperties for NonTransitiveTwoOctetExtendedCommunity {
 
     fn transitive(&self) -> bool {
         false
-    }
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct TransitiveIpv4ExtendedCommunity {
-    global_admin: Ipv4Addr,
-    value: TransitiveIpv4ExtendedCommunityValue,
-}
-
-impl TransitiveIpv4ExtendedCommunity {
-    pub const fn new(global_admin: Ipv4Addr, value: TransitiveIpv4ExtendedCommunityValue) -> Self {
-        Self {
-            global_admin,
-            value,
-        }
-    }
-
-    pub const fn global_admin(&self) -> &Ipv4Addr {
-        &self.global_admin
-    }
-
-    pub const fn value(&self) -> &TransitiveIpv4ExtendedCommunityValue {
-        &self.value
     }
 }
 
@@ -282,48 +209,100 @@ impl ExtendedCommunityProperties for TransitiveIpv4ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum TransitiveIpv4ExtendedCommunityValue {
+pub enum TransitiveIpv4ExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    RouteTarget(u32),
+    RouteTarget {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
-    RouteOrigin(u32),
+    RouteOrigin {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [draft-ietf-idr-bgp-ifit-capabilities](https://datatracker.ietf.org/doc/draft-ietf-idr-bgp-ifit-capabilities)
-    Ipv4Ifit,
+    Ipv4Ifit {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
-    OspfDomainIdentifier(u32),
+    OspfDomainIdentifier {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
+
+    /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
+    OspfRouteID {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [draft-dong-idr-node-target-ext-comm](https://datatracker.ietf.org/doc/draft-dong-idr-node-target-ext-comm)
-    NodeTarget(u32),
+    NodeTarget {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [RFC6074](https://datatracker.ietf.org/doc/html/rfc6074)
-    L2vpnIdentifier(u32),
+    L2VpnIdentifier {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
-    VrfRouteImport(u32),
+    VrfRouteImport {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [draft-ietf-idr-flowspec-redirect](https://datatracker.ietf.org/doc/html/draft-ietf-idr-flowspec-redirect)
-    FlowRedirect(u32),
+    FlowSpecRedirectToIpv4 {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
-    CiscoVpnDistinguisher(u32),
+    CiscoVpnDistinguisher {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [RFC7524](https://datatracker.ietf.org/doc/rfc7524)
-    InterAreaP2MpSegmentedNextHop(u32),
+    InterAreaP2MpSegmentedNextHop {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [draft-ietf-bess-service-chaining](https://datatracker.ietf.org/doc/draft-ietf-bess-service-chaining/)
-    RouteTargetRecord(u32),
+    RouteTargetRecord {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
-    VrfRecursiveNextHop(u32),
+    VrfRecursiveNextHop {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [draft-zzhang-idr-rt-derived-community](https://datatracker.ietf.org/doc/draft-zzhang-idr-rt-derived-community/)
-    RtDerivedEc(u32),
+    RtDerivedEc {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
     /// [RFC9081](https://datatracker.ietf.org/doc/rfc9081)
-    MulticastVpnRpAddress(u32),
+    MulticastVpnRpAddress {
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 
-    Unassigned(UnassignedTransitiveTwoOctetExtendedCommunityValue),
+    Unassigned {
+        sub_type: u8,
+        global_admin: Ipv4Addr,
+        local_admin: u16,
+    },
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]

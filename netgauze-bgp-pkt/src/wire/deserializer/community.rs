@@ -13,13 +13,270 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use nom::{error::ErrorKind, number::complete::be_u8, IResult};
+use nom::{
+    error::ErrorKind,
+    number::complete::{be_u16, be_u32, be_u8},
+    IResult,
+};
 use serde::{Deserialize, Serialize};
+use std::net::Ipv4Addr;
 
-use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePDUWithOneInput, Span};
+use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, Span};
 use netgauze_serde_macros::LocatedError;
 
-use crate::community::{ExperimentalExtendedCommunity, UnknownExtendedCommunity};
+use crate::{
+    community::*,
+    iana::{
+        NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveIpv4ExtendedCommunitySubType,
+        TransitiveTwoOctetExtendedCommunitySubType,
+    },
+    wire::deserializer::nlri::Ipv4UnicastParsingError,
+};
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum TransitiveTwoOctetExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePDU<'a, LocatedTransitiveTwoOctetExtendedCommunityParsingError<'a>>
+    for TransitiveTwoOctetExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedTransitiveTwoOctetExtendedCommunityParsingError<'a>> {
+        let (buf, sub_type) = be_u8(buf)?;
+        let (buf, global_admin) = be_u16(buf)?;
+        let (buf, local_admin) = be_u32(buf)?;
+        let ret = match TransitiveTwoOctetExtendedCommunitySubType::try_from(sub_type) {
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::RouteTarget) => {
+                TransitiveTwoOctetExtendedCommunity::RouteTarget {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::RouteOrigin) => {
+                TransitiveTwoOctetExtendedCommunity::RouteOrigin {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::OspfDomainIdentifier) => {
+                TransitiveTwoOctetExtendedCommunity::OspfDomainIdentifier {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::BgpDataCollection) => {
+                TransitiveTwoOctetExtendedCommunity::BgpDataCollection {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::SourceAs) => {
+                TransitiveTwoOctetExtendedCommunity::SourceAs {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::L2VpnIdentifier) => {
+                TransitiveTwoOctetExtendedCommunity::L2VpnIdentifier {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::CiscoVpnDistinguisher) => {
+                TransitiveTwoOctetExtendedCommunity::CiscoVpnDistinguisher {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::RouteTargetRecord) => {
+                TransitiveTwoOctetExtendedCommunity::RouteTargetRecord {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::RtDerivedEc) => {
+                TransitiveTwoOctetExtendedCommunity::RtDerivedEc {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveTwoOctetExtendedCommunitySubType::VirtualNetworkIdentifier) => {
+                TransitiveTwoOctetExtendedCommunity::VirtualNetworkIdentifier {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Err(_) => TransitiveTwoOctetExtendedCommunity::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            },
+        };
+        Ok((buf, ret))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum NonTransitiveTwoOctetExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePDU<'a, LocatedNonTransitiveTwoOctetExtendedCommunityParsingError<'a>>
+    for NonTransitiveTwoOctetExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveTwoOctetExtendedCommunityParsingError<'a>>
+    {
+        let (buf, sub_type) = be_u8(buf)?;
+        let (buf, global_admin) = be_u16(buf)?;
+        let (buf, local_admin) = be_u32(buf)?;
+        let ret = match NonTransitiveTwoOctetExtendedCommunitySubType::try_from(sub_type) {
+            Ok(NonTransitiveTwoOctetExtendedCommunitySubType::LinkBandwidth) => {
+                NonTransitiveTwoOctetExtendedCommunity::LinkBandwidth {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(NonTransitiveTwoOctetExtendedCommunitySubType::VirtualNetworkIdentifier) => {
+                NonTransitiveTwoOctetExtendedCommunity::VirtualNetworkIdentifier {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Err(_) => NonTransitiveTwoOctetExtendedCommunity::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            },
+        };
+        Ok((buf, ret))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum TransitiveIpv4ExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    Ipv4UnicastError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
+    ),
+}
+
+impl<'a> ReadablePDU<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
+    for TransitiveIpv4ExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>> {
+        let (buf, sub_type) = be_u8(buf)?;
+        let (buf, global_admin) = be_u32(buf)?;
+        let global_admin = Ipv4Addr::from(global_admin);
+        let (buf, local_admin) = be_u16(buf)?;
+        let ret = match TransitiveIpv4ExtendedCommunitySubType::try_from(sub_type) {
+            Ok(TransitiveIpv4ExtendedCommunitySubType::RouteTarget) => {
+                TransitiveIpv4ExtendedCommunity::RouteTarget {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::RouteOrigin) => {
+                TransitiveIpv4ExtendedCommunity::RouteOrigin {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::Ipv4Ifit) => {
+                TransitiveIpv4ExtendedCommunity::Ipv4Ifit {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::OspfDomainIdentifier) => {
+                TransitiveIpv4ExtendedCommunity::OspfDomainIdentifier {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::OspfRouteID) => {
+                TransitiveIpv4ExtendedCommunity::OspfRouteID {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::NodeTarget) => {
+                TransitiveIpv4ExtendedCommunity::NodeTarget {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::L2VpnIdentifier) => {
+                TransitiveIpv4ExtendedCommunity::L2VpnIdentifier {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::VrfRouteImport) => {
+                TransitiveIpv4ExtendedCommunity::VrfRouteImport {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::FlowSpecRedirectToIpv4) => {
+                TransitiveIpv4ExtendedCommunity::FlowSpecRedirectToIpv4 {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::CiscoVpnDistinguisher) => {
+                TransitiveIpv4ExtendedCommunity::CiscoVpnDistinguisher {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::InterAreaP2MpSegmentedNextHop) => {
+                TransitiveIpv4ExtendedCommunity::InterAreaP2MpSegmentedNextHop {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::RouteTargetRecord) => {
+                TransitiveIpv4ExtendedCommunity::RouteTargetRecord {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::VrfRecursiveNextHop) => {
+                TransitiveIpv4ExtendedCommunity::VrfRecursiveNextHop {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::RtDerivedEc) => {
+                TransitiveIpv4ExtendedCommunity::RtDerivedEc {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveIpv4ExtendedCommunitySubType::MulticastVpnRpAddress) => {
+                TransitiveIpv4ExtendedCommunity::MulticastVpnRpAddress {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Err(_) => TransitiveIpv4ExtendedCommunity::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            },
+        };
+        Ok((buf, ret))
+    }
+}
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExperimentalExtendedCommunityParsingError {

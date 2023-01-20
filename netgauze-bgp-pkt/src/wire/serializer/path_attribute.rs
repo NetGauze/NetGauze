@@ -17,15 +17,10 @@
 
 use crate::{
     community::ExtendedCommunity,
-    iana::PathAttributeType,
+    iana::{BgpExtendedCommunityType, PathAttributeType},
     nlri::*,
     path_attribute::*,
-    wire::serializer::{
-        community::{
-            ExperimentalExtendedCommunityWritingError, UnknownExtendedCommunityWritingError,
-        },
-        nlri::*,
-    },
+    wire::serializer::{community::*, nlri::*},
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
@@ -560,6 +555,13 @@ impl WritablePDUWithOneInput<bool, ExtendedCommunitiesWritingError> for Extended
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
+    TransitiveTwoOctetExtendedCommunityError(
+        #[from] TransitiveTwoOctetExtendedCommunityWritingError,
+    ),
+    NonTransitiveTwoOctetExtendedCommunityError(
+        #[from] NonTransitiveTwoOctetExtendedCommunityWritingError,
+    ),
+    TransitiveIpv4ExtendedCommunityError(#[from] TransitiveIpv4ExtendedCommunityWritingError),
     ExperimentalExtendedCommunityError(#[from] ExperimentalExtendedCommunityWritingError),
     UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityWritingError),
 }
@@ -570,9 +572,9 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
     fn len(&self) -> usize {
         Self::BASE_LENGTH
             + match self {
-                ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(_) => todo!(),
-                ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(_) => todo!(),
-                ExtendedCommunity::TransitiveIpv4ExtendedCommunity(_) => todo!(),
+                ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(value) => value.len(),
+                ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(value) => value.len(),
+                ExtendedCommunity::TransitiveIpv4ExtendedCommunity(value) => value.len(),
                 ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(_) => todo!(),
                 ExtendedCommunity::TransitiveOpaqueExtendedCommunity(_) => todo!(),
                 ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(_) => todo!(),
@@ -586,9 +588,22 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
         writer: &mut T,
     ) -> Result<(), ExtendedCommunityWritingError> {
         match self {
-            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(_) => todo!(),
-            ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(_) => todo!(),
-            ExtendedCommunity::TransitiveIpv4ExtendedCommunity(_) => todo!(),
+            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(value) => {
+                writer.write_u8(
+                    BgpExtendedCommunityType::TransitiveTwoOctetExtendedCommunity as u8,
+                )?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(value) => {
+                writer.write_u8(
+                    BgpExtendedCommunityType::NonTransitiveTwoOctetExtendedCommunity as u8,
+                )?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::TransitiveIpv4ExtendedCommunity(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveIpv4ExtendedCommunity as u8)?;
+                value.write(writer)?;
+            }
             ExtendedCommunity::NonTransitiveIpv4ExtendedCommunity(_) => todo!(),
             ExtendedCommunity::TransitiveOpaqueExtendedCommunity(_) => todo!(),
             ExtendedCommunity::NonTransitiveOpaqueExtendedCommunity(_) => todo!(),

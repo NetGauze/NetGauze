@@ -19,12 +19,7 @@ use crate::{
     community::ExtendedCommunity,
     iana::{BgpExtendedCommunityType, PathAttributeType, UndefinedPathAttributeType},
     path_attribute::*,
-    wire::deserializer::{
-        community::{
-            ExperimentalExtendedCommunityParsingError, UnknownExtendedCommunityParsingError,
-        },
-        nlri::*,
-    },
+    wire::deserializer::{community::*, nlri::*},
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
@@ -933,6 +928,18 @@ impl<'a> ReadablePDU<'a, LocatedCommunitiesParsingError<'a>> for Community {
 pub enum ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    TransitiveTwoOctetExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        TransitiveTwoOctetExtendedCommunityParsingError,
+    ),
+    NonTransitiveTwoOctetExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        NonTransitiveTwoOctetExtendedCommunityParsingError,
+    ),
+    TransitiveIpv4ExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        TransitiveIpv4ExtendedCommunityParsingError,
+    ),
     ExperimentalExtendedCommunityError(
         #[from_located(module = "crate::wire::deserializer::community")]
         ExperimentalExtendedCommunityParsingError,
@@ -951,16 +958,25 @@ impl<'a> ReadablePDU<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedC
         let comm_type = BgpExtendedCommunityType::try_from(code);
         let (buf, ret) = match comm_type {
             Ok(BgpExtendedCommunityType::TransitiveTwoOctetExtendedCommunity) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let (buf, value) = parse_into_located(buf)?;
+                (
+                    buf,
+                    ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(value),
+                )
             }
             Ok(BgpExtendedCommunityType::NonTransitiveTwoOctetExtendedCommunity) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let (buf, value) = parse_into_located(buf)?;
+                (
+                    buf,
+                    ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(value),
+                )
             }
             Ok(BgpExtendedCommunityType::TransitiveIpv4ExtendedCommunity) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let (buf, value) = parse_into_located(buf)?;
+                (
+                    buf,
+                    ExtendedCommunity::TransitiveIpv4ExtendedCommunity(value),
+                )
             }
             Ok(BgpExtendedCommunityType::NonTransitiveIpv4ExtendedCommunity) => {
                 let (buf, value) = parse_into_located_one_input(buf, code)?;

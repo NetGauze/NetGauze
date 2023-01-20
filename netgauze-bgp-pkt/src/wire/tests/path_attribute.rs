@@ -42,7 +42,7 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{test_helpers::*, Span};
 
-use crate::community::{ExtendedCommunity, UnknownExtendedCommunity};
+use crate::community::*;
 use nom::error::ErrorKind;
 use std::{
     net::{Ipv4Addr, Ipv6Addr},
@@ -1498,6 +1498,84 @@ fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
 }
 
 #[test]
+fn test_transitive_two_octet_extended_community() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0xc0, 0x10, 0x08, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    ];
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
+            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(
+                TransitiveTwoOctetExtendedCommunity::RouteTarget {
+                    global_admin: 1,
+                    local_admin: 1,
+                },
+            ),
+        ])),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_non_transitive_two_octet_extended_community() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0xc0, 0x10, 0x08, 0x40, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    ];
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
+            ExtendedCommunity::NonTransitiveTwoOctetExtendedCommunity(
+                NonTransitiveTwoOctetExtendedCommunity::LinkBandwidth {
+                    global_admin: 1,
+                    local_admin: 1,
+                },
+            ),
+        ])),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_transitive_ipv4_extended_community() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0xc0, 0x10, 0x08, 0x01, 0x02, 0x0a, 0x0b, 0x0c, 0x08, 0x00, 0x2d,
+    ];
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
+            ExtendedCommunity::TransitiveIpv4ExtendedCommunity(
+                TransitiveIpv4ExtendedCommunity::RouteTarget {
+                    global_admin: Ipv4Addr::new(10, 11, 12, 8),
+                    local_admin: 45,
+                },
+            ),
+        ])),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_unknown_extended_community() -> Result<(), PathAttributeWritingError> {
     let good_wire = [
         0xc0, 0x10, 0x08, 0x33, 0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
@@ -1509,6 +1587,46 @@ fn test_unknown_extended_community() -> Result<(), PathAttributeWritingError> {
         false,
         PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
             ExtendedCommunity::Unknown(UnknownExtendedCommunity::new(0x33, 2, [0, 1, 0, 0, 0, 1])),
+        ])),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_multiple_extended_communities() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0xc0, 0x10, 0x18, 0x00, 0x03, 0x00, 0x64, 0x00, 0x00, 0x00, 0xc8, 0x00, 0x04, 0x00, 0x64,
+        0x4e, 0x08, 0x04, 0x8e, 0x01, 0x02, 0x0a, 0x0a, 0x08, 0x08, 0x00, 0x2d,
+    ];
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
+            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(
+                TransitiveTwoOctetExtendedCommunity::RouteOrigin {
+                    global_admin: 100,
+                    local_admin: 200,
+                },
+            ),
+            ExtendedCommunity::TransitiveTwoOctetExtendedCommunity(
+                TransitiveTwoOctetExtendedCommunity::Unassigned {
+                    sub_type: 4,
+                    global_admin: 100,
+                    local_admin: 1309148302,
+                },
+            ),
+            ExtendedCommunity::TransitiveIpv4ExtendedCommunity(
+                TransitiveIpv4ExtendedCommunity::RouteTarget {
+                    global_admin: Ipv4Addr::new(10, 10, 8, 8),
+                    local_admin: 45,
+                },
+            ),
         ])),
     )
     .unwrap();

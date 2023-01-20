@@ -13,11 +13,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    community::UnknownExtendedCommunity,
-    wire::serializer::community::UnknownExtendedCommunityWritingError,
+use crate::{community::*, wire::serializer::community::*};
+use netgauze_parse_utils::test_helpers::{
+    test_parsed_completely, test_parsed_completely_with_one_input, test_write,
 };
-use netgauze_parse_utils::test_helpers::{test_parsed_completely_with_one_input, test_write};
+use std::net::Ipv4Addr;
+
+#[test]
+fn test_transitive_two_extended_community(
+) -> Result<(), TransitiveTwoOctetExtendedCommunityWritingError> {
+    let good_wire = [0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01];
+    let good = TransitiveTwoOctetExtendedCommunity::RouteTarget {
+        global_admin: 1,
+        local_admin: 1,
+    };
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_non_transitive_two_extended_community(
+) -> Result<(), NonTransitiveTwoOctetExtendedCommunityWritingError> {
+    let good_wire = [0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01];
+    let good = NonTransitiveTwoOctetExtendedCommunity::LinkBandwidth {
+        global_admin: 1,
+        local_admin: 1,
+    };
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_transitive_ipv4_extended_community(
+) -> Result<(), TransitiveIpv4ExtendedCommunityWritingError> {
+    let good_wire = [0x02, 0x0a, 0x0b, 0x0c, 0x08, 0x00, 0x2d];
+    let good = TransitiveIpv4ExtendedCommunity::RouteTarget {
+        global_admin: Ipv4Addr::new(10, 11, 12, 8),
+        local_admin: 45,
+    };
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
 
 #[test]
 fn test_unknown_extended_community() -> Result<(), UnknownExtendedCommunityWritingError> {
