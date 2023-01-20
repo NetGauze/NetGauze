@@ -944,6 +944,14 @@ pub enum ExtendedCommunityParsingError {
         #[from_located(module = "crate::wire::deserializer::community")]
         NonTransitiveIpv4ExtendedCommunityParsingError,
     ),
+    TransitiveFourOctetExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        TransitiveFourOctetExtendedCommunityParsingError,
+    ),
+    NonTransitiveFourOctetExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        NonTransitiveFourOctetExtendedCommunityParsingError,
+    ),
     TransitiveOpaqueExtendedCommunityError(
         #[from_located(module = "crate::wire::deserializer::community")]
         TransitiveOpaqueExtendedCommunityParsingError,
@@ -998,12 +1006,18 @@ impl<'a> ReadablePDU<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedC
                 )
             }
             Ok(BgpExtendedCommunityType::TransitiveFourOctetExtendedCommunity) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let (buf, value) = parse_into_located(buf)?;
+                (
+                    buf,
+                    ExtendedCommunity::TransitiveFourOctetExtendedCommunity(value),
+                )
             }
             Ok(BgpExtendedCommunityType::NonTransitiveFourOctetExtendedCommunity) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let (buf, value) = parse_into_located(buf)?;
+                (
+                    buf,
+                    ExtendedCommunity::NonTransitiveFourOctetExtendedCommunity(value),
+                )
             }
             Ok(BgpExtendedCommunityType::TransitiveOpaqueExtendedCommunity) => {
                 let (buf, value) = parse_into_located(buf)?;

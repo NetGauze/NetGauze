@@ -20,6 +20,19 @@ use netgauze_parse_utils::test_helpers::{
 use std::net::Ipv4Addr;
 
 #[test]
+fn test_transitive_four_octet_extended_community(
+) -> Result<(), TransitiveFourOctetExtendedCommunityWritingError> {
+    let good_wire = [0x03, 0x00, 0x63, 0xdc, 0x3c, 0x00, 0x01];
+    let good = TransitiveFourOctetExtendedCommunity::RouteOrigin {
+        global_admin: 6544444,
+        local_admin: 1,
+    };
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+#[test]
 fn test_transitive_two_extended_community(
 ) -> Result<(), TransitiveTwoOctetExtendedCommunityWritingError> {
     let good_wire = [0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01];

@@ -27,10 +27,9 @@ use netgauze_serde_macros::LocatedError;
 use crate::{
     community::*,
     iana::{
-        NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveIpv4ExtendedCommunitySubType,
-        TransitiveTwoOctetExtendedCommunitySubType,
+        NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
+        TransitiveIpv4ExtendedCommunitySubType, TransitiveTwoOctetExtendedCommunitySubType,
     },
-    wire::deserializer::nlri::Ipv4UnicastParsingError,
 };
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -162,9 +161,6 @@ impl<'a> ReadablePDU<'a, LocatedNonTransitiveTwoOctetExtendedCommunityParsingErr
 pub enum TransitiveIpv4ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    Ipv4UnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
-    ),
 }
 
 impl<'a> ReadablePDU<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
@@ -282,9 +278,6 @@ impl<'a> ReadablePDU<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
 pub enum NonTransitiveIpv4ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    Ipv4UnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
-    ),
 }
 
 impl<'a> ReadablePDU<'a, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'a>>
@@ -297,8 +290,106 @@ impl<'a> ReadablePDU<'a, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'
         let (buf, global_admin) = be_u32(buf)?;
         let global_admin = Ipv4Addr::from(global_admin);
         let (buf, local_admin) = be_u16(buf)?;
-
         let ret = NonTransitiveIpv4ExtendedCommunity::Unassigned {
+            sub_type,
+            global_admin,
+            local_admin,
+        };
+        Ok((buf, ret))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum TransitiveFourOctetExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePDU<'a, LocatedTransitiveFourOctetExtendedCommunityParsingError<'a>>
+    for TransitiveFourOctetExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedTransitiveFourOctetExtendedCommunityParsingError<'a>> {
+        let (buf, sub_type) = be_u8(buf)?;
+        let (buf, global_admin) = be_u32(buf)?;
+        let (buf, local_admin) = be_u16(buf)?;
+        let ret = match TransitiveFourOctetExtendedCommunitySubType::try_from(sub_type) {
+            Ok(TransitiveFourOctetExtendedCommunitySubType::RouteTarget) => {
+                TransitiveFourOctetExtendedCommunity::RouteTarget {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveFourOctetExtendedCommunitySubType::RouteOrigin) => {
+                TransitiveFourOctetExtendedCommunity::RouteOrigin {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveFourOctetExtendedCommunitySubType::OspfDomainIdentifier) => {
+                TransitiveFourOctetExtendedCommunity::OspfDomainIdentifier {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveFourOctetExtendedCommunitySubType::BgpDataCollection) => {
+                TransitiveFourOctetExtendedCommunity::BgpDataCollection {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveFourOctetExtendedCommunitySubType::SourceAs) => {
+                TransitiveFourOctetExtendedCommunity::SourceAs {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveFourOctetExtendedCommunitySubType::CiscoVpnDistinguisher) => {
+                TransitiveFourOctetExtendedCommunity::CiscoVpnDistinguisher {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveFourOctetExtendedCommunitySubType::RouteTargetRecord) => {
+                TransitiveFourOctetExtendedCommunity::RouteTargetRecord {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Ok(TransitiveFourOctetExtendedCommunitySubType::RtDerivedEc) => {
+                TransitiveFourOctetExtendedCommunity::RtDerivedEc {
+                    global_admin,
+                    local_admin,
+                }
+            }
+            Err(_) => TransitiveFourOctetExtendedCommunity::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            },
+        };
+        Ok((buf, ret))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum NonTransitiveFourOctetExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePDU<'a, LocatedNonTransitiveFourOctetExtendedCommunityParsingError<'a>>
+    for NonTransitiveFourOctetExtendedCommunity
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedNonTransitiveFourOctetExtendedCommunityParsingError<'a>>
+    {
+        let (buf, sub_type) = be_u8(buf)?;
+        let (buf, global_admin) = be_u32(buf)?;
+        let (buf, local_admin) = be_u16(buf)?;
+        let ret = NonTransitiveFourOctetExtendedCommunity::Unassigned {
             sub_type,
             global_admin,
             local_admin,

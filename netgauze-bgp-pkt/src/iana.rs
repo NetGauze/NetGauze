@@ -938,6 +938,47 @@ impl TryFrom<u8> for NonTransitiveTwoOctetExtendedCommunitySubType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransitiveFourOctetExtendedCommunitySubType {
+    /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
+    RouteTarget = 0x02,
+
+    /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
+    RouteOrigin = 0x03,
+
+    /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
+    OspfDomainIdentifier = 0x05,
+
+    /// [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    BgpDataCollection = 0x08,
+
+    /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
+    SourceAs = 0x09,
+
+    CiscoVpnDistinguisher = 0x10,
+
+    /// [draft-ietf-bess-service-chaining](https://datatracker.ietf.org/doc/html/draft-ietf-bess-service-chaining)
+    RouteTargetRecord = 0x13,
+
+    /// [draft-zzhang-idr-rt-derived-community-00](https://datatracker.ietf.org/doc/html/draft-zzhang-idr-rt-derived-community-00)
+    RtDerivedEc = 0x15,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedTransitiveFourOctetExtendedCommunitySubType(pub u8);
+
+impl TryFrom<u8> for TransitiveFourOctetExtendedCommunitySubType {
+    type Error = UndefinedTransitiveFourOctetExtendedCommunitySubType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedTransitiveFourOctetExtendedCommunitySubType(value)),
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum TransitiveIpv4ExtendedCommunitySubType {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteTarget = 0x02,

@@ -16,8 +16,8 @@
 use crate::{
     community::*,
     iana::{
-        NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveIpv4ExtendedCommunitySubType,
-        TransitiveTwoOctetExtendedCommunitySubType,
+        NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
+        TransitiveIpv4ExtendedCommunitySubType, TransitiveTwoOctetExtendedCommunitySubType,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -377,6 +377,142 @@ impl WritablePDU<NonTransitiveIpv4ExtendedCommunityWritingError>
         };
         writer.write_u8(sub_type)?;
         writer.write_all(&global_admin.octets())?;
+        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum TransitiveFourOctetExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<TransitiveFourOctetExtendedCommunityWritingError>
+    for TransitiveFourOctetExtendedCommunity
+{
+    // 1-octet subtype + 2-octets global admin + 4-octets local admin
+    const BASE_LENGTH: usize = 7;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), TransitiveFourOctetExtendedCommunityWritingError>
+    where
+        Self: Sized,
+    {
+        let (sub_type, global_admin, local_admin) = match self {
+            Self::RouteTarget {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveFourOctetExtendedCommunitySubType::RouteTarget as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::RouteOrigin {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveFourOctetExtendedCommunitySubType::RouteOrigin as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::OspfDomainIdentifier {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveFourOctetExtendedCommunitySubType::OspfDomainIdentifier as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::BgpDataCollection {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveFourOctetExtendedCommunitySubType::BgpDataCollection as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::SourceAs {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveFourOctetExtendedCommunitySubType::RouteTarget as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::CiscoVpnDistinguisher {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveFourOctetExtendedCommunitySubType::CiscoVpnDistinguisher as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::RouteTargetRecord {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveFourOctetExtendedCommunitySubType::RouteTargetRecord as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::RtDerivedEc {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveTwoOctetExtendedCommunitySubType::RtDerivedEc as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            } => (*sub_type, global_admin, local_admin),
+        };
+        writer.write_u8(sub_type)?;
+        writer.write_u32::<NetworkEndian>(*global_admin)?;
+        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum NonTransitiveFourOctetExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<NonTransitiveFourOctetExtendedCommunityWritingError>
+    for NonTransitiveFourOctetExtendedCommunity
+{
+    // 1-octet subtype + 2-octets global admin + 4-octets local admin
+    const BASE_LENGTH: usize = 7;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), NonTransitiveFourOctetExtendedCommunityWritingError>
+    where
+        Self: Sized,
+    {
+        let (sub_type, global_admin, local_admin) = match self {
+            Self::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            } => (*sub_type, global_admin, local_admin),
+        };
+        writer.write_u8(sub_type)?;
+        writer.write_u32::<NetworkEndian>(*global_admin)?;
         writer.write_u16::<NetworkEndian>(*local_admin)?;
         Ok(())
     }

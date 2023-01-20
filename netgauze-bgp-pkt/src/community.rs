@@ -55,6 +55,12 @@ pub enum ExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     NonTransitiveIpv4ExtendedCommunity(NonTransitiveIpv4ExtendedCommunity),
 
+    /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
+    TransitiveFourOctetExtendedCommunity(TransitiveFourOctetExtendedCommunity),
+
+    /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
+    NonTransitiveFourOctetExtendedCommunity(NonTransitiveFourOctetExtendedCommunity),
+
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     TransitiveOpaqueExtendedCommunity(TransitiveOpaqueExtendedCommunity),
 
@@ -73,6 +79,8 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
             Self::NonTransitiveTwoOctetExtendedCommunity(value) => value.iana_defined(),
             Self::TransitiveIpv4ExtendedCommunity(value) => value.iana_defined(),
             Self::NonTransitiveIpv4ExtendedCommunity(value) => value.iana_defined(),
+            Self::TransitiveFourOctetExtendedCommunity(value) => value.iana_defined(),
+            Self::NonTransitiveFourOctetExtendedCommunity(value) => value.iana_defined(),
             Self::TransitiveOpaqueExtendedCommunity(value) => value.iana_defined(),
             Self::NonTransitiveOpaqueExtendedCommunity(value) => value.iana_defined(),
             Self::Experimental(value) => value.iana_defined(),
@@ -86,6 +94,8 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
             Self::NonTransitiveTwoOctetExtendedCommunity(value) => value.transitive(),
             Self::TransitiveIpv4ExtendedCommunity(value) => value.transitive(),
             Self::NonTransitiveIpv4ExtendedCommunity(value) => value.transitive(),
+            Self::TransitiveFourOctetExtendedCommunity(value) => value.transitive(),
+            Self::NonTransitiveFourOctetExtendedCommunity(value) => value.transitive(),
             Self::TransitiveOpaqueExtendedCommunity(value) => value.transitive(),
             Self::NonTransitiveOpaqueExtendedCommunity(value) => value.transitive(),
             Self::Experimental(value) => value.transitive(),
@@ -198,7 +208,82 @@ impl ExtendedCommunityProperties for NonTransitiveTwoOctetExtendedCommunity {
     }
 }
 
-impl ExtendedCommunityProperties for TransitiveIpv4ExtendedCommunity {
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransitiveFourOctetExtendedCommunity {
+    /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
+    RouteTarget {
+        global_admin: u32,
+        local_admin: u16,
+    },
+
+    /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
+    RouteOrigin {
+        global_admin: u32,
+        local_admin: u16,
+    },
+
+    /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
+    OspfDomainIdentifier {
+        global_admin: u32,
+        local_admin: u16,
+    },
+
+    /// [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    BgpDataCollection {
+        global_admin: u32,
+        local_admin: u16,
+    },
+
+    /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
+    SourceAs {
+        global_admin: u32,
+        local_admin: u16,
+    },
+
+    CiscoVpnDistinguisher {
+        global_admin: u32,
+        local_admin: u16,
+    },
+
+    /// [draft-ietf-bess-service-chaining](https://datatracker.ietf.org/doc/draft-ietf-bess-service-chaining/)
+    RouteTargetRecord {
+        global_admin: u32,
+        local_admin: u16,
+    },
+
+    /// [draft-zzhang-idr-rt-derived-community](https://datatracker.ietf.org/doc/draft-zzhang-idr-rt-derived-community/)
+    RtDerivedEc {
+        global_admin: u32,
+        local_admin: u16,
+    },
+
+    Unassigned {
+        sub_type: u8,
+        global_admin: u32,
+        local_admin: u16,
+    },
+}
+
+impl ExtendedCommunityProperties for TransitiveFourOctetExtendedCommunity {
+    fn iana_defined(&self) -> bool {
+        true
+    }
+
+    fn transitive(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum NonTransitiveFourOctetExtendedCommunity {
+    Unassigned {
+        sub_type: u8,
+        global_admin: u32,
+        local_admin: u16,
+    },
+}
+
+impl ExtendedCommunityProperties for NonTransitiveFourOctetExtendedCommunity {
     fn iana_defined(&self) -> bool {
         true
     }
@@ -303,6 +388,16 @@ pub enum TransitiveIpv4ExtendedCommunity {
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
+}
+
+impl ExtendedCommunityProperties for TransitiveIpv4ExtendedCommunity {
+    fn iana_defined(&self) -> bool {
+        true
+    }
+
+    fn transitive(&self) -> bool {
+        true
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
