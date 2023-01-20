@@ -16,8 +16,8 @@
 //! Serializer for BGP Path Attributes
 
 use crate::{
-    community::ExtendedCommunity,
-    iana::{BgpExtendedCommunityType, PathAttributeType},
+    community::{ExtendedCommunity, ExtendedCommunityIpv6},
+    iana::{BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, PathAttributeType},
     nlri::*,
     path_attribute::*,
     wire::serializer::{community::*, nlri::*},
@@ -38,6 +38,7 @@ pub enum PathAttributeWritingError {
     AggregatorError(#[from] AggregatorWritingError),
     CommunitiesError(#[from] CommunitiesWritingError),
     ExtendedCommunitiesError(#[from] ExtendedCommunitiesWritingError),
+    ExtendedCommunitiesErrorIpv6(#[from] ExtendedCommunitiesIpv6WritingError),
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
@@ -58,6 +59,7 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::Aggregator(value) => value.len(self.extended_length()),
             PathAttributeValue::Communities(value) => value.len(self.extended_length()),
             PathAttributeValue::ExtendedCommunities(value) => value.len(self.extended_length()),
+            PathAttributeValue::ExtendedCommunitiesIpv6(value) => value.len(self.extended_length()),
             PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
             PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
@@ -119,6 +121,10 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             }
             PathAttributeValue::ExtendedCommunities(value) => {
                 writer.write_u8(PathAttributeType::ExtendedCommunities.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::ExtendedCommunitiesIpv6(value) => {
+                writer.write_u8(PathAttributeType::ExtendedCommunitiesIpv6.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MpReach(value) => {
@@ -638,6 +644,79 @@ impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
                 value.write(writer)?;
             }
             ExtendedCommunity::Unknown(value) => {
+                writer.write_u8(value.code())?;
+                value.write(writer)?;
+            }
+        };
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum ExtendedCommunitiesIpv6WritingError {
+    StdIOError(#[from_std_io_error] String),
+    ExtendedCommunityIpv6Error(#[from] ExtendedCommunityIpv6WritingError),
+}
+
+impl WritablePDUWithOneInput<bool, ExtendedCommunitiesIpv6WritingError>
+    for ExtendedCommunitiesIpv6
+{
+    // One octet length (if extended is not enabled)
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let base = Self::BASE_LENGTH + usize::from(extended_length);
+        let value_len = self.communities().iter().map(|x| x.len()).sum::<usize>();
+        base + value_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), ExtendedCommunitiesIpv6WritingError> {
+        write_length(self, extended_length, writer)?;
+        for community in self.communities() {
+            community.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum ExtendedCommunityIpv6WritingError {
+    StdIOError(#[from_std_io_error] String),
+    TransitiveIpv6ExtendedCommunityError(#[from] TransitiveIpv6ExtendedCommunityWritingError),
+    NonTransitiveIp64ExtendedCommunityError(#[from] NonTransitiveIpv6ExtendedCommunityWritingError),
+    UnknownExtendedCommunityIpv6Error(#[from] UnknownExtendedCommunityIpv6WritingError),
+}
+
+impl WritablePDU<ExtendedCommunityIpv6WritingError> for ExtendedCommunityIpv6 {
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                Self::TransitiveIpv6(value) => value.len(),
+                Self::NonTransitiveIpv6(value) => value.len(),
+                Self::Unknown(value) => value.len(),
+            }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), ExtendedCommunityIpv6WritingError> {
+        match self {
+            Self::TransitiveIpv6(value) => {
+                writer.write_u8(BgpExtendedCommunityIpv6Type::TransitiveIpv6 as u8)?;
+                value.write(writer)?;
+            }
+            Self::NonTransitiveIpv6(value) => {
+                writer.write_u8(BgpExtendedCommunityIpv6Type::NonTransitiveIpv6 as u8)?;
+                value.write(writer)?;
+            }
+            Self::Unknown(value) => {
                 writer.write_u8(value.code())?;
                 value.write(writer)?;
             }

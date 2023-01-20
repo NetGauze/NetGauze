@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use serde::{Deserialize, Serialize};
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 pub trait ExtendedCommunityProperties {
     fn iana_defined(&self) -> bool;
@@ -518,6 +518,184 @@ impl UnknownExtendedCommunity {
 }
 
 impl ExtendedCommunityProperties for UnknownExtendedCommunity {
+    fn iana_defined(&self) -> bool {
+        self.code & 0x80 != 0
+    }
+
+    fn transitive(&self) -> bool {
+        self.code & 0x40 == 0
+    }
+}
+
+/// Similar to [ExtendedCommunity] but for IPv6
+/// ```text
+/// 0                   1                   2                   3
+/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// | 0x00 or 0x40  |    Sub-Type   |    Global Administrator       |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |          Global Administrator (cont.)                         |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |          Global Administrator (cont.)                         |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |          Global Administrator (cont.)                         |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// | Global Administrator (cont.)  |    Local Administrator        |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+///
+/// See [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum ExtendedCommunityIpv6 {
+    /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
+    TransitiveIpv6(TransitiveIpv6ExtendedCommunity),
+
+    /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
+    NonTransitiveIpv6(NonTransitiveIpv6ExtendedCommunity),
+
+    Unknown(UnknownExtendedCommunityIpv6),
+}
+
+impl ExtendedCommunityProperties for ExtendedCommunityIpv6 {
+    fn iana_defined(&self) -> bool {
+        match self {
+            Self::TransitiveIpv6(value) => value.iana_defined(),
+            Self::NonTransitiveIpv6(value) => value.iana_defined(),
+            Self::Unknown(value) => value.iana_defined(),
+        }
+    }
+
+    fn transitive(&self) -> bool {
+        match self {
+            Self::TransitiveIpv6(value) => value.transitive(),
+            Self::NonTransitiveIpv6(value) => value.transitive(),
+            Self::Unknown(value) => value.transitive(),
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransitiveIpv6ExtendedCommunity {
+    /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
+    RouteTarget {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
+    RouteOrigin {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    /// [draft-ietf-idr-bgp-ifit-capabilities](https://datatracker.ietf.org/doc/draft-ietf-idr-bgp-ifit-capabilities)
+    Ipv6Ifit {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    /// [RFC6515](https://datatracker.ietf.org/doc/html/rfc6515) and
+    /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
+    VrfRouteImport {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    /// [draft-ietf-idr-flowspec-redirect](https://datatracker.ietf.org/doc/html/draft-ietf-idr-flowspec-redirect)
+    FlowSpecRedirectToIpv6 {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    /// [RFC8956](https://datatracker.ietf.org/doc/html/rfc8956)
+    FlowSpecRtRedirectToIpv6 {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    CiscoVpnDistinguisher {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    /// [RFC7524](https://datatracker.ietf.org/doc/rfc7524)
+    InterAreaP2MpSegmentedNextHop {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    /// [draft-zzhang-idr-rt-derived-community](https://datatracker.ietf.org/doc/draft-zzhang-idr-rt-derived-community/)
+    RtDerivedEc {
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+
+    Unassigned {
+        sub_type: u8,
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+}
+
+impl ExtendedCommunityProperties for TransitiveIpv6ExtendedCommunity {
+    fn iana_defined(&self) -> bool {
+        true
+    }
+
+    fn transitive(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum NonTransitiveIpv6ExtendedCommunity {
+    Unassigned {
+        sub_type: u8,
+        global_admin: Ipv6Addr,
+        local_admin: u16,
+    },
+}
+
+impl ExtendedCommunityProperties for NonTransitiveIpv6ExtendedCommunity {
+    fn iana_defined(&self) -> bool {
+        true
+    }
+
+    fn transitive(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UnknownExtendedCommunityIpv6 {
+    code: u8,
+    sub_type: u8,
+    value: [u8; 18],
+}
+
+impl UnknownExtendedCommunityIpv6 {
+    pub const fn new(code: u8, sub_type: u8, value: [u8; 18]) -> Self {
+        Self {
+            code,
+            sub_type,
+            value,
+        }
+    }
+
+    pub const fn code(&self) -> u8 {
+        self.code
+    }
+
+    pub const fn sub_type(&self) -> u8 {
+        self.sub_type
+    }
+
+    pub const fn value(&self) -> &[u8; 18] {
+        &self.value
+    }
+}
+
+impl ExtendedCommunityProperties for UnknownExtendedCommunityIpv6 {
     fn iana_defined(&self) -> bool {
         self.code & 0x80 != 0
     }

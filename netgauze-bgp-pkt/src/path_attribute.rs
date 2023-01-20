@@ -16,7 +16,11 @@
 //! Contains the extensible definitions for various [PathAttribute] that can be
 //! used in [crate::update::BGPUpdateMessage].
 
-use crate::{community::ExtendedCommunity, iana::WellKnownCommunity, nlri::*};
+use crate::{
+    community::{ExtendedCommunity, ExtendedCommunityIpv6},
+    iana::WellKnownCommunity,
+    nlri::*,
+};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
@@ -153,6 +157,7 @@ pub enum PathAttributeValue {
     Aggregator(Aggregator),
     Communities(Communities),
     ExtendedCommunities(ExtendedCommunities),
+    ExtendedCommunitiesIpv6(ExtendedCommunitiesIpv6),
     MpReach(MpReach),
     MpUnreach(MpUnreach),
     UnknownAttribute(UnknownAttribute),
@@ -171,6 +176,7 @@ impl PathAttributeValue {
             Self::Aggregator(_) => Aggregator::can_be_optional(),
             Self::Communities(_) => Communities::can_be_optional(),
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_optional(),
+            Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_optional(),
             Self::MpReach(_) => MpReach::can_be_optional(),
             Self::MpUnreach(_) => MpUnreach::can_be_optional(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -189,6 +195,7 @@ impl PathAttributeValue {
             Self::Aggregator(_) => Aggregator::can_be_transitive(),
             Self::Communities(_) => Communities::can_be_transitive(),
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_transitive(),
+            Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_transitive(),
             Self::MpReach(_) => MpReach::can_be_transitive(),
             Self::MpUnreach(_) => MpUnreach::can_be_transitive(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_transitive(),
@@ -207,6 +214,7 @@ impl PathAttributeValue {
             Self::Aggregator(_) => Aggregator::can_be_partial(),
             Self::Communities(_) => Communities::can_be_partial(),
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_partial(),
+            Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_partial(),
             Self::MpReach(_) => MpReach::can_be_partial(),
             Self::MpUnreach(_) => MpUnreach::can_be_partial(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -665,6 +673,37 @@ impl PathAttributeValueProperties for Communities {
     }
 }
 
+/// Four octet values to specify a community.
+///
+/// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Community(u32);
+
+impl Community {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(&self) -> u32 {
+        self.0
+    }
+    /// Parse the community numerical value into a [WellKnownCommunity].
+    /// If the value is not well-known, then will return None.
+    pub const fn into_well_known(&self) -> Option<WellKnownCommunity> {
+        WellKnownCommunity::from_repr(self.0)
+    }
+
+    /// Getting the ASN number part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    pub const fn collection_asn(&self) -> u16 {
+        (self.0 >> 16 & 0xffff) as u16
+    }
+
+    /// Getting the value part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    pub const fn collection_value(&self) -> u16 {
+        (self.0 & 0x0000ffff) as u16
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExtendedCommunities {
     communities: Vec<ExtendedCommunity>,
@@ -694,34 +733,32 @@ impl PathAttributeValueProperties for ExtendedCommunities {
     }
 }
 
-/// Four octet values to specify a community.
-///
-/// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Community(u32);
+pub struct ExtendedCommunitiesIpv6 {
+    communities: Vec<ExtendedCommunityIpv6>,
+}
 
-impl Community {
-    pub const fn new(value: u32) -> Self {
-        Self(value)
+impl ExtendedCommunitiesIpv6 {
+    pub const fn new(communities: Vec<ExtendedCommunityIpv6>) -> Self {
+        Self { communities }
     }
 
-    pub const fn value(&self) -> u32 {
-        self.0
+    pub const fn communities(&self) -> &Vec<ExtendedCommunityIpv6> {
+        &self.communities
     }
-    /// Parse the community numerical value into a [WellKnownCommunity].
-    /// If the value is not well-known, then will return None.
-    pub const fn into_well_known(&self) -> Option<WellKnownCommunity> {
-        WellKnownCommunity::from_repr(self.0)
+}
+
+impl PathAttributeValueProperties for ExtendedCommunitiesIpv6 {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
     }
 
-    /// Getting the ASN number part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
-    pub const fn collection_asn(&self) -> u16 {
-        (self.0 >> 16 & 0xffff) as u16
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
     }
 
-    /// Getting the value part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
-    pub const fn collection_value(&self) -> u16 {
-        (self.0 & 0x0000ffff) as u16
+    fn can_be_partial() -> Option<bool> {
+        None
     }
 }
 

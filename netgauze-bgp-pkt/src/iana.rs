@@ -111,7 +111,7 @@ pub enum PathAttributeType {
     TrafficEngineering = 24,
 
     /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
-    ExtendedCommunitiesIPv6 = 25,
+    ExtendedCommunitiesIpv6 = 25,
 
     /// [RFC7311](https://datatracker.ietf.org/doc/html/rfc7311)
     AccumulatedIGP = 26,
@@ -867,6 +867,30 @@ impl TryFrom<u8> for BgpExtendedCommunityType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpExtendedCommunityIpv6Type {
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    TransitiveIpv6 = 0x00,
+
+    /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    NonTransitiveIpv6 = 0x40,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedBgpExtendedCommunityIpv6Type(pub u8);
+
+impl TryFrom<u8> for BgpExtendedCommunityIpv6Type {
+    type Error = UndefinedBgpExtendedCommunityIpv6Type;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedBgpExtendedCommunityIpv6Type(value)),
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum TransitiveTwoOctetExtendedCommunitySubType {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteTarget = 0x02,
@@ -1033,6 +1057,51 @@ impl TryFrom<u8> for TransitiveIpv4ExtendedCommunitySubType {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
             None => Err(UndefinedTransitiveIpv4ExtendedCommunitySubType(value)),
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransitiveIpv6ExtendedCommunitySubType {
+    /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
+    RouteTarget = 0x02,
+
+    /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
+    RouteOrigin = 0x03,
+
+    /// [draft-wang-idr-bgp-ifit-capabilities](https://datatracker.ietf.org/doc/html/draft-wang-idr-bgp-ifit-capabilities)
+    Ipv6Ifit = 0x05,
+
+    /// [RFC6515](https://datatracker.ietf.org/doc/html/rfc6515) and
+    /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
+    VrfRouteImport = 0x0b,
+
+    /// [draft-dong-idr-node-target-ext-comm](https://datatracker.ietf.org/doc/draft-dong-idr-node-target-ext-comm/03/)
+    FlowSpecRedirectToIpv6 = 0x0c,
+
+    /// [RFC8956](https://datatracker.ietf.org/doc/html/rfc8956)
+    FlowSpecRtRedirectToIpv6 = 0x0d,
+
+    CiscoVpnDistinguisher = 0x10,
+
+    /// [RFC7524](https://datatracker.ietf.org/doc/html/rfc7524])
+    InterAreaP2MpSegmentedNextHop = 0x12,
+
+    /// [draft-zzhang-idr-rt-derived-community-00](https://datatracker.ietf.org/doc/html/draft-zzhang-idr-rt-derived-community-00)
+    RtDerivedEc = 0x15,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedTransitiveIpv6ExtendedCommunitySubType(pub u8);
+
+impl TryFrom<u8> for TransitiveIpv6ExtendedCommunitySubType {
+    type Error = UndefinedTransitiveIpv6ExtendedCommunitySubType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedTransitiveIpv6ExtendedCommunitySubType(value)),
         }
     }
 }

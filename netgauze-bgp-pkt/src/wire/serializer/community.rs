@@ -17,7 +17,8 @@ use crate::{
     community::*,
     iana::{
         NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
-        TransitiveIpv4ExtendedCommunitySubType, TransitiveTwoOctetExtendedCommunitySubType,
+        TransitiveIpv4ExtendedCommunitySubType, TransitiveIpv6ExtendedCommunitySubType,
+        TransitiveTwoOctetExtendedCommunitySubType,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -628,6 +629,165 @@ impl WritablePDU<UnknownExtendedCommunityWritingError> for UnknownExtendedCommun
     where
         Self: Sized,
     {
+        writer.write_u8(self.sub_type())?;
+        writer.write_all(self.value())?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum TransitiveIpv6ExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<TransitiveIpv6ExtendedCommunityWritingError> for TransitiveIpv6ExtendedCommunity {
+    // 1-octet subtype + 16-octets global admin + 2-octets local admin
+    const BASE_LENGTH: usize = 19;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), TransitiveIpv6ExtendedCommunityWritingError> {
+        let (sub_type, global_admin, local_admin) = match self {
+            Self::RouteTarget {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv6ExtendedCommunitySubType::RouteTarget as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::RouteOrigin {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv6ExtendedCommunitySubType::RouteOrigin as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::Ipv6Ifit {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv6ExtendedCommunitySubType::Ipv6Ifit as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::VrfRouteImport {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv4ExtendedCommunitySubType::VrfRouteImport as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::FlowSpecRedirectToIpv6 {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv6ExtendedCommunitySubType::FlowSpecRedirectToIpv6 as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::FlowSpecRtRedirectToIpv6 {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv6ExtendedCommunitySubType::FlowSpecRtRedirectToIpv6 as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::CiscoVpnDistinguisher {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv6ExtendedCommunitySubType::CiscoVpnDistinguisher as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::InterAreaP2MpSegmentedNextHop {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv6ExtendedCommunitySubType::InterAreaP2MpSegmentedNextHop as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::RtDerivedEc {
+                global_admin,
+                local_admin,
+            } => (
+                TransitiveIpv6ExtendedCommunitySubType::RtDerivedEc as u8,
+                global_admin,
+                local_admin,
+            ),
+            Self::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            } => (*sub_type, global_admin, local_admin),
+        };
+        writer.write_u8(sub_type)?;
+        writer.write_all(&global_admin.octets())?;
+        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum NonTransitiveIpv6ExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<NonTransitiveIpv6ExtendedCommunityWritingError>
+    for NonTransitiveIpv6ExtendedCommunity
+{
+    // 1-octet subtype + 16-octets global admin + 2-octets local admin
+    const BASE_LENGTH: usize = 19;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), NonTransitiveIpv6ExtendedCommunityWritingError> {
+        let (sub_type, global_admin, local_admin) = match self {
+            Self::Unassigned {
+                sub_type,
+                global_admin,
+                local_admin,
+            } => (*sub_type, global_admin, local_admin),
+        };
+        writer.write_u8(sub_type)?;
+        writer.write_all(&global_admin.octets())?;
+        writer.write_u16::<NetworkEndian>(*local_admin)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum UnknownExtendedCommunityIpv6WritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<UnknownExtendedCommunityIpv6WritingError> for UnknownExtendedCommunityIpv6 {
+    // 1-octet subtype + 18-octets value
+    const BASE_LENGTH: usize = 19;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), UnknownExtendedCommunityIpv6WritingError> {
         writer.write_u8(self.sub_type())?;
         writer.write_all(self.value())?;
         Ok(())

@@ -16,8 +16,11 @@
 //! Deserializer for BGP Path Attributes
 
 use crate::{
-    community::ExtendedCommunity,
-    iana::{BgpExtendedCommunityType, PathAttributeType, UndefinedPathAttributeType},
+    community::{ExtendedCommunity, ExtendedCommunityIpv6},
+    iana::{
+        BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, PathAttributeType,
+        UndefinedPathAttributeType,
+    },
     path_attribute::*,
     wire::deserializer::{community::*, nlri::*},
 };
@@ -76,6 +79,9 @@ pub enum PathAttributeParsingError {
     AggregatorError(#[from_located(module = "self")] AggregatorParsingError),
     CommunitiesError(#[from_located(module = "self")] CommunitiesParsingError),
     ExtendedCommunitiesError(#[from_located(module = "self")] ExtendedCommunitiesParsingError),
+    ExtendedCommunitiesErrorIpv6(
+        #[from_located(module = "self")] ExtendedCommunitiesIpv6ParsingError,
+    ),
     MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
@@ -149,6 +155,11 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
             Ok(PathAttributeType::ExtendedCommunities) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::ExtendedCommunities(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::ExtendedCommunitiesIpv6) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::ExtendedCommunitiesIpv6(value);
                 (buf, value)
             }
             Ok(PathAttributeType::MPReachNLRI) => {
@@ -1123,5 +1134,71 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedExtendedCommunitiesParsingErro
         };
         let (_, communities) = parse_till_empty_into_located(communities_buf)?;
         Ok((buf, ExtendedCommunities::new(communities)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum ExtendedCommunityIpv6ParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    TransitiveIpv6ExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        TransitiveIpv6ExtendedCommunityParsingError,
+    ),
+    NonTransitiveIpv6ExtendedCommunityError(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        NonTransitiveIpv6ExtendedCommunityParsingError,
+    ),
+    UnknownExtendedCommunityIpv6Error(
+        #[from_located(module = "crate::wire::deserializer::community")]
+        UnknownExtendedCommunityIpv6ParsingError,
+    ),
+}
+
+impl<'a> ReadablePDU<'a, LocatedExtendedCommunityIpv6ParsingError<'a>> for ExtendedCommunityIpv6 {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedExtendedCommunityIpv6ParsingError<'a>> {
+        let (buf, code) = be_u8(buf)?;
+        let comm_type = BgpExtendedCommunityIpv6Type::try_from(code);
+        let (buf, ret) = match comm_type {
+            Ok(BgpExtendedCommunityIpv6Type::TransitiveIpv6) => {
+                let (buf, value) = parse_into_located(buf)?;
+                (buf, ExtendedCommunityIpv6::TransitiveIpv6(value))
+            }
+            Ok(BgpExtendedCommunityIpv6Type::NonTransitiveIpv6) => {
+                let (buf, value) = parse_into_located(buf)?;
+                (buf, ExtendedCommunityIpv6::NonTransitiveIpv6(value))
+            }
+            Err(err) => {
+                let (buf, value) = parse_into_located_one_input(buf, err.0)?;
+                (buf, ExtendedCommunityIpv6::Unknown(value))
+            }
+        };
+        Ok((buf, ret))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum ExtendedCommunitiesIpv6ParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    ExtendedCommunityIpv6Error(#[from_located(module = "self")] ExtendedCommunityIpv6ParsingError),
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedExtendedCommunitiesIpv6ParsingError<'a>>
+    for ExtendedCommunitiesIpv6
+{
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedExtendedCommunitiesIpv6ParsingError<'a>> {
+        let (buf, communities_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (_, communities) = parse_till_empty_into_located(communities_buf)?;
+        Ok((buf, ExtendedCommunitiesIpv6::new(communities)))
     }
 }
