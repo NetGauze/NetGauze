@@ -14,14 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    capabilities::{
-        AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, ExperimentalCapability,
-        ExperimentalCapabilityCode, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
-        FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
-        ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, EXTENDED_MESSAGE_CAPABILITY_LENGTH,
-        EXTENDED_NEXT_HOP_ENCODING_LENGTH, FOUR_OCTET_AS_CAPABILITY_LENGTH,
-        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
-    },
+    capabilities::*,
     iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
 };
 use netgauze_iana::address_family::{
@@ -325,9 +318,7 @@ impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathCa
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>>
-    for AddPathCapabilityAddressFamily
-{
+impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathAddressFamily {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedAddPathCapabilityParsingError<'a>> {
@@ -354,10 +345,7 @@ impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>>
             }
         })(buf)?;
 
-        Ok((
-            buf,
-            AddPathCapabilityAddressFamily::new(address_type, send, receive),
-        ))
+        Ok((buf, AddPathAddressFamily::new(address_type, send, receive)))
     }
 }
 

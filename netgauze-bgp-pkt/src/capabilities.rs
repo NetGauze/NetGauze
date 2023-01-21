@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! BGP Capabilities advertised in BGP Open Messages.
+//! See [RFC5492 Capabilities Advertisement with BGP-4](https://datatracker.ietf.org/doc/html/rfc5492)
+
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
@@ -181,30 +184,43 @@ impl FourOctetASCapability {
     }
 }
 
+/// Allows the advertisement on multiple paths for the same address prefix
+/// without replacing any previous ones.
+///
 /// See [RFC7911](https://datatracker.ietf.org/doc/html/RFC7911)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AddPathCapability {
-    address_families: Vec<AddPathCapabilityAddressFamily>,
+    address_families: Vec<AddPathAddressFamily>,
 }
 
 impl AddPathCapability {
-    pub const fn new(address_families: Vec<AddPathCapabilityAddressFamily>) -> Self {
+    pub const fn new(address_families: Vec<AddPathAddressFamily>) -> Self {
         Self { address_families }
     }
 
-    pub const fn address_families(&self) -> &Vec<AddPathCapabilityAddressFamily> {
+    pub const fn address_families(&self) -> &Vec<AddPathAddressFamily> {
         &self.address_families
     }
 }
 
+/// Single Address Family with Add Path capability enabled
+/// ```text
+/// +------------------------------------------------+
+/// | Address Family Identifier (2 octets)           |
+/// +------------------------------------------------+
+/// | Subsequent Address Family Identifier (1 octet) |
+/// +------------------------------------------------+
+/// | Send/Receive (1 octet)                         |
+/// +------------------------------------------------+
+/// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct AddPathCapabilityAddressFamily {
+pub struct AddPathAddressFamily {
     address_type: AddressType,
     send: bool,
     receive: bool,
 }
 
-impl AddPathCapabilityAddressFamily {
+impl AddPathAddressFamily {
     pub const fn new(address_type: AddressType, send: bool, receive: bool) -> Self {
         Self {
             address_type,
@@ -217,10 +233,14 @@ impl AddPathCapabilityAddressFamily {
         self.address_type
     }
 
+    ///  This field indicates whether the sender is able to send multiple paths
+    /// to its peer the [AddressType]
     pub const fn send(&self) -> bool {
         self.send
     }
 
+    ///  This field indicates whether the sender is able to receive multiple
+    /// paths from its peer the [AddressType]
     pub const fn receive(&self) -> bool {
         self.receive
     }
@@ -263,6 +283,17 @@ impl ExtendedNextHopEncodingCapability {
     }
 }
 
+/// Encoding for a single extended next hop
+///
+/// ```text
+/// +-----------------------------------------------------+
+/// | NLRI AFI - 1 (2 octets)                             |
+/// +-----------------------------------------------------+
+/// | NLRI SAFI - 1 (2 octets)                            |
+/// +-----------------------------------------------------+
+/// | Nexthop AFI - 1 (2 octets)                          |
+/// +-----------------------------------------------------+
+/// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExtendedNextHopEncoding {
     address_type: AddressType,

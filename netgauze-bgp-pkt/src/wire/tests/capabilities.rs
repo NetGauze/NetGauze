@@ -14,11 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    capabilities::{
-        AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, ExperimentalCapability,
-        ExperimentalCapabilityCode, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
-        FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
-    },
+    capabilities::*,
     wire::{deserializer::capabilities::*, serializer::capabilities::*},
 };
 use netgauze_iana::address_family::{
@@ -186,12 +182,14 @@ fn test_parse_add_path() -> Result<(), BGPCapabilityWritingError> {
     let bad_send_receive_wire = [0x45, 0x04, 0x00, 0x02, 0x01, 0x04];
     let bad_incomplete_wire = [0x45, 0x03, 0x00, 0x02, 0x01, 0x03];
 
-    let good = BGPCapability::AddPath(AddPathCapability::new(vec![
-        AddPathCapabilityAddressFamily::new(AddressType::Ipv6Unicast, true, true),
-    ]));
+    let good = BGPCapability::AddPath(AddPathCapability::new(vec![AddPathAddressFamily::new(
+        AddressType::Ipv6Unicast,
+        true,
+        true,
+    )]));
     let good_long = BGPCapability::AddPath(AddPathCapability::new(vec![
-        AddPathCapabilityAddressFamily::new(AddressType::Ipv4Unicast, true, false),
-        AddPathCapabilityAddressFamily::new(AddressType::Ipv6Unicast, false, true),
+        AddPathAddressFamily::new(AddressType::Ipv4Unicast, true, false),
+        AddPathAddressFamily::new(AddressType::Ipv6Unicast, false, true),
     ]));
     let bad_send_receive = LocatedBGPCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(5, &bad_send_receive_wire[5..]) },

@@ -13,17 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    capabilities::{
-        AddPathCapability, AddPathCapabilityAddressFamily, BGPCapability, ExtendedNextHopEncoding,
-        ExtendedNextHopEncodingCapability, FourOctetASCapability,
-        MultiProtocolExtensionsCapability, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
-        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
-        ROUTE_REFRESH_CAPABILITY_LENGTH,
-    },
-    iana::BGPCapabilityCode,
-};
+use crate::{capabilities::*, iana::BGPCapabilityCode};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
@@ -174,7 +164,7 @@ impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapability {
     }
 }
 
-impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapabilityAddressFamily {
+impl WritablePDU<AddPathCapabilityWritingError> for AddPathAddressFamily {
     // 2 octet AFI, 1 reserved, and 1 SAFI
     const BASE_LENGTH: usize = 4;
 
