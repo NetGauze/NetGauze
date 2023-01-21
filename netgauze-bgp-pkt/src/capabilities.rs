@@ -38,6 +38,9 @@ pub(crate) const EXTENDED_MESSAGE_CAPABILITY_LENGTH: u8 = 0;
 /// 2-octet NLRI AFI + 2-octet NLRI SAFI + 2-octet NextHop AFI as per RFC8950
 pub(crate) const EXTENDED_NEXT_HOP_ENCODING_LENGTH: u8 = 6;
 
+/// 2-octet NLRI AFI + 1-octet NLRI SAFI + 1-octet flags as per RFC4724
+pub(crate) const GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH: u8 = 4;
+
 /// BGP Capabilities are included as parameters in the BGPOpen message
 /// to indicate support of certain BGP Features.
 ///
@@ -63,6 +66,10 @@ pub enum BGPCapability {
 
     /// Defined in [RFC7313](https://datatracker.ietf.org/doc/html/rfc7313)
     EnhancedRouteRefresh,
+
+    /// Defined in [RFC4724](https://datatracker.ietf.org/doc/html/rfc4724)
+    /// and [RFC8538](https://datatracker.ietf.org/doc/html/rfc8538)
+    GracefulRestartCapability(GracefulRestartCapability),
 
     AddPath(AddPathCapability),
 
@@ -181,6 +188,71 @@ impl FourOctetASCapability {
 
     pub const fn asn4(&self) -> u32 {
         self.asn4
+    }
+}
+
+/// Defined in [RFC4724](https://datatracker.ietf.org/doc/html/rfc4724)
+/// and [RFC8538](https://datatracker.ietf.org/doc/html/rfc8538)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GracefulRestartCapability {
+    restart: bool,
+    graceful_notification: bool,
+    time: u16,
+    address_families: Vec<GracefulRestartAddressFamily>,
+}
+
+impl GracefulRestartCapability {
+    pub fn new(
+        restart: bool,
+        graceful_notification: bool,
+        time: u16,
+        address_families: Vec<GracefulRestartAddressFamily>,
+    ) -> Self {
+        Self {
+            restart,
+            graceful_notification,
+            time,
+            address_families,
+        }
+    }
+
+    pub const fn restart(&self) -> bool {
+        self.restart
+    }
+
+    pub const fn graceful_notification(&self) -> bool {
+        self.graceful_notification
+    }
+
+    pub const fn time(&self) -> u16 {
+        self.time
+    }
+
+    pub const fn address_families(&self) -> &Vec<GracefulRestartAddressFamily> {
+        &self.address_families
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct GracefulRestartAddressFamily {
+    forwarding_state: bool,
+    address_type: AddressType,
+}
+
+impl GracefulRestartAddressFamily {
+    pub const fn new(forwarding_state: bool, address_type: AddressType) -> Self {
+        Self {
+            forwarding_state,
+            address_type,
+        }
+    }
+
+    pub const fn forwarding_state(&self) -> bool {
+        self.forwarding_state
+    }
+
+    pub const fn address_type(&self) -> &AddressType {
+        &self.address_type
     }
 }
 

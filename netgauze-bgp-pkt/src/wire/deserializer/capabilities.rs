@@ -48,6 +48,9 @@ pub enum BGPCapabilityParsingError {
     MultiProtocolExtensionsCapabilityError(
         #[from_located(module = "self")] MultiProtocolExtensionsCapabilityParsingError,
     ),
+    GracefulRestartCapabilityError(
+        #[from_located(module = "self")] GracefulRestartCapabilityParsingError,
+    ),
     AddPathCapabilityError(#[from_located(module = "self")] AddPathCapabilityParsingError),
     ExtendedNextHopEncodingCapabilityError(
         #[from_located(module = "self")] ExtendedNextHopEncodingCapabilityParsingError,
@@ -144,7 +147,8 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
                 }
                 BGPCapabilityCode::BGPRole => parse_unrecognized_capability(code.into(), buf),
                 BGPCapabilityCode::GracefulRestartCapability => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    let (buf, cap) = parse_into_located(buf)?;
+                    Ok((buf, BGPCapability::GracefulRestartCapability(cap)))
                 }
                 BGPCapabilityCode::FourOctetAS => {
                     let (buf, cap) = parse_into_located(buf)?;
@@ -292,6 +296,70 @@ impl<'a> ReadablePDU<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a
             }
         };
         Ok((buf, MultiProtocolExtensionsCapability::new(address_type)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum GracefulRestartCapabilityParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    AddressFamilyError(#[from_external] UndefinedAddressFamily),
+    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
+    AddressTypeError(InvalidAddressType),
+}
+
+impl<'a> ReadablePDU<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
+    for GracefulRestartCapability
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedGracefulRestartCapabilityParsingError<'a>> {
+        let (buf, params_buf) = nom::multi::length_data(be_u8)(buf)?;
+        let (params_buf, header) = be_u16(params_buf)?;
+        let restart = header & 0x8000 == 0x8000;
+        let graceful_notification = header & 0x4000 == 0x4000;
+        let time = header & 0x0fff;
+        let (_, address_families) = parse_till_empty(params_buf)?;
+        Ok((
+            buf,
+            GracefulRestartCapability::new(restart, graceful_notification, time, address_families),
+        ))
+    }
+}
+
+impl<'a> ReadablePDU<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
+    for GracefulRestartAddressFamily
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedGracefulRestartCapabilityParsingError<'a>> {
+        let input = buf;
+        let (buf, ehe_buf) =
+            nom::bytes::complete::take(GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH as usize)(buf)?;
+        let (ehe_buf, nlri_afi) =
+            nom::combinator::map_res(be_u16, AddressFamily::try_from)(ehe_buf)?;
+        let (ehe_buf, nlri_safi) =
+            nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(ehe_buf)?;
+        let address_type = match AddressType::from_afi_safi(nlri_afi, nlri_safi) {
+            Ok(address_type) => address_type,
+            Err(err) => {
+                return Err(nom::Err::Error(
+                    LocatedGracefulRestartCapabilityParsingError::new(
+                        input,
+                        GracefulRestartCapabilityParsingError::AddressTypeError(err),
+                    ),
+                ))
+            }
+        };
+        let (_, flags) = be_u8(ehe_buf)?;
+        let forwarding_state = flags & 0x80 == 0x80;
+
+        Ok((
+            buf,
+            GracefulRestartAddressFamily::new(forwarding_state, address_type),
+        ))
     }
 }
 

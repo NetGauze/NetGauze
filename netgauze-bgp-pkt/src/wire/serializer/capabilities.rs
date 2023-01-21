@@ -24,6 +24,7 @@ pub enum BGPCapabilityWritingError {
     StdIOError(#[from_std_io_error] String),
     FourOctetASCapabilityError(#[from] FourOctetASCapabilityWritingError),
     MultiProtocolExtensionsCapabilityError(#[from] MultiProtocolExtensionsCapabilityWritingError),
+    GracefulRestartCapabilityError(#[from] GracefulRestartCapabilityWritingError),
     AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
     ExtendedNextHopEncodingCapabilityError(#[from] ExtendedNextHopEncodingCapabilityWritingError),
 }
@@ -40,8 +41,10 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             Self::RouteRefresh => ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::FourOctetAS(value) => value.len(),
+            // GracefulRestartCapability carries n length field, so need to account for it here
+            Self::GracefulRestartCapability(value) => value.len() - 2,
             Self::AddPath(value) => value.len(),
-            // ExtendedNextHopEncoding carries an length field, so need to account for it here
+            // ExtendedNextHopEncoding carries n length field, so need to account for it here
             Self::ExtendedNextHopEncoding(value) => value.len() - 1,
             Self::ExtendedMessage => EXTENDED_MESSAGE_CAPABILITY_LENGTH as usize,
             Self::Experimental(value) => value.value().len(),
@@ -69,6 +72,11 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             Self::ExtendedMessage => {
                 writer.write_u8(BGPCapabilityCode::BGPExtendedMessage.into())?;
                 writer.write_u8(len)?;
+            }
+            Self::GracefulRestartCapability(value) => {
+                writer.write_u8(BGPCapabilityCode::GracefulRestartCapability.into())?;
+                writer.write_u8(len)?;
+                value.write(writer)?;
             }
             Self::AddPath(value) => {
                 writer.write_u8(BGPCapabilityCode::ADDPathCapability.into())?;
@@ -136,6 +144,55 @@ impl WritablePDU<MultiProtocolExtensionsCapabilityWritingError>
         writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
         writer.write_u8(0)?;
         writer.write_u8(self.address_type().subsequent_address_family().into())?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum GracefulRestartCapabilityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<GracefulRestartCapabilityWritingError> for GracefulRestartCapability {
+    /// 4-octet time and flags
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self
+                .address_families()
+                .iter()
+                .map(|x| x.len())
+                .sum::<usize>()
+    }
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), GracefulRestartCapabilityWritingError> {
+        let mut flags: u16 = 0;
+        flags |= if self.restart() { 0x8000 } else { 0x0000 };
+        flags |= if self.graceful_notification() {
+            0x4000
+        } else {
+            0x0000
+        };
+        flags |= self.time();
+        writer.write_u16::<NetworkEndian>(flags)?;
+        for value in self.address_families() {
+            value.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl WritablePDU<GracefulRestartCapabilityWritingError> for GracefulRestartAddressFamily {
+    // 2 octet AFI, 1 reserved, and 1 SAFI
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), GracefulRestartCapabilityWritingError> {
+        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
+        writer.write_u8(self.address_type().subsequent_address_family().into())?;
+        writer.write_u8(u8::from(self.forwarding_state()))?;
         Ok(())
     }
 }

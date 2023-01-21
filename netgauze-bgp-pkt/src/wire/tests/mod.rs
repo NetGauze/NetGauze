@@ -15,8 +15,9 @@
 
 use crate::{
     capabilities::{
-        BGPCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
-        FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
+        AddPathAddressFamily, AddPathCapability, BGPCapability, ExtendedNextHopEncoding,
+        ExtendedNextHopEncodingCapability, FourOctetASCapability, GracefulRestartCapability,
+        MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
     iana::{
         RouteRefreshSubcode, UndefinedBGPErrorNotificationCode, UndefinedBgpMessageType,
@@ -333,6 +334,65 @@ fn test_bgp_message_open1() -> Result<(), BGPMessageWritingError> {
                         AddressFamily::IPv6,
                     ),
                 ]),
+            )]),
+        ],
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_message_open_multi_protocol() -> Result<(), BGPMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x71, 0x01, 0x04, 0x00, 0xc8, 0x00, 0xb4, 0xac, 0x10, 0x00, 0x14, 0x54, 0x02,
+        0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x02, 0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x02,
+        0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00, 0x02, 0x02, 0x46, 0x00, 0x02, 0x06, 0x41,
+        0x04, 0x00, 0x00, 0x00, 0xc8, 0x02, 0x02, 0x06, 0x00, 0x02, 0x0a, 0x45, 0x08, 0x00, 0x01,
+        0x01, 0x01, 0x00, 0x01, 0x02, 0x01, 0x02, 0x06, 0x49, 0x04, 0x02, 0x72, 0x32, 0x00, 0x02,
+        0x04, 0x40, 0x02, 0xc0, 0x78, 0x02, 0x10, 0x47, 0x0e, 0x00, 0x01, 0x01, 0x80, 0x00, 0x00,
+        0x00, 0x00, 0x01, 0x02, 0x80, 0x00, 0x00, 0x00,
+    ];
+
+    let good = BGPMessage::Open(BGPOpenMessage::new(
+        200,
+        180,
+        Ipv4Addr::new(172, 16, 0, 20),
+        vec![
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+                MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
+            )]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+                MultiProtocolExtensionsCapability::new(AddressType::Ipv4Multicast),
+            )]),
+            // Cisco Route Refresh
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+                UnrecognizedCapability::new(128, vec![]),
+            )]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::EnhancedRouteRefresh]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
+                FourOctetASCapability::new(200),
+            )]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::ExtendedMessage]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::AddPath(
+                AddPathCapability::new(vec![
+                    AddPathAddressFamily::new(AddressType::Ipv4Unicast, false, true),
+                    AddPathAddressFamily::new(AddressType::Ipv4Multicast, false, true),
+                ]),
+            )]),
+            // FQDN
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+                UnrecognizedCapability::new(73, vec![0x02, 0x72, 0x32, 0x00]),
+            )]),
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::GracefulRestartCapability(
+                GracefulRestartCapability::new(true, true, 120, vec![]),
+            )]),
+            // Long Lived Graceful Restart
+            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+                UnrecognizedCapability::new(71, vec![0, 1, 1, 128, 0, 0, 0, 0, 1, 2, 128, 0, 0, 0]),
             )]),
         ],
     ));

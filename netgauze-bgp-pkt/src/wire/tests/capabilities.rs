@@ -176,6 +176,22 @@ fn test_multi_protocol_extension() -> Result<(), BGPCapabilityWritingError> {
 }
 
 #[test]
+fn test_graceful_restart() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [0x40, 0x02, 0xc0, 0x78];
+
+    let good = BGPCapability::GracefulRestartCapability(GracefulRestartCapability::new(
+        true,
+        true,
+        120,
+        vec![],
+    ));
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_parse_add_path() -> Result<(), BGPCapabilityWritingError> {
     let good_wire = [0x45, 0x04, 0x00, 0x02, 0x01, 0x03];
     let good_long_wire = [0x45, 0x08, 0x00, 0x01, 0x01, 0x02, 0x00, 0x02, 0x01, 0x01];
