@@ -192,7 +192,7 @@ impl WritablePDU<GracefulRestartCapabilityWritingError> for GracefulRestartAddre
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), GracefulRestartCapabilityWritingError> {
         writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
         writer.write_u8(self.address_type().subsequent_address_family().into())?;
-        writer.write_u8(u8::from(self.forwarding_state()))?;
+        writer.write_u8(if self.forwarding_state() { 0x80 } else { 0x00 })?;
         Ok(())
     }
 }

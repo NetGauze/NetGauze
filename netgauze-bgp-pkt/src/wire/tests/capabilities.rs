@@ -178,6 +178,7 @@ fn test_multi_protocol_extension() -> Result<(), BGPCapabilityWritingError> {
 #[test]
 fn test_graceful_restart() -> Result<(), BGPCapabilityWritingError> {
     let good_wire = [0x40, 0x02, 0xc0, 0x78];
+    let good_address_family_wire = [0x40, 0x06, 0xc0, 0x78, 0x00, 0x01, 0x01, 0x80];
 
     let good = BGPCapability::GracefulRestartCapability(GracefulRestartCapability::new(
         true,
@@ -185,9 +186,21 @@ fn test_graceful_restart() -> Result<(), BGPCapabilityWritingError> {
         120,
         vec![],
     ));
+    let good_address_family =
+        BGPCapability::GracefulRestartCapability(GracefulRestartCapability::new(
+            true,
+            true,
+            120,
+            vec![GracefulRestartAddressFamily::new(
+                true,
+                AddressType::Ipv4Unicast,
+            )],
+        ));
 
     test_parsed_completely(&good_wire, &good);
+    test_parsed_completely(&good_address_family_wire, &good_address_family);
     test_write(&good, &good_wire)?;
+    test_write(&good_address_family, &good_address_family_wire)?;
     Ok(())
 }
 
