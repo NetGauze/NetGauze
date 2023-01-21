@@ -13,11 +13,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{community::*, wire::serializer::community::*};
-use netgauze_parse_utils::test_helpers::{
-    test_parsed_completely, test_parsed_completely_with_one_input, test_write,
+use crate::{
+    community::*,
+    wire::{
+        deserializer::community::{CommunityParsingError, LocatedCommunityParsingError},
+        serializer::community::*,
+    },
 };
+use netgauze_parse_utils::{
+    test_helpers::{
+        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input, test_write,
+    },
+    Span,
+};
+use nom::error::ErrorKind;
 use std::net::Ipv4Addr;
+
+#[test]
+fn test_community() -> Result<(), CommunityWritingError> {
+    let good_wire = [0x00, 0xef, 0x00, 0x20];
+    let bad_incomplete_wire = [0x00];
+
+    let good = Community::new(0x00ef0020);
+    let bad_incomplete = LocatedCommunityParsingError::new(
+        Span::new(&bad_incomplete_wire),
+        CommunityParsingError::NomError(ErrorKind::Eof),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_parse_error::<Community, LocatedCommunityParsingError<'_>>(
+        &bad_incomplete_wire,
+        &bad_incomplete,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
 
 #[test]
 fn test_transitive_four_octet_extended_community(

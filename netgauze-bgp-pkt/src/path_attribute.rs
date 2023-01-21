@@ -17,8 +17,7 @@
 //! used in [crate::update::BGPUpdateMessage].
 
 use crate::{
-    community::{ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
-    iana::WellKnownCommunity,
+    community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     nlri::*,
 };
 use serde::{Deserialize, Serialize};
@@ -677,37 +676,6 @@ impl PathAttributeValueProperties for Communities {
     }
 }
 
-/// Four octet values to specify a community.
-///
-/// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Community(u32);
-
-impl Community {
-    pub const fn new(value: u32) -> Self {
-        Self(value)
-    }
-
-    pub const fn value(&self) -> u32 {
-        self.0
-    }
-    /// Parse the community numerical value into a [WellKnownCommunity].
-    /// If the value is not well-known, then will return None.
-    pub const fn into_well_known(&self) -> Option<WellKnownCommunity> {
-        WellKnownCommunity::from_repr(self.0)
-    }
-
-    /// Getting the ASN number part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
-    pub const fn collection_asn(&self) -> u16 {
-        (self.0 >> 16 & 0xffff) as u16
-    }
-
-    /// Getting the value part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
-    pub const fn collection_value(&self) -> u16 {
-        (self.0 & 0x0000ffff) as u16
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ExtendedCommunities {
     communities: Vec<ExtendedCommunity>,
@@ -946,14 +914,7 @@ impl PathAttributeValueProperties for UnknownAttribute {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        iana::WellKnownCommunity,
-        path_attribute::{
-            AS4Path, ASPath, Aggregator, AsPathSegmentType, Community, LocalPreference, MpReach,
-            MultiExitDiscriminator, NextHop, Origin, PathAttributeValueProperties,
-            UndefinedAsPathSegmentType, UndefinedOrigin,
-        },
-    };
+    use super::*;
 
     #[test]
     fn test_origin() {
@@ -1008,22 +969,5 @@ mod tests {
         assert!(Aggregator::can_be_transitive().unwrap_or(false));
         assert!(MpReach::can_be_optional().unwrap_or(false));
         assert!(!MpReach::can_be_transitive().unwrap_or(false));
-    }
-
-    #[test]
-    fn test_community_into_well_known() {
-        let well_known = Community::new(0xFFFFFF04);
-        let not_well_known = Community::new(0x00FF0F04);
-        assert_eq!(
-            well_known.into_well_known(),
-            Some(WellKnownCommunity::NoPeer)
-        );
-        assert_eq!(not_well_known.into_well_known(), None);
-    }
-    #[test]
-    fn test_community_val() {
-        let comm = Community::new(0x10012003);
-        assert_eq!(comm.collection_asn(), 0x1001);
-        assert_eq!(comm.collection_value(), 0x2003);
     }
 }

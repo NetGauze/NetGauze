@@ -16,6 +16,7 @@
 use crate::{
     community::*,
     iana::{
+        BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType,
         NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
         TransitiveIpv4ExtendedCommunitySubType, TransitiveIpv6ExtendedCommunitySubType,
         TransitiveTwoOctetExtendedCommunitySubType,
@@ -24,6 +25,183 @@ use crate::{
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum CommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<CommunityWritingError> for Community {
+    // u32 community value
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), CommunityWritingError> {
+        writer.write_u32::<NetworkEndian>(self.value())?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum ExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+    TransitiveTwoOctetExtendedCommunityError(
+        #[from] TransitiveTwoOctetExtendedCommunityWritingError,
+    ),
+    NonTransitiveTwoOctetExtendedCommunityError(
+        #[from] NonTransitiveTwoOctetExtendedCommunityWritingError,
+    ),
+    TransitiveIpv4ExtendedCommunityError(#[from] TransitiveIpv4ExtendedCommunityWritingError),
+    NonTransitiveIpv4ExtendedCommunityError(#[from] NonTransitiveIpv4ExtendedCommunityWritingError),
+    TransitiveFourOctetExtendedCommunityError(
+        #[from] TransitiveFourOctetExtendedCommunityWritingError,
+    ),
+    NonTransitiveFourOctetExtendedCommunityError(
+        #[from] NonTransitiveFourOctetExtendedCommunityWritingError,
+    ),
+    TransitiveOpaqueExtendedCommunityError(#[from] TransitiveOpaqueExtendedCommunityWritingError),
+    NonTransitiveOpaqueExtendedCommunityError(
+        #[from] NonTransitiveOpaqueExtendedCommunityWritingError,
+    ),
+    ExperimentalExtendedCommunityError(#[from] ExperimentalExtendedCommunityWritingError),
+    UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityWritingError),
+}
+
+impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                ExtendedCommunity::TransitiveTwoOctet(value) => value.len(),
+                ExtendedCommunity::NonTransitiveTwoOctet(value) => value.len(),
+                ExtendedCommunity::TransitiveIpv4(value) => value.len(),
+                ExtendedCommunity::NonTransitiveIpv4(value) => value.len(),
+                ExtendedCommunity::TransitiveFourOctet(value) => value.len(),
+                ExtendedCommunity::NonTransitiveFourOctet(value) => value.len(),
+                ExtendedCommunity::TransitiveOpaque(value) => value.len(),
+                ExtendedCommunity::NonTransitiveOpaque(value) => value.len(),
+                ExtendedCommunity::Experimental(value) => value.len(),
+                ExtendedCommunity::Unknown(value) => value.len(),
+            }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), ExtendedCommunityWritingError> {
+        match self {
+            ExtendedCommunity::TransitiveTwoOctet(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveTwoOctet as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::NonTransitiveTwoOctet(value) => {
+                writer.write_u8(BgpExtendedCommunityType::NonTransitiveTwoOctet as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::TransitiveIpv4(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveIpv4 as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::NonTransitiveIpv4(value) => {
+                writer.write_u8(BgpExtendedCommunityType::NonTransitiveIpv4 as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::TransitiveFourOctet(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveFourOctet as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::NonTransitiveFourOctet(value) => {
+                writer.write_u8(BgpExtendedCommunityType::NonTransitiveFourOctet as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::TransitiveOpaque(value) => {
+                writer.write_u8(BgpExtendedCommunityType::TransitiveOpaque as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::NonTransitiveOpaque(value) => {
+                writer.write_u8(BgpExtendedCommunityType::NonTransitiveOpaque as u8)?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::Experimental(value) => {
+                writer.write_u8(value.code())?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::Unknown(value) => {
+                writer.write_u8(value.code())?;
+                value.write(writer)?;
+            }
+        };
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum ExtendedCommunityIpv6WritingError {
+    StdIOError(#[from_std_io_error] String),
+    TransitiveIpv6ExtendedCommunityError(#[from] TransitiveIpv6ExtendedCommunityWritingError),
+    NonTransitiveIp64ExtendedCommunityError(#[from] NonTransitiveIpv6ExtendedCommunityWritingError),
+    UnknownExtendedCommunityIpv6Error(#[from] UnknownExtendedCommunityIpv6WritingError),
+}
+
+impl WritablePDU<ExtendedCommunityIpv6WritingError> for ExtendedCommunityIpv6 {
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                Self::TransitiveIpv6(value) => value.len(),
+                Self::NonTransitiveIpv6(value) => value.len(),
+                Self::Unknown(value) => value.len(),
+            }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), ExtendedCommunityIpv6WritingError> {
+        match self {
+            Self::TransitiveIpv6(value) => {
+                writer.write_u8(BgpExtendedCommunityIpv6Type::TransitiveIpv6 as u8)?;
+                value.write(writer)?;
+            }
+            Self::NonTransitiveIpv6(value) => {
+                writer.write_u8(BgpExtendedCommunityIpv6Type::NonTransitiveIpv6 as u8)?;
+                value.write(writer)?;
+            }
+            Self::Unknown(value) => {
+                writer.write_u8(value.code())?;
+                value.write(writer)?;
+            }
+        };
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum LargeCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<LargeCommunityWritingError> for LargeCommunity {
+    /// 4-octet global admin + 4-octets local data part 1 + 4-octets local data
+    /// part 1
+    const BASE_LENGTH: usize = 12;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), LargeCommunityWritingError> {
+        writer.write_u32::<NetworkEndian>(self.global_admin())?;
+        writer.write_u32::<NetworkEndian>(self.local_data1())?;
+        writer.write_u32::<NetworkEndian>(self.local_data2())?;
+        Ok(())
+    }
+}
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum TransitiveTwoOctetExtendedCommunityWritingError {

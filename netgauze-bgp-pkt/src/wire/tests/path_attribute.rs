@@ -992,27 +992,6 @@ fn test_parse_path_attribute_as4_aggregator() -> Result<(), PathAttributeWriting
 }
 
 #[test]
-fn test_community() -> Result<(), CommunitiesWritingError> {
-    let good_wire = [0x00, 0xef, 0x00, 0x20];
-    let bad_incomplete_wire = [0x00];
-
-    let good = Community::new(0x00ef0020);
-    let bad_incomplete = LocatedCommunitiesParsingError::new(
-        Span::new(&bad_incomplete_wire),
-        CommunitiesParsingError::NomError(ErrorKind::Eof),
-    );
-
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<Community, LocatedCommunitiesParsingError<'_>>(
-        &bad_incomplete_wire,
-        &bad_incomplete,
-    );
-
-    test_write(&good, &good_wire)?;
-    Ok(())
-}
-
-#[test]
 fn test_parse_path_attribute_communities() -> Result<(), PathAttributeWritingError> {
     let good_zero_wire = [0xc0, 0x08, 0x00];
     let good_one_wire = [0xc0, 0x08, 0x04, 0x00, 0x00, 0x00, 0x01];

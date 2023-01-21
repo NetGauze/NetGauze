@@ -13,8 +13,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::iana::WellKnownCommunity;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
+
+/// Four octet values to specify a community.
+///
+/// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Community(u32);
+
+impl Community {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    pub const fn value(&self) -> u32 {
+        self.0
+    }
+    /// Parse the community numerical value into a [WellKnownCommunity].
+    /// If the value is not well-known, then will return None.
+    pub const fn into_well_known(&self) -> Option<WellKnownCommunity> {
+        WellKnownCommunity::from_repr(self.0)
+    }
+
+    /// Getting the ASN number part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    pub const fn collection_asn(&self) -> u16 {
+        (self.0 >> 16 & 0xffff) as u16
+    }
+
+    /// Getting the value part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
+    pub const fn collection_value(&self) -> u16 {
+        (self.0 & 0x0000ffff) as u16
+    }
+}
 
 /// As defined in [RFC8092](https://www.rfc-editor.org/rfc/rfc8092)
 ///
@@ -747,5 +779,27 @@ impl ExtendedCommunityProperties for UnknownExtendedCommunityIpv6 {
 
     fn transitive(&self) -> bool {
         self.code & 0x40 == 0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_community_into_well_known() {
+        let well_known = Community::new(0xFFFFFF04);
+        let not_well_known = Community::new(0x00FF0F04);
+        assert_eq!(
+            well_known.into_well_known(),
+            Some(WellKnownCommunity::NoPeer)
+        );
+        assert_eq!(not_well_known.into_well_known(), None);
+    }
+    #[test]
+    fn test_community_val() {
+        let comm = Community::new(0x10012003);
+        assert_eq!(comm.collection_asn(), 0x1001);
+        assert_eq!(comm.collection_value(), 0x2003);
     }
 }
