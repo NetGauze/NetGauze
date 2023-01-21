@@ -16,6 +16,51 @@
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+/// As defined in [RFC8092](https://www.rfc-editor.org/rfc/rfc8092)
+///
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                      Global Administrator                     |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                       Local Data Part 1                       |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                       Local Data Part 2                       |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+///
+/// Global Administrator:  A four-octet namespace identifier.
+/// Local Data Part 1:  A four-octet operator-defined value.
+/// Local Data Part 2:  A four-octet operator-defined value.
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct LargeCommunity {
+    global_admin: u32,
+    local_data1: u32,
+    local_data2: u32,
+}
+
+impl LargeCommunity {
+    pub const fn new(global_admin: u32, local_data1: u32, local_data2: u32) -> Self {
+        Self {
+            global_admin,
+            local_data1,
+            local_data2,
+        }
+    }
+
+    pub const fn global_admin(&self) -> u32 {
+        self.global_admin
+    }
+
+    pub const fn local_data1(&self) -> u32 {
+        self.local_data1
+    }
+
+    pub const fn local_data2(&self) -> u32 {
+        self.local_data2
+    }
+}
 pub trait ExtendedCommunityProperties {
     fn iana_defined(&self) -> bool;
     fn transitive(&self) -> bool;

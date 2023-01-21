@@ -16,7 +16,7 @@
 //! Deserializer for BGP Path Attributes
 
 use crate::{
-    community::{ExtendedCommunity, ExtendedCommunityIpv6},
+    community::*,
     iana::{
         BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, PathAttributeType,
         UndefinedPathAttributeType,
@@ -82,6 +82,7 @@ pub enum PathAttributeParsingError {
     ExtendedCommunitiesErrorIpv6(
         #[from_located(module = "self")] ExtendedCommunitiesIpv6ParsingError,
     ),
+    LargeCommunitiesError(#[from_located(module = "self")] LargeCommunitiesParsingError),
     MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
@@ -160,6 +161,11 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
             Ok(PathAttributeType::ExtendedCommunitiesIpv6) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::ExtendedCommunitiesIpv6(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::LargeCommunities) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::LargeCommunities(value);
                 (buf, value)
             }
             Ok(PathAttributeType::MPReachNLRI) => {
@@ -1200,5 +1206,47 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedExtendedCommunitiesIpv6Parsing
         };
         let (_, communities) = parse_till_empty_into_located(communities_buf)?;
         Ok((buf, ExtendedCommunitiesIpv6::new(communities)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum LargeCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePDU<'a, LocatedLargeCommunityParsingError<'a>> for LargeCommunity {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedLargeCommunityParsingError<'a>> {
+        let (buf, global_admin) = be_u32(buf)?;
+        let (buf, local_data1) = be_u32(buf)?;
+        let (buf, local_data2) = be_u32(buf)?;
+        Ok((
+            buf,
+            LargeCommunity::new(global_admin, local_data1, local_data2),
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum LargeCommunitiesParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    LargeCommunityError(#[from_located(module = "self")] LargeCommunityParsingError),
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedLargeCommunitiesParsingError<'a>>
+    for LargeCommunities
+{
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedLargeCommunitiesParsingError<'a>> {
+        let (buf, communities_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (_, communities) = parse_till_empty_into_located(communities_buf)?;
+        Ok((buf, LargeCommunities::new(communities)))
     }
 }

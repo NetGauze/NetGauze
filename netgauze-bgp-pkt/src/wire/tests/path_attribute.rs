@@ -1633,6 +1633,27 @@ fn test_multiple_extended_communities() -> Result<(), PathAttributeWritingError>
 }
 
 #[test]
+fn test_large_community() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0xc0, 0x20, 0x0c, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x22, 0x00, 0x00, 0x00, 0x38,
+    ];
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::LargeCommunities(LargeCommunities::new(vec![LargeCommunity::new(
+            12, 34, 56,
+        )])),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_unknown_attribute() -> Result<(), UnknownAttributeWritingError> {
     let good_wire = [0x00, 0x04, 0xac, 0x10, 0x03, 0x02];
     let good_extended_wire = [0x00, 0x00, 0x04, 0xac, 0x10, 0x03, 0x02];

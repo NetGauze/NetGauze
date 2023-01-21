@@ -16,7 +16,7 @@
 //! Serializer for BGP Path Attributes
 
 use crate::{
-    community::{ExtendedCommunity, ExtendedCommunityIpv6},
+    community::{ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     iana::{BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, PathAttributeType},
     nlri::*,
     path_attribute::*,
@@ -38,7 +38,8 @@ pub enum PathAttributeWritingError {
     AggregatorError(#[from] AggregatorWritingError),
     CommunitiesError(#[from] CommunitiesWritingError),
     ExtendedCommunitiesError(#[from] ExtendedCommunitiesWritingError),
-    ExtendedCommunitiesErrorIpv6(#[from] ExtendedCommunitiesIpv6WritingError),
+    ExtendedCommunitiesIpv6Error(#[from] ExtendedCommunitiesIpv6WritingError),
+    LargeCommunitiesError(#[from] LargeCommunitiesWritingError),
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
@@ -60,6 +61,7 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::Communities(value) => value.len(self.extended_length()),
             PathAttributeValue::ExtendedCommunities(value) => value.len(self.extended_length()),
             PathAttributeValue::ExtendedCommunitiesIpv6(value) => value.len(self.extended_length()),
+            PathAttributeValue::LargeCommunities(value) => value.len(self.extended_length()),
             PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
             PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
@@ -125,6 +127,10 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             }
             PathAttributeValue::ExtendedCommunitiesIpv6(value) => {
                 writer.write_u8(PathAttributeType::ExtendedCommunitiesIpv6.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::LargeCommunities(value) => {
+                writer.write_u8(PathAttributeType::LargeCommunities.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MpReach(value) => {
@@ -721,6 +727,57 @@ impl WritablePDU<ExtendedCommunityIpv6WritingError> for ExtendedCommunityIpv6 {
                 value.write(writer)?;
             }
         };
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum LargeCommunitiesWritingError {
+    StdIOError(#[from_std_io_error] String),
+    LargeCommunityError(#[from] LargeCommunityWritingError),
+}
+
+impl WritablePDUWithOneInput<bool, LargeCommunitiesWritingError> for LargeCommunities {
+    // One octet length (if extended is not enabled)
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let base = Self::BASE_LENGTH + usize::from(extended_length);
+        let value_len = self.communities().iter().map(|x| x.len()).sum::<usize>();
+        base + value_len
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), LargeCommunitiesWritingError> {
+        write_length(self, extended_length, writer)?;
+        for community in self.communities() {
+            community.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum LargeCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<LargeCommunityWritingError> for LargeCommunity {
+    /// 4-octet global admin + 4-octets local data part 1 + 4-octets local data
+    /// part 1
+    const BASE_LENGTH: usize = 12;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), LargeCommunityWritingError> {
+        writer.write_u32::<NetworkEndian>(self.global_admin())?;
+        writer.write_u32::<NetworkEndian>(self.local_data1())?;
+        writer.write_u32::<NetworkEndian>(self.local_data2())?;
         Ok(())
     }
 }

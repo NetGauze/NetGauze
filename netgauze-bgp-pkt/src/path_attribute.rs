@@ -17,7 +17,7 @@
 //! used in [crate::update::BGPUpdateMessage].
 
 use crate::{
-    community::{ExtendedCommunity, ExtendedCommunityIpv6},
+    community::{ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     iana::WellKnownCommunity,
     nlri::*,
 };
@@ -158,6 +158,7 @@ pub enum PathAttributeValue {
     Communities(Communities),
     ExtendedCommunities(ExtendedCommunities),
     ExtendedCommunitiesIpv6(ExtendedCommunitiesIpv6),
+    LargeCommunities(LargeCommunities),
     MpReach(MpReach),
     MpUnreach(MpUnreach),
     UnknownAttribute(UnknownAttribute),
@@ -177,6 +178,7 @@ impl PathAttributeValue {
             Self::Communities(_) => Communities::can_be_optional(),
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_optional(),
             Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_optional(),
+            Self::LargeCommunities(_) => LargeCommunities::can_be_optional(),
             Self::MpReach(_) => MpReach::can_be_optional(),
             Self::MpUnreach(_) => MpUnreach::can_be_optional(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -196,6 +198,7 @@ impl PathAttributeValue {
             Self::Communities(_) => Communities::can_be_transitive(),
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_transitive(),
             Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_transitive(),
+            Self::LargeCommunities(_) => LargeCommunities::can_be_transitive(),
             Self::MpReach(_) => MpReach::can_be_transitive(),
             Self::MpUnreach(_) => MpUnreach::can_be_transitive(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_transitive(),
@@ -215,6 +218,7 @@ impl PathAttributeValue {
             Self::Communities(_) => Communities::can_be_partial(),
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_partial(),
             Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_partial(),
+            Self::LargeCommunities(_) => LargeCommunities::can_be_partial(),
             Self::MpReach(_) => MpReach::can_be_partial(),
             Self::MpUnreach(_) => MpUnreach::can_be_partial(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -749,6 +753,35 @@ impl ExtendedCommunitiesIpv6 {
 }
 
 impl PathAttributeValueProperties for ExtendedCommunitiesIpv6 {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        None
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LargeCommunities {
+    communities: Vec<LargeCommunity>,
+}
+
+impl LargeCommunities {
+    pub const fn new(communities: Vec<LargeCommunity>) -> Self {
+        Self { communities }
+    }
+
+    pub const fn communities(&self) -> &Vec<LargeCommunity> {
+        &self.communities
+    }
+}
+
+impl PathAttributeValueProperties for LargeCommunities {
     fn can_be_optional() -> Option<bool> {
         Some(true)
     }
