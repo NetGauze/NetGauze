@@ -1,5 +1,5 @@
 [package]
-name = "netgauze-ipfix-pkt"
+name = "netgauze-flow-pkt"
 version = "0.0.1"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
