@@ -2,12 +2,12 @@ use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use netgauze_ipfix_pkt::{FieldSpecifier, IpfixPacket};
+use netgauze_ipfix_pkt::{ipfix::IpfixPacket, FieldSpecifier};
 use netgauze_parse_utils::{ReadablePDUWithOneInput, Span, WritablePDUWithOneInput};
 
 const IPFIX_PKT_TEMPLATE_RAW: &[u8] = &[
     0x00, 0x0a, // Version
-    0x00, 0x60, // Length
+    0x00, 0x74, // Length
     0x58, 0x3d, 0xe0, 0x59, // Export time
     0x00, 0x00, 0x0e, 0xe4, // Seq number
     0x00, 0x00, 0x00, 0x00, // Observation domain
@@ -156,7 +156,10 @@ const IPFIX_PKT_DATA_PKT_ONLY: &[u8] = &[
     0x06, 0x02, 0x04, 0x00
 ];
 
-pub fn test_parse(span: Span, templates_map: Rc<RefCell<HashMap<u16, Rc<Vec<FieldSpecifier>>>>>) {
+pub fn test_parse(
+    span: Span,
+    templates_map: Rc<RefCell<HashMap<u16, Rc<(Vec<FieldSpecifier>, Vec<FieldSpecifier>)>>>>,
+) {
     let x = IpfixPacket::from_wire(span, templates_map);
     x.unwrap();
 }

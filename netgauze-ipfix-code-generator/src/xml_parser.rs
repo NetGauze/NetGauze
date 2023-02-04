@@ -191,6 +191,13 @@ pub(crate) fn parse_information_elements(node: &Node, pen: u32) -> Vec<Informati
             log::info!("Skipping a child with no name: {:?}", child);
             continue;
         }
+        let data_type = data_type.map(|x| {
+            if name == Some("samplerId".to_string()) {
+                "unsigned32".to_string()
+            } else {
+                x
+            }
+        });
         let ie = InformationElement {
             pen,
             name: name.unwrap(),

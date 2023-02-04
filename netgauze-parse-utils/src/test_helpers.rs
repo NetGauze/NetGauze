@@ -18,7 +18,7 @@
 
 use crate::{
     ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs,
-    Span, WritablePDU, WritablePDUWithOneInput,
+    Span, WritablePDU, WritablePDUWithOneInput, WritablePDUWithTwoInputs,
 };
 use netgauze_locate::BinarySpan;
 use nom::IResult;
@@ -215,20 +215,46 @@ pub fn test_write<T: WritablePDU<E>, E: Eq>(input: &T, expected: &[u8]) -> Resul
     Ok(())
 }
 
-pub fn test_write_with_one_input<I: Copy, T: WritablePDUWithOneInput<I, E>, E: Eq>(
+pub fn test_write_with_one_input<I: Clone, T: WritablePDUWithOneInput<I, E>, E: Eq>(
     input: &T,
     parser_input: I,
     expected: &[u8],
 ) -> Result<(), E> {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
-    input.write(&mut cursor, parser_input)?;
+    input.write(&mut cursor, parser_input.clone())?;
     assert_eq!(
         buf, expected,
         "Serialized buffer is different the the expected one"
     );
     assert_eq!(
         input.len(parser_input),
+        expected.len(),
+        "Packet::len() is different the serialized buffer length"
+    );
+    Ok(())
+}
+
+pub fn test_write_with_two_inputs<
+    I1: Copy,
+    I2: Copy,
+    T: WritablePDUWithTwoInputs<I1, I2, E>,
+    E: Eq,
+>(
+    input: &T,
+    parser_input1: I1,
+    parser_input2: I2,
+    expected: &[u8],
+) -> Result<(), E> {
+    let mut buf: Vec<u8> = vec![];
+    let mut cursor = Cursor::new(&mut buf);
+    input.write(&mut cursor, parser_input1, parser_input2)?;
+    assert_eq!(
+        buf, expected,
+        "Serialized buffer is different the the expected one"
+    );
+    assert_eq!(
+        input.len(parser_input1, parser_input2),
         expected.len(),
         "Packet::len() is different the serialized buffer length"
     );

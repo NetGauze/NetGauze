@@ -261,7 +261,6 @@ pub(crate) fn generate_information_element_ids(ie: &Vec<InformationElement>) -> 
 
     ret.push_str(generate_impl_ie_template_for_ie(ie).as_str());
     ret.push_str(generate_from_for_ie().as_str());
-
     ret
 }
 
@@ -468,17 +467,17 @@ fn generate_ie_template_trait_for_main(
     ret
 }
 
-fn generate_ie_record_enum_for_ie(
+fn generate_ie_field_enum_for_ie(
     iana_ies: &Vec<InformationElement>,
     vendors: &Vec<(String, String, u32)>,
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str(generate_derive(false, false, false).as_str());
-    ret.push_str("pub enum Record {\n");
+    ret.push_str("pub enum Field {\n");
     ret.push_str("    Unknown(Vec<u8>),\n");
     for (name, pkg, _) in vendors {
-        ret.push_str(format!("    {name}({pkg}::Record),\n").as_str());
+        ret.push_str(format!("    {name}({pkg}::Field),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
@@ -523,7 +522,7 @@ pub(crate) fn generate_ie_ids(
 
     ret.push_str(generate_ie_try_from_pen_code(iana_ies, vendors).as_str());
     ret.push_str(generate_ie_template_trait_for_main(iana_ies, vendors).as_str());
-    ret.push_str(generate_ie_record_enum_for_ie(iana_ies, vendors).as_str());
+    ret.push_str(generate_ie_field_enum_for_ie(iana_ies, vendors).as_str());
 
     ret
 }
@@ -688,6 +687,7 @@ fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
 
 fn get_deserializer_header(ty_name: &str) -> String {
     let mut header = format!("impl<'a> netgauze_parse_utils::ReadablePDUWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n");
+    header.push_str("    #[inline]\n");
     header.push_str(format!("    fn from_wire(buf: netgauze_parse_utils::Span<'a>, length: u16) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
     header
 }
@@ -1155,7 +1155,7 @@ pub(crate) fn generate_pkg_ie_serializers(
     for ie in ies {
         ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
     }
-    let ty_name = "Record";
+    let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
     ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
@@ -1190,21 +1190,21 @@ pub(crate) fn generate_pkg_ie_serializers(
     for ie in ies {
         ret.push_str(
             format!(
-                "            Self::{}(value) => value.write(writer, length)?,\n",
+                "           Self::{}(value) => value.write(writer, length)?,\n",
                 ie.name
             )
             .as_str(),
         );
     }
-    ret.push_str("         }\n");
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n");
     ret.push_str("}\n\n");
 
     ret
 }
 
-pub(crate) fn generate_records_enum(ies: &Vec<InformationElement>) -> String {
+pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     let not_copy = ies.iter().any(|x| {
@@ -1214,7 +1214,7 @@ pub(crate) fn generate_records_enum(ies: &Vec<InformationElement>) -> String {
         .iter()
         .any(|x| get_rust_type(&x.data_type) == "f32" || get_rust_type(&x.data_type) == "f64");
     ret.push_str(generate_derive(false, !not_copy, !not_eq).as_str());
-    ret.push_str("pub enum Record {\n");
+    ret.push_str("pub enum Field {\n");
     for ie in ies {
         ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
     }
@@ -1274,7 +1274,7 @@ pub(crate) fn generate_ie_values(ies: &Vec<InformationElement>) -> String {
 
 fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
-    let ty_name = "Record";
+    let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
     ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
@@ -1294,6 +1294,7 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
 
     ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, Located{ty_name}ParsingError<'a>>\n").as_str());
     ret.push_str(format!("for {ty_name} {{\n").as_str());
+    ret.push_str("    #[inline]\n");
     ret.push_str("    fn from_wire(\n");
     ret.push_str("        buf: netgauze_parse_utils::Span<'a>,\n");
     ret.push_str("        ie: &InformationElementId,\n");
@@ -1303,13 +1304,14 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         ret.push_str(format!("            InformationElementId::{} => {{\n", ie.name).as_str());
         ret.push_str(format!("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input::<'_, u16, Located{}ParsingError<'_>, Located{}ParsingError<'_>, {}>(buf, length)?;\n", ie.name, ty_name, ie.name).as_str());
-        ret.push_str(format!("                (buf, Record::{}(value))\n", ie.name).as_str());
+        ret.push_str(format!("                (buf, Field::{}(value))\n", ie.name).as_str());
         ret.push_str("            }\n");
     }
     ret.push_str("        };\n");
     ret.push_str("       Ok((buf, value))\n");
     ret.push_str("    }\n");
     ret.push_str("}\n");
+
     ret
 }
 
@@ -1325,14 +1327,14 @@ pub(crate) fn generate_ie_deser_main(
         ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
     }
 
-    let ty_name = "Record";
+    let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
     ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     for (name, pkg, _) in vendor_prefixes {
-        let value_name = format!("{pkg}::RecordParsingError");
+        let value_name = format!("{pkg}::FieldParsingError");
         ret.push_str(
             format!("    {name}Error(#[from_located(module = \"\")] {value_name}),\n").as_str(),
         );
@@ -1349,20 +1351,21 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
-    ret.push_str("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, LocatedRecordParsingError<'a>>\n");
-    ret.push_str("for Record {\n");
+    ret.push_str("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, LocatedFieldParsingError<'a>>\n");
+    ret.push_str("for Field {\n");
+    ret.push_str("    #[inline]\n");
     ret.push_str("    fn from_wire(\n");
     ret.push_str("        buf: netgauze_parse_utils::Span<'a>,\n");
     ret.push_str("        ie: &InformationElementId,\n");
     ret.push_str("        length: u16,\n");
-    ret.push_str("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedRecordParsingError<'a>> {\n");
+    ret.push_str("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedFieldParsingError<'a>> {\n");
     ret.push_str("        let (buf, value) = match ie {\n");
     for (name, _, _) in vendor_prefixes {
         ret.push_str(
             format!("            InformationElementId::{name}(value_ie) => {{\n").as_str(),
         );
         ret.push_str("                let (buf, value) = netgauze_parse_utils::parse_into_located_two_inputs(buf, value_ie, length)?;\n");
-        ret.push_str(format!("                (buf, crate::ie::Record::{name}(value))\n").as_str());
+        ret.push_str(format!("                (buf, crate::ie::Field::{name}(value))\n").as_str());
         ret.push_str("            }\n");
     }
     for ie in iana_ies {
@@ -1370,7 +1373,7 @@ pub(crate) fn generate_ie_deser_main(
         ret.push_str("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input(buf, length)?;\n");
         ret.push_str(
             format!(
-                "                (buf, crate::ie::Record::{}(value))\n",
+                "                (buf, crate::ie::Field::{}(value))\n",
                 ie.name
             )
             .as_str(),
@@ -1382,6 +1385,7 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str("        Ok((buf, value))\n");
     ret.push_str("    }\n");
     ret.push_str("}\n");
+
     ret
 }
 
@@ -1656,13 +1660,13 @@ pub(crate) fn generate_ie_ser_main(
         ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
     }
 
-    let ty_name = "Record";
+    let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
     ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
     for (name, pkg, _) in vendor_prefixes {
-        ret.push_str(format!("    {name}Error(#[from] {pkg}::RecordWritingError),\n").as_str());
+        ret.push_str(format!("    {name}Error(#[from] {pkg}::FieldWritingError),\n").as_str());
     }
     for ie in iana_ies {
         ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());

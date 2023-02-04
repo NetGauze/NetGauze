@@ -226,7 +226,7 @@ fn generate_vendor_ie(
     output.push_str("\n\n");
 
     output.push_str(generate_ie_values(&ie_node_parsed).as_str());
-    output.push_str(generate_records_enum(&ie_node_parsed).as_str());
+    output.push_str(generate_fields_enum(&ie_node_parsed).as_str());
 
     let dest_path = Path::new(&out_dir).join(format!(
         "{}_{}",
