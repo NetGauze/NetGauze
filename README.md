@@ -5,6 +5,12 @@
 A collection of network related libraries that includes protocol parsers and daemons.
 This project is still in an early stage.
 
+## Supported Protocols
+
+1. BGP, `netgauze-bgp-pkt`
+2. BMP, `netgauze-bmp-pkt`
+3. Netflow V9 and IPFIX `netgauze-flow-pkt`
+
 # Development documentation
 
 *Running Packet Serde Fuzzer*
