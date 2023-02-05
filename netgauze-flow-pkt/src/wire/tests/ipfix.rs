@@ -461,9 +461,7 @@ fn test_complex_sequence() -> Result<(), IpfixPacketWritingError> {
         0x06, 0x02, 0x04, 0x00];
 
     let (_, _pkt1) = IpfixPacket::from_wire(Span::new(&pkt1_wire), templates_map.clone()).unwrap();
-    println!("Pkt1: {:?}", _pkt1);
     let (_, _pkt2)  = IpfixPacket::from_wire(Span::new(&pkt2_wire), templates_map).unwrap();
-    println!("Pkt2: {:?}", _pkt2);
     // TODO: test writing complex packets
     Ok(())
 }
