@@ -23,6 +23,12 @@ use crate::ie::*;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FlowInfo {
+    NetFlowV9(netflow::NetFlowV9Packet),
+    IPFIX(ipfix::IpfixPacket),
+}
+
 /// Errors when crafting a new Set
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum FieldSpecifierError {
