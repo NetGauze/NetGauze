@@ -16,7 +16,7 @@
 #![no_main]
 extern crate libfuzzer_sys;
 use libfuzzer_sys::fuzz_target;
-use netgauze_ipfix_pkt::ipfix::IpfixPacket;
+use netgauze_flow_pkt::ipfix::IpfixPacket;
 use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
