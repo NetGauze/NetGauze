@@ -351,6 +351,14 @@ impl WritablePDUWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField
             }
             ScopeField::System(System(value)) => {
                 writer.write_all(value.as_bytes())?;
+                match length {
+                    None => {}
+                    Some(length) => {
+                        for _ in value.as_bytes().len()..(length as usize) {
+                            writer.write_u8(0)?;
+                        }
+                    }
+                }
             }
             ScopeField::Interface(Interface(value)) => match length {
                 None => writer.write_u32::<NetworkEndian>(*value)?,

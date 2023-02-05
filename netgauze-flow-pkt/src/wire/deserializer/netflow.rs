@@ -374,20 +374,16 @@ pub enum ScopeFieldParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidLength(u16),
-    FromUtf8Error(String),
+    Utf8Error(String),
 }
 
-impl<'a> nom::error::FromExternalError<Span<'a>, std::string::FromUtf8Error>
+impl<'a> nom::error::FromExternalError<Span<'a>, std::str::Utf8Error>
     for LocatedScopeFieldParsingError<'a>
 {
-    fn from_external_error(
-        input: Span<'a>,
-        _kind: ErrorKind,
-        error: std::string::FromUtf8Error,
-    ) -> Self {
+    fn from_external_error(input: Span<'a>, _kind: ErrorKind, error: std::str::Utf8Error) -> Self {
         LocatedScopeFieldParsingError::new(
             input,
-            ScopeFieldParsingError::FromUtf8Error(error.to_string()),
+            ScopeFieldParsingError::Utf8Error(error.to_string()),
         )
     }
 }
@@ -414,10 +410,16 @@ impl<'a>
                 ))
             }
             ScopeInformationElementId::System => {
-                let (buf, value) =
-                    nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
-                        String::from_utf8(x.to_vec())
-                    })(buf)?;
+                let (buf, value) = nom::combinator::map_res(
+                    nom::bytes::complete::take(length),
+                    |str_buf: Span<'_>| {
+                        let nul_index = str_buf
+                            .iter()
+                            .position(|&c| c == b'\0')
+                            .unwrap_or(str_buf.len());
+                        std::str::from_utf8(&str_buf[..nul_index]).map(|x| x.to_string())
+                    },
+                )(buf)?;
                 Ok((buf, ScopeField::System(System(value))))
             }
             ScopeInformationElementId::Interface => {

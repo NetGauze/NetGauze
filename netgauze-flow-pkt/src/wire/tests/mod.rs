@@ -228,6 +228,24 @@ fn test_time_fraction_value() -> Result<(), ie_ser::flowStartMicrosecondsWriting
 }
 
 #[test]
+fn test_string_value() -> Result<(), ie_ser::interfaceNameWritingError> {
+    let good_wire = [
+        0x6c, 0x6f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00,
+    ];
+
+    let good = ie::interfaceName("lo".to_string());
+
+    test_parsed_completely_with_one_input::<
+        ie::interfaceName,
+        u16,
+        ie_desr::LocatedinterfaceNameParsingError<'_>,
+    >(&good_wire, good_wire.len() as u16, &good);
+    test_write_with_one_input(&good, Some(good_wire.len() as u16), &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_record_value() -> Result<(), ie_ser::FieldWritingError> {
     let value_wire = [0x12, 0xc6, 0x21, 0x12, 0x69, 0x32];
     let value =

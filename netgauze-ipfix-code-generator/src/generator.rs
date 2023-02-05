@@ -943,17 +943,17 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     string_error.push_str(format!("pub enum {ie_name}ParsingError {{\n").as_str());
     string_error.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     string_error.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
-    string_error.push_str("    FromUtf8Error(String),\n");
+    string_error.push_str("    Utf8Error(String),\n");
     string_error.push_str("}\n\n");
 
-    string_error.push_str("impl<'a> nom::error::FromExternalError<netgauze_parse_utils::Span<'a>, std::string::FromUtf8Error>\n");
+    string_error.push_str("impl<'a> nom::error::FromExternalError<netgauze_parse_utils::Span<'a>, std::str::Utf8Error>\n");
     string_error.push_str(format!("for Located{ie_name}ParsingError<'a>\n").as_str());
     string_error.push_str("{\n");
-    string_error.push_str("    fn from_external_error(input: netgauze_parse_utils::Span<'a>, _kind: nom::error::ErrorKind, error: std::string::FromUtf8Error) -> Self {\n");
+    string_error.push_str("    fn from_external_error(input: netgauze_parse_utils::Span<'a>, _kind: nom::error::ErrorKind, error: std::str::Utf8Error) -> Self {\n");
     string_error.push_str(format!("        Located{ie_name}ParsingError::new(\n").as_str());
     string_error.push_str("            input,\n");
     string_error.push_str(
-        format!("            {ie_name}ParsingError::FromUtf8Error(error.to_string()),\n").as_str(),
+        format!("            {ie_name}ParsingError::Utf8Error(error.to_string()),\n").as_str(),
     );
     string_error.push_str("        )\n");
     string_error.push_str("    }\n");
@@ -963,8 +963,15 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     ret.push_str(header.as_str());
 
     ret.push_str("        let (buf, value) =\n");
-    ret.push_str("            nom::combinator::map_res(nom::bytes::complete::take(length), |x: netgauze_parse_utils::Span<'_>| {\n");
-    ret.push_str("                String::from_utf8(x.to_vec())\n");
+    ret.push_str("            nom::combinator::map_res(nom::bytes::complete::take(length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
+    ret.push_str("                let nul_range_end = str_buf\n");
+    ret.push_str("                    .iter()\n");
+    ret.push_str("                    .position(|&c| c == b'\\0')\n");
+    ret.push_str("                    .unwrap_or(str_buf.len());\n");
+    ret.push_str(
+        "                let result = ::std::str::from_utf8(&str_buf[..nul_range_end]);\n",
+    );
+    ret.push_str("                result.map(|x| x.to_string())\n");
     ret.push_str("            })(buf)?;\n");
     ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     ret.push_str("    }\n");
@@ -1131,6 +1138,9 @@ pub(crate) fn generate_pkg_ie_deserializers(
 ) -> String {
     let mut ret = String::new();
     // Not every vendor is using time based values
+    if ies.iter().any(|x| x.data_type.contains("String")) {
+        ret.push_str("use nom::InputIter;\n");
+    }
     if ies.iter().any(|x| x.data_type.contains("chrono")) {
         ret.push_str("use chrono::TimeZone;\n");
     }
@@ -1509,11 +1519,22 @@ fn generate_string_serializer(ie_name: &str) -> String {
         .as_str(),
     );
     ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
-    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
-    ret.push_str("         self.0.len()\n");
+    ret.push_str("     fn len(&self, length: Option<u16>) -> usize {\n");
+    ret.push_str("         match length {\n");
+    ret.push_str("             None => self.0.len(),\n");
+    ret.push_str("             Some(len) => len as usize,\n");
+    ret.push_str("         }\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
+    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
     ret.push_str("         writer.write_all(self.0.as_bytes())?;\n");
+    ret.push_str("         match length {\n");
+    ret.push_str("             None => {},\n");
+    ret.push_str("             Some(len) => {\n");
+    ret.push_str("                  for _ in self.0.as_bytes().len()..(len as usize) {\n");
+    ret.push_str("                      writer.write_u8(0)?\n");
+    ret.push_str("                  }\n");
+    ret.push_str("             }\n");
+    ret.push_str("         }\n");
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
     ret.push_str("}\n\n");
