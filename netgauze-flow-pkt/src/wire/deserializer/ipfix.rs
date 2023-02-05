@@ -37,7 +37,7 @@ use netgauze_serde_macros::LocatedError;
 
 /// 2-octets version, 2-octets length, 4-octets * 3 (export time, seq no,
 /// observation domain id)
-const IPFIX_HEADER_LENGTH: u16 = 16;
+pub const IPFIX_HEADER_LENGTH: u16 = 16;
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum IpfixPacketParsingError {

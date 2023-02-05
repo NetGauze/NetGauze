@@ -37,7 +37,7 @@ use crate::{
 
 /// 2-octets version, 2-octets count, 4-octets * 4 (sysUpTime, UNIX time, seq
 /// no, source id)
-pub(crate) const NETFLOW_V9_HEADER_LENGTH: u16 = 20;
+pub const NETFLOW_V9_HEADER_LENGTH: u16 = 20;
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum NetFlowV9PacketParsingError {

@@ -24,7 +24,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc};
 
-pub(crate) const NETFLOW_V9_VERSION: u16 = 9;
+pub const NETFLOW_V9_VERSION: u16 = 9;
 
 /// A value of 0 is reserved for Template Sets
 pub(crate) const NETFLOW_TEMPLATE_SET_ID: u16 = 0;

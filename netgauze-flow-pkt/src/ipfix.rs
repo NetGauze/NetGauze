@@ -19,7 +19,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{ie::Field, DataSetId, FieldSpecifier};
 
-pub(crate) const IPFIX_VERSION: u16 = 10;
+pub const IPFIX_VERSION: u16 = 10;
 
 /// A value of 2 is reserved for Template Sets
 pub(crate) const IPFIX_TEMPLATE_SET_ID: u16 = 2;
