@@ -207,9 +207,17 @@ impl WritablePDU<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), OptionsTemplateRecordWritingError> {
         writer.write_u16::<NetworkEndian>(self.id())?;
         writer.write_u16::<NetworkEndian>(
-            (self.scope_field_specifiers().len() + self.field_specifiers().len()) as u16,
+            self.scope_field_specifiers()
+                .iter()
+                .map(|x| x.len())
+                .sum::<usize>() as u16,
         )?;
-        writer.write_u16::<NetworkEndian>(self.scope_field_specifiers().len() as u16)?;
+        writer.write_u16::<NetworkEndian>(
+            self.field_specifiers()
+                .iter()
+                .map(|x| x.len())
+                .sum::<usize>() as u16,
+        )?;
         for field in self.scope_field_specifiers() {
             field.write(writer)?;
         }
