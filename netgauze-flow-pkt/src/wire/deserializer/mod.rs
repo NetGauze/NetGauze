@@ -31,6 +31,12 @@ pub mod ipfix;
 pub mod netflow;
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum FlowParsingError {
+    IpfixParsingError(ipfix::IpfixPacketParsingError),
+    NetFlowV9ParsingError(netflow::NetFlowV9PacketParsingError),
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FieldSpecifierParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

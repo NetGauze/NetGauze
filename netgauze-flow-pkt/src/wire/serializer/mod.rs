@@ -24,6 +24,13 @@ use netgauze_serde_macros::WritingError;
 use std::io::Write;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum FlowWritingError {
+    StdIOError(#[from_std_io_error] String),
+    IpfixWritingError(#[from] ipfix::IpfixPacketWritingError),
+    NetFlowV9WritingError(#[from] netflow::NetFlowV9WritingError),
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum FieldSpecifierWritingError {
     StdIOError(#[from_std_io_error] String),
 }
