@@ -13,28 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    capabilities::{
-        AddPathAddressFamily, AddPathCapability, BgpCapability, ExtendedNextHopEncoding,
-        ExtendedNextHopEncodingCapability, FourOctetAsCapability, GracefulRestartCapability,
-        MultiProtocolExtensionsCapability, UnrecognizedCapability,
-    },
-    iana::{
-        RouteRefreshSubcode, UndefinedBgpErrorNotificationCode, UndefinedBgpMessageType,
-        UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
-    },
-    notification::CeaseError,
-    open::{BgpOpenMessageParameter, BGP_VERSION},
-    wire::{
-        deserializer::{
-            notification::{BgpNotificationMessageParsingError, CeaseErrorParsingError},
-            route_refresh::BgpRouteRefreshMessageParsingError,
-            BgpMessageParsingError, LocatedBgpMessageParsingError,
-        },
-        serializer::BgpMessageWritingError,
-    },
-    BgpOpenMessage, BgpMessage, BgpNotificationMessage, BgpRouteRefreshMessage,
-};
+use std::net::Ipv4Addr;
+
+use ipnet::Ipv4Net;
+use nom::error::ErrorKind;
+
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
     test_helpers::{
@@ -43,8 +26,39 @@ use netgauze_parse_utils::{
     },
     Span,
 };
-use nom::error::ErrorKind;
-use std::net::Ipv4Addr;
+
+use crate::{
+    capabilities::{
+        AddPathAddressFamily, AddPathCapability, BgpCapability, ExtendedNextHopEncoding,
+        ExtendedNextHopEncodingCapability, FourOctetAsCapability, GracefulRestartCapability,
+        MultiProtocolExtensionsCapability, UnrecognizedCapability,
+    },
+    community::{ExtendedCommunity, TransitiveFourOctetExtendedCommunity},
+    iana::{
+        RouteRefreshSubcode, UndefinedBgpErrorNotificationCode, UndefinedBgpMessageType,
+        UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
+    },
+    nlri::{
+        Ipv4MplsVpnUnicast, Ipv4Unicast, LabeledIpv4NextHop, LabeledNextHop, MplsLabel,
+        RouteDistinguisher,
+    },
+    notification::CeaseError,
+    open::{BgpOpenMessageParameter, BGP_VERSION},
+    path_attribute::{
+        AsPath, ClusterId, ClusterList, ExtendedCommunities, LocalPreference, MpReach, MpUnreach,
+        MultiExitDiscriminator, Origin, Originator, PathAttribute, PathAttributeValue,
+    },
+    update::BgpUpdateMessage,
+    wire::{
+        deserializer::{
+            notification::{BgpNotificationMessageParsingError, CeaseErrorParsingError},
+            route_refresh::BgpRouteRefreshMessageParsingError,
+            BgpMessageParsingError, LocatedBgpMessageParsingError,
+        },
+        serializer::BgpMessageWritingError,
+    },
+    BgpMessage, BgpNotificationMessage, BgpOpenMessage, BgpRouteRefreshMessage,
+};
 
 mod capabilities;
 mod community;
@@ -395,6 +409,155 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
                 UnrecognizedCapability::new(71, vec![0, 1, 1, 128, 0, 0, 0, 0, 1, 2, 128, 0, 0, 0]),
             )]),
         ],
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_rd_withdraw() -> Result<(), BgpMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x2e, 0x02, 0x00, 0x00, 0x00, 0x17, 0x90, 0x0f, 0x00, 0x13, 0x00, 0x01, 0x80,
+        0x78, 0x16, 0x98, 0x91, 0x00, 0x02, 0x00, 0x64, 0x00, 0xc8, 0x01, 0x2c, 0x01, 0x01, 0x01,
+        0x01,
+    ];
+
+    let good = BgpMessage::Update(BgpUpdateMessage::new(
+        vec![],
+        vec![PathAttribute::from(
+            true,
+            false,
+            false,
+            true,
+            PathAttributeValue::MpUnreach(MpUnreach::Ipv4MplsVpnUnicast {
+                nlri: vec![Ipv4MplsVpnUnicast::new(
+                    RouteDistinguisher::As4Administrator {
+                        asn4: 6553800,
+                        number: 300,
+                    },
+                    vec![MplsLabel::new([22, 152, 145])],
+                    Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(1, 1, 1, 1), 32).unwrap())
+                        .unwrap(),
+                )],
+            }),
+        )
+        .unwrap()],
+        vec![],
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_rd_announce() -> Result<(), BgpMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x6a, 0x02, 0x00, 0x00, 0x00, 0x53, 0x40, 0x01, 0x01, 0x02, 0x40, 0x02, 0x00,
+        0x80, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0x40, 0x05, 0x04, 0x00, 0x00, 0x00, 0x64, 0x80,
+        0x09, 0x04, 0xd5, 0xb1, 0x7f, 0xbe, 0x80, 0x0a, 0x04, 0x00, 0x00, 0x00, 0xc8, 0xc0, 0x10,
+        0x08, 0x02, 0x02, 0x00, 0x64, 0x00, 0xc8, 0x01, 0x2c, 0x90, 0x0e, 0x00, 0x21, 0x00, 0x01,
+        0x80, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd5, 0xb1, 0x7f, 0xbe, 0x00,
+        0x78, 0x02, 0xc0, 0x51, 0x00, 0x02, 0x00, 0x64, 0x00, 0xc8, 0x01, 0x2c, 0x01, 0x01, 0x01,
+        0x01,
+    ];
+
+    let good = BgpMessage::Update(BgpUpdateMessage::new(
+        vec![],
+        vec![
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::Origin(Origin::Incomplete),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::AsPath(AsPath::As2PathSegments(vec![])),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(0)),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::LocalPreference(LocalPreference::new(100)),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::Originator(Originator::new(Ipv4Addr::new(213, 177, 127, 190))),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::ClusterList(ClusterList::new(vec![ClusterId::new(
+                    Ipv4Addr::new(0, 0, 0, 200),
+                )])),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                true,
+                false,
+                false,
+                PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
+                    ExtendedCommunity::TransitiveFourOctet(
+                        TransitiveFourOctetExtendedCommunity::RouteTarget {
+                            global_admin: 6553800,
+                            local_admin: 300,
+                        },
+                    ),
+                ])),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                true,
+                PathAttributeValue::MpReach(MpReach::Ipv4MplsVpnUnicast {
+                    next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
+                        RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
+                        Ipv4Addr::new(213, 177, 127, 190),
+                    )),
+                    nlri: vec![Ipv4MplsVpnUnicast::new(
+                        RouteDistinguisher::As4Administrator {
+                            asn4: 6553800,
+                            number: 300,
+                        },
+                        vec![MplsLabel::new([2, 192, 81])],
+                        Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(1, 1, 1, 1), 32).unwrap())
+                            .unwrap(),
+                    )],
+                }),
+            )
+            .unwrap(),
+        ],
+        vec![],
     ));
 
     test_parsed_completely_with_one_input(&good_wire, false, &good);

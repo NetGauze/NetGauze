@@ -79,6 +79,8 @@ pub enum PathAttributeParsingError {
         #[from_located(module = "self")] ExtendedCommunitiesIpv6ParsingError,
     ),
     LargeCommunitiesError(#[from_located(module = "self")] LargeCommunitiesParsingError),
+    OriginatorError(#[from_located(module = "self")] OriginatorParsingError),
+    ClusterListError(#[from_located(module = "self")] ClusterListParsingError),
     MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
@@ -162,6 +164,16 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
             Ok(PathAttributeType::LargeCommunities) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::LargeCommunities(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::OriginatorId) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::Originator(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::ClusterList) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::ClusterList(value);
                 (buf, value)
             }
             Ok(PathAttributeType::MpReachNlri) => {
@@ -1010,5 +1022,61 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedLargeCommunitiesParsingError<'
         };
         let (_, communities) = parse_till_empty_into_located(communities_buf)?;
         Ok((buf, LargeCommunities::new(communities)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum OriginatorParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedOriginatorParsingError<'a>> for Originator {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedOriginatorParsingError<'a>> {
+        let (buf, data_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (_buf, id) = be_u32(data_buf)?;
+        Ok((buf, Originator::new(Ipv4Addr::from(id))))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum ClusterIdParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePDU<'a, LocatedClusterIdParsingError<'a>> for ClusterId {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedClusterIdParsingError<'a>> {
+        let (buf, id) = be_u32(buf)?;
+        Ok((buf, ClusterId::new(Ipv4Addr::from(id))))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum ClusterListParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    ClusterIdError(#[from_located(module = "self")] ClusterIdParsingError),
+}
+
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedClusterListParsingError<'a>> for ClusterList {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedClusterListParsingError<'a>> {
+        let (buf, data_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (_, cluster_ids) = parse_till_empty_into_located(data_buf)?;
+        Ok((buf, ClusterList::new(cluster_ids)))
     }
 }

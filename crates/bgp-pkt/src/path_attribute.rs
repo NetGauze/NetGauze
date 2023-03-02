@@ -158,6 +158,8 @@ pub enum PathAttributeValue {
     ExtendedCommunities(ExtendedCommunities),
     ExtendedCommunitiesIpv6(ExtendedCommunitiesIpv6),
     LargeCommunities(LargeCommunities),
+    Originator(Originator),
+    ClusterList(ClusterList),
     MpReach(MpReach),
     MpUnreach(MpUnreach),
     UnknownAttribute(UnknownAttribute),
@@ -178,6 +180,8 @@ impl PathAttributeValue {
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_optional(),
             Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_optional(),
             Self::LargeCommunities(_) => LargeCommunities::can_be_optional(),
+            Self::Originator(_) => Originator::can_be_optional(),
+            Self::ClusterList(_) => ClusterList::can_be_optional(),
             Self::MpReach(_) => MpReach::can_be_optional(),
             Self::MpUnreach(_) => MpUnreach::can_be_optional(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -198,6 +202,8 @@ impl PathAttributeValue {
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_transitive(),
             Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_transitive(),
             Self::LargeCommunities(_) => LargeCommunities::can_be_transitive(),
+            Self::Originator(_) => Originator::can_be_transitive(),
+            Self::ClusterList(_) => ClusterList::can_be_transitive(),
             Self::MpReach(_) => MpReach::can_be_transitive(),
             Self::MpUnreach(_) => MpUnreach::can_be_transitive(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_transitive(),
@@ -218,6 +224,8 @@ impl PathAttributeValue {
             Self::ExtendedCommunities(_) => ExtendedCommunities::can_be_partial(),
             Self::ExtendedCommunitiesIpv6(_) => ExtendedCommunitiesIpv6::can_be_partial(),
             Self::LargeCommunities(_) => LargeCommunities::can_be_partial(),
+            Self::Originator(_) => Originator::can_be_partial(),
+            Self::ClusterList(_) => ClusterList::can_be_partial(),
             Self::MpReach(_) => MpReach::can_be_partial(),
             Self::MpUnreach(_) => MpUnreach::can_be_partial(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -760,6 +768,87 @@ impl PathAttributeValueProperties for LargeCommunities {
 
     fn can_be_partial() -> Option<bool> {
         None
+    }
+}
+
+/// ORIGINATOR_ID is an optional, non-transitive BGP attribute. This
+/// attribute is 4 bytes long and it will be created by an RR in reflecting a
+/// route. This attribute carries the BGP Identifier of the originator of
+/// the route in the local AS.  A BGP speaker SHOULD NOT create an ORIGINATOR_ID
+/// attribute if one already exists.  A router that recognizes the ORIGINATOR_ID
+/// attribute SHOULD ignore a route received with its BGP Identifier as the
+/// ORIGINATOR_ID.
+///
+/// [RFC4456](https://datatracker.ietf.org/doc/html/rfc4456) defines this value
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Originator(Ipv4Addr);
+
+impl Originator {
+    pub const fn new(id: Ipv4Addr) -> Self {
+        Self(id)
+    }
+
+    pub const fn id(&self) -> &Ipv4Addr {
+        &self.0
+    }
+}
+
+impl PathAttributeValueProperties for Originator {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_transitive() -> Option<bool> {
+        Some(false)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
+    }
+}
+
+/// CLUSTER_LIST is a new, optional, non-transitive BGP attribute. It is a
+/// sequence of CLUSTER_ID values representing the reflection path that the
+/// route has passed.
+///
+/// [RFC4456](https://datatracker.ietf.org/doc/html/rfc4456) defines this value
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ClusterList(Vec<ClusterId>);
+
+impl ClusterList {
+    pub const fn new(cluster_list: Vec<ClusterId>) -> Self {
+        Self(cluster_list)
+    }
+
+    pub const fn cluster_list(&self) -> &Vec<ClusterId> {
+        &self.0
+    }
+}
+
+impl PathAttributeValueProperties for ClusterList {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_transitive() -> Option<bool> {
+        Some(false)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ClusterId(Ipv4Addr);
+
+impl ClusterId {
+    pub const fn new(id: Ipv4Addr) -> Self {
+        Self(id)
+    }
+
+    pub const fn id(&self) -> &Ipv4Addr {
+        &self.0
     }
 }
 

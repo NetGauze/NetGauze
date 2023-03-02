@@ -25,6 +25,7 @@ use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
 use netgauze_serde_macros::WritingError;
 
+
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
     StdIOError(#[from_std_io_error] String),
@@ -39,6 +40,8 @@ pub enum PathAttributeWritingError {
     ExtendedCommunitiesError(#[from] ExtendedCommunitiesWritingError),
     ExtendedCommunitiesIpv6Error(#[from] ExtendedCommunitiesIpv6WritingError),
     LargeCommunitiesError(#[from] LargeCommunitiesWritingError),
+    OriginatorError(#[from] OriginatorWritingError),
+    ClusterListError(#[from] ClusterListWritingError),
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
@@ -61,6 +64,8 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::ExtendedCommunities(value) => value.len(self.extended_length()),
             PathAttributeValue::ExtendedCommunitiesIpv6(value) => value.len(self.extended_length()),
             PathAttributeValue::LargeCommunities(value) => value.len(self.extended_length()),
+            PathAttributeValue::Originator(value) => value.len(self.extended_length()),
+            PathAttributeValue::ClusterList(value) => value.len(self.extended_length()),
             PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
             PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
@@ -130,6 +135,14 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
             }
             PathAttributeValue::LargeCommunities(value) => {
                 writer.write_u8(PathAttributeType::LargeCommunities.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::Originator(value) => {
+                writer.write_u8(PathAttributeType::OriginatorId.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::ClusterList(value) => {
+                writer.write_u8(PathAttributeType::ClusterList.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MpReach(value) => {
@@ -459,6 +472,84 @@ impl WritablePDUWithOneInput<bool, AggregatorWritingError> for Aggregator {
             Self::As2Aggregator(agg) => agg.write(writer, extended_length),
             Self::As4Aggregator(agg) => agg.write(writer, extended_length),
         }
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum OriginatorWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDUWithOneInput<bool, OriginatorWritingError> for Originator {
+    // 4-octet for BGP ID
+    const BASE_LENGTH: usize = 5;
+
+    fn len(&self, extended_length: bool) -> usize {
+        if extended_length {
+            Self::BASE_LENGTH + 1
+        } else {
+            Self::BASE_LENGTH
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), OriginatorWritingError> {
+        write_length(self, extended_length, writer)?;
+        writer.write_all(&self.id().octets())?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum ClusterIdWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePDU<ClusterIdWritingError> for ClusterId {
+    // 4-octet for BGP ID
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), ClusterIdWritingError> {
+        writer.write_all(&self.id().octets())?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum ClusterListWritingError {
+    StdIOError(#[from_std_io_error] String),
+    ClusterIdError(#[from] ClusterIdWritingError),
+}
+
+impl WritablePDUWithOneInput<bool, ClusterListWritingError> for ClusterList {
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let len = self.cluster_list().iter().map(|x| x.len()).sum::<usize>();
+        len + if extended_length {
+            Self::BASE_LENGTH + 1
+        } else {
+            Self::BASE_LENGTH
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), ClusterListWritingError> {
+        write_length(self, extended_length, writer)?;
+        for cluster_id in self.cluster_list() {
+            cluster_id.write(writer)?;
+        }
+        Ok(())
     }
 }
 

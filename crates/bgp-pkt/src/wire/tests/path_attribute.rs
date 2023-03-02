@@ -1633,6 +1633,42 @@ fn test_large_community() -> Result<(), PathAttributeWritingError> {
 }
 
 #[test]
+fn test_originator() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0x80, 0x09, 0x04, 0xd5, 0xb1, 0x7f, 0xbe];
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        false,
+        PathAttributeValue::Originator(Originator::new(Ipv4Addr::new(213, 177, 127, 190))),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_cluster_list() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0x80, 0x0a, 0x04, 0x00, 0x00, 0x00, 0xc8];
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        false,
+        PathAttributeValue::ClusterList(ClusterList::new(vec![ClusterId::new(Ipv4Addr::new(
+            0, 0, 0, 200,
+        ))])),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_unknown_attribute() -> Result<(), UnknownAttributeWritingError> {
     let good_wire = [0x00, 0x04, 0xac, 0x10, 0x03, 0x02];
     let good_extended_wire = [0x00, 0x00, 0x04, 0xac, 0x10, 0x03, 0x02];
