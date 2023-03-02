@@ -23,7 +23,6 @@ nom = { version = "7.1", optional = true }
 byteorder = { version = "1.4", optional = true }
 criterion = { version = "0.4", optional = true } # Dev dep for bench
 
-
 [features]
 default = ["serde"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
@@ -36,7 +35,7 @@ netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-hel
 
 [build-dependencies]
 reqwest = { version = "0.11", features = ["blocking"] }
-roxmltree = "0.17"
+roxmltree = "0.18"
 netgauze-ipfix-code-generator = {path = "../netgauze-ipfix-code-generator"}
 
 
