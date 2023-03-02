@@ -47,7 +47,7 @@ impl WritablePDU<BgpOpenMessageWritingError> for BgpOpenMessage {
         writer.write_u32::<NetworkEndian>(self.bgp_id().into())?;
         let params_length: usize = self.params().iter().map(BgpOpenMessageParameter::len).sum();
         writer.write_u8(params_length as u8)?;
-        for param in self.params().iter() {
+        for param in self.params() {
             param.write(writer)?;
         }
         Ok(())
@@ -73,7 +73,7 @@ impl WritablePDU<BgpOpenMessageWritingError> for BgpOpenMessageParameter {
             BgpOpenMessageParameter::Capabilities(capabilities) => {
                 writer.write_u8(BgpOpenMessageParameterType::Capability.into())?;
                 writer.write_u8(length as u8)?;
-                for capability in capabilities.iter() {
+                for capability in capabilities {
                     capability.write(writer)?;
                 }
                 Ok(())

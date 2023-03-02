@@ -94,8 +94,8 @@ fn filter_attribute_by_name(
 ) -> syn::Result<(Vec<syn::Ident>, Vec<syn::Ident>)> {
     let mut variants = vec![];
     let mut idents = vec![];
-    for variant in enum_data.variants.iter() {
-        for field in variant.fields.iter() {
+    for variant in &enum_data.variants {
+        for field in &variant.fields {
             for attr in field.attrs.iter().filter(|attr| {
                 attr.path
                     .segments
@@ -128,8 +128,8 @@ fn filter_attribute_by_name_with_module(
 ) -> syn::Result<(Vec<syn::Ident>, Vec<(Vec<syn::Ident>, syn::Ident)>)> {
     let mut variants = vec![];
     let mut idents = vec![];
-    for variant in enum_data.variants.iter() {
-        for field in variant.fields.iter() {
+    for variant in &enum_data.variants {
+        for field in &variant.fields {
             for _attr in field.attrs.iter().filter(|attr| {
                 attr.path
                     .segments
@@ -164,8 +164,8 @@ struct LocatedError {}
 impl LocatedError {
     fn get_from_nom(enum_data: &syn::DataEnum) -> syn::Result<Vec<syn::Ident>> {
         let mut from_nom_variants = vec![];
-        for variant in enum_data.variants.iter() {
-            for field in variant.fields.iter() {
+        for variant in &enum_data.variants {
+            for field in &variant.fields {
                 for _ in field.attrs.iter().filter(|attr| {
                     attr.path
                         .segments
@@ -185,8 +185,8 @@ impl LocatedError {
         enum_data: &syn::DataEnum,
     ) -> syn::Result<Vec<(syn::Ident, syn::Ident, Vec<syn::Ident>)>> {
         let mut ret = vec![];
-        for variant in enum_data.variants.iter() {
-            for field in variant.fields.iter() {
+        for variant in &enum_data.variants {
+            for field in &variant.fields {
                 for attr in field.attrs.iter().filter(|attr| {
                     attr.path
                         .segments

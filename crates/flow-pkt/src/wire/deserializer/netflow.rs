@@ -238,11 +238,11 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordP
         let (_, options_fields): (_, Vec<FieldSpecifier>) =
             parse_till_empty_into_located(options_buf)?;
         let mut scope_fields = Vec::with_capacity(options_scope_fields.len());
-        for a in options_scope_fields.iter() {
+        for a in &options_scope_fields {
             scope_fields.push((*a).clone());
         }
         let mut fields = Vec::with_capacity(options_fields.len());
-        for a in options_fields.iter() {
+        for a in &options_fields {
             fields.push(a.clone());
         }
         {
@@ -353,7 +353,7 @@ impl<'a> ReadablePDUWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordPars
         let (scope_fields_specs, field_specs) = field_specifiers.as_ref();
 
         let mut scope_fields = Vec::<ScopeField>::with_capacity(scope_fields_specs.len());
-        for spec in scope_fields_specs.iter() {
+        for spec in scope_fields_specs {
             let (t, scope_field) =
                 parse_into_located_two_inputs(buf, &spec.element_id(), spec.length())?;
             buf = t;
@@ -361,7 +361,7 @@ impl<'a> ReadablePDUWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordPars
         }
 
         let mut fields = Vec::<crate::ie::Field>::with_capacity(field_specs.len());
-        for spec in field_specs.iter() {
+        for spec in field_specs {
             let (t, field) = parse_into_located_two_inputs(buf, &spec.element_id(), spec.length)?;
             buf = t;
             fields.push(field);

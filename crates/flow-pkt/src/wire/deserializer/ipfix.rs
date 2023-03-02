@@ -271,7 +271,7 @@ impl<'a> ReadablePDUWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordPars
         let (scope_fields_specs, field_specs) = field_specifiers.as_ref();
 
         let mut scope_fields = Vec::<crate::ie::Field>::with_capacity(scope_fields_specs.len());
-        for spec in scope_fields_specs.iter() {
+        for spec in scope_fields_specs {
             let (t, scope_field) =
                 parse_into_located_two_inputs(buf, &spec.element_id(), spec.length)?;
             buf = t;
@@ -279,7 +279,7 @@ impl<'a> ReadablePDUWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordPars
         }
 
         let mut fields = Vec::<crate::ie::Field>::with_capacity(field_specs.len());
-        for spec in field_specs.iter() {
+        for spec in field_specs {
             let (t, field) = parse_into_located_two_inputs(buf, &spec.element_id(), spec.length)?;
             buf = t;
             fields.push(field);

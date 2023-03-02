@@ -13,17 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(clippy::upper_case_acronyms)]
-#![deny(missing_debug_implementations)]
-#![deny(rust_2018_idioms)]
-#![deny(unreachable_pub)]
-#![deny(unused_allocation)]
-#![deny(unused_assignments)]
-#![deny(unused_comparisons)]
-#![deny(clippy::clone_on_ref_ptr)]
-#![deny(clippy::trivially_copy_pass_by_ref)]
-#![deny(clippy::missing_const_for_fn)]
-
 use crate::{
     generator::*,
     xml_parser::{find_node_by_id, parse_iana_common_values, parse_information_elements, ID_IE},

@@ -14,7 +14,6 @@
 // limitations under the License.
 
 #![no_main]
-extern crate libfuzzer_sys;
 use libfuzzer_sys::fuzz_target;
 use netgauze_flow_pkt::ipfix::IpfixPacket;
 use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};

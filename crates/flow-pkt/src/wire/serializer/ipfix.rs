@@ -186,10 +186,10 @@ impl WritablePDUWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingErro
         match written {
             Some(_) => {}
             None => {
-                for record in self.scope_fields().iter() {
+                for record in self.scope_fields() {
                     record.write(writer, None)?;
                 }
-                for record in self.fields().iter() {
+                for record in self.fields() {
                     record.write(writer, None)?;
                 }
             }

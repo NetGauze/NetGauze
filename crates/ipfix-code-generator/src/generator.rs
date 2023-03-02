@@ -58,7 +58,7 @@ pub(crate) fn generate_ie_data_type(data_types: &[SimpleRegistry]) -> String {
     ret.push_str("#[repr(u8)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
     ret.push_str("pub enum InformationElementDataType {\n");
-    for x in data_types.iter() {
+    for x in data_types {
         for xref in x.xref.iter().filter_map(generate_xref_link) {
             ret.push_str(format!("  /// {xref}\n").as_str());
         }
@@ -75,7 +75,7 @@ pub(crate) fn generate_ie_units(entries: &[SimpleRegistry]) -> String {
     ret.push_str("#[repr(u8)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
     ret.push_str("pub enum InformationElementUnits {\n");
-    for entry in entries.iter() {
+    for entry in entries {
         ret.push('\n');
         if let Some(comments) = entry.comments.as_ref() {
             ret.push_str(format!("  /// {comments}\n").as_str());
@@ -103,7 +103,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
     ret.push_str("#[repr(u8)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
     ret.push_str("pub enum InformationElementSemantics {\n");
-    for x in data_types.iter() {
+    for x in data_types {
         ret.push('\n');
         for xref in x.xref.iter().filter_map(generate_xref_link) {
             ret.push_str(format!("  /// {xref}\n").as_str());
