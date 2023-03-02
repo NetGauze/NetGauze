@@ -10,11 +10,11 @@ BMP Protocol representation and serde.
 """
 
 [dependencies]
-netgauze-iana = {path = "../netgauze-iana"}
-netgauze-bgp-pkt = {path = "../netgauze-bgp-pkt"}
-netgauze-locate = { path = "../netgauze-locate", optional = true }
-netgauze-parse-utils = { path = "../netgauze-parse-utils", optional = true }
-netgauze-serde-macros = { path = "../netgauze-serde-macros", optional = true }
+netgauze-iana = {path = "../iana"}
+netgauze-bgp-pkt = {path = "../bgp-pkt"}
+netgauze-locate = { path = "../locate", optional = true }
+netgauze-parse-utils = { path = "../parse-utils", optional = true }
+netgauze-serde-macros = { path = "../serde-macros", optional = true }
 strum = "0.24"
 strum_macros = "0.24"
 chrono = {version="0.4", default-features = false, features=["std", "serde"]}
@@ -30,5 +30,5 @@ serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauz
 bench = ["criterion"]
 
 [dev-dependencies]
-netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-helpers"] }
+netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
 chrono = {version="0.4", default-features = false, features=["std", "serde", "clock"]}

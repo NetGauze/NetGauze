@@ -1,14 +1,14 @@
 [workspace]
 
 members = [
-    "netgauze-bgp-pkt",
-    "netgauze-bmpd",
-    "netgauze-bmp-pkt",
-    "netgauze-iana",
-    "netgauze-ipfix-code-generator",
-    "netgauze-flow-pkt",
-    "netgauze-locate",
-    "netgauze-parse-utils",
-    "netgauze-serde-macros",
+    "crates/bgp-pkt",
+    "crates/bmp-service",
+    "crates/bmp-pkt",
+    "crates/iana",
+    "crates/ipfix-code-generator",
+    "crates/flow-pkt",
+    "crates/locate",
+    "crates/parse-utils",
+    "crates/serde-macros",
     "fuzz"
 ]

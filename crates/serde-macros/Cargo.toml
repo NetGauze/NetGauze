@@ -19,6 +19,6 @@ proc-macro2 = "1.0"
 
 [dev-dependencies]
 trybuild = { version = "1.0", features = ["diff"] }
-netgauze-parse-utils = {path = "../netgauze-parse-utils"}
-netgauze-locate = { path = "../netgauze-locate" }
+netgauze-parse-utils = {path = "../parse-utils"}
+netgauze-locate = { path = "../locate" }
 nom = { version = "7.1", default-features = false }

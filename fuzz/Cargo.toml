@@ -12,10 +12,10 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-netgauze-parse-utils = {path = "../netgauze-parse-utils"}
-netgauze-bgp-pkt = {path = "../netgauze-bgp-pkt", features = ["serde"]}
-netgauze-bmp-pkt = {path = "../netgauze-bmp-pkt", features = ["serde"]}
-netgauze-flow-pkt = {path = "../netgauze-flow-pkt", features = ["serde"]}
+netgauze-parse-utils = {path = "../crates/parse-utils"}
+netgauze-bgp-pkt = {path = "../crates/bgp-pkt", features = ["serde"]}
+netgauze-bmp-pkt = {path = "../crates/bmp-pkt", features = ["serde"]}
+netgauze-flow-pkt = {path = "../crates/flow-pkt", features = ["serde"]}
 
 [[bin]]
 name = "fuzz-bgp-pkt"

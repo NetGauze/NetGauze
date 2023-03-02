@@ -10,9 +10,9 @@ Netflow(v9)/IPFIX(v10) Protocol representation and serde
 """
 
 [dependencies]
-netgauze-locate = { path = "../netgauze-locate", optional = true }
-netgauze-parse-utils = { path = "../netgauze-parse-utils", optional = true }
-netgauze-serde-macros = { path = "../netgauze-serde-macros", optional = true }
+netgauze-locate = { path = "../locate", optional = true }
+netgauze-parse-utils = { path = "../parse-utils", optional = true }
+netgauze-serde-macros = { path = "../serde-macros", optional = true }
 serde = {version = "1.0", features = ["derive"]}
 strum = "0.24"
 strum_macros = "0.24"
@@ -30,13 +30,13 @@ bench = ["criterion"]
 
 
 [dev-dependencies]
-netgauze-parse-utils = { path = "../netgauze-parse-utils", features = ["test-helpers"] }
+netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
 
 
 [build-dependencies]
 reqwest = { version = "0.11", features = ["blocking"] }
 roxmltree = "0.18"
-netgauze-ipfix-code-generator = {path = "../netgauze-ipfix-code-generator"}
+netgauze-ipfix-code-generator = {path = "../ipfix-code-generator"}
 
 
 [[bench]]
