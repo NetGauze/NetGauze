@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! BGP PDU data representation
+
 use crate::{
     iana::BgpMessageType, notification::BgpNotificationMessage, open::BgpOpenMessage,
     route_refresh::BgpRouteRefreshMessage, update::BgpUpdateMessage,

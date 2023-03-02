@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Representations for BGP Update message
+
 use crate::path_attribute::PathAttribute;
 use ipnet::Ipv4Net;
 use serde::{Deserialize, Serialize};

@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Representations for BGP Open message
+
 use crate::{capabilities::BgpCapability, Deserialize, Serialize};
 use std::net::Ipv4Addr;
 

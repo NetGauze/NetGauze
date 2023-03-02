@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Representations for BGP Notification message
+
 use serde::{Deserialize, Serialize};
 
 /// BGP Notification message

@@ -13,6 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Data types to represent various Network Layer Reachability Information
+//! (`NLRI`)
+
 use crate::iana::RouteDistinguisherTypeCode;
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_iana::address_family::AddressType;
