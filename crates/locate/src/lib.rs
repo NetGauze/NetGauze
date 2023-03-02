@@ -1,3 +1,14 @@
+#![allow(clippy::upper_case_acronyms)]
+#![deny(missing_debug_implementations)]
+#![deny(rust_2018_idioms)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+#![deny(clippy::clone_on_ref_ptr)]
+#![deny(clippy::trivially_copy_pass_by_ref)]
+#![deny(clippy::missing_const_for_fn)]
+
 #[cfg(test)]
 mod tests;
 
@@ -14,7 +25,7 @@ pub struct BinarySpan<T> {
 }
 
 impl<T> BinarySpan<T> {
-    pub fn new(buffer: T) -> Self {
+    pub const fn new(buffer: T) -> Self {
         Self {
             offset: 0,
             fragment: buffer,
@@ -26,11 +37,11 @@ impl<T> BinarySpan<T> {
     /// This is unsafe, because giving an offset too large may result in
     /// undefined behavior, as some methods move back along the fragment
     /// assuming any negative index within the offset is valid.
-    pub unsafe fn new_from_raw_offset(offset: usize, fragment: T) -> Self {
+    pub const unsafe fn new_from_raw_offset(offset: usize, fragment: T) -> Self {
         Self { offset, fragment }
     }
 
-    pub fn new_extra(program: T) -> BinarySpan<T> {
+    pub const fn new_extra(program: T) -> BinarySpan<T> {
         BinarySpan {
             offset: 0,
             fragment: program,
@@ -38,12 +49,12 @@ impl<T> BinarySpan<T> {
     }
 
     #[inline]
-    pub fn location_offset(&self) -> usize {
+    pub const fn location_offset(&self) -> usize {
         self.offset
     }
 
     #[inline]
-    pub fn fragment(&self) -> &T {
+    pub const fn fragment(&self) -> &T {
         &self.fragment
     }
 }

@@ -143,7 +143,7 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                 // less than 4-octets (min field size) is padding
                 while buf.len() > 3 {
                     let (t, option_template) =
-                        parse_into_located_one_input(buf, templates_map.clone())?;
+                        parse_into_located_one_input(buf, Rc::clone(&templates_map))?;
                     buf = t;
                     option_templates.push(option_template);
                 }
@@ -175,7 +175,7 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                 let count = buf.len() / record_length;
                 let mut records = Vec::with_capacity(count);
                 while buf.len() >= record_length {
-                    let (t, record) = parse_into_located_one_input(buf, template.clone())?;
+                    let (t, record) = parse_into_located_one_input(buf, Rc::clone(template))?;
                     buf = t;
                     records.push(record);
                 }
@@ -245,7 +245,7 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordP
             buf = t;
         }
         {
-            let mut map: RefMut<_> = templates_map.borrow_mut();
+            let mut map: RefMut<'_, _> = templates_map.borrow_mut();
             map.insert(template_id, Rc::new((scope_fields.clone(), fields.clone())));
         }
         Ok((
@@ -323,7 +323,7 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingE
             buf = t;
         }
         {
-            let mut map: RefMut<_> = templates_map.borrow_mut();
+            let mut map: RefMut<'_, _> = templates_map.borrow_mut();
             map.insert(template_id, Rc::new((vec![], fields.clone())));
         }
         Ok((buf, TemplateRecord::new(template_id, fields)))

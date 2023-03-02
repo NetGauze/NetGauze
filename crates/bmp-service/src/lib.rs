@@ -13,7 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate core;
+#![allow(clippy::upper_case_acronyms)]
+#![deny(missing_debug_implementations)]
+#![deny(rust_2018_idioms)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+#![deny(clippy::clone_on_ref_ptr)]
+#![deny(clippy::trivially_copy_pass_by_ref)]
+#![deny(clippy::missing_const_for_fn)]
 
 use serde::{Deserialize, Serialize};
 

@@ -180,7 +180,7 @@ fn it_should_calculate_offset_for_str() {
 fn it_should_capture_position() {
     use nom::{bytes::complete::tag, IResult};
 
-    fn parser(s: BytesSpan) -> IResult<BytesSpan, (BytesSpan, &[u8])> {
+    fn parser(s: BytesSpan<'_>) -> IResult<BytesSpan<'_>, (BytesSpan<'_>, &[u8])> {
         let (s, _) = take(2usize)(s)?;
         let (s, t) = tag([3u8])(s)?;
         Ok((s, (s, t.fragment())))

@@ -25,7 +25,6 @@ use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
 use netgauze_serde_macros::WritingError;
 
-
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
     StdIOError(#[from_std_io_error] String),

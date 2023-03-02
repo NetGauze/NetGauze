@@ -13,6 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(clippy::upper_case_acronyms)]
+#![deny(missing_debug_implementations)]
+#![deny(rust_2018_idioms)]
+#![deny(unreachable_pub)]
+#![deny(unused_allocation)]
+#![deny(unused_assignments)]
+#![deny(unused_comparisons)]
+#![deny(clippy::clone_on_ref_ptr)]
+#![deny(clippy::trivially_copy_pass_by_ref)]
+#![deny(clippy::missing_const_for_fn)]
+
 use crate::{
     generator::*,
     xml_parser::{find_node_by_id, parse_iana_common_values, parse_information_elements, ID_IE},
@@ -118,23 +129,23 @@ impl SourceConfig {
         }
     }
 
-    pub fn source(&self) -> &RegistrySource {
+    pub const fn source(&self) -> &RegistrySource {
         &self.source
     }
 
-    pub fn registry_type(&self) -> &RegistryType {
+    pub const fn registry_type(&self) -> &RegistryType {
         &self.registry_type
     }
 
-    pub fn pen(&self) -> u32 {
+    pub const fn pen(&self) -> u32 {
         self.pen
     }
 
-    pub fn mod_name(&self) -> &String {
+    pub const fn mod_name(&self) -> &String {
         &self.mod_name
     }
 
-    pub fn name(&self) -> &String {
+    pub const fn name(&self) -> &String {
         &self.name
     }
 }
@@ -151,11 +162,11 @@ impl Config {
         Self { iana, vendors }
     }
 
-    pub fn iana(&self) -> &SourceConfig {
+    pub const fn iana(&self) -> &SourceConfig {
         &self.iana
     }
 
-    pub fn vendors(&self) -> &Vec<SourceConfig> {
+    pub const fn vendors(&self) -> &Vec<SourceConfig> {
         &self.vendors
     }
 }

@@ -99,7 +99,7 @@ impl<
         Codec: Decoder<Item = Data, Error = Error>,
     > TaggedFramedReadStream<RX, TX, Tag, Data, Error, Codec>
 {
-    pub fn new(tag: Tag, framed: FramedRead<RX, Codec>, tx: Option<TX>) -> Self {
+    pub const fn new(tag: Tag, framed: FramedRead<RX, Codec>, tx: Option<TX>) -> Self {
         Self {
             tag,
             framed,

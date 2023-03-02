@@ -37,7 +37,7 @@ pub(crate) fn find_node_by_id<'a, 'input>(
 /// Get the text value of an XML node if applicable
 /// For example `<a>bb</a>` returns `Some("bb".to_string())`,
 /// while `<a><b/></a>` returns `None`
-fn get_string_child(node: &Node, tag_name: ExpandedName) -> Option<String> {
+fn get_string_child(node: &Node<'_, '_>, tag_name: ExpandedName<'_, '_>) -> Option<String> {
     node.children()
         .find(|x| x.tag_name() == tag_name)
         .map(|x| x.text().map(|txt| txt.trim().to_string()))
@@ -45,7 +45,7 @@ fn get_string_child(node: &Node, tag_name: ExpandedName) -> Option<String> {
 }
 
 /// Parse tags such as `<xref type="rfc">rfc1233</xref>`
-fn parse_xref(node: &Node) -> Vec<Xref> {
+fn parse_xref(node: &Node<'_, '_>) -> Vec<Xref> {
     let children = node
         .children()
         .filter(|x| x.tag_name() == (IANA_NAMESPACE, "xref").into())
@@ -64,7 +64,7 @@ fn parse_xref(node: &Node) -> Vec<Xref> {
 /// Parse simple registries with just value, name (description), and optionally
 /// a comment [IPFIX Information Element Data Types](https://www.iana.org/assignments/ipfix/ipfix.xml#ipfix-information-element-data-types)
 /// And [IPFIX Information Element Semantics](https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-information-element-semantics)
-pub(crate) fn parse_simple_registry(node: &Node) -> Vec<SimpleRegistry> {
+pub(crate) fn parse_simple_registry(node: &Node<'_, '_>) -> Vec<SimpleRegistry> {
     let children = node
         .children()
         .filter(|x| x.tag_name() == (IANA_NAMESPACE, "record").into())
@@ -96,7 +96,7 @@ pub(crate) fn parse_simple_registry(node: &Node) -> Vec<SimpleRegistry> {
     ret
 }
 
-pub fn parse_description_string(node: &Node) -> Option<String> {
+pub fn parse_description_string(node: &Node<'_, '_>) -> Option<String> {
     if let Some(description) = node
         .children()
         .find(|x| x.tag_name() == (IANA_NAMESPACE, "description").into())
@@ -131,7 +131,7 @@ pub fn parse_description_string(node: &Node) -> Option<String> {
     }
 }
 
-pub(crate) fn parse_information_elements(node: &Node, pen: u32) -> Vec<InformationElement> {
+pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<InformationElement> {
     let children = node
         .children()
         .filter(|x| x.tag_name() == (IANA_NAMESPACE, "record").into())
@@ -222,7 +222,7 @@ pub(crate) fn parse_information_elements(node: &Node, pen: u32) -> Vec<Informati
 
 /// Parse data types, data type semantics, and units registries
 pub(crate) fn parse_iana_common_values(
-    iana_root: &Node,
+    iana_root: &Node<'_, '_>,
 ) -> (
     Vec<SimpleRegistry>,
     Vec<SimpleRegistry>,
