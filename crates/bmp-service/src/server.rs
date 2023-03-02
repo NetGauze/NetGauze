@@ -29,7 +29,7 @@ pub type BmpRequest =
     Result<TaggedData<AddrInfo, Option<BmpMessage>>, TaggedData<AddrInfo, BmpCodecDecoderError>>;
 
 /// Allows the consuming service of BMP to send some messages back to
-/// [BmpServer]
+/// [`BmpServer`]
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum BmpServerResponse {
     /// Ask BmpServer to close the given connection to the BMP sender.

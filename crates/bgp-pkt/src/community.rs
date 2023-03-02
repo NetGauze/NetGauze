@@ -31,7 +31,7 @@ impl Community {
     pub const fn value(&self) -> u32 {
         self.0
     }
-    /// Parse the community numerical value into a [WellKnownCommunity].
+    /// Parse the community numerical value into a [`WellKnownCommunity`].
     /// If the value is not well-known, then will return None.
     pub const fn into_well_known(&self) -> Option<WellKnownCommunity> {
         WellKnownCommunity::from_repr(self.0)
@@ -604,7 +604,7 @@ impl ExtendedCommunityProperties for UnknownExtendedCommunity {
     }
 }
 
-/// Similar to [ExtendedCommunity] but for IPv6
+/// Similar to [`ExtendedCommunity`] but for IPv6
 /// ```text
 /// 0                   1                   2                   3
 /// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1

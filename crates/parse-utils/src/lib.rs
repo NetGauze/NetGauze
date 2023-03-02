@@ -80,7 +80,7 @@ pub trait WritablePDU<ErrorType> {
 
     /// The total length of the written buffer
     ///
-    /// *Note*: the [Self::len] might be less than the length value written in
+    /// *Note*: the [`Self::len`] might be less than the length value written in
     /// the PDU, since most PDUs don't include the length of their 'length'
     /// field in the calculation
     fn len(&self) -> usize;
@@ -98,7 +98,7 @@ pub trait WritablePDUWithOneInput<I, ErrorType> {
 
     /// The total length of the written buffer
     ///
-    /// *Note*: the [Self::len] might be less than the length value written in
+    /// *Note*: the [`Self::len`] might be less than the length value written in
     /// the PDU, since most PDUs don't include the length of their 'length'
     /// field in the calculation
     fn len(&self, input: I) -> usize;
@@ -116,7 +116,7 @@ pub trait WritablePDUWithTwoInputs<I1, I2, ErrorType> {
 
     /// The total length of the written buffer
     ///
-    /// *Note*: the [Self::len] might be less than the length value written in
+    /// *Note*: the [`Self::len`] might be less than the length value written in
     /// the PDU, since most PDUs don't include the length of their 'length'
     /// field in the calculation
     fn len(&self, input1: I1, input2: I2) -> usize;
@@ -133,8 +133,8 @@ pub trait WritablePDUWithTwoInputs<I1, I2, ErrorType> {
 
 /// Located Parsing error is the error raised by parsing a given buffer and a
 /// reference to the location where it occurred. The offset of the buffer in the
-/// [Span] should refer (as much as possible) to the first byte where the error
-/// started
+/// [`Span`] should refer (as much as possible) to the first byte where the
+/// error started
 pub trait LocatedParsingError {
     type Span;
     type Error;

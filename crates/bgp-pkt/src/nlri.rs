@@ -19,7 +19,7 @@ use netgauze_iana::address_family::AddressType;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-/// Get the [netgauze_iana::address_family::AddressType] of a given NLRI
+/// Get the [`AddressType`] of a given NLRI
 pub trait NlriAddressType {
     fn address_type() -> AddressType;
 }
@@ -123,7 +123,7 @@ pub enum LabeledNextHop {
     Ipv6(LabeledIpv6NextHop),
 }
 
-/// A more restricted version of [ipnet::Ipv4Net] that allows only unicast
+/// A more restricted version of [`Ipv4Net`] that allows only unicast
 /// networks
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4Unicast(Ipv4Net);
@@ -203,7 +203,7 @@ impl NlriAddressType for Ipv4MplsVpnUnicast {
     }
 }
 
-/// A more restricted version of `ipnet::Ipv4Net` that allows only multicast
+/// A more restricted version of [`Ipv4Net`] that allows only multicast
 /// networks
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4Multicast(Ipv4Net);
@@ -239,7 +239,7 @@ impl NlriAddressType for Ipv4Multicast {
     }
 }
 
-/// A more restricted version of `ipnet::Ipv6Net` that allows only unicast
+/// A more restricted version of [`Ipv6Net`] that allows only unicast
 /// networks
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6Unicast(Ipv6Net);
@@ -313,7 +313,7 @@ impl NlriAddressType for Ipv6MplsVpnUnicast {
     }
 }
 
-/// A more restricted version of `ipnet::Ipv6Net` that allows only multicast
+/// A more restricted version of [`Ipv6Net`] that allows only multicast
 /// networks
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6Multicast(Ipv6Net);

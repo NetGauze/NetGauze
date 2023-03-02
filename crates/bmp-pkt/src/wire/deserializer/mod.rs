@@ -411,7 +411,7 @@ pub enum PeerUpNotificationMessageParsingError {
 
 /// Check if the V flag is enabled in the peer header. Or return error of the
 /// peer type that don't have a peer flag defined. Currently, only
-/// GlobalInstancePeer, RdInstancePeer, and LocalInstancePeer have V flag
+/// `GlobalInstancePeer`, `RdInstancePeer`, and `LocalInstancePeer` have V flag
 /// defined.
 ///
 /// For experimental we assume ipv6 since this will not fail and still parse all

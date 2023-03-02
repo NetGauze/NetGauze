@@ -158,7 +158,7 @@ impl TemplateRecord {
         self.id
     }
 
-    /// List of [FieldSpecifier] defined in the template.
+    /// List of [`FieldSpecifier`] defined in the template.
     pub const fn field_specifiers(&self) -> &Vec<FieldSpecifier> {
         &self.field_specifiers
     }

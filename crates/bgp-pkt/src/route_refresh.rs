@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Representation for RouteRefresh BGP message.
+//! Representation for `RouteRefresh` BGP message.
 
 use crate::iana::RouteRefreshSubcode;
 use netgauze_iana::address_family::AddressType;

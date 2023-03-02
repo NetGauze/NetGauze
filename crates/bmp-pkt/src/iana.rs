@@ -27,7 +27,7 @@ pub const PEER_FLAGS_IS_IPV6: u8 = 0b10000000;
 pub const PEER_FLAGS_IS_POST_POLICY: u8 = 0b01000000;
 
 /// Corresponds to the A flag. If set indicates that the message is formatted
-/// using the legacy 2-byte AS_PATH format See [RFC7854](https://datatracker.ietf.org/doc/html/rfc7854)
+/// using the legacy 2-byte `AS_PATH` format See [RFC7854](https://datatracker.ietf.org/doc/html/rfc7854)
 pub const PEER_FLAGS_IS_ASN2: u8 = 0b00100000;
 
 /// Corresponds to the O flag. If set indicates that the message is from
@@ -45,7 +45,7 @@ pub enum BmpVersion {
     Version3 = 3,
 }
 
-/// BGP version is not one of [BmpVersion], the carried value is the undefined
+/// BGP version is not one of [`BmpVersion`], the carried value is the undefined
 /// code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBmpVersion(pub u8);
@@ -84,7 +84,7 @@ pub enum BmpMessageType {
     Experimental254 = 254,
 }
 
-/// BGP Message type is not one of [BmpMessageType], the carried value is the
+/// BGP Message type is not one of [`BmpMessageType`], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBmpMessageType(pub u8);
@@ -120,7 +120,7 @@ pub enum BmpPeerTypeCode {
     Experimental254 = 254,
 }
 
-/// BGP Message type is not one of [BmpPeerTypeCode], the carried value is the
+/// BGP Message type is not one of [`BmpPeerTypeCode`], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBmpPeerTypeCode(pub u8);
@@ -142,7 +142,7 @@ impl TryFrom<u8> for BmpPeerTypeCode {
     }
 }
 
-/// BMP InformationTLV types as registered in IANA [BMP Initiation and Peer Up Information TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#initiation-peer-up-tlvs)
+/// BMP `InformationTLV` types as registered in IANA [BMP Initiation and Peer Up Information TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#initiation-peer-up-tlvs)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum InitiationInformationTlvType {
@@ -157,8 +157,8 @@ pub enum InitiationInformationTlvType {
     Experimental65534 = 65534,
 }
 
-/// BMP InformationTLV type is not one of [InitiationInformationTlvType], the
-/// carried value is the undefined code.
+/// BMP `InformationTLV` type is not one of [`InitiationInformationTlvType`],
+/// the carried value is the undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedInitiationInformationTlvType(pub u16);
 
@@ -179,7 +179,7 @@ impl TryFrom<u16> for InitiationInformationTlvType {
     }
 }
 
-/// BMP Termination InformationTLV types as registered in IANA [BMP Termination Message TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#termination-message-tlvs)
+/// BMP Termination `InformationTLV` types as registered in IANA [BMP Termination Message TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#termination-message-tlvs)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum TerminationInformationTlvType {
@@ -191,8 +191,8 @@ pub enum TerminationInformationTlvType {
     Experimental65534 = 65534,
 }
 
-/// BMP InformationTLV type is not one of [TerminationInformationTlvType], the
-/// carried value is the undefined code.
+/// BMP `InformationTLV` type is not one of [`TerminationInformationTlvType`],
+/// the carried value is the undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedTerminationInformationTlvType(pub u16);
 
@@ -228,7 +228,7 @@ pub enum PeerTerminationCode {
     Experimental65534 = 65534,
 }
 
-/// BMP termination reason code type is not one of [PeerTerminationCode], the
+/// BMP termination reason code type is not one of [`PeerTerminationCode`], the
 /// carried value is the undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedPeerTerminationCode(pub u16);
@@ -266,7 +266,7 @@ pub enum PeerDownReasonCode {
     Experimental254 = 254,
 }
 
-/// BMP Peer down reason code type is not one of [PeerDownReasonCode], the
+/// BMP Peer down reason code type is not one of [`PeerDownReasonCode`], the
 /// carried value is the undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedPeerDownReasonCode(pub u8);
@@ -300,7 +300,7 @@ pub enum RouteMirroringTlvType {
     Experimental65534 = 65534,
 }
 
-/// BMP type is not one of [RouteMirroringTlvType], the carried value is the
+/// BMP type is not one of [`RouteMirroringTlvType`], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedRouteMirroringTlvType(pub u16);
@@ -334,7 +334,7 @@ pub enum RouteMirroringInformation {
     Experimental65534 = 65534,
 }
 
-/// Code is not one of [RouteMirroringInformation], the carried value is the
+/// Code is not one of [`RouteMirroringInformation`], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedRouteMirroringInformation(pub u16);
@@ -384,7 +384,7 @@ pub enum BmpStatisticsType {
     Experimental65534 = 65534,
 }
 
-/// Code is not one of [BmpStatisticsType], the carried value is the undefined
+/// Code is not one of [`BmpStatisticsType`], the carried value is the undefined
 /// code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBmpStatisticsType(pub u16);

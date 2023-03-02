@@ -95,7 +95,7 @@ impl BgpOpenMessage {
     }
 }
 
-/// Optional Parameter included in [BgpOpenMessage].
+/// Optional Parameter included in [`BgpOpenMessage`].
 ///
 /// ```text
 /// 0                   1

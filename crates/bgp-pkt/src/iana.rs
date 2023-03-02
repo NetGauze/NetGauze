@@ -30,7 +30,7 @@ pub enum BgpMessageType {
     RouteRefresh = 5,
 }
 
-/// BGP Message type is not one of [BgpMessageType], the carried value is the
+/// BGP Message type is not one of [`BgpMessageType`], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBgpMessageType(pub u8);
@@ -216,7 +216,7 @@ impl TryFrom<u8> for BgpErrorNotificationCode {
     }
 }
 
-/// Message Header Error sub-codes for [BgpErrorNotificationCode::MessageHeaderError] as defined by IANA [Message Header Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-5)
+/// Message Header Error sub-codes for [`BgpErrorNotificationCode::MessageHeaderError`] as defined by IANA [Message Header Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-5)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum MessageHeaderErrorSubCode {
@@ -247,7 +247,7 @@ impl TryFrom<u8> for MessageHeaderErrorSubCode {
     }
 }
 
-/// OPEN Message Error sub-codes for [BgpErrorNotificationCode::OpenMessageError] as defined by IANA [OPEN Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-6)
+/// OPEN Message Error sub-codes for [`BgpErrorNotificationCode::OpenMessageError`] as defined by IANA [OPEN Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-6)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum OpenMessageErrorSubCode {
@@ -286,7 +286,7 @@ impl TryFrom<u8> for OpenMessageErrorSubCode {
     }
 }
 
-/// UPDATE Message Error sub-codes for [BgpErrorNotificationCode::UpdateMessageError] as defined by IANA [UPDATE Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-7)
+/// UPDATE Message Error sub-codes for [`BgpErrorNotificationCode::UpdateMessageError`] as defined by IANA [UPDATE Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-7)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum UpdateMessageErrorSubCode {
@@ -324,7 +324,7 @@ impl TryFrom<u8> for UpdateMessageErrorSubCode {
     }
 }
 
-/// BGP Finite State Machine Error sub-codes for [BgpErrorNotificationCode::FiniteStateMachineError] as defined by IANA [BGP Finite State Machine Error Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-finite-state-machine-error-subcodes)
+/// BGP Finite State Machine Error sub-codes for [`BgpErrorNotificationCode::FiniteStateMachineError`] as defined by IANA [BGP Finite State Machine Error Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-finite-state-machine-error-subcodes)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum FiniteStateMachineErrorSubCode {
@@ -361,7 +361,7 @@ impl TryFrom<u8> for FiniteStateMachineErrorSubCode {
     }
 }
 
-/// BGP Cease NOTIFICATION message Error sub-codes for [BgpErrorNotificationCode::Cease] as defined by IANA [BGP Cease NOTIFICATION message subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-8)
+/// BGP Cease NOTIFICATION message Error sub-codes for [`BgpErrorNotificationCode::Cease]` as defined by IANA [BGP Cease NOTIFICATION message subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-8)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum CeaseErrorSubCode {
@@ -416,7 +416,7 @@ impl TryFrom<u8> for CeaseErrorSubCode {
     }
 }
 
-/// BGP ROUTE-REFRESH Message Error subcodes for [BgpErrorNotificationCode::RouteRefreshMessageError] as defined by IANA [BGP ROUTE-REFRESH Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-error-subcodes)
+/// BGP ROUTE-REFRESH Message Error subcodes for [`BgpErrorNotificationCode::RouteRefreshMessageError`] as defined by IANA [BGP ROUTE-REFRESH Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-error-subcodes)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RouteRefreshMessageErrorSubCode {

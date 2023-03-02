@@ -179,21 +179,21 @@ impl PeerHeader {
 /// Flags:
 ///  - ipv6: The V flag indicates that the Peer address is an IPv6 address. For
 ///    IPv4 peers, this is set to `false`.
-///  - post_policy: The L flag, if set to `true`, indicates that the message
+///  - `post_policy`: The L flag, if set to `true`, indicates that the message
 ///    reflects the post-policy Adj-RIB-In (i.e., its path attributes reflect
 ///    the application of inbound policy). It is set to `false` if the message
 ///    reflects the pre-policy Adj-RIB-In. Locally sourced routes also carry an
 ///    L flag of `true`. This flag has no significance when used with route
 ///    mirroring messages.
 ///  - asn2: The A flag, if set to `true`, indicates that the message is
-///    formatted using the legacy 2-byte AS_PATH format. If set to `false`,
-///    the message is formatted using the 4-byte AS_PATH format
+///    formatted using the legacy 2-byte `AS_PATH` format. If set to `false`,
+///    the message is formatted using the 4-byte `AS_PATH` format
 ///    [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793).
-///    A BMP speaker MAY choose to propagate the AS_PATH
+///    A BMP speaker MAY choose to propagate the `AS_PATH`
 ///    information as received from its peer, or it MAY choose to
-///    reformat all AS_PATH information into a 4-byte format
+///    reformat all `AS_PATH` information into a 4-byte format
 ///    regardless of how it was received from the peer. In the latter
-///    case, AS4_PATH or AS4_AGGREGATOR path attributes SHOULD NOT be
+///    case, `AS4_PATH` or `AS4_AGGREGATOR` path attributes SHOULD NOT be
 ///    sent in the BMP UPDATE message. This flag has no significance
 ///    when used with route mirroring messages.
 ///  - filtered: The F flag indicates that the Loc-RIB is filtered. This MUST be
@@ -255,10 +255,10 @@ impl BmpPeerType {
 /// inform the monitoring station of its vendor, software version, and so on.
 ///
 /// The initiation message consists of the common BMP header followed by
-/// two or more Information TLVs [InitiationInformation].
+/// two or more Information TLVs [`InitiationInformation`].
 ///
-/// The [InitiationInformation::SystemDescription] and
-/// [InitiationInformation::SystemName] Information TLVs MUST be sent, any
+/// The [`InitiationInformation::SystemDescription`] and
+/// [`InitiationInformation::SystemName`] Information TLVs MUST be sent, any
 /// others are optional. The string TLV MAY be included multiple times.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct InitiationMessage {
@@ -275,8 +275,8 @@ impl InitiationMessage {
     }
 }
 
-///  The Information TLV is used by the [InitiationMessage] and
-/// [PeerUpNotificationMessage]
+///  The Information TLV is used by the [`InitiationMessage`] and
+/// [`PeerUpNotificationMessage`]
 ///
 /// ```text
 ///  0                   1                   2                   3
@@ -379,7 +379,7 @@ impl TerminationMessage {
     }
 }
 
-///  The Information TLV is used by the [TerminationMessage]
+///  The Information TLV is used by the [`TerminationMessage`]
 ///
 /// ```text
 ///  0                   1                   2                   3
@@ -415,9 +415,9 @@ impl TerminationInformation {
     }
 }
 
-/// Runtime errors when constructing a [RouteMonitoringMessage]
+/// Runtime errors when constructing a [`RouteMonitoringMessage`]
 /// Peer Up BGP messages should only carry
-/// [netgauze_bgp_pkt::BgpMessage::Update], anything else is an error
+/// [`netgauze_bgp_pkt::BgpMessage::Update`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RouteMonitoringMessageError {
     UnexpectedMessageType(BgpMessageType),
@@ -551,9 +551,9 @@ pub struct PeerUpNotificationMessage {
     information: Vec<InitiationInformation>,
 }
 
-/// Runtime errors when constructing a [PeerUpNotificationMessage]
-/// Peer Up BGP messages should only carry [netgauze_bgp_pkt::BgpMessage::Open],
-/// anything else is an error
+/// Runtime errors when constructing a [`PeerUpNotificationMessage`]
+/// Peer Up BGP messages should only carry
+/// [`netgauze_bgp_pkt::BgpMessage::Open`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerUpNotificationMessageError {
     UnexpectedSentMessageType(BgpMessageType),
@@ -622,9 +622,9 @@ impl PeerUpNotificationMessage {
     }
 }
 
-/// Runtime errors when constructing a [PeerDownNotificationMessage]
+/// Runtime errors when constructing a [`PeerDownNotificationMessage`]
 /// Peer Up BGP messages should only carry
-/// [netgauze_bgp_pkt::BgpMessage::Notification], anything else is an error
+/// [`netgauze_bgp_pkt::BgpMessage::Notification`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerDownNotificationMessageError {
     UnexpectedBgpMessageType(BgpMessageType),
@@ -697,7 +697,7 @@ impl PeerDownNotificationMessage {
 }
 
 /// Reason indicates why the session was closed and
-/// [PeerDownNotificationMessage] is sent.
+/// [`PeerDownNotificationMessage`] is sent.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerDownNotificationReason {
     /// The local system closed the session.  Following the
@@ -806,7 +806,7 @@ impl StatisticsReportMessage {
     }
 }
 
-/// [StatisticsReportMessage] value
+/// [`StatisticsReportMessage`] value
 ///
 /// ```text
 ///  0                   1                   2                   3

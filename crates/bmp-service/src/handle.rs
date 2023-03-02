@@ -10,7 +10,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Utils to handle [crate::server::BmpServer] lifecycle
+//! Utils to handle [`crate::server::BmpServer`] lifecycle
 //! This module is heavily influenced by [axum-server](https://github.com/programatik29/axum-server/blob/84bc67b/src/handle.rs)
 
 use std::{
@@ -30,11 +30,11 @@ pub(crate) struct NotifyOnce {
     notify: Notify,
 }
 
-/// Specialized version of [tokio::sync::Notify] that notify listeners only
+/// Specialized version of [`Notify`] that notify listeners only
 /// once. Useful for shutdown signals, where we need to make sure that we don't
 /// notify multiple times.
 impl NotifyOnce {
-    /// If not notified before, then call [tokio::sync::Notify::notify_waiters]
+    /// If not notified before, then call [`Notify::notify_waiters`]
     pub(crate) fn notify_waiters(&self) {
         if !self.triggered.fetch_or(true, Ordering::SeqCst) {
             self.notify.notify_waiters();
@@ -46,7 +46,7 @@ impl NotifyOnce {
         self.triggered.load(Ordering::SeqCst)
     }
 
-    /// If not notified before, then call [tokio::sync::Notify::notified]
+    /// If not notified before, then call [`Notify::notified`]
     pub(crate) async fn notified(&self) {
         if !self.triggered.load(Ordering::SeqCst) {
             self.notify.notified().await;

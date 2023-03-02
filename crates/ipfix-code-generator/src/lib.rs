@@ -98,7 +98,7 @@ pub enum RegistryType {
     IanaXML,
 }
 
-/// Configuration for a single IPFIX FLow IE entities definition
+/// Configuration for a single IPFIX Flow IE entities definition
 /// Could be the main IANA registry or a vendor specific source
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct SourceConfig {
@@ -122,8 +122,8 @@ impl SourceConfig {
     ) -> Self {
         Self {
             source,
-            pen,
             registry_type,
+            pen,
             mod_name,
             name,
         }

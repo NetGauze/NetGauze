@@ -11,7 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
 // implied.
 // See the License for the specific language governing permissions and
-// limitations under the License.
+// limitations under the License.Get the
+// [netgauze_iana::address_family::AddressType] of a given NLRI
 
 //! Deserializer for BGP Path Attributes
 

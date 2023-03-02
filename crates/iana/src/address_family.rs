@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Handling [AddressFamily] (SAFI) and [SubsequentAddressFamily] (SAFI).
-//! Also introduces a new `enum` [AddressType] to make sure we can only
+//! Handling [`AddressFamily`] (SAFI) and [`SubsequentAddressFamily`] (SAFI).
+//! Also introduces a new `enum` [`AddressType`] to make sure we can only
 //! construct valid AFI/SAFI combinations
 //!
 //! ```rust
@@ -178,7 +178,7 @@ pub enum AddressFamily {
     MplsNamespaces = 16399,
 }
 
-/// Error type used in `[TryFrom] for [AddressFamily].
+/// Error type used in [`TryFrom`] for [`AddressFamily`].
 /// The value carried is the undefined value being parsed
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -369,7 +369,7 @@ pub enum SubsequentAddressFamily {
     PrivateUse254 = 254,
 }
 
-/// Error type used in `[TryFrom] for [SubsequentAddressFamily].
+/// Error type used in [`TryFrom`] for [`SubsequentAddressFamily`].
 /// The value carried is the undefined value being parsed
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -392,7 +392,7 @@ impl TryFrom<u8> for SubsequentAddressFamily {
     }
 }
 
-/// Since not all [AddressFamily] and [SubsequentAddressFamily] are valid
+/// Since not all [`AddressFamily`] and [`SubsequentAddressFamily`] are valid
 /// combinations, this enum defines a set of valid combination to ensure only
 /// valid AFI/SAFI are used at compile time.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -417,7 +417,7 @@ pub enum AddressType {
     BgpLs,
 }
 
-/// Error type used in `[TryFrom] for [AddressType].
+/// Error type used in [`TryFrom`] for [`AddressType`].
 /// The value carried is the undefined value being parsed
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct InvalidAddressType {

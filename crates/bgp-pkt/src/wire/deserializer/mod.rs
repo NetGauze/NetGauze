@@ -54,8 +54,8 @@ use netgauze_serde_macros::LocatedError;
 pub const BGP_MIN_MESSAGE_LENGTH: u16 = 19;
 
 /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271) defined max length as 4096.
-/// *Note*, this only applies to [BgpMessage::Open] and [BgpMessage::KeepAlive]
-/// according to the updated
+/// *Note*, this only applies to [`BgpMessage::Open`] and
+/// [`BgpMessage::KeepAlive`] according to the updated
 /// [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654)
 pub const BGP_MAX_MESSAGE_LENGTH: u16 = 4096;
 
@@ -168,7 +168,7 @@ pub enum BgpMessageParsingError {
     NomError(#[from_nom] ErrorKind),
 
     /// The first 16-bytes of a BGP message is NOT all set to `1`
-    /// For simplicity, we carry the equivalent [u128] value that was invalid
+    /// For simplicity, we carry the equivalent [`u128`] value that was invalid
     /// instead of the whole buffer
     ConnectionNotSynchronized(u128),
 
@@ -199,7 +199,7 @@ pub enum BgpMessageParsingError {
     ),
 }
 
-/// Parse [BgpMessage] length and type, then check that the length of a BGP
+/// Parse [`BgpMessage`] length and type, then check that the length of a BGP
 /// message is valid according to it's type. Takes into consideration both rules at [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
 /// and [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654).
 fn parse_bgp_message_length_and_type(

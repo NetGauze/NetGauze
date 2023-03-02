@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Contains the extensible definitions for various [PathAttribute] that can be
-//! used in [crate::update::BgpUpdateMessage].
+//! Contains the extensible definitions for various [`PathAttribute`] that can
+//! be used in [`crate::update::BgpUpdateMessage`].
 
 use crate::{
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
@@ -26,19 +26,19 @@ use strum_macros::{Display, FromRepr};
 
 /// General properties to check the validity of a given path attribute value
 pub trait PathAttributeValueProperties {
-    /// Check the validity of the `optional` bit in the [PathAttribute]:
+    /// Check the validity of the `optional` bit in the [`PathAttribute`]:
     ///  - `Some(true)` optional must be set to `true`.
     ///  - `Some(false)` optional must be set to `false`.
     ///  - `None` optional can be set to either `true` or `false`.
     fn can_be_optional() -> Option<bool>;
 
-    /// Check the validity of the `transitive` bit in the [PathAttribute]:
+    /// Check the validity of the `transitive` bit in the [`PathAttribute`]:
     ///  - `Some(true)` transitive must be set to `true`.
     ///  - `Some(false)` transitive must be set to `false`.
     ///  - `None` transitive can be set to either `true` or `false`.
     fn can_be_transitive() -> Option<bool>;
 
-    /// Check the validity of the `partial` bit in the [PathAttribute]:
+    /// Check the validity of the `partial` bit in the [`PathAttribute`]:
     ///  - `Some(true)` partial must be set to `true`.
     ///  - `Some(false)` partial must be set to `false`.
     ///  - `None` partial can be set to either `true` or `false`.
@@ -52,7 +52,7 @@ pub enum InvalidPathAttribute {
     InvalidPartialFlagValue(bool),
 }
 
-/// PathAttribute
+/// Path Attribute
 ///
 /// ```text
 /// 0                   1                   2                   3
@@ -271,7 +271,7 @@ impl From<Origin> for u8 {
     }
 }
 
-/// Error type used in `[TryFrom] for [Origin].
+/// Error type used in [`TryFrom`] for [`Origin`].
 /// The value carried is the undefined value being parsed
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedOrigin(pub u8);
@@ -287,7 +287,7 @@ impl TryFrom<u8> for Origin {
     }
 }
 
-/// AS_PATH is a well-known mandatory attribute that is composed
+/// `AS_PATH` is a well-known mandatory attribute that is composed
 /// of a sequence of AS path segments.  Each AS path segment is
 /// represented by a triple <path segment type, path segment
 /// length, path segment value>.
@@ -311,7 +311,7 @@ impl PathAttributeValueProperties for AsPath {
     }
 }
 
-/// AsPathSegmentType
+/// AS Path Segment Type
 ///
 /// ```text
 /// 0
@@ -333,7 +333,7 @@ impl From<AsPathSegmentType> for u8 {
     }
 }
 
-/// Error type used in `[TryFrom] for [AsPathSegmentType].
+/// Error type used in [`TryFrom`] for [`AsPathSegmentType`].
 /// The value carried is the undefined value being parsed
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedAsPathSegmentType(pub u8);
@@ -420,8 +420,8 @@ pub struct As4Path {
 
 /// This is an optional transitive attribute that
 /// contains the AS path encoded with four-octet AS numbers. The
-/// AS4_PATH attribute has the same semantics and the same encoding as
-/// the [AsPath] attribute, except that it is "optional transitive", and
+/// `AS4_PATH` attribute has the same semantics and the same encoding as
+/// the [`AsPath`] attribute, except that it is "optional transitive", and
 /// it carries four-octet AS numbers.
 /// See [RFC6793](https://datatracker.ietf.org/doc/html/RFC6793)
 impl As4Path {
@@ -514,7 +514,7 @@ impl PathAttributeValueProperties for MultiExitDiscriminator {
     }
 }
 
-/// LOCAL_PREF is a well-known attribute that is a four-octet
+/// `LOCAL_PREF` is a well-known attribute that is a four-octet
 /// unsigned integer. A BGP speaker uses it to inform its other
 /// internal peers of the advertising speaker's degree of
 /// preference for an advertised route.
@@ -547,7 +547,7 @@ impl PathAttributeValueProperties for LocalPreference {
     }
 }
 
-/// ATOMIC_AGGREGATE is a well-known discretionary attribute of length 0.
+/// `ATOMIC_AGGREGATE` is a well-known discretionary attribute of length 0.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AtomicAggregate;
 
@@ -771,13 +771,13 @@ impl PathAttributeValueProperties for LargeCommunities {
     }
 }
 
-/// ORIGINATOR_ID is an optional, non-transitive BGP attribute. This
+/// `ORIGINATOR_ID` is an optional, non-transitive BGP attribute. This
 /// attribute is 4 bytes long and it will be created by an RR in reflecting a
 /// route. This attribute carries the BGP Identifier of the originator of
-/// the route in the local AS.  A BGP speaker SHOULD NOT create an ORIGINATOR_ID
-/// attribute if one already exists.  A router that recognizes the ORIGINATOR_ID
-/// attribute SHOULD ignore a route received with its BGP Identifier as the
-/// ORIGINATOR_ID.
+/// the route in the local AS.  A BGP speaker SHOULD NOT create an
+/// `ORIGINATOR_ID` attribute if one already exists.  A router that recognizes
+/// the `ORIGINATOR_ID` attribute SHOULD ignore a route received with its BGP
+/// Identifier as the `ORIGINATOR_ID`.
 ///
 /// [RFC4456](https://datatracker.ietf.org/doc/html/rfc4456) defines this value
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -807,8 +807,8 @@ impl PathAttributeValueProperties for Originator {
     }
 }
 
-/// CLUSTER_LIST is a new, optional, non-transitive BGP attribute. It is a
-/// sequence of CLUSTER_ID values representing the reflection path that the
+/// `CLUSTER_LIST` is a new, optional, non-transitive BGP attribute. It is a
+/// sequence of `CLUSTER_ID` values representing the reflection path that the
 /// route has passed.
 ///
 /// [RFC4456](https://datatracker.ietf.org/doc/html/rfc4456) defines this value
@@ -852,13 +852,13 @@ impl ClusterId {
     }
 }
 
-/// Multi-protocol Reachable NLRI (MP_REACH_NLRI) is an optional non-transitive
-/// attribute that can be used for the following purposes:
+/// Multi-protocol Reachable NLRI (`MP_REACH_NLRI`) is an optional
+/// non-transitive attribute that can be used for the following purposes:
 ///
 /// 1. to advertise a feasible route to a peer
 /// 2. to permit a router to advertise the Network Layer address of the router
 /// that should be used as the next hop to the destinations
-/// listed in the Network Layer Reachability Information field of the MP_NLRI
+/// listed in the Network Layer Reachability Information field of the `MP_NLRI`
 /// attribute.
 ///
 /// see [RFC4760](https://www.rfc-editor.org/rfc/rfc4760)
@@ -923,7 +923,7 @@ impl PathAttributeValueProperties for MpReach {
     }
 }
 
-/// Multi-protocol Unreachable NLRI (MP_UNREACH_NLRI) is an optional
+/// Multi-protocol Unreachable NLRI (`MP_UNREACH_NLRI`) is an optional
 /// non-transitive attribute that can be used for the purpose of withdrawing
 /// multiple unfeasible routes from service.
 ///

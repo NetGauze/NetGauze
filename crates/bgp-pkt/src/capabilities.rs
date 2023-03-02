@@ -35,14 +35,15 @@ pub(crate) const FOUR_OCTET_AS_CAPABILITY_LENGTH: u8 = 4;
 /// BGP Extended Message capability have fixed length as per RFC8654
 pub(crate) const EXTENDED_MESSAGE_CAPABILITY_LENGTH: u8 = 0;
 
-/// 2-octet NLRI AFI + 2-octet NLRI SAFI + 2-octet NextHop AFI as per RFC8950
+/// 2-octet NLRI AFI + 2-octet NLRI SAFI + 2-octet `NextHop` AFI as per RFC8950
 pub(crate) const EXTENDED_NEXT_HOP_ENCODING_LENGTH: u8 = 6;
 
 /// 2-octet NLRI AFI + 1-octet NLRI SAFI + 1-octet flags as per RFC4724
 pub(crate) const GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH: u8 = 4;
 
-/// BGP Capabilities are included as parameters in the BGPOpen message
-/// to indicate support of certain BGP Features.
+/// BGP Capabilities are included as parameters in the
+/// [`crate::open::BgpOpenMessage`] message to indicate support of certain BGP
+/// Features.
 ///
 /// See [RFC5492 Capabilities Advertisement with BGP-4](https://datatracker.ietf.org/doc/html/rfc5492)
 ///
@@ -152,7 +153,7 @@ impl ExperimentalCapability {
 }
 
 /// Capability advertisement to speak a multi-protocol for a given
-/// [AddressType] as defined in [RFC4760 Multiprotocol Extensions for BGP-4](https://datatracker.ietf.org/doc/html/rfc4760)
+/// [`AddressType`] as defined in [RFC4760 Multiprotocol Extensions for BGP-4](https://datatracker.ietf.org/doc/html/rfc4760)
 ///
 /// ```text
 /// 0       7      15      23      31
@@ -306,13 +307,13 @@ impl AddPathAddressFamily {
     }
 
     ///  This field indicates whether the sender is able to send multiple paths
-    /// to its peer the [AddressType]
+    /// to its peer the [`AddressType`]
     pub const fn send(&self) -> bool {
         self.send
     }
 
     ///  This field indicates whether the sender is able to receive multiple
-    /// paths from its peer the [AddressType]
+    /// paths from its peer the [`AddressType`]
     pub const fn receive(&self) -> bool {
         self.receive
     }

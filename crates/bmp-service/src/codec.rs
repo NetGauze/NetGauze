@@ -43,7 +43,7 @@ impl From<std::io::Error> for BmpCodecDecoderError {
     }
 }
 
-/// Encoder and Decoder for [BmpMessage]
+/// Encoder and Decoder for [`BmpMessage`]
 #[derive(Debug, Default)]
 pub struct BmpCodec {
     /// Helper to track in the decoder if we are inside a BMP message or not
