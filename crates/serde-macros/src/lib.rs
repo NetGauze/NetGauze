@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate proc_macro;
-
 use quote::{format_ident, quote, TokenStreamExt};
 use syn::spanned::Spanned;
 
@@ -352,7 +350,7 @@ impl LocatedError {
             )*
         };
 
-        for (located_variant, located_ident, located_module) in from_located.iter() {
+        for (located_variant, located_ident, located_module) in &from_located {
             let tmp = quote! {
                 #[automatically_derived]
                 impl<'a> From<#(#located_module)::*::#located_ident<'a>> for #located_struct_name<'a> {

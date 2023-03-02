@@ -21,11 +21,11 @@ pub enum AError {
     A
 }
 
-fn parse_a(buf: Span<'_>) -> IResult<Span<'_>, u8, LocatedAError> {
+fn parse_a(buf: Span<'_>) -> IResult<Span<'_>, u8, LocatedAError<'_>> {
     Err(nom::Err::Error(LocatedAError::new(buf, AError::A)))
 }
 
-fn parse(buf: Span<'_>) -> IResult<Span<'_>, u8, LocatedTestError> {
+fn parse(buf: Span<'_>) -> IResult<Span<'_>, u8, LocatedTestError<'_>> {
     match parse_a(buf) {
         Ok((buf, ret)) => Ok((buf, ret)),
         Err(err) => match err {

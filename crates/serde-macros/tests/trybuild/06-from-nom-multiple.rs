@@ -22,7 +22,7 @@ pub enum AError {
     A
 }
 
-fn parse(buf: Span<'_>, ) -> IResult<Span<'_>, u8, LocatedTestError> {
+fn parse(buf: Span<'_>, ) -> IResult<Span<'_>, u8, LocatedTestError<'_>> {
     let (buf, ret) = be_u8(buf)?;
     Ok((buf, ret))
 }
