@@ -22,10 +22,10 @@ use crate::{
         },
         serializer::{
             update::{NetworkLayerReachabilityInformationWritingError, WithdrawRouteWritingError},
-            BGPMessageWritingError,
+            BgpMessageWritingError,
         },
     },
-    BGPMessage, BGPUpdateMessage,
+    BgpMessage, BgpUpdateMessage,
 };
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
@@ -97,24 +97,24 @@ fn test_ipv4_nlri() -> Result<(), NetworkLayerReachabilityInformationWritingErro
 }
 
 #[test]
-fn test_empty_update() -> Result<(), BGPMessageWritingError> {
+fn test_empty_update() -> Result<(), BgpMessageWritingError> {
     let good_wire = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0x00, 0x17, 0x02, 0x00, 0x00, 0x00, 0x00,
     ];
-    let good = BGPMessage::Update(BGPUpdateMessage::new(vec![], vec![], vec![]));
+    let good = BgpMessage::Update(BgpUpdateMessage::new(vec![], vec![], vec![]));
     test_parsed_completely_with_one_input(&good_wire, false, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
 
 #[test]
-fn test_withdraw_update() -> Result<(), BGPMessageWritingError> {
+fn test_withdraw_update() -> Result<(), BgpMessageWritingError> {
     let good_withdraw_wire = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0x00, 0x1b, 0x02, 0x00, 0x04, 0x18, 0xac, 0x10, 0x01, 0x00, 0x00,
     ];
-    let good_withdraw = BGPMessage::Update(BGPUpdateMessage::new(
+    let good_withdraw = BgpMessage::Update(BgpUpdateMessage::new(
         vec![WithdrawRoute::new(
             Ipv4Net::new(Ipv4Addr::new(172, 16, 1, 0), 24).unwrap(),
         )],

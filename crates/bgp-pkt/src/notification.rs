@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum BGPNotificationMessage {
+pub enum BgpNotificationMessage {
     MessageHeaderError(MessageHeaderError),
     OpenMessageError(OpenMessageError),
     UpdateMessageError(UpdateMessageError),
@@ -48,8 +48,8 @@ pub enum MessageHeaderError {
 pub enum OpenMessageError {
     Unspecific { value: Vec<u8> },
     UnsupportedVersionNumber { value: Vec<u8> },
-    BadPeerAS { value: Vec<u8> },
-    BadBGPIdentifier { value: Vec<u8> },
+    BadPeerAs { value: Vec<u8> },
+    BadBgpIdentifier { value: Vec<u8> },
     UnsupportedOptionalParameter { value: Vec<u8> },
     UnacceptableHoldTime { value: Vec<u8> },
     UnsupportedCapability { value: Vec<u8> },
@@ -69,7 +69,7 @@ pub enum UpdateMessageError {
     InvalidNextHopAttribute { value: Vec<u8> },
     OptionalAttributeError { value: Vec<u8> },
     InvalidNetworkField { value: Vec<u8> },
-    MalformedASPath { value: Vec<u8> },
+    MalformedAsPath { value: Vec<u8> },
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]

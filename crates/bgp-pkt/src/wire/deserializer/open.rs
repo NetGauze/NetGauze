@@ -14,10 +14,10 @@
 // limitations under the License.
 
 use crate::{
-    iana::{BGPOpenMessageParameterType, UndefinedBGPOpenMessageParameterType},
-    open::BGPOpenMessageParameter,
-    wire::deserializer::capabilities::BGPCapabilityParsingError,
-    BGPOpenMessage,
+    iana::{BgpOpenMessageParameterType, UndefinedBgpOpenMessageParameterType},
+    open::BgpOpenMessageParameter,
+    wire::deserializer::capabilities::BgpCapabilityParsingError,
+    BgpOpenMessage,
 };
 use netgauze_parse_utils::{parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePDU, Span};
 use netgauze_serde_macros::LocatedError;
@@ -31,36 +31,36 @@ use std::net::Ipv4Addr;
 
 /// BGP Open Message Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum BGPOpenMessageParsingError {
+pub enum BgpOpenMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UnsupportedVersionNumber(u8),
-    ParameterError(#[from_located(module = "self")] BGPParameterParsingError),
+    ParameterError(#[from_located(module = "self")] BgpParameterParsingError),
 }
 
 /// BGP Open Message Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum BGPParameterParsingError {
+pub enum BgpParameterParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    UndefinedParameterType(#[from_external] UndefinedBGPOpenMessageParameterType),
+    UndefinedParameterType(#[from_external] UndefinedBgpOpenMessageParameterType),
     CapabilityError(
         #[from_located(module = "crate::wire::deserializer::capabilities")]
-        BGPCapabilityParsingError,
+        BgpCapabilityParsingError,
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBGPOpenMessageParsingError<'a>> for BGPOpenMessage {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBGPOpenMessageParsingError<'a>> {
+impl<'a> ReadablePDU<'a, LocatedBgpOpenMessageParsingError<'a>> for BgpOpenMessage {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpOpenMessageParsingError<'a>> {
         let (buf, _) = nom::combinator::map_res(be_u8, |x| {
             if x == 4 {
                 Ok(x)
             } else {
-                Err(BGPOpenMessageParsingError::UnsupportedVersionNumber(x))
+                Err(BgpOpenMessageParsingError::UnsupportedVersionNumber(x))
             }
         })(buf)?;
         let (buf, my_as) = be_u16(buf)?;
@@ -69,27 +69,27 @@ impl<'a> ReadablePDU<'a, LocatedBGPOpenMessageParsingError<'a>> for BGPOpenMessa
         let bgp_id = Ipv4Addr::from(bgp_id);
         let (buf, params_buf) = nom::multi::length_data(be_u8)(buf)?;
         let (_, params) = parse_till_empty_into_located(params_buf)?;
-        Ok((buf, BGPOpenMessage::new(my_as, hold_time, bgp_id, params)))
+        Ok((buf, BgpOpenMessage::new(my_as, hold_time, bgp_id, params)))
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedBGPParameterParsingError<'a>> for BGPOpenMessageParameter {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBGPParameterParsingError<'a>> {
+impl<'a> ReadablePDU<'a, LocatedBgpParameterParsingError<'a>> for BgpOpenMessageParameter {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpParameterParsingError<'a>> {
         let begin_buf = buf;
         let (buf, param_type) =
-            nom::combinator::map_res(be_u8, BGPOpenMessageParameterType::try_from)(buf)?;
+            nom::combinator::map_res(be_u8, BgpOpenMessageParameterType::try_from)(buf)?;
         match param_type {
-            BGPOpenMessageParameterType::Capability => {
+            BgpOpenMessageParameterType::Capability => {
                 let (buf, capabilities_buf) = nom::multi::length_data(be_u8)(buf)?;
                 let (_, capabilities) = parse_till_empty_into_located(capabilities_buf)?;
-                Ok((buf, BGPOpenMessageParameter::Capabilities(capabilities)))
+                Ok((buf, BgpOpenMessageParameter::Capabilities(capabilities)))
             }
-            BGPOpenMessageParameterType::ExtendedLength => {
-                return Err(nom::Err::Error(LocatedBGPParameterParsingError::new(
+            BgpOpenMessageParameterType::ExtendedLength => {
+                return Err(nom::Err::Error(LocatedBgpParameterParsingError::new(
                     begin_buf,
-                    BGPParameterParsingError::UndefinedParameterType(
-                        UndefinedBGPOpenMessageParameterType(
-                            BGPOpenMessageParameterType::ExtendedLength.into(),
+                    BgpParameterParsingError::UndefinedParameterType(
+                        UndefinedBgpOpenMessageParameterType(
+                            BgpOpenMessageParameterType::ExtendedLength.into(),
                         ),
                     ),
                 )))

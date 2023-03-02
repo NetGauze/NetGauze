@@ -25,8 +25,8 @@
 #![deny(clippy::missing_const_for_fn)]
 
 use crate::{
-    iana::BGPMessageType, notification::BGPNotificationMessage, open::BGPOpenMessage,
-    route_refresh::BGPRouteRefreshMessage, update::BGPUpdateMessage,
+    iana::BgpMessageType, notification::BgpNotificationMessage, open::BgpOpenMessage,
+    route_refresh::BgpRouteRefreshMessage, update::BgpUpdateMessage,
 };
 use ::serde::{Deserialize, Serialize};
 
@@ -62,23 +62,23 @@ pub mod wire;
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum BGPMessage {
-    Open(BGPOpenMessage),
-    Update(BGPUpdateMessage),
-    Notification(BGPNotificationMessage),
+pub enum BgpMessage {
+    Open(BgpOpenMessage),
+    Update(BgpUpdateMessage),
+    Notification(BgpNotificationMessage),
     KeepAlive,
-    RouteRefresh(BGPRouteRefreshMessage),
+    RouteRefresh(BgpRouteRefreshMessage),
 }
 
-impl BGPMessage {
+impl BgpMessage {
     /// Get the BGP message IANA type
-    pub const fn get_type(&self) -> BGPMessageType {
+    pub const fn get_type(&self) -> BgpMessageType {
         match self {
-            Self::Open(_) => BGPMessageType::Open,
-            Self::Update(_) => BGPMessageType::Update,
-            Self::Notification(_) => BGPMessageType::Notification,
-            Self::KeepAlive => BGPMessageType::KeepAlive,
-            Self::RouteRefresh(_) => BGPMessageType::RouteRefresh,
+            Self::Open(_) => BgpMessageType::Open,
+            Self::Update(_) => BgpMessageType::Update,
+            Self::Notification(_) => BgpMessageType::Notification,
+            Self::KeepAlive => BgpMessageType::KeepAlive,
+            Self::RouteRefresh(_) => BgpMessageType::RouteRefresh,
         }
     }
 }

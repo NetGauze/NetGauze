@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{capabilities::*, iana::BGPCapabilityCode};
+use crate::{capabilities::*, iana::BgpCapabilityCode};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
@@ -22,14 +22,14 @@ use std::io::Write;
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BGPCapabilityWritingError {
     StdIOError(#[from_std_io_error] String),
-    FourOctetASCapabilityError(#[from] FourOctetASCapabilityWritingError),
+    FourOctetAsCapabilityError(#[from] FourOctetAsCapabilityWritingError),
     MultiProtocolExtensionsCapabilityError(#[from] MultiProtocolExtensionsCapabilityWritingError),
     GracefulRestartCapabilityError(#[from] GracefulRestartCapabilityWritingError),
     AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
     ExtendedNextHopEncodingCapabilityError(#[from] ExtendedNextHopEncodingCapabilityWritingError),
 }
 
-impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
+impl WritablePDU<BGPCapabilityWritingError> for BgpCapability {
     // 1-octet length and 1-octet capability type
     const BASE_LENGTH: usize = 2;
 
@@ -40,7 +40,7 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
             }
             Self::RouteRefresh => ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
-            Self::FourOctetAS(value) => value.len(),
+            Self::FourOctetAs(value) => value.len(),
             // GracefulRestartCapability carries n length field, so need to account for it here
             Self::GracefulRestartCapability(value) => value.len() - 2,
             Self::AddPath(value) => value.len(),
@@ -57,39 +57,39 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
         let len = (self.len() - Self::BASE_LENGTH) as u8;
         match self {
             Self::MultiProtocolExtensions(value) => {
-                writer.write_u8(BGPCapabilityCode::MultiProtocolExtensions.into())?;
+                writer.write_u8(BgpCapabilityCode::MultiProtocolExtensions.into())?;
                 writer.write_u8(value.len() as u8)?;
                 value.write(writer)?;
             }
             Self::RouteRefresh => {
-                writer.write_u8(BGPCapabilityCode::RouteRefreshCapability.into())?;
+                writer.write_u8(BgpCapabilityCode::RouteRefreshCapability.into())?;
                 writer.write_u8(len)?;
             }
             Self::EnhancedRouteRefresh => {
-                writer.write_u8(BGPCapabilityCode::EnhancedRouteRefresh.into())?;
+                writer.write_u8(BgpCapabilityCode::EnhancedRouteRefresh.into())?;
                 writer.write_u8(len)?;
             }
             Self::ExtendedMessage => {
-                writer.write_u8(BGPCapabilityCode::BGPExtendedMessage.into())?;
+                writer.write_u8(BgpCapabilityCode::BgpExtendedMessage.into())?;
                 writer.write_u8(len)?;
             }
             Self::GracefulRestartCapability(value) => {
-                writer.write_u8(BGPCapabilityCode::GracefulRestartCapability.into())?;
+                writer.write_u8(BgpCapabilityCode::GracefulRestartCapability.into())?;
                 writer.write_u8(len)?;
                 value.write(writer)?;
             }
             Self::AddPath(value) => {
-                writer.write_u8(BGPCapabilityCode::ADDPathCapability.into())?;
+                writer.write_u8(BgpCapabilityCode::AddPathCapability.into())?;
                 writer.write_u8(len)?;
                 value.write(writer)?;
             }
-            Self::FourOctetAS(value) => {
-                writer.write_u8(BGPCapabilityCode::FourOctetAS.into())?;
+            Self::FourOctetAs(value) => {
+                writer.write_u8(BgpCapabilityCode::FourOctetAs.into())?;
                 writer.write_u8(value.len() as u8)?;
                 value.write(writer)?;
             }
             Self::ExtendedNextHopEncoding(value) => {
-                writer.write_u8(BGPCapabilityCode::ExtendedNextHopEncoding.into())?;
+                writer.write_u8(BgpCapabilityCode::ExtendedNextHopEncoding.into())?;
                 value.write(writer)?;
             }
             Self::Experimental(value) => {
@@ -108,17 +108,17 @@ impl WritablePDU<BGPCapabilityWritingError> for BGPCapability {
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum FourOctetASCapabilityWritingError {
+pub enum FourOctetAsCapabilityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<FourOctetASCapabilityWritingError> for FourOctetASCapability {
+impl WritablePDU<FourOctetAsCapabilityWritingError> for FourOctetAsCapability {
     const BASE_LENGTH: usize = FOUR_OCTET_AS_CAPABILITY_LENGTH as usize;
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
     }
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), FourOctetASCapabilityWritingError> {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), FourOctetAsCapabilityWritingError> {
         writer.write_u32::<NetworkEndian>(self.asn4())?;
         Ok(())
     }

@@ -15,7 +15,7 @@
 
 use crate::{
     capabilities::*,
-    iana::{BGPCapabilityCode, UndefinedBGPCapabilityCode},
+    iana::{BgpCapabilityCode, UndefinedBgpCapabilityCode},
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
@@ -35,16 +35,16 @@ use netgauze_serde_macros::LocatedError;
 
 /// BGP Capability Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum BGPCapabilityParsingError {
+pub enum BgpCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    UndefinedCapabilityCode(#[from_external] UndefinedBGPCapabilityCode),
+    UndefinedCapabilityCode(#[from_external] UndefinedBgpCapabilityCode),
     InvalidRouteRefreshLength(u8),
     InvalidEnhancedRouteRefreshLength(u8),
     InvalidExtendedMessageLength(u8),
-    FourOctetASCapabilityError(#[from_located(module = "self")] FourOctetASCapabilityParsingError),
+    FourOctetAsCapabilityError(#[from_located(module = "self")] FourOctetAsCapabilityParsingError),
     MultiProtocolExtensionsCapabilityError(
         #[from_located(module = "self")] MultiProtocolExtensionsCapabilityParsingError,
     ),
@@ -60,22 +60,22 @@ pub enum BGPCapabilityParsingError {
 fn parse_experimental_capability(
     code: ExperimentalCapabilityCode,
     buf: Span<'_>,
-) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
+) -> IResult<Span<'_>, BgpCapability, LocatedBgpCapabilityParsingError<'_>> {
     let (buf, value) = nom::multi::length_count(be_u8, be_u8)(buf)?;
     Ok((
         buf,
-        BGPCapability::Experimental(ExperimentalCapability::new(code, value)),
+        BgpCapability::Experimental(ExperimentalCapability::new(code, value)),
     ))
 }
 
 fn parse_unrecognized_capability(
     code: u8,
     buf: Span<'_>,
-) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
+) -> IResult<Span<'_>, BgpCapability, LocatedBgpCapabilityParsingError<'_>> {
     let (buf, value) = nom::multi::length_count(be_u8, be_u8)(buf)?;
     Ok((
         buf,
-        BGPCapability::Unrecognized(UnrecognizedCapability::new(code, value)),
+        BgpCapability::Unrecognized(UnrecognizedCapability::new(code, value)),
     ))
 }
 
@@ -98,135 +98,135 @@ fn check_capability_length<'a, E, L: FromExternalError<Span<'a>, E> + ParseError
 
 fn parse_route_refresh_capability(
     buf: Span<'_>,
-) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
+) -> IResult<Span<'_>, BgpCapability, LocatedBgpCapabilityParsingError<'_>> {
     let (buf, _) = check_capability_length(buf, ROUTE_REFRESH_CAPABILITY_LENGTH, |x| {
-        BGPCapabilityParsingError::InvalidRouteRefreshLength(x)
+        BgpCapabilityParsingError::InvalidRouteRefreshLength(x)
     })?;
-    Ok((buf, BGPCapability::RouteRefresh))
+    Ok((buf, BgpCapability::RouteRefresh))
 }
 
 fn parse_enhanced_route_refresh_capability(
     buf: Span<'_>,
-) -> IResult<Span<'_>, BGPCapability, LocatedBGPCapabilityParsingError<'_>> {
+) -> IResult<Span<'_>, BgpCapability, LocatedBgpCapabilityParsingError<'_>> {
     let (buf, _) = check_capability_length(buf, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH, |x| {
-        BGPCapabilityParsingError::InvalidEnhancedRouteRefreshLength(x)
+        BgpCapabilityParsingError::InvalidEnhancedRouteRefreshLength(x)
     })?;
-    Ok((buf, BGPCapability::EnhancedRouteRefresh))
+    Ok((buf, BgpCapability::EnhancedRouteRefresh))
 }
 
-impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBGPCapabilityParsingError<'a>> {
-        let parsed: IResult<Span<'_>, BGPCapabilityCode, LocatedBGPCapabilityParsingError<'_>> =
-            nom::combinator::map_res(be_u8, BGPCapabilityCode::try_from)(buf);
+impl<'a> ReadablePDU<'a, LocatedBgpCapabilityParsingError<'a>> for BgpCapability {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpCapabilityParsingError<'a>> {
+        let parsed: IResult<Span<'_>, BgpCapabilityCode, LocatedBgpCapabilityParsingError<'_>> =
+            nom::combinator::map_res(be_u8, BgpCapabilityCode::try_from)(buf);
         match parsed {
             Ok((buf, code)) => match code {
-                BGPCapabilityCode::MultiProtocolExtensions => {
+                BgpCapabilityCode::MultiProtocolExtensions => {
                     let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BGPCapability::MultiProtocolExtensions(cap)))
+                    Ok((buf, BgpCapability::MultiProtocolExtensions(cap)))
                 }
-                BGPCapabilityCode::RouteRefreshCapability => parse_route_refresh_capability(buf),
-                BGPCapabilityCode::OutboundRouteFilteringCapability => {
+                BgpCapabilityCode::RouteRefreshCapability => parse_route_refresh_capability(buf),
+                BgpCapabilityCode::OutboundRouteFilteringCapability => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
-                BGPCapabilityCode::ExtendedNextHopEncoding => {
+                BgpCapabilityCode::ExtendedNextHopEncoding => {
                     let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BGPCapability::ExtendedNextHopEncoding(cap)))
+                    Ok((buf, BgpCapability::ExtendedNextHopEncoding(cap)))
                 }
-                BGPCapabilityCode::BGPExtendedMessage => {
+                BgpCapabilityCode::BgpExtendedMessage => {
                     let (buf, _) =
                         check_capability_length(buf, EXTENDED_MESSAGE_CAPABILITY_LENGTH, |x| {
-                            BGPCapabilityParsingError::InvalidExtendedMessageLength(x)
+                            BgpCapabilityParsingError::InvalidExtendedMessageLength(x)
                         })?;
-                    Ok((buf, BGPCapability::ExtendedMessage))
+                    Ok((buf, BgpCapability::ExtendedMessage))
                 }
-                BGPCapabilityCode::BGPSecCapability => {
+                BgpCapabilityCode::BgpSecCapability => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
-                BGPCapabilityCode::MultipleLabelsCapability => {
+                BgpCapabilityCode::MultipleLabelsCapability => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
-                BGPCapabilityCode::BGPRole => parse_unrecognized_capability(code.into(), buf),
-                BGPCapabilityCode::GracefulRestartCapability => {
+                BgpCapabilityCode::BgpRole => parse_unrecognized_capability(code.into(), buf),
+                BgpCapabilityCode::GracefulRestartCapability => {
                     let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BGPCapability::GracefulRestartCapability(cap)))
+                    Ok((buf, BgpCapability::GracefulRestartCapability(cap)))
                 }
-                BGPCapabilityCode::FourOctetAS => {
+                BgpCapabilityCode::FourOctetAs => {
                     let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BGPCapability::FourOctetAS(cap)))
+                    Ok((buf, BgpCapability::FourOctetAs(cap)))
                 }
-                BGPCapabilityCode::SupportForDynamicCapability => {
+                BgpCapabilityCode::SupportForDynamicCapability => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
-                BGPCapabilityCode::MultiSessionBGPCapability => {
+                BgpCapabilityCode::MultiSessionBgpCapability => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
-                BGPCapabilityCode::ADDPathCapability => {
+                BgpCapabilityCode::AddPathCapability => {
                     let (buf, cap) = parse_into_located(buf)?;
-                    Ok((buf, BGPCapability::AddPath(cap)))
+                    Ok((buf, BgpCapability::AddPath(cap)))
                 }
-                BGPCapabilityCode::EnhancedRouteRefresh => {
+                BgpCapabilityCode::EnhancedRouteRefresh => {
                     parse_enhanced_route_refresh_capability(buf)
                 }
-                BGPCapabilityCode::LongLivedGracefulRestartLLGRCapability => {
+                BgpCapabilityCode::LongLivedGracefulRestartLLGRCapability => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
-                BGPCapabilityCode::RoutingPolicyDistribution => {
+                BgpCapabilityCode::RoutingPolicyDistribution => {
                     parse_unrecognized_capability(code.into(), buf)
                 }
-                BGPCapabilityCode::FQDN => parse_unrecognized_capability(code.into(), buf),
-                BGPCapabilityCode::Experimental239 => {
+                BgpCapabilityCode::FQDN => parse_unrecognized_capability(code.into(), buf),
+                BgpCapabilityCode::Experimental239 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental239, buf)
                 }
-                BGPCapabilityCode::Experimental240 => {
+                BgpCapabilityCode::Experimental240 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental240, buf)
                 }
-                BGPCapabilityCode::Experimental241 => {
+                BgpCapabilityCode::Experimental241 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental241, buf)
                 }
-                BGPCapabilityCode::Experimental242 => {
+                BgpCapabilityCode::Experimental242 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental242, buf)
                 }
-                BGPCapabilityCode::Experimental243 => {
+                BgpCapabilityCode::Experimental243 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental243, buf)
                 }
-                BGPCapabilityCode::Experimental244 => {
+                BgpCapabilityCode::Experimental244 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental244, buf)
                 }
-                BGPCapabilityCode::Experimental245 => {
+                BgpCapabilityCode::Experimental245 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental245, buf)
                 }
-                BGPCapabilityCode::Experimental246 => {
+                BgpCapabilityCode::Experimental246 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental246, buf)
                 }
-                BGPCapabilityCode::Experimental247 => {
+                BgpCapabilityCode::Experimental247 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental247, buf)
                 }
-                BGPCapabilityCode::Experimental248 => {
+                BgpCapabilityCode::Experimental248 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental248, buf)
                 }
-                BGPCapabilityCode::Experimental249 => {
+                BgpCapabilityCode::Experimental249 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental249, buf)
                 }
-                BGPCapabilityCode::Experimental250 => {
+                BgpCapabilityCode::Experimental250 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental250, buf)
                 }
-                BGPCapabilityCode::Experimental251 => {
+                BgpCapabilityCode::Experimental251 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental251, buf)
                 }
-                BGPCapabilityCode::Experimental252 => {
+                BgpCapabilityCode::Experimental252 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental252, buf)
                 }
-                BGPCapabilityCode::Experimental253 => {
+                BgpCapabilityCode::Experimental253 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental253, buf)
                 }
-                BGPCapabilityCode::Experimental254 => {
+                BgpCapabilityCode::Experimental254 => {
                     parse_experimental_capability(ExperimentalCapabilityCode::Experimental254, buf)
                 }
             },
-            Err(nom::Err::Error(LocatedBGPCapabilityParsingError {
+            Err(nom::Err::Error(LocatedBgpCapabilityParsingError {
                 span: buf,
                 error:
-                    BGPCapabilityParsingError::UndefinedCapabilityCode(UndefinedBGPCapabilityCode(_)),
+                    BgpCapabilityParsingError::UndefinedCapabilityCode(UndefinedBgpCapabilityCode(_)),
             })) => {
                 // Parse code again, since nom won't advance the buffer on map_res error
                 let (buf, code) = be_u8(buf)?;
@@ -238,7 +238,7 @@ impl<'a> ReadablePDU<'a, LocatedBGPCapabilityParsingError<'a>> for BGPCapability
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum FourOctetASCapabilityParsingError {
+pub enum FourOctetAsCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
@@ -246,15 +246,15 @@ pub enum FourOctetASCapabilityParsingError {
     InvalidLength(u8),
 }
 
-impl<'a> ReadablePDU<'a, LocatedFourOctetASCapabilityParsingError<'a>> for FourOctetASCapability {
+impl<'a> ReadablePDU<'a, LocatedFourOctetAsCapabilityParsingError<'a>> for FourOctetAsCapability {
     fn from_wire(
         buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedFourOctetASCapabilityParsingError<'a>> {
+    ) -> IResult<Span<'a>, Self, LocatedFourOctetAsCapabilityParsingError<'a>> {
         let (buf, _) = check_capability_length(buf, FOUR_OCTET_AS_CAPABILITY_LENGTH, |x| {
-            FourOctetASCapabilityParsingError::InvalidLength(x)
+            FourOctetAsCapabilityParsingError::InvalidLength(x)
         })?;
         let (buf, asn4) = be_u32(buf)?;
-        Ok((buf, FourOctetASCapability::new(asn4)))
+        Ok((buf, FourOctetAsCapability::new(asn4)))
     }
 }
 

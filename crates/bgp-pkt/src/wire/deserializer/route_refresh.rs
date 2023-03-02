@@ -17,7 +17,7 @@
 
 use crate::{
     iana::{RouteRefreshSubcode, UndefinedRouteRefreshSubcode},
-    BGPRouteRefreshMessage,
+    BgpRouteRefreshMessage,
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
@@ -37,7 +37,7 @@ use netgauze_parse_utils::ErrorKindSerdeDeref;
 
 /// BGP Route Refresh Message Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum BGPRouteRefreshMessageParsingError {
+pub enum BgpRouteRefreshMessageParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     UndefinedOperation(#[from_external] UndefinedRouteRefreshSubcode),
@@ -46,10 +46,10 @@ pub enum BGPRouteRefreshMessageParsingError {
     InvalidAddressType(InvalidAddressType),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBGPRouteRefreshMessageParsingError<'a>> for BGPRouteRefreshMessage {
+impl<'a> ReadablePDU<'a, LocatedBgpRouteRefreshMessageParsingError<'a>> for BgpRouteRefreshMessage {
     fn from_wire(
         buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBGPRouteRefreshMessageParsingError<'a>> {
+    ) -> IResult<Span<'a>, Self, LocatedBgpRouteRefreshMessageParsingError<'a>> {
         let input = buf;
         let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
         let (buf, op) = nom::combinator::map_res(be_u8, RouteRefreshSubcode::try_from)(buf)?;
@@ -58,13 +58,13 @@ impl<'a> ReadablePDU<'a, LocatedBGPRouteRefreshMessageParsingError<'a>> for BGPR
             Ok(val) => val,
             Err(err) => {
                 return Err(nom::Err::Error(
-                    LocatedBGPRouteRefreshMessageParsingError::new(
+                    LocatedBgpRouteRefreshMessageParsingError::new(
                         input,
-                        BGPRouteRefreshMessageParsingError::InvalidAddressType(err),
+                        BgpRouteRefreshMessageParsingError::InvalidAddressType(err),
                     ),
                 ))
             }
         };
-        Ok((buf, BGPRouteRefreshMessage::new(address_type, op)))
+        Ok((buf, BgpRouteRefreshMessage::new(address_type, op)))
     }
 }

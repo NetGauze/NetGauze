@@ -14,7 +14,7 @@
 // limitations under the License.
 
 //! Contains the extensible definitions for various [PathAttribute] that can be
-//! used in [crate::update::BGPUpdateMessage].
+//! used in [crate::update::BgpUpdateMessage].
 
 use crate::{
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
@@ -147,8 +147,8 @@ impl PathAttribute {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PathAttributeValue {
     Origin(Origin),
-    ASPath(ASPath),
-    AS4Path(AS4Path),
+    AsPath(AsPath),
+    As4Path(As4Path),
     NextHop(NextHop),
     MultiExitDiscriminator(MultiExitDiscriminator),
     LocalPreference(LocalPreference),
@@ -167,8 +167,8 @@ impl PathAttributeValue {
     pub fn can_be_optional(&self) -> Option<bool> {
         match self {
             Self::Origin(_) => Origin::can_be_optional(),
-            Self::ASPath(_) => ASPath::can_be_optional(),
-            Self::AS4Path(_) => AS4Path::can_be_optional(),
+            Self::AsPath(_) => AsPath::can_be_optional(),
+            Self::As4Path(_) => As4Path::can_be_optional(),
             Self::NextHop(_) => NextHop::can_be_optional(),
             Self::MultiExitDiscriminator(_) => MultiExitDiscriminator::can_be_optional(),
             Self::LocalPreference(_) => LocalPreference::can_be_optional(),
@@ -187,8 +187,8 @@ impl PathAttributeValue {
     pub fn can_be_transitive(&self) -> Option<bool> {
         match self {
             Self::Origin(_) => Origin::can_be_transitive(),
-            Self::ASPath(_) => ASPath::can_be_transitive(),
-            Self::AS4Path(_) => AS4Path::can_be_transitive(),
+            Self::AsPath(_) => AsPath::can_be_transitive(),
+            Self::As4Path(_) => As4Path::can_be_transitive(),
             Self::NextHop(_) => NextHop::can_be_transitive(),
             Self::MultiExitDiscriminator(_) => MultiExitDiscriminator::can_be_transitive(),
             Self::LocalPreference(_) => LocalPreference::can_be_transitive(),
@@ -207,8 +207,8 @@ impl PathAttributeValue {
     pub fn can_be_partial(&self) -> Option<bool> {
         match self {
             Self::Origin(_) => Origin::can_be_partial(),
-            Self::ASPath(_) => ASPath::can_be_partial(),
-            Self::AS4Path(_) => AS4Path::can_be_partial(),
+            Self::AsPath(_) => AsPath::can_be_partial(),
+            Self::As4Path(_) => As4Path::can_be_partial(),
             Self::NextHop(_) => NextHop::can_be_partial(),
             Self::MultiExitDiscriminator(_) => MultiExitDiscriminator::can_be_partial(),
             Self::LocalPreference(_) => LocalPreference::can_be_partial(),
@@ -284,12 +284,12 @@ impl TryFrom<u8> for Origin {
 /// represented by a triple <path segment type, path segment
 /// length, path segment value>.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ASPath {
+pub enum AsPath {
     As2PathSegments(Vec<As2PathSegment>),
     As4PathSegments(Vec<As4PathSegment>),
 }
 
-impl PathAttributeValueProperties for ASPath {
+impl PathAttributeValueProperties for AsPath {
     fn can_be_optional() -> Option<bool> {
         Some(false)
     }
@@ -406,17 +406,17 @@ impl As4PathSegment {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct AS4Path {
+pub struct As4Path {
     segments: Vec<As4PathSegment>,
 }
 
 /// This is an optional transitive attribute that
 /// contains the AS path encoded with four-octet AS numbers. The
 /// AS4_PATH attribute has the same semantics and the same encoding as
-/// the [ASPath] attribute, except that it is "optional transitive", and
+/// the [AsPath] attribute, except that it is "optional transitive", and
 /// it carries four-octet AS numbers.
 /// See [RFC6793](https://datatracker.ietf.org/doc/html/RFC6793)
-impl AS4Path {
+impl As4Path {
     pub const fn new(segments: Vec<As4PathSegment>) -> Self {
         Self { segments }
     }
@@ -426,7 +426,7 @@ impl AS4Path {
     }
 }
 
-impl PathAttributeValueProperties for AS4Path {
+impl PathAttributeValueProperties for As4Path {
     fn can_be_optional() -> Option<bool> {
         Some(true)
     }
@@ -947,8 +947,8 @@ mod tests {
     fn test_path_attributes_well_known_mandatory() {
         assert!(!Origin::can_be_optional().unwrap_or(false));
         assert!(Origin::can_be_transitive().unwrap_or(false));
-        assert!(!ASPath::can_be_optional().unwrap_or(false));
-        assert!(ASPath::can_be_transitive().unwrap_or(false));
+        assert!(!AsPath::can_be_optional().unwrap_or(false));
+        assert!(AsPath::can_be_transitive().unwrap_or(false));
         assert!(!NextHop::can_be_optional().unwrap_or(false));
         assert!(NextHop::can_be_transitive().unwrap_or(false));
         assert!(!LocalPreference::can_be_optional().unwrap_or(false));
@@ -963,8 +963,8 @@ mod tests {
 
     #[test]
     fn test_path_attributes_optional() {
-        assert!(AS4Path::can_be_optional().unwrap_or(false));
-        assert!(AS4Path::can_be_transitive().unwrap_or(false));
+        assert!(As4Path::can_be_optional().unwrap_or(false));
+        assert!(As4Path::can_be_transitive().unwrap_or(false));
         assert!(Aggregator::can_be_optional().unwrap_or(false));
         assert!(Aggregator::can_be_transitive().unwrap_or(false));
         assert!(MpReach::can_be_optional().unwrap_or(false));

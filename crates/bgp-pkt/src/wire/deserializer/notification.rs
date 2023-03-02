@@ -17,9 +17,9 @@
 
 use crate::{
     iana::{
-        BGPErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
+        BgpErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
         MessageHeaderErrorSubCode, OpenMessageErrorSubCode, RouteRefreshMessageErrorSubCode,
-        UndefinedBGPErrorNotificationCode, UndefinedCeaseErrorSubCode,
+        UndefinedBgpErrorNotificationCode, UndefinedCeaseErrorSubCode,
         UndefinedFiniteStateMachineErrorSubCode, UndefinedMessageHeaderErrorSubCode,
         UndefinedOpenMessageErrorSubCode, UndefinedRouteRefreshMessageError,
         UndefinedUpdateMessageErrorSubCode, UpdateMessageErrorSubCode,
@@ -28,7 +28,7 @@ use crate::{
         CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
-    BGPNotificationMessage,
+    BgpNotificationMessage,
 };
 use netgauze_parse_utils::{parse_into_located, ErrorKindSerdeDeref, ReadablePDU, Span};
 use netgauze_serde_macros::LocatedError;
@@ -37,12 +37,12 @@ use serde::{Deserialize, Serialize};
 
 /// BGP Notification Message Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum BGPNotificationMessageParsingError {
+pub enum BgpNotificationMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    UndefinedBGPErrorNotificationCode(#[from_external] UndefinedBGPErrorNotificationCode),
+    UndefinedBgpErrorNotificationCode(#[from_external] UndefinedBgpErrorNotificationCode),
     MessageHeaderError(#[from_located(module = "self")] MessageHeaderErrorParsingError),
     OpenMessageError(#[from_located(module = "self")] OpenMessageErrorParsingError),
     UpdateMessageError(#[from_located(module = "self")] UpdateMessageErrorParsingError),
@@ -52,40 +52,40 @@ pub enum BGPNotificationMessageParsingError {
     RouteRefreshError(#[from_located(module = "self")] RouteRefreshErrorParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBGPNotificationMessageParsingError<'a>> for BGPNotificationMessage {
+impl<'a> ReadablePDU<'a, LocatedBgpNotificationMessageParsingError<'a>> for BgpNotificationMessage {
     fn from_wire(
         buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBGPNotificationMessageParsingError<'a>> {
+    ) -> IResult<Span<'a>, Self, LocatedBgpNotificationMessageParsingError<'a>> {
         let (buf, notification_type) =
-            nom::combinator::map_res(be_u8, BGPErrorNotificationCode::try_from)(buf)?;
+            nom::combinator::map_res(be_u8, BgpErrorNotificationCode::try_from)(buf)?;
         match notification_type {
-            BGPErrorNotificationCode::MessageHeaderError => {
+            BgpErrorNotificationCode::MessageHeaderError => {
                 let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, BGPNotificationMessage::MessageHeaderError(value)))
+                Ok((buf, BgpNotificationMessage::MessageHeaderError(value)))
             }
-            BGPErrorNotificationCode::OpenMessageError => {
+            BgpErrorNotificationCode::OpenMessageError => {
                 let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, BGPNotificationMessage::OpenMessageError(value)))
+                Ok((buf, BgpNotificationMessage::OpenMessageError(value)))
             }
-            BGPErrorNotificationCode::UpdateMessageError => {
+            BgpErrorNotificationCode::UpdateMessageError => {
                 let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, BGPNotificationMessage::UpdateMessageError(value)))
+                Ok((buf, BgpNotificationMessage::UpdateMessageError(value)))
             }
-            BGPErrorNotificationCode::HoldTimerExpired => {
+            BgpErrorNotificationCode::HoldTimerExpired => {
                 let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, BGPNotificationMessage::HoldTimerExpiredError(value)))
+                Ok((buf, BgpNotificationMessage::HoldTimerExpiredError(value)))
             }
-            BGPErrorNotificationCode::FiniteStateMachineError => {
+            BgpErrorNotificationCode::FiniteStateMachineError => {
                 let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, BGPNotificationMessage::FiniteStateMachineError(value)))
+                Ok((buf, BgpNotificationMessage::FiniteStateMachineError(value)))
             }
-            BGPErrorNotificationCode::Cease => {
+            BgpErrorNotificationCode::Cease => {
                 let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, BGPNotificationMessage::CeaseError(value)))
+                Ok((buf, BgpNotificationMessage::CeaseError(value)))
             }
-            BGPErrorNotificationCode::RouteRefreshMessageError => {
+            BgpErrorNotificationCode::RouteRefreshMessageError => {
                 let (buf, value) = parse_into_located(buf)?;
-                Ok((buf, BGPNotificationMessage::RouteRefreshError(value)))
+                Ok((buf, BgpNotificationMessage::RouteRefreshError(value)))
             }
         }
     }
@@ -167,15 +167,15 @@ impl<'a> ReadablePDU<'a, LocatedOpenMessageErrorParsingError<'a>> for OpenMessag
                     value: (*value.fragment()).into(),
                 },
             )),
-            OpenMessageErrorSubCode::BadPeerAS => Ok((
+            OpenMessageErrorSubCode::BadPeerAs => Ok((
                 buf,
-                OpenMessageError::BadPeerAS {
+                OpenMessageError::BadPeerAs {
                     value: (*value.fragment()).into(),
                 },
             )),
-            OpenMessageErrorSubCode::BadBGPIdentifier => Ok((
+            OpenMessageErrorSubCode::BadBgpIdentifier => Ok((
                 buf,
-                OpenMessageError::BadBGPIdentifier {
+                OpenMessageError::BadBgpIdentifier {
                     value: (*value.fragment()).into(),
                 },
             )),
@@ -285,9 +285,9 @@ impl<'a> ReadablePDU<'a, LocatedUpdateMessageErrorParsingError<'a>> for UpdateMe
                     value: (*value.fragment()).into(),
                 },
             )),
-            UpdateMessageErrorSubCode::MalformedASPath => Ok((
+            UpdateMessageErrorSubCode::MalformedAsPath => Ok((
                 buf,
-                Self::MalformedASPath {
+                Self::MalformedAsPath {
                     value: (*value.fragment()).into(),
                 },
             )),

@@ -109,14 +109,14 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 let value = PathAttributeValue::Origin(value);
                 (buf, value)
             }
-            Ok(PathAttributeType::ASPath) => {
+            Ok(PathAttributeType::AsPath) => {
                 let (buf, value) = parse_into_located_two_inputs(buf, extended_length, asn4)?;
-                let value = PathAttributeValue::ASPath(value);
+                let value = PathAttributeValue::AsPath(value);
                 (buf, value)
             }
-            Ok(PathAttributeType::AS4Path) => {
+            Ok(PathAttributeType::As4Path) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::AS4Path(value);
+                let value = PathAttributeValue::As4Path(value);
                 (buf, value)
             }
             Ok(PathAttributeType::NextHop) => {
@@ -164,12 +164,12 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 let value = PathAttributeValue::LargeCommunities(value);
                 (buf, value)
             }
-            Ok(PathAttributeType::MPReachNLRI) => {
+            Ok(PathAttributeType::MpReachNlri) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::MpReach(value);
                 (buf, value)
             }
-            Ok(PathAttributeType::MPUnreachNLRI) => {
+            Ok(PathAttributeType::MpUnreachNlri) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::MpUnreach(value);
                 (buf, value)
@@ -242,7 +242,7 @@ pub enum AsPathParsingError {
     UndefinedAsPathSegmentType(#[from_external] UndefinedAsPathSegmentType),
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAsPathParsingError<'a>> for ASPath {
+impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAsPathParsingError<'a>> for AsPath {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -281,7 +281,7 @@ impl<'a> ReadablePDU<'a, LocatedAsPathParsingError<'a>> for As4PathSegment {
     }
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for AS4Path {
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for As4Path {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,

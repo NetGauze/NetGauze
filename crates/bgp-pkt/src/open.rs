@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{capabilities::BGPCapability, Deserialize, Serialize};
+use crate::{capabilities::BgpCapability, Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 pub const BGP_VERSION: u8 = 4;
@@ -39,22 +39,22 @@ pub const BGP_VERSION: u8 = 4;
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BGPOpenMessage {
+pub struct BgpOpenMessage {
     version: u8,
     my_as: u16,
     hold_time: u16,
     bgp_id: Ipv4Addr,
-    params: Vec<BGPOpenMessageParameter>, // TODO (AH): rfc5492
+    params: Vec<BgpOpenMessageParameter>, // TODO (AH): rfc5492
 }
 
-impl BGPOpenMessage {
+impl BgpOpenMessage {
     pub fn new(
         my_as: u16,
         hold_time: u16,
         bgp_id: Ipv4Addr,
-        params: Vec<BGPOpenMessageParameter>,
-    ) -> BGPOpenMessage {
-        BGPOpenMessage {
+        params: Vec<BgpOpenMessageParameter>,
+    ) -> BgpOpenMessage {
+        BgpOpenMessage {
             version: BGP_VERSION,
             my_as,
             hold_time,
@@ -79,23 +79,23 @@ impl BGPOpenMessage {
         self.bgp_id
     }
 
-    pub const fn params(&self) -> &Vec<BGPOpenMessageParameter> {
+    pub const fn params(&self) -> &Vec<BgpOpenMessageParameter> {
         &self.params
     }
 
     /// Shortcut to get a list of all the capabilities from all the parameters
-    pub fn capabilities(&self) -> Vec<&BGPCapability> {
+    pub fn capabilities(&self) -> Vec<&BgpCapability> {
         return self
             .params
             .iter()
             .flat_map(|x| match x {
-                BGPOpenMessageParameter::Capabilities(capabilities_vec) => capabilities_vec,
+                BgpOpenMessageParameter::Capabilities(capabilities_vec) => capabilities_vec,
             })
-            .collect::<Vec<&BGPCapability>>();
+            .collect::<Vec<&BgpCapability>>();
     }
 }
 
-/// Optional Parameter included in [BGPOpenMessage].
+/// Optional Parameter included in [BgpOpenMessage].
 ///
 /// ```text
 /// 0                   1
@@ -104,7 +104,7 @@ impl BGPOpenMessage {
 /// |  Parm. Type   | Parm. Length  |  Parameter Value (variable)
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-...
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum BGPOpenMessageParameter {
+pub enum BgpOpenMessageParameter {
     /// Capabilities Advertisement
-    Capabilities(Vec<BGPCapability>),
+    Capabilities(Vec<BgpCapability>),
 }

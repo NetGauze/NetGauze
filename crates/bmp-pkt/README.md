@@ -6,7 +6,7 @@ BMP-4 Protocol representation and wire format serialization/deserialization (ser
 
 ```rust
 use chrono::{DateTime, Utc};
-use netgauze_bgp_pkt::BGPMessage;
+use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bmp_pkt::{
     iana::RouteMirroringInformation, BmpMessage, BmpMessageValue, BmpPeerType, PeerHeader,
     RouteMirroringMessage, RouteMirroringValue,
@@ -19,7 +19,7 @@ use std::{
 };
 
 fn main() {
-    let bmp_msg = BmpMessage::V3(BmpMessageValue::RouteMirroring(RouteMirroringMessage::new(
+    let bmp_msg = BgpMessage::V3(BmpMessageValue::RouteMirroring(RouteMirroringMessage::new(
         PeerHeader::new(
             BmpPeerType::LocRibInstancePeer { filtered: false },
             None,
@@ -30,7 +30,7 @@ fn main() {
         ),
         vec![
             RouteMirroringValue::Information(RouteMirroringInformation::Experimental65531),
-            RouteMirroringValue::BgpMessage(BGPMessage::KeepAlive),
+            RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive),
         ],
     )));
 

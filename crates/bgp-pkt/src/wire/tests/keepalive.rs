@@ -14,18 +14,18 @@
 // limitations under the License.
 
 use crate::{
-    wire::{serializer::BGPMessageWritingError, tests::BGP_MARKER},
-    BGPMessage,
+    wire::{serializer::BgpMessageWritingError, tests::BGP_MARKER},
+    BgpMessage,
 };
 use netgauze_parse_utils::test_helpers::{
     combine, test_parsed_completely_with_one_input, test_write,
 };
 
 #[test]
-fn test_keep_alive() -> Result<(), BGPMessageWritingError> {
+fn test_keep_alive() -> Result<(), BgpMessageWritingError> {
     let good_wire = combine(vec![BGP_MARKER, &[0x00, 0x13, 0x04]]);
 
-    let good = BGPMessage::KeepAlive;
+    let good = BgpMessage::KeepAlive;
 
     test_parsed_completely_with_one_input(&good_wire[..], false, &good);
     test_parsed_completely_with_one_input(&good_wire[..], true, &good);

@@ -40,12 +40,12 @@ use netgauze_parse_utils::{
 };
 
 use crate::{
-    iana::{BGPMessageType, UndefinedBgpMessageType},
+    iana::{BgpMessageType, UndefinedBgpMessageType},
     wire::deserializer::{
-        notification::BGPNotificationMessageParsingError, open::BGPOpenMessageParsingError,
-        route_refresh::BGPRouteRefreshMessageParsingError, update::BGPUpdateMessageParsingError,
+        notification::BgpNotificationMessageParsingError, open::BgpOpenMessageParsingError,
+        route_refresh::BgpRouteRefreshMessageParsingError, update::BgpUpdateMessageParsingError,
     },
-    BGPMessage,
+    BgpMessage,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -54,7 +54,7 @@ use netgauze_serde_macros::LocatedError;
 pub const BGP_MIN_MESSAGE_LENGTH: u16 = 19;
 
 /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271) defined max length as 4096.
-/// *Note*, this only applies to [BGPMessage::Open] and [BGPMessage::KeepAlive]
+/// *Note*, this only applies to [BgpMessage::Open] and [BgpMessage::KeepAlive]
 /// according to the updated
 /// [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654)
 pub const BGP_MAX_MESSAGE_LENGTH: u16 = 4096;
@@ -161,7 +161,7 @@ impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6PrefixParsingErro
 
 /// BGP Message Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum BGPMessageParsingError {
+pub enum BgpMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
@@ -180,39 +180,39 @@ pub enum BGPMessageParsingError {
     /// given message type
     BadMessageLength(u16),
 
-    BGPOpenMessageParsingError(
-        #[from_located(module = "crate::wire::deserializer::open")] BGPOpenMessageParsingError,
+    BgpOpenMessageParsingError(
+        #[from_located(module = "crate::wire::deserializer::open")] BgpOpenMessageParsingError,
     ),
 
-    BGPUpdateMessageParsingError(
-        #[from_located(module = "crate::wire::deserializer::update")] BGPUpdateMessageParsingError,
+    BgpUpdateMessageParsingError(
+        #[from_located(module = "crate::wire::deserializer::update")] BgpUpdateMessageParsingError,
     ),
 
-    BGPNotificationMessageParsingError(
+    BgpNotificationMessageParsingError(
         #[from_located(module = "crate::wire::deserializer::notification")]
-        BGPNotificationMessageParsingError,
+        BgpNotificationMessageParsingError,
     ),
 
-    BGPRouteRefreshMessageParsingError(
+    BgpRouteRefreshMessageParsingError(
         #[from_located(module = "crate::wire::deserializer::route_refresh")]
-        BGPRouteRefreshMessageParsingError,
+        BgpRouteRefreshMessageParsingError,
     ),
 }
 
-/// Parse [BGPMessage] length and type, then check that the length of a BGP
+/// Parse [BgpMessage] length and type, then check that the length of a BGP
 /// message is valid according to it's type. Takes into consideration both rules at [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
 /// and [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654).
 fn parse_bgp_message_length_and_type(
     buf: Span<'_>,
-) -> IResult<Span<'_>, (u16, BGPMessageType, Span<'_>), LocatedBGPMessageParsingError<'_>> {
+) -> IResult<Span<'_>, (u16, BgpMessageType, Span<'_>), LocatedBgpMessageParsingError<'_>> {
     let pre_len_buf = buf;
     let (buf, length) = be_u16(buf)?;
 
     // Fail early if the message length is not valid
     if length < BGP_MIN_MESSAGE_LENGTH {
-        return Err(nom::Err::Error(LocatedBGPMessageParsingError::new(
+        return Err(nom::Err::Error(LocatedBgpMessageParsingError::new(
             pre_len_buf,
-            BGPMessageParsingError::BadMessageLength(length),
+            BgpMessageParsingError::BadMessageLength(length),
         )));
     }
 
@@ -221,43 +221,43 @@ fn parse_bgp_message_length_and_type(
     let reminder_result = nom::bytes::complete::take::<
         u16,
         Span<'_>,
-        LocatedBGPMessageParsingError<'_>,
+        LocatedBgpMessageParsingError<'_>,
     >(length - 18)(buf);
     let (reminder_buf, buf) = match reminder_result {
         Ok((reminder_buf, buf)) => (reminder_buf, buf),
         Err(_) => {
-            return Err(nom::Err::Error(LocatedBGPMessageParsingError::new(
+            return Err(nom::Err::Error(LocatedBgpMessageParsingError::new(
                 pre_len_buf,
-                BGPMessageParsingError::BadMessageLength(length),
+                BgpMessageParsingError::BadMessageLength(length),
             )));
         }
     };
-    let (buf, message_type) = nom::combinator::map_res(be_u8, BGPMessageType::try_from)(buf)?;
+    let (buf, message_type) = nom::combinator::map_res(be_u8, BgpMessageType::try_from)(buf)?;
 
     match message_type {
-        BGPMessageType::Open | BGPMessageType::KeepAlive => {
+        BgpMessageType::Open | BgpMessageType::KeepAlive => {
             if !(BGP_MIN_MESSAGE_LENGTH..=BGP_MAX_MESSAGE_LENGTH).contains(&length) {
-                return Err(nom::Err::Error(LocatedBGPMessageParsingError::new(
+                return Err(nom::Err::Error(LocatedBgpMessageParsingError::new(
                     pre_len_buf,
-                    BGPMessageParsingError::BadMessageLength(length),
+                    BgpMessageParsingError::BadMessageLength(length),
                 )));
             }
         }
-        BGPMessageType::Update | BGPMessageType::Notification | BGPMessageType::RouteRefresh => {}
+        BgpMessageType::Update | BgpMessageType::Notification | BgpMessageType::RouteRefresh => {}
     }
     Ok((buf, (length, message_type, reminder_buf)))
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPMessageParsingError<'a>> for BGPMessage {
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBgpMessageParsingError<'a>> for BgpMessage {
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
-    ) -> IResult<Span<'a>, Self, LocatedBGPMessageParsingError<'a>> {
+    ) -> IResult<Span<'a>, Self, LocatedBgpMessageParsingError<'a>> {
         let (buf, _) = nom::combinator::map_res(be_u128, |x| {
             if x == u128::MAX {
                 Ok(x)
             } else {
-                Err(BGPMessageParsingError::ConnectionNotSynchronized(x))
+                Err(BgpMessageParsingError::ConnectionNotSynchronized(x))
             }
         })(buf)?;
 
@@ -265,30 +265,30 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPMessageParsingError<'a>> fo
         // the length based on the type of the message
         let (buf, (_, message_type, reminder_buf)) = parse_bgp_message_length_and_type(buf)?;
         let (buf, msg) = match message_type {
-            BGPMessageType::Open => {
+            BgpMessageType::Open => {
                 let (buf, open) = parse_into_located(buf)?;
-                (buf, BGPMessage::Open(open))
+                (buf, BgpMessage::Open(open))
             }
-            BGPMessageType::Update => {
+            BgpMessageType::Update => {
                 let (buf, update) = parse_into_located_one_input(buf, asn4)?;
-                (buf, BGPMessage::Update(update))
+                (buf, BgpMessage::Update(update))
             }
-            BGPMessageType::Notification => {
+            BgpMessageType::Notification => {
                 let (buf, notification) = parse_into_located(buf)?;
-                (buf, BGPMessage::Notification(notification))
+                (buf, BgpMessage::Notification(notification))
             }
-            BGPMessageType::KeepAlive => (buf, BGPMessage::KeepAlive),
-            BGPMessageType::RouteRefresh => {
+            BgpMessageType::KeepAlive => (buf, BgpMessage::KeepAlive),
+            BgpMessageType::RouteRefresh => {
                 let (buf, route_refresh) = parse_into_located(buf)?;
-                (buf, BGPMessage::RouteRefresh(route_refresh))
+                (buf, BgpMessage::RouteRefresh(route_refresh))
             }
         };
 
         // Make sure we consumed the full BGP message as specified by its length
         if !buf.is_empty() {
-            return Err(nom::Err::Error(LocatedBGPMessageParsingError::new(
+            return Err(nom::Err::Error(LocatedBgpMessageParsingError::new(
                 buf,
-                BGPMessageParsingError::NomError(ErrorKind::NonEmpty),
+                BgpMessageParsingError::NomError(ErrorKind::NonEmpty),
             )));
         }
         Ok((reminder_buf, msg))

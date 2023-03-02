@@ -232,28 +232,28 @@ fn test_as2_path_segments() -> Result<(), AsPathWritingError> {
     let bad_underflow_wire = [0x08, 0x01, 0x01, 0x00, 0x01];
     let bad_overflow_wire = [0x08, 0x01, 0x02, 0x00, 0x01, 0x00, 0x02];
 
-    let good = ASPath::As2PathSegments(vec![
+    let good = AsPath::As2PathSegments(vec![
         As2PathSegment::new(AsPathSegmentType::AsSet, vec![1]),
         As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]),
     ]);
-    let good_extended = ASPath::As2PathSegments(vec![
+    let good_extended = AsPath::As2PathSegments(vec![
         As2PathSegment::new(AsPathSegmentType::AsSet, vec![1]),
         As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]),
     ]);
-    let good_empty = ASPath::As2PathSegments(vec![]);
+    let good_empty = AsPath::As2PathSegments(vec![]);
     let bad_underflow = nom::Err::Incomplete(nom::Needed::new(4));
     let bad_overflow = nom::Err::Incomplete(nom::Needed::new(2));
 
     test_parsed_completely_with_two_inputs(&good_wire, false, false, &good);
     test_parsed_completely_with_two_inputs(&good_empty_wire, false, false, &good_empty);
     test_parsed_completely_with_two_inputs(&good_extended_wire, true, false, &good_extended);
-    test_parse_error_with_two_inputs::<ASPath, bool, bool, LocatedAsPathParsingError<'_>>(
+    test_parse_error_with_two_inputs::<AsPath, bool, bool, LocatedAsPathParsingError<'_>>(
         &bad_underflow_wire,
         false,
         false,
         bad_underflow,
     );
-    test_parse_error_with_two_inputs::<ASPath, bool, bool, LocatedAsPathParsingError<'_>>(
+    test_parse_error_with_two_inputs::<AsPath, bool, bool, LocatedAsPathParsingError<'_>>(
         &bad_overflow_wire,
         false,
         false,
@@ -276,12 +276,12 @@ fn test_as4_path_segments() -> Result<(), AsPathWritingError> {
     let bad_underflow_wire = [0x00, 0x08, 0x01, 0x01, 0x00, 0x01];
     let bad_overflow_wire = [0x00, 0x08, 0x01, 0x02, 0x00, 0x01, 0x00, 0x02];
 
-    let good_empty = ASPath::As4PathSegments(vec![]);
-    let good_one = ASPath::As4PathSegments(vec![As4PathSegment::new(
+    let good_empty = AsPath::As4PathSegments(vec![]);
+    let good_one = AsPath::As4PathSegments(vec![As4PathSegment::new(
         AsPathSegmentType::AsSequence,
         vec![1],
     )]);
-    let good_two = ASPath::As4PathSegments(vec![
+    let good_two = AsPath::As4PathSegments(vec![
         As4PathSegment::new(AsPathSegmentType::AsSet, vec![1]),
         As4PathSegment::new(AsPathSegmentType::AsSequence, vec![1]),
     ]);
@@ -293,13 +293,13 @@ fn test_as4_path_segments() -> Result<(), AsPathWritingError> {
     test_parsed_completely_with_two_inputs(&good_one_wire, true, true, &good_one);
     test_parsed_completely_with_two_inputs(&good_two_wire, true, true, &good_two);
 
-    test_parse_error_with_two_inputs::<ASPath, bool, bool, LocatedAsPathParsingError<'_>>(
+    test_parse_error_with_two_inputs::<AsPath, bool, bool, LocatedAsPathParsingError<'_>>(
         &bad_underflow_wire,
         true,
         true,
         bad_underflow,
     );
-    test_parse_error_with_two_inputs::<ASPath, bool, bool, LocatedAsPathParsingError<'_>>(
+    test_parse_error_with_two_inputs::<AsPath, bool, bool, LocatedAsPathParsingError<'_>>(
         &bad_overflow_wire,
         true,
         true,
@@ -324,7 +324,7 @@ fn test_path_attribute_as2_path() -> Result<(), PathAttributeWritingError> {
         true,
         false,
         false,
-        PathAttributeValue::ASPath(ASPath::As2PathSegments(vec![As2PathSegment::new(
+        PathAttributeValue::AsPath(AsPath::As2PathSegments(vec![As2PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
         )])),
@@ -335,7 +335,7 @@ fn test_path_attribute_as2_path() -> Result<(), PathAttributeWritingError> {
         true,
         false,
         true,
-        PathAttributeValue::ASPath(ASPath::As2PathSegments(vec![As2PathSegment::new(
+        PathAttributeValue::AsPath(AsPath::As2PathSegments(vec![As2PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
         )])),
@@ -374,7 +374,7 @@ fn test_path_attribute_as4_path() -> Result<(), PathAttributeWritingError> {
         true,
         false,
         false,
-        PathAttributeValue::ASPath(ASPath::As4PathSegments(vec![As4PathSegment::new(
+        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
         )])),
@@ -386,7 +386,7 @@ fn test_path_attribute_as4_path() -> Result<(), PathAttributeWritingError> {
         true,
         false,
         true,
-        PathAttributeValue::ASPath(ASPath::As4PathSegments(vec![As4PathSegment::new(
+        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
         )])),
@@ -417,7 +417,7 @@ fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritin
         true,
         false,
         false,
-        PathAttributeValue::AS4Path(AS4Path::new(vec![As4PathSegment::new(
+        PathAttributeValue::As4Path(As4Path::new(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
         )])),
@@ -428,7 +428,7 @@ fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritin
         true,
         false,
         true,
-        PathAttributeValue::AS4Path(AS4Path::new(vec![As4PathSegment::new(
+        PathAttributeValue::As4Path(As4Path::new(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
         )])),
@@ -439,7 +439,7 @@ fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritin
         true,
         true,
         true,
-        PathAttributeValue::AS4Path(AS4Path::new(vec![As4PathSegment::new(
+        PathAttributeValue::As4Path(As4Path::new(vec![As4PathSegment::new(
             AsPathSegmentType::AsSequence,
             vec![100, 300],
         )])),

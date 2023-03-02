@@ -15,25 +15,25 @@
 
 use crate::{
     capabilities::{
-        AddPathAddressFamily, AddPathCapability, BGPCapability, ExtendedNextHopEncoding,
-        ExtendedNextHopEncodingCapability, FourOctetASCapability, GracefulRestartCapability,
+        AddPathAddressFamily, AddPathCapability, BgpCapability, ExtendedNextHopEncoding,
+        ExtendedNextHopEncodingCapability, FourOctetAsCapability, GracefulRestartCapability,
         MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
     iana::{
-        RouteRefreshSubcode, UndefinedBGPErrorNotificationCode, UndefinedBgpMessageType,
+        RouteRefreshSubcode, UndefinedBgpErrorNotificationCode, UndefinedBgpMessageType,
         UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
     },
     notification::CeaseError,
-    open::{BGPOpenMessageParameter, BGP_VERSION},
+    open::{BgpOpenMessageParameter, BGP_VERSION},
     wire::{
         deserializer::{
-            notification::{BGPNotificationMessageParsingError, CeaseErrorParsingError},
-            route_refresh::BGPRouteRefreshMessageParsingError,
-            BGPMessageParsingError, LocatedBGPMessageParsingError,
+            notification::{BgpNotificationMessageParsingError, CeaseErrorParsingError},
+            route_refresh::BgpRouteRefreshMessageParsingError,
+            BgpMessageParsingError, LocatedBgpMessageParsingError,
         },
-        serializer::BGPMessageWritingError,
+        serializer::BgpMessageWritingError,
     },
-    BGPMessage, BGPNotificationMessage, BGPOpenMessage, BGPRouteRefreshMessage,
+    BgpOpenMessage, BgpMessage, BgpNotificationMessage, BgpRouteRefreshMessage,
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
@@ -66,11 +66,11 @@ fn test_bgp_message_not_synchronized_marker() {
     let bad_marker = [0x00; 16];
     let invalid_wire = combine(vec![&bad_marker, &[0x00, 0x13, 0x04]]);
 
-    let invalid = LocatedBGPMessageParsingError::new(
+    let invalid = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(0, &invalid_wire[0..]) },
-        BGPMessageParsingError::ConnectionNotSynchronized(0u128),
+        BgpMessageParsingError::ConnectionNotSynchronized(0u128),
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &invalid_wire,
         false,
         &invalid,
@@ -103,88 +103,88 @@ fn test_bgp_message_length_bounds() {
     let open_overflow_extended_wire =
         combine(vec![BGP_MARKER, &[0x10, 0x01, 0x01], &[0x00; 0x0fee]]);
 
-    let good = BGPMessage::KeepAlive;
-    let open_underflow = LocatedBGPMessageParsingError::new(
+    let good = BgpMessage::KeepAlive;
+    let open_underflow = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(16, &open_underflow_wire[16..]) },
-        BGPMessageParsingError::BadMessageLength(20),
+        BgpMessageParsingError::BadMessageLength(20),
     );
-    let open_less_than_min = LocatedBGPMessageParsingError::new(
+    let open_less_than_min = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(16, &open_less_than_min_wire[16..]) },
-        BGPMessageParsingError::BadMessageLength(18),
+        BgpMessageParsingError::BadMessageLength(18),
     );
-    let update_less_than_min = LocatedBGPMessageParsingError::new(
+    let update_less_than_min = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(16, &update_less_than_min_wire[16..]) },
-        BGPMessageParsingError::BadMessageLength(18),
+        BgpMessageParsingError::BadMessageLength(18),
     );
-    let notification_less_than_min = LocatedBGPMessageParsingError::new(
+    let notification_less_than_min = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(16, &notification_less_than_min_wire[16..]) },
-        BGPMessageParsingError::BadMessageLength(18),
+        BgpMessageParsingError::BadMessageLength(18),
     );
-    let keepalive_less_than_min = LocatedBGPMessageParsingError::new(
+    let keepalive_less_than_min = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(16, &keepalive_less_than_min_wire[16..]) },
-        BGPMessageParsingError::BadMessageLength(18),
+        BgpMessageParsingError::BadMessageLength(18),
     );
-    let route_refresh_less_than_min = LocatedBGPMessageParsingError::new(
+    let route_refresh_less_than_min = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(16, &route_refresh_less_than_min_wire[16..]) },
-        BGPMessageParsingError::BadMessageLength(18),
+        BgpMessageParsingError::BadMessageLength(18),
     );
 
-    let overflow = LocatedBGPMessageParsingError::new(
+    let overflow = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(19, &overflow_wire[19..]) },
-        BGPMessageParsingError::NomError(ErrorKind::NonEmpty),
+        BgpMessageParsingError::NomError(ErrorKind::NonEmpty),
     );
-    let keepalive_overflow_extended = LocatedBGPMessageParsingError::new(
+    let keepalive_overflow_extended = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(16, &keepalive_overflow_extended_wire[16..]) },
-        BGPMessageParsingError::BadMessageLength(4097),
+        BgpMessageParsingError::BadMessageLength(4097),
     );
 
-    let open_overflow_extended = LocatedBGPMessageParsingError::new(
+    let open_overflow_extended = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(16, &open_overflow_extended_wire[16..]) },
-        BGPMessageParsingError::BadMessageLength(4097),
+        BgpMessageParsingError::BadMessageLength(4097),
     );
 
     test_parsed_completely_with_one_input(&good_wire[..], true, &good);
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &open_underflow_wire,
         false,
         &open_underflow,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &open_less_than_min_wire,
         false,
         &open_less_than_min,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &update_less_than_min_wire,
         false,
         &update_less_than_min,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &notification_less_than_min_wire,
         false,
         &notification_less_than_min,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &keepalive_less_than_min_wire,
         false,
         &keepalive_less_than_min,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &route_refresh_less_than_min_wire,
         false,
         &route_refresh_less_than_min,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &overflow_wire,
         false,
         &overflow,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &keepalive_overflow_extended_wire,
         false,
         &keepalive_overflow_extended,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &open_overflow_extended_wire,
         false,
         &open_overflow_extended,
@@ -194,11 +194,11 @@ fn test_bgp_message_length_bounds() {
 #[test]
 fn test_bgp_message_undefined_message_type() {
     let invalid_wire = combine(vec![BGP_MARKER, &[0x00, 0x13, 0xff]]);
-    let invalid = LocatedBGPMessageParsingError::new(
+    let invalid = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(18, &invalid_wire[18..]) },
-        BGPMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(0xff)),
+        BgpMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(0xff)),
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &invalid_wire,
         true,
         &invalid,
@@ -206,16 +206,16 @@ fn test_bgp_message_undefined_message_type() {
 }
 
 #[test]
-fn test_bgp_message_open_no_params() -> Result<(), BGPMessageWritingError> {
+fn test_bgp_message_open_no_params() -> Result<(), BgpMessageWritingError> {
     let good_no_params_wire = combine(vec![&[BGP_VERSION], MY_AS, HOLD_TIME, BGP_ID, &[0x00u8]]);
-    let good_no_params_msg = BGPOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), vec![]);
+    let good_no_params_msg = BgpOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), vec![]);
     test_parsed_completely(&good_no_params_wire, &good_no_params_msg);
     test_write(&good_no_params_msg, &good_no_params_wire)?;
     Ok(())
 }
 
 #[test]
-fn test_bgp_message_notification() -> Result<(), BGPMessageWritingError> {
+fn test_bgp_message_notification() -> Result<(), BgpMessageWritingError> {
     let good_cease_wire = combine(vec![
         BGP_MARKER,
         &[0x00, 0x17, 0x03, 0x06, 0x09, 0x06, 0x03],
@@ -230,33 +230,33 @@ fn test_bgp_message_notification() -> Result<(), BGPMessageWritingError> {
     ]);
 
     let good_cease =
-        BGPMessage::Notification(BGPNotificationMessage::CeaseError(CeaseError::HardReset {
+        BgpMessage::Notification(BgpNotificationMessage::CeaseError(CeaseError::HardReset {
             value: vec![6, 3],
         }));
-    let bad_undefined_notif = LocatedBGPMessageParsingError::new(
+    let bad_undefined_notif = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(19, &bad_undefined_notif_wire[19..]) },
-        BGPMessageParsingError::BGPNotificationMessageParsingError(
-            BGPNotificationMessageParsingError::UndefinedBGPErrorNotificationCode(
-                UndefinedBGPErrorNotificationCode(0xff),
+        BgpMessageParsingError::BgpNotificationMessageParsingError(
+            BgpNotificationMessageParsingError::UndefinedBgpErrorNotificationCode(
+                UndefinedBgpErrorNotificationCode(0xff),
             ),
         ),
     );
-    let bad_undefined_cease = LocatedBGPMessageParsingError::new(
+    let bad_undefined_cease = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(20, &bad_undefined_cease_wire[20..]) },
-        BGPMessageParsingError::BGPNotificationMessageParsingError(
-            BGPNotificationMessageParsingError::CeaseError(CeaseErrorParsingError::Undefined(
+        BgpMessageParsingError::BgpNotificationMessageParsingError(
+            BgpNotificationMessageParsingError::CeaseError(CeaseErrorParsingError::Undefined(
                 UndefinedCeaseErrorSubCode(0xff),
             )),
         ),
     );
 
     test_parsed_completely_with_one_input(&good_cease_wire, false, &good_cease);
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &bad_undefined_notif_wire,
         false,
         &bad_undefined_notif,
     );
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &bad_undefined_cease_wire,
         false,
         &bad_undefined_cease,
@@ -267,28 +267,28 @@ fn test_bgp_message_notification() -> Result<(), BGPMessageWritingError> {
 }
 
 #[test]
-fn test_bgp_message_route_refresh() -> Result<(), BGPMessageWritingError> {
+fn test_bgp_message_route_refresh() -> Result<(), BgpMessageWritingError> {
     let good_normal_payload_wire = [0x00, 0x01, 0x00, 0x01];
     let good_normal_wire = combine(vec![BGP_MARKER, &[0x00, 23, 5], &good_normal_payload_wire]);
     let bad_payload_wire = [0x00, 0x01, 0xff, 0x01];
     let bad_wire = combine(vec![BGP_MARKER, &[0x00, 23, 5], &bad_payload_wire]);
 
-    let good_normal = BGPMessage::RouteRefresh(BGPRouteRefreshMessage::new(
+    let good_normal = BgpMessage::RouteRefresh(BgpRouteRefreshMessage::new(
         AddressType::Ipv4Unicast,
         RouteRefreshSubcode::NormalRequest,
     ));
 
-    let bad = LocatedBGPMessageParsingError::new(
+    let bad = LocatedBgpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(21, &bad_wire[21..]) },
-        BGPMessageParsingError::BGPRouteRefreshMessageParsingError(
-            BGPRouteRefreshMessageParsingError::UndefinedOperation(UndefinedRouteRefreshSubcode(
+        BgpMessageParsingError::BgpRouteRefreshMessageParsingError(
+            BgpRouteRefreshMessageParsingError::UndefinedOperation(UndefinedRouteRefreshSubcode(
                 255,
             )),
         ),
     );
 
     test_parsed_completely_with_one_input(&good_normal_wire, false, &good_normal);
-    test_parse_error_with_one_input::<BGPMessage, bool, LocatedBGPMessageParsingError<'_>>(
+    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
         &bad_wire, false, &bad,
     );
     test_write(&good_normal, &good_normal_wire)?;
@@ -297,7 +297,7 @@ fn test_bgp_message_route_refresh() -> Result<(), BGPMessageWritingError> {
 }
 
 #[test]
-fn test_bgp_message_open1() -> Result<(), BGPMessageWritingError> {
+fn test_bgp_message_open1() -> Result<(), BgpMessageWritingError> {
     let good_wire = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0x00, 0x53, 0x01, 0x04, 0x00, 0x64, 0x00, 0xb4, 0x05, 0x05, 0x05, 0x05, 0x36, 0x02,
@@ -307,25 +307,25 @@ fn test_bgp_message_open1() -> Result<(), BGPMessageWritingError> {
         0x00, 0x02, 0x00, 0x01, 0x00, 0x80, 0x00, 0x02,
     ];
 
-    let good = BGPMessage::Open(BGPOpenMessage::new(
+    let good = BgpMessage::Open(BgpOpenMessage::new(
         100,
         180,
         Ipv4Addr::new(5, 5, 5, 5),
         vec![
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
                 UnrecognizedCapability::new(128, vec![]),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
-                FourOctetASCapability::new(100),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                FourOctetAsCapability::new(100),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::ExtendedNextHopEncoding(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::ExtendedNextHopEncoding(
                 ExtendedNextHopEncodingCapability::new(vec![
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
@@ -344,7 +344,7 @@ fn test_bgp_message_open1() -> Result<(), BGPMessageWritingError> {
 }
 
 #[test]
-fn test_bgp_message_open_multi_protocol() -> Result<(), BGPMessageWritingError> {
+fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> {
     let good_wire = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0x00, 0x71, 0x01, 0x04, 0x00, 0xc8, 0x00, 0xb4, 0xac, 0x10, 0x00, 0x14, 0x54, 0x02,
@@ -356,42 +356,42 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BGPMessageWritingError> 
         0x00, 0x00, 0x01, 0x02, 0x80, 0x00, 0x00, 0x00,
     ];
 
-    let good = BGPMessage::Open(BGPOpenMessage::new(
+    let good = BgpMessage::Open(BgpOpenMessage::new(
         200,
         180,
         Ipv4Addr::new(172, 16, 0, 20),
         vec![
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Multicast),
             )]),
             // Cisco Route Refresh
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
                 UnrecognizedCapability::new(128, vec![]),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::EnhancedRouteRefresh]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
-                FourOctetASCapability::new(200),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::EnhancedRouteRefresh]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                FourOctetAsCapability::new(200),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::ExtendedMessage]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::AddPath(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::ExtendedMessage]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::AddPath(
                 AddPathCapability::new(vec![
                     AddPathAddressFamily::new(AddressType::Ipv4Unicast, false, true),
                     AddPathAddressFamily::new(AddressType::Ipv4Multicast, false, true),
                 ]),
             )]),
             // FQDN
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
                 UnrecognizedCapability::new(73, vec![0x02, 0x72, 0x32, 0x00]),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::GracefulRestartCapability(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::GracefulRestartCapability(
                 GracefulRestartCapability::new(true, true, 120, vec![]),
             )]),
             // Long Lived Graceful Restart
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
                 UnrecognizedCapability::new(71, vec![0, 1, 1, 128, 0, 0, 0, 0, 1, 2, 128, 0, 0, 0]),
             )]),
         ],

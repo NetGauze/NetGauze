@@ -21,7 +21,7 @@ use strum_macros::{Display, FromRepr};
 /// BGP Message types as registered in IANA [BGP Message Types](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-1)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BGPMessageType {
+pub enum BgpMessageType {
     Open = 1,
     Update = 2,
     Notification = 3,
@@ -30,18 +30,18 @@ pub enum BGPMessageType {
     RouteRefresh = 5,
 }
 
-/// BGP Message type is not one of [BGPMessageType], the carried value is the
+/// BGP Message type is not one of [BgpMessageType], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UndefinedBgpMessageType(pub u8);
 
-impl From<BGPMessageType> for u8 {
-    fn from(value: BGPMessageType) -> Self {
+impl From<BgpMessageType> for u8 {
+    fn from(value: BgpMessageType) -> Self {
         value as u8
     }
 }
 
-impl TryFrom<u8> for BGPMessageType {
+impl TryFrom<u8> for BgpMessageType {
     type Error = UndefinedBgpMessageType;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -60,7 +60,7 @@ pub enum PathAttributeType {
     Origin = 1,
 
     /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
-    ASPath = 2,
+    AsPath = 2,
 
     /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
     NextHop = 3,
@@ -81,28 +81,28 @@ pub enum PathAttributeType {
     Communities = 8,
 
     /// [RFC4456](https://datatracker.ietf.org/doc/html/rfc4456)
-    OriginatorID = 9,
+    OriginatorId = 9,
 
     /// [RFC4456](https://datatracker.ietf.org/doc/html/rfc4456)
     ClusterList = 10,
 
     /// [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
-    MPReachNLRI = 14,
+    MpReachNlri = 14,
 
     /// [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
-    MPUnreachNLRI = 15,
+    MpUnreachNlri = 15,
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     ExtendedCommunities = 16,
 
     /// [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793)
-    AS4Path = 17,
+    As4Path = 17,
 
     /// [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793)
     As4Aggregator = 18,
 
     /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
-    PMSITunnel = 22,
+    PmsiTunnel = 22,
 
     /// [RFC9012](https://datatracker.ietf.org/doc/html/rfc9012)
     TunnelEncapsulation = 23,
@@ -114,34 +114,34 @@ pub enum PathAttributeType {
     ExtendedCommunitiesIpv6 = 25,
 
     /// [RFC7311](https://datatracker.ietf.org/doc/html/rfc7311)
-    AccumulatedIGP = 26,
+    AccumulatedIgp = 26,
 
     /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
-    PEDistinguisherLabels = 27,
+    PeDistinguisherLabels = 27,
 
     /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
-    BGPLSAttribute = 29,
+    BgpLsAttribute = 29,
 
     /// [RFC8092](https://datatracker.ietf.org/doc/html/rfc8092)
     LargeCommunities = 32,
 
     /// [RFC8205](https://datatracker.ietf.org/doc/html/rfc8205)
-    BGPSecPath = 33,
+    BgpPSecPath = 33,
 
     /// [RFC9234](https://datatracker.ietf.org/doc/html/rfc9234)
     OnlyToCustomer = 35,
 
     /// D-PATH [draft-ietf-bess-evpn-ipvpn-interworking](https://datatracker.ietf.org/doc/html/draft-ietf-bess-evpn-ipvpn-interworking)
-    BGPDomainPath = 36,
+    BgpDomainPath = 36,
 
     /// [RFC9015](https://datatracker.ietf.org/doc/html/rfc9015)
-    SFPAttribute = 37,
+    SfpAttribute = 37,
 
     /// [RFC9026](https://datatracker.ietf.org/doc/html/rfc9026)
-    BFDDiscriminator = 38,
+    BfdDiscriminator = 38,
 
     /// [RFC8669](https://datatracker.ietf.org/doc/html/rfc8669)
-    BGPPrefixSID = 40,
+    BgpPrefixSid = 40,
 
     /// [RFC6368](https://datatracker.ietf.org/doc/html/rfc6368)
     AttributesSet = 128,
@@ -173,7 +173,7 @@ impl TryFrom<u8> for PathAttributeType {
 /// BGP Error (Notification) Codes as defined by IANA [BGP Error (Notification) Codes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-3)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BGPErrorNotificationCode {
+pub enum BgpErrorNotificationCode {
     /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
     MessageHeaderError = 1,
 
@@ -196,27 +196,27 @@ pub enum BGPErrorNotificationCode {
     RouteRefreshMessageError = 7,
 }
 
-impl From<BGPErrorNotificationCode> for u8 {
-    fn from(value: BGPErrorNotificationCode) -> Self {
+impl From<BgpErrorNotificationCode> for u8 {
+    fn from(value: BgpErrorNotificationCode) -> Self {
         value as u8
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UndefinedBGPErrorNotificationCode(pub u8);
+pub struct UndefinedBgpErrorNotificationCode(pub u8);
 
-impl TryFrom<u8> for BGPErrorNotificationCode {
-    type Error = UndefinedBGPErrorNotificationCode;
+impl TryFrom<u8> for BgpErrorNotificationCode {
+    type Error = UndefinedBgpErrorNotificationCode;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UndefinedBGPErrorNotificationCode(value)),
+            None => Err(UndefinedBgpErrorNotificationCode(value)),
         }
     }
 }
 
-/// Message Header Error sub-codes for [BGPErrorNotificationCode::MessageHeaderError] as defined by IANA [Message Header Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-5)
+/// Message Header Error sub-codes for [BgpErrorNotificationCode::MessageHeaderError] as defined by IANA [Message Header Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-5)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum MessageHeaderErrorSubCode {
@@ -247,15 +247,15 @@ impl TryFrom<u8> for MessageHeaderErrorSubCode {
     }
 }
 
-/// OPEN Message Error sub-codes for [BGPErrorNotificationCode::OpenMessageError] as defined by IANA [OPEN Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-6)
+/// OPEN Message Error sub-codes for [BgpErrorNotificationCode::OpenMessageError] as defined by IANA [OPEN Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-6)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum OpenMessageErrorSubCode {
     /// [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493)
     Unspecific = 0,
     UnsupportedVersionNumber = 1,
-    BadPeerAS = 2,
-    BadBGPIdentifier = 3,
+    BadPeerAs = 2,
+    BadBgpIdentifier = 3,
     UnsupportedOptionalParameter = 4,
     UnacceptableHoldTime = 6,
 
@@ -286,7 +286,7 @@ impl TryFrom<u8> for OpenMessageErrorSubCode {
     }
 }
 
-/// UPDATE Message Error sub-codes for [BGPErrorNotificationCode::UpdateMessageError] as defined by IANA [UPDATE Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-7)
+/// UPDATE Message Error sub-codes for [BgpErrorNotificationCode::UpdateMessageError] as defined by IANA [UPDATE Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-7)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum UpdateMessageErrorSubCode {
@@ -301,7 +301,7 @@ pub enum UpdateMessageErrorSubCode {
     InvalidNextHopAttribute = 8,
     OptionalAttributeError = 9,
     InvalidNetworkField = 10,
-    MalformedASPath = 11,
+    MalformedAsPath = 11,
 }
 
 impl From<UpdateMessageErrorSubCode> for u8 {
@@ -324,7 +324,7 @@ impl TryFrom<u8> for UpdateMessageErrorSubCode {
     }
 }
 
-/// BGP Finite State Machine Error sub-codes for [BGPErrorNotificationCode::FiniteStateMachineError] as defined by IANA [BGP Finite State Machine Error Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-finite-state-machine-error-subcodes)
+/// BGP Finite State Machine Error sub-codes for [BgpErrorNotificationCode::FiniteStateMachineError] as defined by IANA [BGP Finite State Machine Error Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-finite-state-machine-error-subcodes)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum FiniteStateMachineErrorSubCode {
@@ -361,7 +361,7 @@ impl TryFrom<u8> for FiniteStateMachineErrorSubCode {
     }
 }
 
-/// BGP Cease NOTIFICATION message Error sub-codes for [BGPErrorNotificationCode::Cease] as defined by IANA [BGP Cease NOTIFICATION message subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-8)
+/// BGP Cease NOTIFICATION message Error sub-codes for [BgpErrorNotificationCode::Cease] as defined by IANA [BGP Cease NOTIFICATION message subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-8)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum CeaseErrorSubCode {
@@ -416,7 +416,7 @@ impl TryFrom<u8> for CeaseErrorSubCode {
     }
 }
 
-/// BGP ROUTE-REFRESH Message Error subcodes for [BGPErrorNotificationCode::RouteRefreshMessageError] as defined by IANA [BGP ROUTE-REFRESH Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-error-subcodes)
+/// BGP ROUTE-REFRESH Message Error subcodes for [BgpErrorNotificationCode::RouteRefreshMessageError] as defined by IANA [BGP ROUTE-REFRESH Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-error-subcodes)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum RouteRefreshMessageErrorSubCode {
@@ -447,7 +447,7 @@ impl TryFrom<u8> for RouteRefreshMessageErrorSubCode {
 /// [BGP OPEN Optional Parameter Types](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-11)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BGPOpenMessageParameterType {
+pub enum BgpOpenMessageParameterType {
     /// [RFC5492](https://datatracker.ietf.org/doc/html/rfc5492)
     Capability = 2,
 
@@ -455,22 +455,22 @@ pub enum BGPOpenMessageParameterType {
     ExtendedLength = 255,
 }
 
-impl From<BGPOpenMessageParameterType> for u8 {
-    fn from(value: BGPOpenMessageParameterType) -> Self {
+impl From<BgpOpenMessageParameterType> for u8 {
+    fn from(value: BgpOpenMessageParameterType) -> Self {
         value as u8
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UndefinedBGPOpenMessageParameterType(pub u8);
+pub struct UndefinedBgpOpenMessageParameterType(pub u8);
 
-impl TryFrom<u8> for BGPOpenMessageParameterType {
-    type Error = UndefinedBGPOpenMessageParameterType;
+impl TryFrom<u8> for BgpOpenMessageParameterType {
+    type Error = UndefinedBgpOpenMessageParameterType;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UndefinedBGPOpenMessageParameterType(value)),
+            None => Err(UndefinedBgpOpenMessageParameterType(value)),
         }
     }
 }
@@ -478,7 +478,7 @@ impl TryFrom<u8> for BGPOpenMessageParameterType {
 /// [BGP Capabilities Codes](https://www.iana.org/assignments/capability-codes/capability-codes.xhtml)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BGPCapabilityCode {
+pub enum BgpCapabilityCode {
     /// [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
     MultiProtocolExtensions = 1,
 
@@ -492,31 +492,31 @@ pub enum BGPCapabilityCode {
     ExtendedNextHopEncoding = 5,
 
     /// [RFC8654](https://datatracker.ietf.org/doc/html/RFC8654)
-    BGPExtendedMessage = 6,
+    BgpExtendedMessage = 6,
 
     /// [RFC8205](https://datatracker.ietf.org/doc/html/RFC8205)
-    BGPSecCapability = 7,
+    BgpSecCapability = 7,
 
     /// [RFC8277](https://datatracker.ietf.org/doc/html/RFC8277)
     MultipleLabelsCapability = 8,
 
     /// [RFC9234](https://datatracker.ietf.org/doc/html/RFC9234)
-    BGPRole = 9,
+    BgpRole = 9,
 
     /// [RFC4724](https://datatracker.ietf.org/doc/html/RFC4724)
     GracefulRestartCapability = 64,
 
     /// [RFC6793](https://datatracker.ietf.org/doc/html/RFC6793)
-    FourOctetAS = 65,
+    FourOctetAs = 65,
 
     /// [draft-ietf-idr-dynamic-cap](https://datatracker.ietf.org/doc/html/draft-ietf-idr-dynamic-cap)
     SupportForDynamicCapability = 67,
 
     /// [draft-ietf-idr-bgp-multisession](https://datatracker.ietf.org/doc/html/draft-ietf-idr-bgp-multisession)
-    MultiSessionBGPCapability = 68,
+    MultiSessionBgpCapability = 68,
 
     /// [RFC7911](https://datatracker.ietf.org/doc/html/RFC7911)
-    ADDPathCapability = 69,
+    AddPathCapability = 69,
 
     /// [RFC7313](https://datatracker.ietf.org/doc/html/RFC7313)
     EnhancedRouteRefresh = 70,
@@ -579,22 +579,22 @@ pub enum BGPCapabilityCode {
     Experimental254 = 254,
 }
 
-impl From<BGPCapabilityCode> for u8 {
-    fn from(value: BGPCapabilityCode) -> Self {
+impl From<BgpCapabilityCode> for u8 {
+    fn from(value: BgpCapabilityCode) -> Self {
         value as u8
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UndefinedBGPCapabilityCode(pub u8);
+pub struct UndefinedBgpCapabilityCode(pub u8);
 
-impl TryFrom<u8> for BGPCapabilityCode {
-    type Error = UndefinedBGPCapabilityCode;
+impl TryFrom<u8> for BgpCapabilityCode {
+    type Error = UndefinedBgpCapabilityCode;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UndefinedBGPCapabilityCode(value)),
+            None => Err(UndefinedBgpCapabilityCode(value)),
         }
     }
 }
@@ -699,7 +699,7 @@ pub enum WellKnownCommunity {
 /// collectors defined by [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BGPDataCollectionCommunityValueCode {
+pub enum BgpDataCollectionCommunityValueCode {
     CustomerRoutes = 0b0000000000000001,
     PeerRoutes = 0b0000000000000010,
     InternalRoutes = 0b0000000000000011,
@@ -713,7 +713,7 @@ pub enum BGPDataCollectionCommunityValueCode {
 /// Region Identifiers defined [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BGPDataCollectionCommunityRegionIdentifierCode {
+pub enum BgpDataCollectionCommunityRegionIdentifierCode {
     Africa = 0b00001,
     Oceania = 0b00010,
     Asia = 0b00011,
@@ -1113,10 +1113,10 @@ mod tests {
     fn test_bgp_message_type() {
         let undefined_code = 255;
         let open_code = 1;
-        let open = BGPMessageType::try_from(open_code);
-        let undefined = BGPMessageType::try_from(undefined_code);
-        let open_u8: u8 = BGPMessageType::Open.into();
-        assert_eq!(open, Ok(BGPMessageType::Open));
+        let open = BgpMessageType::try_from(open_code);
+        let undefined = BgpMessageType::try_from(undefined_code);
+        let open_u8: u8 = BgpMessageType::Open.into();
+        assert_eq!(open, Ok(BgpMessageType::Open));
         assert_eq!(open_u8, open_code);
         assert_eq!(undefined, Err(UndefinedBgpMessageType(undefined_code)));
     }
@@ -1137,14 +1137,14 @@ mod tests {
     fn test_bgp_error_notification_codee() {
         let undefined_code = 0;
         let valid_code = 1;
-        let ret = BGPErrorNotificationCode::try_from(valid_code);
-        let undefined = BGPErrorNotificationCode::try_from(undefined_code);
-        let valid_u8: u8 = BGPErrorNotificationCode::MessageHeaderError.into();
-        assert_eq!(ret, Ok(BGPErrorNotificationCode::MessageHeaderError));
+        let ret = BgpErrorNotificationCode::try_from(valid_code);
+        let undefined = BgpErrorNotificationCode::try_from(undefined_code);
+        let valid_u8: u8 = BgpErrorNotificationCode::MessageHeaderError.into();
+        assert_eq!(ret, Ok(BgpErrorNotificationCode::MessageHeaderError));
         assert_eq!(valid_u8, valid_code);
         assert_eq!(
             undefined,
-            Err(UndefinedBGPErrorNotificationCode(undefined_code))
+            Err(UndefinedBgpErrorNotificationCode(undefined_code))
         );
     }
 
@@ -1249,26 +1249,26 @@ mod tests {
     fn test_bgp_open_message_parameter_type() {
         let undefined_code = 0;
         let valid_code = 2;
-        let ret = BGPOpenMessageParameterType::try_from(valid_code);
-        let undefined = BGPOpenMessageParameterType::try_from(undefined_code);
-        let valid_u8: u8 = BGPOpenMessageParameterType::Capability.into();
-        assert_eq!(ret, Ok(BGPOpenMessageParameterType::Capability));
+        let ret = BgpOpenMessageParameterType::try_from(valid_code);
+        let undefined = BgpOpenMessageParameterType::try_from(undefined_code);
+        let valid_u8: u8 = BgpOpenMessageParameterType::Capability.into();
+        assert_eq!(ret, Ok(BgpOpenMessageParameterType::Capability));
         assert_eq!(valid_u8, valid_code);
         assert_eq!(
             undefined,
-            Err(UndefinedBGPOpenMessageParameterType(undefined_code))
+            Err(UndefinedBgpOpenMessageParameterType(undefined_code))
         );
     }
     #[test]
     fn test_bgp_capability_code() {
         let undefined_code = 0;
         let valid_code = 2;
-        let ret = BGPCapabilityCode::try_from(valid_code);
-        let undefined = BGPCapabilityCode::try_from(undefined_code);
-        let valid_u8: u8 = BGPCapabilityCode::RouteRefreshCapability.into();
-        assert_eq!(ret, Ok(BGPCapabilityCode::RouteRefreshCapability));
+        let ret = BgpCapabilityCode::try_from(valid_code);
+        let undefined = BgpCapabilityCode::try_from(undefined_code);
+        let valid_u8: u8 = BgpCapabilityCode::RouteRefreshCapability.into();
+        assert_eq!(ret, Ok(BgpCapabilityCode::RouteRefreshCapability));
         assert_eq!(valid_u8, valid_code);
-        assert_eq!(undefined, Err(UndefinedBGPCapabilityCode(undefined_code)));
+        assert_eq!(undefined, Err(UndefinedBgpCapabilityCode(undefined_code)));
     }
 
     #[test]

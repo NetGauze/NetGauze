@@ -31,14 +31,14 @@ fn test_route_refresh() -> Result<(), BGPCapabilityWritingError> {
     let good_wire = [0x02, 0x00];
     let bad_wire = [0x02, 1];
 
-    let good = BGPCapability::RouteRefresh;
-    let bad = LocatedBGPCapabilityParsingError::new(
+    let good = BgpCapability::RouteRefresh;
+    let bad = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &bad_wire[1..]) },
-        BGPCapabilityParsingError::InvalidRouteRefreshLength(1),
+        BgpCapabilityParsingError::InvalidRouteRefreshLength(1),
     );
 
     test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(&bad_wire, &bad);
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(&bad_wire, &bad);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -49,14 +49,14 @@ fn test_enhanced_route_refresh() -> Result<(), BGPCapabilityWritingError> {
     let good_wire = [0x46, 0x00];
     let bad_wire = [0x46, 1];
 
-    let good = BGPCapability::EnhancedRouteRefresh;
-    let bad = LocatedBGPCapabilityParsingError::new(
+    let good = BgpCapability::EnhancedRouteRefresh;
+    let bad = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &bad_wire[1..]) },
-        BGPCapabilityParsingError::InvalidEnhancedRouteRefreshLength(1),
+        BgpCapabilityParsingError::InvalidEnhancedRouteRefreshLength(1),
     );
 
     test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(&bad_wire, &bad);
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(&bad_wire, &bad);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -66,7 +66,7 @@ fn test_enhanced_route_refresh() -> Result<(), BGPCapabilityWritingError> {
 fn test_unrecognized_capability() -> Result<(), BGPCapabilityWritingError> {
     let good_wire = [0x80, 0x01, 0x01];
 
-    let good = BGPCapability::Unrecognized(UnrecognizedCapability::new(128, vec![1]));
+    let good = BgpCapability::Unrecognized(UnrecognizedCapability::new(128, vec![1]));
 
     test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;
@@ -79,26 +79,26 @@ fn test_four_octet_as() -> Result<(), BGPCapabilityWritingError> {
     let invalid_length_wire = [0x41, 0x03, 0x00, 0x00, 0x00, 0x064];
     let bad_incomplete_wire = [0x41, 0x04, 0x00, 0x00, 0x00];
 
-    let good = BGPCapability::FourOctetAS(FourOctetASCapability::new(100));
-    let invalid_length = LocatedBGPCapabilityParsingError::new(
+    let good = BgpCapability::FourOctetAs(FourOctetAsCapability::new(100));
+    let invalid_length = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &invalid_length_wire[1..]) },
-        BGPCapabilityParsingError::FourOctetASCapabilityError(
-            FourOctetASCapabilityParsingError::InvalidLength(invalid_length_wire[1]),
+        BgpCapabilityParsingError::FourOctetAsCapabilityError(
+            FourOctetAsCapabilityParsingError::InvalidLength(invalid_length_wire[1]),
         ),
     );
-    let bad_incomplete = LocatedBGPCapabilityParsingError::new(
+    let bad_incomplete = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(2, &bad_incomplete_wire[2..]) },
-        BGPCapabilityParsingError::FourOctetASCapabilityError(
-            FourOctetASCapabilityParsingError::NomError(ErrorKind::Eof),
+        BgpCapabilityParsingError::FourOctetAsCapabilityError(
+            FourOctetAsCapabilityParsingError::NomError(ErrorKind::Eof),
         ),
     );
 
     test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
         &invalid_length_wire,
         &invalid_length,
     );
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -113,21 +113,21 @@ fn test_extended_message() -> Result<(), BGPCapabilityWritingError> {
     let bad_invalid_length_wire = [0x06, 0x01];
     let bad_incomplete_wire = [0x06];
 
-    let good = BGPCapability::ExtendedMessage;
-    let bad_invalid_length = LocatedBGPCapabilityParsingError::new(
+    let good = BgpCapability::ExtendedMessage;
+    let bad_invalid_length = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &bad_invalid_length_wire[1..]) },
-        BGPCapabilityParsingError::InvalidExtendedMessageLength(1),
+        BgpCapabilityParsingError::InvalidExtendedMessageLength(1),
     );
-    let bad_incomplete = LocatedBGPCapabilityParsingError::new(
+    let bad_incomplete = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &bad_incomplete_wire[1..]) },
-        BGPCapabilityParsingError::NomError(ErrorKind::Eof),
+        BgpCapabilityParsingError::NomError(ErrorKind::Eof),
     );
     test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
         &bad_invalid_length_wire,
         &bad_invalid_length,
     );
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -142,31 +142,31 @@ fn test_multi_protocol_extension() -> Result<(), BGPCapabilityWritingError> {
     let bad_invalid_length_wire = [0x01, 0x03, 0x00, 0x01, 0x00, 0x01];
     let bad_incomplete_wire = [0x01, 0x04, 0x00, 0x01, 0x00];
 
-    let good = BGPCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+    let good = BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
         AddressType::Ipv4Unicast,
     ));
 
-    let bad_invalid_length = LocatedBGPCapabilityParsingError::new(
+    let bad_invalid_length = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &bad_invalid_length_wire[1..]) },
-        BGPCapabilityParsingError::MultiProtocolExtensionsCapabilityError(
+        BgpCapabilityParsingError::MultiProtocolExtensionsCapabilityError(
             MultiProtocolExtensionsCapabilityParsingError::InvalidLength(
                 bad_invalid_length_wire[1],
             ),
         ),
     );
-    let bad_incomplete = LocatedBGPCapabilityParsingError::new(
+    let bad_incomplete = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(5, &bad_incomplete_wire[5..]) },
-        BGPCapabilityParsingError::MultiProtocolExtensionsCapabilityError(
+        BgpCapabilityParsingError::MultiProtocolExtensionsCapabilityError(
             MultiProtocolExtensionsCapabilityParsingError::NomError(ErrorKind::Eof),
         ),
     );
 
     test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
         &bad_invalid_length_wire,
         &bad_invalid_length,
     );
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -180,14 +180,14 @@ fn test_graceful_restart() -> Result<(), BGPCapabilityWritingError> {
     let good_wire = [0x40, 0x02, 0xc0, 0x78];
     let good_address_family_wire = [0x40, 0x06, 0xc0, 0x78, 0x00, 0x01, 0x01, 0x80];
 
-    let good = BGPCapability::GracefulRestartCapability(GracefulRestartCapability::new(
+    let good = BgpCapability::GracefulRestartCapability(GracefulRestartCapability::new(
         true,
         true,
         120,
         vec![],
     ));
     let good_address_family =
-        BGPCapability::GracefulRestartCapability(GracefulRestartCapability::new(
+        BgpCapability::GracefulRestartCapability(GracefulRestartCapability::new(
             true,
             true,
             120,
@@ -211,35 +211,35 @@ fn test_parse_add_path() -> Result<(), BGPCapabilityWritingError> {
     let bad_send_receive_wire = [0x45, 0x04, 0x00, 0x02, 0x01, 0x04];
     let bad_incomplete_wire = [0x45, 0x03, 0x00, 0x02, 0x01, 0x03];
 
-    let good = BGPCapability::AddPath(AddPathCapability::new(vec![AddPathAddressFamily::new(
+    let good = BgpCapability::AddPath(AddPathCapability::new(vec![AddPathAddressFamily::new(
         AddressType::Ipv6Unicast,
         true,
         true,
     )]));
-    let good_long = BGPCapability::AddPath(AddPathCapability::new(vec![
+    let good_long = BgpCapability::AddPath(AddPathCapability::new(vec![
         AddPathAddressFamily::new(AddressType::Ipv4Unicast, true, false),
         AddPathAddressFamily::new(AddressType::Ipv6Unicast, false, true),
     ]));
-    let bad_send_receive = LocatedBGPCapabilityParsingError::new(
+    let bad_send_receive = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(5, &bad_send_receive_wire[5..]) },
-        BGPCapabilityParsingError::AddPathCapabilityError(
+        BgpCapabilityParsingError::AddPathCapabilityError(
             AddPathCapabilityParsingError::InvalidAddPathSendReceiveValue(bad_send_receive_wire[1]),
         ),
     );
-    let bad_incomplete = LocatedBGPCapabilityParsingError::new(
+    let bad_incomplete = LocatedBgpCapabilityParsingError::new(
         unsafe { Span::new_from_raw_offset(5, &bad_incomplete_wire[6..]) },
-        BGPCapabilityParsingError::AddPathCapabilityError(AddPathCapabilityParsingError::NomError(
+        BgpCapabilityParsingError::AddPathCapabilityError(AddPathCapabilityParsingError::NomError(
             ErrorKind::Eof,
         )),
     );
 
     test_parsed_completely(&good_wire, &good);
     test_parsed_completely(&good_long_wire, &good_long);
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
         &bad_send_receive_wire,
         &bad_send_receive,
     );
-    test_parse_error::<BGPCapability, LocatedBGPCapabilityParsingError<'_>>(
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
@@ -329,7 +329,7 @@ fn test_extended_next_hop_encoding_capability() -> Result<(), BGPCapabilityWriti
     ];
 
     let good =
-        BGPCapability::ExtendedNextHopEncoding(ExtendedNextHopEncodingCapability::new(vec![
+        BgpCapability::ExtendedNextHopEncoding(ExtendedNextHopEncodingCapability::new(vec![
             ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
             ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
             ExtendedNextHopEncoding::new(AddressType::Ipv4MplsLabeledVpn, AddressFamily::IPv6),
@@ -347,7 +347,7 @@ fn test_experimental_capabilities() -> Result<(), BGPCapabilityWritingError> {
         let good_wire = [code, 0x01, 0x01];
 
         let code = ExperimentalCapabilityCode::from_repr(code).unwrap();
-        let good = BGPCapability::Experimental(ExperimentalCapability::new(code, vec![1]));
+        let good = BgpCapability::Experimental(ExperimentalCapability::new(code, vec![1]));
 
         test_parsed_completely(&good_wire, &good);
         test_write(&good, &good_wire)?;

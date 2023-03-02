@@ -31,12 +31,12 @@ use serde::{Deserialize, Serialize};
 /// +-------+-------+-------+-------+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BGPRouteRefreshMessage {
+pub struct BgpRouteRefreshMessage {
     address_type: AddressType,
     operation_type: RouteRefreshSubcode,
 }
 
-impl BGPRouteRefreshMessage {
+impl BgpRouteRefreshMessage {
     pub const fn new(address_type: AddressType, operation_type: RouteRefreshSubcode) -> Self {
         Self {
             address_type,

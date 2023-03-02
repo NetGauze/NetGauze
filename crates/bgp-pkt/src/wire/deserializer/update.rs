@@ -18,7 +18,7 @@
 use crate::{
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
     wire::deserializer::{path_attribute::PathAttributeParsingError, Ipv4PrefixParsingError},
-    BGPUpdateMessage,
+    BgpUpdateMessage,
 };
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
@@ -33,7 +33,7 @@ use netgauze_serde_macros::LocatedError;
 
 /// BGP Open Message Parsing errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum BGPUpdateMessageParsingError {
+pub enum BgpUpdateMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
@@ -52,18 +52,18 @@ pub enum BGPUpdateMessageParsingError {
 #[inline]
 fn parse_withdraw_routes(
     buf: Span<'_>,
-) -> IResult<Span<'_>, Vec<WithdrawRoute>, LocatedBGPUpdateMessageParsingError<'_>> {
+) -> IResult<Span<'_>, Vec<WithdrawRoute>, LocatedBgpUpdateMessageParsingError<'_>> {
     let (buf, routes) = parse_till_empty_into_located(buf)?;
     Ok((buf, routes))
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPUpdateMessageParsingError<'a>>
-    for BGPUpdateMessage
+impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBgpUpdateMessageParsingError<'a>>
+    for BgpUpdateMessage
 {
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
-    ) -> IResult<Span<'a>, Self, LocatedBGPUpdateMessageParsingError<'a>> {
+    ) -> IResult<Span<'a>, Self, LocatedBgpUpdateMessageParsingError<'a>> {
         let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
         let (_, withdrawn_routes) = parse_withdraw_routes(withdrawn_buf)?;
         let (buf, path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
@@ -72,7 +72,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBGPUpdateMessageParsingError<'
         let (buf, nlri_vec) = parse_till_empty_into_located(buf)?;
         Ok((
             buf,
-            BGPUpdateMessage::new(withdrawn_routes, path_attributes, nlri_vec),
+            BgpUpdateMessage::new(withdrawn_routes, path_attributes, nlri_vec),
         ))
     }
 }

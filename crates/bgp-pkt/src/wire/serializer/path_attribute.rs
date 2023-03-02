@@ -50,8 +50,8 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
     fn len(&self) -> usize {
         let value_len = match self.value() {
             PathAttributeValue::Origin(value) => value.len(self.extended_length()),
-            PathAttributeValue::ASPath(value) => value.len(self.extended_length()),
-            PathAttributeValue::AS4Path(value) => value.len(self.extended_length()),
+            PathAttributeValue::AsPath(value) => value.len(self.extended_length()),
+            PathAttributeValue::As4Path(value) => value.len(self.extended_length()),
             PathAttributeValue::NextHop(value) => value.len(self.extended_length()),
             PathAttributeValue::MultiExitDiscriminator(value) => value.len(self.extended_length()),
             PathAttributeValue::LocalPreference(value) => value.len(self.extended_length()),
@@ -88,12 +88,12 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 writer.write_u8(PathAttributeType::Origin.into())?;
                 value.write(writer, self.extended_length())?;
             }
-            PathAttributeValue::ASPath(value) => {
-                writer.write_u8(PathAttributeType::ASPath.into())?;
+            PathAttributeValue::AsPath(value) => {
+                writer.write_u8(PathAttributeType::AsPath.into())?;
                 value.write(writer, self.extended_length())?;
             }
-            PathAttributeValue::AS4Path(value) => {
-                writer.write_u8(PathAttributeType::AS4Path.into())?;
+            PathAttributeValue::As4Path(value) => {
+                writer.write_u8(PathAttributeType::As4Path.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::NextHop(value) => {
@@ -133,11 +133,11 @@ impl WritablePDU<PathAttributeWritingError> for PathAttribute {
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MpReach(value) => {
-                writer.write_u8(PathAttributeType::MPReachNLRI.into())?;
+                writer.write_u8(PathAttributeType::MpReachNlri.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MpUnreach(value) => {
-                writer.write_u8(PathAttributeType::MPUnreachNLRI.into())?;
+                writer.write_u8(PathAttributeType::MpUnreachNlri.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::UnknownAttribute(value) => {
@@ -219,7 +219,7 @@ impl WritablePDU<AsPathWritingError> for As4PathSegment {
     }
 }
 
-impl WritablePDUWithOneInput<bool, AsPathWritingError> for ASPath {
+impl WritablePDUWithOneInput<bool, AsPathWritingError> for AsPath {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self, extended_length: bool) -> usize {
@@ -258,7 +258,7 @@ impl WritablePDUWithOneInput<bool, AsPathWritingError> for ASPath {
     }
 }
 
-impl WritablePDUWithOneInput<bool, AsPathWritingError> for AS4Path {
+impl WritablePDUWithOneInput<bool, AsPathWritingError> for As4Path {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self, extended_length: bool) -> usize {

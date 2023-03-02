@@ -18,7 +18,7 @@
 use crate::{iana::*, *};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::wire::serializer::{
-    nlri::RouteDistinguisherWritingError, BGPMessageWritingError,
+    nlri::RouteDistinguisherWritingError, BgpMessageWritingError,
 };
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
@@ -259,7 +259,7 @@ impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum RouteMirroringValueWritingError {
     StdIOError(#[from_std_io_error] String),
-    BGPMessageError(#[from] BGPMessageWritingError),
+    BgpMessageError(#[from] BgpMessageWritingError),
 }
 
 impl WritablePDU<RouteMirroringValueWritingError> for RouteMirroringValue {
@@ -297,7 +297,7 @@ impl WritablePDU<RouteMirroringValueWritingError> for RouteMirroringValue {
 pub enum RouteMonitoringMessageWritingError {
     StdIOError(#[from_std_io_error] String),
     PeerHeaderError(#[from] PeerHeaderWritingError),
-    BGPMessageError(#[from] BGPMessageWritingError),
+    BgpMessageError(#[from] BgpMessageWritingError),
 }
 
 impl WritablePDU<RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
@@ -415,7 +415,7 @@ impl WritablePDU<InitiationInformationWritingError> for InitiationInformation {
 pub enum PeerUpNotificationMessageWritingError {
     StdIOError(#[from_std_io_error] String),
     PeerHeaderError(#[from] PeerHeaderWritingError),
-    BGPMessageError(#[from] BGPMessageWritingError),
+    BgpMessageError(#[from] BgpMessageWritingError),
     InitiationInformationError(#[from] InitiationInformationWritingError),
 }
 
@@ -482,7 +482,7 @@ impl WritablePDU<PeerDownNotificationMessageWritingError> for PeerDownNotificati
 pub enum PeerDownNotificationReasonWritingError {
     StdIOError(#[from_std_io_error] String),
     PeerHeaderError(#[from] PeerHeaderWritingError),
-    BGPMessageError(#[from] BGPMessageWritingError),
+    BgpMessageError(#[from] BgpMessageWritingError),
     InitiationInformationError(#[from] InitiationInformationWritingError),
 }
 

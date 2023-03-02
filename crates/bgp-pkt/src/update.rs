@@ -34,20 +34,20 @@ use serde::{Deserialize, Serialize};
 /// +-----------------------------------------------------+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BGPUpdateMessage {
+pub struct BgpUpdateMessage {
     withdrawn_routes: Vec<WithdrawRoute>,
     path_attributes: Vec<PathAttribute>,
     network_layer_reachability_information: Vec<NetworkLayerReachabilityInformation>,
 }
 
-impl BGPUpdateMessage {
+impl BgpUpdateMessage {
     #[inline]
     pub fn new(
         withdrawn_routes: Vec<WithdrawRoute>,
         path_attributes: Vec<PathAttribute>,
         network_layer_reachability_information: Vec<NetworkLayerReachabilityInformation>,
     ) -> Self {
-        BGPUpdateMessage {
+        BgpUpdateMessage {
             withdrawn_routes,
             path_attributes,
             network_layer_reachability_information,

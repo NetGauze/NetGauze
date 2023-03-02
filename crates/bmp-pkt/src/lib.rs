@@ -31,7 +31,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 
-use netgauze_bgp_pkt::{iana::BGPMessageType, nlri::RouteDistinguisher, BGPMessage};
+use netgauze_bgp_pkt::{iana::BgpMessageType, nlri::RouteDistinguisher, BgpMessage};
 use netgauze_iana::address_family::AddressType;
 
 use crate::iana::{
@@ -417,10 +417,10 @@ impl TerminationInformation {
 
 /// Runtime errors when constructing a [RouteMonitoringMessage]
 /// Peer Up BGP messages should only carry
-/// [netgauze_bgp_pkt::BGPMessage::Update], anything else is an error
+/// [netgauze_bgp_pkt::BgpMessage::Update], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RouteMonitoringMessageError {
-    UnexpectedMessageType(BGPMessageType),
+    UnexpectedMessageType(BgpMessageType),
 }
 
 /// Route Monitoring messages are used for initial synchronization of the
@@ -433,16 +433,16 @@ pub enum RouteMonitoringMessageError {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
-    updates: Vec<BGPMessage>,
+    updates: Vec<BgpMessage>,
 }
 
 impl RouteMonitoringMessage {
     pub fn build(
         peer_header: PeerHeader,
-        updates: Vec<BGPMessage>,
+        updates: Vec<BgpMessage>,
     ) -> Result<Self, RouteMonitoringMessageError> {
         for update in &updates {
-            if update.get_type() != BGPMessageType::Update {
+            if update.get_type() != BgpMessageType::Update {
                 return Err(RouteMonitoringMessageError::UnexpectedMessageType(
                     update.get_type(),
                 ));
@@ -458,7 +458,7 @@ impl RouteMonitoringMessage {
         &self.peer_header
     }
 
-    pub const fn updates(&self) -> &Vec<BGPMessage> {
+    pub const fn updates(&self) -> &Vec<BgpMessage> {
         &self.updates
     }
 }
@@ -493,7 +493,7 @@ pub enum RouteMirroringValue {
     /// A BGP PDU.  This PDU may or may not be an Update message.
     /// If the BGP Message TLV occurs in the Route Mirroring message,
     /// it MUST occur last in the list of TLVs.
-    BgpMessage(BGPMessage),
+    BgpMessage(BgpMessage),
 
     /// A 2-byte code that provides information about the mirrored message or
     /// message stream.
@@ -546,18 +546,18 @@ pub struct PeerUpNotificationMessage {
     local_address: IpAddr,
     local_port: Option<u16>,
     remote_port: Option<u16>,
-    sent_message: BGPMessage,
-    received_message: BGPMessage,
+    sent_message: BgpMessage,
+    received_message: BgpMessage,
     information: Vec<InitiationInformation>,
 }
 
 /// Runtime errors when constructing a [PeerUpNotificationMessage]
-/// Peer Up BGP messages should only carry [netgauze_bgp_pkt::BGPMessage::Open],
+/// Peer Up BGP messages should only carry [netgauze_bgp_pkt::BgpMessage::Open],
 /// anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerUpNotificationMessageError {
-    UnexpectedSentMessageType(BGPMessageType),
-    UnexpectedReceivedMessageType(BGPMessageType),
+    UnexpectedSentMessageType(BgpMessageType),
+    UnexpectedReceivedMessageType(BgpMessageType),
 }
 
 impl PeerUpNotificationMessage {
@@ -566,16 +566,16 @@ impl PeerUpNotificationMessage {
         local_address: IpAddr,
         local_port: Option<u16>,
         remote_port: Option<u16>,
-        sent_message: BGPMessage,
-        received_message: BGPMessage,
+        sent_message: BgpMessage,
+        received_message: BgpMessage,
         information: Vec<InitiationInformation>,
     ) -> Result<Self, PeerUpNotificationMessageError> {
-        if sent_message.get_type() != BGPMessageType::Open {
+        if sent_message.get_type() != BgpMessageType::Open {
             return Err(PeerUpNotificationMessageError::UnexpectedSentMessageType(
                 sent_message.get_type(),
             ));
         }
-        if received_message.get_type() != BGPMessageType::Open {
+        if received_message.get_type() != BgpMessageType::Open {
             return Err(
                 PeerUpNotificationMessageError::UnexpectedReceivedMessageType(
                     sent_message.get_type(),
@@ -609,11 +609,11 @@ impl PeerUpNotificationMessage {
         &self.remote_port
     }
 
-    pub const fn sent_message(&self) -> &BGPMessage {
+    pub const fn sent_message(&self) -> &BgpMessage {
         &self.sent_message
     }
 
-    pub const fn received_message(&self) -> &BGPMessage {
+    pub const fn received_message(&self) -> &BgpMessage {
         &self.received_message
     }
 
@@ -624,10 +624,10 @@ impl PeerUpNotificationMessage {
 
 /// Runtime errors when constructing a [PeerDownNotificationMessage]
 /// Peer Up BGP messages should only carry
-/// [netgauze_bgp_pkt::BGPMessage::Notification], anything else is an error
+/// [netgauze_bgp_pkt::BgpMessage::Notification], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PeerDownNotificationMessageError {
-    UnexpectedBgpMessageType(BGPMessageType),
+    UnexpectedBgpMessageType(BgpMessageType),
     UnexpectedInitiationInformationTlvType(InitiationInformationTlvType),
 }
 
@@ -657,7 +657,7 @@ impl PeerDownNotificationMessage {
         match &reason {
             PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg)
             | PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(msg) => {
-                if msg.get_type() != BGPMessageType::Notification {
+                if msg.get_type() != BgpMessageType::Notification {
                     return Err(PeerDownNotificationMessageError::UnexpectedBgpMessageType(
                         msg.get_type(),
                     ));
@@ -703,7 +703,7 @@ pub enum PeerDownNotificationReason {
     /// The local system closed the session.  Following the
     /// Reason is a BGP PDU containing a BGP NOTIFICATION message that
     /// would have been sent to the peer.
-    LocalSystemClosedNotificationPduFollows(BGPMessage),
+    LocalSystemClosedNotificationPduFollows(BgpMessage),
 
     /// The local system closed the session. No notification
     /// message was sent. Following the reason code is a 2-byte field
@@ -717,7 +717,7 @@ pub enum PeerDownNotificationReason {
     /// The remote system closed the session with a notification
     /// message. Following the Reason is a BGP PDU containing the BGP
     /// NOTIFICATION message as received from the peer.
-    RemoteSystemClosedNotificationPduFollows(BGPMessage),
+    RemoteSystemClosedNotificationPduFollows(BgpMessage),
 
     /// The remote system closed the session without a
     /// notification message. This includes any unexpected termination of

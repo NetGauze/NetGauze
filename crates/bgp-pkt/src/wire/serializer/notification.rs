@@ -15,7 +15,7 @@
 
 use crate::{
     iana::{
-        BGPErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
+        BgpErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
         MessageHeaderErrorSubCode, OpenMessageErrorSubCode, RouteRefreshMessageErrorSubCode,
         UpdateMessageErrorSubCode,
     },
@@ -23,14 +23,14 @@ use crate::{
         CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
-    BGPNotificationMessage,
+    BgpNotificationMessage,
 };
 use byteorder::WriteBytesExt;
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BGPNotificationMessageWritingError {
+pub enum BgpNotificationMessageWritingError {
     StdIOError(#[from_std_io_error] String),
     MessageHeaderError(#[from] MessageHeaderErrorWritingError),
     OpenMessageError(#[from] OpenMessageErrorWritingError),
@@ -41,7 +41,7 @@ pub enum BGPNotificationMessageWritingError {
     RouteRefreshError(#[from] RouteRefreshErrorWritingError),
 }
 
-impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage {
+impl WritablePDU<BgpNotificationMessageWritingError> for BgpNotificationMessage {
     // One octet for the code
     const BASE_LENGTH: usize = 1;
 
@@ -61,34 +61,34 @@ impl WritablePDU<BGPNotificationMessageWritingError> for BGPNotificationMessage 
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), BGPNotificationMessageWritingError> {
+    ) -> Result<(), BgpNotificationMessageWritingError> {
         match self {
             Self::MessageHeaderError(value) => {
-                writer.write_u8(BGPErrorNotificationCode::MessageHeaderError.into())?;
+                writer.write_u8(BgpErrorNotificationCode::MessageHeaderError.into())?;
                 value.write(writer)?;
             }
             Self::OpenMessageError(value) => {
-                writer.write_u8(BGPErrorNotificationCode::OpenMessageError.into())?;
+                writer.write_u8(BgpErrorNotificationCode::OpenMessageError.into())?;
                 value.write(writer)?;
             }
             Self::UpdateMessageError(value) => {
-                writer.write_u8(BGPErrorNotificationCode::UpdateMessageError.into())?;
+                writer.write_u8(BgpErrorNotificationCode::UpdateMessageError.into())?;
                 value.write(writer)?;
             }
             Self::HoldTimerExpiredError(value) => {
-                writer.write_u8(BGPErrorNotificationCode::HoldTimerExpired.into())?;
+                writer.write_u8(BgpErrorNotificationCode::HoldTimerExpired.into())?;
                 value.write(writer)?;
             }
             Self::FiniteStateMachineError(value) => {
-                writer.write_u8(BGPErrorNotificationCode::FiniteStateMachineError.into())?;
+                writer.write_u8(BgpErrorNotificationCode::FiniteStateMachineError.into())?;
                 value.write(writer)?;
             }
             Self::CeaseError(value) => {
-                writer.write_u8(BGPErrorNotificationCode::Cease.into())?;
+                writer.write_u8(BgpErrorNotificationCode::Cease.into())?;
                 value.write(writer)?;
             }
             Self::RouteRefreshError(value) => {
-                writer.write_u8(BGPErrorNotificationCode::RouteRefreshMessageError.into())?;
+                writer.write_u8(BgpErrorNotificationCode::RouteRefreshMessageError.into())?;
                 value.write(writer)?;
             }
         }
@@ -154,8 +154,8 @@ impl WritablePDU<OpenMessageErrorWritingError> for OpenMessageError {
         let value_len = match self {
             Self::Unspecific { value } => value.len(),
             Self::UnsupportedVersionNumber { value } => value.len(),
-            Self::BadPeerAS { value } => value.len(),
-            Self::BadBGPIdentifier { value } => value.len(),
+            Self::BadPeerAs { value } => value.len(),
+            Self::BadBgpIdentifier { value } => value.len(),
             Self::UnsupportedOptionalParameter { value } => value.len(),
             Self::UnacceptableHoldTime { value } => value.len(),
             Self::UnsupportedCapability { value } => value.len(),
@@ -174,12 +174,12 @@ impl WritablePDU<OpenMessageErrorWritingError> for OpenMessageError {
                 writer.write_u8(OpenMessageErrorSubCode::UnsupportedVersionNumber.into())?;
                 writer.write_all(value)?;
             }
-            OpenMessageError::BadPeerAS { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::BadPeerAS.into())?;
+            OpenMessageError::BadPeerAs { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::BadPeerAs.into())?;
                 writer.write_all(value)?;
             }
-            OpenMessageError::BadBGPIdentifier { value } => {
-                writer.write_u8(OpenMessageErrorSubCode::BadBGPIdentifier.into())?;
+            OpenMessageError::BadBgpIdentifier { value } => {
+                writer.write_u8(OpenMessageErrorSubCode::BadBgpIdentifier.into())?;
                 writer.write_all(value)?;
             }
             OpenMessageError::UnsupportedOptionalParameter { value } => {
@@ -224,7 +224,7 @@ impl WritablePDU<UpdateMessageErrorWritingError> for UpdateMessageError {
             Self::InvalidNextHopAttribute { value } => value.len(),
             Self::OptionalAttributeError { value } => value.len(),
             Self::InvalidNetworkField { value } => value.len(),
-            Self::MalformedASPath { value } => value.len(),
+            Self::MalformedAsPath { value } => value.len(),
         };
         Self::BASE_LENGTH + value_len
     }
@@ -275,8 +275,8 @@ impl WritablePDU<UpdateMessageErrorWritingError> for UpdateMessageError {
                 writer.write_u8(UpdateMessageErrorSubCode::InvalidNetworkField.into())?;
                 writer.write_all(value)?;
             }
-            Self::MalformedASPath { value } => {
-                writer.write_u8(UpdateMessageErrorSubCode::MalformedASPath.into())?;
+            Self::MalformedAsPath { value } => {
+                writer.write_u8(UpdateMessageErrorSubCode::MalformedAsPath.into())?;
                 writer.write_all(value)?;
             }
         }

@@ -57,7 +57,7 @@ pub(crate) const GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH: u8 = 4;
 /// +------------------------------+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum BGPCapability {
+pub enum BgpCapability {
     /// Defined in [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
     MultiProtocolExtensions(MultiProtocolExtensionsCapability),
 
@@ -75,7 +75,7 @@ pub enum BGPCapability {
 
     ExtendedMessage,
 
-    FourOctetAS(FourOctetASCapability),
+    FourOctetAs(FourOctetAsCapability),
 
     /// [RFC8950](https://datatracker.ietf.org/doc/html/rfc8950)
     ExtendedNextHopEncoding(ExtendedNextHopEncodingCapability),
@@ -177,11 +177,11 @@ impl MultiProtocolExtensionsCapability {
 
 /// Defined in [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct FourOctetASCapability {
+pub struct FourOctetAsCapability {
     asn4: u32,
 }
 
-impl FourOctetASCapability {
+impl FourOctetAsCapability {
     pub const fn new(asn4: u32) -> Self {
         Self { asn4 }
     }

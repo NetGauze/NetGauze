@@ -2,7 +2,7 @@
 //! in addition to serializing and deserializing BGP packet from wire format.
 
 use chrono::Utc;
-use netgauze_bgp_pkt::BGPMessage;
+use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bmp_pkt::{
     iana::RouteMirroringInformation, BmpMessage, BmpMessageValue, BmpPeerType, PeerHeader,
     RouteMirroringMessage, RouteMirroringValue,
@@ -26,7 +26,7 @@ fn main() {
         ),
         vec![
             RouteMirroringValue::Information(RouteMirroringInformation::Experimental65531),
-            RouteMirroringValue::BgpMessage(BGPMessage::KeepAlive),
+            RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive),
         ],
     )));
 

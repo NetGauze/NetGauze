@@ -15,17 +15,17 @@
 
 //! Serializer for BGP Route Refresh message
 
-use crate::BGPRouteRefreshMessage;
+use crate::BgpRouteRefreshMessage;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BGPRouteRefreshMessageWritingError {
+pub enum BgpRouteRefreshMessageWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<BGPRouteRefreshMessageWritingError> for BGPRouteRefreshMessage {
+impl WritablePDU<BgpRouteRefreshMessageWritingError> for BgpRouteRefreshMessage {
     // 4 octet = 2 afi + 1 op + + 1 safi
     const BASE_LENGTH: usize = 4;
 
@@ -36,7 +36,7 @@ impl WritablePDU<BGPRouteRefreshMessageWritingError> for BGPRouteRefreshMessage 
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
-    ) -> Result<(), BGPRouteRefreshMessageWritingError> {
+    ) -> Result<(), BgpRouteRefreshMessageWritingError> {
         writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
         writer.write_u8(self.operation_type().into())?;
         writer.write_u8(self.address_type().subsequent_address_family().into())?;

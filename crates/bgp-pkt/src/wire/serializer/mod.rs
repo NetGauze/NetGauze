@@ -33,12 +33,12 @@ use crate::{
     wire::{
         deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
         serializer::{
-            notification::BGPNotificationMessageWritingError, open::BGPOpenMessageWritingError,
-            route_refresh::BGPRouteRefreshMessageWritingError,
-            update::BGPUpdateMessageWritingError,
+            notification::BgpNotificationMessageWritingError, open::BgpOpenMessageWritingError,
+            route_refresh::BgpRouteRefreshMessageWritingError,
+            update::BgpUpdateMessageWritingError,
         },
     },
-    BGPMessage,
+    BgpMessage,
 };
 
 /// Helper method to round up the number of bytes based on a given length
@@ -48,25 +48,25 @@ pub(crate) fn round_len(len: u8) -> u8 {
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BGPMessageWritingError {
+pub enum BgpMessageWritingError {
     /// The size of written message is larger than allowed size: 4,096 for open
     /// and keepalive and 2^16 for the rest
-    BGPMessageLengthOverflow(usize),
+    BgpMessageLengthOverflow(usize),
 
     StdIOError(#[from_std_io_error] String),
 
-    /// Error encountered during parsing a [crate::open::BGPOpenMessage]
-    OpenError(#[from] BGPOpenMessageWritingError),
+    /// Error encountered during parsing a [crate::open::BgpOpenMessage]
+    OpenError(#[from] BgpOpenMessageWritingError),
 
-    /// Error encountered during parsing a [crate::update::BGPUpdateMessage]
-    UpdateError(#[from] BGPUpdateMessageWritingError),
+    /// Error encountered during parsing a [crate::update::BgpUpdateMessage]
+    UpdateError(#[from] BgpUpdateMessageWritingError),
 
-    NotificationError(#[from] BGPNotificationMessageWritingError),
+    NotificationError(#[from] BgpNotificationMessageWritingError),
 
-    RouteRefreshError(#[from] BGPRouteRefreshMessageWritingError),
+    RouteRefreshError(#[from] BgpRouteRefreshMessageWritingError),
 }
 
-impl WritablePDU<BGPMessageWritingError> for BGPMessage {
+impl WritablePDU<BgpMessageWritingError> for BgpMessage {
     const BASE_LENGTH: usize = BGP_MIN_MESSAGE_LENGTH as usize;
     fn len(&self) -> usize {
         let body_len = match self {
@@ -79,12 +79,12 @@ impl WritablePDU<BGPMessageWritingError> for BGPMessage {
         Self::BASE_LENGTH + body_len
     }
 
-    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), BGPMessageWritingError> {
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), BgpMessageWritingError> {
         let len = self.len();
         match self {
             Self::Open(_) | Self::KeepAlive => {
                 if len > BGP_MAX_MESSAGE_LENGTH as usize {
-                    return Err(BGPMessageWritingError::BGPMessageLengthOverflow(len));
+                    return Err(BgpMessageWritingError::BgpMessageLengthOverflow(len));
                 }
             }
             Self::Update(_) | Self::Notification(_) | Self::RouteRefresh(_) => {}

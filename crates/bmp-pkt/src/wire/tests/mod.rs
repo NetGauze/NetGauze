@@ -17,19 +17,19 @@ use chrono::{TimeZone, Utc};
 use ipnet::Ipv4Net;
 use netgauze_bgp_pkt::{
     capabilities::{
-        BGPCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
-        FourOctetASCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
+        BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
+        FourOctetAsCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
-    iana::{BGPMessageType, UndefinedBgpMessageType},
-    notification::{BGPNotificationMessage, CeaseError},
-    open::{BGPOpenMessage, BGPOpenMessageParameter},
+    iana::{BgpMessageType, UndefinedBgpMessageType},
+    notification::{BgpNotificationMessage, CeaseError},
+    open::{BgpOpenMessage, BgpOpenMessageParameter},
     path_attribute::{
-        ASPath, As4PathSegment, AsPathSegmentType, NextHop, Origin, PathAttribute,
+        As4PathSegment, AsPath, AsPathSegmentType, NextHop, Origin, PathAttribute,
         PathAttributeValue,
     },
-    update::{BGPUpdateMessage, NetworkLayerReachabilityInformation},
-    wire::deserializer::{nlri::RouteDistinguisherParsingError, BGPMessageParsingError},
-    BGPMessage,
+    update::{BgpUpdateMessage, NetworkLayerReachabilityInformation},
+    wire::deserializer::{nlri::RouteDistinguisherParsingError, BgpMessageParsingError},
+    BgpMessage,
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
@@ -479,7 +479,7 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
             Ipv4Addr::new(172, 16, 0, 20),
             Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
         ),
-        vec![BGPMessage::Update(BGPUpdateMessage::new(
+        vec![BgpMessage::Update(BgpUpdateMessage::new(
             vec![],
             vec![
                 PathAttribute::from(
@@ -495,7 +495,7 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
                     true,
                     false,
                     true,
-                    PathAttributeValue::ASPath(ASPath::As4PathSegments(vec![As4PathSegment::new(
+                    PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
                         AsPathSegmentType::AsSequence,
                         vec![100, 200, 100],
                     )])),
@@ -527,13 +527,13 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
     let bad_bgp = LocatedRouteMonitoringMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(58, &bad_bgp_wire[58..]) },
         RouteMonitoringMessageParsingError::BgpMessageError(
-            BGPMessageParsingError::BadMessageLength(61166),
+            BgpMessageParsingError::BadMessageLength(61166),
         ),
     );
     let bad_bgp_type = LocatedRouteMonitoringMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(42, &bad_bgp_type_wire[42..]) },
         RouteMonitoringMessageParsingError::RouteMonitoringMessageError(
-            RouteMonitoringMessageError::UnexpectedMessageType(BGPMessageType::Notification),
+            RouteMonitoringMessageError::UnexpectedMessageType(BgpMessageType::Notification),
         ),
     );
 
@@ -589,7 +589,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                 Ipv4Addr::new(172, 16, 0, 20),
                 Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
             ),
-            vec![BGPMessage::Update(BGPUpdateMessage::new(
+            vec![BgpMessage::Update(BgpUpdateMessage::new(
                 vec![],
                 vec![
                     PathAttribute::from(
@@ -605,7 +605,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                         true,
                         false,
                         true,
-                        PathAttributeValue::ASPath(ASPath::As4PathSegments(vec![
+                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
                             As4PathSegment::new(AsPathSegmentType::AsSequence, vec![100, 200, 100]),
                         ])),
                     )
@@ -630,7 +630,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
     let bad = LocatedBmpMessageValueParsingError::new(
         unsafe { Span::new_from_raw_offset(43, &bad_wire[43..]) },
         BmpMessageValueParsingError::RouteMonitoringMessageError(
-            RouteMonitoringMessageParsingError::BgpMessageError(BGPMessageParsingError::NomError(
+            RouteMonitoringMessageParsingError::BgpMessageError(BgpMessageParsingError::NomError(
                 ErrorKind::Eof,
             )),
         ),
@@ -682,25 +682,25 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
             IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap()),
             Some(179),
             Some(29834),
-            BGPMessage::Open(BGPOpenMessage::new(
+            BgpMessage::Open(BgpOpenMessage::new(
                 64512,
                 180,
                 Ipv4Addr::new(10, 0, 0, 3),
                 vec![
-                    BGPOpenMessageParameter::Capabilities(vec![
-                        BGPCapability::MultiProtocolExtensions(
+                    BgpOpenMessageParameter::Capabilities(vec![
+                        BgpCapability::MultiProtocolExtensions(
                             MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
                         ),
                     ]),
-                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
                         UnrecognizedCapability::new(128, vec![]),
                     )]),
-                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
-                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
-                        FourOctetASCapability::new(64512),
+                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
+                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                        FourOctetAsCapability::new(64512),
                     )]),
-                    BGPOpenMessageParameter::Capabilities(vec![
-                        BGPCapability::ExtendedNextHopEncoding(
+                    BgpOpenMessageParameter::Capabilities(vec![
+                        BgpCapability::ExtendedNextHopEncoding(
                             ExtendedNextHopEncodingCapability::new(vec![
                                 ExtendedNextHopEncoding::new(
                                     AddressType::Ipv4Unicast,
@@ -719,25 +719,25 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                     ]),
                 ],
             )),
-            BGPMessage::Open(BGPOpenMessage::new(
+            BgpMessage::Open(BgpOpenMessage::new(
                 64512,
                 180,
                 Ipv4Addr::new(10, 0, 0, 1),
                 vec![
-                    BGPOpenMessageParameter::Capabilities(vec![
-                        BGPCapability::MultiProtocolExtensions(
+                    BgpOpenMessageParameter::Capabilities(vec![
+                        BgpCapability::MultiProtocolExtensions(
                             MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
                         ),
                     ]),
-                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
                         UnrecognizedCapability::new(128, vec![]),
                     )]),
-                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
-                    BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
-                        FourOctetASCapability::new(64512),
+                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
+                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                        FourOctetAsCapability::new(64512),
                     )]),
-                    BGPOpenMessageParameter::Capabilities(vec![
-                        BGPCapability::ExtendedNextHopEncoding(
+                    BgpOpenMessageParameter::Capabilities(vec![
+                        BgpCapability::ExtendedNextHopEncoding(
                             ExtendedNextHopEncodingCapability::new(vec![
                                 ExtendedNextHopEncoding::new(
                                     AddressType::Ipv4Unicast,
@@ -780,7 +780,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
 
 #[test]
 fn test_peer_down_reason() -> Result<(), PeerDownNotificationReasonWritingError> {
-    let notif = BGPMessage::Notification(BGPNotificationMessage::CeaseError(
+    let notif = BgpMessage::Notification(BgpNotificationMessage::CeaseError(
         CeaseError::PeerDeConfigured { value: vec![] },
     ));
     let good_local_pdu_wire = [
@@ -825,7 +825,7 @@ fn test_peer_down_reason() -> Result<(), PeerDownNotificationReasonWritingError>
     let bad_local_pdu_bgp = LocatedPeerDownNotificationReasonParsingError::new(
         unsafe { Span::new_from_raw_offset(19, &bad_local_pdu_bgp_wire[19..]) },
         PeerDownNotificationReasonParsingError::BgpMessageError(
-            BGPMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(255)),
+            BgpMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(255)),
         ),
     );
     let bad_local_system_closed = LocatedPeerDownNotificationReasonParsingError::new(
@@ -1025,7 +1025,7 @@ fn test_router_mirroring_value() -> Result<(), RouteMirroringValueWritingError> 
     let good_experimental_65533_wire = [0xff, 0xfd, 0, 2, 1, 2];
     let good_experimental_65534_wire = [0xff, 0xfe, 0, 2, 1, 2];
 
-    let good_bgp = RouteMirroringValue::BgpMessage(BGPMessage::KeepAlive);
+    let good_bgp = RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive);
     let good_information = RouteMirroringValue::Information(RouteMirroringInformation::ErroredPdu);
     let good_experimental_65531 = RouteMirroringValue::Experimental65531(vec![1, 2]);
     let good_experimental_65532 = RouteMirroringValue::Experimental65532(vec![1, 2]);
@@ -1072,7 +1072,7 @@ fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
             Ipv4Addr::new(172, 16, 0, 20),
             Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
         ),
-        vec![RouteMirroringValue::BgpMessage(BGPMessage::KeepAlive)],
+        vec![RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive)],
     )));
     test_parsed_completely(&good_wire, &good);
 

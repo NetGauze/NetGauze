@@ -18,21 +18,21 @@
 use crate::{
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
     wire::serializer::{path_attribute::PathAttributeWritingError, round_len},
-    BGPUpdateMessage,
+    BgpUpdateMessage,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePDU;
 use netgauze_serde_macros::WritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BGPUpdateMessageWritingError {
+pub enum BgpUpdateMessageWritingError {
     StdIOError(#[from_std_io_error] String),
     WithdrawRouteError(#[from] WithdrawRouteWritingError),
     NLRIError(#[from] NetworkLayerReachabilityInformationWritingError),
     PathAttributeError(#[from] PathAttributeWritingError),
 }
 
-impl WritablePDU<BGPUpdateMessageWritingError> for BGPUpdateMessage {
+impl WritablePDU<BgpUpdateMessageWritingError> for BgpUpdateMessage {
     const BASE_LENGTH: usize = 4;
 
     fn len(&self) -> usize {
@@ -54,7 +54,7 @@ impl WritablePDU<BGPUpdateMessageWritingError> for BGPUpdateMessage {
         Self::BASE_LENGTH + withdrawn_len + path_attrs_len + nlri
     }
 
-    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), BGPUpdateMessageWritingError> {
+    fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), BgpUpdateMessageWritingError> {
         let withdrawn_len = self
             .withdraw_routes()
             .iter()

@@ -9,25 +9,25 @@ use netgauze_parse_utils::{ReadablePDUWithOneInput, Span, WritablePDU};
 
 pub fn main() {
     // Construct a new BGP message
-    let msg = BGPMessage::Open(BGPOpenMessage::new(
+    let msg = BgpMessage::Open(BgpOpenMessage::new(
         100,
         180,
         Ipv4Addr::new(5, 5, 5, 5),
         vec![
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::MultiProtocolExtensions(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::Unrecognized(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
                 UnrecognizedCapability::new(128, vec![]),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::RouteRefresh]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::FourOctetAS(
-                FourOctetASCapability::new(100),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                FourOctetAsCapability::new(100),
             )]),
-            BGPOpenMessageParameter::Capabilities(vec![BGPCapability::ExtendedNextHopEncoding(
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::ExtendedNextHopEncoding(
                 ExtendedNextHopEncodingCapability::new(vec![
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Unicast, AddressFamily::IPv6),
                     ExtendedNextHopEncoding::new(AddressType::Ipv4Multicast, AddressFamily::IPv6),
@@ -55,6 +55,6 @@ pub fn main() {
     );
 
     // Deserialize the message from binary format
-    let (_, msg_back) = BGPMessage::from_wire(Span::new(&buf), true).unwrap();
+    let (_, msg_back) = BgpMessage::from_wire(Span::new(&buf), true).unwrap();
     assert_eq!(msg, msg_back);
 }

@@ -17,11 +17,11 @@ use crate::{
     iana::{RouteRefreshSubcode, UndefinedRouteRefreshSubcode},
     wire::{
         deserializer::route_refresh::{
-            BGPRouteRefreshMessageParsingError, LocatedBGPRouteRefreshMessageParsingError,
+            BgpRouteRefreshMessageParsingError, LocatedBgpRouteRefreshMessageParsingError,
         },
-        serializer::route_refresh::BGPRouteRefreshMessageWritingError,
+        serializer::route_refresh::BgpRouteRefreshMessageWritingError,
     },
-    BGPRouteRefreshMessage,
+    BgpRouteRefreshMessage,
 };
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
@@ -31,7 +31,7 @@ use netgauze_parse_utils::{
 use nom::error::ErrorKind;
 
 #[test]
-fn test_route_refresh_message() -> Result<(), BGPRouteRefreshMessageWritingError> {
+fn test_route_refresh_message() -> Result<(), BgpRouteRefreshMessageWritingError> {
     let good_normal_payload_wire = [0x00, 0x01, 0x00, 0x01];
     let good_borr_payload_wire = [0x00, 0x01, 0x01, 0x01];
     let good_eorr_payload_wire = [0x00, 0x01, 0x02, 0x01];
@@ -39,32 +39,32 @@ fn test_route_refresh_message() -> Result<(), BGPRouteRefreshMessageWritingError
     let bad_incomplete_wire = [0x00];
 
     let good_normal_payload =
-        BGPRouteRefreshMessage::new(AddressType::Ipv4Unicast, RouteRefreshSubcode::NormalRequest);
-    let good_borr_payload = BGPRouteRefreshMessage::new(
+        BgpRouteRefreshMessage::new(AddressType::Ipv4Unicast, RouteRefreshSubcode::NormalRequest);
+    let good_borr_payload = BgpRouteRefreshMessage::new(
         AddressType::Ipv4Unicast,
         RouteRefreshSubcode::BeginningOfRouteRefresh,
     );
-    let good_eorr_payload = BGPRouteRefreshMessage::new(
+    let good_eorr_payload = BgpRouteRefreshMessage::new(
         AddressType::Ipv4Unicast,
         RouteRefreshSubcode::EndOfRouteRefresh,
     );
-    let bad_undefined = LocatedBGPRouteRefreshMessageParsingError::new(
+    let bad_undefined = LocatedBgpRouteRefreshMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(2, &bad_undefined_wire[2..]) },
-        BGPRouteRefreshMessageParsingError::UndefinedOperation(UndefinedRouteRefreshSubcode(255)),
+        BgpRouteRefreshMessageParsingError::UndefinedOperation(UndefinedRouteRefreshSubcode(255)),
     );
-    let bad_incomplete = LocatedBGPRouteRefreshMessageParsingError::new(
+    let bad_incomplete = LocatedBgpRouteRefreshMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(0, &bad_incomplete_wire) },
-        BGPRouteRefreshMessageParsingError::NomError(ErrorKind::Eof),
+        BgpRouteRefreshMessageParsingError::NomError(ErrorKind::Eof),
     );
 
     test_parsed_completely(&good_normal_payload_wire, &good_normal_payload);
     test_parsed_completely(&good_borr_payload_wire, &good_borr_payload);
     test_parsed_completely(&good_eorr_payload_wire, &good_eorr_payload);
-    test_parse_error::<BGPRouteRefreshMessage, LocatedBGPRouteRefreshMessageParsingError<'_>>(
+    test_parse_error::<BgpRouteRefreshMessage, LocatedBgpRouteRefreshMessageParsingError<'_>>(
         &bad_undefined_wire,
         &bad_undefined,
     );
-    test_parse_error::<BGPRouteRefreshMessage, LocatedBGPRouteRefreshMessageParsingError<'_>>(
+    test_parse_error::<BgpRouteRefreshMessage, LocatedBgpRouteRefreshMessageParsingError<'_>>(
         &bad_incomplete_wire,
         &bad_incomplete,
     );
