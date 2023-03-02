@@ -10,8 +10,9 @@ NetGauze BGP Pkt is library to represent BGP-4 Packets. It aims to achieve 4 goa
    See [Supported BGP-4 Protocol features](#Supported-BGP-Protocol-features).
 2. Rust native representation of BGP protocol that makes it hard to construct an incorrect BGP packet. We achieve that
    by heavily relying on the rich type system provided by Rust.
-3. Serializing/deserialization (serde) is optional. This to make this library useful for building wider range of
-   applications.
+3. Native BGP wire-protocol Serializing/deserialization (serde) is optional. In addition to support the
+   well-known [serde](https://crates.io/crates/serde) library This to make this library useful for building wider range
+   of applications.
 4. Extensive testing. This includes testing using unit tests extracted from real packets traces and fuzzing.
 
 ## Example
@@ -117,6 +118,8 @@ pub fn main() {
 | Atomic Aggregate             | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | Yes        |                                                                    |
 | Aggregator                   | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | Yes        |                                                                    |
 | Communities                  | [RFC 1997](https://datatracker.ietf.org/doc/html/rfc1997)                                                               | No         | Yes      | Yes        |                                                                    |
+| Extended Communities         | [RFC 4360](https://datatracker.ietf.org/doc/html/rfc4360)                                                               | No         | Yes      | Yes        |                                                                    |
+| Large Communities            | [RFC 8092](https://datatracker.ietf.org/doc/html/rfc8092)                                                               | No         | Yes      | Yes        |                                                                    |
 | Four Octet AS_PATH           | [RFC 6793](https://datatracker.ietf.org/doc/html/RFC6793)                                                               | No         | Yes      | Yes        |                                                                    |
 | MP_REACH_NLRI                | [RFC 4760](https://datatracker.ietf.org/doc/html/rfc4760)                                                               | No         | Yes      | No         |                                                                    |
 | MP_UNREACH_NLRI              | [RFC 4760](https://datatracker.ietf.org/doc/html/rfc4760)                                                               | No         | Yes      | No         |                                                                    |
