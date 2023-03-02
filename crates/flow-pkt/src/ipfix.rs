@@ -189,7 +189,8 @@ impl TemplateRecord {
     }
 
     /// Each Template Record is given a unique Template ID in the range 256 to
-    /// 65535. TODO (AH): do we need to check for template IDs < 256, see https://www.rfc-editor.org/rfc/rfc7011#section-3.4.1
+    /// 65535. TODO (AH): do we need to check for template IDs < 256,
+    /// see [RFC 7011](https://www.rfc-editor.org/rfc/rfc7011#section-3.4.1)
     pub const fn id(&self) -> u16 {
         self.id
     }
