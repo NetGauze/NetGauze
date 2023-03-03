@@ -20,6 +20,7 @@ use crate::{
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     nlri::*,
 };
+use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
@@ -907,6 +908,11 @@ pub enum MpReach {
         next_hop_local: Option<LabeledNextHop>,
         nlri: Vec<Ipv6MplsVpnUnicast>,
     },
+    Unknown {
+        afi: AddressFamily,
+        safi: SubsequentAddressFamily,
+        value: Vec<u8>,
+    },
 }
 
 impl PathAttributeValueProperties for MpReach {
@@ -940,12 +946,29 @@ impl PathAttributeValueProperties for MpReach {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MpUnreach {
-    Ipv4Unicast { nlri: Vec<Ipv4Unicast> },
-    Ipv4Multicast { nlri: Vec<Ipv4Multicast> },
-    Ipv4MplsVpnUnicast { nlri: Vec<Ipv4MplsVpnUnicast> },
-    Ipv6Unicast { nlri: Vec<Ipv6Unicast> },
-    Ipv6Multicast { nlri: Vec<Ipv6Multicast> },
-    Ipv6MplsVpnUnicast { nlri: Vec<Ipv6MplsVpnUnicast> },
+    Ipv4Unicast {
+        nlri: Vec<Ipv4Unicast>,
+    },
+    Ipv4Multicast {
+        nlri: Vec<Ipv4Multicast>,
+    },
+    Ipv4MplsVpnUnicast {
+        nlri: Vec<Ipv4MplsVpnUnicast>,
+    },
+    Ipv6Unicast {
+        nlri: Vec<Ipv6Unicast>,
+    },
+    Ipv6Multicast {
+        nlri: Vec<Ipv6Multicast>,
+    },
+    Ipv6MplsVpnUnicast {
+        nlri: Vec<Ipv6MplsVpnUnicast>,
+    },
+    Unknown {
+        afi: AddressFamily,
+        safi: SubsequentAddressFamily,
+        nlri: Vec<u8>,
+    },
 }
 
 impl PathAttributeValueProperties for MpUnreach {

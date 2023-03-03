@@ -758,6 +758,11 @@ impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
                 next_hop_global.len() + local_len + nlri_len
             }
+            Self::Unknown {
+                afi: _,
+                safi: _,
+                value,
+            } => value.len(),
         };
         Self::BASE_LENGTH + usize::from(extended_length) + payload_len
     }
@@ -892,6 +897,11 @@ impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
                     nlri.write(writer)?
                 }
             }
+            Self::Unknown { afi, safi, value } => {
+                writer.write_u16::<NetworkEndian>(*afi as u16)?;
+                writer.write_u8(*safi as u8)?;
+                writer.write_all(value)?;
+            }
         }
         Ok(())
     }
@@ -921,6 +931,11 @@ impl WritablePDUWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
             Self::Ipv6Unicast { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::Ipv6Multicast { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::Ipv6MplsVpnUnicast { nlri } => nlri.iter().map(|x| x.len()).sum(),
+            Self::Unknown {
+                afi: _,
+                safi: _,
+                nlri,
+            } => nlri.len(),
         };
         Self::BASE_LENGTH + usize::from(extended_length) + payload_len
     }
@@ -1009,6 +1024,11 @@ impl WritablePDUWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
+            }
+            Self::Unknown { afi, safi, nlri } => {
+                writer.write_u16::<NetworkEndian>(*afi as u16)?;
+                writer.write_u8(*safi as u8)?;
+                writer.write_all(nlri)?;
             }
         }
         Ok(())
