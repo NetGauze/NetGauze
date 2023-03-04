@@ -21,6 +21,7 @@ use std::{
 };
 
 use chrono::{TimeZone, Utc};
+use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
 
 use netgauze_parse_utils::test_helpers::*;
 
@@ -63,7 +64,7 @@ fn test_netflow9_template_record() -> Result<(), NetFlowV9WritingError> {
     );
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
-    test_write_with_one_input(&good, None, &good_wire)?;
+    test_write_with_two_inputs(&good, None, true, &good_wire)?;
     Ok(())
 }
 
@@ -206,7 +207,7 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
     );
 
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    test_write_with_one_input(&good, Some(templates_map.clone()), &good_wire)?;
+    test_write_with_two_inputs(&good, Some(Rc::clone(&templates_map)), true, &good_wire)?;
     Ok(())
 }
 
@@ -387,6 +388,131 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
     );
 
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    test_write_with_one_input(&good, Some(templates_map.clone()), &good_wire)?;
+    test_write_with_two_inputs(&good, Some(Rc::clone(&templates_map)), true, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_mix_option_template_set() -> Result<(), SetWritingError> {
+    let good_wire = [
+        0x00, 0x01, 0x00, 0x1a, 0x01, 0x15, 0x00, 0x04, 0x00, 0x0c, 0x00, 0x01, 0x00, 0x04, 0x00,
+        0x0a, 0x00, 0x02, 0x00, 0x52, 0x00, 0x10, 0x00, 0x53, 0x00, 0x20,
+    ];
+    let good = Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
+        277,
+        vec![ScopeFieldSpecifier::new(ScopeIE::System, 4)],
+        vec![
+            FieldSpecifier::new(IE::ingressInterface, 2).unwrap(),
+            FieldSpecifier::new(IE::interfaceName, 16).unwrap(),
+            FieldSpecifier::new(IE::interfaceDescription, 32).unwrap(),
+        ],
+    )]);
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
+    test_write_with_two_inputs(&good, Some(Rc::clone(&templates_map)), false, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_mix_option_template_set2() -> Result<(), SetWritingError> {
+    let good_wire = [
+        0x00, 0x01, 0x00, 0x18, 0x01, 0x4e, 0x00, 0x04, 0x00, 0x08, 0x00, 0x01, 0x00, 0x04, 0x00,
+        0xea, 0x00, 0x04, 0x00, 0xec, 0x00, 0x20, 0x00, 0x00,
+    ];
+    let good = Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
+        334,
+        vec![ScopeFieldSpecifier::new(ScopeIE::System, 4)],
+        vec![
+            FieldSpecifier::new(IE::ingressVRFID, 4).unwrap(),
+            FieldSpecifier::new(IE::VRFname, 32).unwrap(),
+        ],
+    )]);
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
+    test_write_with_two_inputs(&good, Some(Rc::clone(&templates_map)), true, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_padding() -> Result<(), NetFlowV9WritingError> {
+    let good_no_padding_wire = [
+        0x00, 0x09, // Version
+        0x00, 0x02, // Count
+        0x0f, 0x5e, 0x5c, 0x6b, // Sys up time
+        0x63, 0xd5, 0x45, 0x85, // Timestamp
+        0x00, 0x09, 0x43, 0x2a, // seq
+        0x00, 0x00, 0x00, 0x06, // Source Id
+        0x00, 0x01, // Options Template
+        0x00, 0x1e, // Length
+        0x01, 0x02, // Options template ID
+        0x00, 0x04, // Scope Length
+        0x00, 0x10, // Options Length
+        0x00, 0x01, 0x00, 0x04, 0x00, 0x30, 0x00, 0x04, 0x00, 0x54, 0x00, 0x28, 0x00, 0x31, 0x00,
+        0x01, 0x00, 0x32, 0x00, 0x02, 0x01, 0x02, // Flow Set ID
+        0x00, 0x37, // Flow Set Length
+        0xd5, 0x03, 0xdf, 0x23, // Scope System
+        0x00, 0x00, 0x00, 0x02, // Sampler ID
+        0x4e, 0x45, 0x54, 0x46, // Sampler Name
+        0x4c, 0x4f, 0x57, 0x2d, // Sampler Name
+        0x53, 0x41, 0x4d, 0x50, // Sampler Name
+        0x4c, 0x45, 0x52, 0x2d, // Sampler Name
+        0x4d, 0x41, 0x50, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x02, // Random
+        0x01, 0x00, // Sampler Random Interval
+    ];
+
+    let good_with_padding_wire = [
+        0, 9, 0, 2, 15, 94, 92, 107, 99, 213, 69, 133, 0, 9, 67, 42, 0, 0, 0, 6, 0, 1, 0, 32, 1, 2,
+        0, 4, 0, 16, 0, 1, 0, 4, 0, 48, 0, 4, 0, 84, 0, 40, 0, 49, 0, 1, 0, 50, 0, 2, 0, 0, 1, 2,
+        0, 58, 213, 3, 223, 35, 0, 0, 0, 2, 78, 69, 84, 70, 76, 79, 87, 45, 83, 65, 77, 80, 76, 69,
+        82, 45, 77, 65, 80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0,
+        0, 0, 0,
+    ];
+
+    let templates_no_padding_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_with_padding_map = Rc::new(RefCell::new(HashMap::new()));
+
+    let (_, good_no_padding) = NetFlowV9Packet::from_wire(
+        Span::new(&good_no_padding_wire),
+        Rc::clone(&templates_no_padding_map),
+    )
+    .unwrap();
+    let (_, good_with_padding) = NetFlowV9Packet::from_wire(
+        Span::new(&good_with_padding_wire),
+        Rc::clone(&templates_with_padding_map),
+    )
+    .unwrap();
+
+    // Packets should be equal regardless of the padding
+    test_parsed_completely_with_one_input(
+        &good_no_padding_wire,
+        Rc::clone(&templates_no_padding_map),
+        &good_with_padding,
+    );
+    test_parsed_completely_with_one_input(
+        &good_with_padding_wire,
+        Rc::clone(&templates_with_padding_map),
+        &good_no_padding,
+    );
+
+    test_write_with_two_inputs(
+        &good_no_padding,
+        Some(Rc::clone(&templates_no_padding_map)),
+        false,
+        &good_no_padding_wire,
+    )?;
+    test_write_with_two_inputs(
+        &good_with_padding,
+        Some(Rc::clone(&templates_with_padding_map)),
+        true,
+        &good_with_padding_wire,
+    )?;
     Ok(())
 }

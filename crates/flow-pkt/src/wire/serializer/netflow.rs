@@ -22,7 +22,7 @@ use crate::{
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
+use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput, WritablePDUWithTwoInputs};
 use netgauze_serde_macros::WritingError;
 use std::{io::Write, rc::Rc};
 
@@ -32,16 +32,21 @@ pub enum NetFlowV9WritingError {
     SetError(#[from] SetWritingError),
 }
 
-impl WritablePDUWithOneInput<Option<TemplatesMap>, NetFlowV9WritingError> for NetFlowV9Packet {
+/// [RFC 3954](https://www.rfc-editor.org/rfc/rfc3954) defines padding to 4-bytes start as
+/// SHOULD (optional). The second option is a boolean to indicate if padding
+/// should be included in the output.
+impl WritablePDUWithTwoInputs<Option<TemplatesMap>, bool, NetFlowV9WritingError>
+    for NetFlowV9Packet
+{
     /// 2-octets version, 2-octets count, 4-octets * 4 for meta data
     const BASE_LENGTH: usize = NETFLOW_V9_HEADER_LENGTH as usize;
 
-    fn len(&self, templates_map: Option<TemplatesMap>) -> usize {
-        Self::BASE_LENGTH
+    fn len(&self, templates_map: Option<TemplatesMap>, align_to_4_bytes: bool) -> usize {
+        <Self as WritablePDUWithTwoInputs<_, _, _>>::BASE_LENGTH
             + self
                 .sets()
                 .iter()
-                .map(|x| x.len(templates_map.clone()))
+                .map(|x| x.len(templates_map.clone(), align_to_4_bytes))
                 .sum::<usize>()
     }
 
@@ -49,6 +54,7 @@ impl WritablePDUWithOneInput<Option<TemplatesMap>, NetFlowV9WritingError> for Ne
         &self,
         writer: &mut T,
         templates_map: Option<TemplatesMap>,
+        align_to_4_bytes: bool,
     ) -> Result<(), NetFlowV9WritingError> {
         let count = self
             .sets()
@@ -66,9 +72,25 @@ impl WritablePDUWithOneInput<Option<TemplatesMap>, NetFlowV9WritingError> for Ne
         writer.write_u32::<NetworkEndian>(self.sequence_number())?;
         writer.write_u32::<NetworkEndian>(self.source_id())?;
         for set in self.sets() {
-            set.write(writer, templates_map.clone())?;
+            set.write(writer, templates_map.clone(), align_to_4_bytes)?;
         }
         Ok(())
+    }
+}
+
+impl WritablePDUWithOneInput<Option<TemplatesMap>, NetFlowV9WritingError> for NetFlowV9Packet {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self, templates_map: Option<TemplatesMap>) -> usize {
+        <Self as WritablePDUWithTwoInputs<_, _, _>>::len(self, templates_map, false)
+    }
+
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+        templates_map: Option<TemplatesMap>,
+    ) -> Result<(), NetFlowV9WritingError> {
+        <Self as WritablePDUWithTwoInputs<_, _, _>>::write(self, writer, templates_map, false)
     }
 }
 
@@ -84,6 +106,7 @@ pub enum SetWritingError {
 #[inline]
 fn calculate_set_size_with_padding(
     templates_map: Option<TemplatesMap>,
+    align_to_4_bytes: bool,
     set: &Set,
 ) -> (usize, usize) {
     let length = Set::BASE_LENGTH
@@ -99,15 +122,20 @@ fn calculate_set_size_with_padding(
                     .sum::<usize>()
             }
         };
-    (length, length % 4)
+    if align_to_4_bytes {
+        (length, length % 4)
+    } else {
+        (length, 0)
+    }
 }
 
-impl WritablePDUWithOneInput<Option<TemplatesMap>, SetWritingError> for Set {
+impl WritablePDUWithTwoInputs<Option<TemplatesMap>, bool, SetWritingError> for Set {
     /// 2-octets set id + 2-octet set length
     const BASE_LENGTH: usize = 4;
 
-    fn len(&self, template_map: Option<TemplatesMap>) -> usize {
-        let (length, padding) = calculate_set_size_with_padding(template_map, self);
+    fn len(&self, template_map: Option<TemplatesMap>, align_to_4_bytes: bool) -> usize {
+        let (length, padding) =
+            calculate_set_size_with_padding(template_map, align_to_4_bytes, self);
         length + padding
     }
 
@@ -115,8 +143,10 @@ impl WritablePDUWithOneInput<Option<TemplatesMap>, SetWritingError> for Set {
         &self,
         writer: &mut T,
         templates_map: Option<TemplatesMap>,
+        align_to_4_bytes: bool,
     ) -> Result<(), SetWritingError> {
-        let (length, padding) = calculate_set_size_with_padding(templates_map.clone(), self);
+        let (length, padding) =
+            calculate_set_size_with_padding(templates_map.clone(), align_to_4_bytes, self);
         let length = (length + padding) as u16;
         match self {
             Self::Template(records) => {
