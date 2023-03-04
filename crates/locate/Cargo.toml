@@ -3,6 +3,17 @@ name = "netgauze-locate"
 version = "0.0.1"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+Cloned from the crate `nom_locate` but with the omission of computing
+the line & column number since we don't care about them in binary protocols,
+and they do make using the `LocateSpan` slower.
+"""
+keywords = ["protocol"]
+categories = ["parsing"]
 
 [dependencies]
 nom = { version = "7.1", default-features = false }

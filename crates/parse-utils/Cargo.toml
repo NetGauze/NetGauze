@@ -5,6 +5,13 @@ edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+Serialization/Deserialization utilities for NetGauze
+"""
+keywords = ["protocol"]
+categories = ["parsing"]
 
 [dependencies]
 netgauze-locate = { path = "../locate" }

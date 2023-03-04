@@ -5,9 +5,13 @@ edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
 description = """
 BGP-4 Protocol representation and serde.
 """
+keywords = ["bgp", "parser", "protocol"]
+categories = ["network-programming", "parsing"]
 
 [dependencies]
 netgauze-iana = { path = "../iana" }

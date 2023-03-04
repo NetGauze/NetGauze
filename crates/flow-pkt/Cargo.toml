@@ -5,20 +5,24 @@ edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
 description = """
 Netflow(v9)/IPFIX(v10) Protocol representation and serde
 """
+keywords = ["ipfix", "netflow", "parser", "protocol"]
+categories = ["network-programming", "parsing"]
 
 [dependencies]
 netgauze-locate = { path = "../locate", optional = true }
 netgauze-parse-utils = { path = "../parse-utils", optional = true }
 netgauze-serde-macros = { path = "../serde-macros", optional = true }
-serde = {version = "1.0", features = ["derive"]}
+serde = { version = "1.0", features = ["derive"] }
 strum = "0.24"
 strum_macros = "0.24"
-ipnet = { version = "2.7", features=["serde"] }
+ipnet = { version = "2.7", features = ["serde"] }
 lazy_static = "1.4"
-chrono = {version="0.4", default-features = false, features=["std", "serde"]}
+chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
 nom = { version = "7.1", optional = true }
 byteorder = { version = "1.4", optional = true }
 criterion = { version = "0.4", optional = true } # Dev dep for bench
@@ -36,7 +40,7 @@ netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
 [build-dependencies]
 reqwest = { version = "0.11", features = ["blocking"] }
 roxmltree = "0.18"
-netgauze-ipfix-code-generator = {path = "../ipfix-code-generator"}
+netgauze-ipfix-code-generator = { path = "../ipfix-code-generator" }
 
 
 [[bench]]
