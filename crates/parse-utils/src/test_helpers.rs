@@ -236,8 +236,8 @@ pub fn test_write_with_one_input<I: Clone, T: WritablePDUWithOneInput<I, E>, E: 
 }
 
 pub fn test_write_with_two_inputs<
-    I1: Copy,
-    I2: Copy,
+    I1: Clone,
+    I2: Clone,
     T: WritablePDUWithTwoInputs<I1, I2, E>,
     E: Eq,
 >(
@@ -248,7 +248,7 @@ pub fn test_write_with_two_inputs<
 ) -> Result<(), E> {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
-    input.write(&mut cursor, parser_input1, parser_input2)?;
+    input.write(&mut cursor, parser_input1.clone(), parser_input2.clone())?;
     assert_eq!(
         buf, expected,
         "Serialized buffer is different the the expected one"
