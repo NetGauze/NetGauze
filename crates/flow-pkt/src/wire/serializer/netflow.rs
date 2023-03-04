@@ -334,7 +334,10 @@ impl WritablePDUWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField
     fn len(&self, length: Option<u16>) -> usize {
         match self {
             ScopeField::Unknown { value, .. } => value.len(),
-            ScopeField::System(System(value)) => value.len(),
+            ScopeField::System(System(_)) => match length {
+                None => 4,
+                Some(len) => len as usize,
+            },
             ScopeField::Interface(_) => match length {
                 None => 4,
                 Some(len) => len as usize,
@@ -357,17 +360,14 @@ impl WritablePDUWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField
             ScopeField::Unknown { value, .. } => {
                 writer.write_all(value)?;
             }
-            ScopeField::System(System(value)) => {
-                writer.write_all(value.as_bytes())?;
-                match length {
-                    None => {}
-                    Some(length) => {
-                        for _ in value.as_bytes().len()..(length as usize) {
-                            writer.write_u8(0)?;
-                        }
-                    }
+            ScopeField::System(System(value)) => match length {
+                None => writer.write_u32::<NetworkEndian>(*value)?,
+                Some(len) => {
+                    let be_bytes = value.to_be_bytes();
+                    let begin_offset = be_bytes.len() - len as usize;
+                    writer.write_all(&be_bytes[begin_offset..])?;
                 }
-            }
+            },
             ScopeField::Interface(Interface(value)) => match length {
                 None => writer.write_u32::<NetworkEndian>(*value)?,
                 Some(len) => {

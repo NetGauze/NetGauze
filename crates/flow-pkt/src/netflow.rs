@@ -231,7 +231,7 @@ pub enum ScopeField {
 }
 
 #[derive(Eq, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
-pub struct System(pub String);
+pub struct System(pub u32);
 
 #[derive(Eq, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Interface(pub u32);

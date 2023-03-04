@@ -410,17 +410,18 @@ impl<'a> ReadablePDUWithTwoInputs<'a, &ScopeIE, u16, LocatedScopeFieldParsingErr
                 ))
             }
             ScopeIE::System => {
-                let (buf, value) = nom::combinator::map_res(
-                    nom::bytes::complete::take(length),
-                    |str_buf: Span<'_>| {
-                        let nul_index = str_buf
-                            .iter()
-                            .position(|&c| c == b'\0')
-                            .unwrap_or(str_buf.len());
-                        std::str::from_utf8(&str_buf[..nul_index]).map(|x| x.to_string())
-                    },
-                )(buf)?;
-                Ok((buf, ScopeField::System(System(value))))
+                let len = length as usize;
+                if length > 4 || buf.input_len() < len {
+                    return Err(nom::Err::Error(LocatedScopeFieldParsingError::new(
+                        buf,
+                        ScopeFieldParsingError::InvalidLength(length),
+                    )));
+                }
+                let mut res = 0u32;
+                for byte in buf.iter_elements().take(len) {
+                    res = (res << 8) + byte as u32;
+                }
+                Ok((buf.slice(len..), ScopeField::System(System(res))))
             }
             ScopeIE::Interface => {
                 let len = length as usize;
