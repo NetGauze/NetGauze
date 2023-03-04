@@ -30,7 +30,7 @@ use crate::{
     },
     BgpNotificationMessage,
 };
-use netgauze_parse_utils::{parse_into_located, ErrorKindSerdeDeref, ReadablePDU, Span};
+use netgauze_parse_utils::{parse_into_located, ErrorKindSerdeDeref, ReadablePdu, Span};
 use netgauze_serde_macros::LocatedError;
 use nom::{error::ErrorKind, number::complete::be_u8, IResult};
 use serde::{Deserialize, Serialize};
@@ -52,7 +52,7 @@ pub enum BgpNotificationMessageParsingError {
     RouteRefreshError(#[from_located(module = "self")] RouteRefreshErrorParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBgpNotificationMessageParsingError<'a>> for BgpNotificationMessage {
+impl<'a> ReadablePdu<'a, LocatedBgpNotificationMessageParsingError<'a>> for BgpNotificationMessage {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedBgpNotificationMessageParsingError<'a>> {
@@ -100,7 +100,7 @@ pub enum MessageHeaderErrorParsingError {
     UndefinedMessageHeaderErrorType(#[from_external] UndefinedMessageHeaderErrorSubCode),
 }
 
-impl<'a> ReadablePDU<'a, LocatedMessageHeaderErrorParsingError<'a>> for MessageHeaderError {
+impl<'a> ReadablePdu<'a, LocatedMessageHeaderErrorParsingError<'a>> for MessageHeaderError {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedMessageHeaderErrorParsingError<'a>> {
@@ -146,7 +146,7 @@ pub enum OpenMessageErrorParsingError {
     UndefinedOpenMessageErrorSubCode(#[from_external] UndefinedOpenMessageErrorSubCode),
 }
 
-impl<'a> ReadablePDU<'a, LocatedOpenMessageErrorParsingError<'a>> for OpenMessageError {
+impl<'a> ReadablePdu<'a, LocatedOpenMessageErrorParsingError<'a>> for OpenMessageError {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedOpenMessageErrorParsingError<'a>> {
@@ -216,7 +216,7 @@ pub enum UpdateMessageErrorParsingError {
     UndefinedUpdateMessageErrorSubCode(#[from_external] UndefinedUpdateMessageErrorSubCode),
 }
 
-impl<'a> ReadablePDU<'a, LocatedUpdateMessageErrorParsingError<'a>> for UpdateMessageError {
+impl<'a> ReadablePdu<'a, LocatedUpdateMessageErrorParsingError<'a>> for UpdateMessageError {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedUpdateMessageErrorParsingError<'a>> {
@@ -303,7 +303,7 @@ pub enum HoldTimerExpiredErrorParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedHoldTimerExpiredErrorParsingError<'a>> for HoldTimerExpiredError {
+impl<'a> ReadablePdu<'a, LocatedHoldTimerExpiredErrorParsingError<'a>> for HoldTimerExpiredError {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedHoldTimerExpiredErrorParsingError<'a>> {
@@ -328,7 +328,7 @@ pub enum FiniteStateMachineErrorParsingError {
     Undefined(#[from_external] UndefinedFiniteStateMachineErrorSubCode),
 }
 
-impl<'a> ReadablePDU<'a, LocatedFiniteStateMachineErrorParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedFiniteStateMachineErrorParsingError<'a>>
     for FiniteStateMachineError
 {
     fn from_wire(
@@ -376,7 +376,7 @@ pub enum CeaseErrorParsingError {
     Undefined(#[from_external] UndefinedCeaseErrorSubCode),
 }
 
-impl<'a> ReadablePDU<'a, LocatedCeaseErrorParsingError<'a>> for CeaseError {
+impl<'a> ReadablePdu<'a, LocatedCeaseErrorParsingError<'a>> for CeaseError {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedCeaseErrorParsingError<'a>> {
         let (buf, sub_code) = nom::combinator::map_res(be_u8, CeaseErrorSubCode::try_from)(buf)?;
         let (buf, value) = nom::bytes::complete::take(buf.len())(buf)?;
@@ -455,7 +455,7 @@ pub enum RouteRefreshErrorParsingError {
     Undefined(#[from_external] UndefinedRouteRefreshMessageError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedRouteRefreshErrorParsingError<'a>> for RouteRefreshError {
+impl<'a> ReadablePdu<'a, LocatedRouteRefreshErrorParsingError<'a>> for RouteRefreshError {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedRouteRefreshErrorParsingError<'a>> {

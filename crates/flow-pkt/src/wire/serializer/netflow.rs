@@ -22,7 +22,7 @@ use crate::{
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput, WritablePDUWithTwoInputs};
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput, WritablePduWithTwoInputs};
 use netgauze_serde_macros::WritingError;
 use std::{io::Write, rc::Rc};
 
@@ -35,14 +35,14 @@ pub enum NetFlowV9WritingError {
 /// [RFC 3954](https://www.rfc-editor.org/rfc/rfc3954) defines padding to 4-bytes start as
 /// SHOULD (optional). The second option is a boolean to indicate if padding
 /// should be included in the output.
-impl WritablePDUWithTwoInputs<Option<TemplatesMap>, bool, NetFlowV9WritingError>
+impl WritablePduWithTwoInputs<Option<TemplatesMap>, bool, NetFlowV9WritingError>
     for NetFlowV9Packet
 {
     /// 2-octets version, 2-octets count, 4-octets * 4 for meta data
     const BASE_LENGTH: usize = NETFLOW_V9_HEADER_LENGTH as usize;
 
     fn len(&self, templates_map: Option<TemplatesMap>, align_to_4_bytes: bool) -> usize {
-        <Self as WritablePDUWithTwoInputs<_, _, _>>::BASE_LENGTH
+        <Self as WritablePduWithTwoInputs<_, _, _>>::BASE_LENGTH
             + self
                 .sets()
                 .iter()
@@ -78,11 +78,11 @@ impl WritablePDUWithTwoInputs<Option<TemplatesMap>, bool, NetFlowV9WritingError>
     }
 }
 
-impl WritablePDUWithOneInput<Option<TemplatesMap>, NetFlowV9WritingError> for NetFlowV9Packet {
+impl WritablePduWithOneInput<Option<TemplatesMap>, NetFlowV9WritingError> for NetFlowV9Packet {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self, templates_map: Option<TemplatesMap>) -> usize {
-        <Self as WritablePDUWithTwoInputs<_, _, _>>::len(self, templates_map, false)
+        <Self as WritablePduWithTwoInputs<_, _, _>>::len(self, templates_map, false)
     }
 
     fn write<T: Write>(
@@ -90,7 +90,7 @@ impl WritablePDUWithOneInput<Option<TemplatesMap>, NetFlowV9WritingError> for Ne
         writer: &mut T,
         templates_map: Option<TemplatesMap>,
     ) -> Result<(), NetFlowV9WritingError> {
-        <Self as WritablePDUWithTwoInputs<_, _, _>>::write(self, writer, templates_map, false)
+        <Self as WritablePduWithTwoInputs<_, _, _>>::write(self, writer, templates_map, false)
     }
 }
 
@@ -129,7 +129,7 @@ fn calculate_set_size_with_padding(
     }
 }
 
-impl WritablePDUWithTwoInputs<Option<TemplatesMap>, bool, SetWritingError> for Set {
+impl WritablePduWithTwoInputs<Option<TemplatesMap>, bool, SetWritingError> for Set {
     /// 2-octets set id + 2-octet set length
     const BASE_LENGTH: usize = 4;
 
@@ -186,7 +186,7 @@ pub enum TemplateRecordWritingError {
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
 }
 
-impl WritablePDU<TemplateRecordWritingError> for TemplateRecord {
+impl WritablePdu<TemplateRecordWritingError> for TemplateRecord {
     /// 2-octets template_id, 2-octets field count
     const BASE_LENGTH: usize = 4;
 
@@ -216,7 +216,7 @@ pub enum OptionsTemplateRecordWritingError {
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
 }
 
-impl WritablePDU<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
+impl WritablePdu<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
     /// 2-octets template_id, 2-octets fields count, 2-octet scope fields count
     const BASE_LENGTH: usize = 6;
 
@@ -265,7 +265,7 @@ pub enum DataRecordWritingError {
     FieldError(#[from] FieldWritingError),
 }
 
-impl WritablePDUWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingError> for DataRecord {
+impl WritablePduWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingError> for DataRecord {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self, decoding_template: Option<Rc<DecodingTemplate>>) -> usize {
@@ -333,7 +333,7 @@ pub enum ScopeFieldSpecifierWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<ScopeFieldSpecifierWritingError> for ScopeFieldSpecifier {
+impl WritablePdu<ScopeFieldSpecifierWritingError> for ScopeFieldSpecifier {
     /// 2-octets field id, 2-octets length
     const BASE_LENGTH: usize = 4;
 
@@ -357,7 +357,7 @@ pub enum ScopeFieldWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField {
+impl WritablePduWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField {
     /// 2-octets field id, 2-octets length
     const BASE_LENGTH: usize = 0;
 

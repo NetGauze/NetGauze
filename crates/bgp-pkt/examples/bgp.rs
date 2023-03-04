@@ -5,7 +5,7 @@ use std::{io::Cursor, net::Ipv4Addr};
 
 use netgauze_bgp_pkt::{capabilities::*, open::*, *};
 use netgauze_iana::address_family::*;
-use netgauze_parse_utils::{ReadablePDUWithOneInput, Span, WritablePDU};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
 
 pub fn main() {
     // Construct a new BGP message

@@ -21,7 +21,7 @@ use nom::{
 use serde::{Deserialize, Serialize};
 
 use crate::{FieldSpecifier, FieldSpecifierError};
-use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePDU, Span};
+use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePdu, Span};
 use netgauze_serde_macros::LocatedError;
 
 use crate::ie::{IEError, IE};
@@ -44,7 +44,7 @@ pub enum FieldSpecifierParsingError {
     IEError(IEError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedFieldSpecifierParsingError<'a>> for FieldSpecifier {
+impl<'a> ReadablePdu<'a, LocatedFieldSpecifierParsingError<'a>> for FieldSpecifier {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedFieldSpecifierParsingError<'a>> {
         let input = buf;
         let (buf, code) = be_u16(buf)?;

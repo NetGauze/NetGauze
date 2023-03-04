@@ -17,7 +17,7 @@
 
 use crate::BgpRouteRefreshMessage;
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
@@ -25,7 +25,7 @@ pub enum BgpRouteRefreshMessageWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<BgpRouteRefreshMessageWritingError> for BgpRouteRefreshMessage {
+impl WritablePdu<BgpRouteRefreshMessageWritingError> for BgpRouteRefreshMessage {
     // 4 octet = 2 afi + 1 op + + 1 safi
     const BASE_LENGTH: usize = 4;
 

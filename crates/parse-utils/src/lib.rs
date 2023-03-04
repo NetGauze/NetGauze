@@ -26,7 +26,7 @@ pub type Span<'a> = BinarySpan<&'a [u8]>;
 
 /// Generic trait for Readable Protocol Data Unit that doesn't need any external
 /// input while parsing the packet.
-pub trait ReadablePDU<'a, Error: Debug> {
+pub trait ReadablePdu<'a, Error: Debug> {
     fn from_wire(buf: Span<'a>) -> nom::IResult<Span<'a>, Self, Error>
     where
         Self: Sized;
@@ -34,7 +34,7 @@ pub trait ReadablePDU<'a, Error: Debug> {
 
 /// Generic trait Readable Protocol Data Unit that does need a single external
 /// input
-pub trait ReadablePDUWithOneInput<'a, T, ErrorType> {
+pub trait ReadablePduWithOneInput<'a, T, ErrorType> {
     fn from_wire(buf: Span<'a>, input: T) -> nom::IResult<Span<'a>, Self, ErrorType>
     where
         Self: Sized;
@@ -42,7 +42,7 @@ pub trait ReadablePDUWithOneInput<'a, T, ErrorType> {
 
 /// Generic trait for Readable Protocol Data Unit that does need two external
 /// inputs
-pub trait ReadablePDUWithTwoInputs<'a, T, U, ErrorType> {
+pub trait ReadablePduWithTwoInputs<'a, T, U, ErrorType> {
     fn from_wire(buf: Span<'a>, input1: T, input2: U) -> nom::IResult<Span<'a>, Self, ErrorType>
     where
         Self: Sized;
@@ -50,7 +50,7 @@ pub trait ReadablePDUWithTwoInputs<'a, T, U, ErrorType> {
 
 /// Generic trait for Readable Protocol Data Unit that does need three external
 /// inputs
-pub trait ReadablePDUWithThreeInputs<'a, I1, I2, I3, ErrorType> {
+pub trait ReadablePduWithThreeInputs<'a, I1, I2, I3, ErrorType> {
     fn from_wire(
         buf: Span<'a>,
         input1: I1,
@@ -64,7 +64,7 @@ pub trait ReadablePDUWithThreeInputs<'a, I1, I2, I3, ErrorType> {
 /// Generic trait for Writable Protocol Data Unit that doesn't need any external
 /// input while writing the packet.
 #[allow(clippy::len_without_is_empty)]
-pub trait WritablePDU<ErrorType> {
+pub trait WritablePdu<ErrorType> {
     const BASE_LENGTH: usize;
 
     /// The total length of the written buffer
@@ -82,7 +82,7 @@ pub trait WritablePDU<ErrorType> {
 /// Generic trait for Writable Protocol Data Unit that doesn't need any external
 /// input while writing the packet.
 #[allow(clippy::len_without_is_empty)]
-pub trait WritablePDUWithOneInput<I, ErrorType> {
+pub trait WritablePduWithOneInput<I, ErrorType> {
     const BASE_LENGTH: usize;
 
     /// The total length of the written buffer
@@ -100,7 +100,7 @@ pub trait WritablePDUWithOneInput<I, ErrorType> {
 /// Generic trait for Writable Protocol Data Unit that doesn't need any external
 /// input while writing the packet.
 #[allow(clippy::len_without_is_empty)]
-pub trait WritablePDUWithTwoInputs<I1, I2, ErrorType> {
+pub trait WritablePduWithTwoInputs<I1, I2, ErrorType> {
     const BASE_LENGTH: usize;
 
     /// The total length of the written buffer
@@ -133,7 +133,7 @@ pub trait LocatedParsingError {
 }
 
 #[inline]
-pub fn parse_into_located<'a, Lin: Debug, L: From<Lin>, T: ReadablePDU<'a, Lin>>(
+pub fn parse_into_located<'a, Lin: Debug, L: From<Lin>, T: ReadablePdu<'a, Lin>>(
     buf: Span<'a>,
 ) -> IResult<Span<'a>, T, L> {
     match T::from_wire(buf) {
@@ -152,7 +152,7 @@ pub fn parse_into_located_one_input<
     I,
     Lin: Debug,
     L: From<Lin>,
-    T: ReadablePDUWithOneInput<'a, I, Lin>,
+    T: ReadablePduWithOneInput<'a, I, Lin>,
 >(
     buf: Span<'a>,
     input: I,
@@ -174,7 +174,7 @@ pub fn parse_into_located_two_inputs<
     I2,
     Lin: Debug,
     L: From<Lin>,
-    T: ReadablePDUWithTwoInputs<'a, I1, I2, Lin>,
+    T: ReadablePduWithTwoInputs<'a, I1, I2, Lin>,
 >(
     buf: Span<'a>,
     input1: I1,
@@ -198,7 +198,7 @@ pub fn parse_into_located_three_inputs<
     I3,
     Lin: Debug,
     L: From<Lin>,
-    T: ReadablePDUWithThreeInputs<'a, I1, I2, I3, Lin>,
+    T: ReadablePduWithThreeInputs<'a, I1, I2, I3, Lin>,
 >(
     buf: Span<'a>,
     input1: I1,
@@ -217,7 +217,7 @@ pub fn parse_into_located_three_inputs<
 
 /// Keep repeating the parser till the buf is empty
 #[inline]
-pub fn parse_till_empty<'a, T: ReadablePDU<'a, E>, E: Debug>(
+pub fn parse_till_empty<'a, T: ReadablePdu<'a, E>, E: Debug>(
     buf: Span<'a>,
 ) -> IResult<Span<'a>, Vec<T>, E> {
     let mut buf = buf;
@@ -232,8 +232,7 @@ pub fn parse_till_empty<'a, T: ReadablePDU<'a, E>, E: Debug>(
 
 /// Keep repeating the parser till the buf is empty
 #[inline]
-pub fn parse_till_empty_into_located<'a, Lin: Debug, L: From<Lin>, T: ReadablePDU<'a, Lin>>(
-    //'a, T: ReadablePDU<'a, E>, E: Debug + Clone + Eq + PartialEq>(
+pub fn parse_till_empty_into_located<'a, Lin: Debug, L: From<Lin>, T: ReadablePdu<'a, Lin>>(
     buf: Span<'a>,
 ) -> IResult<Span<'a>, Vec<T>, L> {
     let mut buf = buf;
@@ -251,7 +250,7 @@ pub fn parse_till_empty_into_located<'a, Lin: Debug, L: From<Lin>, T: ReadablePD
 pub fn parse_till_empty_with_one_input<
     'a,
     I: Clone,
-    T: ReadablePDUWithOneInput<'a, I, E>,
+    T: ReadablePduWithOneInput<'a, I, E>,
     E: Debug,
 >(
     buf: Span<'a>,
@@ -274,7 +273,7 @@ pub fn parse_till_empty_into_with_one_input_located<
     I: Clone,
     Lin: Debug,
     L: From<Lin>,
-    T: ReadablePDUWithOneInput<'a, I, Lin>,
+    T: ReadablePduWithOneInput<'a, I, Lin>,
 >(
     buf: Span<'a>,
     input: I,
@@ -297,7 +296,7 @@ pub fn parse_till_empty_into_with_two_inputs_located<
     I2: Clone,
     Lin: Debug,
     L: From<Lin>,
-    T: ReadablePDUWithTwoInputs<'a, I1, I2, Lin>,
+    T: ReadablePduWithTwoInputs<'a, I1, I2, Lin>,
 >(
     buf: Span<'a>,
     input1: I1,

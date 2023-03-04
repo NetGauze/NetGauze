@@ -21,7 +21,7 @@ use crate::{
     BgpUpdateMessage,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
@@ -32,7 +32,7 @@ pub enum BgpUpdateMessageWritingError {
     PathAttributeError(#[from] PathAttributeWritingError),
 }
 
-impl WritablePDU<BgpUpdateMessageWritingError> for BgpUpdateMessage {
+impl WritablePdu<BgpUpdateMessageWritingError> for BgpUpdateMessage {
     const BASE_LENGTH: usize = 4;
 
     fn len(&self) -> usize {
@@ -85,7 +85,7 @@ pub enum WithdrawRouteWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<WithdrawRouteWritingError> for WithdrawRoute {
+impl WritablePdu<WithdrawRouteWritingError> for WithdrawRoute {
     /// One octet for prefix length
     const BASE_LENGTH: usize = 1;
 
@@ -114,7 +114,7 @@ pub enum NetworkLayerReachabilityInformationWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<NetworkLayerReachabilityInformationWritingError>
+impl WritablePdu<NetworkLayerReachabilityInformationWritingError>
     for NetworkLayerReachabilityInformation
 {
     /// one octet length

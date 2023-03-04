@@ -23,7 +23,7 @@ use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
-use netgauze_parse_utils::{ReadablePDU, Span};
+use netgauze_parse_utils::{ReadablePdu, Span};
 use nom::{
     error::ErrorKind,
     number::complete::{be_u16, be_u8},
@@ -46,7 +46,7 @@ pub enum BgpRouteRefreshMessageParsingError {
     InvalidAddressType(InvalidAddressType),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBgpRouteRefreshMessageParsingError<'a>> for BgpRouteRefreshMessage {
+impl<'a> ReadablePdu<'a, LocatedBgpRouteRefreshMessageParsingError<'a>> for BgpRouteRefreshMessage {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedBgpRouteRefreshMessageParsingError<'a>> {

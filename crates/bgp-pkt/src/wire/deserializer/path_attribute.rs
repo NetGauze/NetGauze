@@ -27,8 +27,8 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    parse_till_empty, parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePDU,
-    ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
+    parse_till_empty, parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePdu,
+    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -92,7 +92,7 @@ pub trait IntoLocatedPathAttributeParsingError<'a> {
     fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a>;
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>> for PathAttribute {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>> for PathAttribute {
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
@@ -222,7 +222,7 @@ pub enum OriginParsingError {
     UndefinedOrigin(#[from_external] UndefinedOrigin),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Origin {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Origin {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -255,7 +255,7 @@ pub enum AsPathParsingError {
     UndefinedAsPathSegmentType(#[from_external] UndefinedAsPathSegmentType),
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAsPathParsingError<'a>> for AsPath {
+impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedAsPathParsingError<'a>> for AsPath {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -276,7 +276,7 @@ impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAsPathParsingError<'a>>
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedAsPathParsingError<'a>> for As2PathSegment {
+impl<'a> ReadablePdu<'a, LocatedAsPathParsingError<'a>> for As2PathSegment {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
         let (buf, segment_type) =
             nom::combinator::map_res(be_u8, AsPathSegmentType::try_from)(buf)?;
@@ -285,7 +285,7 @@ impl<'a> ReadablePDU<'a, LocatedAsPathParsingError<'a>> for As2PathSegment {
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedAsPathParsingError<'a>> for As4PathSegment {
+impl<'a> ReadablePdu<'a, LocatedAsPathParsingError<'a>> for As4PathSegment {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
         let (buf, segment_type) =
             nom::combinator::map_res(be_u8, AsPathSegmentType::try_from)(buf)?;
@@ -294,7 +294,7 @@ impl<'a> ReadablePDU<'a, LocatedAsPathParsingError<'a>> for As4PathSegment {
     }
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for As4Path {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for As4Path {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -318,7 +318,7 @@ pub enum NextHopParsingError {
     InvalidNextHopLength(PathAttributeLength),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedNextHopParsingError<'a>> for NextHop {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedNextHopParsingError<'a>> for NextHop {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -353,7 +353,7 @@ pub enum MultiExitDiscriminatorParsingError {
     InvalidLength(PathAttributeLength),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMultiExitDiscriminatorParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMultiExitDiscriminatorParsingError<'a>>
     for MultiExitDiscriminator
 {
     fn from_wire(
@@ -391,7 +391,7 @@ pub enum LocalPreferenceParsingError {
     InvalidLength(PathAttributeLength),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a>>
     for LocalPreference
 {
     fn from_wire(
@@ -427,7 +427,7 @@ pub enum AtomicAggregateParsingError {
     InvalidLength(PathAttributeLength),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a>>
     for AtomicAggregate
 {
     fn from_wire(
@@ -461,7 +461,7 @@ pub enum AggregatorParsingError {
     InvalidLength(PathAttributeLength),
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAggregatorParsingError<'a>>
+impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedAggregatorParsingError<'a>>
     for Aggregator
 {
     fn from_wire(
@@ -479,7 +479,7 @@ impl<'a> ReadablePDUWithTwoInputs<'a, bool, bool, LocatedAggregatorParsingError<
     }
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> for As2Aggregator {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> for As2Aggregator {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -505,7 +505,7 @@ impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> fo
     }
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> for As4Aggregator {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> for As4Aggregator {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -564,7 +564,7 @@ pub enum MpReachParsingError {
     ),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for MpReach {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for MpReach {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -716,7 +716,7 @@ pub enum MpUnreachParsingError {
     ),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for MpUnreach {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for MpUnreach {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -848,7 +848,7 @@ pub enum UnknownAttributeParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'a>>
     for UnknownAttribute
 {
     fn from_wire(
@@ -881,7 +881,7 @@ pub enum CommunitiesParsingError {
     ),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedCommunitiesParsingError<'a>> for Communities {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedCommunitiesParsingError<'a>> for Communities {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -906,7 +906,7 @@ pub enum ExtendedCommunitiesParsingError {
     ),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedExtendedCommunitiesParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedExtendedCommunitiesParsingError<'a>>
     for ExtendedCommunities
 {
     fn from_wire(
@@ -933,7 +933,7 @@ pub enum ExtendedCommunitiesIpv6ParsingError {
     ),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedExtendedCommunitiesIpv6ParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedExtendedCommunitiesIpv6ParsingError<'a>>
     for ExtendedCommunitiesIpv6
 {
     fn from_wire(
@@ -959,7 +959,7 @@ pub enum LargeCommunitiesParsingError {
     ),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedLargeCommunitiesParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedLargeCommunitiesParsingError<'a>>
     for LargeCommunities
 {
     fn from_wire(
@@ -982,7 +982,7 @@ pub enum OriginatorParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedOriginatorParsingError<'a>> for Originator {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOriginatorParsingError<'a>> for Originator {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
@@ -1003,7 +1003,7 @@ pub enum ClusterIdParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedClusterIdParsingError<'a>> for ClusterId {
+impl<'a> ReadablePdu<'a, LocatedClusterIdParsingError<'a>> for ClusterId {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedClusterIdParsingError<'a>> {
         let (buf, id) = be_u32(buf)?;
         Ok((buf, ClusterId::new(Ipv4Addr::from(id))))
@@ -1017,7 +1017,7 @@ pub enum ClusterListParsingError {
     ClusterIdError(#[from_located(module = "self")] ClusterIdParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedClusterListParsingError<'a>> for ClusterList {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedClusterListParsingError<'a>> for ClusterList {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,

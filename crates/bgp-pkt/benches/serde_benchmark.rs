@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use netgauze_bgp_pkt::BgpMessage;
-use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
 const OPEN_COMPLEX_NO_PARAMS: [u8; 29] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,

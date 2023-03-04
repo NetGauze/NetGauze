@@ -16,7 +16,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use netgauze_bgp_pkt::BgpMessage;
-use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
 fuzz_target!(|data: (&[u8], bool)| {
     let (mut buf, asn4) = data;

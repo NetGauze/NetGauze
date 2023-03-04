@@ -20,7 +20,7 @@ use crate::{
     DataSetId, FieldSpecifier,
 };
 use chrono::{TimeZone, Timelike, Utc};
-use netgauze_parse_utils::{test_helpers::*, ReadablePDUWithOneInput, Span};
+use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
 use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};
 
 #[test]

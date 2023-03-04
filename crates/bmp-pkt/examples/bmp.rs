@@ -7,7 +7,7 @@ use netgauze_bmp_pkt::{
     iana::RouteMirroringInformation, BmpMessage, BmpMessageValue, BmpPeerType, PeerHeader,
     RouteMirroringMessage, RouteMirroringValue,
 };
-use netgauze_parse_utils::{ReadablePDU, Span, WritablePDU};
+use netgauze_parse_utils::{ReadablePdu, Span, WritablePdu};
 use std::{
     io::Cursor,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},

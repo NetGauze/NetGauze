@@ -38,7 +38,7 @@ use nom::{
 
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
-    ErrorKindSerdeDeref, ReadablePDU, Span,
+    ErrorKindSerdeDeref, ReadablePdu, Span,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -53,7 +53,7 @@ pub enum BmpMessageParsingError {
     BmpMessageValueError(#[from_located(module = "self")] BmpMessageValueParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
+impl<'a> ReadablePdu<'a, LocatedBmpMessageParsingError<'a>> for BmpMessage {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpMessageParsingError<'a>> {
         let (buf, version) = nom::combinator::map_res(be_u8, BmpVersion::try_from)(buf)?;
         let input = buf;
@@ -106,7 +106,7 @@ pub enum BmpMessageValueParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBmpMessageValueParsingError<'a>> for BmpMessageValue {
+impl<'a> ReadablePdu<'a, LocatedBmpMessageValueParsingError<'a>> for BmpMessageValue {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpMessageValueParsingError<'a>> {
         let (buf, msg_type) = nom::combinator::map_res(be_u8, BmpMessageType::try_from)(buf)?;
         let (buf, msg) = match msg_type {
@@ -160,7 +160,7 @@ pub enum InitiationMessageParsingError {
     InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedInitiationMessageParsingError<'a>> for InitiationMessage {
+impl<'a> ReadablePdu<'a, LocatedInitiationMessageParsingError<'a>> for InitiationMessage {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedInitiationMessageParsingError<'a>> {
@@ -188,7 +188,7 @@ impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedInitiationInformationParsingError<'a>> for InitiationInformation {
+impl<'a> ReadablePdu<'a, LocatedInitiationInformationParsingError<'a>> for InitiationInformation {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedInitiationInformationParsingError<'a>> {
@@ -261,7 +261,7 @@ pub enum RouteMonitoringMessageParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedRouteMonitoringMessageParsingError<'a>> for RouteMonitoringMessage {
+impl<'a> ReadablePdu<'a, LocatedRouteMonitoringMessageParsingError<'a>> for RouteMonitoringMessage {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMonitoringMessageParsingError<'a>> {
@@ -303,7 +303,7 @@ pub enum BmpPeerTypeParsingError {
     UndefinedBmpPeerTypeCode(#[from_external] UndefinedBmpPeerTypeCode),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBmpPeerTypeParsingError<'a>> for BmpPeerType {
+impl<'a> ReadablePdu<'a, LocatedBmpPeerTypeParsingError<'a>> for BmpPeerType {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpPeerTypeParsingError<'a>> {
         let (buf, peer_type_code) =
             nom::combinator::map_res(be_u8, BmpPeerTypeCode::try_from)(buf)?;
@@ -354,7 +354,7 @@ pub enum PeerHeaderParsingError {
     InvalidTime(u32, u32),
 }
 
-impl<'a> ReadablePDU<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
+impl<'a> ReadablePdu<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedPeerHeaderParsingError<'a>> {
         let (buf, peer_type) = parse_into_located(buf)?;
         let (buf, rd) = parse_into_located(buf)?;
@@ -430,7 +430,7 @@ const fn check_is_ipv6(peer_type: &BmpPeerType) -> Result<bool, BmpPeerTypeCode>
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
     for PeerUpNotificationMessage
 {
     fn from_wire(
@@ -503,7 +503,7 @@ pub enum PeerDownNotificationMessageParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedPeerDownNotificationMessageParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedPeerDownNotificationMessageParsingError<'a>>
     for PeerDownNotificationMessage
 {
     fn from_wire(
@@ -538,7 +538,7 @@ pub enum PeerDownNotificationReasonParsingError {
     InitiationInformationError(#[from_located(module = "self")] InitiationInformationParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedPeerDownNotificationReasonParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedPeerDownNotificationReasonParsingError<'a>>
     for PeerDownNotificationReason
 {
     fn from_wire(
@@ -619,7 +619,7 @@ pub enum RouteMirroringMessageParsingError {
     RouteMirroringValueError(#[from_located(module = "self")] RouteMirroringValueParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedRouteMirroringMessageParsingError<'a>> for RouteMirroringMessage {
+impl<'a> ReadablePdu<'a, LocatedRouteMirroringMessageParsingError<'a>> for RouteMirroringMessage {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMirroringMessageParsingError<'a>> {
@@ -640,7 +640,7 @@ pub enum RouteMirroringValueParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedRouteMirroringValueParsingError<'a>> for RouteMirroringValue {
+impl<'a> ReadablePdu<'a, LocatedRouteMirroringValueParsingError<'a>> for RouteMirroringValue {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMirroringValueParsingError<'a>> {
@@ -698,7 +698,7 @@ pub enum TerminationMessageParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedTerminationMessageParsingError<'a>> for TerminationMessage {
+impl<'a> ReadablePdu<'a, LocatedTerminationMessageParsingError<'a>> for TerminationMessage {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedTerminationMessageParsingError<'a>> {
@@ -728,7 +728,7 @@ impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedTerminationInformationParsingError<'a>> for TerminationInformation {
+impl<'a> ReadablePdu<'a, LocatedTerminationInformationParsingError<'a>> for TerminationInformation {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedTerminationInformationParsingError<'a>> {
@@ -790,7 +790,7 @@ pub enum StatisticsReportMessageParsingError {
     StatisticsCounterError(#[from_located(module = "self")] StatisticsCounterParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedStatisticsReportMessageParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedStatisticsReportMessageParsingError<'a>>
     for StatisticsReportMessage
 {
     fn from_wire(
@@ -836,7 +836,7 @@ fn parse_address_type(
     Ok((buf, address_type))
 }
 
-impl<'a> ReadablePDU<'a, LocatedStatisticsCounterParsingError<'a>> for StatisticsCounter {
+impl<'a> ReadablePdu<'a, LocatedStatisticsCounterParsingError<'a>> for StatisticsCounter {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedStatisticsCounterParsingError<'a>> {

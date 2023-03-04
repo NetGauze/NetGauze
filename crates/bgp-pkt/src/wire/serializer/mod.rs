@@ -26,7 +26,7 @@ pub mod update;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
 
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 use crate::{
@@ -66,7 +66,7 @@ pub enum BgpMessageWritingError {
     RouteRefreshError(#[from] BgpRouteRefreshMessageWritingError),
 }
 
-impl WritablePDU<BgpMessageWritingError> for BgpMessage {
+impl WritablePdu<BgpMessageWritingError> for BgpMessage {
     const BASE_LENGTH: usize = BGP_MIN_MESSAGE_LENGTH as usize;
     fn len(&self) -> usize {
         let body_len = match self {

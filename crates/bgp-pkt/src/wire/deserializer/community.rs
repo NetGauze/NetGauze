@@ -22,8 +22,8 @@ use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePDU,
-    ReadablePDUWithOneInput, Span,
+    parse_into_located, parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePdu,
+    ReadablePduWithOneInput, Span,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -45,7 +45,7 @@ pub enum CommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedCommunityParsingError<'a>> for Community {
+impl<'a> ReadablePdu<'a, LocatedCommunityParsingError<'a>> for Community {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedCommunityParsingError<'a>> {
         let (buf, value) = be_u32(buf)?;
         Ok((buf, Community::new(value)))
@@ -88,7 +88,7 @@ pub enum ExtendedCommunityParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedCommunity {
+impl<'a> ReadablePdu<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedCommunity {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedExtendedCommunityParsingError<'a>> {
@@ -226,7 +226,7 @@ pub enum LargeCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedLargeCommunityParsingError<'a>> for LargeCommunity {
+impl<'a> ReadablePdu<'a, LocatedLargeCommunityParsingError<'a>> for LargeCommunity {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedLargeCommunityParsingError<'a>> {
         let (buf, global_admin) = be_u32(buf)?;
         let (buf, local_data1) = be_u32(buf)?;
@@ -244,7 +244,7 @@ pub enum TransitiveTwoOctetExtendedCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedTransitiveTwoOctetExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedTransitiveTwoOctetExtendedCommunityParsingError<'a>>
     for TransitiveTwoOctetExtendedCommunity
 {
     fn from_wire(
@@ -339,7 +339,7 @@ pub enum ExtendedCommunityIpv6ParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedExtendedCommunityIpv6ParsingError<'a>> for ExtendedCommunityIpv6 {
+impl<'a> ReadablePdu<'a, LocatedExtendedCommunityIpv6ParsingError<'a>> for ExtendedCommunityIpv6 {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedExtendedCommunityIpv6ParsingError<'a>> {
@@ -369,7 +369,7 @@ pub enum NonTransitiveTwoOctetExtendedCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedNonTransitiveTwoOctetExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedNonTransitiveTwoOctetExtendedCommunityParsingError<'a>>
     for NonTransitiveTwoOctetExtendedCommunity
 {
     fn from_wire(
@@ -408,7 +408,7 @@ pub enum TransitiveIpv4ExtendedCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
     for TransitiveIpv4ExtendedCommunity
 {
     fn from_wire(
@@ -525,7 +525,7 @@ pub enum NonTransitiveIpv4ExtendedCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'a>>
     for NonTransitiveIpv4ExtendedCommunity
 {
     fn from_wire(
@@ -550,7 +550,7 @@ pub enum TransitiveFourOctetExtendedCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedTransitiveFourOctetExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedTransitiveFourOctetExtendedCommunityParsingError<'a>>
     for TransitiveFourOctetExtendedCommunity
 {
     fn from_wire(
@@ -624,7 +624,7 @@ pub enum NonTransitiveFourOctetExtendedCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedNonTransitiveFourOctetExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedNonTransitiveFourOctetExtendedCommunityParsingError<'a>>
     for NonTransitiveFourOctetExtendedCommunity
 {
     fn from_wire(
@@ -650,7 +650,7 @@ pub enum TransitiveOpaqueExtendedCommunityParsingError {
     InvalidValueLength(usize),
 }
 
-impl<'a> ReadablePDU<'a, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a>>
     for TransitiveOpaqueExtendedCommunity
 {
     fn from_wire(
@@ -680,7 +680,7 @@ pub enum NonTransitiveOpaqueExtendedCommunityParsingError {
     InvalidValueLength(usize),
 }
 
-impl<'a> ReadablePDU<'a, LocatedNonTransitiveOpaqueExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedNonTransitiveOpaqueExtendedCommunityParsingError<'a>>
     for NonTransitiveOpaqueExtendedCommunity
 {
     fn from_wire(
@@ -712,7 +712,7 @@ pub enum ExperimentalExtendedCommunityParsingError {
     InvalidValueLength(usize),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, u8, LocatedExperimentalExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, u8, LocatedExperimentalExtendedCommunityParsingError<'a>>
     for ExperimentalExtendedCommunity
 {
     fn from_wire(
@@ -743,7 +743,7 @@ pub enum UnknownExtendedCommunityParsingError {
     InvalidValueLength(usize),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, u8, LocatedUnknownExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, u8, LocatedUnknownExtendedCommunityParsingError<'a>>
     for UnknownExtendedCommunity
 {
     fn from_wire(
@@ -770,7 +770,7 @@ pub enum TransitiveIpv6ExtendedCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedTransitiveIpv6ExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedTransitiveIpv6ExtendedCommunityParsingError<'a>>
     for TransitiveIpv6ExtendedCommunity
 {
     fn from_wire(
@@ -851,7 +851,7 @@ pub enum NonTransitiveIpv6ExtendedCommunityParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedNonTransitiveIpv6ExtendedCommunityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedNonTransitiveIpv6ExtendedCommunityParsingError<'a>>
     for NonTransitiveIpv6ExtendedCommunity
 {
     fn from_wire(
@@ -877,7 +877,7 @@ pub enum UnknownExtendedCommunityIpv6ParsingError {
     InvalidValueLength(usize),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, u8, LocatedUnknownExtendedCommunityIpv6ParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, u8, LocatedUnknownExtendedCommunityIpv6ParsingError<'a>>
     for UnknownExtendedCommunityIpv6
 {
     fn from_wire(

@@ -15,7 +15,7 @@
 
 use crate::{capabilities::*, iana::BgpCapabilityCode};
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
 
@@ -29,7 +29,7 @@ pub enum BGPCapabilityWritingError {
     ExtendedNextHopEncodingCapabilityError(#[from] ExtendedNextHopEncodingCapabilityWritingError),
 }
 
-impl WritablePDU<BGPCapabilityWritingError> for BgpCapability {
+impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
     // 1-octet length and 1-octet capability type
     const BASE_LENGTH: usize = 2;
 
@@ -112,7 +112,7 @@ pub enum FourOctetAsCapabilityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<FourOctetAsCapabilityWritingError> for FourOctetAsCapability {
+impl WritablePdu<FourOctetAsCapabilityWritingError> for FourOctetAsCapability {
     const BASE_LENGTH: usize = FOUR_OCTET_AS_CAPABILITY_LENGTH as usize;
 
     fn len(&self) -> usize {
@@ -129,7 +129,7 @@ pub enum MultiProtocolExtensionsCapabilityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<MultiProtocolExtensionsCapabilityWritingError>
+impl WritablePdu<MultiProtocolExtensionsCapabilityWritingError>
     for MultiProtocolExtensionsCapability
 {
     const BASE_LENGTH: usize = MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH as usize;
@@ -153,7 +153,7 @@ pub enum GracefulRestartCapabilityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<GracefulRestartCapabilityWritingError> for GracefulRestartCapability {
+impl WritablePdu<GracefulRestartCapabilityWritingError> for GracefulRestartCapability {
     /// 4-octet time and flags
     const BASE_LENGTH: usize = 4;
 
@@ -182,7 +182,7 @@ impl WritablePDU<GracefulRestartCapabilityWritingError> for GracefulRestartCapab
     }
 }
 
-impl WritablePDU<GracefulRestartCapabilityWritingError> for GracefulRestartAddressFamily {
+impl WritablePdu<GracefulRestartCapabilityWritingError> for GracefulRestartAddressFamily {
     // 2 octet AFI, 1 reserved, and 1 SAFI
     const BASE_LENGTH: usize = 4;
 
@@ -202,7 +202,7 @@ pub enum AddPathCapabilityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapability {
+impl WritablePdu<AddPathCapabilityWritingError> for AddPathCapability {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -221,7 +221,7 @@ impl WritablePDU<AddPathCapabilityWritingError> for AddPathCapability {
     }
 }
 
-impl WritablePDU<AddPathCapabilityWritingError> for AddPathAddressFamily {
+impl WritablePdu<AddPathCapabilityWritingError> for AddPathAddressFamily {
     // 2 octet AFI, 1 reserved, and 1 SAFI
     const BASE_LENGTH: usize = 4;
 
@@ -245,7 +245,7 @@ pub enum ExtendedNextHopEncodingCapabilityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<ExtendedNextHopEncodingCapabilityWritingError> for ExtendedNextHopEncoding {
+impl WritablePdu<ExtendedNextHopEncodingCapabilityWritingError> for ExtendedNextHopEncoding {
     const BASE_LENGTH: usize = EXTENDED_NEXT_HOP_ENCODING_LENGTH as usize;
     fn len(&self) -> usize {
         Self::BASE_LENGTH
@@ -261,7 +261,7 @@ impl WritablePDU<ExtendedNextHopEncodingCapabilityWritingError> for ExtendedNext
     }
 }
 
-impl WritablePDU<ExtendedNextHopEncodingCapabilityWritingError>
+impl WritablePdu<ExtendedNextHopEncodingCapabilityWritingError>
     for ExtendedNextHopEncodingCapability
 {
     const BASE_LENGTH: usize = 1;

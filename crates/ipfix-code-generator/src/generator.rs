@@ -678,7 +678,7 @@ fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
 }
 
 fn get_deserializer_header(ty_name: &str) -> String {
-    let mut header = format!("impl<'a> netgauze_parse_utils::ReadablePDUWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n");
+    let mut header = format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n");
     header.push_str("    #[inline]\n");
     header.push_str(format!("    fn from_wire(buf: netgauze_parse_utils::Span<'a>, length: u16) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
     header
@@ -1168,7 +1168,7 @@ pub(crate) fn generate_pkg_ie_serializers(
     ret.push_str("}\n\n");
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
         )
             .as_str(),
     );
@@ -1294,7 +1294,7 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
-    ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &IE, u16, Located{ty_name}ParsingError<'a>>\n").as_str());
+    ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, Located{ty_name}ParsingError<'a>>\n").as_str());
     ret.push_str(format!("for {ty_name} {{\n").as_str());
     ret.push_str("    #[inline]\n");
     ret.push_str("    fn from_wire(\n");
@@ -1353,7 +1353,7 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
-    ret.push_str("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &IE, u16, LocatedFieldParsingError<'a>>\n");
+    ret.push_str("impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, LocatedFieldParsingError<'a>>\n");
     ret.push_str("for Field {\n");
     ret.push_str("    #[inline]\n");
     ret.push_str("    fn from_wire(\n");
@@ -1404,7 +1404,7 @@ fn generate_num8_serializer(num_type: &str, ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1425,7 +1425,7 @@ fn generate_num_serializer(num_type: &str, length: u16, ie_name: &str) -> String
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1462,7 +1462,7 @@ fn generate_array_serializer(ie_name: &str) -> String {
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1483,7 +1483,7 @@ fn generate_ip_serializer(length: u16, ie_name: &str) -> String {
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1504,7 +1504,7 @@ fn generate_string_serializer(ie_name: &str) -> String {
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1536,7 +1536,7 @@ fn generate_bool_serializer(ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1557,7 +1557,7 @@ fn generate_seconds_serializer(ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1580,7 +1580,7 @@ fn generate_milli_seconds_serializer(ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1603,7 +1603,7 @@ fn generate_fraction_serializer(ie_name: &String) -> String {
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
     );
@@ -1686,7 +1686,7 @@ pub(crate) fn generate_ie_ser_main(
 
     ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePDUWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
         )
         .as_str(),
     );

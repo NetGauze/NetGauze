@@ -16,7 +16,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use netgauze_bmp_pkt::BmpMessage;
-use netgauze_parse_utils::{ReadablePDU, Span};
+use netgauze_parse_utils::{ReadablePdu, Span};
 
 fuzz_target!(|data: &[u8]| {
     let mut buf = data;

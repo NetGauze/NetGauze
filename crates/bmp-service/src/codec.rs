@@ -22,7 +22,7 @@ use netgauze_bmp_pkt::{
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
     BmpMessage,
 };
-use netgauze_parse_utils::{LocatedParsingError, ReadablePDU, Span, WritablePDU};
+use netgauze_parse_utils::{LocatedParsingError, ReadablePdu, Span, WritablePdu};
 use nom::Needed;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::{Decoder, Encoder};

@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use netgauze_flow_pkt::{ipfix::IpfixPacket, FieldSpecifier};
-use netgauze_parse_utils::{ReadablePDUWithOneInput, Span, WritablePDUWithOneInput};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};
 
 const IPFIX_PKT_TEMPLATE_RAW: &[u8] = &[
     0x00, 0x0a, // Version

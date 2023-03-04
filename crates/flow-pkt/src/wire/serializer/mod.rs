@@ -19,7 +19,7 @@ pub mod netflow;
 
 use crate::{ie::InformationElementTemplate, FieldSpecifier};
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
 
@@ -35,7 +35,7 @@ pub enum FieldSpecifierWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<FieldSpecifierWritingError> for FieldSpecifier {
+impl WritablePdu<FieldSpecifierWritingError> for FieldSpecifier {
     /// 2-octets field id, 2-octets length
     const BASE_LENGTH: usize = 4;
 

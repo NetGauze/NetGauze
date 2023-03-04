@@ -35,8 +35,8 @@ use nom::{
 use serde::{Deserialize, Serialize};
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePDU,
-    ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePdu,
+    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
 };
 
 use crate::{
@@ -68,17 +68,17 @@ pub enum Ipv4PrefixParsingError {
     InvalidIpv4PrefixLen(u8),
 }
 
-impl<'a> ReadablePDU<'a, LocatedIpv4PrefixParsingError<'a>> for Ipv4Net {
+impl<'a> ReadablePdu<'a, LocatedIpv4PrefixParsingError<'a>> for Ipv4Net {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4PrefixParsingError<'a>> {
         let input = buf;
         let (buf, prefix_len) = be_u8(buf)?;
-        <Self as ReadablePDUWithTwoInputs<u8, Span<'_>, LocatedIpv4PrefixParsingError<'_>>>::from_wire(
+        <Self as ReadablePduWithTwoInputs<u8, Span<'_>, LocatedIpv4PrefixParsingError<'_>>>::from_wire(
             buf, prefix_len, input
         )
     }
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4PrefixParsingError<'a>> for Ipv4Net {
+impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4PrefixParsingError<'a>> for Ipv4Net {
     /// A second version that assumes the prefix length has been read else where
     /// in the message Useful for Labeled VPN NLRI
     fn from_wire(
@@ -119,17 +119,17 @@ pub enum Ipv6PrefixParsingError {
     InvalidIpv6PrefixLen(u8),
 }
 
-impl<'a> ReadablePDU<'a, LocatedIpv6PrefixParsingError<'a>> for Ipv6Net {
+impl<'a> ReadablePdu<'a, LocatedIpv6PrefixParsingError<'a>> for Ipv6Net {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv6PrefixParsingError<'a>> {
         let input = buf;
         let (buf, prefix_len) = be_u8(buf)?;
-        <Self as ReadablePDUWithTwoInputs<u8, Span<'_>, LocatedIpv6PrefixParsingError<'_>>>::from_wire(
+        <Self as ReadablePduWithTwoInputs<u8, Span<'_>, LocatedIpv6PrefixParsingError<'_>>>::from_wire(
             buf, prefix_len, input
         )
     }
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6PrefixParsingError<'a>> for Ipv6Net {
+impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6PrefixParsingError<'a>> for Ipv6Net {
     fn from_wire(
         buf: Span<'a>,
         prefix_len: u8,
@@ -248,7 +248,7 @@ fn parse_bgp_message_length_and_type(
     Ok((buf, (length, message_type, reminder_buf)))
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBgpMessageParsingError<'a>> for BgpMessage {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpMessageParsingError<'a>> for BgpMessage {
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,

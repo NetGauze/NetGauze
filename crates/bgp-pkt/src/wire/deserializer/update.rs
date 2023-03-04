@@ -23,7 +23,7 @@ use crate::{
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
     parse_into_located, parse_till_empty_into_located,
-    parse_till_empty_into_with_one_input_located, ReadablePDU, ReadablePDUWithOneInput, Span,
+    parse_till_empty_into_with_one_input_located, ReadablePdu, ReadablePduWithOneInput, Span,
 };
 use nom::{error::ErrorKind, number::complete::be_u16, IResult};
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ fn parse_withdraw_routes(
     Ok((buf, routes))
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, bool, LocatedBgpUpdateMessageParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpUpdateMessageParsingError<'a>>
     for BgpUpdateMessage
 {
     fn from_wire(
@@ -88,7 +88,7 @@ pub enum WithdrawRouteParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedWithdrawRouteParsingError<'a>> for WithdrawRoute {
+impl<'a> ReadablePdu<'a, LocatedWithdrawRouteParsingError<'a>> for WithdrawRoute {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedWithdrawRouteParsingError<'a>> {
         let (buf, net) = parse_into_located(buf)?;
         Ok((buf, WithdrawRoute::new(net)))
@@ -113,7 +113,7 @@ fn parse_nlri_ipv4(
     Ok((buf, net))
 }
 
-impl<'a> ReadablePDU<'a, LocatedNetworkLayerReachabilityInformationParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedNetworkLayerReachabilityInformationParsingError<'a>>
     for NetworkLayerReachabilityInformation
 {
     fn from_wire(

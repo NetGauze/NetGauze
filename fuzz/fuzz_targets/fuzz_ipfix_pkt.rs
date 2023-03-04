@@ -16,7 +16,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use netgauze_flow_pkt::ipfix::IpfixPacket;
-use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 fuzz_target!(|data: &[u8]| {

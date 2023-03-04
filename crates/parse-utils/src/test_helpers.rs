@@ -17,8 +17,8 @@
 //! serializing/deserializing wire protocols
 
 use crate::{
-    ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithThreeInputs, ReadablePDUWithTwoInputs,
-    Span, WritablePDU, WritablePDUWithOneInput, WritablePDUWithTwoInputs,
+    ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs, ReadablePduWithTwoInputs,
+    Span, WritablePdu, WritablePduWithOneInput, WritablePduWithTwoInputs,
 };
 use netgauze_locate::BinarySpan;
 use nom::IResult;
@@ -35,10 +35,10 @@ pub fn combine(v: Vec<&[u8]>) -> Vec<u8> {
 /// Fancier assert to for more meaningful error messages
 pub fn test_parsed_completely<'a, T, E>(input: &'a [u8], expected: &T) -> T
 where
-    T: ReadablePDU<'a, E> + PartialEq + Debug,
+    T: ReadablePdu<'a, E> + PartialEq + Debug,
     E: Debug,
 {
-    let parsed = <T as ReadablePDU<E>>::from_wire(Span::new(input));
+    let parsed = <T as ReadablePdu<E>>::from_wire(Span::new(input));
     assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
@@ -57,10 +57,10 @@ pub fn test_parsed_completely_with_one_input<'a, T, I, E>(
     expected: &T,
 ) -> T
 where
-    T: ReadablePDUWithOneInput<'a, I, E> + PartialEq + Debug,
+    T: ReadablePduWithOneInput<'a, I, E> + PartialEq + Debug,
     E: Debug,
 {
-    let parsed = <T as ReadablePDUWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
+    let parsed = <T as ReadablePduWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
     assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
@@ -80,10 +80,10 @@ pub fn test_parsed_completely_with_two_inputs<'a, T, I, K, E>(
     expected: &T,
 ) -> T
 where
-    T: ReadablePDUWithTwoInputs<'a, I, K, E> + PartialEq + Debug,
+    T: ReadablePduWithTwoInputs<'a, I, K, E> + PartialEq + Debug,
     E: Debug,
 {
-    let parsed = <T as ReadablePDUWithTwoInputs<I, K, E>>::from_wire(
+    let parsed = <T as ReadablePduWithTwoInputs<I, K, E>>::from_wire(
         Span::new(input),
         parser_input1,
         parser_input2,
@@ -108,10 +108,10 @@ pub fn test_parsed_completely_with_three_inputs<'a, T, I1, I2, I3, E>(
     expected: &T,
 ) -> T
 where
-    T: ReadablePDUWithThreeInputs<'a, I1, I2, I3, E> + PartialEq + Debug,
+    T: ReadablePduWithThreeInputs<'a, I1, I2, I3, E> + PartialEq + Debug,
     E: Debug,
 {
-    let parsed = <T as ReadablePDUWithThreeInputs<I1, I2, I3, E>>::from_wire(
+    let parsed = <T as ReadablePduWithThreeInputs<I1, I2, I3, E>>::from_wire(
         Span::new(input),
         parser_input1,
         parser_input2,
@@ -131,11 +131,11 @@ where
 /// Fancier assert to for more meaningful error messages
 pub fn test_parse_error<'a, T, E>(input: &'a [u8], expected_err: &E)
 where
-    T: ReadablePDU<'a, E> + Debug,
+    T: ReadablePdu<'a, E> + Debug,
     E: Debug + Eq,
 {
     let parsed: IResult<BinarySpan<&[u8]>, T, E> =
-        <T as ReadablePDU<E>>::from_wire(Span::new(input));
+        <T as ReadablePdu<E>>::from_wire(Span::new(input));
     assert!(
         parsed.is_err(),
         "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
@@ -156,11 +156,11 @@ pub fn test_parse_error_with_one_input<'a, T, I, E>(
     parser_input: I,
     expected_err: &'a E,
 ) where
-    T: ReadablePDUWithOneInput<'a, I, E> + Debug,
+    T: ReadablePduWithOneInput<'a, I, E> + Debug,
     E: Debug + Eq,
 {
     let parsed: IResult<BinarySpan<&[u8]>, T, E> =
-        <T as ReadablePDUWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
+        <T as ReadablePduWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
     assert!(
         parsed.is_err(),
         "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
@@ -182,11 +182,11 @@ pub fn test_parse_error_with_two_inputs<'a, T, I, K, E>(
     parser_input2: K,
     expected_err: nom::Err<E>,
 ) where
-    T: ReadablePDUWithTwoInputs<'a, I, K, E> + Debug,
+    T: ReadablePduWithTwoInputs<'a, I, K, E> + Debug,
     E: Debug + Eq,
 {
     let parsed: IResult<BinarySpan<&[u8]>, T, E> =
-        <T as ReadablePDUWithTwoInputs<I, K, E>>::from_wire(
+        <T as ReadablePduWithTwoInputs<I, K, E>>::from_wire(
             Span::new(input),
             parser_input1,
             parser_input2,
@@ -199,7 +199,7 @@ pub fn test_parse_error_with_two_inputs<'a, T, I, K, E>(
     assert_eq!(parsed.err().unwrap(), expected_err);
 }
 
-pub fn test_write<T: WritablePDU<E>, E: Eq>(input: &T, expected: &[u8]) -> Result<(), E> {
+pub fn test_write<T: WritablePdu<E>, E: Eq>(input: &T, expected: &[u8]) -> Result<(), E> {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
     input.write(&mut cursor)?;
@@ -215,7 +215,7 @@ pub fn test_write<T: WritablePDU<E>, E: Eq>(input: &T, expected: &[u8]) -> Resul
     Ok(())
 }
 
-pub fn test_write_with_one_input<I: Clone, T: WritablePDUWithOneInput<I, E>, E: Eq>(
+pub fn test_write_with_one_input<I: Clone, T: WritablePduWithOneInput<I, E>, E: Eq>(
     input: &T,
     parser_input: I,
     expected: &[u8],
@@ -238,7 +238,7 @@ pub fn test_write_with_one_input<I: Clone, T: WritablePDUWithOneInput<I, E>, E: 
 pub fn test_write_with_two_inputs<
     I1: Clone,
     I2: Clone,
-    T: WritablePDUWithTwoInputs<I1, I2, E>,
+    T: WritablePduWithTwoInputs<I1, I2, E>,
     E: Eq,
 >(
     input: &T,

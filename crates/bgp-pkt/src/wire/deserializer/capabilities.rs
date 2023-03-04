@@ -22,7 +22,7 @@ use netgauze_iana::address_family::{
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_till_empty, ErrorKindSerdeDeref, ReadablePDU, Span,
+    parse_into_located, parse_till_empty, ErrorKindSerdeDeref, ReadablePdu, Span,
 };
 use nom::{
     error::{ErrorKind, FromExternalError, ParseError},
@@ -114,7 +114,7 @@ fn parse_enhanced_route_refresh_capability(
     Ok((buf, BgpCapability::EnhancedRouteRefresh))
 }
 
-impl<'a> ReadablePDU<'a, LocatedBgpCapabilityParsingError<'a>> for BgpCapability {
+impl<'a> ReadablePdu<'a, LocatedBgpCapabilityParsingError<'a>> for BgpCapability {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpCapabilityParsingError<'a>> {
         let parsed: IResult<Span<'_>, BgpCapabilityCode, LocatedBgpCapabilityParsingError<'_>> =
             nom::combinator::map_res(be_u8, BgpCapabilityCode::try_from)(buf);
@@ -246,7 +246,7 @@ pub enum FourOctetAsCapabilityParsingError {
     InvalidLength(u8),
 }
 
-impl<'a> ReadablePDU<'a, LocatedFourOctetAsCapabilityParsingError<'a>> for FourOctetAsCapability {
+impl<'a> ReadablePdu<'a, LocatedFourOctetAsCapabilityParsingError<'a>> for FourOctetAsCapability {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedFourOctetAsCapabilityParsingError<'a>> {
@@ -270,7 +270,7 @@ pub enum MultiProtocolExtensionsCapabilityParsingError {
     AddressTypeError(InvalidAddressType),
 }
 
-impl<'a> ReadablePDU<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a>>
     for MultiProtocolExtensionsCapability
 {
     fn from_wire(
@@ -310,7 +310,7 @@ pub enum GracefulRestartCapabilityParsingError {
     AddressTypeError(InvalidAddressType),
 }
 
-impl<'a> ReadablePDU<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
     for GracefulRestartCapability
 {
     fn from_wire(
@@ -329,7 +329,7 @@ impl<'a> ReadablePDU<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
     for GracefulRestartAddressFamily
 {
     fn from_wire(
@@ -375,7 +375,7 @@ pub enum AddPathCapabilityParsingError {
     InvalidAddPathSendReceiveValue(u8),
 }
 
-impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathCapability {
+impl<'a> ReadablePdu<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathCapability {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedAddPathCapabilityParsingError<'a>> {
@@ -386,7 +386,7 @@ impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathCa
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathAddressFamily {
+impl<'a> ReadablePdu<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathAddressFamily {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedAddPathCapabilityParsingError<'a>> {
@@ -428,7 +428,7 @@ pub enum ExtendedNextHopEncodingCapabilityParsingError {
     AddressTypeError(InvalidAddressType),
 }
 
-impl<'a> ReadablePDU<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>
     for ExtendedNextHopEncodingCapability
 {
     fn from_wire(
@@ -441,7 +441,7 @@ impl<'a> ReadablePDU<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a>>
     for ExtendedNextHopEncoding
 {
     fn from_wire(

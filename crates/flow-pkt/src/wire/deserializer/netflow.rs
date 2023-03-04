@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
     parse_till_empty_into_located, parse_till_empty_into_with_one_input_located,
-    ErrorKindSerdeDeref, ReadablePDU, ReadablePDUWithOneInput, ReadablePDUWithTwoInputs, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -49,7 +49,7 @@ pub enum NetFlowV9PacketParsingError {
     SetError(#[from_located(module = "self")] SetParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedNetFlowV9PacketParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedNetFlowV9PacketParsingError<'a>>
     for NetFlowV9Packet
 {
     fn from_wire(
@@ -112,7 +112,7 @@ pub enum SetParsingError {
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> for Set {
+impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> for Set {
     fn from_wire(
         buf: Span<'a>,
         templates_map: TemplatesMap,
@@ -226,7 +226,7 @@ pub enum OptionsTemplateRecordParsingError {
     ScopeFieldSpecifierError(#[from_located(module = "self")] ScopeFieldSpecifierParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordParsingError<'a>>
     for OptionsTemplateRecord
 {
     fn from_wire(
@@ -282,7 +282,7 @@ pub enum TemplateRecordParsingError {
     ),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingError<'a>>
     for TemplateRecord
 {
     fn from_wire(
@@ -321,7 +321,7 @@ pub enum ScopeFieldSpecifierParsingError {
     InvalidLength(ScopeIE, u16),
 }
 
-impl<'a> ReadablePDU<'a, LocatedScopeFieldSpecifierParsingError<'a>> for ScopeFieldSpecifier {
+impl<'a> ReadablePdu<'a, LocatedScopeFieldSpecifierParsingError<'a>> for ScopeFieldSpecifier {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedScopeFieldSpecifierParsingError<'a>> {
@@ -358,7 +358,7 @@ pub enum DataRecordParsingError {
     ScopeFieldError(#[from_located(module = "self")] ScopeFieldParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordParsingError<'a>>
     for DataRecord
 {
     fn from_wire(
@@ -405,7 +405,7 @@ impl<'a> nom::error::FromExternalError<Span<'a>, std::str::Utf8Error>
     }
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, &ScopeIE, u16, LocatedScopeFieldParsingError<'a>>
+impl<'a> ReadablePduWithTwoInputs<'a, &ScopeIE, u16, LocatedScopeFieldParsingError<'a>>
     for ScopeField
 {
     fn from_wire(

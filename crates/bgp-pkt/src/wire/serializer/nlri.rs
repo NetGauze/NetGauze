@@ -22,7 +22,7 @@ use crate::{
     wire::serializer::round_len,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 use std::{convert::Into, io::Write};
 
@@ -38,7 +38,7 @@ pub enum RouteDistinguisherWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<RouteDistinguisherWritingError> for RouteDistinguisher {
+impl WritablePdu<RouteDistinguisherWritingError> for RouteDistinguisher {
     const BASE_LENGTH: usize = RD_LEN as usize;
 
     fn len(&self) -> usize {
@@ -74,7 +74,7 @@ pub enum MplsLabelWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<MplsLabelWritingError> for MplsLabel {
+impl WritablePdu<MplsLabelWritingError> for MplsLabel {
     // We don't include the TTL here
     const BASE_LENGTH: usize = 3;
 
@@ -94,7 +94,7 @@ pub enum LabeledIpv4NextHopWritingError {
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
 }
 
-impl WritablePDU<LabeledIpv4NextHopWritingError> for LabeledIpv4NextHop {
+impl WritablePdu<LabeledIpv4NextHopWritingError> for LabeledIpv4NextHop {
     const BASE_LENGTH: usize = LABELED_IPV4_LEN as usize;
 
     fn len(&self) -> usize {
@@ -114,7 +114,7 @@ pub enum LabeledIpv6NextHopWritingError {
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
 }
 
-impl WritablePDU<LabeledIpv6NextHopWritingError> for LabeledIpv6NextHop {
+impl WritablePdu<LabeledIpv6NextHopWritingError> for LabeledIpv6NextHop {
     const BASE_LENGTH: usize = LABELED_IPV6_LEN as usize;
 
     fn len(&self) -> usize {
@@ -135,7 +135,7 @@ pub enum LabeledNextHopWritingError {
     LabeledIpv6NextHopError(#[from] LabeledIpv6NextHopWritingError),
 }
 
-impl WritablePDU<LabeledNextHopWritingError> for LabeledNextHop {
+impl WritablePdu<LabeledNextHopWritingError> for LabeledNextHop {
     // 1-octet for length
     const BASE_LENGTH: usize = 1;
 
@@ -162,7 +162,7 @@ pub enum Ipv6UnicastWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<Ipv6UnicastWritingError> for Ipv6Unicast {
+impl WritablePdu<Ipv6UnicastWritingError> for Ipv6Unicast {
     // 1-octet for the prefix length
     const BASE_LENGTH: usize = 1;
 
@@ -183,7 +183,7 @@ pub enum Ipv6MulticastWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<Ipv6MulticastWritingError> for Ipv6Multicast {
+impl WritablePdu<Ipv6MulticastWritingError> for Ipv6Multicast {
     // 1-octet for the prefix length
     const BASE_LENGTH: usize = 1;
 
@@ -207,7 +207,7 @@ pub enum Ipv6MplsVpnUnicastWritingError {
     Ipv6UnicastError(#[from] Ipv6UnicastWritingError),
 }
 
-impl WritablePDU<Ipv6MplsVpnUnicastWritingError> for Ipv6MplsVpnUnicast {
+impl WritablePdu<Ipv6MplsVpnUnicastWritingError> for Ipv6MplsVpnUnicast {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -238,7 +238,7 @@ pub enum Ipv4UnicastWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<Ipv4UnicastWritingError> for Ipv4Unicast {
+impl WritablePdu<Ipv4UnicastWritingError> for Ipv4Unicast {
     // 1-octet for the prefix length
     const BASE_LENGTH: usize = 1;
 
@@ -259,7 +259,7 @@ pub enum Ipv4MulticastWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<Ipv4MulticastWritingError> for Ipv4Multicast {
+impl WritablePdu<Ipv4MulticastWritingError> for Ipv4Multicast {
     // 1-octet for the prefix length
     const BASE_LENGTH: usize = 1;
 
@@ -283,7 +283,7 @@ pub enum Ipv4MplsVpnUnicastWritingError {
     Ipv4UnicastError(#[from] Ipv4UnicastWritingError),
 }
 
-impl WritablePDU<Ipv4MplsVpnUnicastWritingError> for Ipv4MplsVpnUnicast {
+impl WritablePdu<Ipv4MplsVpnUnicastWritingError> for Ipv4MplsVpnUnicast {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {

@@ -19,7 +19,7 @@ use crate::{
     wire::deserializer::capabilities::BgpCapabilityParsingError,
     BgpOpenMessage,
 };
-use netgauze_parse_utils::{parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePDU, Span};
+use netgauze_parse_utils::{parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePdu, Span};
 use netgauze_serde_macros::LocatedError;
 use nom::{
     error::ErrorKind,
@@ -54,7 +54,7 @@ pub enum BgpParameterParsingError {
     ),
 }
 
-impl<'a> ReadablePDU<'a, LocatedBgpOpenMessageParsingError<'a>> for BgpOpenMessage {
+impl<'a> ReadablePdu<'a, LocatedBgpOpenMessageParsingError<'a>> for BgpOpenMessage {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpOpenMessageParsingError<'a>> {
         let (buf, _) = nom::combinator::map_res(be_u8, |x| {
             if x == 4 {
@@ -73,7 +73,7 @@ impl<'a> ReadablePDU<'a, LocatedBgpOpenMessageParsingError<'a>> for BgpOpenMessa
     }
 }
 
-impl<'a> ReadablePDU<'a, LocatedBgpParameterParsingError<'a>> for BgpOpenMessageParameter {
+impl<'a> ReadablePdu<'a, LocatedBgpParameterParsingError<'a>> for BgpOpenMessageParameter {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpParameterParsingError<'a>> {
         let begin_buf = buf;
         let (buf, param_type) =

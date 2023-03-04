@@ -30,7 +30,7 @@ use crate::{
 };
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    parse_till_empty_into_with_one_input_located, ErrorKindSerdeDeref, ReadablePDUWithOneInput,
+    parse_till_empty_into_with_one_input_located, ErrorKindSerdeDeref, ReadablePduWithOneInput,
     Span,
 };
 use netgauze_serde_macros::LocatedError;
@@ -49,7 +49,7 @@ pub enum IpfixPacketParsingError {
     SetParsingError(#[from_located(module = "self")] SetParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedIpfixPacketParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedIpfixPacketParsingError<'a>>
     for IpfixPacket
 {
     fn from_wire(
@@ -106,7 +106,7 @@ pub enum SetParsingError {
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> for Set {
+impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> for Set {
     fn from_wire(
         buf: Span<'a>,
         templates_map: TemplatesMap,
@@ -218,7 +218,7 @@ pub enum OptionsTemplateRecordParsingError {
     FieldError(#[from_located(module = "crate::wire::deserializer")] FieldSpecifierParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordParsingError<'a>>
     for OptionsTemplateRecord
 {
     fn from_wire(
@@ -277,7 +277,7 @@ pub enum DataRecordParsingError {
     FieldError(#[from_located(module = "")] ie::FieldParsingError),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordParsingError<'a>>
     for DataRecord
 {
     fn from_wire(
@@ -315,7 +315,7 @@ pub enum TemplateRecordParsingError {
     ),
 }
 
-impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingError<'a>>
     for TemplateRecord
 {
     fn from_wire(

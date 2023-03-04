@@ -23,7 +23,7 @@ use crate::{
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
@@ -31,7 +31,7 @@ pub enum CommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<CommunityWritingError> for Community {
+impl WritablePdu<CommunityWritingError> for Community {
     // u32 community value
     const BASE_LENGTH: usize = 4;
 
@@ -70,7 +70,7 @@ pub enum ExtendedCommunityWritingError {
     UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityWritingError),
 }
 
-impl WritablePDU<ExtendedCommunityWritingError> for ExtendedCommunity {
+impl WritablePdu<ExtendedCommunityWritingError> for ExtendedCommunity {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self) -> usize {
@@ -147,7 +147,7 @@ pub enum ExtendedCommunityIpv6WritingError {
     UnknownExtendedCommunityIpv6Error(#[from] UnknownExtendedCommunityIpv6WritingError),
 }
 
-impl WritablePDU<ExtendedCommunityIpv6WritingError> for ExtendedCommunityIpv6 {
+impl WritablePdu<ExtendedCommunityIpv6WritingError> for ExtendedCommunityIpv6 {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self) -> usize {
@@ -186,7 +186,7 @@ pub enum LargeCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<LargeCommunityWritingError> for LargeCommunity {
+impl WritablePdu<LargeCommunityWritingError> for LargeCommunity {
     /// 4-octet global admin + 4-octets local data part 1 + 4-octets local data
     /// part 1
     const BASE_LENGTH: usize = 12;
@@ -208,7 +208,7 @@ pub enum TransitiveTwoOctetExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<TransitiveTwoOctetExtendedCommunityWritingError>
+impl WritablePdu<TransitiveTwoOctetExtendedCommunityWritingError>
     for TransitiveTwoOctetExtendedCommunity
 {
     // 1-octet subtype + 2-octets global admin + 4-octets local admin
@@ -321,7 +321,7 @@ pub enum NonTransitiveTwoOctetExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<NonTransitiveTwoOctetExtendedCommunityWritingError>
+impl WritablePdu<NonTransitiveTwoOctetExtendedCommunityWritingError>
     for NonTransitiveTwoOctetExtendedCommunity
 {
     // 1-octet subtype + 2-octets global admin + 4-octets local admin
@@ -370,7 +370,7 @@ pub enum TransitiveIpv4ExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<TransitiveIpv4ExtendedCommunityWritingError> for TransitiveIpv4ExtendedCommunity {
+impl WritablePdu<TransitiveIpv4ExtendedCommunityWritingError> for TransitiveIpv4ExtendedCommunity {
     // 1-octet subtype + 4-octets global admin + 2-octets local admin
     const BASE_LENGTH: usize = 7;
 
@@ -521,7 +521,7 @@ pub enum NonTransitiveIpv4ExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<NonTransitiveIpv4ExtendedCommunityWritingError>
+impl WritablePdu<NonTransitiveIpv4ExtendedCommunityWritingError>
     for NonTransitiveIpv4ExtendedCommunity
 {
     // 1-octet subtype + 4-octets global admin + 2-octets local admin
@@ -554,7 +554,7 @@ pub enum TransitiveFourOctetExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<TransitiveFourOctetExtendedCommunityWritingError>
+impl WritablePdu<TransitiveFourOctetExtendedCommunityWritingError>
     for TransitiveFourOctetExtendedCommunity
 {
     // 1-octet subtype + 2-octets global admin + 4-octets local admin
@@ -651,7 +651,7 @@ pub enum NonTransitiveFourOctetExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<NonTransitiveFourOctetExtendedCommunityWritingError>
+impl WritablePdu<NonTransitiveFourOctetExtendedCommunityWritingError>
     for NonTransitiveFourOctetExtendedCommunity
 {
     // 1-octet subtype + 2-octets global admin + 4-octets local admin
@@ -684,7 +684,7 @@ pub enum TransitiveOpaqueExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<TransitiveOpaqueExtendedCommunityWritingError>
+impl WritablePdu<TransitiveOpaqueExtendedCommunityWritingError>
     for TransitiveOpaqueExtendedCommunity
 {
     // 1-octet subtype + 6-octets value
@@ -713,7 +713,7 @@ pub enum NonTransitiveOpaqueExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<NonTransitiveOpaqueExtendedCommunityWritingError>
+impl WritablePdu<NonTransitiveOpaqueExtendedCommunityWritingError>
     for NonTransitiveOpaqueExtendedCommunity
 {
     // 1-octet subtype + 6-octets value
@@ -742,7 +742,7 @@ pub enum ExperimentalExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<ExperimentalExtendedCommunityWritingError> for ExperimentalExtendedCommunity {
+impl WritablePdu<ExperimentalExtendedCommunityWritingError> for ExperimentalExtendedCommunity {
     // 1-octet subtype + 6-octets value
     const BASE_LENGTH: usize = 7;
 
@@ -765,7 +765,7 @@ pub enum UnknownExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<UnknownExtendedCommunityWritingError> for UnknownExtendedCommunity {
+impl WritablePdu<UnknownExtendedCommunityWritingError> for UnknownExtendedCommunity {
     // 1-octet subtype + 6-octets value
     const BASE_LENGTH: usize = 7;
 
@@ -788,7 +788,7 @@ pub enum TransitiveIpv6ExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<TransitiveIpv6ExtendedCommunityWritingError> for TransitiveIpv6ExtendedCommunity {
+impl WritablePdu<TransitiveIpv6ExtendedCommunityWritingError> for TransitiveIpv6ExtendedCommunity {
     // 1-octet subtype + 16-octets global admin + 2-octets local admin
     const BASE_LENGTH: usize = 19;
 
@@ -891,7 +891,7 @@ pub enum NonTransitiveIpv6ExtendedCommunityWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<NonTransitiveIpv6ExtendedCommunityWritingError>
+impl WritablePdu<NonTransitiveIpv6ExtendedCommunityWritingError>
     for NonTransitiveIpv6ExtendedCommunity
 {
     // 1-octet subtype + 16-octets global admin + 2-octets local admin
@@ -924,7 +924,7 @@ pub enum UnknownExtendedCommunityIpv6WritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<UnknownExtendedCommunityIpv6WritingError> for UnknownExtendedCommunityIpv6 {
+impl WritablePdu<UnknownExtendedCommunityIpv6WritingError> for UnknownExtendedCommunityIpv6 {
     // 1-octet subtype + 18-octets value
     const BASE_LENGTH: usize = 19;
 

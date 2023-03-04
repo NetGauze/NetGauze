@@ -27,8 +27,8 @@ use crate::{
     },
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePDU,
-    ReadablePDUWithTwoInputs, Span,
+    parse_into_located, parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePdu,
+    ReadablePduWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -47,7 +47,7 @@ pub enum MplsLabelParsingError {
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePDU<'a, LocatedMplsLabelParsingError<'a>> for MplsLabel {
+impl<'a> ReadablePdu<'a, LocatedMplsLabelParsingError<'a>> for MplsLabel {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedMplsLabelParsingError<'a>> {
         let (buf, p1) = be_u8(buf)?;
         let (buf, p2) = be_u8(buf)?;
@@ -65,7 +65,7 @@ pub enum RouteDistinguisherParsingError {
     InvalidLeafAdRoutes(u16, u32),
 }
 
-impl<'a> ReadablePDU<'a, LocatedRouteDistinguisherParsingError<'a>> for RouteDistinguisher {
+impl<'a> ReadablePdu<'a, LocatedRouteDistinguisherParsingError<'a>> for RouteDistinguisher {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedRouteDistinguisherParsingError<'a>> {
@@ -112,7 +112,7 @@ pub enum LabeledIpv4NextHopParsingError {
     RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedLabeledIpv4NextHopParsingError<'a>> for LabeledIpv4NextHop {
+impl<'a> ReadablePdu<'a, LocatedLabeledIpv4NextHopParsingError<'a>> for LabeledIpv4NextHop {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedLabeledIpv4NextHopParsingError<'a>> {
@@ -130,7 +130,7 @@ pub enum LabeledIpv6NextHopParsingError {
     RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedLabeledIpv6NextHopParsingError<'a>> for LabeledIpv6NextHop {
+impl<'a> ReadablePdu<'a, LocatedLabeledIpv6NextHopParsingError<'a>> for LabeledIpv6NextHop {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedLabeledIpv6NextHopParsingError<'a>> {
@@ -150,7 +150,7 @@ pub enum LabeledNextHopParsingError {
     LabeledIpv6NextHopError(#[from_located(module = "self")] LabeledIpv6NextHopParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedLabeledNextHopParsingError<'a>> for LabeledNextHop {
+impl<'a> ReadablePdu<'a, LocatedLabeledNextHopParsingError<'a>> for LabeledNextHop {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedLabeledNextHopParsingError<'a>> {
         let input = buf;
         let (buf, len) = be_u8(buf)?;
@@ -179,7 +179,7 @@ pub enum Ipv4MplsVpnUnicastParsingError {
     MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedIpv4MplsVpnUnicastParsingError<'a>> for Ipv4MplsVpnUnicast {
+impl<'a> ReadablePdu<'a, LocatedIpv4MplsVpnUnicastParsingError<'a>> for Ipv4MplsVpnUnicast {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedIpv4MplsVpnUnicastParsingError<'a>> {
@@ -220,7 +220,7 @@ pub enum Ipv6MplsVpnUnicastParsingError {
     Ipv6UnicastError(#[from_located(module = "self")] Ipv6UnicastParsingError),
 }
 
-impl<'a> ReadablePDU<'a, LocatedIpv6MplsVpnUnicastParsingError<'a>> for Ipv6MplsVpnUnicast {
+impl<'a> ReadablePdu<'a, LocatedIpv6MplsVpnUnicastParsingError<'a>> for Ipv6MplsVpnUnicast {
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedIpv6MplsVpnUnicastParsingError<'a>> {
@@ -261,14 +261,14 @@ pub enum Ipv6UnicastParsingError {
     InvalidUnicastNetwork(#[from_external] InvalidIpv6UnicastNetwork),
 }
 
-impl<'a> ReadablePDU<'a, LocatedIpv6UnicastParsingError<'a>> for Ipv6Unicast {
+impl<'a> ReadablePdu<'a, LocatedIpv6UnicastParsingError<'a>> for Ipv6Unicast {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv6UnicastParsingError<'a>> {
         let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
         Ok((buf, net))
     }
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6UnicastParsingError<'a>>
+impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6UnicastParsingError<'a>>
     for Ipv6Unicast
 {
     fn from_wire(
@@ -296,7 +296,7 @@ pub enum Ipv6MulticastParsingError {
     InvalidMulticastNetwork(#[from_external] InvalidIpv6MulticastNetwork),
 }
 
-impl<'a> ReadablePDU<'a, LocatedIpv6MulticastParsingError<'a>> for Ipv6Multicast {
+impl<'a> ReadablePdu<'a, LocatedIpv6MulticastParsingError<'a>> for Ipv6Multicast {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv6MulticastParsingError<'a>> {
         let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
         Ok((buf, net))
@@ -315,14 +315,14 @@ pub enum Ipv4UnicastParsingError {
     InvalidUnicastNetwork(#[from_external] InvalidIpv4UnicastNetwork),
 }
 
-impl<'a> ReadablePDU<'a, LocatedIpv4UnicastParsingError<'a>> for Ipv4Unicast {
+impl<'a> ReadablePdu<'a, LocatedIpv4UnicastParsingError<'a>> for Ipv4Unicast {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4UnicastParsingError<'a>> {
         let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
         Ok((buf, net))
     }
 }
 
-impl<'a> ReadablePDUWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4UnicastParsingError<'a>>
+impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4UnicastParsingError<'a>>
     for Ipv4Unicast
 {
     fn from_wire(
@@ -350,7 +350,7 @@ pub enum Ipv4MulticastParsingError {
     InvalidMulticastNetwork(#[from_external] InvalidIpv4MulticastNetwork),
 }
 
-impl<'a> ReadablePDU<'a, LocatedIpv4MulticastParsingError<'a>> for Ipv4Multicast {
+impl<'a> ReadablePdu<'a, LocatedIpv4MulticastParsingError<'a>> for Ipv4Multicast {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4MulticastParsingError<'a>> {
         let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
         Ok((buf, net))

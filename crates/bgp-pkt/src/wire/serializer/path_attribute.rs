@@ -22,7 +22,7 @@ use crate::{
     wire::serializer::{community::*, nlri::*},
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
@@ -46,7 +46,7 @@ pub enum PathAttributeWritingError {
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
 }
 
-impl WritablePDU<PathAttributeWritingError> for PathAttribute {
+impl WritablePdu<PathAttributeWritingError> for PathAttribute {
     const BASE_LENGTH: usize = 2;
 
     fn len(&self) -> usize {
@@ -165,7 +165,7 @@ pub enum OriginWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<bool, OriginWritingError> for Origin {
+impl WritablePduWithOneInput<bool, OriginWritingError> for Origin {
     // One octet length (if extended is not enabled) and second for the origin value
     const BASE_LENGTH: usize = 2;
 
@@ -193,7 +193,7 @@ pub enum AsPathWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<AsPathWritingError> for As2PathSegment {
+impl WritablePdu<AsPathWritingError> for As2PathSegment {
     // one octet length + one more for segment type
     const BASE_LENGTH: usize = 2;
 
@@ -212,7 +212,7 @@ impl WritablePDU<AsPathWritingError> for As2PathSegment {
     }
 }
 
-impl WritablePDU<AsPathWritingError> for As4PathSegment {
+impl WritablePdu<AsPathWritingError> for As4PathSegment {
     // one octet length + one more for segment type
     const BASE_LENGTH: usize = 2;
 
@@ -231,7 +231,7 @@ impl WritablePDU<AsPathWritingError> for As4PathSegment {
     }
 }
 
-impl WritablePDUWithOneInput<bool, AsPathWritingError> for AsPath {
+impl WritablePduWithOneInput<bool, AsPathWritingError> for AsPath {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self, extended_length: bool) -> usize {
@@ -270,7 +270,7 @@ impl WritablePDUWithOneInput<bool, AsPathWritingError> for AsPath {
     }
 }
 
-impl WritablePDUWithOneInput<bool, AsPathWritingError> for As4Path {
+impl WritablePduWithOneInput<bool, AsPathWritingError> for As4Path {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self, extended_length: bool) -> usize {
@@ -301,7 +301,7 @@ pub enum NextHopWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<bool, NextHopWritingError> for NextHop {
+impl WritablePduWithOneInput<bool, NextHopWritingError> for NextHop {
     // One octet length (if extended is not enabled) and 4 for ipv4
     const BASE_LENGTH: usize = 5;
 
@@ -329,7 +329,7 @@ pub enum MultiExitDiscriminatorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<bool, MultiExitDiscriminatorWritingError> for MultiExitDiscriminator {
+impl WritablePduWithOneInput<bool, MultiExitDiscriminatorWritingError> for MultiExitDiscriminator {
     // One octet length (if extended is not enabled) and 4 for u32 metric
     const BASE_LENGTH: usize = 5;
 
@@ -357,7 +357,7 @@ pub enum LocalPreferenceWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<bool, LocalPreferenceWritingError> for LocalPreference {
+impl WritablePduWithOneInput<bool, LocalPreferenceWritingError> for LocalPreference {
     // One octet length (if extended is not enabled) and 4 for u32 local pref
     const BASE_LENGTH: usize = 5;
 
@@ -385,7 +385,7 @@ pub enum AtomicAggregateWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<bool, AtomicAggregateWritingError> for AtomicAggregate {
+impl WritablePduWithOneInput<bool, AtomicAggregateWritingError> for AtomicAggregate {
     // One octet length (if extended is not enabled)
     const BASE_LENGTH: usize = 1;
 
@@ -412,7 +412,7 @@ pub enum AggregatorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As2Aggregator {
+impl WritablePduWithOneInput<bool, AggregatorWritingError> for As2Aggregator {
     // one length (not extended) + two octets as2 + 4 more for ipv4
     const BASE_LENGTH: usize = 7;
 
@@ -432,7 +432,7 @@ impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As2Aggregator {
     }
 }
 
-impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As4Aggregator {
+impl WritablePduWithOneInput<bool, AggregatorWritingError> for As4Aggregator {
     // one length (not extended) + four octets as4 + 4 more for ipv4
     const BASE_LENGTH: usize = 9;
 
@@ -452,7 +452,7 @@ impl WritablePDUWithOneInput<bool, AggregatorWritingError> for As4Aggregator {
     }
 }
 
-impl WritablePDUWithOneInput<bool, AggregatorWritingError> for Aggregator {
+impl WritablePduWithOneInput<bool, AggregatorWritingError> for Aggregator {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self, extended_length: bool) -> usize {
@@ -479,7 +479,7 @@ pub enum OriginatorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<bool, OriginatorWritingError> for Originator {
+impl WritablePduWithOneInput<bool, OriginatorWritingError> for Originator {
     // 4-octet for BGP ID
     const BASE_LENGTH: usize = 5;
 
@@ -507,7 +507,7 @@ pub enum ClusterIdWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<ClusterIdWritingError> for ClusterId {
+impl WritablePdu<ClusterIdWritingError> for ClusterId {
     // 4-octet for BGP ID
     const BASE_LENGTH: usize = 4;
 
@@ -527,7 +527,7 @@ pub enum ClusterListWritingError {
     ClusterIdError(#[from] ClusterIdWritingError),
 }
 
-impl WritablePDUWithOneInput<bool, ClusterListWritingError> for ClusterList {
+impl WritablePduWithOneInput<bool, ClusterListWritingError> for ClusterList {
     const BASE_LENGTH: usize = 1;
 
     fn len(&self, extended_length: bool) -> usize {
@@ -557,7 +557,7 @@ pub enum UnknownAttributeWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDUWithOneInput<bool, UnknownAttributeWritingError> for UnknownAttribute {
+impl WritablePduWithOneInput<bool, UnknownAttributeWritingError> for UnknownAttribute {
     // One octet length (if extended is not enabled) and one octet for code
     const BASE_LENGTH: usize = 2;
 
@@ -588,7 +588,7 @@ pub enum CommunitiesWritingError {
     CommunityError(#[from] CommunityWritingError),
 }
 
-impl WritablePDUWithOneInput<bool, CommunitiesWritingError> for Communities {
+impl WritablePduWithOneInput<bool, CommunitiesWritingError> for Communities {
     // One octet length (if extended is not enabled)
     const BASE_LENGTH: usize = 1;
 
@@ -617,7 +617,7 @@ pub enum ExtendedCommunitiesWritingError {
     ExtendedCommunityError(#[from] ExtendedCommunityWritingError),
 }
 
-impl WritablePDUWithOneInput<bool, ExtendedCommunitiesWritingError> for ExtendedCommunities {
+impl WritablePduWithOneInput<bool, ExtendedCommunitiesWritingError> for ExtendedCommunities {
     // One octet length (if extended is not enabled)
     const BASE_LENGTH: usize = 1;
 
@@ -646,7 +646,7 @@ pub enum ExtendedCommunitiesIpv6WritingError {
     ExtendedCommunityIpv6Error(#[from] ExtendedCommunityIpv6WritingError),
 }
 
-impl WritablePDUWithOneInput<bool, ExtendedCommunitiesIpv6WritingError>
+impl WritablePduWithOneInput<bool, ExtendedCommunitiesIpv6WritingError>
     for ExtendedCommunitiesIpv6
 {
     // One octet length (if extended is not enabled)
@@ -677,7 +677,7 @@ pub enum LargeCommunitiesWritingError {
     LargeCommunityError(#[from] LargeCommunityWritingError),
 }
 
-impl WritablePDUWithOneInput<bool, LargeCommunitiesWritingError> for LargeCommunities {
+impl WritablePduWithOneInput<bool, LargeCommunitiesWritingError> for LargeCommunities {
     // One octet length (if extended is not enabled)
     const BASE_LENGTH: usize = 1;
 
@@ -712,7 +712,7 @@ pub enum MpReachWritingError {
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
 }
 
-impl WritablePDUWithOneInput<bool, MpReachWritingError> for MpReach {
+impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
     // 2-octets AFI, 1-octet SAFI, and 1-octet reserved , 1-octet len
     const BASE_LENGTH: usize = 5;
 
@@ -918,7 +918,7 @@ pub enum MpUnreachWritingError {
     Ipv6MplsVpnUnicastError(#[from] Ipv6MplsVpnUnicastWritingError),
 }
 
-impl WritablePDUWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
+impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
     // 1 len, 2-octets AFI, 1-octet SAFI
     const BASE_LENGTH: usize = 4;
 
@@ -1036,7 +1036,7 @@ impl WritablePDUWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
 }
 
 #[inline]
-fn write_length<T: Sized + WritablePDUWithOneInput<bool, E>, E, W: std::io::Write>(
+fn write_length<T: Sized + WritablePduWithOneInput<bool, E>, E, W: std::io::Write>(
     attribute: &T,
     extended_length: bool,
     writer: &mut W,

@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::{WritablePDU, WritablePDUWithOneInput};
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::{io::Write, rc::Rc};
 
@@ -29,7 +29,7 @@ pub enum IpfixPacketWritingError {
     SetError(#[from] SetWritingError),
 }
 
-impl WritablePDUWithOneInput<Option<TemplatesMap>, IpfixPacketWritingError> for IpfixPacket {
+impl WritablePduWithOneInput<Option<TemplatesMap>, IpfixPacketWritingError> for IpfixPacket {
     /// 2-octets version, 2-octets length, 4-octets * 3 (export time, seq no,
     /// observation domain id)
     const BASE_LENGTH: usize = 16;
@@ -66,7 +66,7 @@ pub enum TemplateRecordWritingError {
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
 }
 
-impl WritablePDU<TemplateRecordWritingError> for TemplateRecord {
+impl WritablePdu<TemplateRecordWritingError> for TemplateRecord {
     /// 2-octets template_id, 2-octets field count
     const BASE_LENGTH: usize = 4;
 
@@ -95,7 +95,7 @@ pub enum OptionsTemplateRecordWritingError {
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
 }
 
-impl WritablePDU<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
+impl WritablePdu<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
     /// 2-octets template_id, 2-octets fields count, 2-octet scope fields count
     const BASE_LENGTH: usize = 6;
 
@@ -135,7 +135,7 @@ pub enum DataRecordWritingError {
     FieldError(#[from] FieldWritingError),
 }
 
-impl WritablePDUWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingError> for DataRecord {
+impl WritablePduWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingError> for DataRecord {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self, decoding_template: Option<Rc<DecodingTemplate>>) -> usize {
@@ -228,7 +228,7 @@ pub enum SetWritingError {
     OptionsTemplateRecordError(#[from] OptionsTemplateRecordWritingError),
 }
 
-impl WritablePDUWithOneInput<Option<TemplatesMap>, SetWritingError> for Set {
+impl WritablePduWithOneInput<Option<TemplatesMap>, SetWritingError> for Set {
     /// 2-octets set id + 2-octet set length
     const BASE_LENGTH: usize = 4;
 

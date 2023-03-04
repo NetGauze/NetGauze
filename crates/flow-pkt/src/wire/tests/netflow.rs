@@ -21,7 +21,7 @@ use std::{
 };
 
 use chrono::{TimeZone, Utc};
-use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
 use netgauze_parse_utils::test_helpers::*;
 

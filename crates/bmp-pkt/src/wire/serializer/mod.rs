@@ -20,7 +20,7 @@ use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::wire::serializer::{
     nlri::RouteDistinguisherWritingError, BgpMessageWritingError,
 };
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 use std::{io::Write, net::IpAddr};
 
@@ -30,7 +30,7 @@ pub enum BmpMessageWritingError {
     BmpMessageValueError(#[from] BmpMessageValueWritingError),
 }
 
-impl WritablePDU<BmpMessageWritingError> for BmpMessage {
+impl WritablePdu<BmpMessageWritingError> for BmpMessage {
     /// 1-octet version, 4-octets msg length
     const BASE_LENGTH: usize = 5;
 
@@ -65,7 +65,7 @@ pub enum BmpMessageValueWritingError {
     StatisticsReportMessageError(#[from] StatisticsReportMessageWritingError),
 }
 
-impl WritablePDU<BmpMessageValueWritingError> for BmpMessageValue {
+impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     /// 1-octet msg type,
     const BASE_LENGTH: usize = 1;
 
@@ -112,7 +112,7 @@ pub enum RouteMirroringMessageWritingError {
     RouteMirroringValueError(#[from] RouteMirroringValueWritingError),
 }
 
-impl WritablePDU<RouteMirroringMessageWritingError> for RouteMirroringMessage {
+impl WritablePdu<RouteMirroringMessageWritingError> for RouteMirroringMessage {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -158,7 +158,7 @@ pub enum BmpPeerTypeWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<BmpPeerTypeWritingError> for BmpPeerType {
+impl WritablePdu<BmpPeerTypeWritingError> for BmpPeerType {
     /// 1-octet type and 1-octet flags
     const BASE_LENGTH: usize = 2;
 
@@ -211,7 +211,7 @@ pub enum PeerHeaderWritingError {
     RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
 }
 
-impl WritablePDU<PeerHeaderWritingError> for PeerHeader {
+impl WritablePdu<PeerHeaderWritingError> for PeerHeader {
     ///  1-octet peer type
     ///  1-octet peer flags
     ///  8-octets peer Distinguisher
@@ -262,7 +262,7 @@ pub enum RouteMirroringValueWritingError {
     BgpMessageError(#[from] BgpMessageWritingError),
 }
 
-impl WritablePDU<RouteMirroringValueWritingError> for RouteMirroringValue {
+impl WritablePdu<RouteMirroringValueWritingError> for RouteMirroringValue {
     /// 2-octet type and 2-octet length
     const BASE_LENGTH: usize = 4;
 
@@ -300,7 +300,7 @@ pub enum RouteMonitoringMessageWritingError {
     BgpMessageError(#[from] BgpMessageWritingError),
 }
 
-impl WritablePDU<RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
+impl WritablePdu<RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -324,7 +324,7 @@ pub enum InitiationMessageWritingError {
     InitiationInformationError(#[from] InitiationInformationWritingError),
 }
 
-impl WritablePDU<InitiationMessageWritingError> for InitiationMessage {
+impl WritablePdu<InitiationMessageWritingError> for InitiationMessage {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -344,7 +344,7 @@ pub enum InitiationInformationWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<InitiationInformationWritingError> for InitiationInformation {
+impl WritablePdu<InitiationInformationWritingError> for InitiationInformation {
     const BASE_LENGTH: usize = 4;
 
     fn len(&self) -> usize {
@@ -419,7 +419,7 @@ pub enum PeerUpNotificationMessageWritingError {
     InitiationInformationError(#[from] InitiationInformationWritingError),
 }
 
-impl WritablePDU<PeerUpNotificationMessageWritingError> for PeerUpNotificationMessage {
+impl WritablePdu<PeerUpNotificationMessageWritingError> for PeerUpNotificationMessage {
     // 16 local addr + 2 local port + 2 remote port
     const BASE_LENGTH: usize = 20;
 
@@ -461,7 +461,7 @@ pub enum PeerDownNotificationMessageWritingError {
     PeerDownNotificationReasonError(#[from] PeerDownNotificationReasonWritingError),
 }
 
-impl WritablePDU<PeerDownNotificationMessageWritingError> for PeerDownNotificationMessage {
+impl WritablePdu<PeerDownNotificationMessageWritingError> for PeerDownNotificationMessage {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -486,7 +486,7 @@ pub enum PeerDownNotificationReasonWritingError {
     InitiationInformationError(#[from] InitiationInformationWritingError),
 }
 
-impl WritablePDU<PeerDownNotificationReasonWritingError> for PeerDownNotificationReason {
+impl WritablePdu<PeerDownNotificationReasonWritingError> for PeerDownNotificationReason {
     // 1 reason
     const BASE_LENGTH: usize = 1;
 
@@ -536,7 +536,7 @@ pub enum TerminationMessageWritingError {
     TerminationInformationError(#[from] TerminationInformationWritingError),
 }
 
-impl WritablePDU<TerminationMessageWritingError> for TerminationMessage {
+impl WritablePdu<TerminationMessageWritingError> for TerminationMessage {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -559,7 +559,7 @@ pub enum TerminationInformationWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<TerminationInformationWritingError> for TerminationInformation {
+impl WritablePdu<TerminationInformationWritingError> for TerminationInformation {
     /// 2-octet information type + 2-octet information length
     const BASE_LENGTH: usize = 4;
 
@@ -597,7 +597,7 @@ pub enum StatisticsReportMessageWritingError {
     StatisticsCounterMessageError(#[from] StatisticsCounterMessageWritingError),
 }
 
-impl WritablePDU<StatisticsReportMessageWritingError> for StatisticsReportMessage {
+impl WritablePdu<StatisticsReportMessageWritingError> for StatisticsReportMessage {
     /// 4-octets Number of counters
     const BASE_LENGTH: usize = 4;
 
@@ -622,7 +622,7 @@ pub enum StatisticsCounterMessageWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<StatisticsCounterMessageWritingError> for StatisticsCounter {
+impl WritablePdu<StatisticsCounterMessageWritingError> for StatisticsCounter {
     /// 2-octets type and 2-octets length
     const BASE_LENGTH: usize = 4;
 

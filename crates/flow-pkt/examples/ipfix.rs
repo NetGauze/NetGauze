@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, io::Cursor, net::Ipv4Addr, rc::Rc
 use chrono::{TimeZone, Utc};
 
 use netgauze_flow_pkt::{ie, ipfix::*, DataSetId, FieldSpecifier};
-use netgauze_parse_utils::{ReadablePDUWithOneInput, Span, WritablePDUWithOneInput};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};
 
 fn main() {
     // Cache to share the templates for decoding data packets

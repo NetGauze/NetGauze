@@ -17,7 +17,7 @@ use std::io::Write;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
 
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 use crate::{
@@ -31,7 +31,7 @@ pub enum BgpOpenMessageWritingError {
     CapabilityError(#[from] BGPCapabilityWritingError),
 }
 
-impl WritablePDU<BgpOpenMessageWritingError> for BgpOpenMessage {
+impl WritablePdu<BgpOpenMessageWritingError> for BgpOpenMessage {
     /// Base length is 10 = 1 (bgp ver) + 2 (my as) + 2 (hold time) + 4 (bgp-id)
     /// + 1 (params len)
     const BASE_LENGTH: usize = 10;
@@ -54,7 +54,7 @@ impl WritablePDU<BgpOpenMessageWritingError> for BgpOpenMessage {
     }
 }
 
-impl WritablePDU<BgpOpenMessageWritingError> for BgpOpenMessageParameter {
+impl WritablePdu<BgpOpenMessageWritingError> for BgpOpenMessageParameter {
     /// 1 octet for the length value and a second for the parameter type
     const BASE_LENGTH: usize = 2;
 

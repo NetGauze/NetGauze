@@ -26,7 +26,7 @@ use crate::{
     BgpNotificationMessage,
 };
 use byteorder::WriteBytesExt;
-use netgauze_parse_utils::WritablePDU;
+use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
@@ -41,7 +41,7 @@ pub enum BgpNotificationMessageWritingError {
     RouteRefreshError(#[from] RouteRefreshErrorWritingError),
 }
 
-impl WritablePDU<BgpNotificationMessageWritingError> for BgpNotificationMessage {
+impl WritablePdu<BgpNotificationMessageWritingError> for BgpNotificationMessage {
     // One octet for the code
     const BASE_LENGTH: usize = 1;
 
@@ -101,7 +101,7 @@ pub enum MessageHeaderErrorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<MessageHeaderErrorWritingError> for MessageHeaderError {
+impl WritablePdu<MessageHeaderErrorWritingError> for MessageHeaderError {
     // One octet sub-code
     const BASE_LENGTH: usize = 1;
 
@@ -146,7 +146,7 @@ pub enum OpenMessageErrorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<OpenMessageErrorWritingError> for OpenMessageError {
+impl WritablePdu<OpenMessageErrorWritingError> for OpenMessageError {
     // One octet sub-code
     const BASE_LENGTH: usize = 1;
 
@@ -208,7 +208,7 @@ pub enum UpdateMessageErrorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<UpdateMessageErrorWritingError> for UpdateMessageError {
+impl WritablePdu<UpdateMessageErrorWritingError> for UpdateMessageError {
     // One octet sub-code
     const BASE_LENGTH: usize = 1;
 
@@ -289,7 +289,7 @@ pub enum HoldTimerExpiredErrorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<HoldTimerExpiredErrorWritingError> for HoldTimerExpiredError {
+impl WritablePdu<HoldTimerExpiredErrorWritingError> for HoldTimerExpiredError {
     // One octet sub-code
     const BASE_LENGTH: usize = 1;
 
@@ -319,7 +319,7 @@ pub enum FiniteStateMachineErrorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<FiniteStateMachineErrorWritingError> for FiniteStateMachineError {
+impl WritablePdu<FiniteStateMachineErrorWritingError> for FiniteStateMachineError {
     // One octet sub-code
     const BASE_LENGTH: usize = 1;
 
@@ -372,7 +372,7 @@ pub enum CeaseErrorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<CeaseErrorWritingError> for CeaseError {
+impl WritablePdu<CeaseErrorWritingError> for CeaseError {
     // One octet sub-code
     const BASE_LENGTH: usize = 1;
 
@@ -444,7 +444,7 @@ pub enum RouteRefreshErrorWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePDU<RouteRefreshErrorWritingError> for RouteRefreshError {
+impl WritablePdu<RouteRefreshErrorWritingError> for RouteRefreshError {
     // One octet sub-code
     const BASE_LENGTH: usize = 1;
 
