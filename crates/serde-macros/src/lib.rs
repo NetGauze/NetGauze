@@ -33,7 +33,7 @@ fn parse_nested_meta(
     let meta = match nested_meta {
         syn::NestedMeta::Meta(meta) => meta,
         syn::NestedMeta::Lit(lit) => {
-            return Err(syn::Error::new(lit.span(), "Unsupported literal attribute"))
+            return Err(syn::Error::new(lit.span(), "Unsupported literal attribute"));
         }
     };
 
@@ -111,7 +111,7 @@ fn filter_attribute_by_name(
                             return Err(syn::Error::new(
                                 attr.span(),
                                 "Couldn't find identifier for this attribute",
-                            ))
+                            ));
                         }
                     }
                 }
@@ -226,7 +226,7 @@ impl LocatedError {
                                 return Err(syn::Error::new(
                                     attr.span(),
                                     "'module' must be defined",
-                                ))
+                                ));
                             }
                             Some(parsed_attr) => {
                                 match parsed_attr.value.get(0) {
@@ -234,14 +234,14 @@ impl LocatedError {
                                         return Err(syn::Error::new(
                                             attr.span(),
                                             "'module' of the Located error is not defined defined",
-                                        ))
+                                        ));
                                     }
                                     Some(name_value) => {
                                         if name_value.ident != format_ident!("module") {
                                             return Err(syn::Error::new(
-                                                    attr.span(),
-                                                    format!("Only accepts one attribute 'module', found {:?}", name_value.ident),
-                                                ));
+                                                attr.span(),
+                                                format!("Only accepts one attribute 'module', found {:?}", name_value.ident),
+                                            ));
                                         }
                                         let mut module_path = name_value.value.clone();
                                         if let Some(path) = ident_module {
@@ -273,7 +273,7 @@ impl LocatedError {
                 return Err(syn::Error::new(
                     input.span(),
                     "Works only with enum error types",
-                ))
+                ));
             }
         };
         let ident = input.ident.clone();
@@ -366,6 +366,28 @@ impl LocatedError {
     }
 }
 
+/// For a given error enum {Name} generate a struct called Located{Name} that
+/// carries the `Span` (the error location in the input stream) info along the
+/// error. Additionally, generates [`From`] for `nom` library errors, external,
+/// and another located errors.
+///
+/// Example:
+/// ```
+/// #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+/// pub enum ExtendedCommunityParsingError {
+///     NomError(#[from_nom] nom::error::ErrorKind),
+///     CommunityError(#[from_located(module = "self")] CommunityParsingError),
+///     UndefinedCapabilityCode(#[from_external] UndefinedBgpCapabilityCode),
+/// }
+///
+/// #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+/// pub enum CommunityParsingError {
+///     NomError(#[from_nom] nom::error::ErrorKind),
+/// }
+///
+/// #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+/// pub struct UndefinedBgpCapabilityCode(pub u8);
+/// ```
 #[proc_macro_derive(LocatedError, attributes(from_nom, from_external, from_located))]
 pub fn located_error(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse_macro_input!(input as syn::DeriveInput);
@@ -386,7 +408,7 @@ impl WritingError {
                 return Err(syn::Error::new(
                     input.span(),
                     "Works only with enum error types",
-                ))
+                ));
             }
         };
         let ident = input.ident.clone();
@@ -421,6 +443,27 @@ impl WritingError {
     }
 }
 
+/// Decorate an `enum` as an error for serializing binary protocol
+/// provides the following decorations for any members of the enum.
+///
+/// 1. `#[from_std_io_error]` automatically generate [`From`] implementation
+/// from [`std::io::Error`] to a [`String`].
+///
+/// 2. `#[from]`, automatically generates a [`From`] implementation for a given
+/// type.
+///
+///
+/// Example:
+/// ```
+/// #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+/// pub enum BgpMessageWritingError {
+///     /// std::io::Error will be converted to this value
+///     StdIOError(#[from_std_io_error] String),
+///
+///     /// BgpOpenMessageWritingError will be converted to this value
+///     OpenError(#[from] BgpOpenMessageWritingError),
+/// }
+/// ```
 #[proc_macro_derive(WritingError, attributes(from_std_io_error, from))]
 pub fn writing_error(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse_macro_input!(input as syn::DeriveInput);
