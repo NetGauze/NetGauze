@@ -112,24 +112,23 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
         templates_map: TemplatesMap,
     ) -> IResult<Span<'a>, Self, LocatedSetParsingError<'a>> {
         let input = buf;
-        let (buf, id) = be_u16(buf)?;
-        if id != IPFIX_TEMPLATE_SET_ID
-            && id != IPFIX_OPTIONS_TEMPLATE_SET_ID
-            && id < DATA_SET_MIN_ID
-        {
-            return Err(nom::Err::Error(LocatedSetParsingError::new(
-                input,
-                SetParsingError::InvalidSetId(id),
-            )));
-        }
-        let input = buf;
-        let (buf, length) = be_u16(buf)?;
-        if length < 4 {
-            return Err(nom::Err::Error(LocatedSetParsingError::new(
-                input,
-                SetParsingError::InvalidLength(length),
-            )));
-        }
+        let (buf, id) = nom::combinator::map_res(be_u16, |id| {
+            if id != IPFIX_TEMPLATE_SET_ID
+                && id != IPFIX_OPTIONS_TEMPLATE_SET_ID
+                && id < DATA_SET_MIN_ID
+            {
+                Err(SetParsingError::InvalidSetId(id))
+            } else {
+                Ok(id)
+            }
+        })(buf)?;
+        let (buf, length) = nom::combinator::map_res(be_u16, |length| {
+            if length < 4 {
+                Err(SetParsingError::InvalidLength(length))
+            } else {
+                Ok(length)
+            }
+        })(buf)?;
         let (reminder, mut buf) = nom::bytes::complete::take(length - 4)(buf)?;
         let set = match id {
             IPFIX_TEMPLATE_SET_ID => {
@@ -155,7 +154,6 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
             }
             // We don't need to check for valid Set ID again, since we already checked
             id => {
-                // TODO: handle padding calculations
                 // Temp variable to keep the borrowed value from RC
                 let binding = templates_map.as_ref().borrow();
                 let template = if let Some(fields) = binding.get(&id) {
