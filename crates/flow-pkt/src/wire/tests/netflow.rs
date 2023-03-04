@@ -24,7 +24,7 @@ use chrono::{TimeZone, Utc};
 
 use netgauze_parse_utils::test_helpers::*;
 
-use crate::{ie, ie::*, netflow::*, wire::serializer::netflow::*, DataSetId, FieldSpecifier};
+use crate::{netflow::*, wire::serializer::netflow::*, DataSetId, FieldSpecifier, *};
 
 #[test]
 fn test_netflow9_template_record() -> Result<(), NetFlowV9WritingError> {
@@ -281,113 +281,105 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
                 DataRecord::new(
                     vec![],
                     vec![
-                        ie::Field::mplsTopLabelStackSection(ie::mplsTopLabelStackSection(vec![
+                        Field::mplsTopLabelStackSection(mplsTopLabelStackSection(vec![
                             0x05, 0xde, 0x01,
                         ])),
-                        ie::Field::mplsLabelStackSection2(ie::mplsLabelStackSection2(vec![
+                        Field::mplsLabelStackSection2(mplsLabelStackSection2(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::mplsLabelStackSection3(ie::mplsLabelStackSection3(vec![
+                        Field::mplsLabelStackSection3(mplsLabelStackSection3(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::mplsLabelStackSection4(ie::mplsLabelStackSection4(vec![
+                        Field::mplsLabelStackSection4(mplsLabelStackSection4(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::mplsLabelStackSection5(ie::mplsLabelStackSection5(vec![
+                        Field::mplsLabelStackSection5(mplsLabelStackSection5(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::mplsLabelStackSection6(ie::mplsLabelStackSection6(vec![
+                        Field::mplsLabelStackSection6(mplsLabelStackSection6(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::ingressInterface(ie::ingressInterface(207)),
-                        ie::Field::egressInterface(ie::egressInterface(161)),
-                        ie::Field::octetDeltaCount(ie::octetDeltaCount(128)),
-                        ie::Field::packetDeltaCount(ie::packetDeltaCount(2)),
-                        ie::Field::flowEndSysUpTime(ie::flowEndSysUpTime(0x0c09ceb5)),
-                        ie::Field::flowStartSysUpTime(ie::flowStartSysUpTime(0x0c09cac2)),
-                        ie::Field::mplsTopLabelIPv4Address(ie::mplsTopLabelIPv4Address(
-                            Ipv4Addr::new(0, 0, 0, 0),
-                        )),
-                        ie::Field::sourceIPv6Address(ie::sourceIPv6Address(Ipv6Addr::from(0))),
-                        ie::Field::destinationIPv6Address(ie::destinationIPv6Address(
-                            Ipv6Addr::from(0),
-                        )),
-                        ie::Field::flowLabelIPv6(ie::flowLabelIPv6(0)),
-                        ie::Field::ipv6ExtensionHeaders(ie::ipv6ExtensionHeaders(0)),
-                        ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                            213, 3, 196, 34,
+                        Field::ingressInterface(ingressInterface(207)),
+                        Field::egressInterface(egressInterface(161)),
+                        Field::octetDeltaCount(octetDeltaCount(128)),
+                        Field::packetDeltaCount(packetDeltaCount(2)),
+                        Field::flowEndSysUpTime(flowEndSysUpTime(0x0c09ceb5)),
+                        Field::flowStartSysUpTime(flowStartSysUpTime(0x0c09cac2)),
+                        Field::mplsTopLabelIPv4Address(mplsTopLabelIPv4Address(Ipv4Addr::new(
+                            0, 0, 0, 0,
                         ))),
-                        ie::Field::destinationIPv4Address(ie::destinationIPv4Address(
-                            Ipv4Addr::new(138, 187, 111, 116),
-                        )),
-                        ie::Field::sourceTransportPort(ie::sourceTransportPort(38718)),
-                        ie::Field::destinationTransportPort(ie::destinationTransportPort(53)),
-                        ie::Field::mplsTopLabelPrefixLength(ie::mplsTopLabelPrefixLength(0)),
-                        ie::Field::mplsTopLabelType(ie::mplsTopLabelType(0)),
-                        ie::Field::forwardingStatus(ie::forwardingStatus(0x40)),
-                        ie::Field::flowDirection(ie::flowDirection(0)),
-                        ie::Field::ipClassOfService(ie::ipClassOfService(0)),
-                        ie::Field::protocolIdentifier(ie::protocolIdentifier(6)),
-                        ie::Field::tcpControlBits(ie::tcpControlBits(2)),
-                        ie::Field::samplerId(ie::samplerId(1)),
-                        ie::Field::ingressVRFID(ie::ingressVRFID(1610612736)),
-                        ie::Field::egressVRFID(ie::egressVRFID(1610612741)),
+                        Field::sourceIPv6Address(sourceIPv6Address(Ipv6Addr::from(0))),
+                        Field::destinationIPv6Address(destinationIPv6Address(Ipv6Addr::from(0))),
+                        Field::flowLabelIPv6(flowLabelIPv6(0)),
+                        Field::ipv6ExtensionHeaders(ipv6ExtensionHeaders(0)),
+                        Field::sourceIPv4Address(sourceIPv4Address(Ipv4Addr::new(213, 3, 196, 34))),
+                        Field::destinationIPv4Address(destinationIPv4Address(Ipv4Addr::new(
+                            138, 187, 111, 116,
+                        ))),
+                        Field::sourceTransportPort(sourceTransportPort(38718)),
+                        Field::destinationTransportPort(destinationTransportPort(53)),
+                        Field::mplsTopLabelPrefixLength(mplsTopLabelPrefixLength(0)),
+                        Field::mplsTopLabelType(mplsTopLabelType(0)),
+                        Field::forwardingStatus(forwardingStatus(0x40)),
+                        Field::flowDirection(flowDirection(0)),
+                        Field::ipClassOfService(ipClassOfService(0)),
+                        Field::protocolIdentifier(protocolIdentifier(6)),
+                        Field::tcpControlBits(tcpControlBits(2)),
+                        Field::samplerId(samplerId(1)),
+                        Field::ingressVRFID(ingressVRFID(1610612736)),
+                        Field::egressVRFID(egressVRFID(1610612741)),
                     ],
                 ),
                 DataRecord::new(
                     vec![],
                     vec![
-                        ie::Field::mplsTopLabelStackSection(ie::mplsTopLabelStackSection(vec![
+                        Field::mplsTopLabelStackSection(mplsTopLabelStackSection(vec![
                             0x05, 0xde, 0x01,
                         ])),
-                        ie::Field::mplsLabelStackSection2(ie::mplsLabelStackSection2(vec![
+                        Field::mplsLabelStackSection2(mplsLabelStackSection2(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::mplsLabelStackSection3(ie::mplsLabelStackSection3(vec![
+                        Field::mplsLabelStackSection3(mplsLabelStackSection3(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::mplsLabelStackSection4(ie::mplsLabelStackSection4(vec![
+                        Field::mplsLabelStackSection4(mplsLabelStackSection4(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::mplsLabelStackSection5(ie::mplsLabelStackSection5(vec![
+                        Field::mplsLabelStackSection5(mplsLabelStackSection5(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::mplsLabelStackSection6(ie::mplsLabelStackSection6(vec![
+                        Field::mplsLabelStackSection6(mplsLabelStackSection6(vec![
                             0x00, 0x00, 0x00,
                         ])),
-                        ie::Field::ingressInterface(ie::ingressInterface(207)),
-                        ie::Field::egressInterface(ie::egressInterface(161)),
-                        ie::Field::octetDeltaCount(ie::octetDeltaCount(128)),
-                        ie::Field::packetDeltaCount(ie::packetDeltaCount(2)),
-                        ie::Field::flowEndSysUpTime(ie::flowEndSysUpTime(0x0c09ceb5)),
-                        ie::Field::flowStartSysUpTime(ie::flowStartSysUpTime(0x0c09cac3)),
-                        ie::Field::mplsTopLabelIPv4Address(ie::mplsTopLabelIPv4Address(
-                            Ipv4Addr::new(0, 0, 0, 0),
-                        )),
-                        ie::Field::sourceIPv6Address(ie::sourceIPv6Address(Ipv6Addr::from(0))),
-                        ie::Field::destinationIPv6Address(ie::destinationIPv6Address(
-                            Ipv6Addr::from(0),
-                        )),
-                        ie::Field::flowLabelIPv6(ie::flowLabelIPv6(0)),
-                        ie::Field::ipv6ExtensionHeaders(ie::ipv6ExtensionHeaders(0)),
-                        ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                            213, 3, 196, 34,
+                        Field::ingressInterface(ingressInterface(207)),
+                        Field::egressInterface(egressInterface(161)),
+                        Field::octetDeltaCount(octetDeltaCount(128)),
+                        Field::packetDeltaCount(packetDeltaCount(2)),
+                        Field::flowEndSysUpTime(flowEndSysUpTime(0x0c09ceb5)),
+                        Field::flowStartSysUpTime(flowStartSysUpTime(0x0c09cac3)),
+                        Field::mplsTopLabelIPv4Address(mplsTopLabelIPv4Address(Ipv4Addr::new(
+                            0, 0, 0, 0,
                         ))),
-                        ie::Field::destinationIPv4Address(ie::destinationIPv4Address(
-                            Ipv4Addr::new(138, 187, 111, 116),
-                        )),
-                        ie::Field::sourceTransportPort(ie::sourceTransportPort(38722)),
-                        ie::Field::destinationTransportPort(ie::destinationTransportPort(53)),
-                        ie::Field::mplsTopLabelPrefixLength(ie::mplsTopLabelPrefixLength(0)),
-                        ie::Field::mplsTopLabelType(ie::mplsTopLabelType(0)),
-                        ie::Field::forwardingStatus(ie::forwardingStatus(0x40)),
-                        ie::Field::flowDirection(ie::flowDirection(0)),
-                        ie::Field::ipClassOfService(ie::ipClassOfService(0)),
-                        ie::Field::protocolIdentifier(ie::protocolIdentifier(6)),
-                        ie::Field::tcpControlBits(ie::tcpControlBits(2)),
-                        ie::Field::samplerId(ie::samplerId(1)),
-                        ie::Field::ingressVRFID(ie::ingressVRFID(1610612736)),
-                        ie::Field::egressVRFID(ie::egressVRFID(1610612741)),
+                        Field::sourceIPv6Address(sourceIPv6Address(Ipv6Addr::from(0))),
+                        Field::destinationIPv6Address(destinationIPv6Address(Ipv6Addr::from(0))),
+                        Field::flowLabelIPv6(flowLabelIPv6(0)),
+                        Field::ipv6ExtensionHeaders(ipv6ExtensionHeaders(0)),
+                        Field::sourceIPv4Address(sourceIPv4Address(Ipv4Addr::new(213, 3, 196, 34))),
+                        Field::destinationIPv4Address(destinationIPv4Address(Ipv4Addr::new(
+                            138, 187, 111, 116,
+                        ))),
+                        Field::sourceTransportPort(sourceTransportPort(38722)),
+                        Field::destinationTransportPort(destinationTransportPort(53)),
+                        Field::mplsTopLabelPrefixLength(mplsTopLabelPrefixLength(0)),
+                        Field::mplsTopLabelType(mplsTopLabelType(0)),
+                        Field::forwardingStatus(forwardingStatus(0x40)),
+                        Field::flowDirection(flowDirection(0)),
+                        Field::ipClassOfService(ipClassOfService(0)),
+                        Field::protocolIdentifier(protocolIdentifier(6)),
+                        Field::tcpControlBits(tcpControlBits(2)),
+                        Field::samplerId(samplerId(1)),
+                        Field::ingressVRFID(ingressVRFID(1610612736)),
+                        Field::egressVRFID(egressVRFID(1610612741)),
                     ],
                 ),
             ],
