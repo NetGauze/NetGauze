@@ -8,12 +8,16 @@ This project is still in an early stage.
 ## Supported Protocols
 
 1. BGP
-   1. Packet representation and wire format serialization/deserialization: [`netgauze-bgp-pkt`](crates/bgp-pkt/README.md)
+    1. Packet representation and wire format
+       serialization/deserialization: [`netgauze-bgp-pkt`](crates/bgp-pkt/README.md)
 2. BMP
-   1. Packet representation and wire format serialization/deserialization: [`netgauze-bmp-pkt`](crates/bmp-pkt/README.md)
-   2. Service building block to receive BMP messages: [`netgauze-bmp-service`](crates/bmp-service/README.md)
-3. Netflow V9 and IPFIX [`netgauze-flow-pkt`](crates/flow-pkt/README.md)
-        
+    1. Packet representation and wire format
+       serialization/deserialization: [`netgauze-bmp-pkt`](crates/bmp-pkt/README.md)
+    2. Service building block to receive BMP messages: [`netgauze-bmp-service`](crates/bmp-service/README.md)
+3. Netflow V9 and IPFIX
+    1. Packet representation and wire format
+       serialization/deserialization: [`netgauze-flow-pkt`](crates/flow-pkt/README.md)
+    2. Service building block to receive messages: [`netgauze-flow-service`](crates/flow-service/README.md)
 
 # Development documentation
 
