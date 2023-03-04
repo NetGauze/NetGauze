@@ -25,7 +25,16 @@ use netgauze_parse_utils::{ReadablePDUWithOneInput, Span};
 
 use netgauze_parse_utils::test_helpers::*;
 
-use crate::{netflow::*, wire::serializer::netflow::*, DataSetId, FieldSpecifier, *};
+use crate::{
+    netflow::*,
+    wire::{
+        deserializer::netflow::{
+            LocatedNetFlowV9PacketParsingError, NetFlowV9PacketParsingError, SetParsingError,
+        },
+        serializer::netflow::*,
+    },
+    DataSetId, FieldSpecifier, *,
+};
 
 #[test]
 fn test_netflow9_template_record() -> Result<(), NetFlowV9WritingError> {
@@ -469,15 +478,125 @@ fn test_padding() -> Result<(), NetFlowV9WritingError> {
     ];
 
     let good_with_padding_wire = [
-        0, 9, 0, 2, 15, 94, 92, 107, 99, 213, 69, 133, 0, 9, 67, 42, 0, 0, 0, 6, 0, 1, 0, 32, 1, 2,
-        0, 4, 0, 16, 0, 1, 0, 4, 0, 48, 0, 4, 0, 84, 0, 40, 0, 49, 0, 1, 0, 50, 0, 2, 0, 0, 1, 2,
-        0, 58, 213, 3, 223, 35, 0, 0, 0, 2, 78, 69, 84, 70, 76, 79, 87, 45, 83, 65, 77, 80, 76, 69,
-        82, 45, 77, 65, 80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0,
-        0, 0, 0,
+        0x00, 0x09, // Version
+        0x00, 0x02, // Count
+        0x0f, 0x5e, 0x5c, 0x6b, // Sys up time
+        0x63, 0xd5, 0x45, 0x85, // Timestamp
+        0x00, 0x09, 0x43, 0x2a, // seq
+        0x00, 0x00, 0x00, 0x06, // Source Id
+        0x00, 0x01, // Options Template
+        0x00, 0x20, // Length
+        0x01, 0x02, // Options template ID
+        0x00, 0x04, // Scope Length
+        0x00, 0x10, // Options Length
+        0x00, 0x01, 0x00, 0x04, // Scope
+        0x00, 0x30, 0x00, 0x04, // Field
+        0x00, 0x54, 0x00, 0x28, // Field
+        0x00, 0x31, 0x00, 0x01, // Field
+        0x00, 0x32, 0x00, 0x02, 0x00, 0x00, // Padding
+        0x01, 0x02, // Flow Set ID
+        0x00, 0x3a, // Flow Set Length
+        0xd5, 0x03, 0xdf, 0x23, // Scope System
+        0x00, 0x00, 0x00, 0x02, // Sampler ID
+        0x4e, 0x45, 0x54, 0x46, // Sampler Name
+        0x4c, 0x4f, 0x57, 0x2d, // Sampler Name
+        0x53, 0x41, 0x4d, 0x50, // Sampler Name
+        0x4c, 0x45, 0x52, 0x2d, // Sampler Name
+        0x4d, 0x41, 0x50, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x02, // Random
+        0x01, 0x00, // Sampler Random Interval
+        0x00, 0x00, 0x00, // Padding
     ];
 
+    let bad_padding_options_wire = [
+        0x00, 0x09, // Version
+        0x00, 0x02, // Count
+        0x0f, 0x5e, 0x5c, 0x6b, // Sys up time
+        0x63, 0xd5, 0x45, 0x85, // Timestamp
+        0x00, 0x09, 0x43, 0x2a, // seq
+        0x00, 0x00, 0x00, 0x06, // Source Id
+        0x00, 0x01, // Options Template
+        0x00, 0x20, // Length
+        0x01, 0x02, // Options template ID
+        0x00, 0x04, // Scope Length
+        0x00, 0x10, // Options Length
+        0x00, 0x01, 0x00, 0x04, // Scope
+        0x00, 0x30, 0x00, 0x04, // Field
+        0x00, 0x54, 0x00, 0x28, // Field
+        0x00, 0x31, 0x00, 0x01, // Field
+        0x00, 0x32, 0x00, 0x02, 0x00, 0x11, // Padding
+        0x01, 0x02, // Flow Set ID
+        0x00, 0x3a, // Flow Set Length
+        0xd5, 0x03, 0xdf, 0x23, // Scope System
+        0x00, 0x00, 0x00, 0x02, // Sampler ID
+        0x4e, 0x45, 0x54, 0x46, // Sampler Name
+        0x4c, 0x4f, 0x57, 0x2d, // Sampler Name
+        0x53, 0x41, 0x4d, 0x50, // Sampler Name
+        0x4c, 0x45, 0x52, 0x2d, // Sampler Name
+        0x4d, 0x41, 0x50, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x02, // Random
+        0x01, 0x00, // Sampler Random Interval
+        0x00, 0x00, 0x00, // Padding
+    ];
+
+    let bad_padding_data_wire = [
+        0x00, 0x09, // Version
+        0x00, 0x02, // Count
+        0x0f, 0x5e, 0x5c, 0x6b, // Sys up time
+        0x63, 0xd5, 0x45, 0x85, // Timestamp
+        0x00, 0x09, 0x43, 0x2a, // seq
+        0x00, 0x00, 0x00, 0x06, // Source Id
+        0x00, 0x01, // Options Template
+        0x00, 0x20, // Length
+        0x01, 0x02, // Options template ID
+        0x00, 0x04, // Scope Length
+        0x00, 0x10, // Options Length
+        0x00, 0x01, 0x00, 0x04, // Scope
+        0x00, 0x30, 0x00, 0x04, // Field
+        0x00, 0x54, 0x00, 0x28, // Field
+        0x00, 0x31, 0x00, 0x01, // Field
+        0x00, 0x32, 0x00, 0x02, 0x00, 0x00, // Padding
+        0x01, 0x02, // Flow Set ID
+        0x00, 0x3a, // Flow Set Length
+        0xd5, 0x03, 0xdf, 0x23, // Scope System
+        0x00, 0x00, 0x00, 0x02, // Sampler ID
+        0x4e, 0x45, 0x54, 0x46, // Sampler Name
+        0x4c, 0x4f, 0x57, 0x2d, // Sampler Name
+        0x53, 0x41, 0x4d, 0x50, // Sampler Name
+        0x4c, 0x45, 0x52, 0x2d, // Sampler Name
+        0x4d, 0x41, 0x50, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x00, 0x00, 0x00, 0x00, // Sampler Name
+        0x02, // Random
+        0x01, 0x00, // Sampler Random Interval
+        0x01, 0x00, 0x00, // Padding
+    ];
+
+    let bad_options_template_padding = LocatedNetFlowV9PacketParsingError::new(
+        unsafe { Span::new_from_raw_offset(51, &[17]) },
+        NetFlowV9PacketParsingError::SetError(SetParsingError::InvalidPaddingValue(17)),
+    );
+
+    let bad_data_padding = LocatedNetFlowV9PacketParsingError::new(
+        unsafe { Span::new_from_raw_offset(107, &[0x01, 0x00, 0x00]) },
+        NetFlowV9PacketParsingError::SetError(SetParsingError::InvalidPaddingValue(1)),
+    );
     let templates_no_padding_map = Rc::new(RefCell::new(HashMap::new()));
     let templates_with_padding_map = Rc::new(RefCell::new(HashMap::new()));
+    let template_bad_map = Rc::new(RefCell::new(HashMap::new()));
 
     let (_, good_no_padding) = NetFlowV9Packet::from_wire(
         Span::new(&good_no_padding_wire),
@@ -489,6 +608,25 @@ fn test_padding() -> Result<(), NetFlowV9WritingError> {
         Rc::clone(&templates_with_padding_map),
     )
     .unwrap();
+
+    test_parse_error_with_one_input::<
+        NetFlowV9Packet,
+        TemplatesMap,
+        LocatedNetFlowV9PacketParsingError<'_>,
+    >(
+        &bad_padding_options_wire,
+        Rc::clone(&template_bad_map),
+        &bad_options_template_padding,
+    );
+    test_parse_error_with_one_input::<
+        NetFlowV9Packet,
+        TemplatesMap,
+        LocatedNetFlowV9PacketParsingError<'_>,
+    >(
+        &bad_padding_data_wire,
+        Rc::clone(&template_bad_map),
+        &bad_data_padding,
+    );
 
     // Packets should be equal regardless of the padding
     test_parsed_completely_with_one_input(

@@ -106,6 +106,7 @@ pub enum SetParsingError {
     InvalidLength(u16),
     InvalidSetId(u16),
     NoTemplateDefinedFor(u16),
+    InvalidPaddingValue(u8),
     TemplateRecordError(#[from_located(module = "self")] TemplateRecordParsingError),
     OptionsTemplateRecordError(#[from_located(module = "self")] OptionsTemplateRecordParsingError),
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
@@ -154,11 +155,11 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                     option_templates.push(option_template);
                 }
                 // buf could be a non zero value for padding
+                check_padding_value(buf)?;
                 Set::OptionsTemplate(option_templates)
             }
             // We don't need to check for valid Set ID again, since we already checked
             id => {
-                // TODO: handle padding calculations
                 // Temp variable to keep the borrowed value from RC
                 let binding = templates_map.as_ref().borrow();
                 let template = if let Some(fields) = binding.get(&id) {
@@ -185,16 +186,32 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                     buf = t;
                     records.push(record);
                 }
+                // buf could be a non zero value for padding
+                check_padding_value(buf)?;
                 // We can safely unwrap DataSetId here since we already checked the range
                 Set::Data {
                     id: DataSetId::new(id).unwrap(),
                     records,
                 }
-                // buf could be a non zero value for padding
             }
         };
         Ok((reminder, set))
     }
+}
+
+#[inline]
+fn check_padding_value(mut buf: Span<'_>) -> IResult<Span<'_>, (), LocatedSetParsingError<'_>> {
+    while buf.len() > 0 {
+        let (t, padding_value) = be_u8(buf)?;
+        if padding_value != 0 {
+            return Err(nom::Err::Error(LocatedSetParsingError::new(
+                buf,
+                SetParsingError::InvalidPaddingValue(padding_value),
+            )));
+        }
+        buf = t;
+    }
+    Ok((buf, ()))
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
