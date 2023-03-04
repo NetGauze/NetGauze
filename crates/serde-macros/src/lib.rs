@@ -372,7 +372,7 @@ impl LocatedError {
 /// and another located errors.
 ///
 /// Example:
-/// ```
+/// ```no_run
 /// use netgauze_serde_macros::LocatedError;
 /// #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 /// pub enum ExtendedCommunityParsingError {
@@ -455,7 +455,7 @@ impl WritingError {
 ///
 ///
 /// Example:
-/// ```
+/// ```no_run
 /// use netgauze_serde_macros::WritingError;
 ///
 /// #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
