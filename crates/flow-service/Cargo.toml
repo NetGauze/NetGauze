@@ -1,0 +1,27 @@
+[package]
+name = "netgauze-flow-service"
+version = "0.0.1"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+description = """
+IPFIX/Netflow service
+"""
+keywords = ["ipfix", "netflow", "parser", "protocol"]
+categories = ["network-programming", "parsing"]
+
+[dependencies]
+netgauze-flow-pkt = { path = "../flow-pkt" }
+netgauze-parse-utils = { path = "../parse-utils" }
+nom = { version = "7.1" }
+byteorder = "1.4"
+tokio = { version = "1", features = ["full", "tracing"] }
+tokio-util = { version = "0.7", features = ["full", "tracing"] }
+bytes = "1.1"
+dashmap = "5.4"
+serde = { version = "1.0", features = ["derive"] }
+tracing = "0.1"
+futures = "0.3"
+futures-util = "0.3"
+futures-core = "0.3"

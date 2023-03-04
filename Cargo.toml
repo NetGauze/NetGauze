@@ -7,6 +7,7 @@ members = [
     "crates/iana",
     "crates/ipfix-code-generator",
     "crates/flow-pkt",
+    "crates/flow-service",
     "crates/locate",
     "crates/parse-utils",
     "crates/serde-macros",
