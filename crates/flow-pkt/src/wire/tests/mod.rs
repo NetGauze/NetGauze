@@ -42,8 +42,8 @@ fn test_template_record() -> Result<(), TemplateRecordWritingError> {
     let good = TemplateRecord::new(
         2049,
         vec![
-            FieldSpecifier::new(ie::InformationElementId::sourceIPv6Address, 16).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::destinationIPv6Address, 16).unwrap(),
+            FieldSpecifier::new(ie::IE::sourceIPv6Address, 16).unwrap(),
+            FieldSpecifier::new(ie::IE::destinationIPv6Address, 16).unwrap(),
         ],
     );
 
@@ -65,8 +65,7 @@ fn test_template_record() -> Result<(), TemplateRecordWritingError> {
 #[test]
 fn test_field() -> Result<(), FieldSpecifierWritingError> {
     let good_ipv4_src_wire = [0x00, 0x08, 0x00, 0x04];
-    let good_ipv4_src =
-        FieldSpecifier::new(ie::InformationElementId::sourceIPv4Address, 4).unwrap();
+    let good_ipv4_src = FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap();
     test_parsed_completely(&good_ipv4_src_wire, &good_ipv4_src);
     test_write(&good_ipv4_src, &good_ipv4_src_wire)?;
     Ok(())
@@ -147,26 +146,16 @@ fn test_pkg_record_value() -> Result<(), ie_ser::FieldWritingError> {
     ));
     test_parsed_completely_with_two_inputs::<
         ie::Field,
-        &ie::InformationElementId,
+        &ie::IE,
         u16,
         ie_desr::LocatedFieldParsingError<'_>,
-    >(
-        &value_wire,
-        &ie::InformationElementId::sourceMacAddress,
-        6u16,
-        &value,
-    );
+    >(&value_wire, &ie::IE::sourceMacAddress, 6u16, &value);
     test_parse_error_with_two_inputs::<
         ie::Field,
-        &ie::InformationElementId,
+        &ie::IE,
         u16,
         ie_desr::LocatedFieldParsingError<'_>,
-    >(
-        &value_wire,
-        &ie::InformationElementId::sourceMacAddress,
-        2u16,
-        invalid_length,
-    );
+    >(&value_wire, &ie::IE::sourceMacAddress, 2u16, invalid_length);
 
     test_write_with_one_input(&value, None, &value_wire)?;
     Ok(())
@@ -258,26 +247,16 @@ fn test_record_value() -> Result<(), ie_ser::FieldWritingError> {
     ));
     test_parsed_completely_with_two_inputs::<
         ie::Field,
-        &ie::InformationElementId,
+        &ie::IE,
         u16,
         ie_desr::LocatedFieldParsingError<'_>,
-    >(
-        &value_wire,
-        &ie::InformationElementId::sourceMacAddress,
-        6u16,
-        &value,
-    );
+    >(&value_wire, &ie::IE::sourceMacAddress, 6u16, &value);
     test_parse_error_with_two_inputs::<
         ie::Field,
-        &ie::InformationElementId,
+        &ie::IE,
         u16,
         ie_desr::LocatedFieldParsingError<'_>,
-    >(
-        &value_wire,
-        &ie::InformationElementId::sourceMacAddress,
-        2u16,
-        invalid_length,
-    );
+    >(&value_wire, &ie::IE::sourceMacAddress, 2u16, invalid_length);
     test_write_with_one_input(&value, None, &value_wire)?;
     Ok(())
 }
@@ -301,8 +280,8 @@ fn test_data_record_value() -> Result<(), DataRecordWritingError> {
     let fields: Rc<DecodingTemplate> = Rc::new((
         vec![],
         vec![
-            FieldSpecifier::new(ie::InformationElementId::sourceMacAddress, 6).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::destinationMacAddress, 6).unwrap(),
+            FieldSpecifier::new(ie::IE::sourceMacAddress, 6).unwrap(),
+            FieldSpecifier::new(ie::IE::destinationMacAddress, 6).unwrap(),
         ],
     ));
     test_parsed_completely_with_one_input::<
@@ -329,29 +308,29 @@ fn test_set_template() -> Result<(), SetWritingError> {
     let good = Set::Template(vec![TemplateRecord::new(
         307,
         vec![
-            FieldSpecifier::new(ie::InformationElementId::sourceIPv4Address, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::destinationIPv4Address, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::ipClassOfService, 1).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::protocolIdentifier, 1).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::sourceTransportPort, 2).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::destinationTransportPort, 2).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::icmpTypeCodeIPv4, 2).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::ingressInterface, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::bgpSourceAsNumber, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::bgpDestinationAsNumber, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::bgpNextHopIPv4Address, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::egressInterface, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::octetDeltaCount, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::packetDeltaCount, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::flowStartSysUpTime, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::flowEndSysUpTime, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::ipNextHopIPv4Address, 4).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::sourceIPv4PrefixLength, 1).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::destinationIPv4PrefixLength, 1).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::tcpControlBits, 1).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::ipVersion, 1).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::flowStartMilliseconds, 8).unwrap(),
-            FieldSpecifier::new(ie::InformationElementId::flowEndMilliseconds, 8).unwrap(),
+            FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::ipClassOfService, 1).unwrap(),
+            FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
+            FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
+            FieldSpecifier::new(ie::IE::destinationTransportPort, 2).unwrap(),
+            FieldSpecifier::new(ie::IE::icmpTypeCodeIPv4, 2).unwrap(),
+            FieldSpecifier::new(ie::IE::ingressInterface, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::bgpSourceAsNumber, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::bgpDestinationAsNumber, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::bgpNextHopIPv4Address, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::egressInterface, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::flowStartSysUpTime, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::flowEndSysUpTime, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::ipNextHopIPv4Address, 4).unwrap(),
+            FieldSpecifier::new(ie::IE::sourceIPv4PrefixLength, 1).unwrap(),
+            FieldSpecifier::new(ie::IE::destinationIPv4PrefixLength, 1).unwrap(),
+            FieldSpecifier::new(ie::IE::tcpControlBits, 1).unwrap(),
+            FieldSpecifier::new(ie::IE::ipVersion, 1).unwrap(),
+            FieldSpecifier::new(ie::IE::flowStartMilliseconds, 8).unwrap(),
+            FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
         ],
     )]);
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
@@ -389,54 +368,14 @@ fn test_u64_reduced_size_encoding() -> Result<(), ie_ser::FieldWritingError> {
     let two = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xffee));
     let one = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xff));
 
-    test_parsed_completely_with_two_inputs(
-        &full_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        8,
-        &full,
-    );
-    test_parsed_completely_with_two_inputs(
-        &seven_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        7,
-        &seven,
-    );
-    test_parsed_completely_with_two_inputs(
-        &six_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        6,
-        &six,
-    );
-    test_parsed_completely_with_two_inputs(
-        &five_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        5,
-        &five,
-    );
-    test_parsed_completely_with_two_inputs(
-        &four_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        4,
-        &four,
-    );
-    test_parsed_completely_with_two_inputs(
-        &three_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        3,
-        &three,
-    );
-    test_parsed_completely_with_two_inputs(
-        &two_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        2,
-        &two,
-    );
-    test_parsed_completely_with_two_inputs(
-        &one_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        1,
-        &one,
-    );
+    test_parsed_completely_with_two_inputs(&full_wire, &ie::IE::packetDeltaCount, 8, &full);
+    test_parsed_completely_with_two_inputs(&seven_wire, &ie::IE::packetDeltaCount, 7, &seven);
+    test_parsed_completely_with_two_inputs(&six_wire, &ie::IE::packetDeltaCount, 6, &six);
+    test_parsed_completely_with_two_inputs(&five_wire, &ie::IE::packetDeltaCount, 5, &five);
+    test_parsed_completely_with_two_inputs(&four_wire, &ie::IE::packetDeltaCount, 4, &four);
+    test_parsed_completely_with_two_inputs(&three_wire, &ie::IE::packetDeltaCount, 3, &three);
+    test_parsed_completely_with_two_inputs(&two_wire, &ie::IE::packetDeltaCount, 2, &two);
+    test_parsed_completely_with_two_inputs(&one_wire, &ie::IE::packetDeltaCount, 1, &one);
 
     test_write_with_one_input(&full, field_full, &full_wire)?;
     test_write_with_one_input(&seven, field_seven, &seven_wire)?;
@@ -466,30 +405,10 @@ fn test_u32_reduced_size_encoding() -> Result<(), ie_ser::FieldWritingError> {
     let two = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xffee));
     let one = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xff));
 
-    test_parsed_completely_with_two_inputs(
-        &four_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        4,
-        &four,
-    );
-    test_parsed_completely_with_two_inputs(
-        &three_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        3,
-        &three,
-    );
-    test_parsed_completely_with_two_inputs(
-        &two_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        2,
-        &two,
-    );
-    test_parsed_completely_with_two_inputs(
-        &one_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        1,
-        &one,
-    );
+    test_parsed_completely_with_two_inputs(&four_wire, &ie::IE::packetDeltaCount, 4, &four);
+    test_parsed_completely_with_two_inputs(&three_wire, &ie::IE::packetDeltaCount, 3, &three);
+    test_parsed_completely_with_two_inputs(&two_wire, &ie::IE::packetDeltaCount, 2, &two);
+    test_parsed_completely_with_two_inputs(&one_wire, &ie::IE::packetDeltaCount, 1, &one);
 
     test_write_with_one_input(&four, field_four, &four_wire)?;
     test_write_with_one_input(&three, field_three, &three_wire)?;
@@ -509,18 +428,8 @@ fn test_u16_reduced_size_encoding() -> Result<(), ie_ser::FieldWritingError> {
     let two = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xffee));
     let one = ie::Field::packetDeltaCount(ie::packetDeltaCount(0xff));
 
-    test_parsed_completely_with_two_inputs(
-        &two_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        2,
-        &two,
-    );
-    test_parsed_completely_with_two_inputs(
-        &one_wire,
-        &ie::InformationElementId::packetDeltaCount,
-        1,
-        &one,
-    );
+    test_parsed_completely_with_two_inputs(&two_wire, &ie::IE::packetDeltaCount, 2, &two);
+    test_parsed_completely_with_two_inputs(&one_wire, &ie::IE::packetDeltaCount, 1, &one);
 
     test_write_with_one_input(&two, field_two, &two_wire)?;
     test_write_with_one_input(&one, field_one, &one_wire)?;
@@ -554,49 +463,49 @@ fn test_i32_reduced_size_encoding() -> Result<(), ie_ser::FieldWritingError> {
 
     test_parsed_completely_with_two_inputs(
         &u32_max_wire,
-        &ie::InformationElementId::mibObjectValueInteger,
+        &ie::IE::mibObjectValueInteger,
         4,
         &u32_max,
     );
     test_parsed_completely_with_two_inputs(
         &u32_min_wire,
-        &ie::InformationElementId::mibObjectValueInteger,
+        &ie::IE::mibObjectValueInteger,
         4,
         &u32_min,
     );
     test_parsed_completely_with_two_inputs(
         &u24_pos_wire,
-        &ie::InformationElementId::mibObjectValueInteger,
+        &ie::IE::mibObjectValueInteger,
         3,
         &u24_pos,
     );
     test_parsed_completely_with_two_inputs(
         &u24_neg_wire,
-        &ie::InformationElementId::mibObjectValueInteger,
+        &ie::IE::mibObjectValueInteger,
         3,
         &u24_min,
     );
     test_parsed_completely_with_two_inputs(
         &u16_max_wire,
-        &ie::InformationElementId::mibObjectValueInteger,
+        &ie::IE::mibObjectValueInteger,
         2,
         &u16_max,
     );
     test_parsed_completely_with_two_inputs(
         &u16_min_wire,
-        &ie::InformationElementId::mibObjectValueInteger,
+        &ie::IE::mibObjectValueInteger,
         2,
         &u16_neg,
     );
     test_parsed_completely_with_two_inputs(
         &u8_max_wire,
-        &ie::InformationElementId::mibObjectValueInteger,
+        &ie::IE::mibObjectValueInteger,
         1,
         &u8_max,
     );
     test_parsed_completely_with_two_inputs(
         &u8_min_wire,
-        &ie::InformationElementId::mibObjectValueInteger,
+        &ie::IE::mibObjectValueInteger,
         1,
         &u8_min,
     );

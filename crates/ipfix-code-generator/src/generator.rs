@@ -116,7 +116,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
 
 fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
-    ret.push_str("impl super::InformationElementTemplate for InformationElementId {\n");
+    ret.push_str("impl super::InformationElementTemplate for IE {\n");
     ret.push_str("    fn semantics(&self) -> Option<super::InformationElementSemantics> {\n");
     ret.push_str("        match self {\n");
     for ie in ie {
@@ -217,20 +217,20 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
 fn generate_from_for_ie() -> String {
     let mut ret = String::new();
     ret.push_str(generate_derive(false, true, true).as_str());
-    ret.push_str("pub struct UndefinedInformationElementId(pub u16);\n");
+    ret.push_str("pub struct UndefinedIE(pub u16);\n");
 
-    ret.push_str("impl From<InformationElementId> for u16 {\n");
-    ret.push_str("    fn from(value: InformationElementId) -> Self {\n");
+    ret.push_str("impl From<IE> for u16 {\n");
+    ret.push_str("    fn from(value: IE) -> Self {\n");
     ret.push_str("        value as u16\n");
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
 
-    ret.push_str("impl TryFrom<u16> for InformationElementId {\n");
-    ret.push_str("    type Error = UndefinedInformationElementId;\n\n");
+    ret.push_str("impl TryFrom<u16> for IE {\n");
+    ret.push_str("    type Error = UndefinedIE;\n\n");
     ret.push_str("    fn try_from(value: u16) -> Result<Self, Self::Error> {\n");
     ret.push_str("       match Self::from_repr(value) {\n");
     ret.push_str("           Some(val) => Ok(val),\n");
-    ret.push_str("           None => Err(UndefinedInformationElementId(value)),\n");
+    ret.push_str("           None => Err(UndefinedIE(value)),\n");
     ret.push_str("       }\n");
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
@@ -244,7 +244,7 @@ pub(crate) fn generate_information_element_ids(ie: &Vec<InformationElement>) -> 
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u16)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
-    ret.push_str("pub enum InformationElementId {\n");
+    ret.push_str("pub enum IE {\n");
     for ie in ie {
         for line in ie.description.split('\n') {
             ret.push_str(format!("    /// {}\n", line.trim()).as_str());
@@ -289,8 +289,8 @@ fn generate_ie_try_from_pen_code(
     name_prefixes: &Vec<(String, String, u32)>,
 ) -> String {
     let mut ret = String::new();
-    ret.push_str("impl TryFrom<(u32, u16)> for InformationElementId {\n");
-    ret.push_str("    type Error = InformationElementIdError;\n\n");
+    ret.push_str("impl TryFrom<(u32, u16)> for IE {\n");
+    ret.push_str("    type Error = IEError;\n\n");
     ret.push_str("    fn try_from(value: (u32, u16)) -> Result<Self, Self::Error> {\n");
     ret.push_str("        let (pen, code) = value;\n");
     ret.push_str("        match pen {\n");
@@ -299,34 +299,26 @@ fn generate_ie_try_from_pen_code(
     for ie in iana_ies {
         ret.push_str(
             format!(
-                "                    {} =>  Ok(InformationElementId::{}),\n",
+                "                    {} =>  Ok(IE::{}),\n",
                 ie.element_id, ie.name
             )
             .as_str(),
         );
     }
-    ret.push_str("                    _ =>  Err(InformationElementIdError::UndefinedIANAInformationElementId(code)),\n");
+    ret.push_str("                    _ =>  Err(IEError::UndefinedIANAIE(code)),\n");
     ret.push_str("                }\n");
     ret.push_str("            }\n");
     for (name, pkg, pen) in name_prefixes {
         ret.push_str(format!("            {pen} => {{\n").as_str());
-        ret.push_str(
-            format!("                match {pkg}::InformationElementId::try_from(code) {{\n")
-                .as_str(),
-        );
+        ret.push_str(format!("                match {pkg}::IE::try_from(code) {{\n").as_str());
         ret.push_str(format!("                    Ok(ie) => Ok(Self::{name}(ie)),\n").as_str());
         ret.push_str(
-            format!(
-                "                    Err(err) => Err(InformationElementIdError::{name}(err)),\n"
-            )
-            .as_str(),
+            format!("                    Err(err) => Err(IEError::{name}(err)),\n").as_str(),
         );
         ret.push_str("                }\n");
         ret.push_str("            }\n");
     }
-    ret.push_str(
-        "           unknown => Ok(InformationElementId::Unknown{pen: unknown, id: code}),\n",
-    );
+    ret.push_str("           unknown => Ok(IE::Unknown{pen: unknown, id: code}),\n");
     ret.push_str("       }\n");
     ret.push_str("   }\n");
     ret.push_str("}\n\n");
@@ -338,7 +330,7 @@ fn generate_ie_template_trait_for_main(
     vendors: &Vec<(String, String, u32)>,
 ) -> String {
     let mut ret = String::new();
-    ret.push_str("impl super::InformationElementTemplate for InformationElementId {\n");
+    ret.push_str("impl super::InformationElementTemplate for IE {\n");
     ret.push_str("    fn semantics(&self) -> Option<InformationElementSemantics> {\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::Unknown{..} => None,\n");
@@ -493,10 +485,10 @@ pub(crate) fn generate_ie_ids(
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str(generate_derive(false, true, true).as_str());
-    ret.push_str("pub enum InformationElementId {\n");
+    ret.push_str("pub enum IE {\n");
     ret.push_str("    Unknown{pen: u32, id: u16},\n");
     for (name, pkg, _) in vendors {
-        ret.push_str(format!("    {name}({pkg}::InformationElementId),\n").as_str());
+        ret.push_str(format!("    {name}({pkg}::IE),\n").as_str());
     }
     for ie in iana_ies {
         for line in ie.description.split('\n') {
@@ -513,10 +505,10 @@ pub(crate) fn generate_ie_ids(
     ret.push_str("}\n\n");
 
     ret.push_str(generate_derive(false, true, true).as_str());
-    ret.push_str("pub enum InformationElementIdError {\n");
-    ret.push_str("    UndefinedIANAInformationElementId(u16),\n");
+    ret.push_str("pub enum IEError {\n");
+    ret.push_str("    UndefinedIANAIE(u16),\n");
     for (name, pkg, _) in vendors {
-        ret.push_str(format!("    {name}({pkg}::UndefinedInformationElementId),\n").as_str());
+        ret.push_str(format!("    {name}({pkg}::UndefinedIE),\n").as_str());
     }
     ret.push_str("}\n\n");
 
@@ -1302,17 +1294,17 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
-    ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, Located{ty_name}ParsingError<'a>>\n").as_str());
+    ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &IE, u16, Located{ty_name}ParsingError<'a>>\n").as_str());
     ret.push_str(format!("for {ty_name} {{\n").as_str());
     ret.push_str("    #[inline]\n");
     ret.push_str("    fn from_wire(\n");
     ret.push_str("        buf: netgauze_parse_utils::Span<'a>,\n");
-    ret.push_str("        ie: &InformationElementId,\n");
+    ret.push_str("        ie: &IE,\n");
     ret.push_str("        length: u16,\n");
     ret.push_str(format!("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
     ret.push_str("        let (buf, value) = match ie {\n");
     for ie in ies {
-        ret.push_str(format!("            InformationElementId::{} => {{\n", ie.name).as_str());
+        ret.push_str(format!("            IE::{} => {{\n", ie.name).as_str());
         ret.push_str(format!("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input::<'_, u16, Located{}ParsingError<'_>, Located{}ParsingError<'_>, {}>(buf, length)?;\n", ie.name, ty_name, ie.name).as_str());
         ret.push_str(format!("                (buf, Field::{}(value))\n", ie.name).as_str());
         ret.push_str("            }\n");
@@ -1361,25 +1353,23 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
-    ret.push_str("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &InformationElementId, u16, LocatedFieldParsingError<'a>>\n");
+    ret.push_str("impl<'a> netgauze_parse_utils::ReadablePDUWithTwoInputs<'a, &IE, u16, LocatedFieldParsingError<'a>>\n");
     ret.push_str("for Field {\n");
     ret.push_str("    #[inline]\n");
     ret.push_str("    fn from_wire(\n");
     ret.push_str("        buf: netgauze_parse_utils::Span<'a>,\n");
-    ret.push_str("        ie: &InformationElementId,\n");
+    ret.push_str("        ie: &IE,\n");
     ret.push_str("        length: u16,\n");
     ret.push_str("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedFieldParsingError<'a>> {\n");
     ret.push_str("        let (buf, value) = match ie {\n");
     for (name, _, _) in vendor_prefixes {
-        ret.push_str(
-            format!("            InformationElementId::{name}(value_ie) => {{\n").as_str(),
-        );
+        ret.push_str(format!("            IE::{name}(value_ie) => {{\n").as_str());
         ret.push_str("                let (buf, value) = netgauze_parse_utils::parse_into_located_two_inputs(buf, value_ie, length)?;\n");
         ret.push_str(format!("                (buf, crate::ie::Field::{name}(value))\n").as_str());
         ret.push_str("            }\n");
     }
     for ie in iana_ies {
-        ret.push_str(format!("            InformationElementId::{} => {{\n", ie.name).as_str());
+        ret.push_str(format!("            IE::{} => {{\n", ie.name).as_str());
         ret.push_str("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input(buf, length)?;\n");
         ret.push_str(
             format!(

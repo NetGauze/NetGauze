@@ -33,7 +33,7 @@ pub enum FlowInfo {
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum FieldSpecifierError {
     /// Specified field length was out of the range defined by the registry
-    InvalidLength(u16, InformationElementId),
+    InvalidLength(u16, IE),
 }
 
 /// Field Specifier
@@ -49,12 +49,12 @@ pub enum FieldSpecifierError {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FieldSpecifier {
-    element_id: InformationElementId,
+    element_id: IE,
     length: u16,
 }
 
 impl FieldSpecifier {
-    pub fn new(element_id: InformationElementId, length: u16) -> Result<Self, FieldSpecifierError> {
+    pub fn new(element_id: IE, length: u16) -> Result<Self, FieldSpecifierError> {
         if let Some(range) = element_id.length_range() {
             if !range.contains(&length) {
                 return Err(FieldSpecifierError::InvalidLength(length, element_id));
@@ -63,7 +63,7 @@ impl FieldSpecifier {
         Ok(Self { element_id, length })
     }
 
-    pub const fn element_id(&self) -> InformationElementId {
+    pub const fn element_id(&self) -> IE {
         self.element_id
     }
 

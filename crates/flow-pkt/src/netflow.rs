@@ -246,7 +246,7 @@ pub struct Cache(pub Vec<u8>);
 pub struct Template(pub Vec<u8>);
 
 #[derive(Copy, Eq, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
-pub enum ScopeInformationElementId {
+pub enum ScopeIE {
     Unknown { pen: u32, id: u16 },
     System,
     Interface,
@@ -255,21 +255,21 @@ pub enum ScopeInformationElementId {
     Template,
 }
 
-impl From<(u32, u16)> for ScopeInformationElementId {
+impl From<(u32, u16)> for ScopeIE {
     fn from(value: (u32, u16)) -> Self {
         let (pen, id) = value;
         match value {
-            (0, 1) => ScopeInformationElementId::System,
-            (0, 2) => ScopeInformationElementId::Interface,
-            (0, 3) => ScopeInformationElementId::LineCard,
-            (0, 4) => ScopeInformationElementId::Cache,
-            (0, 5) => ScopeInformationElementId::Template,
-            _ => ScopeInformationElementId::Unknown { pen, id },
+            (0, 1) => ScopeIE::System,
+            (0, 2) => ScopeIE::Interface,
+            (0, 3) => ScopeIE::LineCard,
+            (0, 4) => ScopeIE::Cache,
+            (0, 5) => ScopeIE::Template,
+            _ => ScopeIE::Unknown { pen, id },
         }
     }
 }
 
-impl InformationElementTemplate for ScopeInformationElementId {
+impl InformationElementTemplate for ScopeIE {
     fn semantics(&self) -> Option<InformationElementSemantics> {
         match self {
             Self::System => Some(InformationElementSemantics::identifier),
@@ -319,16 +319,16 @@ impl InformationElementTemplate for ScopeInformationElementId {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ScopeFieldSpecifier {
-    element_id: ScopeInformationElementId,
+    element_id: ScopeIE,
     length: u16,
 }
 
 impl ScopeFieldSpecifier {
-    pub const fn new(element_id: ScopeInformationElementId, length: u16) -> Self {
+    pub const fn new(element_id: ScopeIE, length: u16) -> Self {
         Self { element_id, length }
     }
 
-    pub const fn element_id(&self) -> ScopeInformationElementId {
+    pub const fn element_id(&self) -> ScopeIE {
         self.element_id
     }
 

@@ -302,7 +302,7 @@ impl<'a> ReadablePDUWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingE
 pub enum ScopeFieldSpecifierParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    InvalidLength(ScopeInformationElementId, u16),
+    InvalidLength(ScopeIE, u16),
 }
 
 impl<'a> ReadablePDU<'a, LocatedScopeFieldSpecifierParsingError<'a>> for ScopeFieldSpecifier {
@@ -318,7 +318,7 @@ impl<'a> ReadablePDU<'a, LocatedScopeFieldSpecifierParsingError<'a>> for ScopeFi
         } else {
             (buf, 0)
         };
-        let ie = ScopeInformationElementId::from((pen, code));
+        let ie = ScopeIE::from((pen, code));
         if !ie
             .length_range()
             .as_ref()
@@ -389,17 +389,16 @@ impl<'a> nom::error::FromExternalError<Span<'a>, std::str::Utf8Error>
     }
 }
 
-impl<'a>
-    ReadablePDUWithTwoInputs<'a, &ScopeInformationElementId, u16, LocatedScopeFieldParsingError<'a>>
+impl<'a> ReadablePDUWithTwoInputs<'a, &ScopeIE, u16, LocatedScopeFieldParsingError<'a>>
     for ScopeField
 {
     fn from_wire(
         buf: Span<'a>,
-        ie: &ScopeInformationElementId,
+        ie: &ScopeIE,
         length: u16,
     ) -> IResult<Span<'a>, Self, LocatedScopeFieldParsingError<'a>> {
         match ie {
-            ScopeInformationElementId::Unknown { .. } => {
+            ScopeIE::Unknown { .. } => {
                 let (buf, value) = nom::multi::count(be_u8, length as usize)(buf)?;
                 Ok((
                     buf,
@@ -410,7 +409,7 @@ impl<'a>
                     },
                 ))
             }
-            ScopeInformationElementId::System => {
+            ScopeIE::System => {
                 let (buf, value) = nom::combinator::map_res(
                     nom::bytes::complete::take(length),
                     |str_buf: Span<'_>| {
@@ -423,7 +422,7 @@ impl<'a>
                 )(buf)?;
                 Ok((buf, ScopeField::System(System(value))))
             }
-            ScopeInformationElementId::Interface => {
+            ScopeIE::Interface => {
                 let len = length as usize;
                 if length > 4 || buf.input_len() < len {
                     return Err(nom::Err::Error(LocatedScopeFieldParsingError::new(
@@ -437,7 +436,7 @@ impl<'a>
                 }
                 Ok((buf.slice(len..), ScopeField::Interface(Interface(res))))
             }
-            ScopeInformationElementId::LineCard => {
+            ScopeIE::LineCard => {
                 let len = length as usize;
                 if length > 4 || buf.input_len() < len {
                     return Err(nom::Err::Error(LocatedScopeFieldParsingError::new(
@@ -451,11 +450,11 @@ impl<'a>
                 }
                 Ok((buf.slice(len..), ScopeField::LineCard(LineCard(res))))
             }
-            ScopeInformationElementId::Cache => {
+            ScopeIE::Cache => {
                 let (buf, value) = nom::multi::count(be_u8, length as usize)(buf)?;
                 Ok((buf, ScopeField::Cache(Cache(value))))
             }
-            ScopeInformationElementId::Template => {
+            ScopeIE::Template => {
                 let (buf, value) = nom::multi::count(be_u8, length as usize)(buf)?;
                 Ok((buf, ScopeField::Template(Template(value))))
             }

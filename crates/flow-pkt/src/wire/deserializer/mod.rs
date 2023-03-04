@@ -24,7 +24,7 @@ use crate::{FieldSpecifier, FieldSpecifierError};
 use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePDU, Span};
 use netgauze_serde_macros::LocatedError;
 
-use crate::ie::{InformationElementId, InformationElementIdError};
+use crate::ie::{IEError, IE};
 
 pub mod ie;
 pub mod ipfix;
@@ -41,7 +41,7 @@ pub enum FieldSpecifierParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     FieldSpecifierError(FieldSpecifierError),
-    InformationElementIdError(InformationElementIdError),
+    IEError(IEError),
 }
 
 impl<'a> ReadablePDU<'a, LocatedFieldSpecifierParsingError<'a>> for FieldSpecifier {
@@ -55,12 +55,12 @@ impl<'a> ReadablePDU<'a, LocatedFieldSpecifierParsingError<'a>> for FieldSpecifi
         } else {
             (buf, 0)
         };
-        let ie = match InformationElementId::try_from((pen, code)) {
+        let ie = match IE::try_from((pen, code)) {
             Ok(ie) => ie,
             Err(err) => {
                 return Err(nom::Err::Error(LocatedFieldSpecifierParsingError::new(
                     input,
-                    FieldSpecifierParsingError::InformationElementIdError(err),
+                    FieldSpecifierParsingError::IEError(err),
                 )));
             }
         };
