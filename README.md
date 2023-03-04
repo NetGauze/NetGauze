@@ -7,14 +7,29 @@ This project is still in an early stage.
 
 ## Supported Protocols
 
-1. BGP, `netgauze-bgp-pkt`
-2. BMP, `netgauze-bmp-pkt`
-3. Netflow V9 and IPFIX `netgauze-flow-pkt`
+1. BGP
+   1. Packet representation and wire format serialization/deserialization: [`netgauze-bgp-pkt`](crates/bgp-pkt/README.md)
+2. BMP
+   1. Packet representation and wire format serialization/deserialization: [`netgauze-bmp-pkt`](crates/bmp-pkt/README.md)
+   2. Service building block to receive BMP messages: [`netgauze-bmp-service`](crates/bmp-service/README.md)
+3. Netflow V9 and IPFIX [`netgauze-flow-pkt`](crates/flow-pkt/README.md)
+        
 
 # Development documentation
 
 *Running Packet Serde Fuzzer*
-```cargo fuzz run fuzz-bgp-pkt```
+
+- Fuzzing BGP
+  ```cargo fuzz run fuzz-bgp-pkt```
+
+- Fuzzing BMP
+  ```cargo fuzz run fuzz-bmp-pkt```
+
+- Fuzzing IPFIX
+  ```cargo fuzz run fuzz-ipfix-pkt```
+
+- Fuzzing Netflow V9
+  ```cargo fuzz run fuzz-netflow-v9-pkt```
 
 ## License
 
