@@ -920,23 +920,23 @@ impl<'a> ReadablePDU<'a, LocatedStatisticsCounterParsingError<'a>> for Statistic
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiAdjRibIn => {
                     let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u32(buf)?;
+                    let (buf, value) = be_u64(buf)?;
                     (
                         buf,
                         StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(
                             address_type,
-                            CounterU32::new(value),
+                            GaugeU64::new(value),
                         ),
                     )
                 }
                 BmpStatisticsType::NumberOfRoutesInPerAfiSafiLocRib => {
                     let (buf, address_type) = parse_address_type(buf)?;
-                    let (buf, value) = be_u32(buf)?;
+                    let (buf, value) = be_u64(buf)?;
                     (
                         buf,
                         StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(
                             address_type,
-                            CounterU32::new(value),
+                            GaugeU64::new(value),
                         ),
                     )
                 }
@@ -997,7 +997,7 @@ impl<'a> ReadablePDU<'a, LocatedStatisticsCounterParsingError<'a>> for Statistic
                     let (buf, value) = be_u64(buf)?;
                     (
                         buf,
-                        StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(
+                        StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(
                             address_type,
                             GaugeU64::new(value),
                         ),

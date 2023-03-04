@@ -21,6 +21,7 @@ use netgauze_bgp_pkt::{
         FourOctetAsCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
     iana::{BgpMessageType, UndefinedBgpMessageType},
+    nlri::RouteDistinguisher::As2Administrator,
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
     path_attribute::{
@@ -1218,5 +1219,146 @@ fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
     test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;
 
+    Ok(())
+}
+
+#[test]
+fn test_statistics_counter() -> Result<(), StatisticsCounterMessageWritingError> {
+    let good_wire = [0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00];
+    let good = StatisticsCounter::NumberOfDuplicatePrefixAdvertisements(CounterU32::new(0));
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_stats() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x01, 0x79, 0x01, 0x01, 0x80, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x00, 0x00,
+        0x21, 0x20, 0x01, 0x01, 0x23, 0x00, 0x45, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x02, 0x19, 0x00, 0x01, 0x00, 0x13, 0xc0, 0x38, 0x01, 0xd2, 0x64, 0x01, 0xfc, 0x76, 0x00,
+        0x0a, 0x41, 0xf9, 0x00, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x04, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x04, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x05, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x04, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x00, 0x08, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0b, 0x00,
+        0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x09, 0x00, 0x0b, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x09, 0x00, 0x0b, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x09, 0x00, 0x0b, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x09, 0x00, 0x0b, 0x00, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x09, 0x00, 0x0b, 0x00, 0x02, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x0a, 0x00, 0x0b, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x0a, 0x00, 0x0b, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x0a, 0x00, 0x0b, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x0a, 0x00, 0x0b, 0x00, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x0a, 0x00, 0x0b, 0x00, 0x02, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x11, 0x00, 0x0b, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x11, 0x00, 0x0b, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x11, 0x00, 0x0b, 0x00, 0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x11, 0x00, 0x0b, 0x00, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x11, 0x00, 0x0b, 0x00, 0x02, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00,
+    ];
+
+    let good = BmpMessage::V3(BmpMessageValue::StatisticsReport(
+        StatisticsReportMessage::new(
+            PeerHeader::new(
+                BmpPeerType::RdInstancePeer {
+                    ipv6: true,
+                    post_policy: false,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                Some(As2Administrator {
+                    asn2: 65499,
+                    number: 33,
+                }),
+                Some(IpAddr::V6(Ipv6Addr::from_str("2001:123:45::219").unwrap())),
+                65555,
+                Ipv4Addr::new(192, 56, 1, 210),
+                Some(Utc.timestamp_opt(1677851766, 672249000).unwrap()),
+            ),
+            vec![
+                StatisticsCounter::NumberOfPrefixesRejectedByInboundPolicy(CounterU32(0)),
+                StatisticsCounter::NumberOfDuplicatePrefixAdvertisements(CounterU32(0)),
+                StatisticsCounter::NumberOfDuplicateWithdraws(CounterU32(0)),
+                StatisticsCounter::NumberOfUpdatesInvalidatedDueToClusterListLoop(CounterU32(0)),
+                StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsPathLoop(CounterU32(0)),
+                StatisticsCounter::NumberOfUpdatesInvalidatedDueToOriginatorId(CounterU32(0)),
+                StatisticsCounter::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(CounterU32(
+                    0,
+                )),
+                StatisticsCounter::NumberOfRoutesInAdjRibIn(GaugeU64(1)),
+                StatisticsCounter::NumberOfRoutesInLocRib(GaugeU64(0)),
+                StatisticsCounter::NumberOfUpdatesSubjectedToTreatAsWithdraw(CounterU32(0)),
+                StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibOut(GaugeU64(1)),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(
+                    AddressType::Ipv4Unicast,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(
+                    AddressType::Ipv6Unicast,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(
+                    AddressType::Ipv4NlriMplsLabels,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(
+                    AddressType::Ipv4MplsLabeledVpn,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiAdjRibIn(
+                    AddressType::Ipv6MplsLabeledVpn,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(
+                    AddressType::Ipv4Unicast,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(
+                    AddressType::Ipv6Unicast,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(
+                    AddressType::Ipv4NlriMplsLabels,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(
+                    AddressType::Ipv4MplsLabeledVpn,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiLocRib(
+                    AddressType::Ipv6MplsLabeledVpn,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(
+                    AddressType::Ipv4Unicast,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(
+                    AddressType::Ipv6Unicast,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(
+                    AddressType::Ipv4NlriMplsLabels,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(
+                    AddressType::Ipv4MplsLabeledVpn,
+                    GaugeU64(0),
+                ),
+                StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(
+                    AddressType::Ipv6MplsLabeledVpn,
+                    GaugeU64(0),
+                ),
+            ],
+        ),
+    ));
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
     Ok(())
 }

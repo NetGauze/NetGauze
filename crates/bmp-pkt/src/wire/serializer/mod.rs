@@ -636,17 +636,17 @@ impl WritablePDU<StatisticsCounterMessageWritingError> for StatisticsCounter {
                 Self::NumberOfUpdatesInvalidatedDueToAsPathLoop(_) => 4,
                 Self::NumberOfUpdatesInvalidatedDueToOriginatorId(_) => 4,
                 Self::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(_) => 4,
-                Self::NumberOfRoutesInAdjRibIn(_) => 4,
-                Self::NumberOfRoutesInLocRib(_) => 4,
-                Self::NumberOfRoutesInPerAfiSafiAdjRibIn(_, _) => 7,
-                Self::NumberOfRoutesInPerAfiSafiLocRib(_, _) => 7,
+                Self::NumberOfRoutesInAdjRibIn(_) => 8,
+                Self::NumberOfRoutesInLocRib(_) => 8,
+                Self::NumberOfRoutesInPerAfiSafiAdjRibIn(_, _) => 11,
+                Self::NumberOfRoutesInPerAfiSafiLocRib(_, _) => 11,
                 Self::NumberOfUpdatesSubjectedToTreatAsWithdraw(_) => 4,
                 Self::NumberOfPrefixesSubjectedToTreatAsWithdraw(_) => 4,
                 Self::NumberOfDuplicateUpdateMessagesReceived(_) => 4,
-                Self::NumberOfRoutesInPrePolicyAdjRibOut(_) => 4,
-                Self::NumberOfRoutesInPostPolicyAdjRibOut(_) => 4,
-                Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(_, _) => 7,
-                Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(_, _) => 7,
+                Self::NumberOfRoutesInPrePolicyAdjRibOut(_) => 8,
+                Self::NumberOfRoutesInPostPolicyAdjRibOut(_) => 8,
+                Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(_, _) => 11,
+                Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(_, _) => 11,
                 Self::Experimental65531(value) => value.len(),
                 Self::Experimental65532(value) => value.len(),
                 Self::Experimental65533(value) => value.len(),
@@ -688,12 +688,12 @@ impl WritablePDU<StatisticsCounterMessageWritingError> for StatisticsCounter {
             Self::NumberOfRoutesInPerAfiSafiAdjRibIn(address_type, value) => {
                 writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
                 writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u32::<NetworkEndian>(value.0)?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
             }
             Self::NumberOfRoutesInPerAfiSafiLocRib(address_type, value) => {
                 writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
                 writer.write_u8(address_type.subsequent_address_family().into())?;
-                writer.write_u32::<NetworkEndian>(value.0)?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
             }
             Self::NumberOfUpdatesSubjectedToTreatAsWithdraw(value) => {
                 writer.write_u32::<NetworkEndian>(value.0)?
