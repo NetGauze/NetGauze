@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
 
     let framed = UdpFramed::new(socket, BytesCodec::default());
     let (_tx, mut stream): (SplitSink<_, (Bytes, _)>, _) = framed.split();
-    let mut clients = Arc::new(DashMap::new());
+    let clients = Arc::new(DashMap::new());
     while let Some(next) = stream.next().await {
         match next {
             Ok((mut buf, addr)) => {
