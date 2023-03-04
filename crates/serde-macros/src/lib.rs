@@ -373,6 +373,7 @@ impl LocatedError {
 ///
 /// Example:
 /// ```
+/// use netgauze_serde_macros::LocatedError;
 /// #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 /// pub enum ExtendedCommunityParsingError {
 ///     NomError(#[from_nom] nom::error::ErrorKind),
@@ -455,6 +456,8 @@ impl WritingError {
 ///
 /// Example:
 /// ```
+/// use netgauze_serde_macros::WritingError;
+///
 /// #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 /// pub enum BgpMessageWritingError {
 ///     /// std::io::Error will be converted to this value

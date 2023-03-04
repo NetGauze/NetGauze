@@ -6,6 +6,8 @@ error. Additionally, generates [`From`] for `nom` library errors, external,
 and another located errors.
 
 ```rust
+use netgauze_serde_macros::LocatedError;
+
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 pub enum ExtendedCommunityParsingError {
     NomError(#[from_nom] nom::error::ErrorKind),
@@ -41,6 +43,8 @@ provides the following decorations for any members of the enum.
 Example:
 
 ```rust
+use netgauze_serde_macros::WritingError;
+
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BgpMessageWritingError {
     /// std::io::Error will be converted to this value
