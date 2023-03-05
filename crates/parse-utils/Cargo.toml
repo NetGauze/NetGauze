@@ -14,8 +14,8 @@ keywords = ["protocol"]
 categories = ["parsing"]
 
 [dependencies]
-netgauze-locate = { path = "../locate" }
-nom = {workspace = true}
+netgauze-locate = { version = "0.1.0", path = "../locate" }
+nom = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [features]
