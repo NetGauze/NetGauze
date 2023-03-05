@@ -1,5 +1,5 @@
 [package]
-name = "netgauze-bmpd"
+name = "netgauze-bmp-service"
 version = "0.1.0"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
