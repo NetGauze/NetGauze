@@ -25,6 +25,7 @@ fn main() {
         )])],
     );
 
+    println!("JSON representation of IPFIX Template packet: {}", serde_json::to_string(&ipfix_template).unwrap());
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
     ipfix_template.write(&mut cursor, None).unwrap();
@@ -61,6 +62,8 @@ fn main() {
             )],
         }],
     );
+
+    println!("JSON representation of IPFIX Data packet: {}", serde_json::to_string(&ipfix_data).unwrap());
 
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);

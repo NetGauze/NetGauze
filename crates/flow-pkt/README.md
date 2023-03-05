@@ -14,4 +14,9 @@
 ## Examples
 
 1. IPFIX [ipfix.rs](examples/ipfix.rs)
+
+   ```cargo run --example ipfix```
+
 2. Netflow V9 [netflow.rs](examples/netflow.rs)
+
+   ```cargo run --example netflow```

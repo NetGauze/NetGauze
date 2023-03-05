@@ -9,8 +9,8 @@ fn main() {
     // Cache to share the templates for decoding data packets
     let templates_map = Rc::new(RefCell::new(HashMap::new()));
 
-    // IPFIX template packet
-    let ipfix_template = NetFlowV9Packet::new(
+    // Netflow V9 template packet
+    let netflow_template = NetFlowV9Packet::new(
         45646,
         Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 00).unwrap(),
         3812,
@@ -26,9 +26,11 @@ fn main() {
         )])],
     );
 
+    println!("JSON representation of Netflow V9 Template packet: {}", serde_json::to_string(&netflow_template).unwrap());
+
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
-    ipfix_template.write(&mut cursor, None).unwrap();
+    netflow_template.write(&mut cursor, None).unwrap();
     assert_eq!(
         buf,
         vec![
@@ -39,10 +41,10 @@ fn main() {
     // Deserialize the message from binary format
     let (_, msg_back) =
         NetFlowV9Packet::from_wire(Span::new(&buf), Rc::clone(&templates_map)).unwrap();
-    assert_eq!(ipfix_template, msg_back);
+    assert_eq!(netflow_template, msg_back);
 
-    // IPFIX data packet
-    let ipfix_data = NetFlowV9Packet::new(
+    // Netflow v9 data packet
+    let netflow_data = NetFlowV9Packet::new(
         45647,
         Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 01).unwrap(),
         3812,
@@ -65,9 +67,11 @@ fn main() {
         }],
     );
 
+    println!("JSON representation of Netflow V9 Data packet: {}", serde_json::to_string(&netflow_data).unwrap());
+
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
-    ipfix_data
+    netflow_data
         .write(&mut cursor, Some(Rc::clone(&templates_map)))
         .unwrap();
     assert_eq!(
@@ -80,5 +84,5 @@ fn main() {
     // Deserialize the message from binary format
     let (_, msg_back) =
         NetFlowV9Packet::from_wire(Span::new(&buf), Rc::clone(&templates_map)).unwrap();
-    assert_eq!(ipfix_data, msg_back);
+    assert_eq!(netflow_data, msg_back);
 }
