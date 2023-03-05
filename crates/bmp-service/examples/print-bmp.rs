@@ -16,10 +16,10 @@
 use std::{convert::Infallible, net::SocketAddr};
 use tower::{service_fn, ServiceBuilder};
 
-use netgauze_bmpd::server::{BmpRequest, BmpServer, BmpServerResponse};
+use netgauze_bmp_service::server::{BmpRequest, BmpServer, BmpServerResponse};
 use tower::buffer::Buffer;
 
-use netgauze_bmpd::handle::BmpServerHandle;
+use netgauze_bmp_service::handle::BmpServerHandle;
 
 fn init_tracing() {
     // Very simple setup at the moment to validate the instrumentation in the code
