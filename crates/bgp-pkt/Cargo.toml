@@ -14,10 +14,10 @@ keywords = ["bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-iana = { path = "../iana" }
-netgauze-locate = { path = "../locate", optional = true }
-netgauze-parse-utils = { path = "../parse-utils", optional = true }
-netgauze-serde-macros = { path = "../serde-macros", optional = true }
+netgauze-iana = { version = "0.1.0", path = "../iana" }
+netgauze-locate = { version = "0.1.0", path = "../locate", optional = true }
+netgauze-parse-utils = { version = "0.1.0", path = "../parse-utils", optional = true }
+netgauze-serde-macros = { version = "0.1.0", path = "../serde-macros", optional = true }
 ipnet = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
@@ -33,7 +33,7 @@ bench = ["criterion"]
 
 
 [dev-dependencies]
-netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
+netgauze-parse-utils = { version = "0.1.0", path = "../parse-utils", features = ["test-helpers"] }
 serde_json = { workspace = true }
 
 
