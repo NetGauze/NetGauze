@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-flow-service"
-version = "0.0.1"
+version = "0.0.0"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
@@ -12,8 +12,8 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-flow-pkt = { path = "../flow-pkt" , version = "0.0.1"}
-netgauze-parse-utils = { path = "../parse-utils", version = "0.0.1" }
+netgauze-flow-pkt = { path = "../flow-pkt" , version = "0.0.0"}
+netgauze-parse-utils = { path = "../parse-utils", version = "0.0.0" }
 nom = { version = "7.1" }
 byteorder = "1.4"
 tokio = { version = "1", features = ["full", "tracing"] }
