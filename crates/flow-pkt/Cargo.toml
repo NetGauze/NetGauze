@@ -14,9 +14,9 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-locate = { path = "../locate", optional = true }
-netgauze-parse-utils = { path = "../parse-utils", optional = true }
-netgauze-serde-macros = { path = "../serde-macros", optional = true }
+netgauze-locate = { version = "0.1.0", path = "../locate", optional = true }
+netgauze-parse-utils = { version = "0.1.0", path = "../parse-utils", optional = true }
+netgauze-serde-macros = { version = "0.1.0", path = "../serde-macros", optional = true }
 serde = { workspace = true, features = ["derive"] }
 strum = { workspace = true }
 strum_macros = { workspace = true }
