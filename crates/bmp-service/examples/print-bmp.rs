@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{convert::Infallible, net::SocketAddr, time::Duration};
+use std::{convert::Infallible, net::SocketAddr};
 use tower::{service_fn, ServiceBuilder};
 
 use netgauze_bmpd::server::{BmpRequest, BmpServer, BmpServerResponse};
@@ -50,8 +50,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         let server = BmpServer::new(local_socket, handle_clone);
         server.serve(buffer_svc).await.unwrap();
     });
-    tokio::time::sleep(Duration::from_secs(3)).await;
-    handle.shutdown();
+    //tokio::time::sleep(Duration::from_secs(3)).await;
+    //handle.shutdown();
     let (_server_ret,) = tokio::join!(server_handle);
 
     Ok(())

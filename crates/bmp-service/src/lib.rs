@@ -24,7 +24,6 @@ use std::{
 pub mod codec;
 pub mod handle;
 pub mod server;
-pub mod service;
 pub mod transport;
 
 /// Capture the address of both sides of a socket
