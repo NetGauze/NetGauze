@@ -372,8 +372,9 @@ impl LocatedError {
 /// and another located errors.
 ///
 /// Example:
-/// ```no_run
+/// ```no_compile
 /// use netgauze_serde_macros::LocatedError;
+///
 /// #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
 /// pub enum ExtendedCommunityParsingError {
 ///     NomError(#[from_nom] nom::error::ErrorKind),
@@ -455,15 +456,21 @@ impl WritingError {
 ///
 ///
 /// Example:
-/// ```no_run
+/// ```no_compile
 /// use netgauze_serde_macros::WritingError;
 ///
 /// #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+/// pub enum BgpOpenMessageWritingError {
+///     // std::io::Error will be converted to this value
+///     StdIOError(#[from_std_io_error] String),
+/// }
+///
+/// #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 /// pub enum BgpMessageWritingError {
-///     /// std::io::Error will be converted to this value
+///     // std::io::Error will be converted to this value
 ///     StdIOError(#[from_std_io_error] String),
 ///
-///     /// BgpOpenMessageWritingError will be converted to this value
+///     // BgpOpenMessageWritingError will be converted to this value
 ///     OpenError(#[from] BgpOpenMessageWritingError),
 /// }
 /// ```
