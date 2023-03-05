@@ -40,6 +40,8 @@ pub fn main() {
         ],
     ));
 
+    println!("JSON representation of BGP packet: {}", serde_json::to_string(&msg).unwrap());
+
     // Serialize the message into it's BGP binary format
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);

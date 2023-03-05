@@ -17,6 +17,8 @@ NetGauze BGP Pkt is library to represent BGP-4 Packets. It aims to achieve 4 goa
 
 ## Example
 
+To run example: `cargo run --example bgp`
+
 ```rust
 use std::io::Cursor;
 use std::net::Ipv4Addr;
@@ -59,6 +61,8 @@ pub fn main() {
             )]),
         ],
     ));
+
+   println!("JSON representation of BGP packet: {}", serde_json::to_string(&msg).unwrap());
 
     // Serialize the message into it's BGP binary format
     let mut buf: Vec<u8> = vec![];
