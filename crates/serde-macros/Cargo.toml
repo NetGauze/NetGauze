@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-serde-macros"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
@@ -27,6 +27,6 @@ proc-macro2 = "1.0"
 
 [dev-dependencies]
 trybuild = { version = "1.0", features = ["diff"] }
-netgauze-parse-utils = { path = "../parse-utils", version = "0.0.0" }
-netgauze-locate = { path = "../locate", version = "0.0.0" }
+netgauze-parse-utils = { path = "../parse-utils", version = "0.0.1" }
+netgauze-locate = { path = "../locate", version = "0.0.1" }
 nom = { version = "7.1", default-features = false }

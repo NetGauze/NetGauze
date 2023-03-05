@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-parse-utils"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
@@ -14,7 +14,7 @@ keywords = ["protocol"]
 categories = ["parsing"]
 
 [dependencies]
-netgauze-locate = { path = "../locate", version = "0.0.0" }
+netgauze-locate = { path = "../locate", version = "0.0.1" }
 nom = { version = "7.1", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 

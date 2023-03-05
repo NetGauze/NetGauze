@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-bmpd"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
@@ -14,8 +14,8 @@ keywords = ["bmp", "bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-bmp-pkt = { path = "../bmp-pkt", version = "0.0.0", features = ["serde"] }
-netgauze-bgp-pkt = { path = "../bgp-pkt", version = "0.0.0", features = ["serde"] }
+netgauze-bmp-pkt = { path = "../bmp-pkt", version = "0.0.1", features = ["serde"] }
+netgauze-bgp-pkt = { path = "../bgp-pkt", version = "0.0.1", features = ["serde"] }
 netgauze-parse-utils = { path = "../parse-utils" }
 
 nom = { version = "7.1" }
