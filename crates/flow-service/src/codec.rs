@@ -13,8 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Code to handle decode/encoding of IPFIX and Netflow V9 packets
+//! It works with [`FlowInfo`] which is enum that combine both IPFIX and Netflow
+//! V9 into one object to make it easier to handle.
+
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
+use nom::Needed;
+use serde::{Deserialize, Serialize};
+use tokio_util::codec::{Decoder, Encoder};
+use tracing::instrument;
+
 use netgauze_flow_pkt::{
     ipfix, netflow,
     wire::{
@@ -31,10 +40,6 @@ use netgauze_flow_pkt::{
 use netgauze_parse_utils::{
     LocatedParsingError, ReadablePduWithOneInput, Span, WritablePduWithOneInput,
 };
-use nom::Needed;
-use serde::{Deserialize, Serialize};
-use tokio_util::codec::{Decoder, Encoder};
-use tracing::instrument;
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum FlowInfoCodecDecoderError {
@@ -51,6 +56,9 @@ impl From<std::io::Error> for FlowInfoCodecDecoderError {
     }
 }
 
+/// [`FlowInfo`] is either IPFIX or Netflow V9 packet.
+/// This struct keep track of the decode process, and keep a cache of the
+/// templates sent by client.
 #[derive(Debug, Default)]
 pub struct FlowInfoCodec {
     /// Helper to track in the decoder if we are inside a message or not
