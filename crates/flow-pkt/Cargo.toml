@@ -14,9 +14,9 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-locate = { path = "../locate", optional = true }
-netgauze-parse-utils = { path = "../parse-utils", optional = true }
-netgauze-serde-macros = { path = "../serde-macros", optional = true }
+netgauze-locate = { path = "../locate", version = "0.0.1", optional = true }
+netgauze-parse-utils = { path = "../parse-utils", version = "0.0.1", optional = true }
+netgauze-serde-macros = { path = "../serde-macros", version = "0.0.1", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 strum = "0.24"
 strum_macros = "0.24"
@@ -34,14 +34,14 @@ bench = ["criterion"]
 
 
 [dev-dependencies]
-netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
+netgauze-parse-utils = { path = "../parse-utils", version = "0.0.1", features = ["test-helpers"] }
 serde_json = "1"
 
 
 [build-dependencies]
 reqwest = { version = "0.11", features = ["blocking"] }
 roxmltree = "0.18"
-netgauze-ipfix-code-generator = { path = "../ipfix-code-generator" }
+netgauze-ipfix-code-generator = { path = "../ipfix-code-generator", version = "0.0.1" }
 
 
 [[bench]]
