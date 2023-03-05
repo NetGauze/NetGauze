@@ -10,7 +10,7 @@ homepage = "https://github.com/NetGauze/NetGauze"
 description = """
 Generate Rust code bindings for IPFIX Information Elements
 """
-keywords = ["ipfix", "netflow", "parser", "protocol", "code", "generator", "schema", "iana"]
+keywords = ["ipfix", "netflow", "parser", "code", "generator"]
 categories = ["network-programming"]
 
 
