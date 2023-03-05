@@ -1,7 +1,7 @@
 # BMP Monitoring Protocol Service to receive BMP packets
 
 Building blocks to develop BMP collectors.
-See [print-flow](examples/print-bmp.rs) for a simple code to receive BMP packets from the network.
+See [print-bmp](examples/print-bmp.rs) for a simple code to receive BMP packets from the network.
 
 ## Run example
 
