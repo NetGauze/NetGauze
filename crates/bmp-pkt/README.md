@@ -4,6 +4,8 @@ BMP-4 Protocol representation and wire format serialization/deserialization (ser
 
 ## Example
 
+To run example: `cargo run --example bmp`
+
 ```rust
 use chrono::{DateTime, Utc};
 use netgauze_bgp_pkt::BgpMessage;
@@ -33,6 +35,11 @@ fn main() {
             RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive),
         ],
     )));
+
+   println!(
+      "JSON representation of BMP packet: {}",
+      serde_json::to_string(&bmp_msg).unwrap()
+   );
 
     // Serialize the message into it's BGP binary format
     let mut buf: Vec<u8> = vec![];
