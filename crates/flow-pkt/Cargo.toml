@@ -34,14 +34,14 @@ bench = ["criterion"]
 
 
 [dev-dependencies]
-netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
+netgauze-parse-utils = { version = "0.1.0", path = "../parse-utils", features = ["test-helpers"] }
 serde_json = { workspace = true }
 
 
 [build-dependencies]
 reqwest = { workspace = true, features = ["blocking"] }
 roxmltree = { workspace = true }
-netgauze-ipfix-code-generator = { path = "../ipfix-code-generator" }
+netgauze-ipfix-code-generator = { version = "0.1.0", path = "../ipfix-code-generator" }
 
 
 [[bench]]
