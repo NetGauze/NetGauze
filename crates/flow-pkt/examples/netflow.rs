@@ -26,7 +26,10 @@ fn main() {
         )])],
     );
 
-    println!("JSON representation of Netflow V9 Template packet: {}", serde_json::to_string(&netflow_template).unwrap());
+    println!(
+        "JSON representation of Netflow V9 Template packet: {}",
+        serde_json::to_string(&netflow_template).unwrap()
+    );
 
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
@@ -67,7 +70,10 @@ fn main() {
         }],
     );
 
-    println!("JSON representation of Netflow V9 Data packet: {}", serde_json::to_string(&netflow_data).unwrap());
+    println!(
+        "JSON representation of Netflow V9 Data packet: {}",
+        serde_json::to_string(&netflow_data).unwrap()
+    );
 
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
