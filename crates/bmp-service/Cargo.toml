@@ -14,9 +14,9 @@ keywords = ["bmp", "bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-bmp-pkt = { path = "../bmp-pkt", features = ["serde"] }
-netgauze-bgp-pkt = { path = "../bgp-pkt", features = ["serde"] }
-netgauze-parse-utils = { path = "../parse-utils" }
+netgauze-bmp-pkt = { version = "0.1.0", path = "../bmp-pkt", features = ["serde"] }
+netgauze-bgp-pkt = { version = "0.1.0", path = "../bgp-pkt", features = ["serde"] }
+netgauze-parse-utils = { version = "0.1.0", path = "../parse-utils" }
 
 nom = { workspace = true }
 byteorder = { workspace = true }
@@ -33,7 +33,6 @@ tower-service = { workspace = true }
 tower-layer = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-
 
 
 [dev-dependencies]
