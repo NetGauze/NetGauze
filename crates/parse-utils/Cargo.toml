@@ -15,8 +15,8 @@ categories = ["parsing"]
 
 [dependencies]
 netgauze-locate = { path = "../locate" }
-nom = { version = "7.1", default-features = false }
-serde = { version = "1.0", features = ["derive"] }
+nom = {workspace = true}
+serde = { workspace = true, features = ["derive"] }
 
 [features]
 test-helpers = []

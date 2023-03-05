@@ -19,14 +19,14 @@ netgauze-bgp-pkt = { path = "../bgp-pkt" }
 netgauze-locate = { path = "../locate", optional = true }
 netgauze-parse-utils = { path = "../parse-utils", optional = true }
 netgauze-serde-macros = { path = "../serde-macros", optional = true }
-strum = "0.24"
-strum_macros = "0.24"
-chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
-ipnet = { version = "2.7", features = ["serde"] }
-nom = { version = "7.1", optional = true }
-byteorder = { version = "1.4", optional = true }
-criterion = { version = "0.4", optional = true } # Dev dep for bench
-serde = { version = "1.0", features = ["derive"] }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+chrono = { workspace = true }
+ipnet = { workspace = true, features = ["serde"] }
+nom = { workspace = true, optional = true }
+byteorder = { workspace = true, optional = true }
+criterion = { workspace = true, optional = true } # Dev dep for bench
+serde = { workspace = true, features = ["derive"] }
 
 [features]
 default = ["serde"]
@@ -35,5 +35,5 @@ bench = ["criterion"]
 
 [dev-dependencies]
 netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
-chrono = { version = "0.4", default-features = false, features = ["std", "serde", "clock"] }
-serde_json = "1"
+chrono = { workspace = true, default-features = false, features = ["std", "serde", "clock"] }
+serde_json = { workspace = true }

@@ -17,15 +17,15 @@ categories = ["network-programming", "parsing"]
 netgauze-locate = { path = "../locate", optional = true }
 netgauze-parse-utils = { path = "../parse-utils", optional = true }
 netgauze-serde-macros = { path = "../serde-macros", optional = true }
-serde = { version = "1.0", features = ["derive"] }
-strum = "0.24"
-strum_macros = "0.24"
-ipnet = { version = "2.7", features = ["serde"] }
-lazy_static = "1.4"
-chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
-nom = { version = "7.1", optional = true }
-byteorder = { version = "1.4", optional = true }
-criterion = { version = "0.4", optional = true } # Dev dep for bench
+serde = { workspace = true, features = ["derive"] }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+ipnet = { workspace = true, features = ["serde"] }
+lazy_static = { workspace = true }
+chrono = { workspace = true, default-features = false, features = ["std", "serde"] }
+nom = { workspace = true, optional = true }
+byteorder = { workspace = true, optional = true }
+criterion = { workspace = true, optional = true } # Dev dep for bench
 
 [features]
 default = ["serde"]
@@ -35,12 +35,12 @@ bench = ["criterion"]
 
 [dev-dependencies]
 netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
-serde_json = "1"
+serde_json = { workspace = true }
 
 
 [build-dependencies]
-reqwest = { version = "0.11", features = ["blocking"] }
-roxmltree = "0.18"
+reqwest = { workspace = true, features = ["blocking"] }
+roxmltree = { workspace = true }
 netgauze-ipfix-code-generator = { path = "../ipfix-code-generator" }
 
 

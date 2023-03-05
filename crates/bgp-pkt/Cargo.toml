@@ -18,13 +18,13 @@ netgauze-iana = { path = "../iana" }
 netgauze-locate = { path = "../locate", optional = true }
 netgauze-parse-utils = { path = "../parse-utils", optional = true }
 netgauze-serde-macros = { path = "../serde-macros", optional = true }
-ipnet = { version = "2.7", features = ["serde"] }
-strum = "0.24"
-strum_macros = "0.24"
-serde = { version = "1.0", features = ["derive"] }
-nom = { version = "7.1", optional = true }
-byteorder = { version = "1.4", optional = true }
-criterion = { version = "0.4", optional = true } # Dev dep for bench
+ipnet = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+nom = { workspace = true, optional = true }
+byteorder = { workspace = true, optional = true }
+criterion = { workspace = true, optional = true } # Dev dep for bench
 
 [features]
 default = ["serde"]
@@ -34,7 +34,7 @@ bench = ["criterion"]
 
 [dev-dependencies]
 netgauze-parse-utils = { path = "../parse-utils", features = ["test-helpers"] }
-serde_json = "1"
+serde_json = { workspace = true }
 
 
 [[bench]]
