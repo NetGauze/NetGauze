@@ -19,7 +19,7 @@
 //! ```no_run
 //! use futures_util::StreamExt;
 //! use netgauze_bmp_pkt::BmpMessage;
-//! use netgauze_bmpd::{
+//! use netgauze_bmp_service::{
 //!     codec::{BmpCodec, BmpCodecDecoderError},
 //!     server::BmpServerResponse,
 //!     transport::{TaggedFramedReadStream, TaggedFramedReadStreamResult},
