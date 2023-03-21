@@ -157,7 +157,7 @@ const IPFIX_PKT_DATA_PKT_ONLY: &[u8] = &[
 ];
 
 pub fn test_parse(
-    span: Span,
+    span: Span<'_>,
     templates_map: Rc<RefCell<HashMap<u16, Rc<(Vec<FieldSpecifier>, Vec<FieldSpecifier>)>>>>,
 ) {
     let x = IpfixPacket::from_wire(span, templates_map);
