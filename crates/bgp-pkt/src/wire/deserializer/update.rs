@@ -22,12 +22,18 @@ use crate::{
 };
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
-    parse_into_located, parse_till_empty_into_located,
-    parse_till_empty_into_with_one_input_located, ReadablePdu, ReadablePduWithOneInput, Span,
+    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
+    parse_till_empty_into_with_one_input_located, ReadablePdu, ReadablePduWithOneInput,
+    ReadablePduWithTwoInputs, Span,
 };
-use nom::{error::ErrorKind, number::complete::be_u16, IResult};
+use nom::{
+    error::ErrorKind,
+    number::complete::{be_u16, be_u32},
+    IResult,
+};
 use serde::{Deserialize, Serialize};
 
+use crate::update::AddPathIpv4Net;
 use netgauze_parse_utils::ErrorKindSerdeDeref;
 use netgauze_serde_macros::LocatedError;
 
@@ -57,19 +63,20 @@ fn parse_withdraw_routes(
     Ok((buf, routes))
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpUpdateMessageParsingError<'a>>
+impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedBgpUpdateMessageParsingError<'a>>
     for BgpUpdateMessage
 {
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
+        add_path: bool,
     ) -> IResult<Span<'a>, Self, LocatedBgpUpdateMessageParsingError<'a>> {
         let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
         let (_, withdrawn_routes) = parse_withdraw_routes(withdrawn_buf)?;
         let (buf, path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
         let (_, path_attributes) =
             parse_till_empty_into_with_one_input_located(path_attributes_buf, asn4)?;
-        let (buf, nlri_vec) = parse_till_empty_into_located(buf)?;
+        let (buf, nlri_vec) = parse_into_located_one_input(buf, add_path)?;
         Ok((
             buf,
             BgpUpdateMessage::new(withdrawn_routes, path_attributes, nlri_vec),
@@ -113,19 +120,31 @@ fn parse_nlri_ipv4(
     Ok((buf, net))
 }
 
-impl<'a> ReadablePdu<'a, LocatedNetworkLayerReachabilityInformationParsingError<'a>>
+impl<'a>
+    ReadablePduWithOneInput<'a, bool, LocatedNetworkLayerReachabilityInformationParsingError<'a>>
     for NetworkLayerReachabilityInformation
 {
     fn from_wire(
         buf: Span<'a>,
+        add_path: bool,
     ) -> IResult<Span<'a>, Self, LocatedNetworkLayerReachabilityInformationParsingError<'a>> {
         let mut buf = buf;
+        if add_path {
+            let mut nets = vec![];
+            while !buf.is_empty() {
+                let (t, path_id) = be_u32(buf)?;
+                let (t, net) = parse_nlri_ipv4(t)?;
+                nets.push(AddPathIpv4Net::new(path_id, net));
+                buf = t;
+            }
+            return Ok((buf, NetworkLayerReachabilityInformation::Ipv4AddPath(nets)));
+        }
         let mut nets = vec![];
         while !buf.is_empty() {
             let (t, net) = parse_nlri_ipv4(buf)?;
             nets.push(net);
             buf = t;
         }
-        Ok((buf, NetworkLayerReachabilityInformation::new(nets)))
+        Ok((buf, NetworkLayerReachabilityInformation::Ipv4(nets)))
     }
 }

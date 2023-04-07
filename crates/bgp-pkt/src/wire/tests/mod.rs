@@ -21,8 +21,8 @@ use nom::error::ErrorKind;
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
     test_helpers::{
-        combine, test_parse_error_with_one_input, test_parsed_completely,
-        test_parsed_completely_with_one_input, test_write,
+        combine, test_parse_error_with_two_inputs, test_parsed_completely,
+        test_parsed_completely_with_two_inputs, test_write,
     },
     Span,
 };
@@ -45,10 +45,11 @@ use crate::{
     notification::CeaseError,
     open::{BgpOpenMessageParameter, BGP_VERSION},
     path_attribute::{
-        AsPath, ClusterId, ClusterList, ExtendedCommunities, LocalPreference, MpReach, MpUnreach,
-        MultiExitDiscriminator, Origin, Originator, PathAttribute, PathAttributeValue,
+        As4PathSegment, AsPath, AsPathSegmentType, ClusterId, ClusterList, ExtendedCommunities,
+        LocalPreference, MpReach, MpUnreach, MultiExitDiscriminator, NextHop, Origin, Originator,
+        PathAttribute, PathAttributeValue,
     },
-    update::BgpUpdateMessage,
+    update::{AddPathIpv4Net, BgpUpdateMessage, NetworkLayerReachabilityInformation},
     wire::{
         deserializer::{
             notification::{BgpNotificationMessageParsingError, CeaseErrorParsingError},
@@ -84,10 +85,11 @@ fn test_bgp_message_not_synchronized_marker() {
         unsafe { Span::new_from_raw_offset(0, &invalid_wire[0..]) },
         BgpMessageParsingError::ConnectionNotSynchronized(0u128),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &invalid_wire,
         false,
-        &invalid,
+        false,
+        nom::Err::Error(invalid),
     );
 }
 
@@ -157,51 +159,60 @@ fn test_bgp_message_length_bounds() {
         BgpMessageParsingError::BadMessageLength(4097),
     );
 
-    test_parsed_completely_with_one_input(&good_wire[..], true, &good);
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire[..], true, false, &good);
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &open_underflow_wire,
         false,
-        &open_underflow,
+        false,
+        nom::Err::Error(open_underflow),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &open_less_than_min_wire,
         false,
-        &open_less_than_min,
+        false,
+        nom::Err::Error(open_less_than_min),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &update_less_than_min_wire,
         false,
-        &update_less_than_min,
+        false,
+        nom::Err::Error(update_less_than_min),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &notification_less_than_min_wire,
         false,
-        &notification_less_than_min,
+        false,
+        nom::Err::Error(notification_less_than_min),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &keepalive_less_than_min_wire,
         false,
-        &keepalive_less_than_min,
+        false,
+        nom::Err::Error(keepalive_less_than_min),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &route_refresh_less_than_min_wire,
         false,
-        &route_refresh_less_than_min,
+        false,
+        nom::Err::Error(route_refresh_less_than_min),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &overflow_wire,
         false,
-        &overflow,
+        false,
+        nom::Err::Error(overflow),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &keepalive_overflow_extended_wire,
         false,
-        &keepalive_overflow_extended,
+        false,
+        nom::Err::Error(keepalive_overflow_extended),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &open_overflow_extended_wire,
         false,
-        &open_overflow_extended,
+        false,
+        nom::Err::Error(open_overflow_extended),
     );
 }
 
@@ -212,10 +223,11 @@ fn test_bgp_message_undefined_message_type() {
         unsafe { Span::new_from_raw_offset(18, &invalid_wire[18..]) },
         BgpMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(0xff)),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &invalid_wire,
         true,
-        &invalid,
+        false,
+        nom::Err::Error(invalid),
     );
 }
 
@@ -264,16 +276,18 @@ fn test_bgp_message_notification() -> Result<(), BgpMessageWritingError> {
         ),
     );
 
-    test_parsed_completely_with_one_input(&good_cease_wire, false, &good_cease);
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_cease_wire, false, false, &good_cease);
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &bad_undefined_notif_wire,
         false,
-        &bad_undefined_notif,
+        false,
+        nom::Err::Error(bad_undefined_notif),
     );
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
         &bad_undefined_cease_wire,
         false,
-        &bad_undefined_cease,
+        false,
+        nom::Err::Error(bad_undefined_cease),
     );
 
     test_write(&good_cease, &good_cease_wire)?;
@@ -301,9 +315,12 @@ fn test_bgp_message_route_refresh() -> Result<(), BgpMessageWritingError> {
         ),
     );
 
-    test_parsed_completely_with_one_input(&good_normal_wire, false, &good_normal);
-    test_parse_error_with_one_input::<BgpMessage, bool, LocatedBgpMessageParsingError<'_>>(
-        &bad_wire, false, &bad,
+    test_parsed_completely_with_two_inputs(&good_normal_wire, false, false, &good_normal);
+    test_parse_error_with_two_inputs::<BgpMessage, bool, bool, LocatedBgpMessageParsingError<'_>>(
+        &bad_wire,
+        false,
+        false,
+        nom::Err::Error(bad),
     );
     test_write(&good_normal, &good_normal_wire)?;
 
@@ -352,7 +369,7 @@ fn test_bgp_message_open1() -> Result<(), BgpMessageWritingError> {
         ],
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, false, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -411,7 +428,7 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
         ],
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, false, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -445,10 +462,10 @@ fn test_rd_withdraw() -> Result<(), BgpMessageWritingError> {
             }),
         )
         .unwrap()],
-        vec![],
+        NetworkLayerReachabilityInformation::Ipv4(vec![]),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, false, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -557,10 +574,97 @@ fn test_rd_announce() -> Result<(), BgpMessageWritingError> {
             )
             .unwrap(),
         ],
-        vec![],
+        NetworkLayerReachabilityInformation::Ipv4(vec![]),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_add_path() -> Result<(), BgpMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x59, 0x02, 0x00, 0x00, 0x00, 0x30, 0x40, 0x01, 0x01, 0x00, 0x40, 0x02, 0x06,
+        0x02, 0x01, 0x00, 0x00, 0xfb, 0xff, 0x40, 0x03, 0x04, 0x0a, 0x00, 0x0e, 0x01, 0x80, 0x04,
+        0x04, 0x00, 0x00, 0x00, 0x00, 0x40, 0x05, 0x04, 0x00, 0x00, 0x00, 0x64, 0x80, 0x0a, 0x04,
+        0x0a, 0x00, 0x22, 0x04, 0x80, 0x09, 0x04, 0x0a, 0x00, 0x0f, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x20, 0x05, 0x05, 0x05, 0x05, 0x00, 0x00, 0x00, 0x01, 0x20, 0xc0, 0xa8, 0x01, 0x05,
+    ];
+
+    let good = BgpMessage::Update(BgpUpdateMessage::new(
+        vec![],
+        vec![
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::Origin(Origin::IGP),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![As4PathSegment::new(
+                    AsPathSegmentType::AsSequence,
+                    vec![64511],
+                )])),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::NextHop(NextHop::new(Ipv4Addr::new(10, 0, 14, 1))),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(0)),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::LocalPreference(LocalPreference::new(100)),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::ClusterList(ClusterList::new(vec![ClusterId::new(
+                    Ipv4Addr::new(10, 0, 34, 4),
+                )])),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::Originator(Originator::new(Ipv4Addr::new(10, 0, 15, 1))),
+            )
+            .unwrap(),
+        ],
+        NetworkLayerReachabilityInformation::Ipv4AddPath(vec![
+            AddPathIpv4Net::new(1, Ipv4Net::new(Ipv4Addr::new(5, 5, 5, 5), 32).unwrap()),
+            AddPathIpv4Net::new(1, Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 5), 32).unwrap()),
+        ]),
+    ));
+
+    test_parsed_completely_with_two_inputs(&good_wire, true, true, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }

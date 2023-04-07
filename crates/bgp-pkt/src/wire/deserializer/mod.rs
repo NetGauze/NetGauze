@@ -35,8 +35,8 @@ use nom::{
 use serde::{Deserialize, Serialize};
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
+    parse_into_located, parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePdu,
+    ReadablePduWithTwoInputs, Span,
 };
 
 use crate::{
@@ -248,10 +248,13 @@ fn parse_bgp_message_length_and_type(
     Ok((buf, (length, message_type, reminder_buf)))
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpMessageParsingError<'a>> for BgpMessage {
+impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedBgpMessageParsingError<'a>>
+    for BgpMessage
+{
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
+        add_path: bool,
     ) -> IResult<Span<'a>, Self, LocatedBgpMessageParsingError<'a>> {
         let (buf, _) = nom::combinator::map_res(be_u128, |x| {
             if x == u128::MAX {
@@ -270,7 +273,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpMessageParsingError<'a>> fo
                 (buf, BgpMessage::Open(open))
             }
             BgpMessageType::Update => {
-                let (buf, update) = parse_into_located_one_input(buf, asn4)?;
+                let (buf, update) = parse_into_located_two_inputs(buf, asn4, add_path)?;
                 (buf, BgpMessage::Update(update))
             }
             BgpMessageType::Notification => {

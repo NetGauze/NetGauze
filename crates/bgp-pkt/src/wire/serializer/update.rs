@@ -46,11 +46,7 @@ impl WritablePdu<BgpUpdateMessageWritingError> for BgpUpdateMessage {
             .iter()
             .map(|w| w.len())
             .sum::<usize>();
-        let nlri = self
-            .network_layer_reachability_information()
-            .iter()
-            .map(|w| w.len())
-            .sum::<usize>();
+        let nlri = self.network_layer_reachability_information().len();
         Self::BASE_LENGTH + withdrawn_len + path_attrs_len + nlri
     }
 
@@ -73,9 +69,8 @@ impl WritablePdu<BgpUpdateMessageWritingError> for BgpUpdateMessage {
         for attr in self.path_attributes() {
             attr.write(writer)?;
         }
-        for nlri in self.network_layer_reachability_information() {
-            nlri.write(writer)?;
-        }
+        self.network_layer_reachability_information()
+            .write(writer)?;
         Ok(())
     }
 }
@@ -118,26 +113,43 @@ impl WritablePdu<NetworkLayerReachabilityInformationWritingError>
     for NetworkLayerReachabilityInformation
 {
     /// one octet length
-    const BASE_LENGTH: usize = 1;
+    const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
-        let sum_len: u32 = self
-            .networks()
-            .iter()
-            .map(|x| round_len(x.prefix_len()) as u32)
-            .sum();
-        1 + sum_len as usize
+        let sum_len: u32 = match self {
+            Self::Ipv4(networks) => networks
+                .iter()
+                .map(|x| 1 + round_len(x.prefix_len()) as u32)
+                .sum(),
+            Self::Ipv4AddPath(networks) => networks
+                .iter()
+                .map(|x| 5 + round_len(x.prefix().prefix_len()) as u32)
+                .sum(),
+        };
+        sum_len as usize
     }
 
     fn write<T: std::io::Write>(
         &self,
         writer: &mut T,
     ) -> Result<(), NetworkLayerReachabilityInformationWritingError> {
-        for network in self.networks() {
-            let len = round_len(network.prefix_len());
-            writer.write_u8(network.prefix_len())?;
-            writer.write_all(&network.network().octets()[..len as usize])?;
-        }
+        match self {
+            Self::Ipv4(networks) => {
+                for network in networks {
+                    let len = round_len(network.prefix_len());
+                    writer.write_u8(network.prefix_len())?;
+                    writer.write_all(&network.network().octets()[..len as usize])?;
+                }
+            }
+            Self::Ipv4AddPath(networks) => {
+                for network in networks {
+                    writer.write_u32::<NetworkEndian>(network.path_id())?;
+                    let len = round_len(network.prefix().prefix_len());
+                    writer.write_u8(network.prefix().prefix_len())?;
+                    writer.write_all(&network.prefix().network().octets()[..len as usize])?;
+                }
+            }
+        };
         Ok(())
     }
 }

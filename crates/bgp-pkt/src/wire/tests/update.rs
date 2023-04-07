@@ -30,7 +30,8 @@ use crate::{
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
     test_helpers::{
-        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input, test_write,
+        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input,
+        test_parsed_completely_with_two_inputs, test_write,
     },
     Span,
 };
@@ -75,20 +76,22 @@ fn test_ipv4_nlri() -> Result<(), NetworkLayerReachabilityInformationWritingErro
     let not_octet_boundary_wire = [0x13, 0xac, 0x10, 0x00];
     let not_octet_boundary2_wire = [23, 192, 168, 128];
 
-    let octet_boundary = NetworkLayerReachabilityInformation::new(vec![Ipv4Net::from_str(
-        "172.16.11.0/24",
+    let octet_boundary =
+        NetworkLayerReachabilityInformation::Ipv4(vec![
+            Ipv4Net::from_str("172.16.11.0/24").unwrap()
+        ]);
+    let not_octet_boundary = NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Net::from_str(
+        "172.16.0.0/19",
     )
     .unwrap()]);
-    let not_octet_boundary =
-        NetworkLayerReachabilityInformation::new(vec![Ipv4Net::from_str("172.16.0.0/19").unwrap()]);
     let not_octet_boundary2 =
-        NetworkLayerReachabilityInformation::new(vec![
+        NetworkLayerReachabilityInformation::Ipv4(vec![
             Ipv4Net::from_str("192.168.128.0/23").unwrap()
         ]);
 
-    test_parsed_completely(&octet_boundary_wire, &octet_boundary);
-    test_parsed_completely(&not_octet_boundary_wire, &not_octet_boundary);
-    test_parsed_completely(&not_octet_boundary2_wire, &not_octet_boundary2);
+    test_parsed_completely_with_one_input(&octet_boundary_wire, false, &octet_boundary);
+    test_parsed_completely_with_one_input(&not_octet_boundary_wire, false, &not_octet_boundary);
+    test_parsed_completely_with_one_input(&not_octet_boundary2_wire, false, &not_octet_boundary2);
 
     test_write(&octet_boundary, &octet_boundary_wire)?;
     test_write(&not_octet_boundary, &not_octet_boundary_wire)?;
@@ -102,8 +105,12 @@ fn test_empty_update() -> Result<(), BgpMessageWritingError> {
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0x00, 0x17, 0x02, 0x00, 0x00, 0x00, 0x00,
     ];
-    let good = BgpMessage::Update(BgpUpdateMessage::new(vec![], vec![], vec![]));
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    let good = BgpMessage::Update(BgpUpdateMessage::new(
+        vec![],
+        vec![],
+        NetworkLayerReachabilityInformation::Ipv4(vec![]),
+    ));
+    test_parsed_completely_with_two_inputs(&good_wire, false, false, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -119,10 +126,10 @@ fn test_withdraw_update() -> Result<(), BgpMessageWritingError> {
             Ipv4Net::new(Ipv4Addr::new(172, 16, 1, 0), 24).unwrap(),
         )],
         vec![],
-        vec![],
+        NetworkLayerReachabilityInformation::Ipv4(vec![]),
     ));
 
-    test_parsed_completely_with_one_input(&good_withdraw_wire, false, &good_withdraw);
+    test_parsed_completely_with_two_inputs(&good_withdraw_wire, false, false, &good_withdraw);
     test_write(&good_withdraw, &good_withdraw_wire)?;
     Ok(())
 }

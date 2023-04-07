@@ -511,9 +511,9 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
                 )
                 .unwrap(),
             ],
-            vec![NetworkLayerReachabilityInformation::new(vec![
-                Ipv4Net::from_str("172.16.1.0/24").unwrap(),
-            ])],
+            NetworkLayerReachabilityInformation::Ipv4(vec![
+                Ipv4Net::from_str("172.16.1.0/24").unwrap()
+            ]),
         ))],
     )
     .unwrap();
@@ -620,9 +620,9 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                     )
                     .unwrap(),
                 ],
-                vec![NetworkLayerReachabilityInformation::new(vec![
-                    Ipv4Net::from_str("172.16.1.0/24").unwrap(),
-                ])],
+                NetworkLayerReachabilityInformation::Ipv4(vec![
+                    Ipv4Net::from_str("172.16.1.0/24").unwrap()
+                ]),
             ))],
         )
         .unwrap(),

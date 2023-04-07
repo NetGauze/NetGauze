@@ -16,11 +16,11 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use netgauze_bgp_pkt::BgpMessage;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePduWithTwoInputs, Span};
 
-fuzz_target!(|data: (&[u8], bool)| {
-    let (mut buf, asn4) = data;
-    while let Ok((retbuf, _msg)) = BgpMessage::from_wire(Span::new(buf), asn4) {
+fuzz_target!(|data: (&[u8], bool, bool)| {
+    let (mut buf, asn4, addpath) = data;
+    while let Ok((retbuf, _msg)) = BgpMessage::from_wire(Span::new(buf), asn4, addpath) {
         buf = retbuf.fragment();
     }
 });

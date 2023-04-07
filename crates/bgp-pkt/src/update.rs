@@ -15,9 +15,10 @@
 
 //! Representations for BGP Update message
 
-use crate::path_attribute::PathAttribute;
 use ipnet::Ipv4Net;
 use serde::{Deserialize, Serialize};
+
+use crate::path_attribute::PathAttribute;
 
 /// UPDATE messages are used to transfer routing information between BGP peers
 /// as defined by [RFC4271](https://datatracker.ietf.org/doc/html/RFC4271).
@@ -39,7 +40,7 @@ use serde::{Deserialize, Serialize};
 pub struct BgpUpdateMessage {
     withdrawn_routes: Vec<WithdrawRoute>,
     path_attributes: Vec<PathAttribute>,
-    network_layer_reachability_information: Vec<NetworkLayerReachabilityInformation>,
+    network_layer_reachability_information: NetworkLayerReachabilityInformation,
 }
 
 impl BgpUpdateMessage {
@@ -47,7 +48,7 @@ impl BgpUpdateMessage {
     pub fn new(
         withdrawn_routes: Vec<WithdrawRoute>,
         path_attributes: Vec<PathAttribute>,
-        network_layer_reachability_information: Vec<NetworkLayerReachabilityInformation>,
+        network_layer_reachability_information: NetworkLayerReachabilityInformation,
     ) -> Self {
         BgpUpdateMessage {
             withdrawn_routes,
@@ -66,7 +67,7 @@ impl BgpUpdateMessage {
     #[inline]
     pub const fn network_layer_reachability_information(
         &self,
-    ) -> &Vec<NetworkLayerReachabilityInformation> {
+    ) -> &NetworkLayerReachabilityInformation {
         &self.network_layer_reachability_information
     }
 }
@@ -87,14 +88,27 @@ impl WithdrawRoute {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct NetworkLayerReachabilityInformation(Vec<Ipv4Net>);
+pub struct AddPathIpv4Net {
+    path_id: u32,
+    prefix: Ipv4Net,
+}
 
-impl NetworkLayerReachabilityInformation {
-    pub fn new(networks: Vec<Ipv4Net>) -> Self {
-        Self(networks)
+impl AddPathIpv4Net {
+    pub const fn new(path_id: u32, prefix: Ipv4Net) -> Self {
+        Self { path_id, prefix }
     }
 
-    pub const fn networks(&self) -> &Vec<Ipv4Net> {
-        &self.0
+    pub const fn path_id(&self) -> u32 {
+        self.path_id
     }
+
+    pub const fn prefix(&self) -> Ipv4Net {
+        self.prefix
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum NetworkLayerReachabilityInformation {
+    Ipv4(Vec<Ipv4Net>),
+    Ipv4AddPath(Vec<AddPathIpv4Net>),
 }
