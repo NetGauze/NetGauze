@@ -86,10 +86,15 @@ impl WritablePdu<WithdrawRouteWritingError> for WithdrawRoute {
 
     fn len(&self) -> usize {
         // Divide by 8 since we count the octets
-        Self::BASE_LENGTH + self.prefix().prefix_len() as usize / 8
+        Self::BASE_LENGTH
+            + self.path_id().map_or(0, |_| 4)
+            + self.prefix().prefix_len() as usize / 8
     }
 
     fn write<T: std::io::Write>(&self, writer: &mut T) -> Result<(), WithdrawRouteWritingError> {
+        if let Some(path_id) = self.path_id() {
+            writer.write_u32::<NetworkEndian>(path_id)?;
+        }
         writer.write_u8(self.prefix().prefix_len())?;
         for octet in self
             .prefix()

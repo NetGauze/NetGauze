@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::net::Ipv4Addr;
+use std::{net::Ipv4Addr, str::FromStr};
 
 use ipnet::Ipv4Net;
 use nom::error::ErrorKind;
@@ -49,7 +49,9 @@ use crate::{
         LocalPreference, MpReach, MpUnreach, MultiExitDiscriminator, NextHop, Origin, Originator,
         PathAttribute, PathAttributeValue,
     },
-    update::{AddPathIpv4Net, BgpUpdateMessage, NetworkLayerReachabilityInformation},
+    update::{
+        AddPathIpv4Net, BgpUpdateMessage, NetworkLayerReachabilityInformation, WithdrawRoute,
+    },
     wire::{
         deserializer::{
             notification::{BgpNotificationMessageParsingError, CeaseErrorParsingError},
@@ -662,6 +664,28 @@ fn test_bgp_add_path() -> Result<(), BgpMessageWritingError> {
             AddPathIpv4Net::new(1, Ipv4Net::new(Ipv4Addr::new(5, 5, 5, 5), 32).unwrap()),
             AddPathIpv4Net::new(1, Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 5), 32).unwrap()),
         ]),
+    ));
+
+    test_parsed_completely_with_two_inputs(&good_wire, true, true, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_add_path_withdraw() -> Result<(), BgpMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x1f, 0x02, 0x00, 0x08, 0x00, 0x00, 0x00, 0x04, 0x18, 0xac, 0x10, 0x64, 0x00,
+        0x00,
+    ];
+
+    let good = BgpMessage::Update(BgpUpdateMessage::new(
+        vec![WithdrawRoute::new(
+            Some(4),
+            Ipv4Net::from_str("172.16.100.0/24").unwrap(),
+        )],
+        vec![],
+        NetworkLayerReachabilityInformation::Ipv4AddPath(vec![]),
     ));
 
     test_parsed_completely_with_two_inputs(&good_wire, true, true, &good);

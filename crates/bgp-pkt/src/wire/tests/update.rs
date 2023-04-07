@@ -30,7 +30,7 @@ use crate::{
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
     test_helpers::{
-        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input,
+        test_parse_error_with_one_input, test_parsed_completely_with_one_input,
         test_parsed_completely_with_two_inputs, test_write,
     },
     Span,
@@ -44,7 +44,7 @@ fn test_withdraw_route() -> Result<(), WithdrawRouteWritingError> {
     let bad_overflow_wire = [0xff, 0xac, 0x10, 0x01];
     let bad_prefix_wire = [0x21, 0xac, 0x10, 0xff, 0xff, 0xff];
 
-    let good = WithdrawRoute::new(Ipv4Net::from_str("172.16.1.0/24").unwrap());
+    let good = WithdrawRoute::new(None, Ipv4Net::from_str("172.16.1.0/24").unwrap());
     let bad_overflow = LocatedWithdrawRouteParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &bad_overflow_wire[1..]) },
         WithdrawRouteParsingError::Ipv4PrefixParsingError(Ipv4PrefixParsingError::NomError(
@@ -57,13 +57,15 @@ fn test_withdraw_route() -> Result<(), WithdrawRouteWritingError> {
             Ipv4PrefixParsingError::InvalidIpv4PrefixLen(33),
         ),
     );
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<WithdrawRoute, LocatedWithdrawRouteParsingError<'_>>(
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parse_error_with_one_input::<WithdrawRoute, bool, LocatedWithdrawRouteParsingError<'_>>(
         &bad_overflow_wire,
+        false,
         &bad_overflow,
     );
-    test_parse_error::<WithdrawRoute, LocatedWithdrawRouteParsingError<'_>>(
+    test_parse_error_with_one_input::<WithdrawRoute, bool, LocatedWithdrawRouteParsingError<'_>>(
         &bad_prefix_wire,
+        false,
         &bad_prefix,
     );
     test_write(&good, &good_wire)?;
@@ -123,6 +125,7 @@ fn test_withdraw_update() -> Result<(), BgpMessageWritingError> {
     ];
     let good_withdraw = BgpMessage::Update(BgpUpdateMessage::new(
         vec![WithdrawRoute::new(
+            None,
             Ipv4Net::new(Ipv4Addr::new(172, 16, 1, 0), 24).unwrap(),
         )],
         vec![],

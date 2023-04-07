@@ -22,9 +22,8 @@ use crate::{
 };
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
-    parse_till_empty_into_with_one_input_located, ReadablePdu, ReadablePduWithOneInput,
-    ReadablePduWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input, parse_till_empty_into_with_one_input_located,
+    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
 };
 use nom::{
     error::ErrorKind,
@@ -58,8 +57,9 @@ pub enum BgpUpdateMessageParsingError {
 #[inline]
 fn parse_withdraw_routes(
     buf: Span<'_>,
+    add_path: bool,
 ) -> IResult<Span<'_>, Vec<WithdrawRoute>, LocatedBgpUpdateMessageParsingError<'_>> {
-    let (buf, routes) = parse_till_empty_into_located(buf)?;
+    let (buf, routes) = parse_till_empty_into_with_one_input_located(buf, add_path)?;
     Ok((buf, routes))
 }
 
@@ -72,7 +72,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedBgpUpdateMessageParsing
         add_path: bool,
     ) -> IResult<Span<'a>, Self, LocatedBgpUpdateMessageParsingError<'a>> {
         let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (_, withdrawn_routes) = parse_withdraw_routes(withdrawn_buf)?;
+        let (_, withdrawn_routes) = parse_withdraw_routes(withdrawn_buf, add_path)?;
         let (buf, path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
         let (_, path_attributes) =
             parse_till_empty_into_with_one_input_located(path_attributes_buf, asn4)?;
@@ -95,10 +95,19 @@ pub enum WithdrawRouteParsingError {
     ),
 }
 
-impl<'a> ReadablePdu<'a, LocatedWithdrawRouteParsingError<'a>> for WithdrawRoute {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedWithdrawRouteParsingError<'a>> {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedWithdrawRouteParsingError<'a>> for WithdrawRoute {
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedWithdrawRouteParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
         let (buf, net) = parse_into_located(buf)?;
-        Ok((buf, WithdrawRoute::new(net)))
+        Ok((buf, WithdrawRoute::new(path_id, net)))
     }
 }
 

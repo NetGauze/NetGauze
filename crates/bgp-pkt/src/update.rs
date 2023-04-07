@@ -74,12 +74,17 @@ impl BgpUpdateMessage {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WithdrawRoute {
+    path_id: Option<u32>,
     prefix: Ipv4Net,
 }
 
 impl WithdrawRoute {
-    pub const fn new(prefix: Ipv4Net) -> Self {
-        Self { prefix }
+    pub const fn new(path_id: Option<u32>, prefix: Ipv4Net) -> Self {
+        Self { path_id, prefix }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
     }
 
     pub const fn prefix(&self) -> &Ipv4Net {
