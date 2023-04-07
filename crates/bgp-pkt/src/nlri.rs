@@ -44,6 +44,7 @@ impl MplsLabel {
         self.0[2] & 0x01 == 0x01
     }
 }
+
 /// Route Distinguisher (RD) is a 8-byte value and encoded as follows:
 ///     - Type Field: 2 bytes
 ///     - Value Field: 6 bytes
@@ -128,7 +129,7 @@ pub enum LabeledNextHop {
 
 /// A more restricted version of [`Ipv4Net`] that allows only unicast
 /// networks
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4Unicast(Ipv4Net);
 
 /// Raised when the network is not a unicast range
@@ -208,7 +209,7 @@ impl NlriAddressType for Ipv4MplsVpnUnicast {
 
 /// A more restricted version of [`Ipv4Net`] that allows only multicast
 /// networks
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv4Multicast(Ipv4Net);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -244,7 +245,7 @@ impl NlriAddressType for Ipv4Multicast {
 
 /// A more restricted version of [`Ipv6Net`] that allows only unicast
 /// networks
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6Unicast(Ipv6Net);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -318,7 +319,7 @@ impl NlriAddressType for Ipv6MplsVpnUnicast {
 
 /// A more restricted version of [`Ipv6Net`] that allows only multicast
 /// networks
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Ipv6Multicast(Ipv6Net);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]

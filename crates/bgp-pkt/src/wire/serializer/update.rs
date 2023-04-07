@@ -124,11 +124,11 @@ impl WritablePdu<NetworkLayerReachabilityInformationWritingError>
         let sum_len: u32 = match self {
             Self::Ipv4(networks) => networks
                 .iter()
-                .map(|x| 1 + round_len(x.prefix_len()) as u32)
+                .map(|x| 1 + round_len(x.address().prefix_len()) as u32)
                 .sum(),
             Self::Ipv4AddPath(networks) => networks
                 .iter()
-                .map(|x| 5 + round_len(x.prefix().prefix_len()) as u32)
+                .map(|x| 5 + round_len(x.prefix().address().prefix_len()) as u32)
                 .sum(),
         };
         sum_len as usize
@@ -141,17 +141,19 @@ impl WritablePdu<NetworkLayerReachabilityInformationWritingError>
         match self {
             Self::Ipv4(networks) => {
                 for network in networks {
-                    let len = round_len(network.prefix_len());
-                    writer.write_u8(network.prefix_len())?;
-                    writer.write_all(&network.network().octets()[..len as usize])?;
+                    let len = round_len(network.address().prefix_len());
+                    writer.write_u8(network.address().prefix_len())?;
+                    writer.write_all(&network.address().network().octets()[..len as usize])?;
                 }
             }
             Self::Ipv4AddPath(networks) => {
                 for network in networks {
                     writer.write_u32::<NetworkEndian>(network.path_id())?;
-                    let len = round_len(network.prefix().prefix_len());
-                    writer.write_u8(network.prefix().prefix_len())?;
-                    writer.write_all(&network.prefix().network().octets()[..len as usize])?;
+                    let len = round_len(network.prefix().address().prefix_len());
+                    writer.write_u8(network.prefix().address().prefix_len())?;
+                    writer.write_all(
+                        &network.prefix().address().network().octets()[..len as usize],
+                    )?;
                 }
             }
         };

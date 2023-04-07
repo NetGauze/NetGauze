@@ -661,8 +661,16 @@ fn test_bgp_add_path() -> Result<(), BgpMessageWritingError> {
             .unwrap(),
         ],
         NetworkLayerReachabilityInformation::Ipv4AddPath(vec![
-            AddPathIpv4Net::new(1, Ipv4Net::new(Ipv4Addr::new(5, 5, 5, 5), 32).unwrap()),
-            AddPathIpv4Net::new(1, Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 5), 32).unwrap()),
+            AddPathIpv4Net::new(
+                1,
+                Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(5, 5, 5, 5), 32).unwrap())
+                    .unwrap(),
+            ),
+            AddPathIpv4Net::new(
+                1,
+                Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 5), 32).unwrap())
+                    .unwrap(),
+            ),
         ]),
     ));
 

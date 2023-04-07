@@ -21,7 +21,7 @@ use netgauze_bgp_pkt::{
         FourOctetAsCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
     iana::{BgpMessageType, UndefinedBgpMessageType},
-    nlri::RouteDistinguisher::As2Administrator,
+    nlri::Ipv4Unicast,
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
     path_attribute::{
@@ -511,9 +511,10 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
                 )
                 .unwrap(),
             ],
-            NetworkLayerReachabilityInformation::Ipv4(vec![
-                Ipv4Net::from_str("172.16.1.0/24").unwrap()
-            ]),
+            NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Unicast::from_net(
+                Ipv4Net::from_str("172.16.1.0/24").unwrap(),
+            )
+            .unwrap()]),
         ))],
     )
     .unwrap();
@@ -620,9 +621,10 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                     )
                     .unwrap(),
                 ],
-                NetworkLayerReachabilityInformation::Ipv4(vec![
-                    Ipv4Net::from_str("172.16.1.0/24").unwrap()
-                ]),
+                NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Unicast::from_net(
+                    Ipv4Net::from_str("172.16.1.0/24").unwrap(),
+                )
+                .unwrap()]),
             ))],
         )
         .unwrap(),
@@ -1271,7 +1273,7 @@ fn test_bmp_stats() -> Result<(), BmpMessageWritingError> {
                     asn2: false,
                     adj_rib_out: false,
                 },
-                Some(As2Administrator {
+                Some(RouteDistinguisher::As2Administrator {
                     asn2: 65499,
                     number: 33,
                 }),

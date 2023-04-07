@@ -20,7 +20,6 @@ use crate::{
     wire::deserializer::{path_attribute::PathAttributeParsingError, Ipv4PrefixParsingError},
     BgpUpdateMessage,
 };
-use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_till_empty_into_with_one_input_located,
     ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
@@ -32,7 +31,7 @@ use nom::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::update::AddPathIpv4Net;
+use crate::{update::AddPathIpv4Net, wire::deserializer::nlri::Ipv4UnicastParsingError};
 use netgauze_parse_utils::ErrorKindSerdeDeref;
 use netgauze_serde_macros::LocatedError;
 
@@ -120,13 +119,9 @@ pub enum NetworkLayerReachabilityInformationParsingError {
     Ipv4PrefixParsingError(
         #[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError,
     ),
-}
-
-fn parse_nlri_ipv4(
-    buf: Span<'_>,
-) -> IResult<Span<'_>, Ipv4Net, LocatedNetworkLayerReachabilityInformationParsingError<'_>> {
-    let (buf, net) = parse_into_located(buf)?;
-    Ok((buf, net))
+    Ipv4UnicastError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
+    ),
 }
 
 impl<'a>
@@ -142,7 +137,7 @@ impl<'a>
             let mut nets = vec![];
             while !buf.is_empty() {
                 let (t, path_id) = be_u32(buf)?;
-                let (t, net) = parse_nlri_ipv4(t)?;
+                let (t, net) = parse_into_located(t)?;
                 nets.push(AddPathIpv4Net::new(path_id, net));
                 buf = t;
             }
@@ -150,7 +145,7 @@ impl<'a>
         }
         let mut nets = vec![];
         while !buf.is_empty() {
-            let (t, net) = parse_nlri_ipv4(buf)?;
+            let (t, net) = parse_into_located(buf)?;
             nets.push(net);
             buf = t;
         }

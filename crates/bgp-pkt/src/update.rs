@@ -15,6 +15,7 @@
 
 //! Representations for BGP Update message
 
+use crate::nlri::Ipv4Unicast;
 use ipnet::Ipv4Net;
 use serde::{Deserialize, Serialize};
 
@@ -95,11 +96,11 @@ impl WithdrawRoute {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct AddPathIpv4Net {
     path_id: u32,
-    prefix: Ipv4Net,
+    prefix: Ipv4Unicast,
 }
 
 impl AddPathIpv4Net {
-    pub const fn new(path_id: u32, prefix: Ipv4Net) -> Self {
+    pub const fn new(path_id: u32, prefix: Ipv4Unicast) -> Self {
         Self { path_id, prefix }
     }
 
@@ -107,13 +108,13 @@ impl AddPathIpv4Net {
         self.path_id
     }
 
-    pub const fn prefix(&self) -> Ipv4Net {
+    pub const fn prefix(&self) -> Ipv4Unicast {
         self.prefix
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum NetworkLayerReachabilityInformation {
-    Ipv4(Vec<Ipv4Net>),
+    Ipv4(Vec<Ipv4Unicast>),
     Ipv4AddPath(Vec<AddPathIpv4Net>),
 }

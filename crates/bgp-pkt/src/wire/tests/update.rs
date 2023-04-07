@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    nlri::Ipv4Unicast,
     update::{NetworkLayerReachabilityInformation, WithdrawRoute},
     wire::{
         deserializer::{
@@ -78,18 +79,20 @@ fn test_ipv4_nlri() -> Result<(), NetworkLayerReachabilityInformationWritingErro
     let not_octet_boundary_wire = [0x13, 0xac, 0x10, 0x00];
     let not_octet_boundary2_wire = [23, 192, 168, 128];
 
-    let octet_boundary =
-        NetworkLayerReachabilityInformation::Ipv4(vec![
-            Ipv4Net::from_str("172.16.11.0/24").unwrap()
-        ]);
-    let not_octet_boundary = NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Net::from_str(
-        "172.16.0.0/19",
+    let octet_boundary = NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Unicast::from_net(
+        Ipv4Net::from_str("172.16.11.0/24").unwrap(),
     )
     .unwrap()]);
+    let not_octet_boundary =
+        NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Unicast::from_net(
+            Ipv4Net::from_str("172.16.0.0/19").unwrap(),
+        )
+        .unwrap()]);
     let not_octet_boundary2 =
-        NetworkLayerReachabilityInformation::Ipv4(vec![
-            Ipv4Net::from_str("192.168.128.0/23").unwrap()
-        ]);
+        NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Unicast::from_net(
+            Ipv4Net::from_str("192.168.128.0/23").unwrap(),
+        )
+        .unwrap()]);
 
     test_parsed_completely_with_one_input(&octet_boundary_wire, false, &octet_boundary);
     test_parsed_completely_with_one_input(&not_octet_boundary_wire, false, &not_octet_boundary);
