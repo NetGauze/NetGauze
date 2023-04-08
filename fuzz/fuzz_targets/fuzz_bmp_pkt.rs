@@ -14,13 +14,18 @@
 // limitations under the License.
 
 #![no_main]
-use libfuzzer_sys::fuzz_target;
-use netgauze_bmp_pkt::BmpMessage;
-use netgauze_parse_utils::{ReadablePdu, Span};
 
-fuzz_target!(|data: &[u8]| {
-    let mut buf = data;
-    while let Ok((retbuf, _msg)) = BmpMessage::from_wire(Span::new(buf)) {
+use std::collections::HashMap;
+
+use libfuzzer_sys::fuzz_target;
+
+use netgauze_bmp_pkt::BmpMessage;
+use netgauze_iana::address_family::AddressType;
+use netgauze_parse_utils::{ReadablePduWithTwoInputs, Span};
+
+fuzz_target!(|data: (&[u8], bool, HashMap<AddressType, bool>)| {
+    let (mut buf, asn4, addpath) = data;
+    while let Ok((retbuf, _msg)) = BmpMessage::from_wire(Span::new(buf), asn4, &addpath) {
         buf = retbuf.fragment();
     }
 });

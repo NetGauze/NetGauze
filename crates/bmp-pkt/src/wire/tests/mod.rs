@@ -34,11 +34,15 @@ use netgauze_bgp_pkt::{
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
-    test_helpers::{test_parse_error, test_parsed_completely, test_write},
+    test_helpers::{
+        test_parse_error, test_parse_error_with_two_inputs, test_parsed_completely,
+        test_parsed_completely_with_two_inputs, test_write,
+    },
     Span,
 };
 use nom::error::ErrorKind;
 use std::{
+    collections::HashMap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
@@ -431,10 +435,17 @@ fn test_bmp_value_initiation_message() -> Result<(), BmpMessageValueWritingError
             ),
         ),
     );
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BmpMessageValue, LocatedBmpMessageValueParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        BmpMessageValue,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedBmpMessageValueParsingError<'_>,
+    >(
         &bad_information_wire,
-        &bad_information,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_information),
     );
     test_write(&good, &good_wire)?;
     Ok(())
@@ -538,18 +549,39 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
         ),
     );
 
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<RouteMonitoringMessage, LocatedRouteMonitoringMessageParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        RouteMonitoringMessage,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedRouteMonitoringMessageParsingError<'_>,
+    >(
         &bad_peer_header_wire,
-        &bad_peer_header,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_peer_header),
     );
-    test_parse_error::<RouteMonitoringMessage, LocatedRouteMonitoringMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        RouteMonitoringMessage,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedRouteMonitoringMessageParsingError<'_>,
+    >(
         &bad_bgp_wire,
-        &bad_bgp,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_bgp),
     );
-    test_parse_error::<RouteMonitoringMessage, LocatedRouteMonitoringMessageParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        RouteMonitoringMessage,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedRouteMonitoringMessageParsingError<'_>,
+    >(
         &bad_bgp_type_wire,
-        &bad_bgp_type,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_bgp_type),
     );
 
     test_write(&good, &good_wire)?;
@@ -636,8 +668,13 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
             )),
         ),
     );
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BmpMessageValue, LocatedBmpMessageValueParsingError<'_>>(&bad_wire, &bad);
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        BmpMessageValue,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedBmpMessageValueParsingError<'_>,
+    >(&bad_wire, true, &HashMap::new(), nom::Err::Error(bad));
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -772,8 +809,13 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
             ),
         ),
     );
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<BmpMessageValue, LocatedBmpMessageValueParsingError<'_>>(&bad_wire, &bad);
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        BmpMessageValue,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedBmpMessageValueParsingError<'_>,
+    >(&bad_wire, true, &HashMap::new(), nom::Err::Error(bad));
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -848,32 +890,110 @@ fn test_peer_down_reason() -> Result<(), PeerDownNotificationReasonWritingError>
         ),
     );
 
-    test_parsed_completely(&good_local_fsm_wire, &good_local_fsm);
-    test_parsed_completely(&good_local_pdu_wire, &good_local_pdu);
-    test_parsed_completely(&bad_remote_pdu_bgp_wire, &good_remote_pdu);
-    test_parsed_completely(&good_remote_no_data_wire, &good_remote_no_data);
-    test_parsed_completely(&good_peer_de_configured_wire, &good_peer_de_configured);
-    test_parsed_completely(&good_local_system_closed_wire, &good_local_system_closed);
-    test_parsed_completely(&good_experimental_251_wire, &good_experimental_251);
-    test_parsed_completely(&good_experimental_252_wire, &good_experimental_252);
-    test_parsed_completely(&good_experimental_253_wire, &good_experimental_253);
-    test_parsed_completely(&good_experimental_254_wire, &good_experimental_254);
+    test_parsed_completely_with_two_inputs(
+        &good_local_fsm_wire,
+        true,
+        &HashMap::new(),
+        &good_local_fsm,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_local_pdu_wire,
+        true,
+        &HashMap::new(),
+        &good_local_pdu,
+    );
+    test_parsed_completely_with_two_inputs(
+        &bad_remote_pdu_bgp_wire,
+        true,
+        &HashMap::new(),
+        &good_remote_pdu,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_remote_no_data_wire,
+        true,
+        &HashMap::new(),
+        &good_remote_no_data,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_peer_de_configured_wire,
+        true,
+        &HashMap::new(),
+        &good_peer_de_configured,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_local_system_closed_wire,
+        true,
+        &HashMap::new(),
+        &good_local_system_closed,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_experimental_251_wire,
+        true,
+        &HashMap::new(),
+        &good_experimental_251,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_experimental_252_wire,
+        true,
+        &HashMap::new(),
+        &good_experimental_252,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_experimental_253_wire,
+        true,
+        &HashMap::new(),
+        &good_experimental_253,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_experimental_254_wire,
+        true,
+        &HashMap::new(),
+        &good_experimental_254,
+    );
 
-    test_parse_error::<PeerDownNotificationReason, LocatedPeerDownNotificationReasonParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        PeerDownNotificationReason,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPeerDownNotificationReasonParsingError<'_>,
+    >(
         &bad_local_pdu_bgp_wire,
-        &bad_local_pdu_bgp,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_local_pdu_bgp),
     );
-    test_parse_error::<PeerDownNotificationReason, LocatedPeerDownNotificationReasonParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        PeerDownNotificationReason,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPeerDownNotificationReasonParsingError<'_>,
+    >(
         &bad_local_system_closed_wire,
-        &bad_local_system_closed,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_local_system_closed),
     );
-    test_parse_error::<PeerDownNotificationReason, LocatedPeerDownNotificationReasonParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        PeerDownNotificationReason,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPeerDownNotificationReasonParsingError<'_>,
+    >(
         &bad_eof_wire,
-        &bad_eof,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_eof),
     );
-    test_parse_error::<PeerDownNotificationReason, LocatedPeerDownNotificationReasonParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        PeerDownNotificationReason,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPeerDownNotificationReasonParsingError<'_>,
+    >(
         &bad_undefined_reason_code_wire,
-        &bad_undefined_reason_code,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_undefined_reason_code),
     );
 
     test_write(&good_local_fsm, &good_local_fsm_wire)?;
@@ -949,19 +1069,41 @@ fn test_peer_down_notification() -> Result<(), PeerDownNotificationMessageWritin
             ),
         ),
     );
-    test_parsed_completely(&good_wire, &good);
-    test_parse_error::<
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
+
+    test_parse_error_with_two_inputs::<
         PeerDownNotificationMessage,
+        bool,
+        &HashMap<AddressType, bool>,
         LocatedPeerDownNotificationMessageParsingError<'_>,
-    >(&bad_information_wire, &bad_information);
-    test_parse_error::<
+    >(
+        &bad_information_wire,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_information),
+    );
+    test_parse_error_with_two_inputs::<
         PeerDownNotificationMessage,
+        bool,
+        &HashMap<AddressType, bool>,
         LocatedPeerDownNotificationMessageParsingError<'_>,
-    >(&bad_peer_header_wire, &bad_peer_header);
-    test_parse_error::<
+    >(
+        &bad_peer_header_wire,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_peer_header),
+    );
+    test_parse_error_with_two_inputs::<
         PeerDownNotificationMessage,
+        bool,
+        &HashMap<AddressType, bool>,
         LocatedPeerDownNotificationMessageParsingError<'_>,
-    >(&bad_peer_reason_wire, &bad_peer_reason);
+    >(
+        &bad_peer_reason_wire,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_peer_reason),
+    );
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -1002,11 +1144,18 @@ fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
         BmpMessageValueParsingError::NomError(ErrorKind::Eof),
     );
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
 
-    test_parse_error::<BmpMessageValue, LocatedBmpMessageValueParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        BmpMessageValue,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedBmpMessageValueParsingError<'_>,
+    >(
         &bad_eof_wire,
-        &bad_eof,
+        true,
+        &HashMap::new(),
+        nom::Err::Error(bad_eof),
     );
 
     test_write(&good, &good_wire)?;
@@ -1033,12 +1182,37 @@ fn test_router_mirroring_value() -> Result<(), RouteMirroringValueWritingError> 
     let good_experimental_65533 = RouteMirroringValue::Experimental65533(vec![1, 2]);
     let good_experimental_65534 = RouteMirroringValue::Experimental65534(vec![1, 2]);
 
-    test_parsed_completely(&good_bgp_wire, &good_bgp);
-    test_parsed_completely(&good_information_wire, &good_information);
-    test_parsed_completely(&good_experimental_65531_wire, &good_experimental_65531);
-    test_parsed_completely(&good_experimental_65532_wire, &good_experimental_65532);
-    test_parsed_completely(&good_experimental_65533_wire, &good_experimental_65533);
-    test_parsed_completely(&good_experimental_65534_wire, &good_experimental_65534);
+    test_parsed_completely_with_two_inputs(&good_bgp_wire, true, &HashMap::new(), &good_bgp);
+    test_parsed_completely_with_two_inputs(
+        &good_information_wire,
+        true,
+        &HashMap::new(),
+        &good_information,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_experimental_65531_wire,
+        true,
+        &HashMap::new(),
+        &good_experimental_65531,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_experimental_65532_wire,
+        true,
+        &HashMap::new(),
+        &good_experimental_65532,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_experimental_65533_wire,
+        true,
+        &HashMap::new(),
+        &good_experimental_65533,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_experimental_65534_wire,
+        true,
+        &HashMap::new(),
+        &good_experimental_65534,
+    );
 
     test_write(&good_bgp, &good_bgp_wire)?;
     test_write(&good_information, &good_information_wire)?;
@@ -1075,7 +1249,7 @@ fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
         ),
         vec![RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive)],
     )));
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -1170,7 +1344,7 @@ fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
         ),
         vec![TerminationInformation::String("test".to_string())],
     )));
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -1216,7 +1390,7 @@ fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
             ],
         ),
     ));
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -1358,7 +1532,7 @@ fn test_bmp_stats() -> Result<(), BmpMessageWritingError> {
         ),
     ));
 
-    test_parsed_completely(&good_wire, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }

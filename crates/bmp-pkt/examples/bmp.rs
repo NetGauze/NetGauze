@@ -7,8 +7,9 @@ use netgauze_bmp_pkt::{
     iana::RouteMirroringInformation, BmpMessage, BmpMessageValue, BmpPeerType, PeerHeader,
     RouteMirroringMessage, RouteMirroringValue,
 };
-use netgauze_parse_utils::{ReadablePdu, Span, WritablePdu};
+use netgauze_parse_utils::{ReadablePduWithTwoInputs, Span, WritablePdu};
 use std::{
+    collections::HashMap,
     io::Cursor,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
@@ -50,6 +51,6 @@ fn main() {
     );
 
     // Deserialize the message from binary format
-    let (_, bmp_msg_back) = BmpMessage::from_wire(Span::new(&buf)).unwrap();
+    let (_, bmp_msg_back) = BmpMessage::from_wire(Span::new(&buf), true, &HashMap::new()).unwrap();
     assert_eq!(bmp_msg, bmp_msg_back);
 }
