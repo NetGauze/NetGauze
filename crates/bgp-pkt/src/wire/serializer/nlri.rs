@@ -15,9 +15,9 @@
 
 use crate::{
     nlri::{
-        Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4Unicast, Ipv4UnicastAddress, Ipv6MplsVpnUnicast,
-        Ipv6Multicast, Ipv6Unicast, Ipv6UnicastAddress, LabeledIpv4NextHop, LabeledIpv6NextHop,
-        LabeledNextHop, MplsLabel, RouteDistinguisher,
+        Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4MulticastAddress, Ipv4Unicast, Ipv4UnicastAddress,
+        Ipv6MplsVpnUnicast, Ipv6Multicast, Ipv6MulticastAddress, Ipv6Unicast, Ipv6UnicastAddress,
+        LabeledIpv4NextHop, LabeledIpv6NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
     },
     wire::serializer::round_len,
 };
@@ -222,6 +222,28 @@ impl WritablePdu<Ipv6MulticastWritingError> for Ipv6Multicast {
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum Ipv6MulticastAddressWritingError {
+    StdIOError(#[from_std_io_error] String),
+    Ipv6MulticastError(#[from] Ipv6MulticastWritingError),
+}
+
+impl WritablePdu<Ipv6MulticastAddressWritingError> for Ipv6MulticastAddress {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.network().len()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6MulticastAddressWritingError> {
+        if let Some(path_id) = self.path_id() {
+            writer.write_u32::<NetworkEndian>(path_id)?;
+        }
+        self.network().write(writer)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum Ipv6MplsVpnUnicastWritingError {
     StdIOError(#[from_std_io_error] String),
     MplsLabelError(#[from] MplsLabelWritingError),
@@ -315,6 +337,28 @@ impl WritablePdu<Ipv4MulticastWritingError> for Ipv4Multicast {
         let len = self.len() - Self::BASE_LENGTH;
         writer.write_u8(self.address().prefix_len())?;
         writer.write_all(&self.address().network().octets()[..len])?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum Ipv4MulticastAddressWritingError {
+    StdIOError(#[from_std_io_error] String),
+    Ipv4MulticastError(#[from] Ipv4MulticastWritingError),
+}
+
+impl WritablePdu<Ipv4MulticastAddressWritingError> for Ipv4MulticastAddress {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.network().len()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4MulticastAddressWritingError> {
+        if let Some(path_id) = self.path_id() {
+            writer.write_u32::<NetworkEndian>(path_id)?;
+        }
+        self.network().write(writer)?;
         Ok(())
     }
 }

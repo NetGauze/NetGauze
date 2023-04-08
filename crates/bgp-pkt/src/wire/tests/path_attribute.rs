@@ -44,7 +44,10 @@ use netgauze_parse_utils::{test_helpers::*, Span};
 
 use crate::{
     community::*,
-    wire::deserializer::nlri::{Ipv4UnicastAddressParsingError, Ipv6UnicastAddressParsingError},
+    wire::deserializer::nlri::{
+        Ipv4UnicastAddressParsingError, Ipv6MulticastAddressParsingError,
+        Ipv6UnicastAddressParsingError,
+    },
 };
 use nom::error::ErrorKind;
 use std::{
@@ -1617,8 +1620,13 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast(
         true,
         PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast {
             nlri: vec![
-                Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8::/32").unwrap()).unwrap(),
-                Ipv6Multicast::from_net(Ipv6Net::from_str("fffd:0:0:8bea::/64").unwrap()).unwrap(),
+                Ipv6MulticastAddress::new_no_path_id(
+                    Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8::/32").unwrap()).unwrap(),
+                ),
+                Ipv6MulticastAddress::new_no_path_id(
+                    Ipv6Multicast::from_net(Ipv6Net::from_str("fffd:0:0:8bea::/64").unwrap())
+                        .unwrap(),
+                ),
             ],
         }),
     )
@@ -1626,11 +1634,15 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast(
 
     let invalid_afi = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
-        PathAttributeParsingError::MpUnreachErrorError(MpUnreachParsingError::Ipv6MulticastError(
-            Ipv6MulticastParsingError::InvalidMulticastNetwork(InvalidIpv6MulticastNetwork(
-                Ipv6Net::from_str("2001:db8::/32").unwrap(),
-            )),
-        )),
+        PathAttributeParsingError::MpUnreachErrorError(
+            MpUnreachParsingError::Ipv6MulticastAddressError(
+                Ipv6MulticastAddressParsingError::Ipv6MulticastError(
+                    Ipv6MulticastParsingError::InvalidMulticastNetwork(
+                        InvalidIpv6MulticastNetwork(Ipv6Net::from_str("2001:db8::/32").unwrap()),
+                    ),
+                ),
+            ),
+        ),
     );
 
     test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);

@@ -17,9 +17,10 @@ use crate::{
     iana::{RouteDistinguisherTypeCode, UndefinedRouteDistinguisherTypeCode},
     nlri::{
         InvalidIpv4MulticastNetwork, InvalidIpv4UnicastNetwork, InvalidIpv6MulticastNetwork,
-        InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4Unicast,
-        Ipv4UnicastAddress, Ipv6MplsVpnUnicast, Ipv6Multicast, Ipv6Unicast, Ipv6UnicastAddress,
-        LabeledIpv4NextHop, LabeledIpv6NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
+        InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4MulticastAddress,
+        Ipv4Unicast, Ipv4UnicastAddress, Ipv6MplsVpnUnicast, Ipv6Multicast, Ipv6MulticastAddress,
+        Ipv6Unicast, Ipv6UnicastAddress, LabeledIpv4NextHop, LabeledIpv6NextHop, LabeledNextHop,
+        MplsLabel, RouteDistinguisher,
     },
     wire::{
         deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError},
@@ -313,8 +314,6 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6UnicastAddressParsingError
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6MulticastParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
-    /// additional information.
     Ipv6PrefixError(
         #[from_external]
         #[from_located(module = "crate::wire::deserializer")]
@@ -327,6 +326,31 @@ impl<'a> ReadablePdu<'a, LocatedIpv6MulticastParsingError<'a>> for Ipv6Multicast
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv6MulticastParsingError<'a>> {
         let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
         Ok((buf, net))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum Ipv6MulticastAddressParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    Ipv6MulticastError(#[from_located(module = "self")] Ipv6MulticastParsingError),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6MulticastAddressParsingError<'a>>
+    for Ipv6MulticastAddress
+{
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedIpv6MulticastAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
+        let (buf, net) = parse_into_located(buf)?;
+        Ok((buf, Ipv6MulticastAddress::new(path_id, net)))
     }
 }
 
@@ -392,10 +416,6 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4UnicastAddressParsingError
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4MulticastParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
     Ipv4PrefixError(
         #[from_external]
         #[from_located(module = "crate::wire::deserializer")]
@@ -408,5 +428,30 @@ impl<'a> ReadablePdu<'a, LocatedIpv4MulticastParsingError<'a>> for Ipv4Multicast
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpv4MulticastParsingError<'a>> {
         let (buf, net) = nom::combinator::map_res(parse_into_located, Self::from_net)(buf)?;
         Ok((buf, net))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum Ipv4MulticastAddressParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    Ipv4MulticastError(#[from_located(module = "self")] Ipv4MulticastParsingError),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4MulticastAddressParsingError<'a>>
+    for Ipv4MulticastAddress
+{
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedIpv4MulticastAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
+        let (buf, net) = parse_into_located(buf)?;
+        Ok((buf, Ipv4MulticastAddress::new(path_id, net)))
     }
 }

@@ -174,7 +174,7 @@ impl Ipv4UnicastAddress {
         Self { path_id, network }
     }
 
-    pub const fn new_no_path(network: Ipv4Unicast) -> Self {
+    pub const fn new_no_path_id(network: Ipv4Unicast) -> Self {
         Self {
             path_id: None,
             network,
@@ -265,7 +265,35 @@ impl TryFrom<Ipv4Net> for Ipv4Multicast {
     }
 }
 
-impl NlriAddressType for Ipv4Multicast {
+/// Ipv4 Multicast Network address in NLRI
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Ipv4MulticastAddress {
+    path_id: Option<u32>,
+    network: Ipv4Multicast,
+}
+
+impl Ipv4MulticastAddress {
+    pub const fn new(path_id: Option<u32>, network: Ipv4Multicast) -> Self {
+        Self { path_id, network }
+    }
+
+    pub const fn new_no_path_id(network: Ipv4Multicast) -> Self {
+        Self {
+            path_id: None,
+            network,
+        }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
+    }
+
+    pub const fn network(&self) -> Ipv4Multicast {
+        self.network
+    }
+}
+
+impl NlriAddressType for Ipv4MulticastAddress {
     fn address_type() -> AddressType {
         AddressType::Ipv4Multicast
     }
@@ -400,7 +428,35 @@ impl TryFrom<Ipv6Net> for Ipv6Multicast {
     }
 }
 
-impl NlriAddressType for Ipv6Multicast {
+/// Ipv4 Multicast Network address in NLRI
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Ipv6MulticastAddress {
+    path_id: Option<u32>,
+    network: Ipv6Multicast,
+}
+
+impl Ipv6MulticastAddress {
+    pub const fn new(path_id: Option<u32>, network: Ipv6Multicast) -> Self {
+        Self { path_id, network }
+    }
+
+    pub const fn new_no_path_id(network: Ipv6Multicast) -> Self {
+        Self {
+            path_id: None,
+            network,
+        }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
+    }
+
+    pub const fn network(&self) -> Ipv6Multicast {
+        self.network
+    }
+}
+
+impl NlriAddressType for Ipv6MulticastAddress {
     fn address_type() -> AddressType {
         AddressType::Ipv6Multicast
     }
@@ -441,7 +497,10 @@ mod tests {
         assert!(multicast.is_ok());
         assert!(multicast.is_ok());
         assert_eq!(multicast.unwrap().address(), &multicast_addr);
-        assert_eq!(Ipv4Multicast::address_type(), AddressType::Ipv4Multicast);
+        assert_eq!(
+            Ipv4MulticastAddress::address_type(),
+            AddressType::Ipv4Multicast
+        );
         assert_eq!(unicast, Err(InvalidIpv4MulticastNetwork(unicast_addr)));
     }
 
@@ -469,7 +528,10 @@ mod tests {
 
         assert!(multicast.is_ok());
         assert_eq!(multicast.unwrap().address(), &multicast_addr);
-        assert_eq!(Ipv6Multicast::address_type(), AddressType::Ipv6Multicast);
+        assert_eq!(
+            Ipv6MulticastAddress::address_type(),
+            AddressType::Ipv6Multicast
+        );
         assert_eq!(unicast, Err(InvalidIpv6MulticastNetwork(unicast_addr)));
     }
 }

@@ -950,7 +950,7 @@ pub enum MpUnreach {
         nlri: Vec<Ipv4UnicastAddress>,
     },
     Ipv4Multicast {
-        nlri: Vec<Ipv4Multicast>,
+        nlri: Vec<Ipv4MulticastAddress>,
     },
     Ipv4MplsVpnUnicast {
         nlri: Vec<Ipv4MplsVpnUnicast>,
@@ -959,7 +959,7 @@ pub enum MpUnreach {
         nlri: Vec<Ipv6UnicastAddress>,
     },
     Ipv6Multicast {
-        nlri: Vec<Ipv6Multicast>,
+        nlri: Vec<Ipv6MulticastAddress>,
     },
     Ipv6MplsVpnUnicast {
         nlri: Vec<Ipv6MplsVpnUnicast>,

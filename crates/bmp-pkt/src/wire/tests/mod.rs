@@ -511,7 +511,7 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
                 )
                 .unwrap(),
             ],
-            vec![Ipv4UnicastAddress::new_no_path(
+            vec![Ipv4UnicastAddress::new_no_path_id(
                 Ipv4Unicast::from_net(Ipv4Net::from_str("172.16.1.0/24").unwrap()).unwrap(),
             )],
         ))],
@@ -620,7 +620,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                     )
                     .unwrap(),
                 ],
-                vec![Ipv4UnicastAddress::new_no_path(
+                vec![Ipv4UnicastAddress::new_no_path_id(
                     Ipv4Unicast::from_net(Ipv4Net::from_str("172.16.1.0/24").unwrap()).unwrap(),
                 )],
             ))],

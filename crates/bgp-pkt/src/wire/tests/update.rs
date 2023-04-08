@@ -44,7 +44,7 @@ fn test_withdraw_route() -> Result<(), Ipv4UnicastAddressWritingError> {
     let bad_overflow_wire = [0xff, 0xac, 0x10, 0x01];
     let bad_prefix_wire = [0x21, 0xac, 0x10, 0xff, 0xff, 0xff];
 
-    let good = Ipv4UnicastAddress::new_no_path(
+    let good = Ipv4UnicastAddress::new_no_path_id(
         Ipv4Unicast::from_net(Ipv4Net::from_str("172.16.1.0/24").unwrap()).unwrap(),
     );
     let bad_overflow = LocatedIpv4UnicastAddressParsingError::new(
@@ -116,7 +116,7 @@ fn test_withdraw_update() -> Result<(), BgpMessageWritingError> {
         0xff, 0x00, 0x1b, 0x02, 0x00, 0x04, 0x18, 0xac, 0x10, 0x01, 0x00, 0x00,
     ];
     let good_withdraw = BgpMessage::Update(BgpUpdateMessage::new(
-        vec![Ipv4UnicastAddress::new_no_path(
+        vec![Ipv4UnicastAddress::new_no_path_id(
             Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(172, 16, 1, 0), 24).unwrap()).unwrap(),
         )],
         vec![],
