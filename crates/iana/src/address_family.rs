@@ -395,7 +395,7 @@ impl TryFrom<u8> for SubsequentAddressFamily {
 /// Since not all [`AddressFamily`] and [`SubsequentAddressFamily`] are valid
 /// combinations, this enum defines a set of valid combination to ensure only
 /// valid AFI/SAFI are used at compile time.
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
 pub enum AddressType {
     Ipv4Unicast,
     Ipv4Multicast,
