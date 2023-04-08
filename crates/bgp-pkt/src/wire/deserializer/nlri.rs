@@ -17,10 +17,10 @@ use crate::{
     iana::{RouteDistinguisherTypeCode, UndefinedRouteDistinguisherTypeCode},
     nlri::{
         InvalidIpv4MulticastNetwork, InvalidIpv4UnicastNetwork, InvalidIpv6MulticastNetwork,
-        InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4MulticastAddress,
-        Ipv4Unicast, Ipv4UnicastAddress, Ipv6MplsVpnUnicast, Ipv6Multicast, Ipv6MulticastAddress,
-        Ipv6Unicast, Ipv6UnicastAddress, LabeledIpv4NextHop, LabeledIpv6NextHop, LabeledNextHop,
-        MplsLabel, RouteDistinguisher,
+        InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicastAddress, Ipv4Multicast, Ipv4MulticastAddress,
+        Ipv4Unicast, Ipv4UnicastAddress, Ipv6MplsVpnUnicastAddress, Ipv6Multicast,
+        Ipv6MulticastAddress, Ipv6Unicast, Ipv6UnicastAddress, LabeledIpv4NextHop,
+        LabeledIpv6NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
     },
     wire::{
         deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError},
@@ -171,7 +171,7 @@ impl<'a> ReadablePdu<'a, LocatedLabeledNextHopParsingError<'a>> for LabeledNextH
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum Ipv4MplsVpnUnicastParsingError {
+pub enum Ipv4MplsVpnUnicastAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidPrefixLength(u8),
@@ -180,10 +180,13 @@ pub enum Ipv4MplsVpnUnicastParsingError {
     MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedIpv4MplsVpnUnicastParsingError<'a>> for Ipv4MplsVpnUnicast {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>>
+    for Ipv4MplsVpnUnicastAddress
+{
     fn from_wire(
         buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedIpv4MplsVpnUnicastParsingError<'a>> {
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>> {
         let input = buf;
         let (mut buf, prefix_len) = be_u8(buf)?;
         let mut label_stack = vec![];
@@ -194,25 +197,36 @@ impl<'a> ReadablePdu<'a, LocatedIpv4MplsVpnUnicastParsingError<'a>> for Ipv4Mpls
             is_bottom = label.is_bottom();
             label_stack.push(label);
         }
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
         let (buf, rd) = parse_into_located(buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
         let reminder_prefix_len = match prefix_len.checked_sub(read_prefix) {
             None => {
-                return Err(nom::Err::Error(LocatedIpv4MplsVpnUnicastParsingError::new(
-                    input,
-                    Ipv4MplsVpnUnicastParsingError::InvalidPrefixLength(prefix_len),
-                )));
+                return Err(nom::Err::Error(
+                    LocatedIpv4MplsVpnUnicastAddressParsingError::new(
+                        input,
+                        Ipv4MplsVpnUnicastAddressParsingError::InvalidPrefixLength(prefix_len),
+                    ),
+                ));
             }
             Some(val) => val,
         };
         let (buf, network) = parse_into_located_two_inputs(buf, reminder_prefix_len, input)?;
-        Ok((buf, Ipv4MplsVpnUnicast::new(rd, label_stack, network)))
+        Ok((
+            buf,
+            Ipv4MplsVpnUnicastAddress::new(path_id, rd, label_stack, network),
+        ))
     }
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum Ipv6MplsVpnUnicastParsingError {
+pub enum Ipv6MplsVpnUnicastAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
@@ -221,10 +235,13 @@ pub enum Ipv6MplsVpnUnicastParsingError {
     Ipv6UnicastError(#[from_located(module = "self")] Ipv6UnicastParsingError),
 }
 
-impl<'a> ReadablePdu<'a, LocatedIpv6MplsVpnUnicastParsingError<'a>> for Ipv6MplsVpnUnicast {
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>>
+    for Ipv6MplsVpnUnicastAddress
+{
     fn from_wire(
         buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedIpv6MplsVpnUnicastParsingError<'a>> {
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>> {
         let input = buf;
         let (mut buf, prefix_len) = be_u8(buf)?;
         let mut label_stack = vec![];
@@ -235,20 +252,31 @@ impl<'a> ReadablePdu<'a, LocatedIpv6MplsVpnUnicastParsingError<'a>> for Ipv6Mpls
             is_bottom = label.is_bottom();
             label_stack.push(label);
         }
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
         let (buf, rd) = parse_into_located(buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
         let reminder_prefix_len = match prefix_len.checked_sub(read_prefix) {
             None => {
-                return Err(nom::Err::Error(LocatedIpv6MplsVpnUnicastParsingError::new(
-                    input,
-                    Ipv6MplsVpnUnicastParsingError::InvalidPrefixLength(prefix_len),
-                )));
+                return Err(nom::Err::Error(
+                    LocatedIpv6MplsVpnUnicastAddressParsingError::new(
+                        input,
+                        Ipv6MplsVpnUnicastAddressParsingError::InvalidPrefixLength(prefix_len),
+                    ),
+                ));
             }
             Some(val) => val,
         };
         let (buf, network) = parse_into_located_two_inputs(buf, reminder_prefix_len, input)?;
-        Ok((buf, Ipv6MplsVpnUnicast::new(rd, label_stack, network)))
+        Ok((
+            buf,
+            Ipv6MplsVpnUnicastAddress::new(path_id, rd, label_stack, network),
+        ))
     }
 }
 

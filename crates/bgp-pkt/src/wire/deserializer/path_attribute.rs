@@ -555,20 +555,24 @@ pub enum MpReachParsingError {
     Ipv4UnicastAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastAddressParsingError,
     ),
-    Ipv4MulticastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MulticastParsingError,
+    Ipv4MulticastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")]
+        Ipv4MulticastAddressParsingError,
     ),
-    Ipv4MplsVpnUnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
+    Ipv4MplsVpnUnicastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")]
+        Ipv4MplsVpnUnicastAddressParsingError,
     ),
     Ipv6UnicastAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastAddressParsingError,
     ),
-    Ipv6MulticastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MulticastParsingError,
+    Ipv6MulticastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")]
+        Ipv6MulticastAddressParsingError,
     ),
-    Ipv6MplsVpnUnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MplsVpnUnicastParsingError,
+    Ipv6MplsVpnUnicastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")]
+        Ipv6MplsVpnUnicastAddressParsingError,
     ),
     LabeledNextHopError(
         #[from_located(module = "crate::wire::deserializer::nlri")] LabeledNextHopParsingError,
@@ -609,13 +613,19 @@ impl<'a>
                 let (mp_buf, next_hop) = be_u32(mp_buf)?;
                 let next_hop = Ipv4Addr::from(next_hop);
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv4Multicast)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::Ipv4Multicast { next_hop, nlri }))
             }
             Ok(AddressType::Ipv4MplsLabeledVpn) => {
                 let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv4MplsLabeledVpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::Ipv4MplsVpnUnicast { next_hop, nlri }))
             }
             Ok(AddressType::Ipv6Unicast) => {
@@ -653,7 +663,10 @@ impl<'a>
                     (mp_buf, None)
                 };
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv6Multicast)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((
                     buf,
                     MpReach::Ipv6Multicast {
@@ -690,18 +703,20 @@ pub enum MpUnreachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")]
         Ipv4MulticastAddressParsingError,
     ),
-    Ipv4MplsVpnUnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
+    Ipv4MplsVpnUnicastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")]
+        Ipv4MplsVpnUnicastAddressParsingError,
     ),
-    Ipv6UnicastError(
+    Ipv6UnicastAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastAddressParsingError,
     ),
     Ipv6MulticastAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")]
         Ipv6MulticastAddressParsingError,
     ),
-    Ipv6MplsVpnUnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MplsVpnUnicastParsingError,
+    Ipv6MplsVpnUnicastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")]
+        Ipv6MplsVpnUnicastAddressParsingError,
     ),
 }
 
@@ -742,7 +757,10 @@ impl<'a>
                 Ok((buf, MpUnreach::Ipv4Multicast { nlri }))
             }
             Ok(AddressType::Ipv4MplsLabeledVpn) => {
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv4Multicast)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::Ipv4MplsVpnUnicast { nlri }))
             }
             Ok(AddressType::Ipv6Unicast) => {
@@ -760,8 +778,11 @@ impl<'a>
                 Ok((buf, MpUnreach::Ipv6Multicast { nlri }))
             }
             Ok(AddressType::Ipv6MplsLabeledVpn) => {
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
-                Ok((buf, MpUnreach::Ipv6MplsVpnUnicast { nlri }))
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv6MplsLabeledVpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpUnreach::Ipv6MplsVpnUnicastAddress { nlri }))
             }
             Ok(_) | Err(_) => Ok((
                 buf,

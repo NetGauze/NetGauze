@@ -887,11 +887,11 @@ pub enum MpReach {
     },
     Ipv4Multicast {
         next_hop: Ipv4Addr,
-        nlri: Vec<Ipv4Multicast>,
+        nlri: Vec<Ipv4MulticastAddress>,
     },
     Ipv4MplsVpnUnicast {
         next_hop: LabeledNextHop,
-        nlri: Vec<Ipv4MplsVpnUnicast>,
+        nlri: Vec<Ipv4MplsVpnUnicastAddress>,
     },
     Ipv6Unicast {
         next_hop_global: Ipv6Addr,
@@ -901,12 +901,12 @@ pub enum MpReach {
     Ipv6Multicast {
         next_hop_global: Ipv6Addr,
         next_hop_local: Option<Ipv6Addr>,
-        nlri: Vec<Ipv6Multicast>,
+        nlri: Vec<Ipv6MulticastAddress>,
     },
-    Ipv6MplsVpnUnicast {
+    Ipv6MplsVpnUnicastAddress {
         next_hop_global: LabeledNextHop,
         next_hop_local: Option<LabeledNextHop>,
-        nlri: Vec<Ipv6MplsVpnUnicast>,
+        nlri: Vec<Ipv6MplsVpnUnicastAddress>,
     },
     Unknown {
         afi: AddressFamily,
@@ -953,7 +953,7 @@ pub enum MpUnreach {
         nlri: Vec<Ipv4MulticastAddress>,
     },
     Ipv4MplsVpnUnicast {
-        nlri: Vec<Ipv4MplsVpnUnicast>,
+        nlri: Vec<Ipv4MplsVpnUnicastAddress>,
     },
     Ipv6Unicast {
         nlri: Vec<Ipv6UnicastAddress>,
@@ -961,8 +961,8 @@ pub enum MpUnreach {
     Ipv6Multicast {
         nlri: Vec<Ipv6MulticastAddress>,
     },
-    Ipv6MplsVpnUnicast {
-        nlri: Vec<Ipv6MplsVpnUnicast>,
+    Ipv6MplsVpnUnicastAddress {
+        nlri: Vec<Ipv6MplsVpnUnicastAddress>,
     },
     Unknown {
         afi: AddressFamily,

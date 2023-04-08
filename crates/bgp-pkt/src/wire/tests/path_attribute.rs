@@ -45,8 +45,8 @@ use netgauze_parse_utils::{test_helpers::*, Span};
 use crate::{
     community::*,
     wire::deserializer::nlri::{
-        Ipv4UnicastAddressParsingError, Ipv6MulticastAddressParsingError,
-        Ipv6UnicastAddressParsingError,
+        Ipv4MulticastAddressParsingError, Ipv4UnicastAddressParsingError,
+        Ipv6MulticastAddressParsingError, Ipv6UnicastAddressParsingError,
     },
 };
 use nom::error::ErrorKind;
@@ -1374,20 +1374,24 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_multicast() -> Result<(), PathAt
         true,
         PathAttributeValue::MpReach(MpReach::Ipv4Multicast {
             next_hop: Ipv4Addr::new(172, 16, 0, 20),
-            nlri: vec![
+            nlri: vec![Ipv4MulticastAddress::new_no_path_id(
                 Ipv4Multicast::from_net(Ipv4Net::from_str("224.0.0.0/16").unwrap()).unwrap(),
-            ],
+            )],
         }),
     )
     .unwrap();
 
     let invalid = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(14, &invalid_wire[14..]) },
-        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv4MulticastError(
-            Ipv4MulticastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
-                ErrorKind::Eof,
-            )),
-        )),
+        PathAttributeParsingError::MpReachErrorError(
+            MpReachParsingError::Ipv4MulticastAddressError(
+                Ipv4MulticastAddressParsingError::Ipv4MulticastError(
+                    Ipv4MulticastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
+                        ErrorKind::Eof,
+                    )),
+                ),
+            ),
+        ),
     );
 
     test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
@@ -1506,9 +1510,17 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
             next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
             next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
             nlri: vec![
-                Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1:2::/64").unwrap()).unwrap(),
-                Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1:1::/64").unwrap()).unwrap(),
-                Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1::/64").unwrap()).unwrap(),
+                Ipv6MulticastAddress::new_no_path_id(
+                    Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1:2::/64").unwrap())
+                        .unwrap(),
+                ),
+                Ipv6MulticastAddress::new_no_path_id(
+                    Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1:1::/64").unwrap())
+                        .unwrap(),
+                ),
+                Ipv6MulticastAddress::new_no_path_id(
+                    Ipv6Multicast::from_net(Ipv6Net::from_str("ff01:db8:1::/64").unwrap()).unwrap(),
+                ),
             ],
         }),
     )
@@ -1516,11 +1528,17 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
 
     let invalid = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(40, &invalid_addr_wire[40..]) },
-        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv6MulticastError(
-            Ipv6MulticastParsingError::InvalidMulticastNetwork(InvalidIpv6MulticastNetwork(
-                Ipv6Net::from_str("2001:db8:1:2::/64").unwrap(),
-            )),
-        )),
+        PathAttributeParsingError::MpReachErrorError(
+            MpReachParsingError::Ipv6MulticastAddressError(
+                Ipv6MulticastAddressParsingError::Ipv6MulticastError(
+                    Ipv6MulticastParsingError::InvalidMulticastNetwork(
+                        InvalidIpv6MulticastNetwork(
+                            Ipv6Net::from_str("2001:db8:1:2::/64").unwrap(),
+                        ),
+                    ),
+                ),
+            ),
+        ),
     );
 
     test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
@@ -1575,13 +1593,15 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_unicast() -> Result<(), PathAt
 
     let invalid_afi = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
-        PathAttributeParsingError::MpUnreachErrorError(MpUnreachParsingError::Ipv6UnicastError(
-            Ipv6UnicastAddressParsingError::Ipv6UnicastError(
-                Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
-                    Ipv6Net::from_str("ff01:db8::/32").unwrap(),
-                )),
+        PathAttributeParsingError::MpUnreachErrorError(
+            MpUnreachParsingError::Ipv6UnicastAddressError(
+                Ipv6UnicastAddressParsingError::Ipv6UnicastError(
+                    Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
+                        Ipv6Net::from_str("ff01:db8::/32").unwrap(),
+                    )),
+                ),
             ),
-        )),
+        ),
     );
 
     test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
@@ -1681,7 +1701,7 @@ fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
                 RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
                 Ipv6Addr::from_str("fc00::1").unwrap(),
             )),
-            nlri: vec![Ipv4MplsVpnUnicast::new(
+            nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
                 RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
                 vec![MplsLabel::new([0, 65, 1])],
                 Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),

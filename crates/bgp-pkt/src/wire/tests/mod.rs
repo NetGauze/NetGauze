@@ -43,8 +43,8 @@ use crate::{
         UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
     },
     nlri::{
-        Ipv4MplsVpnUnicast, Ipv4Unicast, Ipv4UnicastAddress, Ipv6Unicast, Ipv6UnicastAddress,
-        LabeledIpv4NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
+        Ipv4MplsVpnUnicastAddress, Ipv4Unicast, Ipv4UnicastAddress, Ipv6Unicast,
+        Ipv6UnicastAddress, LabeledIpv4NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
     },
     notification::CeaseError,
     open::{BgpOpenMessageParameter, BGP_VERSION},
@@ -519,7 +519,7 @@ fn test_rd_withdraw() -> Result<(), BgpMessageWritingError> {
             false,
             true,
             PathAttributeValue::MpUnreach(MpUnreach::Ipv4MplsVpnUnicast {
-                nlri: vec![Ipv4MplsVpnUnicast::new(
+                nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
                     RouteDistinguisher::As4Administrator {
                         asn4: 6553800,
                         number: 300,
@@ -630,7 +630,7 @@ fn test_rd_announce() -> Result<(), BgpMessageWritingError> {
                         RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
                         Ipv4Addr::new(213, 177, 127, 190),
                     )),
-                    nlri: vec![Ipv4MplsVpnUnicast::new(
+                    nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
                         RouteDistinguisher::As4Administrator {
                             asn4: 6553800,
                             number: 300,

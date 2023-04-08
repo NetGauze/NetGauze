@@ -197,23 +197,43 @@ impl NlriAddressType for Ipv4UnicastAddress {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Ipv4MplsVpnUnicast {
+pub struct Ipv4MplsVpnUnicastAddress {
+    path_id: Option<u32>,
     rd: RouteDistinguisher,
     label_stack: Vec<MplsLabel>,
     network: Ipv4Unicast,
 }
 
-impl Ipv4MplsVpnUnicast {
+impl Ipv4MplsVpnUnicastAddress {
     pub const fn new(
+        path_id: Option<u32>,
         rd: RouteDistinguisher,
         label_stack: Vec<MplsLabel>,
         network: Ipv4Unicast,
     ) -> Self {
         Self {
+            path_id,
             rd,
             label_stack,
             network,
         }
+    }
+
+    pub const fn new_no_path_id(
+        rd: RouteDistinguisher,
+        label_stack: Vec<MplsLabel>,
+        network: Ipv4Unicast,
+    ) -> Self {
+        Self {
+            path_id: None,
+            rd,
+            label_stack,
+            network,
+        }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
     }
 
     pub const fn rd(&self) -> &RouteDistinguisher {
@@ -229,7 +249,7 @@ impl Ipv4MplsVpnUnicast {
     }
 }
 
-impl NlriAddressType for Ipv4MplsVpnUnicast {
+impl NlriAddressType for Ipv4MplsVpnUnicastAddress {
     fn address_type() -> AddressType {
         AddressType::Ipv4MplsLabeledVpn
     }
@@ -356,19 +376,35 @@ impl NlriAddressType for Ipv6UnicastAddress {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Ipv6MplsVpnUnicast {
+pub struct Ipv6MplsVpnUnicastAddress {
+    path_id: Option<u32>,
     rd: RouteDistinguisher,
     label_stack: Vec<MplsLabel>,
     network: Ipv6Unicast,
 }
 
-impl Ipv6MplsVpnUnicast {
+impl Ipv6MplsVpnUnicastAddress {
     pub const fn new(
+        path_id: Option<u32>,
         rd: RouteDistinguisher,
         label_stack: Vec<MplsLabel>,
         network: Ipv6Unicast,
     ) -> Self {
         Self {
+            path_id,
+            rd,
+            label_stack,
+            network,
+        }
+    }
+
+    pub const fn new_no_path_id(
+        rd: RouteDistinguisher,
+        label_stack: Vec<MplsLabel>,
+        network: Ipv6Unicast,
+    ) -> Self {
+        Self {
+            path_id: None,
             rd,
             label_stack,
             network,
@@ -388,7 +424,7 @@ impl Ipv6MplsVpnUnicast {
     }
 }
 
-impl NlriAddressType for Ipv6MplsVpnUnicast {
+impl NlriAddressType for Ipv6MplsVpnUnicastAddress {
     fn address_type() -> AddressType {
         AddressType::Ipv6MplsLabeledVpn
     }
