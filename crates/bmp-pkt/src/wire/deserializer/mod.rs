@@ -17,6 +17,7 @@
 
 use chrono::{LocalResult, TimeZone, Utc};
 use std::{
+    collections::HashMap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     string::FromUtf8Error,
 };
@@ -270,7 +271,8 @@ impl<'a> ReadablePdu<'a, LocatedRouteMonitoringMessageParsingError<'a>> for Rout
         let mut bgp_messages = vec![];
         while !buf.is_empty() {
             let marker = buf;
-            let (t, msg): (Span<'_>, BgpMessage) = parse_into_located_two_inputs(buf, true, false)?;
+            let (t, msg): (Span<'_>, BgpMessage) =
+                parse_into_located_two_inputs(buf, true, &HashMap::new())?;
             if msg.get_type() != BgpMessageType::Update {
                 return Err(nom::Err::Error(
                     LocatedRouteMonitoringMessageParsingError::new(
@@ -468,8 +470,8 @@ impl<'a> ReadablePdu<'a, LocatedPeerUpNotificationMessageParsingError<'a>>
         } else {
             Some(remote_port)
         };
-        let (buf, sent_message) = parse_into_located_two_inputs(buf, true, false)?;
-        let (buf, received_message) = parse_into_located_two_inputs(buf, true, false)?;
+        let (buf, sent_message) = parse_into_located_two_inputs(buf, true, &HashMap::new())?;
+        let (buf, received_message) = parse_into_located_two_inputs(buf, true, &HashMap::new())?;
         let (buf, information) = parse_till_empty_into_located(buf)?;
         let peer_up_msg = PeerUpNotificationMessage::build(
             peer_header,
@@ -548,7 +550,7 @@ impl<'a> ReadablePdu<'a, LocatedPeerDownNotificationReasonParsingError<'a>>
             nom::combinator::map_res(be_u8, PeerDownReasonCode::try_from)(buf)?;
         match reason_code {
             PeerDownReasonCode::LocalSystemClosedNotificationPduFollows => {
-                let (buf, msg) = parse_into_located_two_inputs(buf, true, false)?;
+                let (buf, msg) = parse_into_located_two_inputs(buf, true, &HashMap::new())?;
                 Ok((
                     buf,
                     PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg),
@@ -562,7 +564,7 @@ impl<'a> ReadablePdu<'a, LocatedPeerDownNotificationReasonParsingError<'a>>
                 ))
             }
             PeerDownReasonCode::RemoteSystemClosedNotificationPduFollows => {
-                let (buf, msg) = parse_into_located_two_inputs(buf, true, false)?;
+                let (buf, msg) = parse_into_located_two_inputs(buf, true, &HashMap::new())?;
                 Ok((
                     buf,
                     PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(msg),
@@ -649,7 +651,7 @@ impl<'a> ReadablePdu<'a, LocatedRouteMirroringValueParsingError<'a>> for RouteMi
         let (reminder, buf) = nom::multi::length_data(be_u16)(buf)?;
         let (buf, value) = match code {
             RouteMirroringTlvType::BgpMessage => {
-                let (buf, msg) = parse_into_located_two_inputs(buf, true, false)?;
+                let (buf, msg) = parse_into_located_two_inputs(buf, true, &HashMap::new())?;
                 (buf, RouteMirroringValue::BgpMessage(msg))
             }
             RouteMirroringTlvType::Information => {

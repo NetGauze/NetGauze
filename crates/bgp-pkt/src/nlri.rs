@@ -162,7 +162,35 @@ impl TryFrom<Ipv4Net> for Ipv4Unicast {
     }
 }
 
-impl NlriAddressType for Ipv4Unicast {
+/// Ipv4 Network address in NLRI
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Ipv4UnicastAddress {
+    path_id: Option<u32>,
+    network: Ipv4Unicast,
+}
+
+impl Ipv4UnicastAddress {
+    pub const fn new(path_id: Option<u32>, network: Ipv4Unicast) -> Self {
+        Self { path_id, network }
+    }
+
+    pub const fn new_no_path(network: Ipv4Unicast) -> Self {
+        Self {
+            path_id: None,
+            network,
+        }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
+    }
+
+    pub const fn network(&self) -> Ipv4Unicast {
+        self.network
+    }
+}
+
+impl NlriAddressType for Ipv4UnicastAddress {
     fn address_type() -> AddressType {
         AddressType::Ipv4Unicast
     }
@@ -272,7 +300,28 @@ impl TryFrom<Ipv6Net> for Ipv6Unicast {
     }
 }
 
-impl NlriAddressType for Ipv6Unicast {
+/// Ipv6 Network address in NLRI
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Ipv6UnicastAddress {
+    path_id: Option<u32>,
+    network: Ipv6Unicast,
+}
+
+impl Ipv6UnicastAddress {
+    pub const fn new(path_id: Option<u32>, network: Ipv6Unicast) -> Self {
+        Self { path_id, network }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
+    }
+
+    pub const fn network(&self) -> Ipv6Unicast {
+        self.network
+    }
+}
+
+impl NlriAddressType for Ipv6UnicastAddress {
     fn address_type() -> AddressType {
         AddressType::Ipv6Unicast
     }
@@ -377,7 +426,7 @@ mod tests {
         assert!(unicast.is_ok());
         assert!(unicast.is_ok());
         assert_eq!(unicast.unwrap().address(), &unicast_addr);
-        assert_eq!(Ipv4Unicast::address_type(), AddressType::Ipv4Unicast);
+        assert_eq!(Ipv4UnicastAddress::address_type(), AddressType::Ipv4Unicast);
         assert_eq!(multicast, Err(InvalidIpv4UnicastNetwork(multicast_addr)));
     }
 
@@ -406,7 +455,7 @@ mod tests {
 
         assert!(unicast.is_ok());
         assert_eq!(unicast.unwrap().address(), &unicast_addr);
-        assert_eq!(Ipv6Unicast::address_type(), AddressType::Ipv6Unicast);
+        assert_eq!(Ipv6UnicastAddress::address_type(), AddressType::Ipv6Unicast);
         assert_eq!(multicast, Err(InvalidIpv6UnicastNetwork(multicast_addr)));
     }
 

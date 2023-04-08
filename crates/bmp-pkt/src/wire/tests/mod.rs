@@ -21,14 +21,14 @@ use netgauze_bgp_pkt::{
         FourOctetAsCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
     iana::{BgpMessageType, UndefinedBgpMessageType},
-    nlri::Ipv4Unicast,
+    nlri::{Ipv4Unicast, Ipv4UnicastAddress},
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
     path_attribute::{
         As4PathSegment, AsPath, AsPathSegmentType, NextHop, Origin, PathAttribute,
         PathAttributeValue,
     },
-    update::{BgpUpdateMessage, NetworkLayerReachabilityInformation},
+    update::BgpUpdateMessage,
     wire::deserializer::{nlri::RouteDistinguisherParsingError, BgpMessageParsingError},
     BgpMessage,
 };
@@ -511,10 +511,9 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
                 )
                 .unwrap(),
             ],
-            NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Unicast::from_net(
-                Ipv4Net::from_str("172.16.1.0/24").unwrap(),
-            )
-            .unwrap()]),
+            vec![Ipv4UnicastAddress::new_no_path(
+                Ipv4Unicast::from_net(Ipv4Net::from_str("172.16.1.0/24").unwrap()).unwrap(),
+            )],
         ))],
     )
     .unwrap();
@@ -621,10 +620,9 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                     )
                     .unwrap(),
                 ],
-                NetworkLayerReachabilityInformation::Ipv4(vec![Ipv4Unicast::from_net(
-                    Ipv4Net::from_str("172.16.1.0/24").unwrap(),
-                )
-                .unwrap()]),
+                vec![Ipv4UnicastAddress::new_no_path(
+                    Ipv4Unicast::from_net(Ipv4Net::from_str("172.16.1.0/24").unwrap()).unwrap(),
+                )],
             ))],
         )
         .unwrap(),

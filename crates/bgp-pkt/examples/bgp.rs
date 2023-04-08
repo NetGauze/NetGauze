@@ -1,7 +1,7 @@
 //! Simple example of constructing BGP packet
 //! in addition to serializing and deserializing BGP packet from wire format.
 
-use std::{io::Cursor, net::Ipv4Addr};
+use std::{collections::HashMap, io::Cursor, net::Ipv4Addr};
 
 use netgauze_bgp_pkt::{capabilities::*, open::*, *};
 use netgauze_iana::address_family::*;
@@ -60,6 +60,6 @@ pub fn main() {
     );
 
     // Deserialize the message from binary format
-    let (_, msg_back) = BgpMessage::from_wire(Span::new(&buf), true, false).unwrap();
+    let (_, msg_back) = BgpMessage::from_wire(Span::new(&buf), true, &HashMap::new()).unwrap();
     assert_eq!(msg, msg_back);
 }

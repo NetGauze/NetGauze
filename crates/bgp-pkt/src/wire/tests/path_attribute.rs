@@ -37,14 +37,18 @@ use crate::{
 };
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_iana::address_family::{
-    AddressFamily, SubsequentAddressFamily, UndefinedAddressFamily,
+    AddressFamily, AddressType, SubsequentAddressFamily, UndefinedAddressFamily,
     UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{test_helpers::*, Span};
 
-use crate::community::*;
+use crate::{
+    community::*,
+    wire::deserializer::nlri::{Ipv4UnicastAddressParsingError, Ipv6UnicastAddressParsingError},
+};
 use nom::error::ErrorKind;
 use std::{
+    collections::HashMap,
     net::{Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
@@ -137,17 +141,34 @@ fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
         PathAttributeParsingError::OriginError(OriginParsingError::NomError(ErrorKind::Eof)),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, false, &good_extended);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_extended_wire,
+        false,
+        &HashMap::new(),
+        &good_extended,
+    );
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &bad_extended_wire,
         false,
-        &bad_extended,
+        &HashMap::new(),
+        nom::Err::Error(bad_extended),
     );
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &bad_incomplete_wire,
         false,
-        &bad_incomplete,
+        &HashMap::new(),
+        nom::Err::Error(bad_incomplete),
     );
 
     test_write(&good, &good_wire)?;
@@ -349,12 +370,23 @@ fn test_path_attribute_as2_path() -> Result<(), PathAttributeWritingError> {
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_wire_extended, false, &good_extended);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_wire_extended,
+        false,
+        &HashMap::new(),
+        &good_extended,
+    );
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &undefined_segment_type_wire,
         false,
-        &undefined_segment_type,
+        &HashMap::new(),
+        nom::Err::Error(undefined_segment_type),
     );
     test_write(&good_extended, &good_wire_extended)?;
     Ok(())
@@ -393,8 +425,13 @@ fn test_path_attribute_as4_path() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, true, &good);
-    test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_wire_extended,
+        true,
+        &HashMap::new(),
+        &good_extended,
+    );
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
     Ok(())
@@ -446,9 +483,19 @@ fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritin
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
-    test_parsed_completely_with_one_input(&good_wire_partial, true, &good_partial);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_wire_extended,
+        true,
+        &HashMap::new(),
+        &good_extended,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_wire_partial,
+        true,
+        &HashMap::new(),
+        &good_partial,
+    );
 
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
@@ -505,11 +552,19 @@ fn test_path_attribute_next_hop() -> Result<(), PathAttributeWritingError> {
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
-        &bad_wire, false, &bad,
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_wire_extended,
+        true,
+        &HashMap::new(),
+        &good_extended,
     );
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(&bad_wire, false, &HashMap::new(), nom::Err::Error(bad));
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
     Ok(())
@@ -570,12 +625,23 @@ fn test_path_attribute_multi_exit_discriminator() -> Result<(), PathAttributeWri
         ),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_wire_extended, true, &good_extended);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_wire_extended,
+        true,
+        &HashMap::new(),
+        &good_extended,
+    );
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &bad_eof_wire,
         false,
-        &bad_eof,
+        &HashMap::new(),
+        nom::Err::Error(bad_eof),
     );
 
     test_write(&good, &good_wire)?;
@@ -641,8 +707,13 @@ fn test_path_attribute_local_preference() -> Result<(), PathAttributeWritingErro
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_extended_wire,
+        true,
+        &HashMap::new(),
+        &good_extended,
+    );
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_extended_wire)?;
     Ok(())
@@ -721,17 +792,34 @@ fn test_path_attribute_atomic_aggregate() -> Result<(), PathAttributeWritingErro
         ),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_extended_wire,
+        true,
+        &HashMap::new(),
+        &good_extended,
+    );
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &bad_length_wire,
         false,
-        &bad_length,
+        &HashMap::new(),
+        nom::Err::Error(bad_length),
     );
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &bad_extended_length_wire,
         true,
-        &bad_extended_length,
+        &HashMap::new(),
+        nom::Err::Error(bad_extended_length),
     );
 
     test_write(&good, &good_wire)?;
@@ -886,23 +974,46 @@ fn test_path_attribute_as2_aggregator() -> Result<(), PathAttributeWritingError>
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_partial_wire, false, &good_partial);
-    test_parsed_completely_with_one_input(&good_extended_wire, false, &good_extended);
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_partial_wire,
+        false,
+        &HashMap::new(),
+        &good_partial,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_extended_wire,
+        false,
+        &HashMap::new(),
+        &good_extended,
+    );
+    test_parsed_completely_with_two_inputs(
         &good_partial_extended_wire,
         false,
+        &HashMap::new(),
         &good_partial_extended,
     );
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &bad_length_wire,
         false,
-        &bad_length,
+        &HashMap::new(),
+        nom::Err::Error(bad_length),
     );
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &bad_incomplete_wire,
         false,
-        &bad_incomplete,
+        &HashMap::new(),
+        nom::Err::Error(bad_incomplete),
     );
 
     test_write(&good, &good_wire)?;
@@ -975,12 +1086,23 @@ fn test_parse_path_attribute_as4_aggregator() -> Result<(), PathAttributeWriting
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, true, &good);
-    test_parsed_completely_with_one_input(&good_partial_wire, true, &good_partial);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
-    test_parsed_completely_with_one_input(
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_partial_wire,
+        true,
+        &HashMap::new(),
+        &good_partial,
+    );
+    test_parsed_completely_with_two_inputs(
+        &good_extended_wire,
+        true,
+        &HashMap::new(),
+        &good_extended,
+    );
+    test_parsed_completely_with_two_inputs(
         &good_partial_extended_wire,
         true,
+        &HashMap::new(),
         &good_partial_extended,
     );
 
@@ -1044,10 +1166,15 @@ fn test_parse_path_attribute_communities() -> Result<(), PathAttributeWritingErr
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_zero_wire, false, &good_zero);
-    test_parsed_completely_with_one_input(&good_one_wire, false, &good_one);
-    test_parsed_completely_with_one_input(&good_two_wire, false, &good_two);
-    test_parsed_completely_with_one_input(&good_two_wire_extended, true, &good_two_extended);
+    test_parsed_completely_with_two_inputs(&good_zero_wire, false, &HashMap::new(), &good_zero);
+    test_parsed_completely_with_two_inputs(&good_one_wire, false, &HashMap::new(), &good_one);
+    test_parsed_completely_with_two_inputs(&good_two_wire, false, &HashMap::new(), &good_two);
+    test_parsed_completely_with_two_inputs(
+        &good_two_wire_extended,
+        true,
+        &HashMap::new(),
+        &good_two_extended,
+    );
     test_write(&good_zero, &good_zero_wire)?;
     test_write(&good_one, &good_one_wire)?;
     test_write(&good_two, &good_two_wire)?;
@@ -1101,9 +1228,18 @@ fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
         next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
         next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
         nlri: vec![
-            Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:2::/64").unwrap()).unwrap(),
-            Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:1::/64").unwrap()).unwrap(),
-            Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
+            Ipv6UnicastAddress::new(
+                None,
+                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:2::/64").unwrap()).unwrap(),
+            ),
+            Ipv6UnicastAddress::new(
+                None,
+                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:1::/64").unwrap()).unwrap(),
+            ),
+            Ipv6UnicastAddress::new(
+                None,
+                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
+            ),
         ],
     };
 
@@ -1125,19 +1261,36 @@ fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good);
-    test_parsed_completely_with_one_input(&unknown_address_type_wire, false, &unknown_address_type);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(&good_extended_wire, true, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &unknown_address_type_wire,
+        false,
+        &HashMap::new(),
+        &unknown_address_type,
+    );
 
-    test_parse_error_with_one_input::<MpReach, bool, LocatedMpReachParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        MpReach,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedMpReachParsingError<'_>,
+    >(
         &invalid_afi_wire,
         false,
-        &invalid_afi,
+        &HashMap::new(),
+        nom::Err::Error(invalid_afi),
     );
-    test_parse_error_with_one_input::<MpReach, bool, LocatedMpReachParsingError<'_>>(
+    test_parse_error_with_two_inputs::<
+        MpReach,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedMpReachParsingError<'_>,
+    >(
         &invalid_safi_wire,
         false,
-        &invalid_safi,
+        &HashMap::new(),
+        nom::Err::Error(invalid_safi),
     );
 
     test_write_with_one_input(&good, false, &good_wire)?;
@@ -1163,27 +1316,36 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_unicast() -> Result<(), PathAttr
         true,
         PathAttributeValue::MpReach(MpReach::Ipv4Unicast {
             next_hop: Ipv4Addr::new(172, 16, 0, 20),
-            nlri: vec![
+            nlri: vec![Ipv4UnicastAddress::new(
+                None,
                 Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.0.0/16").unwrap()).unwrap(),
-            ],
+            )],
         }),
     )
     .unwrap();
 
     let invalid = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(14, &invalid_wire[14..]) },
-        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv4UnicastError(
-            Ipv4UnicastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
-                ErrorKind::Eof,
-            )),
+        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv4UnicastAddressError(
+            Ipv4UnicastAddressParsingError::Ipv4UnicastError(
+                Ipv4UnicastParsingError::Ipv4PrefixError(Ipv4PrefixParsingError::NomError(
+                    ErrorKind::Eof,
+                )),
+            ),
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &invalid_wire,
         false,
-        &invalid,
+        &HashMap::new(),
+        nom::Err::Error(invalid),
     );
 
     test_write(&good, &good_wire)?;
@@ -1225,11 +1387,17 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_multicast() -> Result<(), PathAt
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &invalid_wire,
         false,
-        &invalid,
+        &HashMap::new(),
+        nom::Err::Error(invalid),
     );
 
     test_write(&good, &good_wire)?;
@@ -1262,9 +1430,18 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_unicast() -> Result<(), PathAttr
             next_hop_global: Ipv6Addr::new(0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x1),
             next_hop_local: Some(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xc001, 0xbff, 0xfe7e, 0)),
             nlri: vec![
-                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:2::/64").unwrap()).unwrap(),
-                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:1::/64").unwrap()).unwrap(),
-                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
+                Ipv6UnicastAddress::new(
+                    None,
+                    Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:2::/64").unwrap()).unwrap(),
+                ),
+                Ipv6UnicastAddress::new(
+                    None,
+                    Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1:1::/64").unwrap()).unwrap(),
+                ),
+                Ipv6UnicastAddress::new(
+                    None,
+                    Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8:1::/64").unwrap()).unwrap(),
+                ),
             ],
         }),
     )
@@ -1272,18 +1449,26 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_unicast() -> Result<(), PathAttr
 
     let invalid = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(40, &invalid_addr_wire[40..]) },
-        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv6UnicastError(
-            Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
-                Ipv6Net::from_str("ff01:db8:1:2::/64").unwrap(),
-            )),
+        PathAttributeParsingError::MpReachErrorError(MpReachParsingError::Ipv6UnicastAddressError(
+            Ipv6UnicastAddressParsingError::Ipv6UnicastError(
+                Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
+                    Ipv6Net::from_str("ff01:db8:1:2::/64").unwrap(),
+                )),
+            ),
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &invalid_addr_wire,
         false,
-        &invalid,
+        &HashMap::new(),
+        nom::Err::Error(invalid),
     );
 
     test_write(&good, &good_wire)?;
@@ -1335,11 +1520,17 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &invalid_addr_wire,
         false,
-        &invalid,
+        &HashMap::new(),
+        nom::Err::Error(invalid),
     );
 
     test_write(&good, &good_wire)?;
@@ -1365,8 +1556,15 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_unicast() -> Result<(), PathAt
         true,
         PathAttributeValue::MpUnreach(MpUnreach::Ipv6Unicast {
             nlri: vec![
-                Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8::/32").unwrap()).unwrap(),
-                Ipv6Unicast::from_net(Ipv6Net::from_str("fdfd:0:0:8bea::/64").unwrap()).unwrap(),
+                Ipv6UnicastAddress::new(
+                    None,
+                    Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8::/32").unwrap()).unwrap(),
+                ),
+                Ipv6UnicastAddress::new(
+                    None,
+                    Ipv6Unicast::from_net(Ipv6Net::from_str("fdfd:0:0:8bea::/64").unwrap())
+                        .unwrap(),
+                ),
             ],
         }),
     )
@@ -1375,17 +1573,25 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_unicast() -> Result<(), PathAt
     let invalid_afi = LocatedPathAttributeParsingError::new(
         unsafe { Span::new_from_raw_offset(7, &invalid_afi_wire[7..]) },
         PathAttributeParsingError::MpUnreachErrorError(MpUnreachParsingError::Ipv6UnicastError(
-            Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
-                Ipv6Net::from_str("ff01:db8::/32").unwrap(),
-            )),
+            Ipv6UnicastAddressParsingError::Ipv6UnicastError(
+                Ipv6UnicastParsingError::InvalidUnicastNetwork(InvalidIpv6UnicastNetwork(
+                    Ipv6Net::from_str("ff01:db8::/32").unwrap(),
+                )),
+            ),
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &invalid_afi_wire,
         false,
-        &invalid_afi,
+        &HashMap::new(),
+        nom::Err::Error(invalid_afi),
     );
 
     test_write(&good, &good_wire)?;
@@ -1427,11 +1633,17 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast(
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &invalid_afi_wire,
         false,
-        &invalid_afi,
+        &HashMap::new(),
+        nom::Err::Error(invalid_afi),
     );
 
     test_write(&good, &good_wire)?;
@@ -1466,7 +1678,7 @@ fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1492,7 +1704,7 @@ fn test_transitive_two_octet_extended_community() -> Result<(), PathAttributeWri
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1518,7 +1730,7 @@ fn test_non_transitive_two_octet_extended_community() -> Result<(), PathAttribut
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1542,7 +1754,7 @@ fn test_transitive_ipv4_extended_community() -> Result<(), PathAttributeWritingE
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1563,7 +1775,7 @@ fn test_unknown_extended_community() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1601,7 +1813,7 @@ fn test_multiple_extended_communities() -> Result<(), PathAttributeWritingError>
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1622,7 +1834,7 @@ fn test_large_community() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1639,7 +1851,7 @@ fn test_originator() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1658,7 +1870,7 @@ fn test_cluster_list() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1709,12 +1921,23 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
         )),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, true, &good);
-    test_parsed_completely_with_one_input(&good_extended_wire, true, &good_extended);
-    test_parse_error_with_one_input::<PathAttribute, bool, LocatedPathAttributeParsingError<'_>>(
+    test_parsed_completely_with_two_inputs(&good_wire, true, &HashMap::new(), &good);
+    test_parsed_completely_with_two_inputs(
+        &good_extended_wire,
+        true,
+        &HashMap::new(),
+        &good_extended,
+    );
+    test_parse_error_with_two_inputs::<
+        PathAttribute,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'_>,
+    >(
         &bad_incomplete_wire,
         false,
-        &bad_incomplete,
+        &HashMap::new(),
+        nom::Err::Error(bad_incomplete),
     );
 
     test_write(&good, &good_wire)?;

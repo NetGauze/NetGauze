@@ -18,8 +18,8 @@ use crate::{
     nlri::{
         InvalidIpv4MulticastNetwork, InvalidIpv4UnicastNetwork, InvalidIpv6MulticastNetwork,
         InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicast, Ipv4Multicast, Ipv4Unicast,
-        Ipv6MplsVpnUnicast, Ipv6Multicast, Ipv6Unicast, LabeledIpv4NextHop, LabeledIpv6NextHop,
-        LabeledNextHop, MplsLabel, RouteDistinguisher,
+        Ipv4UnicastAddress, Ipv6MplsVpnUnicast, Ipv6Multicast, Ipv6Unicast, Ipv6UnicastAddress,
+        LabeledIpv4NextHop, LabeledIpv6NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
     },
     wire::{
         deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError},
@@ -28,7 +28,7 @@ use crate::{
 };
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithTwoInputs, Span,
+    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -253,6 +253,8 @@ impl<'a> ReadablePdu<'a, LocatedIpv6MplsVpnUnicastParsingError<'a>> for Ipv6Mpls
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6UnicastParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
     Ipv6PrefixError(
         #[from_external]
         #[from_located(module = "crate::wire::deserializer")]
@@ -285,6 +287,31 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6UnicastParsingErr
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum Ipv6UnicastAddressParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    Ipv6UnicastError(#[from_located(module = "self")] Ipv6UnicastParsingError),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6UnicastAddressParsingError<'a>>
+    for Ipv6UnicastAddress
+{
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedIpv6UnicastAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
+        let (buf, net) = parse_into_located(buf)?;
+        Ok((buf, Ipv6UnicastAddress::new(path_id, net)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6MulticastParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -305,8 +332,6 @@ impl<'a> ReadablePdu<'a, LocatedIpv6MulticastParsingError<'a>> for Ipv6Multicast
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4UnicastParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
-    /// additional information.
     Ipv4PrefixError(
         #[from_external]
         #[from_located(module = "crate::wire::deserializer")]
@@ -339,9 +364,38 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4UnicastParsingErr
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum Ipv4UnicastAddressParsingError {
+    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    Ipv4UnicastError(#[from_located(module = "self")] Ipv4UnicastParsingError),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4UnicastAddressParsingError<'a>>
+    for Ipv4UnicastAddress
+{
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedIpv4UnicastAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, add_path) = be_u32(buf)?;
+            (buf, Some(add_path))
+        } else {
+            (buf, None)
+        };
+        let (buf, net) = parse_into_located(buf)?;
+        Ok((buf, Ipv4UnicastAddress::new(path_id, net)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4MulticastParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
     Ipv4PrefixError(
         #[from_external]
         #[from_located(module = "crate::wire::deserializer")]

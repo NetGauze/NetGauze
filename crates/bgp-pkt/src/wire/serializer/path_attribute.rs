@@ -703,9 +703,9 @@ impl WritablePduWithOneInput<bool, LargeCommunitiesWritingError> for LargeCommun
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum MpReachWritingError {
     StdIOError(#[from_std_io_error] String),
-    Ipv4UnicastError(#[from] Ipv4UnicastWritingError),
+    Ipv4UnicastError(#[from] Ipv4UnicastAddressWritingError),
     Ipv4MulticastError(#[from] Ipv4MulticastWritingError),
-    Ipv6UnicastError(#[from] Ipv6UnicastWritingError),
+    Ipv6UnicastError(#[from] Ipv6UnicastAddressWritingError),
     Ipv6MulticastError(#[from] Ipv6MulticastWritingError),
     Ipv4MplsVpnUnicastError(#[from] Ipv4MplsVpnUnicastWritingError),
     Ipv6MplsVpnUnicastError(#[from] Ipv6MplsVpnUnicastWritingError),
@@ -776,10 +776,10 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
         match self {
             Self::Ipv4Unicast { next_hop, nlri } => {
                 writer.write_u16::<NetworkEndian>(
-                    Ipv4Unicast::address_type().address_family().into(),
+                    Ipv4UnicastAddress::address_type().address_family().into(),
                 )?;
                 writer.write_u8(
-                    Ipv4Unicast::address_type()
+                    Ipv4UnicastAddress::address_type()
                         .subsequent_address_family()
                         .into(),
                 )?;
@@ -827,10 +827,10 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 nlri,
             } => {
                 writer.write_u16::<NetworkEndian>(
-                    Ipv6Unicast::address_type().address_family().into(),
+                    Ipv6UnicastAddress::address_type().address_family().into(),
                 )?;
                 writer.write_u8(
-                    Ipv6Unicast::address_type()
+                    Ipv6UnicastAddress::address_type()
                         .subsequent_address_family()
                         .into(),
                 )?;
@@ -910,10 +910,10 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum MpUnreachWritingError {
     StdIOError(#[from_std_io_error] String),
-    Ipv4UnicastError(#[from] Ipv4UnicastWritingError),
+    Ipv4UnicastError(#[from] Ipv4UnicastAddressWritingError),
     Ipv4MulticastError(#[from] Ipv4MulticastWritingError),
     Ipv4MplsVpnUnicastError(#[from] Ipv4MplsVpnUnicastWritingError),
-    Ipv6UnicastError(#[from] Ipv6UnicastWritingError),
+    Ipv6UnicastError(#[from] Ipv6UnicastAddressWritingError),
     Ipv6MulticastError(#[from] Ipv6MulticastWritingError),
     Ipv6MplsVpnUnicastError(#[from] Ipv6MplsVpnUnicastWritingError),
 }
@@ -949,10 +949,10 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
         match self {
             Self::Ipv4Unicast { nlri } => {
                 writer.write_u16::<NetworkEndian>(
-                    Ipv4Unicast::address_type().address_family().into(),
+                    Ipv4UnicastAddress::address_type().address_family().into(),
                 )?;
                 writer.write_u8(
-                    Ipv4Unicast::address_type()
+                    Ipv4UnicastAddress::address_type()
                         .subsequent_address_family()
                         .into(),
                 )?;
@@ -988,10 +988,10 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
             }
             Self::Ipv6Unicast { nlri } => {
                 writer.write_u16::<NetworkEndian>(
-                    Ipv6Unicast::address_type().address_family().into(),
+                    Ipv6UnicastAddress::address_type().address_family().into(),
                 )?;
                 writer.write_u8(
-                    Ipv6Unicast::address_type()
+                    Ipv6UnicastAddress::address_type()
                         .subsequent_address_family()
                         .into(),
                 )?;

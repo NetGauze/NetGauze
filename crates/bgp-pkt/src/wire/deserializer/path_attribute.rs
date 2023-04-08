@@ -27,8 +27,8 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    parse_till_empty, parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
+    parse_till_empty, parse_till_empty_into_located, parse_till_empty_into_with_one_input_located,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -37,7 +37,10 @@ use nom::{
     IResult,
 };
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::{
+    collections::HashMap,
+    net::{Ipv4Addr, Ipv6Addr},
+};
 
 const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
 const TRANSITIVE_PATH_ATTRIBUTE_MASK: u8 = 0x40;
@@ -92,10 +95,18 @@ pub trait IntoLocatedPathAttributeParsingError<'a> {
     fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a>;
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>> for PathAttribute {
+impl<'a>
+    ReadablePduWithTwoInputs<
+        'a,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedPathAttributeParsingError<'a>,
+    > for PathAttribute
+{
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
+        add_path_map: &HashMap<AddressType, bool>,
     ) -> IResult<Span<'a>, Self, LocatedPathAttributeParsingError<'a>> {
         let (buf, attributes) = be_u8(buf)?;
         let buf_before_code = buf;
@@ -178,12 +189,14 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedPathAttributeParsingError<'a>>
                 (buf, value)
             }
             Ok(PathAttributeType::MpReachNlri) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let (buf, value) =
+                    parse_into_located_two_inputs(buf, extended_length, add_path_map)?;
                 let value = PathAttributeValue::MpReach(value);
                 (buf, value)
             }
             Ok(PathAttributeType::MpUnreachNlri) => {
-                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let (buf, value) =
+                    parse_into_located_two_inputs(buf, extended_length, add_path_map)?;
                 let value = PathAttributeValue::MpUnreach(value);
                 (buf, value)
             }
@@ -539,8 +552,8 @@ pub enum MpReachParsingError {
     NomError(#[from_nom] ErrorKind),
     UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
     UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
-    Ipv4UnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
+    Ipv4UnicastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastAddressParsingError,
     ),
     Ipv4MulticastError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MulticastParsingError,
@@ -548,8 +561,8 @@ pub enum MpReachParsingError {
     Ipv4MplsVpnUnicastError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
     ),
-    Ipv6UnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastParsingError,
+    Ipv6UnicastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastAddressParsingError,
     ),
     Ipv6MulticastError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MulticastParsingError,
@@ -562,10 +575,14 @@ pub enum MpReachParsingError {
     ),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for MpReach {
+impl<'a>
+    ReadablePduWithTwoInputs<'a, bool, &HashMap<AddressType, bool>, LocatedMpReachParsingError<'a>>
+    for MpReach
+{
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
+        add_path_map: &HashMap<AddressType, bool>,
     ) -> IResult<Span<'a>, Self, LocatedMpReachParsingError<'a>> {
         let (buf, mp_buf) = if extended_length {
             nom::multi::length_data(be_u16)(buf)?
@@ -581,7 +598,10 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                 let (mp_buf, next_hop) = be_u32(mp_buf)?;
                 let next_hop = Ipv4Addr::from(next_hop);
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv4Unicast)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::Ipv4Unicast { next_hop, nlri }))
             }
             Ok(AddressType::Ipv4Multicast) => {
@@ -609,7 +629,10 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMpReachParsingError<'a>> for M
                     (mp_buf, None)
                 };
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv6Unicast)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((
                     buf,
                     MpReach::Ipv6Unicast {
@@ -660,8 +683,8 @@ pub enum MpUnreachParsingError {
     NomError(#[from_nom] ErrorKind),
     UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
     UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
-    Ipv4UnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
+    Ipv4UnicastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastAddressParsingError,
     ),
     Ipv4MulticastError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MulticastParsingError,
@@ -670,7 +693,7 @@ pub enum MpUnreachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4MplsVpnUnicastParsingError,
     ),
     Ipv6UnicastError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6UnicastAddressParsingError,
     ),
     Ipv6MulticastError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv6MulticastParsingError,
@@ -680,10 +703,18 @@ pub enum MpUnreachParsingError {
     ),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for MpUnreach {
+impl<'a>
+    ReadablePduWithTwoInputs<
+        'a,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedMpUnreachParsingError<'a>,
+    > for MpUnreach
+{
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
+        add_path_map: &HashMap<AddressType, bool>,
     ) -> IResult<Span<'a>, Self, LocatedMpUnreachParsingError<'a>> {
         let (buf, mp_buf) = if extended_length {
             nom::multi::length_data(be_u16)(buf)?
@@ -695,7 +726,10 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for
             nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(mp_buf)?;
         match AddressType::from_afi_safi(afi, safi) {
             Ok(AddressType::Ipv4Unicast) => {
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv4Unicast)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::Ipv4Unicast { nlri }))
             }
             Ok(AddressType::Ipv4Multicast) => {
@@ -707,7 +741,10 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMpUnreachParsingError<'a>> for
                 Ok((buf, MpUnreach::Ipv4MplsVpnUnicast { nlri }))
             }
             Ok(AddressType::Ipv6Unicast) => {
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv6Unicast)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::Ipv6Unicast { nlri }))
             }
             Ok(AddressType::Ipv6Multicast) => {

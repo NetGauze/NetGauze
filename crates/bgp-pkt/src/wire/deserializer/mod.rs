@@ -25,8 +25,12 @@ pub mod route_refresh;
 pub mod update;
 
 use ipnet::{Ipv4Net, Ipv6Net};
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::{
+    collections::HashMap,
+    net::{Ipv4Addr, Ipv6Addr},
+};
 
+use netgauze_iana::address_family::AddressType;
 use nom::{
     error::ErrorKind,
     number::complete::{be_u128, be_u16, be_u8},
@@ -248,13 +252,18 @@ fn parse_bgp_message_length_and_type(
     Ok((buf, (length, message_type, reminder_buf)))
 }
 
-impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedBgpMessageParsingError<'a>>
-    for BgpMessage
+impl<'a>
+    ReadablePduWithTwoInputs<
+        'a,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedBgpMessageParsingError<'a>,
+    > for BgpMessage
 {
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
-        add_path: bool,
+        add_path: &HashMap<AddressType, bool>,
     ) -> IResult<Span<'a>, Self, LocatedBgpMessageParsingError<'a>> {
         let (buf, _) = nom::combinator::map_res(be_u128, |x| {
             if x == u128::MAX {

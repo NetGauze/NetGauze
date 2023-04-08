@@ -15,23 +15,17 @@
 
 //! Deserializer for BGP Update message
 
-use crate::{
-    update::{NetworkLayerReachabilityInformation, WithdrawRoute},
-    wire::deserializer::{path_attribute::PathAttributeParsingError, Ipv4PrefixParsingError},
-    BgpUpdateMessage,
-};
+use crate::{wire::deserializer::path_attribute::PathAttributeParsingError, BgpUpdateMessage};
+use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_with_one_input_located,
-    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
+    parse_till_empty_into_with_one_input_located, parse_till_empty_into_with_two_inputs_located,
+    ReadablePduWithTwoInputs, Span,
 };
-use nom::{
-    error::ErrorKind,
-    number::complete::{be_u16, be_u32},
-    IResult,
-};
+use nom::{error::ErrorKind, number::complete::be_u16, IResult};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-use crate::{update::AddPathIpv4Net, wire::deserializer::nlri::Ipv4UnicastParsingError};
+use crate::wire::deserializer::nlri::{Ipv4UnicastAddressParsingError, Ipv4UnicastParsingError};
 use netgauze_parse_utils::ErrorKindSerdeDeref;
 use netgauze_serde_macros::LocatedError;
 
@@ -42,113 +36,44 @@ pub enum BgpUpdateMessageParsingError {
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    WithdrawRouteError(#[from_located(module = "self")] WithdrawRouteParsingError),
     PathAttributeError(
         #[from_located(module = "crate::wire::deserializer::path_attribute")]
         PathAttributeParsingError,
     ),
-    NetworkLayerReachabilityInformationError(
-        #[from_located(module = "self")] NetworkLayerReachabilityInformationParsingError,
-    ),
-}
-
-/// Helper function to parse the withdraw routes buffer in an update message
-#[inline]
-fn parse_withdraw_routes(
-    buf: Span<'_>,
-    add_path: bool,
-) -> IResult<Span<'_>, Vec<WithdrawRoute>, LocatedBgpUpdateMessageParsingError<'_>> {
-    let (buf, routes) = parse_till_empty_into_with_one_input_located(buf, add_path)?;
-    Ok((buf, routes))
-}
-
-impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedBgpUpdateMessageParsingError<'a>>
-    for BgpUpdateMessage
-{
-    fn from_wire(
-        buf: Span<'a>,
-        asn4: bool,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedBgpUpdateMessageParsingError<'a>> {
-        let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (_, withdrawn_routes) = parse_withdraw_routes(withdrawn_buf, add_path)?;
-        let (buf, path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (_, path_attributes) =
-            parse_till_empty_into_with_one_input_located(path_attributes_buf, asn4)?;
-        let (buf, nlri_vec) = parse_into_located_one_input(buf, add_path)?;
-        Ok((
-            buf,
-            BgpUpdateMessage::new(withdrawn_routes, path_attributes, nlri_vec),
-        ))
-    }
-}
-
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum WithdrawRouteParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    Ipv4PrefixParsingError(
-        #[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError,
-    ),
-}
-
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedWithdrawRouteParsingError<'a>> for WithdrawRoute {
-    fn from_wire(
-        buf: Span<'a>,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedWithdrawRouteParsingError<'a>> {
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
-        } else {
-            (buf, None)
-        };
-        let (buf, net) = parse_into_located(buf)?;
-        Ok((buf, WithdrawRoute::new(path_id, net)))
-    }
-}
-
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum NetworkLayerReachabilityInformationParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
-    /// additional information.
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    Ipv4PrefixParsingError(
-        #[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError,
-    ),
     Ipv4UnicastError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastParsingError,
+    ),
+    Ipv4UnicastAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastAddressParsingError,
     ),
 }
 
 impl<'a>
-    ReadablePduWithOneInput<'a, bool, LocatedNetworkLayerReachabilityInformationParsingError<'a>>
-    for NetworkLayerReachabilityInformation
+    ReadablePduWithTwoInputs<
+        'a,
+        bool,
+        &HashMap<AddressType, bool>,
+        LocatedBgpUpdateMessageParsingError<'a>,
+    > for BgpUpdateMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedNetworkLayerReachabilityInformationParsingError<'a>> {
-        let mut buf = buf;
-        if add_path {
-            let mut nets = vec![];
-            while !buf.is_empty() {
-                let (t, path_id) = be_u32(buf)?;
-                let (t, net) = parse_into_located(t)?;
-                nets.push(AddPathIpv4Net::new(path_id, net));
-                buf = t;
-            }
-            return Ok((buf, NetworkLayerReachabilityInformation::Ipv4AddPath(nets)));
-        }
-        let mut nets = vec![];
-        while !buf.is_empty() {
-            let (t, net) = parse_into_located(buf)?;
-            nets.push(net);
-            buf = t;
-        }
-        Ok((buf, NetworkLayerReachabilityInformation::Ipv4(nets)))
+        asn4: bool,
+        add_path_map: &HashMap<AddressType, bool>,
+    ) -> IResult<Span<'a>, Self, LocatedBgpUpdateMessageParsingError<'a>> {
+        let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
+        let add_path = add_path_map
+            .get(&AddressType::Ipv4Unicast)
+            .map_or(false, |x| *x);
+        let (_, withdrawn_routes) =
+            parse_till_empty_into_with_one_input_located(withdrawn_buf, add_path)?;
+        let (buf, path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
+        let (_, path_attributes) =
+            parse_till_empty_into_with_two_inputs_located(path_attributes_buf, asn4, add_path_map)?;
+        let (buf, nlri_vec) = parse_till_empty_into_with_one_input_located(buf, add_path)?;
+        Ok((
+            buf,
+            BgpUpdateMessage::new(withdrawn_routes, path_attributes, nlri_vec),
+        ))
     }
 }

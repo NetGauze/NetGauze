@@ -883,7 +883,7 @@ impl ClusterId {
 pub enum MpReach {
     Ipv4Unicast {
         next_hop: Ipv4Addr,
-        nlri: Vec<Ipv4Unicast>,
+        nlri: Vec<Ipv4UnicastAddress>,
     },
     Ipv4Multicast {
         next_hop: Ipv4Addr,
@@ -896,7 +896,7 @@ pub enum MpReach {
     Ipv6Unicast {
         next_hop_global: Ipv6Addr,
         next_hop_local: Option<Ipv6Addr>,
-        nlri: Vec<Ipv6Unicast>,
+        nlri: Vec<Ipv6UnicastAddress>,
     },
     Ipv6Multicast {
         next_hop_global: Ipv6Addr,
@@ -947,7 +947,7 @@ impl PathAttributeValueProperties for MpReach {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MpUnreach {
     Ipv4Unicast {
-        nlri: Vec<Ipv4Unicast>,
+        nlri: Vec<Ipv4UnicastAddress>,
     },
     Ipv4Multicast {
         nlri: Vec<Ipv4Multicast>,
@@ -956,7 +956,7 @@ pub enum MpUnreach {
         nlri: Vec<Ipv4MplsVpnUnicast>,
     },
     Ipv6Unicast {
-        nlri: Vec<Ipv6Unicast>,
+        nlri: Vec<Ipv6UnicastAddress>,
     },
     Ipv6Multicast {
         nlri: Vec<Ipv6Multicast>,
