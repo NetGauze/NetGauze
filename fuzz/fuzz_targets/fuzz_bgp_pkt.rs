@@ -14,13 +14,18 @@
 // limitations under the License.
 
 #![no_main]
+
+use std::collections::HashMap;
+
 use libfuzzer_sys::fuzz_target;
+
 use netgauze_bgp_pkt::BgpMessage;
+use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{ReadablePduWithTwoInputs, Span};
 
-fuzz_target!(|data: (&[u8], bool, bool)| {
+fuzz_target!(|data: (&[u8], bool, HashMap<AddressType, bool>)| {
     let (mut buf, asn4, addpath) = data;
-    while let Ok((retbuf, _msg)) = BgpMessage::from_wire(Span::new(buf), asn4, addpath) {
+    while let Ok((retbuf, _msg)) = BgpMessage::from_wire(Span::new(buf), asn4, &addpath) {
         buf = retbuf.fragment();
     }
 });
