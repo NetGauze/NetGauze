@@ -22,7 +22,7 @@ use netgauze_bmp_pkt::{
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
     BmpMessage,
 };
-use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithTwoInputs, Span, WritablePdu};
+use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 use nom::Needed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -84,7 +84,7 @@ impl Decoder for BmpCodec {
                 Ok(None)
             } else {
                 self.in_message = false;
-                let msg = match BmpMessage::from_wire(Span::new(buf), true, &HashMap::new()) {
+                let msg = match BmpMessage::from_wire(Span::new(buf), &HashMap::new()) {
                     Ok((span, msg)) => {
                         buf.advance(span.location_offset());
                         msg

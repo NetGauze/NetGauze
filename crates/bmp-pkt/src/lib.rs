@@ -162,6 +162,19 @@ impl PeerHeader {
     pub const fn timestamp(&self) -> &Option<DateTime<Utc>> {
         &self.timestamp
     }
+
+    pub const fn is_asn4(&self) -> bool {
+        match self.peer_type {
+            BmpPeerType::GlobalInstancePeer { asn2, .. } => !asn2,
+            BmpPeerType::RdInstancePeer { asn2, .. } => !asn2,
+            BmpPeerType::LocalInstancePeer { asn2, .. } => !asn2,
+            BmpPeerType::LocRibInstancePeer { .. } => true,
+            BmpPeerType::Experimental251 { .. } => true,
+            BmpPeerType::Experimental252 { .. } => true,
+            BmpPeerType::Experimental253 { .. } => true,
+            BmpPeerType::Experimental254 { .. } => true,
+        }
+    }
 }
 
 /// Identifies the type of peer, along with the type specific flags
