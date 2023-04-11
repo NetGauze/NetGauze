@@ -15,8 +15,8 @@
 
 //! Representations for BGP Open message
 
-use crate::{capabilities::BgpCapability, Deserialize, Serialize};
-use std::net::Ipv4Addr;
+use crate::{capabilities::BgpCapability, iana::BgpCapabilityCode, Deserialize, Serialize};
+use std::{collections::HashMap, net::Ipv4Addr};
 
 pub const BGP_VERSION: u8 = 4;
 
@@ -86,14 +86,16 @@ impl BgpOpenMessage {
     }
 
     /// Shortcut to get a list of all the capabilities from all the parameters
-    pub fn capabilities(&self) -> Vec<&BgpCapability> {
+    pub fn capabilities(&self) -> HashMap<BgpCapabilityCode, &BgpCapability> {
         return self
             .params
             .iter()
             .flat_map(|x| match x {
                 BgpOpenMessageParameter::Capabilities(capabilities_vec) => capabilities_vec,
             })
-            .collect::<Vec<&BgpCapability>>();
+            .filter(|x| x.code().is_ok())
+            .map(|x| (x.code().unwrap(), x))
+            .collect::<HashMap<BgpCapabilityCode, &BgpCapability>>();
     }
 }
 

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{capabilities::*, iana::BgpCapabilityCode};
+use crate::capabilities::*;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
@@ -57,39 +57,39 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
         let len = (self.len() - Self::BASE_LENGTH) as u8;
         match self {
             Self::MultiProtocolExtensions(value) => {
-                writer.write_u8(BgpCapabilityCode::MultiProtocolExtensions.into())?;
+                writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(value.len() as u8)?;
                 value.write(writer)?;
             }
             Self::RouteRefresh => {
-                writer.write_u8(BgpCapabilityCode::RouteRefreshCapability.into())?;
+                writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(len)?;
             }
             Self::EnhancedRouteRefresh => {
-                writer.write_u8(BgpCapabilityCode::EnhancedRouteRefresh.into())?;
+                writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(len)?;
             }
             Self::ExtendedMessage => {
-                writer.write_u8(BgpCapabilityCode::BgpExtendedMessage.into())?;
+                writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(len)?;
             }
             Self::GracefulRestartCapability(value) => {
-                writer.write_u8(BgpCapabilityCode::GracefulRestartCapability.into())?;
+                writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(len)?;
                 value.write(writer)?;
             }
             Self::AddPath(value) => {
-                writer.write_u8(BgpCapabilityCode::AddPathCapability.into())?;
+                writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(len)?;
                 value.write(writer)?;
             }
             Self::FourOctetAs(value) => {
-                writer.write_u8(BgpCapabilityCode::FourOctetAs.into())?;
+                writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(value.len() as u8)?;
                 value.write(writer)?;
             }
             Self::ExtendedNextHopEncoding(value) => {
-                writer.write_u8(BgpCapabilityCode::ExtendedNextHopEncoding.into())?;
+                writer.write_u8(self.code().unwrap().into())?;
                 value.write(writer)?;
             }
             Self::Experimental(value) => {

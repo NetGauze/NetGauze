@@ -477,7 +477,7 @@ impl TryFrom<u8> for BgpOpenMessageParameterType {
 
 /// [BGP Capabilities Codes](https://www.iana.org/assignments/capability-codes/capability-codes.xhtml)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Display, FromRepr, Copy, Clone, Hash, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BgpCapabilityCode {
     /// [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
     MultiProtocolExtensions = 1,

@@ -16,6 +16,7 @@
 //! BGP Capabilities advertised in BGP Open Messages.
 //! See [RFC5492 Capabilities Advertisement with BGP-4](https://datatracker.ietf.org/doc/html/rfc5492)
 
+use crate::iana::BgpCapabilityCode;
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
@@ -84,6 +85,72 @@ pub enum BgpCapability {
     Experimental(ExperimentalCapability),
 
     Unrecognized(UnrecognizedCapability),
+}
+
+impl BgpCapability {
+    pub const fn code(&self) -> Result<BgpCapabilityCode, u8> {
+        match self {
+            Self::MultiProtocolExtensions(_) => Ok(BgpCapabilityCode::MultiProtocolExtensions),
+            Self::RouteRefresh => Ok(BgpCapabilityCode::RouteRefreshCapability),
+            Self::EnhancedRouteRefresh => Ok(BgpCapabilityCode::EnhancedRouteRefresh),
+            Self::GracefulRestartCapability(_) => Ok(BgpCapabilityCode::GracefulRestartCapability),
+            Self::AddPath(_) => Ok(BgpCapabilityCode::AddPathCapability),
+            Self::ExtendedMessage => Ok(BgpCapabilityCode::BgpExtendedMessage),
+            Self::FourOctetAs(_) => Ok(BgpCapabilityCode::FourOctetAs),
+            Self::ExtendedNextHopEncoding(_) => Ok(BgpCapabilityCode::ExtendedNextHopEncoding),
+            Self::Experimental(value) => match value.code() {
+                ExperimentalCapabilityCode::Experimental239 => {
+                    Ok(BgpCapabilityCode::Experimental239)
+                }
+                ExperimentalCapabilityCode::Experimental240 => {
+                    Ok(BgpCapabilityCode::Experimental240)
+                }
+                ExperimentalCapabilityCode::Experimental241 => {
+                    Ok(BgpCapabilityCode::Experimental241)
+                }
+                ExperimentalCapabilityCode::Experimental242 => {
+                    Ok(BgpCapabilityCode::Experimental242)
+                }
+                ExperimentalCapabilityCode::Experimental243 => {
+                    Ok(BgpCapabilityCode::Experimental243)
+                }
+                ExperimentalCapabilityCode::Experimental244 => {
+                    Ok(BgpCapabilityCode::Experimental244)
+                }
+                ExperimentalCapabilityCode::Experimental245 => {
+                    Ok(BgpCapabilityCode::Experimental245)
+                }
+                ExperimentalCapabilityCode::Experimental246 => {
+                    Ok(BgpCapabilityCode::Experimental246)
+                }
+                ExperimentalCapabilityCode::Experimental247 => {
+                    Ok(BgpCapabilityCode::Experimental247)
+                }
+                ExperimentalCapabilityCode::Experimental248 => {
+                    Ok(BgpCapabilityCode::Experimental248)
+                }
+                ExperimentalCapabilityCode::Experimental249 => {
+                    Ok(BgpCapabilityCode::Experimental249)
+                }
+                ExperimentalCapabilityCode::Experimental250 => {
+                    Ok(BgpCapabilityCode::Experimental250)
+                }
+                ExperimentalCapabilityCode::Experimental251 => {
+                    Ok(BgpCapabilityCode::Experimental251)
+                }
+                ExperimentalCapabilityCode::Experimental252 => {
+                    Ok(BgpCapabilityCode::Experimental252)
+                }
+                ExperimentalCapabilityCode::Experimental253 => {
+                    Ok(BgpCapabilityCode::Experimental253)
+                }
+                ExperimentalCapabilityCode::Experimental254 => {
+                    Ok(BgpCapabilityCode::Experimental254)
+                }
+            },
+            Self::Unrecognized(value) => Err(value.code),
+        }
+    }
 }
 
 /// Generic struct to carry all the unsupported BGP capabilities
