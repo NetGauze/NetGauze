@@ -439,7 +439,7 @@ fn test_bmp_value_initiation_message() -> Result<(), BmpMessageValueWritingError
     test_parsed_completely_with_one_input(&good_wire, &HashMap::new(), &good);
     test_parse_error_with_one_input::<
         BmpMessageValue,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_information_wire, &HashMap::new(), &bad_information);
     test_write(&good, &good_wire)?;
@@ -547,17 +547,17 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
     test_parsed_completely_with_one_input(&good_wire, &HashMap::new(), &good);
     test_parse_error_with_one_input::<
         RouteMonitoringMessage,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedRouteMonitoringMessageParsingError<'_>,
     >(&bad_peer_header_wire, &HashMap::new(), &bad_peer_header);
     test_parse_error_with_one_input::<
         RouteMonitoringMessage,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedRouteMonitoringMessageParsingError<'_>,
     >(&bad_bgp_wire, &HashMap::new(), &bad_bgp);
     test_parse_error_with_one_input::<
         RouteMonitoringMessage,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedRouteMonitoringMessageParsingError<'_>,
     >(&bad_bgp_type_wire, &HashMap::new(), &bad_bgp_type);
 
@@ -648,7 +648,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
     test_parsed_completely_with_one_input(&good_wire, &HashMap::new(), &good);
     test_parse_error_with_one_input::<
         BmpMessageValue,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_wire, &HashMap::new(), &bad);
     test_write(&good, &good_wire)?;
@@ -788,7 +788,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
     test_parsed_completely_with_one_input(&good_wire, &HashMap::new(), &good);
     test_parse_error_with_one_input::<
         BmpMessageValue,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_wire, &HashMap::new(), &bad);
 
@@ -1048,17 +1048,17 @@ fn test_peer_down_notification() -> Result<(), PeerDownNotificationMessageWritin
 
     test_parse_error_with_one_input::<
         PeerDownNotificationMessage,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedPeerDownNotificationMessageParsingError<'_>,
     >(&bad_information_wire, &HashMap::new(), &bad_information);
     test_parse_error_with_one_input::<
         PeerDownNotificationMessage,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedPeerDownNotificationMessageParsingError<'_>,
     >(&bad_peer_header_wire, &HashMap::new(), &bad_peer_header);
     test_parse_error_with_one_input::<
         PeerDownNotificationMessage,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedPeerDownNotificationMessageParsingError<'_>,
     >(&bad_peer_reason_wire, &HashMap::new(), &bad_peer_reason);
 
@@ -1105,7 +1105,7 @@ fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
 
     test_parse_error_with_one_input::<
         BmpMessageValue,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_eof_wire, &HashMap::new(), &bad_eof);
 

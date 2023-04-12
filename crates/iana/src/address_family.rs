@@ -41,7 +41,6 @@
 //! );
 //! ```
 
-use arbitrary::Arbitrary;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
 
@@ -396,7 +395,8 @@ impl TryFrom<u8> for SubsequentAddressFamily {
 /// Since not all [`AddressFamily`] and [`SubsequentAddressFamily`] are valid
 /// combinations, this enum defines a set of valid combination to ensure only
 /// valid AFI/SAFI are used at compile time.
-#[derive(Arbitrary, Copy, Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum AddressType {
     Ipv4Unicast,
     Ipv4Multicast,

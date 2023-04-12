@@ -27,11 +27,14 @@ nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
 criterion = { workspace = true, optional = true } # Dev dep for bench
 serde = { workspace = true, features = ["derive"] }
+arbitrary = { workspace = true, optional = true }
+arbitrary_ext = { workspace = true, optional = true }
 
 [features]
 default = ["serde"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
 bench = ["criterion"]
+fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
 netgauze-parse-utils = { version = "0.1.0", path = "../parse-utils", features = ["test-helpers"] }

@@ -200,7 +200,8 @@ impl PeerHeader {
 ///    when used with route mirroring messages.
 ///  - filtered: The F flag indicates that the Loc-RIB is filtered. This MUST be
 ///    set when a filter is applied to Loc-RIB routes sent to the BMP collector.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpPeerType {
     GlobalInstancePeer {
         ipv6: bool,
@@ -961,5 +962,87 @@ impl Deref for GaugeU64 {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+// Custom function to generate arbitrary ipv4 addresses
+#[cfg(feature = "fuzz")]
+fn arbitrary_ipv4(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Ipv4Addr> {
+    let value = u.int_in_range(0..=u32::MAX)?;
+    Ok(Ipv4Addr::from(value))
+}
+
+// Custom function to generate arbitrary ipv6 addresses
+#[cfg(feature = "fuzz")]
+fn arbitrary_ipv6(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<std::net::Ipv6Addr> {
+    let value = u.int_in_range(0..=u128::MAX)?;
+    Ok(std::net::Ipv6Addr::from(value))
+}
+
+// Custom function to generate arbitrary IPv4 and IPv6 addresses
+#[cfg(feature = "fuzz")]
+fn arbitrary_ip(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<IpAddr> {
+    let ipv4 = arbitrary_ipv4(u)?;
+    let ipv6 = arbitrary_ipv6(u)?;
+    let choices = [IpAddr::V4(ipv4), IpAddr::V6(ipv6)];
+    let addr = u.choose(&choices)?;
+    Ok(*addr)
+}
+
+/// PeerKey is used to identify a BMP peer. This key is unique only
+/// to the BMP session.
+#[derive(Debug, Hash, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct PeerKey {
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ip)))]
+    peer_address: Option<IpAddr>,
+    peer_type: BmpPeerType,
+    rd: Option<RouteDistinguisher>,
+    asn: u32,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
+    bgp_id: Ipv4Addr,
+}
+
+impl PeerKey {
+    pub const fn new(
+        peer_address: Option<IpAddr>,
+        peer_type: BmpPeerType,
+        rd: Option<RouteDistinguisher>,
+        asn: u32,
+        bgp_id: Ipv4Addr,
+    ) -> Self {
+        Self {
+            peer_address,
+            peer_type,
+            rd,
+            asn,
+            bgp_id,
+        }
+    }
+
+    pub const fn from_peer_header(header: &PeerHeader) -> Self {
+        Self::new(
+            header.address,
+            header.peer_type,
+            header.rd,
+            header.peer_as,
+            header.bgp_id,
+        )
+    }
+
+    pub const fn peer_address(&self) -> &Option<IpAddr> {
+        &self.peer_address
+    }
+    pub const fn peer_type(&self) -> BmpPeerType {
+        self.peer_type
+    }
+    pub const fn rd(&self) -> Option<RouteDistinguisher> {
+        self.rd
+    }
+    pub const fn asn(&self) -> u32 {
+        self.asn
+    }
+    pub const fn bgp_id(&self) -> Ipv4Addr {
+        self.bgp_id
     }
 }

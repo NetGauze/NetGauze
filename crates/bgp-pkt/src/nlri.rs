@@ -49,6 +49,7 @@ impl MplsLabel {
 ///     - Type Field: 2 bytes
 ///     - Value Field: 6 bytes
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteDistinguisher {
     /// The Value field consists of two subfields:
     ///     - Administrator subfield: ASN2

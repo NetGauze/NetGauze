@@ -55,12 +55,16 @@ pub enum BmpMessageParsingError {
     BmpMessageValueError(#[from_located(module = "self")] BmpMessageValueParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, &HashMap<AddressType, bool>, LocatedBmpMessageParsingError<'a>>
-    for BmpMessage
+impl<'a>
+    ReadablePduWithOneInput<
+        'a,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        LocatedBmpMessageParsingError<'a>,
+    > for BmpMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        add_path: &HashMap<AddressType, bool>,
+        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
     ) -> IResult<Span<'a>, Self, LocatedBmpMessageParsingError<'a>> {
         let (buf, version) = nom::combinator::map_res(be_u8, BmpVersion::try_from)(buf)?;
         let input = buf;
@@ -114,12 +118,15 @@ pub enum BmpMessageValueParsingError {
 }
 
 impl<'a>
-    ReadablePduWithOneInput<'a, &HashMap<AddressType, bool>, LocatedBmpMessageValueParsingError<'a>>
-    for BmpMessageValue
+    ReadablePduWithOneInput<
+        'a,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        LocatedBmpMessageValueParsingError<'a>,
+    > for BmpMessageValue
 {
     fn from_wire(
         buf: Span<'a>,
-        add_path: &HashMap<AddressType, bool>,
+        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
     ) -> IResult<Span<'a>, Self, LocatedBmpMessageValueParsingError<'a>> {
         let (buf, msg_type) = nom::combinator::map_res(be_u8, BmpMessageType::try_from)(buf)?;
         let (buf, msg) = match msg_type {
@@ -277,21 +284,24 @@ pub enum RouteMonitoringMessageParsingError {
 impl<'a>
     ReadablePduWithOneInput<
         'a,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedRouteMonitoringMessageParsingError<'a>,
     > for RouteMonitoringMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        add_path: &HashMap<AddressType, bool>,
+        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMonitoringMessageParsingError<'a>> {
         let (mut buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+        let peer_key = PeerKey::from_peer_header(&peer_header);
+        let empty = HashMap::new();
+        let add_path_support = add_path.get(&peer_key).unwrap_or(&empty);
         let input = buf;
         let mut bgp_messages = vec![];
         while !buf.is_empty() {
             let marker = buf;
             let (t, msg): (Span<'_>, BgpMessage) =
-                parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path)?;
+                parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path_support)?;
             if msg.get_type() != BgpMessageType::Update {
                 return Err(nom::Err::Error(
                     LocatedRouteMonitoringMessageParsingError::new(
@@ -454,16 +464,19 @@ const fn check_is_ipv6(peer_type: &BmpPeerType) -> Result<bool, BmpPeerTypeCode>
 impl<'a>
     ReadablePduWithOneInput<
         'a,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedPeerUpNotificationMessageParsingError<'a>,
     > for PeerUpNotificationMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        add_path: &HashMap<AddressType, bool>,
+        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
     ) -> IResult<Span<'a>, Self, LocatedPeerUpNotificationMessageParsingError<'a>> {
         let input = buf;
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+        let peer_key = PeerKey::from_peer_header(&peer_header);
+        let empty = HashMap::new();
+        let add_path_support = add_path.get(&peer_key).unwrap_or(&empty);
         let ipv6 = match check_is_ipv6(&peer_header.peer_type) {
             Ok(ipv6) => ipv6,
             Err(code) => {
@@ -495,9 +508,9 @@ impl<'a>
             Some(remote_port)
         };
         let (buf, sent_message) =
-            parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path)?;
+            parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path_support)?;
         let (buf, received_message) =
-            parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path)?;
+            parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path_support)?;
         let (buf, information) = parse_till_empty_into_located(buf)?;
         let peer_up_msg = PeerUpNotificationMessage::build(
             peer_header,
@@ -534,17 +547,21 @@ pub enum PeerDownNotificationMessageParsingError {
 impl<'a>
     ReadablePduWithOneInput<
         'a,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedPeerDownNotificationMessageParsingError<'a>,
     > for PeerDownNotificationMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        add_path: &HashMap<AddressType, bool>,
+        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
     ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationMessageParsingError<'a>> {
         let input = buf;
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
-        let (buf, reason) = parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path)?;
+        let peer_key = PeerKey::from_peer_header(&peer_header);
+        let empty = HashMap::new();
+        let add_path_support = add_path.get(&peer_key).unwrap_or(&empty);
+        let (buf, reason) =
+            parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path_support)?;
         let msg = PeerDownNotificationMessage::build(peer_header, reason);
         match msg {
             Ok(msg) => Ok((buf, msg)),
@@ -662,17 +679,23 @@ pub enum RouteMirroringMessageParsingError {
 impl<'a>
     ReadablePduWithOneInput<
         'a,
-        &HashMap<AddressType, bool>,
+        &HashMap<PeerKey, HashMap<AddressType, bool>>,
         LocatedRouteMirroringMessageParsingError<'a>,
     > for RouteMirroringMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        add_path: &HashMap<AddressType, bool>,
+        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMirroringMessageParsingError<'a>> {
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
-        let (buf, mirrored) =
-            parse_till_empty_into_with_two_inputs_located(buf, peer_header.is_asn4(), add_path)?;
+        let peer_key = PeerKey::from_peer_header(&peer_header);
+        let empty = HashMap::new();
+        let add_path_support = add_path.get(&peer_key).unwrap_or(&empty);
+        let (buf, mirrored) = parse_till_empty_into_with_two_inputs_located(
+            buf,
+            peer_header.is_asn4(),
+            add_path_support,
+        )?;
         Ok((buf, RouteMirroringMessage::new(peer_header, mirrored)))
     }
 }
