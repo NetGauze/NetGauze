@@ -405,7 +405,7 @@ impl<'a> ReadablePdu<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
         let input = buf;
         let (buf, timestamp_secs) = be_u32(buf)?;
         let (buf, timestamp_micro) = be_u32(buf)?;
-        let time = if timestamp_secs != 0 && timestamp_micro != 0 {
+        let time = if timestamp_secs != 0 || timestamp_micro != 0 {
             let time_opt = Utc.timestamp_opt(
                 timestamp_secs.into(),
                 timestamp_micro.checked_mul(1_000).unwrap_or(u32::MAX),

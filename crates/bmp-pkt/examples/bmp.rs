@@ -1,7 +1,7 @@
 //! Simple example of constructing BMP packet
-//! in addition to serializing and deserializing BGP packet from wire format.
+//! in addition to serializing and deserializing BMP packet from wire format.
 
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bmp_pkt::{
     iana::RouteMirroringInformation, BmpMessage, BmpMessageValue, BmpPeerType, PeerHeader,
@@ -23,7 +23,7 @@ fn main() {
             Some(IpAddr::V6(Ipv6Addr::from_str("2001::1").unwrap())),
             65000,
             Ipv4Addr::new(172, 10, 0, 1),
-            Some(Utc::now()),
+            Some(Utc.with_ymd_and_hms(2023, 01, 01, 01, 00, 00).unwrap()),
         ),
         vec![
             RouteMirroringValue::Information(RouteMirroringInformation::Experimental65531),
@@ -44,7 +44,7 @@ fn main() {
         buf,
         vec![
             3, 0, 0, 0, 77, 6, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 1, 0, 0, 253, 232, 172, 10, 0, 1, 99, 67, 29, 215, 0, 10, 102, 27, 0, 1, 0, 2,
+            0, 0, 0, 1, 0, 0, 253, 232, 172, 10, 0, 1, 99, 176, 219, 16, 0, 0, 0, 0, 0, 1, 0, 2,
             255, 251, 0, 0, 0, 19, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
             255, 255, 255, 0, 19, 4
         ]
