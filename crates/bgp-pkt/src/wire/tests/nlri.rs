@@ -14,12 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    nlri::{
-        InvalidIpv4MulticastNetwork, InvalidIpv4UnicastNetwork, InvalidIpv6MulticastNetwork,
-        InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicastAddress, Ipv4Multicast, Ipv4Unicast,
-        Ipv6Multicast, Ipv6Unicast, LabeledIpv6NextHop, LabeledNextHop, MplsLabel,
-        RouteDistinguisher,
-    },
+    nlri::*,
     wire::{deserializer::nlri::*, serializer::nlri::*},
 };
 use ipnet::{Ipv4Net, Ipv6Net};
@@ -29,7 +24,10 @@ use netgauze_parse_utils::{
     },
     Span,
 };
-use std::{net::Ipv6Addr, str::FromStr};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    str::FromStr,
+};
 
 #[test]
 fn test_ipv6_unicast() -> Result<(), Ipv6UnicastWritingError> {
@@ -160,6 +158,124 @@ fn test_ipv4_mpls_vpn_unicast() -> Result<(), Ipv4MplsVpnUnicastAddressWritingEr
         Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
     );
     test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_mac_address() -> Result<(), MacAddressWritingError> {
+    let good_wire = [0x00, 0x0c, 0x29, 0xde, 0xe3, 0x64];
+
+    let good = MacAddress([0x00, 0x0c, 0x29, 0xde, 0xe3, 0x64]);
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_ethernet_tag() -> Result<(), EthernetTagWritingError> {
+    let good_wire = [0x01, 0x02, 0x03, 0x04];
+
+    let good = EthernetTag(16909060);
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_ethernet_segment_id() -> Result<(), EthernetSegmentIdentifierWritingError> {
+    let good_wire = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a];
+
+    let good =
+        EthernetSegmentIdentifier([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a]);
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_ethernet_auto_discovery() -> Result<(), EthernetAutoDiscoveryWritingError> {
+    let good_wire = [
+        0x00, 0x01, 0x78, 0x00, 0x02, 0x05, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+        0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x49, 0x35, 0x01,
+    ];
+
+    let good = EthernetAutoDiscovery::new(
+        RouteDistinguisher::Ipv4Administrator {
+            ip: Ipv4Addr::new(120, 0, 2, 5),
+            number: 100,
+        },
+        EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05]),
+        EthernetTag(0),
+        MplsLabel::new([0x49, 0x35, 0x01]),
+    );
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_mac_ip_advertisement() -> Result<(), MacIpAdvertisementWritingError> {
+    let good_wire = [
+        0x00, 0x01, 0x78, 0x00, 0x02, 0x05, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x30, 0x00, 0x0c, 0x29, 0x82, 0xc2, 0xa9, 0x00,
+        0x49, 0x30, 0x01,
+    ];
+
+    let good = MacIpAdvertisement::new(
+        RouteDistinguisher::Ipv4Administrator {
+            ip: Ipv4Addr::new(120, 0, 2, 5),
+            number: 100,
+        },
+        EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+        EthernetTag(100),
+        MacAddress([0x00, 0x0c, 0x29, 0x82, 0xc2, 0xa9]),
+        None,
+        MplsLabel::new([0x49, 0x30, 0x01]),
+        None,
+    );
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_inclusive_multicast_ethernet_tag_route(
+) -> Result<(), InclusiveMulticastEthernetTagRouteWritingError> {
+    let good_wire = [
+        0x00, 0x01, 0xac, 0x10, 0x00, 0xc8, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x20, 0xac, 0x10,
+        0x00, 0xc8,
+    ];
+
+    let good = InclusiveMulticastEthernetTagRoute::new(
+        RouteDistinguisher::Ipv4Administrator {
+            ip: Ipv4Addr::new(172, 16, 0, 200),
+            number: 4,
+        },
+        EthernetTag(0),
+        IpAddr::V4(Ipv4Addr::new(172, 16, 0, 200)),
+    );
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_ethernet_segment_route() -> Result<(), EthernetSegmentRouteWritingError> {
+    let good_wire = [
+        0x00, 0x01, 0x78, 0x00, 0x02, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+        0x00, 0x00, 0x05, 0x20, 0x78, 0x00, 0x02, 0x05,
+    ];
+
+    let good = EthernetSegmentRoute::new(
+        RouteDistinguisher::Ipv4Administrator {
+            ip: Ipv4Addr::new(120, 0, 2, 5),
+            number: 0,
+        },
+        EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x05]),
+        IpAddr::V4(Ipv4Addr::new(120, 0, 2, 5)),
+    );
+    test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }

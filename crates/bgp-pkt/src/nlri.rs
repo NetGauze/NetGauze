@@ -20,7 +20,7 @@ use crate::iana::RouteDistinguisherTypeCode;
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_iana::address_family::AddressType;
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 /// Get the [`AddressType`] of a given NLRI
 pub trait NlriAddressType {
@@ -496,6 +496,250 @@ impl Ipv6MulticastAddress {
 impl NlriAddressType for Ipv6MulticastAddress {
     fn address_type() -> AddressType {
         AddressType::Ipv6Multicast
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EthernetSegmentIdentifier(pub [u8; 10]);
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EthernetTag(pub u32);
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MacAddress(pub [u8; 6]);
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum EvpnAddress {
+    EthernetAutoDiscovery(EthernetAutoDiscovery),
+    MacIpAdvertisement(MacIpAdvertisement),
+    InclusiveMulticastEthernetTagRoute(InclusiveMulticastEthernetTagRoute),
+    EthernetSegmentRoute(EthernetSegmentRoute),
+    IpPrefix,
+}
+
+impl NlriAddressType for EvpnAddress {
+    fn address_type() -> AddressType {
+        AddressType::L2VpnBgpEvpn
+    }
+}
+
+/// An Ethernet A-D route type specific EVPN NLRI [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
+/// ```text
+/// +---------------------------------------+
+/// |  Route Distinguisher (RD) (8 octets)  |
+/// +---------------------------------------+
+/// |Ethernet Segment Identifier (10 octets)|
+/// +---------------------------------------+
+/// |  Ethernet Tag ID (4 octets)           |
+/// +---------------------------------------+
+/// |  MPLS Label (3 octets)                |
+/// +---------------------------------------+
+/// ```
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EthernetAutoDiscovery {
+    rd: RouteDistinguisher,
+    segment_id: EthernetSegmentIdentifier,
+    tag: EthernetTag,
+    mpls_label: MplsLabel,
+}
+
+impl EthernetAutoDiscovery {
+    pub const fn new(
+        rd: RouteDistinguisher,
+        segment_id: EthernetSegmentIdentifier,
+        tag: EthernetTag,
+        mpls_label: MplsLabel,
+    ) -> Self {
+        Self {
+            rd,
+            segment_id,
+            tag,
+            mpls_label,
+        }
+    }
+
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
+    }
+
+    pub const fn segment_id(&self) -> &EthernetSegmentIdentifier {
+        &self.segment_id
+    }
+
+    pub const fn tag(&self) -> &EthernetTag {
+        &self.tag
+    }
+    pub const fn mpls_label(&self) -> &MplsLabel {
+        &self.mpls_label
+    }
+}
+
+/// A MAC/IP Advertisement route type specific EVPN NLRI
+/// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
+///
+/// ```text
+/// +---------------------------------------+
+/// |  RD (8 octets)                        |
+/// +---------------------------------------+
+/// |Ethernet Segment Identifier (10 octets)|
+/// +---------------------------------------+
+/// |  Ethernet Tag ID (4 octets)           |
+/// +---------------------------------------+
+/// |  MAC Address Length (1 octet)         |
+/// +---------------------------------------+
+/// |  MAC Address (6 octets)               |
+/// +---------------------------------------+
+/// |  IP Address Length (1 octet)          |
+/// +---------------------------------------+
+/// |  IP Address (0, 4, or 16 octets)      |
+/// +---------------------------------------+
+/// |  MPLS Label1 (3 octets)               |
+/// +---------------------------------------+
+/// |  MPLS Label2 (0 or 3 octets)          |
+/// +---------------------------------------+
+/// ```
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MacIpAdvertisement {
+    rd: RouteDistinguisher,
+    segment_id: EthernetSegmentIdentifier,
+    tag: EthernetTag,
+    mac: MacAddress,
+    ip: Option<IpAddr>,
+    mpls_label1: MplsLabel,
+    mpls_label2: Option<MplsLabel>,
+}
+
+impl MacIpAdvertisement {
+    pub const fn new(
+        rd: RouteDistinguisher,
+        segment_id: EthernetSegmentIdentifier,
+        tag: EthernetTag,
+        mac: MacAddress,
+        ip: Option<IpAddr>,
+        mpls_label1: MplsLabel,
+        mpls_label2: Option<MplsLabel>,
+    ) -> Self {
+        Self {
+            rd,
+            segment_id,
+            tag,
+            mac,
+            ip,
+            mpls_label1,
+            mpls_label2,
+        }
+    }
+
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
+    }
+
+    pub const fn segment_id(&self) -> &EthernetSegmentIdentifier {
+        &self.segment_id
+    }
+
+    pub const fn tag(&self) -> &EthernetTag {
+        &self.tag
+    }
+
+    pub const fn mac(&self) -> &MacAddress {
+        &self.mac
+    }
+
+    pub const fn ip(&self) -> Option<&IpAddr> {
+        self.ip.as_ref()
+    }
+
+    pub const fn mpls_label1(&self) -> &MplsLabel {
+        &self.mpls_label1
+    }
+
+    pub const fn mpls_label2(&self) -> Option<&MplsLabel> {
+        self.mpls_label2.as_ref()
+    }
+}
+
+/// An Inclusive Multicast Ethernet Tag route type specific EVPN NLRI
+/// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
+///
+/// ```text
+/// +---------------------------------------+
+/// |  RD (8 octets)                        |
+/// +---------------------------------------+
+/// |  Ethernet Tag ID (4 octets)           |
+/// +---------------------------------------+
+/// |  IP Address Length (1 octet)          |
+/// +---------------------------------------+
+/// |  Originating Router's IP Address      |
+/// |          (4 or 16 octets)             |
+/// +---------------------------------------+
+/// ```
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct InclusiveMulticastEthernetTagRoute {
+    rd: RouteDistinguisher,
+    tag: EthernetTag,
+    ip: IpAddr,
+}
+
+impl InclusiveMulticastEthernetTagRoute {
+    pub const fn new(rd: RouteDistinguisher, tag: EthernetTag, ip: IpAddr) -> Self {
+        Self { rd, tag, ip }
+    }
+
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
+    }
+
+    pub const fn tag(&self) -> &EthernetTag {
+        &self.tag
+    }
+
+    pub const fn ip(&self) -> &IpAddr {
+        &self.ip
+    }
+}
+
+/// An Ethernet Segment route type specific EVPN NLRI
+/// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
+///
+/// ```text
+/// +---------------------------------------+
+/// |  RD (8 octets)                        |
+/// +---------------------------------------+
+/// |Ethernet Segment Identifier (10 octets)|
+/// +---------------------------------------+
+/// |  IP Address Length (1 octet)          |
+/// +---------------------------------------+
+/// |  Originating Router's IP Address      |
+/// |          (4 or 16 octets)             |
+/// +---------------------------------------+
+/// ```
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct EthernetSegmentRoute {
+    rd: RouteDistinguisher,
+    segment_id: EthernetSegmentIdentifier,
+    ip: IpAddr,
+}
+
+impl EthernetSegmentRoute {
+    pub const fn new(
+        rd: RouteDistinguisher,
+        segment_id: EthernetSegmentIdentifier,
+        ip: IpAddr,
+    ) -> Self {
+        Self { rd, segment_id, ip }
+    }
+
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
+    }
+
+    pub const fn segment_id(&self) -> &EthernetSegmentIdentifier {
+        &self.segment_id
+    }
+
+    pub const fn ip(&self) -> &IpAddr {
+        &self.ip
     }
 }
 

@@ -13,26 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    nlri::{
-        Ipv4MplsVpnUnicastAddress, Ipv4Multicast, Ipv4MulticastAddress, Ipv4Unicast,
-        Ipv4UnicastAddress, Ipv6MplsVpnUnicastAddress, Ipv6Multicast, Ipv6MulticastAddress,
-        Ipv6Unicast, Ipv6UnicastAddress, LabeledIpv4NextHop, LabeledIpv6NextHop, LabeledNextHop,
-        MplsLabel, RouteDistinguisher,
-    },
-    wire::serializer::round_len,
-};
+use crate::{nlri::*, wire::serializer::round_len};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
-use std::{convert::Into, io::Write};
+use std::{convert::Into, io::Write, net::IpAddr};
 
 /// Length for Route Distinguisher
 pub(crate) const RD_LEN: u8 = 8;
 pub(crate) const IPV4_LEN: u8 = 4;
+pub(crate) const IPV4_LEN_BITS: u8 = 32;
 pub(crate) const LABELED_IPV4_LEN: u8 = RD_LEN + IPV4_LEN;
 pub(crate) const IPV6_LEN: u8 = 16;
+pub(crate) const IPV6_LEN_BITS: u8 = 128;
 pub(crate) const LABELED_IPV6_LEN: u8 = RD_LEN + IPV6_LEN;
+pub(crate) const MPLS_LABEL_LEN_BITS: u8 = 24;
+pub(crate) const MAC_ADDRESS_LEN_BITS: u8 = 48;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum RouteDistinguisherWritingError {
@@ -398,6 +394,227 @@ impl WritablePdu<Ipv4MplsVpnUnicastAddressWritingError> for Ipv4MplsVpnUnicastAd
         let network_octets = &self.network().address().network().octets();
         let prefix_len = self.network().len() - 1;
         writer.write_all(&network_octets[0..prefix_len])?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum MacAddressWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePdu<MacAddressWritingError> for MacAddress {
+    const BASE_LENGTH: usize = 6;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MacAddressWritingError> {
+        writer.write_all(&self.0)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum EthernetTagWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePdu<EthernetTagWritingError> for EthernetTag {
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), EthernetTagWritingError> {
+        writer.write_u32::<NetworkEndian>(self.0)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum EthernetSegmentIdentifierWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePdu<EthernetSegmentIdentifierWritingError> for EthernetSegmentIdentifier {
+    const BASE_LENGTH: usize = 10;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), EthernetSegmentIdentifierWritingError> {
+        writer.write_all(&self.0)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum EthernetAutoDiscoveryWritingError {
+    RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+    EthernetTagError(#[from] EthernetTagWritingError),
+    MplsLabelError(#[from] MplsLabelWritingError),
+}
+
+impl WritablePdu<EthernetAutoDiscoveryWritingError> for EthernetAutoDiscovery {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.rd().len()
+            + self.segment_id().len()
+            + self.tag().len()
+            + self.mpls_label().len()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), EthernetAutoDiscoveryWritingError> {
+        self.rd().write(writer)?;
+        self.segment_id().write(writer)?;
+        self.tag().write(writer)?;
+        self.mpls_label().write(writer)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum MacIpAdvertisementWritingError {
+    StdIOError(#[from_std_io_error] String),
+    RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+    EthernetTagError(#[from] EthernetTagWritingError),
+    MacAddressError(#[from] MacAddressWritingError),
+    MplsLabelError(#[from] MplsLabelWritingError),
+}
+
+impl WritablePdu<MacIpAdvertisementWritingError> for MacIpAdvertisement {
+    // 1-mac address len + 1 ip address len
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.rd().len()
+            + self.segment_id().len()
+            + self.tag().len()
+            + self.mac().len()
+            + self.ip().map_or(0, |x| {
+                if x.is_ipv4() {
+                    IPV4_LEN as usize
+                } else {
+                    IPV6_LEN as usize
+                }
+            })
+            + self.mpls_label1().len()
+            + self.mpls_label2().map_or(0, |x| x.len())
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MacIpAdvertisementWritingError> {
+        self.rd().write(writer)?;
+        self.segment_id().write(writer)?;
+        self.tag().write(writer)?;
+        writer.write_u8(MAC_ADDRESS_LEN_BITS)?;
+        self.mac().write(writer)?;
+        match self.ip() {
+            None => writer.write_u8(0)?,
+            Some(IpAddr::V4(addr)) => {
+                writer.write_u8(IPV4_LEN_BITS)?;
+                writer.write_all(&addr.octets())?;
+            }
+            Some(IpAddr::V6(addr)) => {
+                writer.write_u8(IPV6_LEN_BITS)?;
+                writer.write_all(&addr.octets())?;
+            }
+        }
+        self.mpls_label1().write(writer)?;
+        if let Some(label) = self.mpls_label2() {
+            label.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum InclusiveMulticastEthernetTagRouteWritingError {
+    StdIOError(#[from_std_io_error] String),
+    RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+    EthernetTagError(#[from] EthernetTagWritingError),
+}
+
+impl WritablePdu<InclusiveMulticastEthernetTagRouteWritingError>
+    for InclusiveMulticastEthernetTagRoute
+{
+    // 1-octet for ip length
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.rd().len()
+            + self.tag().len()
+            + if self.ip().is_ipv4() {
+                IPV4_LEN as usize
+            } else {
+                IPV6_LEN as usize
+            }
+    }
+
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), InclusiveMulticastEthernetTagRouteWritingError> {
+        self.rd().write(writer)?;
+        self.tag().write(writer)?;
+        match self.ip() {
+            IpAddr::V4(addr) => {
+                writer.write_u8(IPV4_LEN_BITS)?;
+                writer.write_all(&addr.octets())?;
+            }
+            IpAddr::V6(addr) => {
+                writer.write_u8(IPV6_LEN_BITS)?;
+                writer.write_all(&addr.octets())?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum EthernetSegmentRouteWritingError {
+    StdIOError(#[from_std_io_error] String),
+    RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+}
+
+impl WritablePdu<EthernetSegmentRouteWritingError> for EthernetSegmentRoute {
+    // 1-octet for ip length
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.rd().len()
+            + self.segment_id().len()
+            + if self.ip().is_ipv4() {
+                IPV4_LEN as usize
+            } else {
+                IPV6_LEN as usize
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), EthernetSegmentRouteWritingError> {
+        self.rd().write(writer)?;
+        self.segment_id().write(writer)?;
+        match self.ip() {
+            IpAddr::V4(addr) => {
+                writer.write_u8(IPV4_LEN_BITS)?;
+                writer.write_all(&addr.octets())?;
+            }
+            IpAddr::V6(addr) => {
+                writer.write_u8(IPV6_LEN_BITS)?;
+                writer.write_all(&addr.octets())?;
+            }
+        }
         Ok(())
     }
 }

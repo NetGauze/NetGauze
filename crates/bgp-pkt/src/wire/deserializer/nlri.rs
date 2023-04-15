@@ -15,16 +15,13 @@
 
 use crate::{
     iana::{RouteDistinguisherTypeCode, UndefinedRouteDistinguisherTypeCode},
-    nlri::{
-        InvalidIpv4MulticastNetwork, InvalidIpv4UnicastNetwork, InvalidIpv6MulticastNetwork,
-        InvalidIpv6UnicastNetwork, Ipv4MplsVpnUnicastAddress, Ipv4Multicast, Ipv4MulticastAddress,
-        Ipv4Unicast, Ipv4UnicastAddress, Ipv6MplsVpnUnicastAddress, Ipv6Multicast,
-        Ipv6MulticastAddress, Ipv6Unicast, Ipv6UnicastAddress, LabeledIpv4NextHop,
-        LabeledIpv6NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
-    },
+    nlri::*,
     wire::{
         deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError},
-        serializer::nlri::{LABELED_IPV4_LEN, LABELED_IPV6_LEN, RD_LEN},
+        serializer::nlri::{
+            IPV4_LEN_BITS, IPV6_LEN_BITS, LABELED_IPV4_LEN, LABELED_IPV6_LEN, MAC_ADDRESS_LEN_BITS,
+            MPLS_LABEL_LEN_BITS, RD_LEN,
+        },
     },
 };
 use netgauze_parse_utils::{
@@ -38,9 +35,7 @@ use nom::{
     IResult,
 };
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, Ipv6Addr};
-
-pub(crate) const MPLS_LABEL_LEN_BITS: u8 = 24;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MplsLabelParsingError {
@@ -481,5 +476,240 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4MulticastAddressParsingErr
         };
         let (buf, net) = parse_into_located(buf)?;
         Ok((buf, Ipv4MulticastAddress::new(path_id, net)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum MacAddressParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+impl<'a> ReadablePdu<'a, LocatedMacAddressParsingError<'a>> for MacAddress {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedMacAddressParsingError<'a>> {
+        let (buf, byte0) = be_u8(buf)?;
+        let (buf, byte1) = be_u8(buf)?;
+        let (buf, byte2) = be_u8(buf)?;
+        let (buf, byte3) = be_u8(buf)?;
+        let (buf, byte4) = be_u8(buf)?;
+        let (buf, byte5) = be_u8(buf)?;
+        Ok((buf, MacAddress([byte0, byte1, byte2, byte3, byte4, byte5])))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum EthernetSegmentIdentifierParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePdu<'a, LocatedEthernetSegmentIdentifierParsingError<'a>>
+    for EthernetSegmentIdentifier
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedEthernetSegmentIdentifierParsingError<'a>> {
+        let (buf, byte0) = be_u8(buf)?;
+        let (buf, byte1) = be_u8(buf)?;
+        let (buf, byte2) = be_u8(buf)?;
+        let (buf, byte3) = be_u8(buf)?;
+        let (buf, byte4) = be_u8(buf)?;
+        let (buf, byte5) = be_u8(buf)?;
+        let (buf, byte6) = be_u8(buf)?;
+        let (buf, byte7) = be_u8(buf)?;
+        let (buf, byte8) = be_u8(buf)?;
+        let (buf, byte9) = be_u8(buf)?;
+        Ok((
+            buf,
+            EthernetSegmentIdentifier([
+                byte0, byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9,
+            ]),
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum EthernetTagParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePdu<'a, LocatedEthernetTagParsingError<'a>> for EthernetTag {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedEthernetTagParsingError<'a>> {
+        let (buf, tag) = be_u32(buf)?;
+        Ok((buf, EthernetTag(tag)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum EthernetAutoDiscoveryParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
+    EthernetSegmentIdentifierError(
+        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
+    ),
+    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
+    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+}
+
+impl<'a> ReadablePdu<'a, LocatedEthernetAutoDiscoveryParsingError<'a>> for EthernetAutoDiscovery {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedEthernetAutoDiscoveryParsingError<'a>> {
+        let (buf, rd) = parse_into_located(buf)?;
+        let (buf, segment_id) = parse_into_located(buf)?;
+        let (buf, tag) = parse_into_located(buf)?;
+        let (buf, mpls_label) = parse_into_located(buf)?;
+        Ok((
+            buf,
+            EthernetAutoDiscovery::new(rd, segment_id, tag, mpls_label),
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum MacIpAdvertisementParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidMacAddressLength(u8),
+    InvalidIpAddressAddressLength(u8),
+    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
+    EthernetSegmentIdentifierError(
+        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
+    ),
+    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
+    MacAddressError(#[from_located(module = "self")] MacAddressParsingError),
+    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+}
+
+impl<'a> ReadablePdu<'a, LocatedMacIpAdvertisementParsingError<'a>> for MacIpAdvertisement {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedMacIpAdvertisementParsingError<'a>> {
+        let (buf, rd) = parse_into_located(buf)?;
+        let (buf, segment_id) = parse_into_located(buf)?;
+        let (buf, tag) = parse_into_located(buf)?;
+        let input = buf;
+        let (buf, mac_len) = be_u8(buf)?;
+        if mac_len != MAC_ADDRESS_LEN_BITS {
+            return Err(nom::Err::Error(LocatedMacIpAdvertisementParsingError::new(
+                input,
+                MacIpAdvertisementParsingError::InvalidMacAddressLength(mac_len),
+            )));
+        }
+        let (buf, mac) = parse_into_located(buf)?;
+        let input = buf;
+        let (buf, ip_len) = be_u8(buf)?;
+        let (buf, ip) = match ip_len {
+            0 => (buf, None),
+            IPV4_LEN_BITS => {
+                let (buf, ip) = be_u32(buf)?;
+                (buf, Some(IpAddr::V4(Ipv4Addr::from(ip))))
+            }
+            IPV6_LEN_BITS => {
+                let (buf, ip) = be_u128(buf)?;
+                (buf, Some(IpAddr::V6(Ipv6Addr::from(ip))))
+            }
+            _ => {
+                return Err(nom::Err::Error(LocatedMacIpAdvertisementParsingError::new(
+                    input,
+                    MacIpAdvertisementParsingError::InvalidIpAddressAddressLength(ip_len),
+                )));
+            }
+        };
+
+        let (buf, mpls_label) = parse_into_located(buf)?;
+        let (buf, mpls_label2) = if buf.len() > 0 {
+            let (buf, mpls_label2) = parse_into_located(buf)?;
+            (buf, Some(mpls_label2))
+        } else {
+            (buf, None)
+        };
+        Ok((
+            buf,
+            MacIpAdvertisement::new(rd, segment_id, tag, mac, ip, mpls_label, mpls_label2),
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum InclusiveMulticastEthernetTagRouteParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidIpAddressAddressLength(u8),
+    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
+    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
+}
+
+impl<'a> ReadablePdu<'a, LocatedInclusiveMulticastEthernetTagRouteParsingError<'a>>
+    for InclusiveMulticastEthernetTagRoute
+{
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedInclusiveMulticastEthernetTagRouteParsingError<'a>> {
+        let (buf, rd) = parse_into_located(buf)?;
+        let (buf, tag) = parse_into_located(buf)?;
+        let input = buf;
+        let (buf, ip_len) = be_u8(buf)?;
+        let (buf, ip) = match ip_len {
+            IPV4_LEN_BITS => {
+                let (buf, ip) = be_u32(buf)?;
+                (buf, IpAddr::V4(Ipv4Addr::from(ip)))
+            }
+            IPV6_LEN_BITS => {
+                let (buf, ip) = be_u128(buf)?;
+                (buf, IpAddr::V6(Ipv6Addr::from(ip)))
+            }
+            _ => {
+                return Err(nom::Err::Error(
+                    LocatedInclusiveMulticastEthernetTagRouteParsingError::new(
+                        input,
+                        InclusiveMulticastEthernetTagRouteParsingError::InvalidIpAddressAddressLength(ip_len),
+                    ),
+                ));
+            }
+        };
+        Ok((buf, InclusiveMulticastEthernetTagRoute::new(rd, tag, ip)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum EthernetSegmentRouteParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidIpAddressAddressLength(u8),
+    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
+    EthernetSegmentIdentifierError(
+        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
+    ),
+}
+
+impl<'a> ReadablePdu<'a, LocatedEthernetSegmentRouteParsingError<'a>> for EthernetSegmentRoute {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedEthernetSegmentRouteParsingError<'a>> {
+        let (buf, rd) = parse_into_located(buf)?;
+        let (buf, segment_id) = parse_into_located(buf)?;
+        let input = buf;
+        let (buf, ip_len) = be_u8(buf)?;
+        let (buf, ip) = match ip_len {
+            IPV4_LEN_BITS => {
+                let (buf, ip) = be_u32(buf)?;
+                (buf, IpAddr::V4(Ipv4Addr::from(ip)))
+            }
+            IPV6_LEN_BITS => {
+                let (buf, ip) = be_u128(buf)?;
+                (buf, IpAddr::V6(Ipv6Addr::from(ip)))
+            }
+            _ => {
+                return Err(nom::Err::Error(
+                    LocatedEthernetSegmentRouteParsingError::new(
+                        input,
+                        EthernetSegmentRouteParsingError::InvalidIpAddressAddressLength(ip_len),
+                    ),
+                ));
+            }
+        };
+        Ok((buf, EthernetSegmentRoute::new(rd, segment_id, ip)))
     }
 }
