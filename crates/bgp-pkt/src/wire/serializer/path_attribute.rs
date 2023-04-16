@@ -766,7 +766,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 } else {
                     IPV6_LEN as usize
                 };
-                next_hop_len + 1 + nlri.len()
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                next_hop_len + 1 + nlri_len
             }
             Self::Unknown {
                 afi: _,
@@ -931,7 +932,9 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     }
                 }
                 writer.write_u8(0)?;
-                nlri.write(writer)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
             }
             Self::Unknown { afi, safi, value } => {
                 writer.write_u16::<NetworkEndian>(*afi as u16)?;

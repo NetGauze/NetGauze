@@ -910,7 +910,7 @@ pub enum MpReach {
     },
     L2Evpn {
         next_hop: IpAddr,
-        nlri: L2EvpnAddress,
+        nlri: Vec<L2EvpnAddress>,
     },
     Unknown {
         afi: AddressFamily,

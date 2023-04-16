@@ -706,7 +706,7 @@ impl<'a>
                 let add_path = add_path_map
                     .get(&AddressType::L2VpnBgpEvpn)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_into_located_one_input(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::L2Evpn { next_hop, nlri }))
             }
             Ok(_) | Err(_) => Ok((
