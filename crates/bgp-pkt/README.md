@@ -62,7 +62,7 @@ pub fn main() {
         ],
     ));
 
-   println!("JSON representation of BGP packet: {}", serde_json::to_string(&msg).unwrap());
+    println!("JSON representation of BGP packet: {}", serde_json::to_string(&msg).unwrap());
 
     // Serialize the message into it's BGP binary format
     let mut buf: Vec<u8> = vec![];
@@ -132,14 +132,15 @@ pub fn main() {
 
 ### MP-BGP supported address families
 
-| RFC                                                       | Address Family (AFI) | Subsequence Address Family (SAFI) | Notes |
-|-----------------------------------------------------------|----------------------|-----------------------------------|-------|
-|                                                           | 1 = IPv4             | 1 = Unicast                       |       |
-|                                                           | 1 = IPv4             | 2 = Multicast                     |       |
-| [RFC 4364](https://datatracker.ietf.org/doc/html/RFC4364) | 1 = IPv4             | 128 = MPLS Labeled Unicast        |       |
-|                                                           | 2 = IPv6             | 1 = Unicast                       |       |
-|                                                           | 2 = IPv6             | 2 = Multicast                     |       |
-| [RFC 4659](https://datatracker.ietf.org/doc/html/RFC4659) | 2 = IPv4             | 128 = MPLS Labeled Unicast        |       |
+| RFC                                                                                                                    | Address Family (AFI) | Subsequence Address Family (SAFI) | Notes                                   |
+|------------------------------------------------------------------------------------------------------------------------|----------------------|-----------------------------------|-----------------------------------------|
+|                                                                                                                        | 1 = IPv4             | 1 = Unicast                       |                                         |
+|                                                                                                                        | 1 = IPv4             | 2 = Multicast                     |                                         |
+| [RFC 4364](https://datatracker.ietf.org/doc/html/RFC4364)                                                              | 1 = IPv4             | 128 = MPLS Labeled Unicast        |                                         |
+|                                                                                                                        | 2 = IPv6             | 1 = Unicast                       |                                         |
+|                                                                                                                        | 2 = IPv6             | 2 = Multicast                     |                                         |
+| [RFC 4659](https://datatracker.ietf.org/doc/html/RFC4659)                                                              | 2 = IPv4             | 128 = MPLS Labeled Unicast        |                                         |
+| [RFC 7432](https://datatracker.ietf.org/doc/html/RFC7432) and [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136) | 25 = L2 VPN          | 70 = BGP EVPNs                    | Route types from 1 till 5 are supported |
 
 # Development documentation
 
