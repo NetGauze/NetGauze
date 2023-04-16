@@ -751,6 +751,9 @@ pub enum MpUnreachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")]
         Ipv6MplsVpnUnicastAddressParsingError,
     ),
+    L2EvpnAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] L2EvpnAddressParsingError,
+    ),
 }
 
 impl<'a>
@@ -816,6 +819,13 @@ impl<'a>
                     .map_or(false, |x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::Ipv6MplsVpnUnicastAddress { nlri }))
+            }
+            Ok(AddressType::L2VpnBgpEvpn) => {
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv6MplsLabeledVpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpUnreach::L2Evpn { nlri }))
             }
             Ok(_) | Err(_) => Ok((
                 buf,

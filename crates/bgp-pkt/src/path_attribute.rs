@@ -968,6 +968,9 @@ pub enum MpUnreach {
     Ipv6MplsVpnUnicastAddress {
         nlri: Vec<Ipv6MplsVpnUnicastAddress>,
     },
+    L2Evpn {
+        nlri: Vec<L2EvpnAddress>,
+    },
     Unknown {
         afi: AddressFamily,
         safi: SubsequentAddressFamily,
