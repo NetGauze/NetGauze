@@ -16,7 +16,7 @@
 //! Data types to represent various Network Layer Reachability Information
 //! (`NLRI`)
 
-use crate::iana::RouteDistinguisherTypeCode;
+use crate::iana::{L2EvpnRouteTypeCode, RouteDistinguisherTypeCode};
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_iana::address_family::AddressType;
 use serde::{Deserialize, Serialize};
@@ -508,16 +508,52 @@ pub struct EthernetTag(pub u32);
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MacAddress(pub [u8; 6]);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum EvpnAddress {
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct L2EvpnAddress {
+    path_id: Option<u32>,
+    route: L2EvpnRoute,
+}
+
+impl L2EvpnAddress {
+    pub const fn new(path_id: Option<u32>, route: L2EvpnRoute) -> Self {
+        Self { path_id, route }
+    }
+
+    pub const fn path_id(&self) -> Option<&u32> {
+        self.path_id.as_ref()
+    }
+
+    pub const fn route(&self) -> &L2EvpnRoute {
+        &self.route
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum L2EvpnRoute {
     EthernetAutoDiscovery(EthernetAutoDiscovery),
     MacIpAdvertisement(MacIpAdvertisement),
     InclusiveMulticastEthernetTagRoute(InclusiveMulticastEthernetTagRoute),
     EthernetSegmentRoute(EthernetSegmentRoute),
-    IpPrefix,
+    IpPrefixRoute(L2EvpnIpPrefixRoute),
+    Unknown { code: u8, value: Vec<u8> },
 }
 
-impl NlriAddressType for EvpnAddress {
+impl L2EvpnRoute {
+    pub const fn route_type(&self) -> Result<L2EvpnRouteTypeCode, u8> {
+        match self {
+            Self::EthernetAutoDiscovery(_) => Ok(L2EvpnRouteTypeCode::EthernetAutoDiscovery),
+            Self::MacIpAdvertisement(_) => Ok(L2EvpnRouteTypeCode::MacIpAdvertisement),
+            Self::InclusiveMulticastEthernetTagRoute(_) => {
+                Ok(L2EvpnRouteTypeCode::InclusiveMulticastEthernetTagRoute)
+            }
+            Self::EthernetSegmentRoute(_) => Ok(L2EvpnRouteTypeCode::EthernetSegmentRoute),
+            Self::IpPrefixRoute(_) => Ok(L2EvpnRouteTypeCode::IpPrefix),
+            Self::Unknown { code, .. } => Err(*code),
+        }
+    }
+}
+
+impl NlriAddressType for L2EvpnAddress {
     fn address_type() -> AddressType {
         AddressType::L2VpnBgpEvpn
     }
@@ -740,6 +776,155 @@ impl EthernetSegmentRoute {
 
     pub const fn ip(&self) -> &IpAddr {
         &self.ip
+    }
+}
+
+/// The BGP EVPN IPv4 or IPv6 Prefix Route
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum L2EvpnIpPrefixRoute {
+    V4(L2EvpnIpv4PrefixRoute),
+    V6(L2EvpnIpv6PrefixRoute),
+}
+
+/// The BGP EVPN IPv4 Prefix Route
+/// [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136)
+/// ```text
+///  +---------------------------------------+
+/// |      RD (8 octets)                    |
+/// +---------------------------------------+
+/// |Ethernet Segment Identifier (10 octets)|
+/// +---------------------------------------+
+/// |  Ethernet Tag ID (4 octets)           |
+/// +---------------------------------------+
+/// |  IP Prefix Length (1 octet, 0 to 32)  |
+/// +---------------------------------------+
+/// |  IP Prefix (4 octets)                 |
+/// +---------------------------------------+
+/// |  GW IP Address (4 octets)             |
+/// +---------------------------------------+
+/// |  MPLS Label (3 octets)                |
+/// +---------------------------------------+
+/// ```
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct L2EvpnIpv4PrefixRoute {
+    rd: RouteDistinguisher,
+    segment_id: EthernetSegmentIdentifier,
+    tag: EthernetTag,
+    prefix: Ipv4Net,
+    gateway: Ipv4Addr,
+    label: MplsLabel,
+}
+
+impl L2EvpnIpv4PrefixRoute {
+    pub const fn new(
+        rd: RouteDistinguisher,
+        segment_id: EthernetSegmentIdentifier,
+        tag: EthernetTag,
+        prefix: Ipv4Net,
+        gateway: Ipv4Addr,
+        label: MplsLabel,
+    ) -> Self {
+        Self {
+            rd,
+            segment_id,
+            tag,
+            prefix,
+            gateway,
+            label,
+        }
+    }
+
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
+    }
+
+    pub const fn segment_id(&self) -> &EthernetSegmentIdentifier {
+        &self.segment_id
+    }
+
+    pub const fn tag(&self) -> &EthernetTag {
+        &self.tag
+    }
+    pub const fn prefix(&self) -> &Ipv4Net {
+        &self.prefix
+    }
+    pub const fn gateway(&self) -> &Ipv4Addr {
+        &self.gateway
+    }
+
+    pub const fn label(&self) -> &MplsLabel {
+        &self.label
+    }
+}
+
+/// The BGP EVPN IPv4 Prefix Route
+/// [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136)
+/// ```text
+///  +---------------------------------------+
+/// |      RD (8 octets)                    |
+/// +---------------------------------------+
+/// |Ethernet Segment Identifier (10 octets)|
+/// +---------------------------------------+
+/// |  Ethernet Tag ID (4 octets)           |
+/// +---------------------------------------+
+/// |  IP Prefix Length (1 octet, 0 to 32)  |
+/// +---------------------------------------+
+/// |  IP Prefix (4 octets)                 |
+/// +---------------------------------------+
+/// |  GW IP Address (4 octets)             |
+/// +---------------------------------------+
+/// |  MPLS Label (3 octets)                |
+/// +---------------------------------------+
+/// ```
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct L2EvpnIpv6PrefixRoute {
+    rd: RouteDistinguisher,
+    segment_id: EthernetSegmentIdentifier,
+    tag: EthernetTag,
+    prefix: Ipv6Net,
+    gateway: Ipv6Addr,
+    label: MplsLabel,
+}
+
+impl L2EvpnIpv6PrefixRoute {
+    pub const fn new(
+        rd: RouteDistinguisher,
+        segment_id: EthernetSegmentIdentifier,
+        tag: EthernetTag,
+        prefix: Ipv6Net,
+        gateway: Ipv6Addr,
+        label: MplsLabel,
+    ) -> Self {
+        Self {
+            rd,
+            segment_id,
+            tag,
+            prefix,
+            gateway,
+            label,
+        }
+    }
+
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
+    }
+
+    pub const fn segment_id(&self) -> &EthernetSegmentIdentifier {
+        &self.segment_id
+    }
+
+    pub const fn tag(&self) -> &EthernetTag {
+        &self.tag
+    }
+    pub const fn prefix(&self) -> &Ipv6Net {
+        &self.prefix
+    }
+    pub const fn gateway(&self) -> &Ipv6Addr {
+        &self.gateway
+    }
+
+    pub const fn label(&self) -> &MplsLabel {
+        &self.label
     }
 }
 

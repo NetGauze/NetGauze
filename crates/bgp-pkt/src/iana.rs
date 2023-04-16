@@ -1109,7 +1109,7 @@ impl TryFrom<u8> for TransitiveIpv6ExtendedCommunitySubType {
 /// EVPN Route Types [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum EvpnRouteTypeCode {
+pub enum L2EvpnRouteTypeCode {
     /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
     EthernetAutoDiscovery = 0x01,
 
@@ -1117,10 +1117,10 @@ pub enum EvpnRouteTypeCode {
     MacIpAdvertisement = 0x02,
 
     /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
-    InclusiveMulticastEthernetTag = 0x03,
+    InclusiveMulticastEthernetTagRoute = 0x03,
 
     /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
-    EthernetSegment = 0x04,
+    EthernetSegmentRoute = 0x04,
 
     /// [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136)
     IpPrefix = 0x05,
@@ -1136,15 +1136,15 @@ pub enum EvpnRouteTypeCode {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UndefinedEvpnRouteTypeCode(pub u8);
+pub struct UndefinedL2EvpnRouteTypeCode(pub u8);
 
-impl TryFrom<u8> for EvpnRouteTypeCode {
-    type Error = UndefinedEvpnRouteTypeCode;
+impl TryFrom<u8> for L2EvpnRouteTypeCode {
+    type Error = UndefinedL2EvpnRouteTypeCode;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UndefinedEvpnRouteTypeCode(value)),
+            None => Err(UndefinedL2EvpnRouteTypeCode(value)),
         }
     }
 }

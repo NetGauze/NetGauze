@@ -19,7 +19,10 @@
 use crate::{
     iana::{PathAttributeType, UndefinedPathAttributeType},
     path_attribute::*,
-    wire::deserializer::{community::*, nlri::*},
+    wire::{
+        deserializer::{community::*, nlri::*},
+        serializer::nlri::{IPV4_LEN, IPV6_LEN},
+    },
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, SubsequentAddressFamily, UndefinedAddressFamily,
@@ -39,7 +42,7 @@ use nom::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 
 const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
@@ -550,6 +553,7 @@ pub enum MpReachParsingError {
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    InvalidIpAddressType(u8),
     UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
     UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
     Ipv4UnicastAddressError(
@@ -573,6 +577,9 @@ pub enum MpReachParsingError {
     Ipv6MplsVpnUnicastAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")]
         Ipv6MplsVpnUnicastAddressParsingError,
+    ),
+    L2EvpnAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] L2EvpnAddressParsingError,
     ),
     LabeledNextHopError(
         #[from_located(module = "crate::wire::deserializer::nlri")] LabeledNextHopParsingError,
@@ -675,6 +682,32 @@ impl<'a>
                         nlri,
                     },
                 ))
+            }
+            Ok(AddressType::L2VpnBgpEvpn) => {
+                let tmp = mp_buf;
+                let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
+                let (mp_buf, next_hop) = match next_hop_len {
+                    IPV4_LEN => {
+                        let (mp_buf, addr) = be_u32(mp_buf)?;
+                        (mp_buf, IpAddr::V4(Ipv4Addr::from(addr)))
+                    }
+                    IPV6_LEN => {
+                        let (mp_buf, addr) = be_u128(mp_buf)?;
+                        (mp_buf, IpAddr::V6(Ipv6Addr::from(addr)))
+                    }
+                    _ => {
+                        return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                            tmp,
+                            MpReachParsingError::InvalidIpAddressType(next_hop_len),
+                        )));
+                    }
+                };
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::L2VpnBgpEvpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_into_located_one_input(mp_buf, add_path)?;
+                Ok((buf, MpReach::L2Evpn { next_hop, nlri }))
             }
             Ok(_) | Err(_) => Ok((
                 buf,

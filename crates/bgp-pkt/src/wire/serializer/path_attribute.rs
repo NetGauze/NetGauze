@@ -24,6 +24,7 @@ use crate::{
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
+use std::net::IpAddr;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
@@ -709,6 +710,7 @@ pub enum MpReachWritingError {
     Ipv6MulticastAddressError(#[from] Ipv6MulticastAddressWritingError),
     Ipv4MplsVpnUnicastAddressError(#[from] Ipv4MplsVpnUnicastAddressWritingError),
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
+    L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
 }
 
@@ -757,6 +759,14 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 let local_len: usize = next_hop_local.map(|x| x.len()).unwrap_or(0);
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
                 next_hop_global.len() + local_len + nlri_len
+            }
+            Self::L2Evpn { next_hop, nlri } => {
+                let next_hop_len = if next_hop.is_ipv4() {
+                    IPV4_LEN as usize
+                } else {
+                    IPV6_LEN as usize
+                };
+                next_hop_len + 1 + nlri.len()
             }
             Self::Unknown {
                 afi: _,
@@ -900,6 +910,28 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
+            }
+            Self::L2Evpn { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    L2EvpnAddress::address_type().address_family().into(),
+                )?;
+                writer.write_u8(
+                    L2EvpnAddress::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                match next_hop {
+                    IpAddr::V4(addr) => {
+                        writer.write_u8(IPV4_LEN)?;
+                        writer.write_all(&addr.octets())?;
+                    }
+                    IpAddr::V6(addr) => {
+                        writer.write_u8(IPV6_LEN)?;
+                        writer.write_all(&addr.octets())?;
+                    }
+                }
+                writer.write_u8(0)?;
+                nlri.write(writer)?;
             }
             Self::Unknown { afi, safi, value } => {
                 writer.write_u16::<NetworkEndian>(*afi as u16)?;

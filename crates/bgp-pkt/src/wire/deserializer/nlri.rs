@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    iana::{RouteDistinguisherTypeCode, UndefinedRouteDistinguisherTypeCode},
+    iana::{L2EvpnRouteTypeCode, RouteDistinguisherTypeCode, UndefinedRouteDistinguisherTypeCode},
     nlri::*,
     wire::{
         deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError},
@@ -36,6 +36,13 @@ use nom::{
 };
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+/// An IP Prefix route type for IPv4 has the Length field set to 34
+/// [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136)
+pub(crate) const L2_EVPN_IPV4_PREFIX_ROUTE_LEN: usize = 34;
+/// An IP Prefix route type for IPv6 has the Length field set to 58
+/// [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136)
+pub(crate) const L2_EVPN_IPV6_PREFIX_ROUTE_LEN: usize = 58;
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MplsLabelParsingError {
@@ -711,5 +718,176 @@ impl<'a> ReadablePdu<'a, LocatedEthernetSegmentRouteParsingError<'a>> for Ethern
             }
         };
         Ok((buf, EthernetSegmentRoute::new(rd, segment_id, ip)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum L2EvpnRouteParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    EthernetAutoDiscoveryError(#[from_located(module = "self")] EthernetAutoDiscoveryParsingError),
+    MacIpAdvertisementError(#[from_located(module = "self")] MacIpAdvertisementParsingError),
+    InclusiveMulticastEthernetTagRouteError(
+        #[from_located(module = "self")] InclusiveMulticastEthernetTagRouteParsingError,
+    ),
+    EthernetSegmentRouteError(#[from_located(module = "self")] EthernetSegmentRouteParsingError),
+    L2EvpnIpPrefixRouteError(#[from_located(module = "self")] L2EvpnIpPrefixRouteParsingError),
+}
+
+impl<'a> ReadablePdu<'a, LocatedL2EvpnRouteParsingError<'a>> for L2EvpnRoute {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedL2EvpnRouteParsingError<'a>> {
+        let (buf, typ_code) = be_u8(buf)?;
+        let (buf, len) = be_u8(buf)?;
+        let (buf, route_buf) = nom::bytes::complete::take(len)(buf)?;
+        let typ = L2EvpnRouteTypeCode::try_from(typ_code);
+        let (_buf, value) = match typ {
+            Ok(L2EvpnRouteTypeCode::EthernetAutoDiscovery) => {
+                let (buf, value) = parse_into_located(route_buf)?;
+                (buf, L2EvpnRoute::EthernetAutoDiscovery(value))
+            }
+            Ok(L2EvpnRouteTypeCode::MacIpAdvertisement) => {
+                let (buf, value) = parse_into_located(route_buf)?;
+                (buf, L2EvpnRoute::MacIpAdvertisement(value))
+            }
+            Ok(L2EvpnRouteTypeCode::InclusiveMulticastEthernetTagRoute) => {
+                let (buf, value) = parse_into_located(route_buf)?;
+                (buf, L2EvpnRoute::InclusiveMulticastEthernetTagRoute(value))
+            }
+            Ok(L2EvpnRouteTypeCode::EthernetSegmentRoute) => {
+                let (buf, value) = parse_into_located(route_buf)?;
+                (buf, L2EvpnRoute::EthernetSegmentRoute(value))
+            }
+            Ok(L2EvpnRouteTypeCode::IpPrefix) => {
+                let (buf, value) = parse_into_located(route_buf)?;
+                (buf, L2EvpnRoute::IpPrefixRoute(value))
+            }
+            Ok(_) | Err(_) => {
+                let (buf, len) = be_u8(buf)?;
+                let (buf, value): (Span<'_>, Span<'_>) = nom::bytes::complete::take(len)(buf)?;
+                (
+                    buf,
+                    L2EvpnRoute::Unknown {
+                        code: typ_code,
+                        value: value.to_vec(),
+                    },
+                )
+            }
+        };
+        Ok((buf, value))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum L2EvpnAddressParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    L2EvpnRouteError(#[from_located(module = "self")] L2EvpnRouteParsingError),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedL2EvpnAddressParsingError<'a>> for L2EvpnAddress {
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedL2EvpnAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
+        let (buf, route) = parse_into_located(buf)?;
+        Ok((buf, L2EvpnAddress::new(path_id, route)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum L2EvpnIpv4PrefixRouteParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
+    EthernetSegmentIdentifierError(
+        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
+    ),
+    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
+    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+    Ipv4PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError),
+}
+
+impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv4PrefixRouteParsingError<'a>> for L2EvpnIpv4PrefixRoute {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedL2EvpnIpv4PrefixRouteParsingError<'a>> {
+        let (buf, rd) = parse_into_located(buf)?;
+        let (buf, segment_id) = parse_into_located(buf)?;
+        let (buf, tag) = parse_into_located(buf)?;
+        let (buf, prefix) = parse_into_located(buf)?;
+        let (buf, gateway) = be_u32(buf)?;
+        let gateway = Ipv4Addr::from(gateway);
+        let (buf, mpls_label) = parse_into_located(buf)?;
+        Ok((
+            buf,
+            L2EvpnIpv4PrefixRoute::new(rd, segment_id, tag, prefix, gateway, mpls_label),
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum L2EvpnIpv6PrefixRouteParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    RouteDistinguisherError(#[from_located(module = "self")] RouteDistinguisherParsingError),
+    EthernetSegmentIdentifierError(
+        #[from_located(module = "self")] EthernetSegmentIdentifierParsingError,
+    ),
+    EthernetTagError(#[from_located(module = "self")] EthernetTagParsingError),
+    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+    Ipv6PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv6PrefixParsingError),
+}
+
+impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv6PrefixRouteParsingError<'a>> for L2EvpnIpv6PrefixRoute {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedL2EvpnIpv6PrefixRouteParsingError<'a>> {
+        let (buf, rd) = parse_into_located(buf)?;
+        let (buf, segment_id) = parse_into_located(buf)?;
+        let (buf, tag) = parse_into_located(buf)?;
+        let (buf, prefix) = parse_into_located(buf)?;
+        let (buf, gateway) = be_u128(buf)?;
+        let gateway = Ipv6Addr::from(gateway);
+        let (buf, mpls_label) = parse_into_located(buf)?;
+        Ok((
+            buf,
+            L2EvpnIpv6PrefixRoute::new(rd, segment_id, tag, prefix, gateway, mpls_label),
+        ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum L2EvpnIpPrefixRouteParsingError {
+    InvalidBufferLength(usize),
+    L2EvpnIpv4PrefixRouteError(#[from_located(module = "self")] L2EvpnIpv4PrefixRouteParsingError),
+    L2EvpnIpv6PrefixRouteError(#[from_located(module = "self")] L2EvpnIpv6PrefixRouteParsingError),
+}
+
+impl<'a> ReadablePdu<'a, LocatedL2EvpnIpPrefixRouteParsingError<'a>> for L2EvpnIpPrefixRoute {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedL2EvpnIpPrefixRouteParsingError<'a>> {
+        match buf.len() {
+            L2_EVPN_IPV4_PREFIX_ROUTE_LEN => {
+                let (buf, value) = parse_into_located(buf)?;
+                Ok((buf, L2EvpnIpPrefixRoute::V4(value)))
+            }
+            L2_EVPN_IPV6_PREFIX_ROUTE_LEN => {
+                let (buf, value) = parse_into_located(buf)?;
+                Ok((buf, L2EvpnIpPrefixRoute::V6(value)))
+            }
+            _ => Err(nom::Err::Error(
+                LocatedL2EvpnIpPrefixRouteParsingError::new(
+                    buf,
+                    L2EvpnIpPrefixRouteParsingError::InvalidBufferLength(buf.len()),
+                ),
+            )),
+        }
     }
 }

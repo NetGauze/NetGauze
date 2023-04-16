@@ -15,7 +15,7 @@
 
 use std::{
     collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
 
@@ -37,22 +37,18 @@ use crate::{
         ExtendedNextHopEncodingCapability, FourOctetAsCapability, GracefulRestartCapability,
         MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
-    community::{ExtendedCommunity, TransitiveFourOctetExtendedCommunity},
+    community::{
+        ExtendedCommunity, TransitiveFourOctetExtendedCommunity, TransitiveOpaqueExtendedCommunity,
+        TransitiveTwoOctetExtendedCommunity,
+    },
     iana::{
         RouteRefreshSubcode, UndefinedBgpErrorNotificationCode, UndefinedBgpMessageType,
         UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
     },
-    nlri::{
-        Ipv4MplsVpnUnicastAddress, Ipv4Unicast, Ipv4UnicastAddress, Ipv6Unicast,
-        Ipv6UnicastAddress, LabeledIpv4NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher,
-    },
+    nlri::*,
     notification::CeaseError,
     open::{BgpOpenMessageParameter, BGP_VERSION},
-    path_attribute::{
-        As4PathSegment, AsPath, AsPathSegmentType, ClusterId, ClusterList, ExtendedCommunities,
-        LocalPreference, MpReach, MpUnreach, MultiExitDiscriminator, NextHop, Origin, Originator,
-        PathAttribute, PathAttributeValue,
-    },
+    path_attribute::*,
     update::BgpUpdateMessage,
     wire::{
         deserializer::{
@@ -826,6 +822,116 @@ fn test_bgp_add_path_mp_ipv6_unicast() -> Result<(), BgpMessageWritingError> {
                     AsPathSegmentType::AsSequence,
                     vec![100, 1000],
                 )])),
+            )
+            .unwrap(),
+        ],
+        vec![],
+    ));
+
+    test_parsed_completely_with_two_inputs(
+        &good_wire,
+        true,
+        &HashMap::from([(AddressType::Ipv6Unicast, true)]),
+        &good,
+    );
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_evpn() -> Result<(), BgpMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x69, 0x02, 0x00, 0x00, 0x00, 0x52, 0x90, 0x0e, 0x00, 0x2c, 0x00, 0x19, 0x46,
+        0x04, 0xac, 0x10, 0x00, 0x64, 0x00, 0x02, 0x21, 0x00, 0x01, 0xac, 0x10, 0x00, 0x64, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x30, 0x08, 0x00, 0x27, 0x81, 0xd5, 0x67, 0x00, 0x00, 0x00, 0x6f, 0x40, 0x01, 0x01, 0x00,
+        0x50, 0x02, 0x00, 0x00, 0x40, 0x05, 0x04, 0x00, 0x00, 0x00, 0x64, 0xc0, 0x10, 0x10, 0x03,
+        0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 0x03, 0xe8, 0x00, 0x00, 0x00, 0x6f,
+    ];
+
+    let _good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x72, 0x01, 0x04, 0x03, 0xe8, 0x00, 0xb4, 0xac, 0x10, 0x00, 0x64, 0x55, 0x02,
+        0x06, 0x01, 0x04, 0x00, 0x02, 0x00, 0x01, 0x02, 0x06, 0x01, 0x04, 0x00, 0x19, 0x00, 0x46,
+        0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00, 0x02, 0x02, 0x46, 0x00, 0x02, 0x06, 0x41,
+        0x04, 0x00, 0x00, 0x03, 0xe8, 0x02, 0x02, 0x06, 0x00, 0x02, 0x0a, 0x45, 0x08, 0x00, 0x02,
+        0x01, 0x01, 0x00, 0x19, 0x46, 0x01, 0x02, 0x07, 0x49, 0x05, 0x03, 0x70, 0x65, 0x31, 0x00,
+        0x02, 0x04, 0x40, 0x02, 0x40, 0x78, 0x02, 0x10, 0x47, 0x0e, 0x00, 0x02, 0x01, 0x80, 0x00,
+        0x00, 0x00, 0x00, 0x19, 0x46, 0x80, 0x00, 0x00, 0x00,
+    ];
+
+    let good = BgpMessage::Update(BgpUpdateMessage::new(
+        vec![],
+        vec![
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                true,
+                PathAttributeValue::MpReach(MpReach::L2Evpn {
+                    next_hop: IpAddr::V4(Ipv4Addr::new(172, 16, 0, 100)),
+                    nlri: L2EvpnAddress::new(
+                        None,
+                        L2EvpnRoute::MacIpAdvertisement(MacIpAdvertisement::new(
+                            RouteDistinguisher::Ipv4Administrator {
+                                ip: Ipv4Addr::new(172, 16, 0, 100),
+                                number: 2,
+                            },
+                            EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+                            EthernetTag(0),
+                            MacAddress([8, 0, 39, 129, 213, 103]),
+                            None,
+                            MplsLabel::new([0, 0, 111]),
+                            None,
+                        )),
+                    ),
+                }),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::Origin(Origin::IGP),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                true,
+                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::LocalPreference(LocalPreference::new(100)),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                true,
+                false,
+                false,
+                PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
+                    ExtendedCommunity::TransitiveOpaque(
+                        TransitiveOpaqueExtendedCommunity::Unassigned {
+                            sub_type: 12,
+                            value: [0, 0, 0, 0, 0, 8],
+                        },
+                    ),
+                    ExtendedCommunity::TransitiveTwoOctet(
+                        TransitiveTwoOctetExtendedCommunity::RouteTarget {
+                            global_admin: 1000,
+                            local_admin: 111,
+                        },
+                    ),
+                ])),
             )
             .unwrap(),
         ],

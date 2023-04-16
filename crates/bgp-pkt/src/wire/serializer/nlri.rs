@@ -618,3 +618,158 @@ impl WritablePdu<EthernetSegmentRouteWritingError> for EthernetSegmentRoute {
         Ok(())
     }
 }
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum L2EvpnRouteWritingError {
+    StdIOError(#[from_std_io_error] String),
+    EthernetAutoDiscoveryError(#[from] EthernetAutoDiscoveryWritingError),
+    MacIpAdvertisementError(#[from] MacIpAdvertisementWritingError),
+    InclusiveMulticastEthernetTagWritingError(
+        #[from] InclusiveMulticastEthernetTagRouteWritingError,
+    ),
+    EthernetSegmentRouteError(#[from] EthernetSegmentRouteWritingError),
+    L2EvpnIpPrefixRouteError(#[from] L2EvpnIpPrefixRouteWritingError),
+}
+
+impl WritablePdu<L2EvpnRouteWritingError> for L2EvpnRoute {
+    // 1-octet type + 1-octet length
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                Self::EthernetAutoDiscovery(value) => value.len(),
+                Self::MacIpAdvertisement(value) => value.len(),
+                Self::InclusiveMulticastEthernetTagRoute(value) => value.len(),
+                Self::EthernetSegmentRoute(value) => value.len(),
+                Self::IpPrefixRoute(value) => value.len(),
+                Self::Unknown { value, .. } => value.len(),
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), L2EvpnRouteWritingError> {
+        match self.route_type() {
+            Ok(code) => writer.write_u8(code as u8)?,
+            Err(code) => writer.write_u8(code)?,
+        }
+        writer.write_u8((self.len() - Self::BASE_LENGTH) as u8)?;
+        match self {
+            Self::EthernetAutoDiscovery(value) => value.write(writer)?,
+            Self::MacIpAdvertisement(value) => value.write(writer)?,
+            Self::InclusiveMulticastEthernetTagRoute(value) => value.write(writer)?,
+            Self::EthernetSegmentRoute(value) => value.write(writer)?,
+            Self::IpPrefixRoute(value) => value.write(writer)?,
+            Self::Unknown { value, .. } => {
+                writer.write_u8((value.len() + 1) as u8)?;
+                writer.write_all(value)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum L2EvpnAddressWritingError {
+    StdIOError(#[from_std_io_error] String),
+    L2EvpnRouteError(#[from] L2EvpnRouteWritingError),
+}
+
+impl WritablePdu<L2EvpnAddressWritingError> for L2EvpnAddress {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.route().len()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), L2EvpnAddressWritingError> {
+        if let Some(path_id) = self.path_id() {
+            writer.write_u32::<NetworkEndian>(*path_id)?;
+        }
+        self.route().write(writer)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum L2EvpnIpv4PrefixRouteWritingError {
+    StdIOError(#[from_std_io_error] String),
+    RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+    EthernetTagError(#[from] EthernetTagWritingError),
+    MplsLabelError(#[from] MplsLabelWritingError),
+}
+
+impl WritablePdu<L2EvpnIpv4PrefixRouteWritingError> for L2EvpnIpv4PrefixRoute {
+    // 1-octet prefix len + 2 * 4 prefix & gateway + 3 MPLS Label
+    const BASE_LENGTH: usize = 12;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.rd().len() + self.segment_id().len() + self.tag().len()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), L2EvpnIpv4PrefixRouteWritingError> {
+        self.rd().write(writer)?;
+        self.segment_id().write(writer)?;
+        self.tag().write(writer)?;
+        writer.write_u8(self.prefix().prefix_len())?;
+        writer.write_all(&self.prefix().network().octets())?;
+        writer.write_all(&self.gateway().octets())?;
+        self.label().write(writer)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum L2EvpnIpv6PrefixRouteWritingError {
+    StdIOError(#[from_std_io_error] String),
+    RouteDistinguisherError(#[from] RouteDistinguisherWritingError),
+    EthernetSegmentIdentifierError(#[from] EthernetSegmentIdentifierWritingError),
+    EthernetTagError(#[from] EthernetTagWritingError),
+    MplsLabelError(#[from] MplsLabelWritingError),
+}
+
+impl WritablePdu<L2EvpnIpv6PrefixRouteWritingError> for L2EvpnIpv6PrefixRoute {
+    // 1-octet prefix len + 2 * 16 prefix & gateway + 3 MPLS Label
+    const BASE_LENGTH: usize = 36;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.rd().len() + self.segment_id().len() + self.tag().len()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), L2EvpnIpv6PrefixRouteWritingError> {
+        self.rd().write(writer)?;
+        self.segment_id().write(writer)?;
+        self.tag().write(writer)?;
+        writer.write_u8(self.prefix().prefix_len())?;
+        writer.write_all(&self.prefix().network().octets())?;
+        writer.write_all(&self.gateway().octets())?;
+        self.label().write(writer)?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum L2EvpnIpPrefixRouteWritingError {
+    L2EvpnIpv4PrefixRouteError(#[from] L2EvpnIpv4PrefixRouteWritingError),
+    L2EvpnIpv6PrefixRouteError(#[from] L2EvpnIpv6PrefixRouteWritingError),
+}
+
+impl WritablePdu<L2EvpnIpPrefixRouteWritingError> for L2EvpnIpPrefixRoute {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                Self::V4(value) => value.len(),
+                Self::V6(value) => value.len(),
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), L2EvpnIpPrefixRouteWritingError> {
+        match self {
+            Self::V4(value) => value.write(writer)?,
+            Self::V6(value) => value.write(writer)?,
+        }
+        Ok(())
+    }
+}

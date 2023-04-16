@@ -22,7 +22,7 @@ use crate::{
 };
 use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
 
 /// General properties to check the validity of a given path attribute value
@@ -907,6 +907,10 @@ pub enum MpReach {
         next_hop_global: LabeledNextHop,
         next_hop_local: Option<LabeledNextHop>,
         nlri: Vec<Ipv6MplsVpnUnicastAddress>,
+    },
+    L2Evpn {
+        next_hop: IpAddr,
+        nlri: L2EvpnAddress,
     },
     Unknown {
         afi: AddressFamily,
