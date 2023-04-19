@@ -77,6 +77,8 @@ pub enum BgpCapability {
 
     ExtendedMessage,
 
+    MultipleLabels(Vec<MultipleLabel>),
+
     FourOctetAs(FourOctetAsCapability),
 
     /// [RFC8950](https://datatracker.ietf.org/doc/html/rfc8950)
@@ -96,6 +98,7 @@ impl BgpCapability {
             Self::GracefulRestartCapability(_) => Ok(BgpCapabilityCode::GracefulRestartCapability),
             Self::AddPath(_) => Ok(BgpCapabilityCode::AddPathCapability),
             Self::ExtendedMessage => Ok(BgpCapabilityCode::BgpExtendedMessage),
+            Self::MultipleLabels(_) => Ok(BgpCapabilityCode::MultipleLabelsCapability),
             Self::FourOctetAs(_) => Ok(BgpCapabilityCode::FourOctetAs),
             Self::ExtendedNextHopEncoding(_) => Ok(BgpCapabilityCode::ExtendedNextHopEncoding),
             Self::Experimental(value) => match value.code() {
@@ -454,5 +457,37 @@ impl ExtendedNextHopEncoding {
 
     pub const fn next_hop_afi(&self) -> AddressFamily {
         self.next_hop_afi
+    }
+}
+
+/// Addresses support for Multiple Labels Capability
+/// defined by: [RFC8277](https://datatracker.ietf.org/doc/html/rfc8277)
+/// ```text
+/// 0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |              AFI              |    SAFI       |    Count      ~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MultipleLabel {
+    address_type: AddressType,
+    count: u8,
+}
+
+impl MultipleLabel {
+    pub const fn new(address_type: AddressType, count: u8) -> Self {
+        Self {
+            address_type,
+            count,
+        }
+    }
+
+    pub const fn address_type(&self) -> AddressType {
+        self.address_type
+    }
+
+    pub const fn count(&self) -> u8 {
+        self.count
     }
 }

@@ -27,6 +27,7 @@ pub enum BGPCapabilityWritingError {
     GracefulRestartCapabilityError(#[from] GracefulRestartCapabilityWritingError),
     AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
     ExtendedNextHopEncodingCapabilityError(#[from] ExtendedNextHopEncodingCapabilityWritingError),
+    MultipleLabelError(#[from] MultipleLabelWritingError),
 }
 
 impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
@@ -47,6 +48,7 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
             // ExtendedNextHopEncoding carries n length field, so need to account for it here
             Self::ExtendedNextHopEncoding(value) => value.len() - 1,
             Self::ExtendedMessage => EXTENDED_MESSAGE_CAPABILITY_LENGTH as usize,
+            Self::MultipleLabels(value) => value.iter().map(|x| x.len()).sum(),
             Self::Experimental(value) => value.value().len(),
             Self::Unrecognized(value) => value.value().len(),
         };
@@ -72,6 +74,12 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
             Self::ExtendedMessage => {
                 writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(len)?;
+            }
+            Self::MultipleLabels(value) => {
+                writer.write_u8(self.code().unwrap().into())?;
+                for addr in value {
+                    addr.write(writer)?;
+                }
             }
             Self::GracefulRestartCapability(value) => {
                 writer.write_u8(self.code().unwrap().into())?;
@@ -277,6 +285,25 @@ impl WritablePdu<ExtendedNextHopEncodingCapabilityWritingError>
         for encoding in self.encodings() {
             encoding.write(writer)?;
         }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum MultipleLabelWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePdu<MultipleLabelWritingError> for MultipleLabel {
+    // 2 octets afi  + 1 octet safi + 1 octet count
+    const BASE_LENGTH: usize = 4;
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultipleLabelWritingError> {
+        writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
+        writer.write_u8(self.address_type().subsequent_address_family().into())?;
+        writer.write_u8(self.count())?;
         Ok(())
     }
 }

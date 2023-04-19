@@ -22,7 +22,8 @@ use netgauze_iana::address_family::{
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_till_empty, ErrorKindSerdeDeref, ReadablePdu, Span,
+    parse_into_located, parse_till_empty, parse_till_empty_into_located, ErrorKindSerdeDeref,
+    ReadablePdu, Span,
 };
 use nom::{
     error::{ErrorKind, FromExternalError, ParseError},
@@ -55,6 +56,7 @@ pub enum BgpCapabilityParsingError {
     ExtendedNextHopEncodingCapabilityError(
         #[from_located(module = "self")] ExtendedNextHopEncodingCapabilityParsingError,
     ),
+    MultipleLabelError(#[from_located(module = "self")] MultipleLabelParsingError),
 }
 
 fn parse_experimental_capability(
@@ -143,7 +145,8 @@ impl<'a> ReadablePdu<'a, LocatedBgpCapabilityParsingError<'a>> for BgpCapability
                     parse_unrecognized_capability(code.into(), buf)
                 }
                 BgpCapabilityCode::MultipleLabelsCapability => {
-                    parse_unrecognized_capability(code.into(), buf)
+                    let (buf, cap) = parse_till_empty_into_located(buf)?;
+                    Ok((buf, BgpCapability::MultipleLabels(cap)))
                 }
                 BgpCapabilityCode::BgpRole => parse_unrecognized_capability(code.into(), buf),
                 BgpCapabilityCode::GracefulRestartCapability => {
@@ -474,5 +477,33 @@ impl<'a> ReadablePdu<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a
             buf,
             ExtendedNextHopEncoding::new(address_type, next_hop_afi),
         ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum MultipleLabelParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    AddressFamilyError(#[from_external] UndefinedAddressFamily),
+    SubsequentAddressFamilyError(#[from_external] UndefinedSubsequentAddressFamily),
+    AddressTypeError(InvalidAddressType),
+}
+
+impl<'a> ReadablePdu<'a, LocatedMultipleLabelParsingError<'a>> for MultipleLabel {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedMultipleLabelParsingError<'a>> {
+        let input = buf;
+        let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
+        let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
+        let address_type = match AddressType::from_afi_safi(afi, safi) {
+            Ok(address_type) => address_type,
+            Err(err) => {
+                return Err(nom::Err::Error(LocatedMultipleLabelParsingError::new(
+                    input,
+                    MultipleLabelParsingError::AddressTypeError(err),
+                )))
+            }
+        };
+        let (buf, count) = be_u8(buf)?;
+        Ok((buf, MultipleLabel::new(address_type, count)))
     }
 }
