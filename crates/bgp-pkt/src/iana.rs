@@ -1149,6 +1149,64 @@ impl TryFrom<u8> for L2EvpnRouteTypeCode {
     }
 }
 
+/// EVPN Extended Community Sub-Types [IANA](https://www.iana.org/assignments/bgp-extended-communities/bgp-extended-communities.xhtml#evpn)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum EvpnExtendedCommunitySubType {
+    /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
+    MacMobility = 0x00,
+
+    /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
+    EsiLabel = 0x01,
+
+    /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
+    EsImportRouteTarget = 0x02,
+
+    /// [RFC9135](https://datatracker.ietf.org/doc/html/rfc9135)
+    EvpnRoutersMac = 0x03,
+
+    /// [RFC8214](https://datatracker.ietf.org/doc/html/rfc8214)
+    EvpnL2Attribute = 0x04,
+
+    /// [RFC8317](https://datatracker.ietf.org/doc/html/rfc8317)
+    ETree = 0x05,
+
+    /// [RFC8584](https://datatracker.ietf.org/doc/html/rfc8584)
+    DfSelection = 0x06,
+
+    /// [RFC9047](https://datatracker.ietf.org/doc/html/rfc9047)
+    ArpNd = 0x08,
+
+    /// [RFC9251](https://datatracker.ietf.org/doc/html/rfc9251)
+    MulticastFlags = 0x09,
+
+    /// [RFC9251](https://datatracker.ietf.org/doc/html/rfc9251)
+    EviRtType0 = 0x0a,
+
+    /// [RFC9251](https://datatracker.ietf.org/doc/html/rfc9251)
+    EviRtType1 = 0x0b,
+
+    /// [RFC9251](https://datatracker.ietf.org/doc/html/rfc9251)
+    EviRtType2 = 0x0c,
+
+    /// [RFC9251](https://datatracker.ietf.org/doc/html/rfc9251)
+    EviRtType3 = 0x0d,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedEvpnExtendedCommunitySubType(pub u8);
+
+impl TryFrom<u8> for EvpnExtendedCommunitySubType {
+    type Error = UndefinedEvpnExtendedCommunitySubType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedEvpnExtendedCommunitySubType(value)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

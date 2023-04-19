@@ -16,11 +16,12 @@
 use crate::{
     community::*,
     iana::{
-        BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType,
+        BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, EvpnExtendedCommunitySubType,
         NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
         TransitiveIpv4ExtendedCommunitySubType, TransitiveIpv6ExtendedCommunitySubType,
         TransitiveTwoOctetExtendedCommunitySubType,
     },
+    wire::serializer::nlri::MacAddressWritingError,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
@@ -66,6 +67,7 @@ pub enum ExtendedCommunityWritingError {
     NonTransitiveOpaqueExtendedCommunityError(
         #[from] NonTransitiveOpaqueExtendedCommunityWritingError,
     ),
+    EvpnExtendedCommunityError(#[from] EvpnExtendedCommunityWritingError),
     ExperimentalExtendedCommunityError(#[from] ExperimentalExtendedCommunityWritingError),
     UnknownExtendedCommunityError(#[from] UnknownExtendedCommunityWritingError),
 }
@@ -84,6 +86,7 @@ impl WritablePdu<ExtendedCommunityWritingError> for ExtendedCommunity {
                 ExtendedCommunity::NonTransitiveFourOctet(value) => value.len(),
                 ExtendedCommunity::TransitiveOpaque(value) => value.len(),
                 ExtendedCommunity::NonTransitiveOpaque(value) => value.len(),
+                ExtendedCommunity::Evpn(value) => value.len(),
                 ExtendedCommunity::Experimental(value) => value.len(),
                 ExtendedCommunity::Unknown(value) => value.len(),
             }
@@ -128,6 +131,10 @@ impl WritablePdu<ExtendedCommunityWritingError> for ExtendedCommunity {
             }
             ExtendedCommunity::Experimental(value) => {
                 writer.write_u8(value.code())?;
+                value.write(writer)?;
+            }
+            ExtendedCommunity::Evpn(value) => {
+                writer.write_u8(BgpExtendedCommunityType::Evpn as u8)?;
                 value.write(writer)?;
             }
             ExtendedCommunity::Unknown(value) => {
@@ -938,6 +945,56 @@ impl WritablePdu<UnknownExtendedCommunityIpv6WritingError> for UnknownExtendedCo
     ) -> Result<(), UnknownExtendedCommunityIpv6WritingError> {
         writer.write_u8(self.sub_type())?;
         writer.write_all(self.value())?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum EvpnExtendedCommunityWritingError {
+    StdIOError(#[from_std_io_error] String),
+    MacAddressError(#[from] MacAddressWritingError),
+}
+
+impl WritablePdu<EvpnExtendedCommunityWritingError> for EvpnExtendedCommunity {
+    // 1-octet subtype + 2-octets global admin + 4-octets local admin
+    const BASE_LENGTH: usize = 7;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), EvpnExtendedCommunityWritingError> {
+        match self {
+            Self::MacMobility { flags, seq_no } => {
+                writer.write_u8(EvpnExtendedCommunitySubType::MacMobility as u8)?;
+                writer.write_u8(*flags)?;
+                // reserved
+                writer.write_u8(0)?;
+                writer.write_u32::<NetworkEndian>(*seq_no)?;
+            }
+            Self::EsiLabel { flags, esi_label } => {
+                writer.write_u8(EvpnExtendedCommunitySubType::EsiLabel as u8)?;
+                writer.write_u8(*flags)?;
+                // reserved
+                writer.write_u16::<NetworkEndian>(0)?;
+                writer.write_all(esi_label)?;
+            }
+            Self::EsImportRouteTarget { route_target } => {
+                writer.write_u8(EvpnExtendedCommunitySubType::EsImportRouteTarget as u8)?;
+                writer.write_all(route_target)?;
+            }
+            Self::EvpnRoutersMac { mac } => {
+                writer.write_u8(EvpnExtendedCommunitySubType::EvpnRoutersMac as u8)?;
+                mac.write(writer)?;
+            }
+            Self::Unassigned { sub_type, value } => {
+                writer.write_u8(*sub_type)?;
+                writer.write_all(value)?;
+            }
+        }
         Ok(())
     }
 }

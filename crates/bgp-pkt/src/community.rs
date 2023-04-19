@@ -15,7 +15,7 @@
 
 //! Representations for normal, extended, and large BGP Communities.
 
-use crate::iana::WellKnownCommunity;
+use crate::{iana::WellKnownCommunity, nlri::MacAddress};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
@@ -146,6 +146,9 @@ pub enum ExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     NonTransitiveOpaque(NonTransitiveOpaqueExtendedCommunity),
 
+    ///EVPN [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
+    Evpn(EvpnExtendedCommunity),
+
     Experimental(ExperimentalExtendedCommunity),
 
     Unknown(UnknownExtendedCommunity),
@@ -162,6 +165,7 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
             Self::NonTransitiveFourOctet(value) => value.iana_defined(),
             Self::TransitiveOpaque(value) => value.iana_defined(),
             Self::NonTransitiveOpaque(value) => value.iana_defined(),
+            Self::Evpn(value) => value.iana_defined(),
             Self::Experimental(value) => value.iana_defined(),
             Self::Unknown(value) => value.iana_defined(),
         }
@@ -178,6 +182,7 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
             Self::TransitiveOpaque(value) => value.transitive(),
             Self::NonTransitiveOpaque(value) => value.transitive(),
             Self::Experimental(value) => value.transitive(),
+            Self::Evpn(value) => value.transitive(),
             Self::Unknown(value) => value.transitive(),
         }
     }
@@ -781,6 +786,83 @@ impl ExtendedCommunityProperties for UnknownExtendedCommunityIpv6 {
 
     fn transitive(&self) -> bool {
         self.code & 0x40 == 0
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum EvpnExtendedCommunity {
+    /// MAC Mobility extended community
+    /// ```text
+    ///    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///  | Type=0x06     | Sub-Type=0x00 |Flags(1 octet)|  Reserved=0    |
+    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///  |                       Sequence Number                         |
+    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// The low-order bit of the Flags octet is defined as the
+    /// "Sticky/static" flag and may be set to 1.  A value of 1 means that
+    /// the MAC address is static and cannot move.  The sequence number is
+    /// used to ensure that PEs retain the correct MAC/IP Advertisement route
+    /// when multiple updates occur for the same MAC address.
+    MacMobility {
+        flags: u8,
+        seq_no: u32,
+    },
+
+    /// Each ESI Label extended community
+    /// ```text
+    ///   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///  | Type=0x06     | Sub-Type=0x01 | Flags(1 octet)|  Reserved=0   |
+    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///  |  Reserved=0   |          ESI Label                            |
+    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    EsiLabel {
+        flags: u8,
+        esi_label: [u8; 3],
+    },
+
+    /// ```text
+    /// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// | Type=0x06     | Sub-Type=0x02 |          ES-Import            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                     ES-Import Cont'd                          |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    EsImportRouteTarget {
+        route_target: [u8; 6],
+    },
+
+    /// EVPN Router's MAC Extended Community
+    /// ```text
+    ///   0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// | Type=0x06     | Sub-Type=0x03 |        EVPN Router's MAC      |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                    EVPN Router's MAC Cont'd                   |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    EvpnRoutersMac {
+        mac: MacAddress,
+    },
+
+    Unassigned {
+        sub_type: u8,
+        value: [u8; 6],
+    },
+}
+
+impl ExtendedCommunityProperties for EvpnExtendedCommunity {
+    fn iana_defined(&self) -> bool {
+        true
+    }
+
+    fn transitive(&self) -> bool {
+        true
     }
 }
 

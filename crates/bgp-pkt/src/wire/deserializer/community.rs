@@ -30,11 +30,12 @@ use netgauze_serde_macros::LocatedError;
 use crate::{
     community::*,
     iana::{
-        BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType,
+        BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, EvpnExtendedCommunitySubType,
         NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
         TransitiveIpv4ExtendedCommunitySubType, TransitiveIpv6ExtendedCommunitySubType,
         TransitiveTwoOctetExtendedCommunitySubType,
     },
+    wire::deserializer::nlri::MacAddressParsingError,
 };
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -80,6 +81,7 @@ pub enum ExtendedCommunityParsingError {
     NonTransitiveOpaqueExtendedCommunityError(
         #[from_located(module = "self")] NonTransitiveOpaqueExtendedCommunityParsingError,
     ),
+    EvpnExtendedCommunityError(#[from_located(module = "self")] EvpnExtendedCommunityParsingError),
     ExperimentalExtendedCommunityError(
         #[from_located(module = "self")] ExperimentalExtendedCommunityParsingError,
     ),
@@ -140,8 +142,8 @@ impl<'a> ReadablePdu<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedC
                 (buf, ExtendedCommunity::Unknown(value))
             }
             Ok(BgpExtendedCommunityType::Evpn) => {
-                let (buf, value) = parse_into_located_one_input(buf, code)?;
-                (buf, ExtendedCommunity::Unknown(value))
+                let (buf, value) = parse_into_located(buf)?;
+                (buf, ExtendedCommunity::Evpn(value))
             }
             Ok(BgpExtendedCommunityType::FlowSpecNextHop) => {
                 let (buf, value) = parse_into_located_one_input(buf, code)?;
@@ -702,6 +704,64 @@ impl<'a> ReadablePdu<'a, LocatedNonTransitiveOpaqueExtendedCommunityParsingError
             buf,
             NonTransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value },
         ))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum EvpnExtendedCommunityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    MacAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] MacAddressParsingError,
+    ),
+}
+
+impl<'a> ReadablePdu<'a, LocatedEvpnExtendedCommunityParsingError<'a>> for EvpnExtendedCommunity {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedEvpnExtendedCommunityParsingError<'a>> {
+        let (buf, sub_type) = be_u8(buf)?;
+        let (buf, community) = match EvpnExtendedCommunitySubType::try_from(sub_type) {
+            Ok(EvpnExtendedCommunitySubType::MacMobility) => {
+                let (buf, flags) = be_u8(buf)?;
+                let (buf, _reserved) = be_u8(buf)?;
+                let (buf, seq_no) = be_u32(buf)?;
+                (buf, EvpnExtendedCommunity::MacMobility { flags, seq_no })
+            }
+            Ok(EvpnExtendedCommunitySubType::EsiLabel) => {
+                let (buf, flags) = be_u8(buf)?;
+                let (buf, _reserved) = be_u16(buf)?;
+                let (buf, p1) = be_u16(buf)?;
+                let (buf, p2) = be_u8(buf)?;
+                let p1 = p1.to_be_bytes();
+                let esi_label: [u8; 3] = [p1[0], p1[1], p2];
+                (buf, EvpnExtendedCommunity::EsiLabel { flags, esi_label })
+            }
+            Ok(EvpnExtendedCommunitySubType::EsImportRouteTarget) => {
+                let (buf, p1) = be_u32(buf)?;
+                let (buf, p2) = be_u16(buf)?;
+                let p1 = p1.to_be_bytes();
+                let p2 = p2.to_be_bytes();
+                let route_target: [u8; 6] = [p1[0], p1[1], p1[2], p1[2], p2[0], p2[1]];
+                (
+                    buf,
+                    EvpnExtendedCommunity::EsImportRouteTarget { route_target },
+                )
+            }
+            Ok(EvpnExtendedCommunitySubType::EvpnRoutersMac) => {
+                let (buf, mac) = parse_into_located(buf)?;
+                (buf, EvpnExtendedCommunity::EvpnRoutersMac { mac })
+            }
+            Ok(_) | Err(_) => {
+                let (buf, p1) = be_u32(buf)?;
+                let (buf, p2) = be_u16(buf)?;
+                let p1 = p1.to_be_bytes();
+                let p2 = p2.to_be_bytes();
+                let value: [u8; 6] = [p1[0], p1[1], p1[2], p1[2], p2[0], p2[1]];
+                (buf, EvpnExtendedCommunity::Unassigned { sub_type, value })
+            }
+        };
+        Ok((buf, community))
     }
 }
 
