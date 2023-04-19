@@ -27,16 +27,7 @@ use netgauze_parse_utils::{
 };
 use netgauze_serde_macros::LocatedError;
 
-use crate::{
-    community::*,
-    iana::{
-        BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, EvpnExtendedCommunitySubType,
-        NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
-        TransitiveIpv4ExtendedCommunitySubType, TransitiveIpv6ExtendedCommunitySubType,
-        TransitiveTwoOctetExtendedCommunitySubType,
-    },
-    wire::deserializer::nlri::MacAddressParsingError,
-};
+use crate::{community::*, iana::*, wire::deserializer::nlri::MacAddressParsingError};
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum CommunityParsingError {
@@ -649,7 +640,6 @@ impl<'a> ReadablePdu<'a, LocatedNonTransitiveFourOctetExtendedCommunityParsingEr
 pub enum TransitiveOpaqueExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    InvalidValueLength(usize),
 }
 
 impl<'a> ReadablePdu<'a, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a>>
@@ -659,19 +649,25 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a>> {
         let (buf, sub_type) = be_u8(buf)?;
-        let input = buf;
-        let (buf, value) = nom::multi::count(be_u8, 6)(buf)?;
-        let len = value.len();
-        let value: [u8; 6] = value.try_into().map_err(|_| {
-            nom::Err::Error(LocatedTransitiveOpaqueExtendedCommunityParsingError::new(
-                input,
-                TransitiveOpaqueExtendedCommunityParsingError::InvalidValueLength(len),
-            ))
-        })?;
-        Ok((
-            buf,
-            TransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value },
-        ))
+        let (buf, community) = match TransitiveOpaqueExtendedCommunitySubType::try_from(sub_type) {
+            Ok(TransitiveOpaqueExtendedCommunitySubType::DefaultGateway) => {
+                let (buf, _) = be_u16(buf)?;
+                let (buf, _) = be_u32(buf)?;
+                (buf, TransitiveOpaqueExtendedCommunity::DefaultGateway)
+            }
+            Err(_) => {
+                let (buf, p1) = be_u16(buf)?;
+                let (buf, p2) = be_u32(buf)?;
+                let p1 = p1.to_be_bytes();
+                let p2 = p2.to_be_bytes();
+                let value: [u8; 6] = [p1[0], p1[1], p2[0], p2[1], p2[2], p2[3]];
+                (
+                    buf,
+                    TransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value },
+                )
+            }
+        };
+        Ok((buf, community))
     }
 }
 

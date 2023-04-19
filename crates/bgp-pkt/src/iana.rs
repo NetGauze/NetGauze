@@ -1207,6 +1207,28 @@ impl TryFrom<u8> for EvpnExtendedCommunitySubType {
     }
 }
 
+/// Transitive Opaque Extended Community Sub-Types [IANA](https://www.iana.org/assignments/bgp-extended-communities/bgp-extended-communities.xhtml#trans-opaque)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum TransitiveOpaqueExtendedCommunitySubType {
+    /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
+    DefaultGateway = 0x0d,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedTransitiveOpaqueExtendedCommunitySubType(pub u8);
+
+impl TryFrom<u8> for TransitiveOpaqueExtendedCommunitySubType {
+    type Error = UndefinedTransitiveOpaqueExtendedCommunitySubType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedTransitiveOpaqueExtendedCommunitySubType(value)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

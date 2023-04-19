@@ -505,7 +505,17 @@ impl ExtendedCommunityProperties for NonTransitiveIpv4ExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum TransitiveOpaqueExtendedCommunity {
-    Unassigned { sub_type: u8, value: [u8; 6] },
+    /// The Default Gateway community  It is a transitive community,
+    /// which means that the first octet is 0x03.  The value of the second
+    /// octet (Sub-Type) is 0x0d (Default Gateway) as assigned by IANA.  The
+    /// Value field of this community is reserved (set to 0 by the senders,
+    /// ignored by the receivers).
+    DefaultGateway,
+
+    Unassigned {
+        sub_type: u8,
+        value: [u8; 6],
+    },
 }
 
 impl ExtendedCommunityProperties for TransitiveOpaqueExtendedCommunity {

@@ -19,7 +19,7 @@ use crate::{
         BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, EvpnExtendedCommunitySubType,
         NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
         TransitiveIpv4ExtendedCommunitySubType, TransitiveIpv6ExtendedCommunitySubType,
-        TransitiveTwoOctetExtendedCommunitySubType,
+        TransitiveOpaqueExtendedCommunitySubType, TransitiveTwoOctetExtendedCommunitySubType,
     },
     wire::serializer::nlri::MacAddressWritingError,
 };
@@ -706,6 +706,11 @@ impl WritablePdu<TransitiveOpaqueExtendedCommunityWritingError>
         writer: &mut T,
     ) -> Result<(), TransitiveOpaqueExtendedCommunityWritingError> {
         match self {
+            Self::DefaultGateway => {
+                writer.write_u8(TransitiveOpaqueExtendedCommunitySubType::DefaultGateway as u8)?;
+                writer.write_u16::<NetworkEndian>(0)?;
+                writer.write_u32::<NetworkEndian>(0)?;
+            }
             Self::Unassigned { sub_type, value } => {
                 writer.write_u8(*sub_type)?;
                 writer.write_all(value)?;
