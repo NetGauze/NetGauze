@@ -860,6 +860,50 @@ pub enum EvpnExtendedCommunity {
         mac: MacAddress,
     },
 
+    /// EVPN Layer 2 Attributes Extended Community
+    /// [RFC8214](https://datatracker.ietf.org/doc/rfc8214)
+    ///
+    /// ```text
+    /// +-------------------------------------------+
+    /// |  Type (0x06) / Sub-type (0x04) (2 octets) |
+    /// +-------------------------------------------+
+    /// |  Control Flags  (2 octets)                |
+    /// +-------------------------------------------+
+    /// |  L2 MTU (2 octets)                        |
+    /// +-------------------------------------------+
+    /// |  Reserved (2 octets)                      |
+    /// +-------------------------------------------+
+    /// ```
+    EvpnL2Attribute {
+        /// EVPN Layer 2 Attributes Control Flags
+        /// ```text
+        /// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+        /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        /// |   MBZ                   |C|P|B|  (MBZ = MUST Be Zero)
+        /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        /// ```
+        ///
+        /// Name     Meaning
+        /// ---------------------------------------------------------------
+        /// P        If set to 1 in multihoming Single-Active scenarios,
+        ///          this flag indicates that the advertising PE is the
+        ///          primary PE.  MUST be set to 1 for multihoming
+        ///         All-Active scenarios by all active PE(s).
+        ///
+        /// B       If set to 1 in multihoming Single-Active scenarios,
+        ///         this flag indicates that the advertising PE is the
+        ///         backup PE.
+        ///
+        /// C        If set to 1, a control word [RFC4448] MUST be present
+        ///          when sending EVPN packets to this PE.  It is
+        ///         recommended that the control word be included in the
+        ///         absence of an entropy label [RFC6790].
+        control_flags: u16,
+
+        /// L2 MTU is a 2-octet value indicating the MTU in bytes.
+        l2_mtu: u16,
+    },
+
     Unassigned {
         sub_type: u8,
         value: [u8; 6],

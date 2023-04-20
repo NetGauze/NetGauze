@@ -748,6 +748,19 @@ impl<'a> ReadablePdu<'a, LocatedEvpnExtendedCommunityParsingError<'a>> for EvpnE
                 let (buf, mac) = parse_into_located(buf)?;
                 (buf, EvpnExtendedCommunity::EvpnRoutersMac { mac })
             }
+            Ok(EvpnExtendedCommunitySubType::EvpnL2Attribute) => {
+                let (buf, control_flags) = be_u16(buf)?;
+                let (buf, l2_mtu) = be_u16(buf)?;
+                // Reserved 2-octets
+                let (buf, _) = be_u16(buf)?;
+                (
+                    buf,
+                    EvpnExtendedCommunity::EvpnL2Attribute {
+                        control_flags,
+                        l2_mtu,
+                    },
+                )
+            }
             Ok(_) | Err(_) => {
                 let (buf, p1) = be_u32(buf)?;
                 let (buf, p2) = be_u16(buf)?;

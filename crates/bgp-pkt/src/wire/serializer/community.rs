@@ -995,6 +995,16 @@ impl WritablePdu<EvpnExtendedCommunityWritingError> for EvpnExtendedCommunity {
                 writer.write_u8(EvpnExtendedCommunitySubType::EvpnRoutersMac as u8)?;
                 mac.write(writer)?;
             }
+            Self::EvpnL2Attribute {
+                control_flags,
+                l2_mtu,
+            } => {
+                writer.write_u8(EvpnExtendedCommunitySubType::EvpnL2Attribute as u8)?;
+                writer.write_u16::<NetworkEndian>(*control_flags)?;
+                writer.write_u16::<NetworkEndian>(*l2_mtu)?;
+                // Reserved 2-octets
+                writer.write_u16::<NetworkEndian>(0)?;
+            }
             Self::Unassigned { sub_type, value } => {
                 writer.write_u8(*sub_type)?;
                 writer.write_all(value)?;

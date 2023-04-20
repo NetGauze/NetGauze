@@ -112,6 +112,7 @@ fn test_evpn_extended_community() -> Result<(), EvpnExtendedCommunityWritingErro
     let es_label_wire = [0x01, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00];
     let es_import_rt_wire = [0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10];
     let good_router_mac_wire = [0x03, 0xaa, 0xbb, 0xcc, 0x00, 0x00, 0xc8];
+    let good_l2_attribute_wire = [0x04, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00];
 
     let mac_mobility = EvpnExtendedCommunity::MacMobility {
         flags: 1,
@@ -128,15 +129,21 @@ fn test_evpn_extended_community() -> Result<(), EvpnExtendedCommunityWritingErro
     let good_router_mac = EvpnExtendedCommunity::EvpnRoutersMac {
         mac: MacAddress([0xaa, 0xbb, 0xcc, 0x00, 0x00, 0xc8]),
     };
+    let good_l2_attribute = EvpnExtendedCommunity::EvpnL2Attribute {
+        control_flags: 2,
+        l2_mtu: 0,
+    };
 
     test_parsed_completely(&mac_mobility_wire, &mac_mobility);
     test_parsed_completely(&es_label_wire, &es_label);
     test_parsed_completely(&es_import_rt_wire, &good_es_import_rt);
     test_parsed_completely(&good_router_mac_wire, &good_router_mac);
+    test_parsed_completely(&good_l2_attribute_wire, &good_l2_attribute);
     test_write(&mac_mobility, &mac_mobility_wire)?;
     test_write(&es_label, &es_label_wire)?;
     test_write(&good_es_import_rt, &es_import_rt_wire)?;
     test_write(&good_router_mac, &good_router_mac_wire)?;
+    test_write(&good_l2_attribute, &good_l2_attribute_wire)?;
     Ok(())
 }
 
