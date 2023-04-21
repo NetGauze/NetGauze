@@ -300,3 +300,45 @@ fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
     test_write(&good, &good_wire)?;
     Ok(())
 }
+
+#[test]
+fn test_route_target_membership() -> Result<(), RouteTargetMembershipWritingError> {
+    let good_wire = [
+        0x00, 0x00, 0xfd, 0xc9, 0x00, 0x02, 0xfd, 0xc9, 0x00, 0x00, 0x0f, 0xb2,
+    ];
+    let good =
+        RouteTargetMembership::new(64969, vec![0x00, 0x02, 0xfd, 0xc9, 0x00, 0x00, 0x0f, 0xb2]);
+    test_parsed_completely_with_one_input(&good_wire, 96, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_route_target_membership_address() -> Result<(), RouteTargetMembershipAddressWritingError> {
+    let good_wire = [
+        0x60, 0x00, 0x00, 0xfd, 0xc9, 0x00, 0x02, 0xfd, 0xc9, 0x00, 0x00, 0x0f, 0xb2,
+    ];
+
+    let good_short_wire = [
+        0x58, 0x00, 0x00, 0xfd, 0xc9, 0x00, 0x02, 0xfd, 0xc9, 0x00, 0x00, 0x0f,
+    ];
+    let good = RouteTargetMembershipAddress::new(
+        None,
+        Some(RouteTargetMembership::new(
+            64969,
+            vec![0x00, 0x02, 0xfd, 0xc9, 0x00, 0x00, 0x0f, 0xb2],
+        )),
+    );
+    let good_short = RouteTargetMembershipAddress::new(
+        None,
+        Some(RouteTargetMembership::new(
+            64969,
+            vec![0x00, 0x02, 0xfd, 0xc9, 0x00, 0x00, 0x0f],
+        )),
+    );
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_one_input(&good_short_wire, false, &good_short);
+    test_write(&good, &good_wire)?;
+    test_write(&good_short, &good_short_wire)?;
+    Ok(())
+}

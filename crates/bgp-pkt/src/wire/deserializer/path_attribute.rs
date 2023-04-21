@@ -584,6 +584,10 @@ pub enum MpReachParsingError {
     LabeledNextHopError(
         #[from_located(module = "crate::wire::deserializer::nlri")] LabeledNextHopParsingError,
     ),
+    RouteTargetMembershipAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")]
+        RouteTargetMembershipAddressParsingError,
+    ),
 }
 
 impl<'a>
@@ -709,6 +713,32 @@ impl<'a>
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::L2Evpn { next_hop, nlri }))
             }
+            Ok(AddressType::RouteTargetConstrains) => {
+                let tmp = mp_buf;
+                let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
+                let (mp_buf, next_hop) = match next_hop_len {
+                    IPV4_LEN => {
+                        let (mp_buf, addr) = be_u32(mp_buf)?;
+                        (mp_buf, IpAddr::V4(Ipv4Addr::from(addr)))
+                    }
+                    IPV6_LEN => {
+                        let (mp_buf, addr) = be_u128(mp_buf)?;
+                        (mp_buf, IpAddr::V6(Ipv6Addr::from(addr)))
+                    }
+                    _ => {
+                        return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                            tmp,
+                            MpReachParsingError::InvalidIpAddressType(next_hop_len),
+                        )));
+                    }
+                };
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::L2VpnBgpEvpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpReach::RouteTargetMembership { next_hop, nlri }))
+            }
             Ok(_) | Err(_) => Ok((
                 buf,
                 MpReach::Unknown {
@@ -753,6 +783,10 @@ pub enum MpUnreachParsingError {
     ),
     L2EvpnAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")] L2EvpnAddressParsingError,
+    ),
+    RouteTargetMembershipAddressError(
+        #[from_located(module = "crate::wire::deserializer::nlri")]
+        RouteTargetMembershipAddressParsingError,
     ),
 }
 
@@ -822,7 +856,14 @@ impl<'a>
             }
             Ok(AddressType::L2VpnBgpEvpn) => {
                 let add_path = add_path_map
-                    .get(&AddressType::Ipv6MplsLabeledVpn)
+                    .get(&AddressType::L2VpnBgpEvpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpUnreach::L2Evpn { nlri }))
+            }
+            Ok(AddressType::RouteTargetConstrains) => {
+                let add_path = add_path_map
+                    .get(&AddressType::RouteTargetConstrains)
                     .map_or(false, |x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::L2Evpn { nlri }))

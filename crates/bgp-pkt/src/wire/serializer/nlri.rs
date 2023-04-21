@@ -773,3 +773,58 @@ impl WritablePdu<L2EvpnIpPrefixRouteWritingError> for L2EvpnIpPrefixRoute {
         Ok(())
     }
 }
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum RouteTargetMembershipAddressWritingError {
+    StdIOError(#[from_std_io_error] String),
+    RouteTargetMembershipWritingError(#[from] RouteTargetMembershipWritingError),
+}
+
+impl WritablePdu<RouteTargetMembershipAddressWritingError> for RouteTargetMembershipAddress {
+    // 1-octet prefix len
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.path_id().map_or(0, |_| 4)
+            + self.membership().map_or(0, |x| x.len())
+    }
+
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), RouteTargetMembershipAddressWritingError> {
+        if let Some(path_id) = self.path_id() {
+            writer.write_u32::<NetworkEndian>(path_id)?;
+        }
+        if let Some(membership) = self.membership() {
+            let prefix_len = membership.len() * 8;
+            writer.write_u8(prefix_len as u8)?;
+            membership.write(writer)?;
+        } else {
+            // Default route with zero prefix length
+            writer.write_u8(0)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum RouteTargetMembershipWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePdu<RouteTargetMembershipWritingError> for RouteTargetMembership {
+    // 4-octet origin AS
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH + self.route_target().len()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteTargetMembershipWritingError> {
+        writer.write_u32::<NetworkEndian>(self.origin_as())?;
+        writer.write_all(self.route_target())?;
+        Ok(())
+    }
+}

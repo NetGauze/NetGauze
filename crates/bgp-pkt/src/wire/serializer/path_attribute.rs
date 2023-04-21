@@ -712,6 +712,7 @@ pub enum MpReachWritingError {
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
+    RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
 }
 
 impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
@@ -761,6 +762,15 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_global.len() + local_len + nlri_len
             }
             Self::L2Evpn { next_hop, nlri } => {
+                let next_hop_len = if next_hop.is_ipv4() {
+                    IPV4_LEN as usize
+                } else {
+                    IPV6_LEN as usize
+                };
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                next_hop_len + 1 + nlri_len
+            }
+            Self::RouteTargetMembership { next_hop, nlri } => {
                 let next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN as usize
                 } else {
@@ -936,6 +946,32 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     nlri.write(writer)?
                 }
             }
+            Self::RouteTargetMembership { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    RouteTargetMembershipAddress::address_type()
+                        .address_family()
+                        .into(),
+                )?;
+                writer.write_u8(
+                    RouteTargetMembershipAddress::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                match next_hop {
+                    IpAddr::V4(addr) => {
+                        writer.write_u8(IPV4_LEN)?;
+                        writer.write_all(&addr.octets())?;
+                    }
+                    IpAddr::V6(addr) => {
+                        writer.write_u8(IPV6_LEN)?;
+                        writer.write_all(&addr.octets())?;
+                    }
+                }
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
             Self::Unknown { afi, safi, value } => {
                 writer.write_u16::<NetworkEndian>(*afi as u16)?;
                 writer.write_u8(*safi as u8)?;
@@ -956,6 +992,7 @@ pub enum MpUnreachWritingError {
     Ipv6MulticastAddressError(#[from] Ipv6MulticastAddressWritingError),
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
+    RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
 }
 
 impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
@@ -972,6 +1009,7 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
             Self::Ipv6Multicast { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::Ipv6MplsVpnUnicastAddress { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::L2Evpn { nlri } => nlri.iter().map(|x| x.len()).sum(),
+            Self::RouteTargetMembership { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::Unknown {
                 afi: _,
                 safi: _,
@@ -1076,6 +1114,21 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
                 )?;
                 writer.write_u8(
                     L2EvpnAddress::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::RouteTargetMembership { nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    RouteTargetMembershipAddress::address_type()
+                        .address_family()
+                        .into(),
+                )?;
+                writer.write_u8(
+                    RouteTargetMembershipAddress::address_type()
                         .subsequent_address_family()
                         .into(),
                 )?;

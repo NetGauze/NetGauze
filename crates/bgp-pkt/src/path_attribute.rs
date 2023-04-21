@@ -912,6 +912,10 @@ pub enum MpReach {
         next_hop: IpAddr,
         nlri: Vec<L2EvpnAddress>,
     },
+    RouteTargetMembership {
+        next_hop: IpAddr,
+        nlri: Vec<RouteTargetMembershipAddress>,
+    },
     Unknown {
         afi: AddressFamily,
         safi: SubsequentAddressFamily,
@@ -970,6 +974,9 @@ pub enum MpUnreach {
     },
     L2Evpn {
         nlri: Vec<L2EvpnAddress>,
+    },
+    RouteTargetMembership {
+        nlri: Vec<RouteTargetMembershipAddress>,
     },
     Unknown {
         afi: AddressFamily,

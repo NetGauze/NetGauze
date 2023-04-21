@@ -928,6 +928,72 @@ impl L2EvpnIpv6PrefixRoute {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RouteTargetMembershipAddress {
+    path_id: Option<u32>,
+    membership: Option<RouteTargetMembership>,
+}
+
+impl RouteTargetMembershipAddress {
+    pub const fn new(path_id: Option<u32>, membership: Option<RouteTargetMembership>) -> Self {
+        Self {
+            path_id,
+            membership,
+        }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
+    }
+
+    pub const fn membership(&self) -> Option<&RouteTargetMembership> {
+        self.membership.as_ref()
+    }
+}
+
+/// Route Target Membership NLRI
+/// [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136)
+/// ```text
+/// +-------------------------------+
+/// | origin as        (4 octets)   |
+/// +-------------------------------+
+/// | route target     (8 octets)   |
+/// +                               +
+/// |                               |
+/// +-------------------------------+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RouteTargetMembership {
+    origin_as: u32,
+    /// Route targets can then be expressed as prefixes, where, for instance,
+    /// a prefix would encompass all route target extended communities
+    /// assigned by a given Global Administrator
+    route_target: Vec<u8>,
+}
+
+impl RouteTargetMembership {
+    pub const fn new(origin_as: u32, route_target: Vec<u8>) -> Self {
+        Self {
+            origin_as,
+            route_target,
+        }
+    }
+
+    pub const fn origin_as(&self) -> u32 {
+        self.origin_as
+    }
+
+    pub const fn route_target(&self) -> &Vec<u8> {
+        &self.route_target
+    }
+}
+
+impl NlriAddressType for RouteTargetMembershipAddress {
+    fn address_type() -> AddressType {
+        AddressType::RouteTargetConstrains
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

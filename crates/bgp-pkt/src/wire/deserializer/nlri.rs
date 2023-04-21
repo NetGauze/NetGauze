@@ -25,8 +25,8 @@ use crate::{
     },
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_two_inputs, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -889,5 +889,66 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnIpPrefixRouteParsingError<'a>> for L2EvpnI
                 ),
             )),
         }
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum RouteTargetMembershipAddressParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidPrefixLen(u8),
+    LocatedRouteTargetMembershipParsingError(
+        #[from_located(module = "self")] RouteTargetMembershipParsingError,
+    ),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedRouteTargetMembershipAddressParsingError<'a>>
+    for RouteTargetMembershipAddress
+{
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedRouteTargetMembershipAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
+        let input = buf;
+        let (buf, prefix_len) = be_u8(buf)?;
+        let (buf, membership) = if prefix_len == 0 {
+            (buf, None)
+        } else if !(32..=96).contains(&prefix_len) {
+            return Err(nom::Err::Error(
+                LocatedRouteTargetMembershipAddressParsingError::new(
+                    input,
+                    RouteTargetMembershipAddressParsingError::InvalidPrefixLen(prefix_len),
+                ),
+            ));
+        } else {
+            let (buf, membership) = parse_into_located_one_input(buf, prefix_len)?;
+            (buf, Some(membership))
+        };
+        Ok((buf, RouteTargetMembershipAddress::new(path_id, membership)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum RouteTargetMembershipParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, u8, LocatedRouteTargetMembershipParsingError<'a>>
+    for RouteTargetMembership
+{
+    fn from_wire(
+        buf: Span<'a>,
+        prefix_len: u8,
+    ) -> IResult<Span<'a>, Self, LocatedRouteTargetMembershipParsingError<'a>> {
+        let (buf, origin_as) = be_u32(buf)?;
+        let (buf, route_target) = nom::multi::count(be_u8, ((prefix_len - 32) / 8) as usize)(buf)?;
+        Ok((buf, RouteTargetMembership::new(origin_as, route_target)))
     }
 }

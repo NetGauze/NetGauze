@@ -52,7 +52,7 @@ use crate::{
 use nom::error::ErrorKind;
 use std::{
     collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
 
@@ -1974,5 +1974,93 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
 
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_extended_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_path_attr_route_target_membership() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x90, 0x0e, 0x00, 0x7d, 0x00, 0x01, 0x84, 0x10, 0xfd, 0x00, 0x3f, 0x00, 0x03, 0x02, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x60, 0x00, 0x00, 0xff, 0xcc,
+        0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xb2, 0x60, 0x00, 0x00, 0xff, 0xcc, 0x00, 0x02,
+        0xff, 0xcc, 0x00, 0x00, 0x0f, 0xa3, 0x60, 0x00, 0x00, 0xff, 0xcc, 0x00, 0x02, 0xff, 0xcc,
+        0x00, 0x00, 0x00, 0x02, 0x60, 0x00, 0x00, 0xff, 0xcc, 0x00, 0x02, 0xff, 0xcc, 0x00, 0x00,
+        0x00, 0x01, 0x60, 0x00, 0x00, 0xff, 0xcc, 0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xd9,
+        0x60, 0x00, 0x00, 0xff, 0xcc, 0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xd8, 0x60, 0x00,
+        0x00, 0xff, 0xcc, 0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc5, 0x60, 0x00, 0x00, 0xff,
+        0xcc, 0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc4,
+    ];
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpReach(MpReach::RouteTargetMembership {
+            next_hop: IpAddr::V6(Ipv6Addr::from_str("fd00:3f00:302::1").unwrap()),
+            nlri: vec![
+                RouteTargetMembershipAddress::new(
+                    None,
+                    Some(RouteTargetMembership::new(
+                        65484,
+                        vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xb2],
+                    )),
+                ),
+                RouteTargetMembershipAddress::new(
+                    None,
+                    Some(RouteTargetMembership::new(
+                        65484,
+                        vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xa3],
+                    )),
+                ),
+                RouteTargetMembershipAddress::new(
+                    None,
+                    Some(RouteTargetMembership::new(
+                        65484,
+                        vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x00, 0x02],
+                    )),
+                ),
+                RouteTargetMembershipAddress::new(
+                    None,
+                    Some(RouteTargetMembership::new(
+                        65484,
+                        vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x00, 0x01],
+                    )),
+                ),
+                RouteTargetMembershipAddress::new(
+                    None,
+                    Some(RouteTargetMembership::new(
+                        65484,
+                        vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xd9],
+                    )),
+                ),
+                RouteTargetMembershipAddress::new(
+                    None,
+                    Some(RouteTargetMembership::new(
+                        65484,
+                        vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xd8],
+                    )),
+                ),
+                RouteTargetMembershipAddress::new(
+                    None,
+                    Some(RouteTargetMembership::new(
+                        65484,
+                        vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc5],
+                    )),
+                ),
+                RouteTargetMembershipAddress::new(
+                    None,
+                    Some(RouteTargetMembership::new(
+                        65484,
+                        vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc4],
+                    )),
+                ),
+            ],
+        }),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+
+    test_write(&good, &good_wire)?;
     Ok(())
 }
