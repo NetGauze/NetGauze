@@ -543,7 +543,9 @@ impl AddressType {
             (AddressFamily::L2vpn, SubsequentAddressFamily::BgpEvpn) => Ok(Self::L2VpnBgpEvpn),
 
             (AddressFamily::BgpLs, SubsequentAddressFamily::BgpLs) => Ok(Self::BgpLs),
-            (AddressFamily::IPv4, SubsequentAddressFamily::RouteTargetConstrains) => Ok(Self::RouteTargetConstrains),
+            (AddressFamily::IPv4, SubsequentAddressFamily::RouteTargetConstrains) => {
+                Ok(Self::RouteTargetConstrains)
+            }
 
             _ => Err(InvalidAddressType::new(afi, safi)),
         }
