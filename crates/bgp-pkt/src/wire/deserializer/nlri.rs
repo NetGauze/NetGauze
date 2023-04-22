@@ -24,6 +24,7 @@ use crate::{
         },
     },
 };
+use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
     ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
@@ -820,7 +821,22 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv4PrefixRouteParsingError<'a>> for L2Evp
         let (buf, rd) = parse_into_located(buf)?;
         let (buf, segment_id) = parse_into_located(buf)?;
         let (buf, tag) = parse_into_located(buf)?;
-        let (buf, prefix) = parse_into_located(buf)?;
+        let input = buf;
+        let (buf, prefix_len) = be_u8(buf)?;
+        let (buf, network) = be_u32(buf)?;
+        let prefix = match Ipv4Net::new(Ipv4Addr::from(network), prefix_len) {
+            Ok(prefix) => prefix,
+            Err(_) => {
+                return Err(nom::Err::Error(
+                    LocatedL2EvpnIpv4PrefixRouteParsingError::new(
+                        input,
+                        L2EvpnIpv4PrefixRouteParsingError::Ipv4PrefixError(
+                            Ipv4PrefixParsingError::InvalidIpv4PrefixLen(prefix_len),
+                        ),
+                    ),
+                ))
+            }
+        };
         let (buf, gateway) = be_u32(buf)?;
         let gateway = Ipv4Addr::from(gateway);
         let (buf, mpls_label) = parse_into_located(buf)?;
@@ -851,7 +867,22 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv6PrefixRouteParsingError<'a>> for L2Evp
         let (buf, rd) = parse_into_located(buf)?;
         let (buf, segment_id) = parse_into_located(buf)?;
         let (buf, tag) = parse_into_located(buf)?;
-        let (buf, prefix) = parse_into_located(buf)?;
+        let input = buf;
+        let (buf, prefix_len) = be_u8(buf)?;
+        let (buf, network) = be_u128(buf)?;
+        let prefix = match Ipv6Net::new(Ipv6Addr::from(network), prefix_len) {
+            Ok(prefix) => prefix,
+            Err(_) => {
+                return Err(nom::Err::Error(
+                    LocatedL2EvpnIpv6PrefixRouteParsingError::new(
+                        input,
+                        L2EvpnIpv6PrefixRouteParsingError::Ipv6PrefixError(
+                            Ipv6PrefixParsingError::InvalidIpv6PrefixLen(prefix_len),
+                        ),
+                    ),
+                ))
+            }
+        };
         let (buf, gateway) = be_u128(buf)?;
         let gateway = Ipv6Addr::from(gateway);
         let (buf, mpls_label) = parse_into_located(buf)?;

@@ -282,12 +282,18 @@ fn test_ethernet_segment_route() -> Result<(), EthernetSegmentRouteWritingError>
 
 #[test]
 fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
-    let good_wire = [
+    let good_ad_wire = [
         0x01, 0x19, 0x00, 0x01, 0x78, 0x00, 0x02, 0x01, 0x00, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x10, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x49, 0x35, 0x01,
     ];
 
-    let good = L2EvpnRoute::EthernetAutoDiscovery(EthernetAutoDiscovery::new(
+    let good_ip_prefix_wire = [
+        0x05, 0x22, 0x00, 0x01, 0x0a, 0x00, 0x0a, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x0a, 0x00, 0x0a, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x64,
+    ];
+
+    let good_ad = L2EvpnRoute::EthernetAutoDiscovery(EthernetAutoDiscovery::new(
         RouteDistinguisher::Ipv4Administrator {
             ip: Ipv4Addr::new(120, 0, 2, 1),
             number: 100,
@@ -296,8 +302,23 @@ fn test_l2_evpn_route() -> Result<(), L2EvpnRouteWritingError> {
         EthernetTag(0),
         MplsLabel::new([0x49, 0x35, 0x01]),
     ));
-    test_parsed_completely(&good_wire, &good);
-    test_write(&good, &good_wire)?;
+
+    let good_ip_prefix =
+        L2EvpnRoute::IpPrefixRoute(L2EvpnIpPrefixRoute::V4(L2EvpnIpv4PrefixRoute::new(
+            RouteDistinguisher::Ipv4Administrator {
+                ip: Ipv4Addr::new(10, 0, 10, 1),
+                number: 2,
+            },
+            EthernetSegmentIdentifier([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+            EthernetTag(0),
+            Ipv4Net::from_str("10.0.10.0/24").unwrap(),
+            Ipv4Addr::from(0),
+            MplsLabel::new([0, 0, 100]),
+        )));
+    test_parsed_completely(&good_ad_wire, &good_ad);
+    test_parsed_completely(&good_ip_prefix_wire, &good_ip_prefix);
+    test_write(&good_ad, &good_ad_wire)?;
+    test_write(&good_ip_prefix, &good_ip_prefix_wire)?;
     Ok(())
 }
 
