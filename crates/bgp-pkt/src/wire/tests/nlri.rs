@@ -163,6 +163,26 @@ fn test_ipv4_mpls_vpn_unicast() -> Result<(), Ipv4MplsVpnUnicastAddressWritingEr
 }
 
 #[test]
+fn test_ipv6_mpls_vpn_unicast() -> Result<(), Ipv6MplsVpnUnicastAddressWritingError> {
+    let good_wire = [
+        0xd6, 0xe0, 0x08, 0x01, 0x00, 0x01, 0x0a, 0xd0, 0xb6, 0x30, 0x00, 0x03, 0xfd, 0x00, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04,
+    ];
+
+    let good = Ipv6MplsVpnUnicastAddress::new_no_path_id(
+        RouteDistinguisher::Ipv4Administrator {
+            ip: Ipv4Addr::new(10, 208, 182, 48),
+            number: 3,
+        },
+        vec![MplsLabel::new([0xe0, 0x08, 0x01])],
+        Ipv6Unicast::from_net(Ipv6Net::from_str("fd00:2::4/126").unwrap()).unwrap(),
+    );
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_mac_address() -> Result<(), MacAddressWritingError> {
     let good_wire = [0x00, 0x0c, 0x29, 0xde, 0xe3, 0x64];
 

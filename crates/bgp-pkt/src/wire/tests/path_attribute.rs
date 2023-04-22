@@ -1683,7 +1683,7 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast(
 }
 
 #[test]
-fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
+fn test_mp_reach_labeled_vpn_ipv4() -> Result<(), PathAttributeWritingError> {
     let good_wire = [
         0x90, 0x0e, 0x00, 0x2c, 0x00, 0x01, 0x80, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1706,6 +1706,55 @@ fn test_mp_reach_labeled_vpn() -> Result<(), PathAttributeWritingError> {
                 vec![MplsLabel::new([0, 65, 1])],
                 Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
             )],
+        }),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_mp_reach_labeled_vpn_ipv6() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x90, 0x0e, 0x00, 0x4d, 0x00, 0x02, 0x80, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xfd, 0xea, 0x3e, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0xd6, 0xe0, 0x08, 0x01, 0x00, 0x01, 0x0a, 0xd7, 0xb6, 0x30, 0x00, 0x03,
+        0xfd, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x04, 0x98, 0xe0, 0x08, 0x01, 0x00, 0x01, 0x0a, 0xd7, 0xb6, 0x30, 0x00, 0x03, 0xfd, 0x01,
+        0xca, 0xfe, 0x00, 0x02, 0x00, 0x03,
+    ];
+
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpReach(MpReach::Ipv6MplsVpnUnicast {
+            next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
+                RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
+                Ipv6Addr::from_str("fdea:3e00:400::1").unwrap(),
+            )),
+            nlri: vec![
+                Ipv6MplsVpnUnicastAddress::new_no_path_id(
+                    RouteDistinguisher::Ipv4Administrator {
+                        ip: Ipv4Addr::new(10, 215, 182, 48),
+                        number: 3,
+                    },
+                    vec![MplsLabel::new([0xe0, 0x08, 0x01])],
+                    Ipv6Unicast::from_net(Ipv6Net::from_str("fd00:2::4/126").unwrap()).unwrap(),
+                ),
+                Ipv6MplsVpnUnicastAddress::new_no_path_id(
+                    RouteDistinguisher::Ipv4Administrator {
+                        ip: Ipv4Addr::new(10, 215, 182, 48),
+                        number: 3,
+                    },
+                    vec![MplsLabel::new([0xe0, 0x08, 0x01])],
+                    Ipv6Unicast::from_net(Ipv6Net::from_str("fd01:cafe:2:3::/64").unwrap())
+                        .unwrap(),
+                ),
+            ],
         }),
     )
     .unwrap();

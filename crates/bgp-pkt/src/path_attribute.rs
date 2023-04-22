@@ -903,9 +903,8 @@ pub enum MpReach {
         next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv6MulticastAddress>,
     },
-    Ipv6MplsVpnUnicastAddress {
-        next_hop_global: LabeledNextHop,
-        next_hop_local: Option<LabeledNextHop>,
+    Ipv6MplsVpnUnicast {
+        next_hop: LabeledNextHop,
         nlri: Vec<Ipv6MplsVpnUnicastAddress>,
     },
     L2Evpn {
@@ -969,7 +968,7 @@ pub enum MpUnreach {
     Ipv6Multicast {
         nlri: Vec<Ipv6MulticastAddress>,
     },
-    Ipv6MplsVpnUnicastAddress {
+    Ipv6MplsVpnUnicast {
         nlri: Vec<Ipv6MplsVpnUnicastAddress>,
     },
     L2Evpn {

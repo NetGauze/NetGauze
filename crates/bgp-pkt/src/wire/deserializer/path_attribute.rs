@@ -687,6 +687,15 @@ impl<'a>
                     },
                 ))
             }
+            Ok(AddressType::Ipv6MplsLabeledVpn) => {
+                let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::Ipv6MplsLabeledVpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpReach::Ipv6MplsVpnUnicast { next_hop, nlri }))
+            }
             Ok(AddressType::L2VpnBgpEvpn) => {
                 let tmp = mp_buf;
                 let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
@@ -852,7 +861,7 @@ impl<'a>
                     .get(&AddressType::Ipv6MplsLabeledVpn)
                     .map_or(false, |x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpUnreach::Ipv6MplsVpnUnicastAddress { nlri }))
+                Ok((buf, MpUnreach::Ipv6MplsVpnUnicast { nlri }))
             }
             Ok(AddressType::L2VpnBgpEvpn) => {
                 let add_path = add_path_map
