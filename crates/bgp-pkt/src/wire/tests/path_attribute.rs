@@ -1765,6 +1765,34 @@ fn test_mp_reach_labeled_vpn_ipv6() -> Result<(), PathAttributeWritingError> {
 }
 
 #[test]
+fn test_mp_reach_nlri_mpls_labels_ipv6() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x90, 0x0e, 0x00, 0x29, 0x00, 0x02, 0x04, 0x10, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x98, 0x05, 0xdc, 0x31, 0xfc,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+    ];
+
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        true,
+        PathAttributeValue::MpReach(MpReach::Ipv6NlriMplsLabels {
+            next_hop: IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap()),
+            nlri: vec![Ipv6NlriMplsLabelsAddress::new_no_path_id(
+                vec![MplsLabel::new([0x05, 0xdc, 0x31])],
+                Ipv6Net::from_str("fc00::3/128").unwrap(),
+            )],
+        }),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_transitive_two_octet_extended_community() -> Result<(), PathAttributeWritingError> {
     let good_wire = [
         0xc0, 0x10, 0x08, 0x00, 0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,

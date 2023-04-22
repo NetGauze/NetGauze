@@ -138,10 +138,12 @@ pub fn main() {
 |------------------------------------------------------------------------------------------------------------------------|----------------------|-----------------------------------|-----------------------------------------|
 |                                                                                                                        | 1 = IPv4             | 1 = Unicast                       |                                         |
 |                                                                                                                        | 1 = IPv4             | 2 = Multicast                     |                                         |
+| [RFC 8277](https://datatracker.ietf.org/doc/html/RFC8277)                                                              | 1 = IPv4             | 4 = MPLS Labeled Unicast          | NLRI with MPLS Labels                   |
 | [RFC 4364](https://datatracker.ietf.org/doc/html/RFC4364)                                                              | 1 = IPv4             | 128 = MPLS Labeled Unicast        |                                         |
 | [RFC 4684](https://datatracker.ietf.org/doc/html/RFC4684)                                                              | 1 = IPv4             | 132 = Route Target constrains     |                                         |
 |                                                                                                                        | 2 = IPv6             | 1 = Unicast                       |                                         |
 |                                                                                                                        | 2 = IPv6             | 2 = Multicast                     |                                         |
+| [RFC 8277](https://datatracker.ietf.org/doc/html/RFC8277)                                                              | 2 = IPv6             | 4 = MPLS Labeled Unicast          | NLRI with MPLS Labels                   |
 | [RFC 4659](https://datatracker.ietf.org/doc/html/RFC4659)                                                              | 2 = IPv4             | 128 = MPLS Labeled Unicast        |                                         |
 | [RFC 7432](https://datatracker.ietf.org/doc/html/RFC7432) and [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136) | 25 = L2 VPN          | 70 = BGP EVPNs                    | Route types from 1 till 5 are supported |
 

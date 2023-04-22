@@ -27,13 +27,13 @@ pub mod update;
 use ipnet::{Ipv4Net, Ipv6Net};
 use std::{
     collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 
 use netgauze_iana::address_family::AddressType;
 use nom::{
     error::ErrorKind,
-    number::complete::{be_u128, be_u16, be_u8},
+    number::complete::{be_u128, be_u16, be_u32, be_u8},
     IResult,
 };
 use serde::{Deserialize, Serialize};
@@ -45,9 +45,13 @@ use netgauze_parse_utils::{
 
 use crate::{
     iana::{BgpMessageType, UndefinedBgpMessageType},
-    wire::deserializer::{
-        notification::BgpNotificationMessageParsingError, open::BgpOpenMessageParsingError,
-        route_refresh::BgpRouteRefreshMessageParsingError, update::BgpUpdateMessageParsingError,
+    wire::{
+        deserializer::{
+            notification::BgpNotificationMessageParsingError, open::BgpOpenMessageParsingError,
+            route_refresh::BgpRouteRefreshMessageParsingError,
+            update::BgpUpdateMessageParsingError,
+        },
+        serializer::nlri::{IPV4_LEN, IPV6_LEN},
     },
     BgpMessage,
 };
@@ -160,6 +164,37 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6PrefixParsingErro
                 Ipv6PrefixParsingError::InvalidIpv6PrefixLen(prefix_len),
             ))),
         }
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum IpAddrParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidIpAddressType(u8),
+}
+
+impl<'a> ReadablePdu<'a, LocatedIpAddrParsingError<'a>> for IpAddr {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedIpAddrParsingError<'a>> {
+        let input = buf;
+        let (buf, ip_len) = be_u8(buf)?;
+        let (buf, addr) = match ip_len {
+            IPV4_LEN => {
+                let (mp_buf, addr) = be_u32(buf)?;
+                (mp_buf, IpAddr::V4(Ipv4Addr::from(addr)))
+            }
+            IPV6_LEN => {
+                let (mp_buf, addr) = be_u128(buf)?;
+                (mp_buf, IpAddr::V6(Ipv6Addr::from(addr)))
+            }
+            _ => {
+                return Err(nom::Err::Error(LocatedIpAddrParsingError::new(
+                    input,
+                    IpAddrParsingError::InvalidIpAddressType(ip_len),
+                )));
+            }
+        };
+        Ok((buf, addr))
     }
 }
 

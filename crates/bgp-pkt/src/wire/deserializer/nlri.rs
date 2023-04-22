@@ -993,7 +993,7 @@ pub enum Ipv4NlriMplsLabelsAddressParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4NlriMplsLabelsAddressParsingError<'a>>
-for Ipv4NlriMplsLabelsAddress
+    for Ipv4NlriMplsLabelsAddress
 {
     fn from_wire(
         buf: Span<'a>,
@@ -1020,7 +1020,6 @@ for Ipv4NlriMplsLabelsAddress
         Ok((buf, Ipv4NlriMplsLabelsAddress::new(path_id, labels, prefix)))
     }
 }
-
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6NlriMplsLabelsAddressParsingError {
