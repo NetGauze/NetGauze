@@ -994,6 +994,154 @@ impl NlriAddressType for RouteTargetMembershipAddress {
     }
 }
 
+/// Binding IPv4 addresses to one or more MPLS labels
+///
+/// [RFC8277](https://datatracker.ietf.org/doc/html/rfc8277) defines two wire format based on
+/// if the Multiple Label capability is used or not.
+///
+/// When Multiple Label capability IS NOT used
+/// ```text
+/// 0                   1                   2                   3
+/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |    Length     |                 Label                 |Rsrv |S|
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                          Prefix                               ~
+/// ~                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// When Multiple Label capability IS used
+/// ```text
+/// 0                   1                   2                     3
+/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+
+/// |    Length     |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                 Label                 |Rsrv |S~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ~                 Label                 |Rsrv |S|
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                          Prefix                               ~
+/// ~                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Ipv4NlriMplsLabelsAddress {
+    path_id: Option<u32>,
+    labels: Vec<MplsLabel>,
+    prefix: Ipv4Net,
+}
+
+impl Ipv4NlriMplsLabelsAddress {
+    pub const fn new(path_id: Option<u32>, labels: Vec<MplsLabel>, prefix: Ipv4Net) -> Self {
+        Self {
+            path_id,
+            labels,
+            prefix,
+        }
+    }
+
+    pub const fn new_no_path_id(labels: Vec<MplsLabel>, prefix: Ipv4Net) -> Self {
+        Self {
+            path_id: None,
+            labels,
+            prefix,
+        }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
+    }
+
+    pub const fn labels(&self) -> &Vec<MplsLabel> {
+        &self.labels
+    }
+
+    pub const fn prefix(&self) -> Ipv4Net {
+        self.prefix
+    }
+}
+
+impl NlriAddressType for Ipv4NlriMplsLabelsAddress {
+    fn address_type() -> AddressType {
+        AddressType::Ipv4NlriMplsLabels
+    }
+}
+
+/// Binding IPv6 addresses to one or more MPLS labels
+///
+/// [RFC8277](https://datatracker.ietf.org/doc/html/rfc8277) defines two wire format based on
+/// if the Multiple Label capability is used or not.
+///
+/// When Multiple Label capability IS NOT used
+/// ```text
+/// 0                   1                   2                   3
+/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |    Length     |                 Label                 |Rsrv |S|
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                          Prefix                               ~
+/// ~                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// When Multiple Label capability IS used
+/// ```text
+/// 0                   1                   2                     3
+/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+
+/// |    Length     |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                 Label                 |Rsrv |S~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ~                 Label                 |Rsrv |S|
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                          Prefix                               ~
+/// ~                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Ipv6NlriMplsLabelsAddress {
+    path_id: Option<u32>,
+    labels: Vec<MplsLabel>,
+    prefix: Ipv6Net,
+}
+
+impl Ipv6NlriMplsLabelsAddress {
+    pub const fn new(path_id: Option<u32>, labels: Vec<MplsLabel>, prefix: Ipv6Net) -> Self {
+        Self {
+            path_id,
+            labels,
+            prefix,
+        }
+    }
+
+    pub const fn new_no_path_id(labels: Vec<MplsLabel>, prefix: Ipv6Net) -> Self {
+        Self {
+            path_id: None,
+            labels,
+            prefix,
+        }
+    }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
+    }
+
+    pub const fn labels(&self) -> &Vec<MplsLabel> {
+        &self.labels
+    }
+
+    pub const fn prefix(&self) -> Ipv6Net {
+        self.prefix
+    }
+}
+
+impl NlriAddressType for Ipv6NlriMplsLabelsAddress {
+    fn address_type() -> AddressType {
+        AddressType::Ipv6NlriMplsLabels
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

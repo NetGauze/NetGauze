@@ -19,7 +19,7 @@ use crate::{
     iana::PathAttributeType,
     nlri::*,
     path_attribute::*,
-    wire::serializer::{community::*, nlri::*},
+    wire::serializer::{community::*, nlri::*, IpAddrWritingError},
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
@@ -704,12 +704,15 @@ impl WritablePduWithOneInput<bool, LargeCommunitiesWritingError> for LargeCommun
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum MpReachWritingError {
     StdIOError(#[from_std_io_error] String),
+    IpAddrError(#[from] IpAddrWritingError),
     Ipv4UnicastAddressError(#[from] Ipv4UnicastAddressWritingError),
     Ipv4MulticastAddressError(#[from] Ipv4MulticastAddressWritingError),
     Ipv6UnicastAddressError(#[from] Ipv6UnicastAddressWritingError),
     Ipv6MulticastAddressError(#[from] Ipv6MulticastAddressWritingError),
     Ipv4MplsVpnUnicastAddressError(#[from] Ipv4MplsVpnUnicastAddressWritingError),
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
+    Ipv4NlriMplsLabelsAddressError(#[from] Ipv4NlriMplsLabelsAddressWritingError),
+    Ipv6NlriMplsLabelsAddressError(#[from] Ipv6NlriMplsLabelsAddressWritingError),
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
@@ -727,6 +730,10 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 IPV4_LEN as usize + 1 + nlri_len
             }
             Self::Ipv4Multicast { next_hop: _, nlri } => {
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                IPV4_LEN as usize + 1 + nlri_len
+            }
+            Self::Ipv4NlriMplsLabels { next_hop: _, nlri } => {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
                 IPV4_LEN as usize + 1 + nlri_len
             }
@@ -751,6 +758,10 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 let local_len: usize = next_hop_local.map(|_| IPV6_LEN as usize).unwrap_or(0);
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
                 IPV6_LEN as usize + 1 + local_len + nlri_len
+            }
+            Self::Ipv6NlriMplsLabels { next_hop: _, nlri } => {
+                let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
+                IPV6_LEN as usize + 1 + nlri_len
             }
             Self::Ipv6MplsVpnUnicast { next_hop, nlri } => {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
@@ -822,6 +833,23 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     nlri.write(writer)?
                 }
             }
+            Self::Ipv4NlriMplsLabels { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    Ipv4MplsVpnUnicastAddress::address_type()
+                        .address_family()
+                        .into(),
+                )?;
+                writer.write_u8(
+                    Ipv4MplsVpnUnicastAddress::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                next_hop.write(writer)?;
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
             Self::Ipv4MplsVpnUnicast { next_hop, nlri } => {
                 writer.write_u16::<NetworkEndian>(
                     Ipv4MplsVpnUnicastAddress::address_type()
@@ -886,6 +914,23 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     writer.write_u8(16)?;
                     writer.write_all(&next_hop_global.octets())?;
                 }
+                writer.write_u8(0)?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::Ipv6NlriMplsLabels { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    Ipv6NlriMplsLabelsAddress::address_type()
+                        .address_family()
+                        .into(),
+                )?;
+                writer.write_u8(
+                    Ipv6NlriMplsLabelsAddress::address_type()
+                        .subsequent_address_family()
+                        .into(),
+                )?;
+                next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
                     nlri.write(writer)?

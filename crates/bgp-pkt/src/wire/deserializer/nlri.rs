@@ -983,3 +983,78 @@ impl<'a> ReadablePduWithOneInput<'a, u8, LocatedRouteTargetMembershipParsingErro
         Ok((buf, RouteTargetMembership::new(origin_as, route_target)))
     }
 }
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum Ipv4NlriMplsLabelsAddressParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+    Ipv4PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4NlriMplsLabelsAddressParsingError<'a>>
+for Ipv4NlriMplsLabelsAddress
+{
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedIpv4NlriMplsLabelsAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
+        let input = buf;
+        let (buf, mut prefix_len) = be_u8(buf)?;
+        let prefix_bytes = prefix_len / 8;
+        let mut labels = Vec::<MplsLabel>::new();
+        let (buf, mut nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
+        while labels.last().map_or(true, |x| !x.is_bottom()) {
+            let (t, label) = parse_into_located(nlri_buf)?;
+            labels.push(label);
+            nlri_buf = t;
+            prefix_len -= MPLS_LABEL_LEN_BITS;
+        }
+        let (_buf, prefix) = parse_into_located_two_inputs(nlri_buf, prefix_len, input)?;
+        Ok((buf, Ipv4NlriMplsLabelsAddress::new(path_id, labels, prefix)))
+    }
+}
+
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum Ipv6NlriMplsLabelsAddressParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
+    Ipv6PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv6PrefixParsingError),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6NlriMplsLabelsAddressParsingError<'a>>
+    for Ipv6NlriMplsLabelsAddress
+{
+    fn from_wire(
+        buf: Span<'a>,
+        add_path: bool,
+    ) -> IResult<Span<'a>, Self, LocatedIpv6NlriMplsLabelsAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
+        let input = buf;
+        let (buf, mut prefix_len) = be_u8(buf)?;
+        let prefix_bytes = prefix_len / 8;
+        let mut labels = Vec::<MplsLabel>::new();
+        let (buf, mut nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
+        while labels.last().map_or(true, |x| !x.is_bottom()) {
+            let (t, label) = parse_into_located(nlri_buf)?;
+            labels.push(label);
+            nlri_buf = t;
+            prefix_len -= MPLS_LABEL_LEN_BITS;
+        }
+        let (_buf, prefix) = parse_into_located_two_inputs(nlri_buf, prefix_len, input)?;
+        Ok((buf, Ipv6NlriMplsLabelsAddress::new(path_id, labels, prefix)))
+    }
+}

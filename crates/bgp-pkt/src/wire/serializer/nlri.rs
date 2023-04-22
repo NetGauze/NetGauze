@@ -828,3 +828,59 @@ impl WritablePdu<RouteTargetMembershipWritingError> for RouteTargetMembership {
         Ok(())
     }
 }
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum Ipv4NlriMplsLabelsAddressWritingError {
+    StdIOError(#[from_std_io_error] String),
+    MplsLabelError(#[from] MplsLabelWritingError),
+}
+
+impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAddress {
+    // 1-octet len
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.labels().iter().map(|x| x.len()).sum::<usize>()
+            + round_len(self.prefix().prefix_len()) as usize
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4NlriMplsLabelsAddressWritingError> {
+        let len = (self.len() - 1) * 8;
+        writer.write_u8(len as u8)?;
+        for label in self.labels() {
+            label.write(writer)?;
+        }
+        let prefix_len = round_len(self.prefix().prefix_len()) as usize;
+        writer.write_all(&self.prefix().network().octets()[..prefix_len])?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum Ipv6NlriMplsLabelsAddressWritingError {
+    StdIOError(#[from_std_io_error] String),
+    MplsLabelError(#[from] MplsLabelWritingError),
+}
+
+impl WritablePdu<Ipv6NlriMplsLabelsAddressWritingError> for Ipv6NlriMplsLabelsAddress {
+    // 1 octet prefix len
+    const BASE_LENGTH: usize = 1;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.labels().iter().map(|x| x.len()).sum::<usize>()
+            + round_len(self.prefix().prefix_len()) as usize
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6NlriMplsLabelsAddressWritingError> {
+        let len = (self.len() - 1) * 8;
+        writer.write_u8(len as u8)?;
+        for label in self.labels() {
+            label.write(writer)?;
+        }
+        let prefix_len = round_len(self.prefix().prefix_len()) as usize;
+        writer.write_all(&self.prefix().network().octets()[..prefix_len])?;
+        Ok(())
+    }
+}
