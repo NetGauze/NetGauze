@@ -107,6 +107,7 @@ pub fn main() {
 | Extended Message                 | [RFC 8654](https://datatracker.ietf.org/doc/html/RFC8654) |                                                                                             |
 | Four Octet AS Number             | [RFC 6793](https://datatracker.ietf.org/doc/html/RFC6793) |                                                                                             |
 | Extended Next Hop Encoding       | [RFC 8950](https://datatracker.ietf.org/doc/html/rfc8950) |                                                                                             |
+| Multiple Labels                  | [RFC 8277](https://datatracker.ietf.org/doc/html/rfc8277) |                                                                                             |
 | Experimental                     | [RFC 8810](https://datatracker.ietf.org/doc/html/RFC8810) | Capabilities with codes 239-254 are marked as experimental, we read their values as Vec<u8> |
 | Unrecognized                     | [RFC 5492](https://datatracker.ietf.org/doc/html/rfc5492) | We carry the capability code and the `u8` vector for it's value                             |
 
@@ -123,6 +124,7 @@ pub fn main() {
 | Aggregator                   | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                                                               | Yes        | Yes      | Yes        |                                                                    |
 | Communities                  | [RFC 1997](https://datatracker.ietf.org/doc/html/rfc1997)                                                               | No         | Yes      | Yes        |                                                                    |
 | Extended Communities         | [RFC 4360](https://datatracker.ietf.org/doc/html/rfc4360)                                                               | No         | Yes      | Yes        |                                                                    |
+| Extended Communities IPv6    | [RFC 5701](https://datatracker.ietf.org/doc/html/rfc5701)                                                               | No         | Yes      | Yes        |                                                                    |
 | Large Communities            | [RFC 8092](https://datatracker.ietf.org/doc/html/rfc8092)                                                               | No         | Yes      | Yes        |                                                                    |
 | Route Reflection             | [RFC 4456](https://datatracker.ietf.org/doc/html/rfc4456)                                                               | No         | Yes      | No         |                                                                    |
 | Four Octet AS_PATH           | [RFC 6793](https://datatracker.ietf.org/doc/html/RFC6793)                                                               | No         | Yes      | Yes        |                                                                    |
