@@ -40,7 +40,7 @@ use crate::path_attribute::PathAttribute;
 pub struct BgpUpdateMessage {
     withdrawn_routes: Vec<Ipv4UnicastAddress>,
     path_attributes: Vec<PathAttribute>,
-    network_layer_reachability_information: Vec<Ipv4UnicastAddress>,
+    nlri: Vec<Ipv4UnicastAddress>,
 }
 
 impl BgpUpdateMessage {
@@ -48,12 +48,12 @@ impl BgpUpdateMessage {
     pub fn new(
         withdrawn_routes: Vec<Ipv4UnicastAddress>,
         path_attributes: Vec<PathAttribute>,
-        network_layer_reachability_information: Vec<Ipv4UnicastAddress>,
+        nlri: Vec<Ipv4UnicastAddress>,
     ) -> Self {
         BgpUpdateMessage {
             withdrawn_routes,
             path_attributes,
-            network_layer_reachability_information,
+            nlri,
         }
     }
     pub const fn withdraw_routes(&self) -> &Vec<Ipv4UnicastAddress> {
@@ -65,7 +65,7 @@ impl BgpUpdateMessage {
     }
 
     #[inline]
-    pub const fn network_layer_reachability_information(&self) -> &Vec<Ipv4UnicastAddress> {
-        &self.network_layer_reachability_information
+    pub const fn nlri(&self) -> &Vec<Ipv4UnicastAddress> {
+        &self.nlri
     }
 }

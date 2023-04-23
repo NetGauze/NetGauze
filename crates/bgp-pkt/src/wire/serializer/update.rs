@@ -46,11 +46,7 @@ impl WritablePdu<BgpUpdateMessageWritingError> for BgpUpdateMessage {
             .iter()
             .map(|w| w.len())
             .sum::<usize>();
-        let nlri = self
-            .network_layer_reachability_information()
-            .iter()
-            .map(|x| x.len())
-            .sum::<usize>();
+        let nlri = self.nlri().iter().map(|x| x.len()).sum::<usize>();
         Self::BASE_LENGTH + withdrawn_len + path_attrs_len + nlri
     }
 
@@ -73,7 +69,7 @@ impl WritablePdu<BgpUpdateMessageWritingError> for BgpUpdateMessage {
         for attr in self.path_attributes() {
             attr.write(writer)?;
         }
-        for address in self.network_layer_reachability_information() {
+        for address in self.nlri() {
             address.write(writer)?;
         }
         Ok(())
