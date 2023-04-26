@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "crates/pcap-reader",
     "crates/bgp-pkt",
     "crates/bmp-service",
     "crates/bmp-pkt",

@@ -1,0 +1,33 @@
+use std::{collections::HashMap, fs::File};
+
+use bytes::BytesMut;
+use pcap_parser::PcapNGReader;
+use tokio_util::codec::Decoder;
+
+use netgauze_bmp_service::codec::BmpCodec;
+use netgauze_pcap_reader::{PcapIter, TransportProtocol};
+
+fn main() {
+    let mut path = env!("CARGO_MANIFEST_DIR").to_owned();
+    path.push_str("/data/bmp.pcapng");
+    let file = File::open(path).unwrap();
+    let reader = PcapNGReader::new(165536, file).unwrap();
+    let reader = Box::new(reader);
+    let mut iter = PcapIter::new(reader);
+    let mut peers = HashMap::new();
+    while let Some((src_ip, src_port, dst_ip, dst_port, protocol, value)) = iter.next() {
+        if protocol != TransportProtocol::TCP {
+            continue;
+        }
+        let key = (src_ip, src_port, dst_ip, dst_port);
+        let (codec, buf) = peers
+            .entry(key)
+            .or_insert((BmpCodec::default(), BytesMut::new()));
+        buf.extend_from_slice(value.as_slice());
+        match codec.decode(buf) {
+            Ok(Some(msg)) => println!("{}", serde_json::to_string(&msg).unwrap()),
+            Ok(None) => {}
+            Err(err) => println!("Error parsing BMP Message: {:?}", err),
+        }
+    }
+}
