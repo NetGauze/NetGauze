@@ -530,6 +530,8 @@ pub enum BgpCapabilityCode {
     /// [draft-ietf-idr-dynamic-cap](https://datatracker.ietf.org/doc/html/draft-ietf-idr-dynamic-cap)
     FQDN = 73,
 
+    CiscoRouteRefresh = 128,
+
     /// [RFC8810](https://datatracker.ietf.org/doc/html/RFC8810)
     Experimental239 = 239,
 
