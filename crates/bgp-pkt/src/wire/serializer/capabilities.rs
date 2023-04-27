@@ -41,6 +41,7 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
             }
             Self::RouteRefresh => ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::EnhancedRouteRefresh => ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
+            Self::CiscoRouteRefresh => ROUTE_REFRESH_CAPABILITY_LENGTH as usize,
             Self::FourOctetAs(value) => value.len(),
             // GracefulRestartCapability carries n length field, so need to account for it here
             Self::GracefulRestartCapability(value) => value.len() - 2,
@@ -68,6 +69,10 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
                 writer.write_u8(len)?;
             }
             Self::EnhancedRouteRefresh => {
+                writer.write_u8(self.code().unwrap().into())?;
+                writer.write_u8(len)?;
+            }
+            Self::CiscoRouteRefresh => {
                 writer.write_u8(self.code().unwrap().into())?;
                 writer.write_u8(len)?;
             }

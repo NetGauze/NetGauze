@@ -134,6 +134,13 @@ impl<'a> ReadablePdu<'a, LocatedBgpCapabilityParsingError<'a>> for BgpCapability
                     let (buf, cap) = parse_into_located(buf)?;
                     Ok((buf, BgpCapability::ExtendedNextHopEncoding(cap)))
                 }
+                BgpCapabilityCode::CiscoRouteRefresh => {
+                    let (buf, _) =
+                        check_capability_length(buf, ROUTE_REFRESH_CAPABILITY_LENGTH, |x| {
+                            BgpCapabilityParsingError::InvalidRouteRefreshLength(x)
+                        })?;
+                    Ok((buf, BgpCapability::CiscoRouteRefresh))
+                }
                 BgpCapabilityCode::BgpExtendedMessage => {
                     let (buf, _) =
                         check_capability_length(buf, EXTENDED_MESSAGE_CAPABILITY_LENGTH, |x| {

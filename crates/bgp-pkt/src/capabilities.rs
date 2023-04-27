@@ -69,6 +69,8 @@ pub enum BgpCapability {
     /// Defined in [RFC7313](https://datatracker.ietf.org/doc/html/rfc7313)
     EnhancedRouteRefresh,
 
+    CiscoRouteRefresh,
+
     /// Defined in [RFC4724](https://datatracker.ietf.org/doc/html/rfc4724)
     /// and [RFC8538](https://datatracker.ietf.org/doc/html/rfc8538)
     GracefulRestartCapability(GracefulRestartCapability),
@@ -95,6 +97,7 @@ impl BgpCapability {
             Self::MultiProtocolExtensions(_) => Ok(BgpCapabilityCode::MultiProtocolExtensions),
             Self::RouteRefresh => Ok(BgpCapabilityCode::RouteRefreshCapability),
             Self::EnhancedRouteRefresh => Ok(BgpCapabilityCode::EnhancedRouteRefresh),
+            Self::CiscoRouteRefresh => Ok(BgpCapabilityCode::CiscoRouteRefresh),
             Self::GracefulRestartCapability(_) => Ok(BgpCapabilityCode::GracefulRestartCapability),
             Self::AddPath(_) => Ok(BgpCapabilityCode::AddPathCapability),
             Self::ExtendedMessage => Ok(BgpCapabilityCode::BgpExtendedMessage),
