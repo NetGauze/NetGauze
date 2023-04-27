@@ -64,9 +64,9 @@ fn test_enhanced_route_refresh() -> Result<(), BGPCapabilityWritingError> {
 
 #[test]
 fn test_unrecognized_capability() -> Result<(), BGPCapabilityWritingError> {
-    let good_wire = [0x80, 0x01, 0x01];
+    let good_wire = [0x00, 0x01, 0x01];
 
-    let good = BgpCapability::Unrecognized(UnrecognizedCapability::new(128, vec![1]));
+    let good = BgpCapability::Unrecognized(UnrecognizedCapability::new(0, vec![1]));
 
     test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;

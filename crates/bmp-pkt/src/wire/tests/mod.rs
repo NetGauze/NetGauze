@@ -18,7 +18,7 @@ use ipnet::Ipv4Net;
 use netgauze_bgp_pkt::{
     capabilities::{
         BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
-        FourOctetAsCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
+        FourOctetAsCapability, MultiProtocolExtensionsCapability,
     },
     iana::{BgpMessageType, UndefinedBgpMessageType},
     nlri::{Ipv4Unicast, Ipv4UnicastAddress},
@@ -706,9 +706,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                             MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
                         ),
                     ]),
-                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
-                        UnrecognizedCapability::new(128, vec![]),
-                    )]),
+                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
                     BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
                     BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
                         FourOctetAsCapability::new(64512),
@@ -743,9 +741,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                             MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
                         ),
                     ]),
-                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
-                        UnrecognizedCapability::new(128, vec![]),
-                    )]),
+                    BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
                     BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
                     BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
                         FourOctetAsCapability::new(64512),

@@ -20,9 +20,7 @@ pub fn main() {
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
             )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
-                UnrecognizedCapability::new(128, vec![]),
-            )]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
                 FourOctetAsCapability::new(100),

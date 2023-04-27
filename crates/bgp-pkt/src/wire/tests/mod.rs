@@ -414,9 +414,7 @@ fn test_bgp_message_open1() -> Result<(), BgpMessageWritingError> {
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4MplsLabeledVpn),
             )]),
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
-                UnrecognizedCapability::new(128, vec![]),
-            )]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
                 FourOctetAsCapability::new(100),
@@ -463,10 +461,7 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
                 MultiProtocolExtensionsCapability::new(AddressType::Ipv4Multicast),
             )]),
-            // Cisco Route Refresh
-            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::Unrecognized(
-                UnrecognizedCapability::new(128, vec![]),
-            )]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::EnhancedRouteRefresh]),
             BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
