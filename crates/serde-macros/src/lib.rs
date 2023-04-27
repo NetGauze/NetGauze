@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use quote::{format_ident, quote, TokenStreamExt};
-use syn::spanned::Spanned;
+use syn::{parse::Parse, spanned::Spanned, Expr, Lit};
 
 #[derive(Debug)]
 struct AttributeNameValue {
@@ -22,70 +22,28 @@ struct AttributeNameValue {
     value: String,
 }
 
+#[derive(Debug)]
 struct Attribute {
     value: Vec<AttributeNameValue>,
 }
 
-fn parse_nested_meta(
-    span: proc_macro2::Span,
-    nested_meta: syn::NestedMeta,
-) -> Result<AttributeNameValue, syn::Error> {
-    let meta = match nested_meta {
-        syn::NestedMeta::Meta(meta) => meta,
-        syn::NestedMeta::Lit(lit) => {
-            return Err(syn::Error::new(lit.span(), "Unsupported literal attribute"));
-        }
-    };
-
-    let named_value = match meta {
-        syn::Meta::Path(ref path) => {
-            return Err(syn::Error::new(
-                path.segments[0].ident.span(),
-                "Path attribute is not supported!",
-            ));
-        }
-        syn::Meta::List(ref lst) => {
-            return Err(syn::Error::new(
-                lst.path.segments[0].ident.span(),
-                "List attribute is not supported!",
-            ));
-        }
-        syn::Meta::NameValue(name_value) => name_value,
-    };
-
-    let ident: syn::Ident = match named_value.path.get_ident() {
-        Some(ident) => ident.clone(),
-        None => return Err(syn::Error::new(span, "Expected ident")),
-    };
-    let lit = named_value.lit;
-    let value = match lit {
-        syn::Lit::Str(str) => str.value(),
-        _ => return Err(syn::Error::new(span, "Unsupported value type")),
-    };
-
-    Ok(AttributeNameValue { ident, value })
-}
-
-fn parse_attribute(
-    span: proc_macro2::Span,
-    attr: &syn::Attribute,
-) -> Result<Option<Attribute>, syn::Error> {
-    let meta = attr.parse_meta()?;
-    match meta {
-        syn::Meta::Path(_) => Ok(Some(Attribute { value: vec![] })),
-        syn::Meta::NameValue(_) => Err(syn::Error::new(
-            span,
-            "Cannot parse syn::Meta::NameValue at",
-        )),
-        syn::Meta::List(lst) => {
-            let mut attrs = vec![];
-            for nested in lst.nested {
-                let x = parse_nested_meta(span, nested)?;
-                attrs.push(x);
+fn parse_attribute(attr: &syn::Attribute) -> Result<Option<Attribute>, syn::Error> {
+    let mut out = vec![];
+    let expr = attr.parse_args_with(syn::Expr::parse)?;
+    if let Expr::Assign(assign) = expr {
+        if let (Expr::Path(left_path), Expr::Lit(right_lit)) =
+            (assign.left.as_ref(), assign.right.as_ref())
+        {
+            if let (Some(ident), Lit::Str(str_lit)) = (left_path.path.get_ident(), &right_lit.lit) {
+                let attr = AttributeNameValue {
+                    ident: ident.clone(),
+                    value: str_lit.value(),
+                };
+                out.push(attr);
             }
-            Ok(Some(Attribute { value: attrs }))
         }
     }
+    Ok(Some(Attribute { value: out }))
 }
 
 fn filter_attribute_by_name(
@@ -97,7 +55,7 @@ fn filter_attribute_by_name(
     for variant in &enum_data.variants {
         for field in &variant.fields {
             for attr in field.attrs.iter().filter(|attr| {
-                attr.path
+                attr.path()
                     .segments
                     .iter()
                     .any(|seg| seg.ident == syn::Ident::new(filter, seg.span()))
@@ -131,7 +89,7 @@ fn filter_attribute_by_name_with_module(
     for variant in &enum_data.variants {
         for field in &variant.fields {
             for _attr in field.attrs.iter().filter(|attr| {
-                attr.path
+                attr.path()
                     .segments
                     .iter()
                     .any(|seg| seg.ident == syn::Ident::new(filter, seg.span()))
@@ -167,7 +125,7 @@ impl LocatedError {
         for variant in &enum_data.variants {
             for field in &variant.fields {
                 for _ in field.attrs.iter().filter(|attr| {
-                    attr.path
+                    attr.path()
                         .segments
                         .iter()
                         .any(|seg| seg.ident == syn::Ident::new("from_nom", seg.span()))
@@ -188,7 +146,7 @@ impl LocatedError {
         for variant in &enum_data.variants {
             for field in &variant.fields {
                 for attr in field.attrs.iter().filter(|attr| {
-                    attr.path
+                    attr.path()
                         .segments
                         .iter()
                         .any(|seg| seg.ident == syn::Ident::new("from_located", seg.span()))
@@ -220,8 +178,7 @@ impl LocatedError {
                                 (ident_module, format_ident!("Located{}", located_ident))
                             }
                         };
-
-                        let located_module = match parse_attribute(variant.ident.span(), attr)? {
+                        let located_module = match parse_attribute(attr)? {
                             None => {
                                 return Err(syn::Error::new(
                                     attr.span(),
@@ -233,7 +190,7 @@ impl LocatedError {
                                     None => {
                                         return Err(syn::Error::new(
                                             attr.span(),
-                                            "'module' of the Located error is not defined defined",
+                                            "'module' of the Located error is not defined",
                                         ));
                                     }
                                     Some(name_value) => {
