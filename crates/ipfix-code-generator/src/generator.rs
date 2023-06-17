@@ -43,9 +43,14 @@ fn generate_xref_link(xref: &Xref) -> Option<String> {
             "[RFC Errata {}](https://www.rfc-editor.org/errata_search.php?eid={})",
             xref.data, xref.data,
         )),
+        "draft" => Some(format!(
+            "[RFC Draft {}](https://datatracker.ietf.org/doc/html/{})",
+            xref.data.to_uppercase(),
+            xref.data,
+        )),
         "person" => None,
         "html" => Some(format!("[{}]({})", xref.data, xref.data)),
-        other => todo!("Handle xref of type {}", other),
+        _ => None,
     }
 }
 
