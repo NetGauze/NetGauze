@@ -14,6 +14,7 @@ members = [
     "crates/serde-macros",
     "fuzz"
 ]
+resolver = "2"
 
 [workspace.dependencies]
 dashmap = "5.4"
