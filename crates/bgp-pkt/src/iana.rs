@@ -1354,6 +1354,64 @@ impl TryFrom<u8> for AigpAttributeType {
 /// Reserved by RFC6793 for AS4 that are non-mappable to AS2
 pub const AS_TRANS: u16 = 23456;
 
+/// BGP-LS NLRI Types [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#nlri-types)
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNlriType {
+    /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
+    Node = 1,
+    /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
+    Link = 2,
+    /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
+    Ipv4TopologyPrefix = 3,
+    /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
+    Ipv6TopologyPrefix = 4,
+    // TODO link
+    TePolicy = 5,
+    // TODO link
+    Srv6Sid = 6,
+}
+
+impl From<BgpLsNlriType> for u16 {
+    fn from(value: BgpLsNlriType) -> Self {
+        value as u16
+    }
+}
+
+/// BGP-LS Protocol IDs [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#protocol-ids)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsProtocolId {
+    IsIsLevel1 = 1,
+    IsIsLevel2 = 2,
+    OspfV2 = 3,
+    Direct = 4,
+    StaticConfiguration = 5,
+    OspfV3 = 6,
+    Bgp = 7,
+    RsvpTe = 8,
+    SegmentRouting = 9,
+}
+
+
+/// BGP-LS Node Descriptor Sub-TLVs [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#node-descriptor-link-descriptor-prefix-descriptor-attribute-tlv)
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNodeDescriptorSubTlv {
+    AutonomousSystem = 512,
+    BgpLsIdentifier = 513,
+    OspfAreaId = 514,
+    IgpRouterId = 515
+}
+
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsPrefixDescriptorTlv {
+    MultiTopologyIdentifier = 263,
+    OspfRouteType = 264,
+    IpReachabilityInformation = 265,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

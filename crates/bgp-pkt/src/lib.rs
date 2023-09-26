@@ -32,6 +32,7 @@ pub mod route_refresh;
 pub mod update;
 #[cfg(feature = "serde")]
 pub mod wire;
+mod bgp_ls;
 
 /// BGP message wire format as defined by [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271#section-4.1)
 /// Here we don't keep the length and type in memory. The type is inferred by

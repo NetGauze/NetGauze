@@ -15,6 +15,7 @@
 
 //! Serializer for BGP Path Attributes
 
+use crate::bgp_ls::BgpLsNlriWritingError;
 use crate::{
     iana::{AigpAttributeType, PathAttributeType},
     nlri::*,
@@ -731,6 +732,8 @@ pub enum MpReachWritingError {
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
+    BgpLsNlriWritingError(#[from] BgpLsNlriWritingError),
+    RouteDistinguisherWritingError(#[from] RouteDistinguisherWritingError),
 }
 
 impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
@@ -847,6 +850,25 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 safi: _,
                 value,
             } => value.len(),
+            Self::BgpLs { nlri_type: _, nlri } => {
+                let ls_nlri_len = nlri.len();
+
+                2 /* nlri type field */
+                    + 2 /* total nlri length field */
+                    + ls_nlri_len
+            }
+            Self::BgpLsVpn {
+                nlri_type: _,
+                rd: _,
+                nlri,
+            } => {
+                let ls_nlri_len = nlri.len();
+
+                2 /* nlri type field */
+                    + 2 /* total nlri length field */
+                    + 8 /* rd */
+                    + ls_nlri_len
+            }
         };
         Self::BASE_LENGTH + usize::from(extended_length) + payload_len
     }
@@ -1117,6 +1139,25 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 writer.write_u16::<NetworkEndian>(*afi as u16)?;
                 writer.write_u8(*safi as u8)?;
                 writer.write_all(value)?;
+            }
+            Self::BgpLs { nlri_type, nlri } => {
+                let total_tlv_length: u16 = (8 /* rd */ + nlri.len()) as u16;
+
+                writer.write_u16::<NetworkEndian>(*nlri_type as u16)?;
+                writer.write_u16::<NetworkEndian>(total_tlv_length)?;
+                nlri.write(writer)?;
+            }
+            Self::BgpLsVpn {
+                nlri_type,
+                rd,
+                nlri,
+            } => {
+                let total_tlv_length: u16 = (8 /* rd */ + nlri.len()) as u16;
+
+                writer.write_u16::<NetworkEndian>(*nlri_type as u16)?;
+                writer.write_u16::<NetworkEndian>(total_tlv_length)?;
+                rd.write(writer)?;
+                nlri.write(writer)?;
             }
         }
         Ok(())

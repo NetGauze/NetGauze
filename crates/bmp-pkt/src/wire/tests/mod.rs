@@ -16,6 +16,11 @@
 #[cfg(not(feature = "fuzz"))]
 use chrono::TimeZone;
 use ipnet::Ipv4Net;
+use netgauze_bgp_pkt::nlri::{
+    EthernetSegmentIdentifier, EthernetTag, L2EvpnAddress, L2EvpnIpPrefixRoute,
+    L2EvpnIpv4PrefixRoute, L2EvpnRoute, MplsLabel,
+};
+use netgauze_bgp_pkt::path_attribute::MpReach;
 use netgauze_bgp_pkt::{
     capabilities::{
         BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
@@ -42,9 +47,11 @@ use netgauze_parse_utils::{
         test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
         test_parsed_completely_with_one_input, test_write,
     },
-    Span,
+    Span, WritablePdu,
 };
 use nom::error::ErrorKind;
+use std::fs::File;
+use std::io::{Cursor, Write};
 use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
 
 use crate::{

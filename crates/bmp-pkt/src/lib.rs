@@ -90,7 +90,7 @@ pub enum BmpMessageValue {
 
 impl BmpMessageValue {
     /// Get IANA type
-    pub const fn get_type(&self) -> BmpMessageType {
+    pub const fn get_type(&self) -> BmpMessageType {base
         match self {
             Self::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
             Self::StatisticsReport(_) => BmpMessageType::StatisticsReport,
