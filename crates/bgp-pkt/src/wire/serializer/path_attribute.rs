@@ -850,7 +850,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 safi: _,
                 value,
             } => value.len(),
-            Self::BgpLs { nlri_type: _, nlri } => {
+            Self::BgpLs { nlri, nlri_type: _ } => {
                 let ls_nlri_len = nlri.len();
 
                 2 /* nlri type field */
@@ -1135,15 +1135,10 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     nlri.write(writer)?
                 }
             }
-            Self::Unknown { afi, safi, value } => {
-                writer.write_u16::<NetworkEndian>(*afi as u16)?;
-                writer.write_u8(*safi as u8)?;
-                writer.write_all(value)?;
-            }
-            Self::BgpLs { nlri_type, nlri } => {
+            Self::BgpLs { nlri } => {
                 let total_tlv_length: u16 = nlri.len() as u16;
 
-                writer.write_u16::<NetworkEndian>(*nlri_type as u16)?;
+                writer.write_u16::<NetworkEndian>(nlri.get_type() as u16)?;
                 writer.write_u16::<NetworkEndian>(total_tlv_length)?;
                 nlri.write(writer)?;
             }
@@ -1154,10 +1149,15 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
             } => {
                 let total_tlv_length: u16 = (8 /* rd */ + nlri.len()) as u16;
 
-                writer.write_u16::<NetworkEndian>(*nlri_type as u16)?;
+                writer.write_u16::<NetworkEndian>(nlri.get_type() as u16)?;
                 writer.write_u16::<NetworkEndian>(total_tlv_length)?;
                 rd.write(writer)?;
                 nlri.write(writer)?;
+            }
+            Self::Unknown { afi, safi, value } => {
+                writer.write_u16::<NetworkEndian>(*afi as u16)?;
+                writer.write_u8(*safi as u8)?;
+                writer.write_all(value)?;
             }
         }
         Ok(())

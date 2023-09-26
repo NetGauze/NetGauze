@@ -1419,6 +1419,17 @@ pub enum BgpLsPrefixDescriptorTlv {
     IpReachabilityInformation = 265,
 }
 
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsLinkDescriptorTlv {
+    LinkLocalRemoteIdentifiers = 258,
+    IPv4InterfaceAddress = 259,
+    IPv4NeighborAddress = 260,
+    IPv6InterfaceAddress = 261,
+    IPv6NeighborAddress = 262,
+    MultiTopologyIdentifier = 263,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

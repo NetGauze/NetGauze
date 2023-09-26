@@ -25,7 +25,6 @@ use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
 use crate::bgp_ls::BgpLsNlri;
-use crate::iana::{BgpLsNlriType};
 
 /// General properties to check the validity of a given path attribute value
 pub trait PathAttributeValueProperties {
@@ -1006,7 +1005,7 @@ pub enum MpReach {
     ///    itself
     /// 
     BgpLs {
-        nlri_type: BgpLsNlriType,
+        // TODO add nexthop
         nlri: BgpLsNlri
     },
 
@@ -1035,7 +1034,7 @@ pub enum MpReach {
     ///    Route Distinguisher.
     ///
     BgpLsVpn {
-        nlri_type: BgpLsNlriType,
+        // TODO add nexthop
         rd: RouteDistinguisher,
         nlri: BgpLsNlri
     },

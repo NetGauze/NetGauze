@@ -1,13 +1,13 @@
-// TODO do not forget MT-ID TLV
-
+// TODO BGP-LS Attribute
 use std::io::Write;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
+use crate::bgp_ls::BgpLsMtIdError::{IsIsMtIdInvalidValue, OspfMtIdInvalidValue};
 use crate::iana;
 use crate::iana::BgpLsDescriptorTlvs::{LocalNodeDescriptor, RemoteNodeDescriptor};
 use crate::iana::{BgpLsDescriptorTlvs, BgpLsProtocolId};
@@ -18,6 +18,17 @@ pub enum BgpLsNlri {
     Link(BgpLsNlriLink),
     Ipv4Prefix(BgpLsNlriIpPrefix),
     Ipv6Prefix(BgpLsNlriIpPrefix),
+}
+
+impl BgpLsNlri {
+    pub fn get_type(&self) -> iana::BgpLsNlriType {
+        match self {
+            BgpLsNlri::Node(_) => iana::BgpLsNlriType::Node,
+            BgpLsNlri::Link(_) => iana::BgpLsNlriType::Link,
+            BgpLsNlri::Ipv4Prefix(_) => iana::BgpLsNlriType::Ipv4TopologyPrefix,
+            BgpLsNlri::Ipv6Prefix(_) => iana::BgpLsNlriType::Ipv6TopologyPrefix,
+        }
+    }
 }
 
 
@@ -57,12 +68,10 @@ pub struct BgpLsNlriIpPrefix {
 }
 
 impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriIpPrefix {
-    // TODO find the use of BASE_LENGTH
-    const BASE_LENGTH: usize = 0;
+    const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
 
     fn len(&self) -> usize {
-        1 /* protocol_id */
-            + 8 /* identifier */
+        Self::BASE_LENGTH
             + self.local_node_descriptors.iter().map(|tlv| tlv.len()).sum::<usize>()
             + self.prefix_descriptors.iter().map(|tlv| tlv.len()).sum::<usize>()
     }
@@ -92,10 +101,11 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriIpPrefix {
 /// |              Type             |             Length            |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ///
-/// tlv_type : tlv code point
-/// tlv_length : tlv length on the wire (as reported by the writer <=> including type and length fields)
+/// `tlv_type` : tlv code point
+/// `tlv_length` : tlv length on the wire (as reported by the writer <=> including type and length fields)
+///
+/// Written length field will be `tlv_length - 4`
 fn write_tlv_header<T: Write>(writer: &mut T, tlv_type: u16, tlv_length: u16) -> Result<(), BgpLsNlriWritingError> {
-
     /* do not account for the tlv type u16 and tlv length u16 */
     let effective_length = tlv_length - 4;
 
@@ -169,7 +179,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsIpReachabilityInformationData {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BgpLsPrefixDescriptorTlv {
-    MultiTopologyIdentifier(),
+    MultiTopologyIdentifier(MultiTopologyIdData),
     OspfRouteType(OspfRouteType),
     IpReachabilityInformation(BgpLsIpReachabilityInformationData),
 }
@@ -177,7 +187,7 @@ pub enum BgpLsPrefixDescriptorTlv {
 impl BgpLsPrefixDescriptorTlv {
     pub fn get_type(&self) -> iana::BgpLsPrefixDescriptorTlv {
         match self {
-            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier() => iana::BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier,
+            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(..) => iana::BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier,
             BgpLsPrefixDescriptorTlv::OspfRouteType(_) => iana::BgpLsPrefixDescriptorTlv::OspfRouteType,
             BgpLsPrefixDescriptorTlv::IpReachabilityInformation(_) => iana::BgpLsPrefixDescriptorTlv::IpReachabilityInformation,
         }
@@ -190,7 +200,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsPrefixDescriptorTlv {
     fn len(&self) -> usize {
         Self::BASE_LENGTH
             + match self {
-            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier() => { unimplemented!() }
+            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(data) => { data.len() }
             BgpLsPrefixDescriptorTlv::OspfRouteType(_) => {
                 1 /* OSPF Route Type */
             }
@@ -202,10 +212,9 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsPrefixDescriptorTlv {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
-
         write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
         match self {
-            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier() => unimplemented!(),
+            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(data) => data.write(writer)?,
             BgpLsPrefixDescriptorTlv::OspfRouteType(data) => writer.write_u8(*data as u8)?,
             BgpLsPrefixDescriptorTlv::IpReachabilityInformation(data) => data.write(writer)?,
         }
@@ -222,11 +231,10 @@ pub struct BgpLsNlriNode {
 }
 
 impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriNode {
-    const BASE_LENGTH: usize = 0;
+    const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
 
     fn len(&self) -> usize {
-        1 /* protocol_id */
-            + 8 /* identifier */
+        Self::BASE_LENGTH
             + self.local_node_descriptors_tlvs.iter().map(|tlv| tlv.len()).sum::<usize>()
     }
 
@@ -277,7 +285,6 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorTlv {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
-
         write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
         for tlv in self.subtlvs() {
             tlv.write(writer)?;
@@ -288,19 +295,66 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorTlv {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum BgpLsLinkDescriptor {
-    // TODO
+pub enum BgpLsLinkDescriptorTlv {
+    LinkLocalRemoteIdentifiers {
+        link_local_identifier: u32,
+        link_remote_identifier: u32,
+    },
+    IPv4InterfaceAddress(Ipv4Addr),
+    IPv4NeighborAddress(Ipv4Addr),
+
+    /// MUST NOT be local-link
+    IPv6InterfaceAddress(Ipv6Addr),
+
+    /// MUST NOT be local-link
+    IPv6NeighborAddress(Ipv6Addr),
+    MultiTopologyIdentifier(MultiTopologyIdData),
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsLinkDescriptor {
-    const BASE_LENGTH: usize = 0;
+impl BgpLsLinkDescriptorTlv {
+    pub fn get_type(&self) -> iana::BgpLsLinkDescriptorTlv {
+        match self {
+            BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers { .. } => iana::BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers,
+            BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(..) => iana::BgpLsLinkDescriptorTlv::IPv4InterfaceAddress,
+            BgpLsLinkDescriptorTlv::IPv4NeighborAddress(..) => iana::BgpLsLinkDescriptorTlv::IPv4NeighborAddress,
+            BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(..) => iana::BgpLsLinkDescriptorTlv::IPv6InterfaceAddress,
+            BgpLsLinkDescriptorTlv::IPv6NeighborAddress(..) => iana::BgpLsLinkDescriptorTlv::IPv6NeighborAddress,
+            BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(..) => iana::BgpLsLinkDescriptorTlv::MultiTopologyIdentifier,
+        }
+    }
+}
+
+impl WritablePdu<BgpLsNlriWritingError> for BgpLsLinkDescriptorTlv {
+    const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
 
     fn len(&self) -> usize {
-        unimplemented!()
+        Self::BASE_LENGTH +
+            match self {
+                BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers { .. } => 8,
+                BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(..) => 4,
+                BgpLsLinkDescriptorTlv::IPv4NeighborAddress(..) => 4,
+                BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(..) => 16,
+                BgpLsLinkDescriptorTlv::IPv6NeighborAddress(..) => 16,
+                BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(data) => data.len(),
+            }
     }
 
-    fn write<T: Write>(&self, _writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
-        unimplemented!()
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+
+        match self {
+            BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers { link_local_identifier, link_remote_identifier } => {
+                writer.write_u32::<NetworkEndian>(*link_local_identifier)?;
+                writer.write_u32::<NetworkEndian>(*link_remote_identifier)?;
+            }
+            BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(ipv4) => writer.write_u32::<NetworkEndian>((*ipv4).into())?,
+            BgpLsLinkDescriptorTlv::IPv4NeighborAddress(ipv4) => writer.write_u32::<NetworkEndian>((*ipv4).into())?,
+            BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(ipv6) => writer.write_all(&ipv6.octets())?,
+            BgpLsLinkDescriptorTlv::IPv6NeighborAddress(ipv6) => writer.write_all(&ipv6.octets())?,
+            BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(data) => data.write(writer)?
+        };
+
+        Ok(())
     }
 }
 
@@ -337,7 +391,6 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorSubTlv {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
-
         write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(data) => writer.write_u32::<NetworkEndian>(*data)?,
@@ -354,37 +407,134 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorSubTlv {
 pub struct BgpLsNlriLink {
     protocol_id: BgpLsProtocolId,
     identifier: u64,
-    local_descriptors_tlv: Vec<BgpLsNodeDescriptorTlv>,
-    remote_descriptors_tlv: Vec<BgpLsNodeDescriptorTlv>,
-    link_descriptors_tlv: Vec<BgpLsLinkDescriptor>,
+    local_node_descriptor_tlvs: Vec<BgpLsNodeDescriptorTlv>,
+    remote_node_descriptor_tlvs: Vec<BgpLsNodeDescriptorTlv>,
+    link_descriptor_tlvs: Vec<BgpLsLinkDescriptorTlv>,
 }
 
 impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriLink {
-    const BASE_LENGTH: usize = 0;
+    const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
 
     fn len(&self) -> usize {
-        1 /* protocol_id */
-            + 8 /* identifier */
-            + self.local_descriptors_tlv.iter().map(|tlv| tlv.len()).sum::<usize>()
-            + self.remote_descriptors_tlv.iter().map(|tlv| tlv.len()).sum::<usize>()
-            + self.link_descriptors_tlv.iter().map(|tlv| tlv.len()).sum::<usize>()
+        Self::BASE_LENGTH
+            + self.local_node_descriptor_tlvs.iter().map(|tlv| tlv.len()).sum::<usize>()
+            + self.remote_node_descriptor_tlvs.iter().map(|tlv| tlv.len()).sum::<usize>()
+            + self.link_descriptor_tlvs.iter().map(|tlv| tlv.len()).sum::<usize>()
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
         writer.write_u16::<NetworkEndian>(self.protocol_id as u16)?;
         writer.write_u64::<NetworkEndian>(self.identifier)?;
 
-        for tlv in &self.local_descriptors_tlv {
+        for tlv in &self.local_node_descriptor_tlvs {
             tlv.write(writer)?;
         }
 
-        for tlv in &self.remote_descriptors_tlv {
+        for tlv in &self.remote_node_descriptor_tlvs {
             tlv.write(writer)?;
         }
 
-        for tlv in &self.link_descriptors_tlv {
+        for tlv in &self.link_descriptor_tlvs {
             tlv.write(writer)?;
         }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct MultiTopologyIdData(Vec<MultiTopologyId>);
+
+impl From<Vec<MultiTopologyId>> for MultiTopologyIdData {
+    fn from(value: Vec<MultiTopologyId>) -> Self {
+        Self(value)
+    }
+}
+
+impl MultiTopologyIdData {
+    pub fn id_count(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl WritablePdu<BgpLsNlriWritingError> for MultiTopologyIdData {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        2 * self.id_count()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+        for id in &self.0 {
+            id.write(writer)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum MultiTopologyId {
+    Ospf(OspfMtId),
+    IsIs(IsIsMtId),
+}
+
+impl MultiTopologyId {
+    pub fn value(&self) -> u16 {
+        match self {
+            MultiTopologyId::Ospf(mtid) => mtid.0 as u16,
+            MultiTopologyId::IsIs(mtid) => mtid.0,
+        }
+    }
+}
+
+#[derive(Debug, Display)]
+pub enum BgpLsMtIdError {
+    OspfMtIdInvalidValue(OspfMtId),
+    IsIsMtIdInvalidValue(IsIsMtId),
+}
+
+#[repr(transparent)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct OspfMtId(u8);
+
+impl OspfMtId {
+    const OSPF_MTID_MAX: u8 = 127;
+    pub fn new(mtid: u8) -> Result<Self, BgpLsMtIdError> {
+        if mtid > Self::OSPF_MTID_MAX {
+            Err(OspfMtIdInvalidValue(Self(mtid)))
+        } else {
+            Ok(Self(mtid))
+        }
+    }
+}
+
+#[repr(transparent)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct IsIsMtId(u16);
+
+impl IsIsMtId {
+    const ISIS_MTID_MAX: u16 = 4095;
+    const ISIS_MTID_RESERVED: u16 = 0;
+
+    pub fn new(mtid: u16) -> Result<Self, BgpLsMtIdError> {
+        if mtid == Self::ISIS_MTID_RESERVED || mtid > Self::ISIS_MTID_MAX {
+            Err(IsIsMtIdInvalidValue(Self(mtid)))
+        } else {
+            Ok(Self(mtid))
+        }
+    }
+}
+
+impl WritablePdu<BgpLsNlriWritingError> for MultiTopologyId {
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+        writer.write_u16::<NetworkEndian>(self.value())?;
 
         Ok(())
     }
