@@ -1393,6 +1393,13 @@ pub enum BgpLsProtocolId {
     SegmentRouting = 9,
 }
 
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsDescriptorTlvs {
+    LocalNodeDescriptor = 256,
+    RemoteNodeDescriptor = 257
+}
+
 
 /// BGP-LS Node Descriptor Sub-TLVs [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#node-descriptor-link-descriptor-prefix-descriptor-attribute-tlv)
 #[repr(u16)]

@@ -1141,7 +1141,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 writer.write_all(value)?;
             }
             Self::BgpLs { nlri_type, nlri } => {
-                let total_tlv_length: u16 = (8 /* rd */ + nlri.len()) as u16;
+                let total_tlv_length: u16 = nlri.len() as u16;
 
                 writer.write_u16::<NetworkEndian>(*nlri_type as u16)?;
                 writer.write_u16::<NetworkEndian>(total_tlv_length)?;
