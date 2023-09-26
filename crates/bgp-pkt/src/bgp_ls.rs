@@ -1,18 +1,494 @@
-// TODO BGP-LS Attribute
 use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
-use netgauze_parse_utils::WritablePdu;
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use crate::bgp_ls::BgpLsMtIdError::{IsIsMtIdInvalidValue, OspfMtIdInvalidValue};
 use crate::iana;
 use crate::iana::BgpLsDescriptorTlvs::{LocalNodeDescriptor, RemoteNodeDescriptor};
 use crate::iana::{BgpLsDescriptorTlvs, BgpLsProtocolId};
+use crate::path_attribute::PathAttributeValueProperties;
+use crate::wire::serializer::IpAddrWritingError;
+use crate::wire::serializer::path_attribute::write_length;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum BgpLs {
+    Node(Vec<BgpLsNodeAttributeTlv>),
+    Link(Vec<BgpLsLinkAttributeTlv>),
+    Prefix(Vec<BgpLsPrefixAttributeTlv>),
+}
+
+impl PathAttributeValueProperties for BgpLs {
+    /// see [RFC7752 Section 3.3]https://www.rfc-editor.org/rfc/rfc7752#section-3.3
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
+    }
+
+    /// see [RFC7752 Section 3.3]https://www.rfc-editor.org/rfc/rfc7752#section-3.3
+    fn can_be_transitive() -> Option<bool> {
+        Some(false)
+    }
+
+    /// optional non-transitive attributes can't be partial
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
+    }
+}
+
+#[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum BgpLsLinkAttributeTlv {
+    LocalNodeIpv4RouterId(Ipv4Addr),
+    LocalNodeIpv6RouterId(Ipv6Addr),
+    /// must be global
+    RemoteNodeIpv4RouterId(Ipv4Addr),
+    /// must be global
+    RemoteNodeIpv6RouterId(Ipv6Addr),
+    RemoteNodeAdministrativeGroupColor(u32),
+    MaximumLinkBandwidth(f32),
+    MaximumReservableLinkBandwidth(f32),
+    UnreservedBandwidth([f32; 8]),
+    TeDefaultMetric(u32),
+
+    ///        0                   1
+    ///        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+    ///       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///       |Protection Cap |    Reserved   |
+    ///       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///       0x01  Extra Traffic
+    ///
+    ///       0x02  Unprotected
+    ///
+    ///       0x04  Shared
+    ///
+    ///       0x08  Dedicated 1:1
+    ///
+    ///       0x10  Dedicated 1+1
+    ///
+    ///       0x20  Enhanced
+    ///
+    ///       0x40  Reserved
+    ///
+    ///       0x80  Reserved
+    LinkProtectionType {
+        extra_traffic: bool,
+        unprotected: bool,
+        shared: bool,
+        dedicated1c1: bool,
+        dedicated1p1: bool,
+        enhanced: bool,
+    },
+    ///       0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |L|R|  Reserved |
+    ///      +-+-+-+-+-+-+-+-+
+    ///
+    ///    +------------+------------------------------------------+-----------+
+    ///    |    Bit     | Description                              | Reference |
+    ///    +------------+------------------------------------------+-----------+
+    ///    |    'L'     | Label Distribution Protocol (LDP)        | [RFC5036] |
+    ///    |    'R'     | Extension to RSVP for LSP Tunnels        | [RFC3209] |
+    ///    |            | (RSVP-TE)                                |           |
+    ///    | 'Reserved' | Reserved for future use                  |           |
+    ///    +------------+------------------------------------------+-----------+
+    MplsProtocolMask {
+        ldp: bool,
+        rsvp_te: bool,
+    },
+
+    ///      0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      //      IGP Link Metric (variable length)      //
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    IgpMetric(Vec<u8>),
+
+    ///      0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |                  Shared Risk Link Group Value                 |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      //                         ............                        //
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |                  Shared Risk Link Group Value                 |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    SharedRiskLinkGroup(), // TODO unimplemented
+
+    ///      0                   1                   2                   3
+    ///      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///     |              Type             |             Length            |
+    ///     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///     //                Opaque link attributes (variable)            //
+    ///     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    OpaqueLinkAttribute(Vec<u8>),
+
+    ///      0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      //                     Link Name (variable)                    //
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    LinkName(String),
+}
+
+impl BgpLsLinkAttributeTlv {
+    pub fn get_type(&self) -> iana::BgpLsLinkAttribute {
+        match self {
+            BgpLsLinkAttributeTlv::LocalNodeIpv4RouterId(_) => iana::BgpLsLinkAttribute::LocalNodeIpv4RouterId,
+            BgpLsLinkAttributeTlv::LocalNodeIpv6RouterId(_) => iana::BgpLsLinkAttribute::LocalNodeIpv6RouterId,
+            BgpLsLinkAttributeTlv::RemoteNodeIpv4RouterId(_) => iana::BgpLsLinkAttribute::RemoteNodeIpv4RouterId,
+            BgpLsLinkAttributeTlv::RemoteNodeIpv6RouterId(_) => iana::BgpLsLinkAttribute::RemoteNodeIpv6RouterId,
+            BgpLsLinkAttributeTlv::RemoteNodeAdministrativeGroupColor(_) => iana::BgpLsLinkAttribute::RemoteNodeAdministrativeGroupColor,
+            BgpLsLinkAttributeTlv::MaximumLinkBandwidth(_) => iana::BgpLsLinkAttribute::MaximumLinkBandwidth,
+            BgpLsLinkAttributeTlv::MaximumReservableLinkBandwidth(_) => iana::BgpLsLinkAttribute::MaximumReservableLinkBandwidth,
+            BgpLsLinkAttributeTlv::UnreservedBandwidth(_) => iana::BgpLsLinkAttribute::UnreservedBandwidth,
+            BgpLsLinkAttributeTlv::TeDefaultMetric(_) => iana::BgpLsLinkAttribute::TeDefaultMetric,
+            BgpLsLinkAttributeTlv::LinkProtectionType { .. } => iana::BgpLsLinkAttribute::LinkProtectionType,
+            BgpLsLinkAttributeTlv::MplsProtocolMask { .. } => iana::BgpLsLinkAttribute::MplsProtocolMask,
+            BgpLsLinkAttributeTlv::IgpMetric(..) => iana::BgpLsLinkAttribute::IgpMetric,
+            BgpLsLinkAttributeTlv::SharedRiskLinkGroup(..) => iana::BgpLsLinkAttribute::SharedRiskLinkGroup,
+            BgpLsLinkAttributeTlv::OpaqueLinkAttribute(..) => iana::BgpLsLinkAttribute::OpaqueLinkAttribute,
+            BgpLsLinkAttributeTlv::LinkName(..) => iana::BgpLsLinkAttribute::LinkName,
+        }
+    }
+}
+
+impl WritablePdu<BgpLsWritingError> for BgpLsLinkAttributeTlv {
+    const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
+
+    fn len(&self) -> usize {
+        match self {
+            BgpLsLinkAttributeTlv::LocalNodeIpv4RouterId(_) => 4,
+            BgpLsLinkAttributeTlv::LocalNodeIpv6RouterId(_) => 16,
+            BgpLsLinkAttributeTlv::RemoteNodeIpv4RouterId(_) => 4,
+            BgpLsLinkAttributeTlv::RemoteNodeIpv6RouterId(_) => 16,
+            BgpLsLinkAttributeTlv::RemoteNodeAdministrativeGroupColor(_) => 4,
+            BgpLsLinkAttributeTlv::MaximumLinkBandwidth(_) => 4,
+            BgpLsLinkAttributeTlv::MaximumReservableLinkBandwidth(_) => 4,
+            BgpLsLinkAttributeTlv::UnreservedBandwidth(_) => 4 * 8,
+            BgpLsLinkAttributeTlv::TeDefaultMetric(_) => 4,
+            BgpLsLinkAttributeTlv::LinkProtectionType { .. } => 2,
+            BgpLsLinkAttributeTlv::MplsProtocolMask { .. } => 1,
+            BgpLsLinkAttributeTlv::IgpMetric(metric) => metric.len(),
+            BgpLsLinkAttributeTlv::SharedRiskLinkGroup() => unimplemented!(),
+            BgpLsLinkAttributeTlv::OpaqueLinkAttribute(attr) => attr.len(),
+            BgpLsLinkAttributeTlv::LinkName(name) => name.len(),
+        }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
+        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+
+        match self {
+            BgpLsLinkAttributeTlv::LocalNodeIpv4RouterId(ipv4) => writer.write_all(&ipv4.octets())?,
+            BgpLsLinkAttributeTlv::LocalNodeIpv6RouterId(ipv6) => writer.write_all(&ipv6.octets())?,
+            BgpLsLinkAttributeTlv::RemoteNodeIpv4RouterId(ipv4) => writer.write_all(&ipv4.octets())?,
+            BgpLsLinkAttributeTlv::RemoteNodeIpv6RouterId(ipv6) => writer.write_all(&ipv6.octets())?,
+            BgpLsLinkAttributeTlv::RemoteNodeAdministrativeGroupColor(color) => writer.write_u32::<NetworkEndian>(*color)?,
+            BgpLsLinkAttributeTlv::MaximumLinkBandwidth(bandwidth) => writer.write_f32::<NetworkEndian>(*bandwidth)?,
+            BgpLsLinkAttributeTlv::MaximumReservableLinkBandwidth(bandwidth) => writer.write_f32::<NetworkEndian>(*bandwidth)?,
+            BgpLsLinkAttributeTlv::UnreservedBandwidth(bandwidths) => {
+                for bandwidth in bandwidths {
+                    writer.write_f32::<NetworkEndian>(*bandwidth)?;
+                }
+            }
+            BgpLsLinkAttributeTlv::TeDefaultMetric(metric) => writer.write_u32::<NetworkEndian>(*metric)?,
+            BgpLsLinkAttributeTlv::LinkProtectionType { .. } => unimplemented!(),
+            BgpLsLinkAttributeTlv::MplsProtocolMask { .. } => unimplemented!(),
+            BgpLsLinkAttributeTlv::IgpMetric(metric) => writer.write_all(metric)?,
+            BgpLsLinkAttributeTlv::SharedRiskLinkGroup() => unimplemented!(),
+            BgpLsLinkAttributeTlv::OpaqueLinkAttribute(attr) => writer.write_all(attr)?,
+            BgpLsLinkAttributeTlv::LinkName(ascii) => writer.write_all(ascii.as_bytes())?,
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum BgpLsPrefixAttributeTlv {
+    ///       0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |D|N|L|P| Resvd.|
+    ///      +-+-+-+-+-+-+-+-+
+    ///
+    ///    The Value field contains bits defined according to the table below:
+    ///
+    ///            +----------+---------------------------+-----------+
+    ///            |   Bit    | Description               | Reference |
+    ///            +----------+---------------------------+-----------+
+    ///            |   'D'    | IS-IS Up/Down Bit         | [RFC5305] |
+    ///            |   'N'    | OSPF "no unicast" Bit     | [RFC5340] |
+    ///            |   'L'    | OSPF "local address" Bit  | [RFC5340] |
+    ///            |   'P'    | OSPF "propagate NSSA" Bit | [RFC5340] |
+    ///            | Reserved | Reserved for future use.  |           |
+    ///            +----------+---------------------------+-----------+
+    IgpFlags {
+        isis_up_down: bool,
+        ospf_no_unicast: bool,
+        ospf_local_address: bool,
+        ospf_propagate_nssa: bool
+    },
+
+    ///      0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      //                    Route Tags (one or more)                 //
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    ///    Length is a multiple of 4.
+    IgpRouteTag(Vec<u32>),
+
+    ///       0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      //                Extended Route Tag (one or more)             //
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    ///    Length is a multiple of 8.
+    IgpExtendedRouteTag(Vec<u64>),
+
+    ///       0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |                            Metric                             |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    ///    Length is 4.
+    PrefixMetric(u32),
+
+    ///       0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      //                Forwarding Address (variable)                //
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    ///    Length is 4 for an IPv4 forwarding address, and 16 for an IPv6
+    ///    forwarding address.
+    OspfForwardingAddress(IpAddr),
+
+    ///       0                   1                   2                   3
+    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      |              Type             |             Length            |
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///      //              Opaque Prefix Attributes  (variable)           //
+    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    OpaquePrefixAttribute(Vec<u8>)
+}
+
+impl BgpLsPrefixAttributeTlv {
+
+    pub fn get_type(&self) -> iana::BgpLsPrefixAttribute {
+        match self {
+            BgpLsPrefixAttributeTlv::IgpFlags { .. } => iana::BgpLsPrefixAttribute::IgpFlags,
+            BgpLsPrefixAttributeTlv::IgpRouteTag(_) => iana::BgpLsPrefixAttribute::IgpRouteTag,
+            BgpLsPrefixAttributeTlv::IgpExtendedRouteTag(_) => iana::BgpLsPrefixAttribute::IgpExtendedRouteTag,
+            BgpLsPrefixAttributeTlv::PrefixMetric(_) => iana::BgpLsPrefixAttribute::PrefixMetric,
+            BgpLsPrefixAttributeTlv::OspfForwardingAddress(_) => iana::BgpLsPrefixAttribute::OspfForwardingAddress,
+            BgpLsPrefixAttributeTlv::OpaquePrefixAttribute(_) => iana::BgpLsPrefixAttribute::OpaquePrefixAttribute,
+        }
+    }
+}
+
+impl WritablePdu<BgpLsWritingError> for BgpLsPrefixAttributeTlv {
+    const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
+
+    fn len(&self) -> usize {
+        match self {
+            BgpLsPrefixAttributeTlv::IgpFlags { .. } => 1,
+            BgpLsPrefixAttributeTlv::IgpRouteTag(tags) => 4 * tags.len(),
+            BgpLsPrefixAttributeTlv::IgpExtendedRouteTag(tags) => 8 * tags.len(),
+            BgpLsPrefixAttributeTlv::PrefixMetric(_) => 4,
+            BgpLsPrefixAttributeTlv::OspfForwardingAddress(addr) => addr.len(),
+            BgpLsPrefixAttributeTlv::OpaquePrefixAttribute(attr) => attr.len(),
+        }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
+
+        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+
+        match self {
+            BgpLsPrefixAttributeTlv::IgpFlags { .. } => unimplemented!(),
+            BgpLsPrefixAttributeTlv::IgpRouteTag(tags) => {
+                for tag in tags {
+                    writer.write_u32::<NetworkEndian>(*tag)?;
+                }
+            }
+            BgpLsPrefixAttributeTlv::IgpExtendedRouteTag(tags) => {
+                for tag in tags {
+                    writer.write_u64::<NetworkEndian>(*tag)?;
+                }
+            }
+            BgpLsPrefixAttributeTlv::PrefixMetric(metric) => writer.write_u32::<NetworkEndian>(*metric)?,
+            BgpLsPrefixAttributeTlv::OspfForwardingAddress(addr) => addr.write(writer)?,
+            BgpLsPrefixAttributeTlv::OpaquePrefixAttribute(attr) => writer.write_all(attr)?,
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum BgpLsNodeAttributeTlv {
+    MultiTopologyIdentifier(MultiTopologyIdData),
+    NodeFlagBits {
+        overload: bool,
+        attached: bool,
+        external: bool,
+        abr: bool,
+        router: bool,
+        v6: bool,
+    },
+    OpaqueNodeAttribute(Vec<u8>),
+    NodeNameTlv(String),
+    IsIsArea(Vec<u8>),
+    LocalNodeIpv4RouterId(Ipv4Addr),
+    LocalNodeIpv6RouterId(Ipv6Addr),
+}
+
+impl BgpLsNodeAttributeTlv {
+    const NODE_NAME_TLV_MAX_LEN: u8 = 255;
+
+    pub fn get_type(&self) -> iana::BgpLsNodeAttributeTlv {
+        match self {
+            BgpLsNodeAttributeTlv::MultiTopologyIdentifier(..) => iana::BgpLsNodeAttributeTlv::MultiTopologyIdentifier,
+            BgpLsNodeAttributeTlv::NodeFlagBits { .. } => iana::BgpLsNodeAttributeTlv::NodeFlagBits,
+            BgpLsNodeAttributeTlv::OpaqueNodeAttribute(..) => iana::BgpLsNodeAttributeTlv::OpaqueNodeAttribute,
+            BgpLsNodeAttributeTlv::NodeNameTlv(..) => iana::BgpLsNodeAttributeTlv::NodeNameTlv,
+            BgpLsNodeAttributeTlv::IsIsArea(..) => iana::BgpLsNodeAttributeTlv::IsIsArea,
+            BgpLsNodeAttributeTlv::LocalNodeIpv4RouterId(..) => iana::BgpLsNodeAttributeTlv::LocalNodeIpv4RouterId,
+            BgpLsNodeAttributeTlv::LocalNodeIpv6RouterId(..) => iana::BgpLsNodeAttributeTlv::LocalNodeIpv6RouterId,
+        }
+    }
+}
+
+impl WritablePdu<BgpLsWritingError> for BgpLsNodeAttributeTlv {
+    const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH +
+            match self {
+                BgpLsNodeAttributeTlv::MultiTopologyIdentifier(data) => data.len(),
+                BgpLsNodeAttributeTlv::NodeFlagBits { .. } => 1,
+                BgpLsNodeAttributeTlv::OpaqueNodeAttribute(bytes) => bytes.len(),
+                BgpLsNodeAttributeTlv::NodeNameTlv(ascii) => ascii.len(),
+                BgpLsNodeAttributeTlv::IsIsArea(area) => area.len(),
+                BgpLsNodeAttributeTlv::LocalNodeIpv4RouterId(_) => 4,
+                BgpLsNodeAttributeTlv::LocalNodeIpv6RouterId(_) => 16,
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
+        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+
+        match self {
+            BgpLsNodeAttributeTlv::MultiTopologyIdentifier(data) => data.write(writer)?,
+            // TODO make macro for bitfields because come on look at this
+            BgpLsNodeAttributeTlv::NodeFlagBits { overload, attached, external, abr, router, v6 } => {
+                let mut flags: u8 = 0x00u8;
+                if *overload {
+                    flags |= 0b_1000_0000;
+                }
+
+                if *attached {
+                    flags |= 0b_0100_0000;
+                }
+
+                if *external {
+                    flags |= 0b_0010_0000;
+                }
+
+                if *abr {
+                    flags |= 0b_0001_0000;
+                }
+
+                if *router {
+                    flags |= 0b_0000_1000;
+                }
+
+                if *v6 {
+                    flags |= 0b_0000_0100;
+                }
+
+                writer.write_u8(flags)?;
+            }
+            BgpLsNodeAttributeTlv::OpaqueNodeAttribute(bytes) => writer.write_all(bytes)?,
+            BgpLsNodeAttributeTlv::NodeNameTlv(ascii) => {
+                if self.len() > BgpLsNodeAttributeTlv::NODE_NAME_TLV_MAX_LEN as usize {
+                    return Err(BgpLsWritingError::NodeNameTlvStringTooLongError);
+                } else {
+                    writer.write_all(ascii.as_bytes())?;
+                }
+            }
+            BgpLsNodeAttributeTlv::IsIsArea(area) => writer.write_all(area)?,
+            BgpLsNodeAttributeTlv::LocalNodeIpv4RouterId(ipv4) => writer.write_all(&ipv4.octets())?,
+            BgpLsNodeAttributeTlv::LocalNodeIpv6RouterId(ipv6) => writer.write_all(&ipv6.octets())?,
+        }
+
+        Ok(())
+    }
+}
+
+impl WritablePduWithOneInput<bool, BgpLsWritingError> for BgpLs {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let len = Self::BASE_LENGTH;
+
+        len + usize::from(extended_length)
+    }
+
+    fn write<T: Write>(&self, writer: &mut T, extended_length: bool) -> Result<(), BgpLsWritingError> where Self: Sized {
+        write_length(self, extended_length, writer)?;
+
+        /* rust does not let us have a &Vec<impl WritablePdu<BgpLsWritingError>> */
+        match self {
+            BgpLs::Node(tlvs) => {
+                for tlv in tlvs {
+                    tlv.write(writer)?;
+                }
+            }
+            BgpLs::Link(tlvs) => {
+                for tlv in tlvs {
+                    tlv.write(writer)?;
+                }
+            }
+            BgpLs::Prefix(tlvs) => {
+                for tlv in tlvs {
+                    tlv.write(writer)?;
+                }
+            }
+        };
+
+        Ok(())
+    }
+}
+
+#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BgpLsNlri {
     Node(BgpLsNlriNode),
     Link(BgpLsNlriLink),
@@ -33,11 +509,13 @@ impl BgpLsNlri {
 
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BgpLsNlriWritingError {
-    StdIoError(#[from_std_io_error] String)
+pub enum BgpLsWritingError {
+    StdIoError(#[from_std_io_error] String),
+    NodeNameTlvStringTooLongError,
+    AddrWritingError(#[from] IpAddrWritingError)
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlri {
+impl WritablePdu<BgpLsWritingError> for BgpLsNlri {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -49,7 +527,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlri {
         }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         match self {
             BgpLsNlri::Node(data) => data.write(writer),
             BgpLsNlri::Link(data) => data.write(writer),
@@ -67,7 +545,7 @@ pub struct BgpLsNlriIpPrefix {
     prefix_descriptors: Vec<BgpLsPrefixDescriptorTlv>,
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriIpPrefix {
+impl WritablePdu<BgpLsWritingError> for BgpLsNlriIpPrefix {
     const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
 
     fn len(&self) -> usize {
@@ -76,7 +554,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriIpPrefix {
             + self.prefix_descriptors.iter().map(|tlv| tlv.len()).sum::<usize>()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         writer.write_u16::<NetworkEndian>(self.protocol_id as u16)?;
         writer.write_u64::<NetworkEndian>(self.identifier)?;
 
@@ -102,10 +580,11 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriIpPrefix {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ///
 /// `tlv_type` : tlv code point
+///
 /// `tlv_length` : tlv length on the wire (as reported by the writer <=> including type and length fields)
 ///
 /// Written length field will be `tlv_length - 4`
-fn write_tlv_header<T: Write>(writer: &mut T, tlv_type: u16, tlv_length: u16) -> Result<(), BgpLsNlriWritingError> {
+fn write_tlv_header<T: Write>(writer: &mut T, tlv_type: u16, tlv_length: u16) -> Result<(), BgpLsWritingError> {
     /* do not account for the tlv type u16 and tlv length u16 */
     let effective_length = tlv_length - 4;
 
@@ -153,14 +632,14 @@ impl BgpLsIpReachabilityInformationData {
     }
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsIpReachabilityInformationData {
+impl WritablePdu<BgpLsWritingError> for BgpLsIpReachabilityInformationData {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
         Self::most_significant_bytes(self.address().prefix_len())
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         writer.write_u8(self.address().prefix_len())?;
 
         // FIXME no way this works, check if significant bytes are at the beginning or not
@@ -177,7 +656,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsIpReachabilityInformationData {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BgpLsPrefixDescriptorTlv {
     MultiTopologyIdentifier(MultiTopologyIdData),
     OspfRouteType(OspfRouteType),
@@ -194,7 +673,7 @@ impl BgpLsPrefixDescriptorTlv {
     }
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsPrefixDescriptorTlv {
+impl WritablePdu<BgpLsWritingError> for BgpLsPrefixDescriptorTlv {
     const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
 
     fn len(&self) -> usize {
@@ -211,7 +690,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsPrefixDescriptorTlv {
         }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
         match self {
             BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(data) => data.write(writer)?,
@@ -230,7 +709,7 @@ pub struct BgpLsNlriNode {
     local_node_descriptors_tlvs: Vec<BgpLsNodeDescriptorTlv>,
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriNode {
+impl WritablePdu<BgpLsWritingError> for BgpLsNlriNode {
     const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
 
     fn len(&self) -> usize {
@@ -238,7 +717,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriNode {
             + self.local_node_descriptors_tlvs.iter().map(|tlv| tlv.len()).sum::<usize>()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         writer.write_u8(self.protocol_id as u8)?;
         writer.write_u64::<NetworkEndian>(self.identifier)?;
 
@@ -250,7 +729,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriNode {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BgpLsNodeDescriptorTlv {
     Local(Vec<BgpLsNodeDescriptorSubTlv>),
     Remote(Vec<BgpLsNodeDescriptorSubTlv>),
@@ -276,7 +755,7 @@ impl BgpLsNodeDescriptorTlv {
     }
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorTlv {
+impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorTlv {
     const BASE_LENGTH: usize = 4; /* tlv type 16bits + tlv length 16bits */
 
     fn len(&self) -> usize {
@@ -284,7 +763,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorTlv {
             + self.subtlvs_len()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
         for tlv in self.subtlvs() {
             tlv.write(writer)?;
@@ -324,7 +803,7 @@ impl BgpLsLinkDescriptorTlv {
     }
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsLinkDescriptorTlv {
+impl WritablePdu<BgpLsWritingError> for BgpLsLinkDescriptorTlv {
     const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
 
     fn len(&self) -> usize {
@@ -339,7 +818,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsLinkDescriptorTlv {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
 
         match self {
@@ -377,7 +856,7 @@ impl BgpLsNodeDescriptorSubTlv {
     }
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorSubTlv {
+impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
     const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
 
     fn len(&self) -> usize {
@@ -390,7 +869,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorSubTlv {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(data) => writer.write_u32::<NetworkEndian>(*data)?,
@@ -412,7 +891,7 @@ pub struct BgpLsNlriLink {
     link_descriptor_tlvs: Vec<BgpLsLinkDescriptorTlv>,
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriLink {
+impl WritablePdu<BgpLsWritingError> for BgpLsNlriLink {
     const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
 
     fn len(&self) -> usize {
@@ -422,7 +901,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriLink {
             + self.link_descriptor_tlvs.iter().map(|tlv| tlv.len()).sum::<usize>()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         writer.write_u16::<NetworkEndian>(self.protocol_id as u16)?;
         writer.write_u64::<NetworkEndian>(self.identifier)?;
 
@@ -457,14 +936,14 @@ impl MultiTopologyIdData {
     }
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for MultiTopologyIdData {
+impl WritablePdu<BgpLsWritingError> for MultiTopologyIdData {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
         2 * self.id_count()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         for id in &self.0 {
             id.write(writer)?;
         }
@@ -526,14 +1005,14 @@ impl IsIsMtId {
     }
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for MultiTopologyId {
+impl WritablePdu<BgpLsWritingError> for MultiTopologyId {
     const BASE_LENGTH: usize = 2;
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> where Self: Sized {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         writer.write_u16::<NetworkEndian>(self.value())?;
 
         Ok(())

@@ -24,7 +24,7 @@ use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
-use crate::bgp_ls::BgpLsNlri;
+use crate::bgp_ls::{BgpLs, BgpLsNlri};
 
 /// General properties to check the validity of a given path attribute value
 pub trait PathAttributeValueProperties {
@@ -64,7 +64,7 @@ pub enum InvalidPathAttribute {
 /// |  Attr. Flags  |Attr. Type Code| Path value (variable)
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PathAttribute {
     /// Optional bit defines whether the attribute is optional (if set to
@@ -157,7 +157,7 @@ impl PathAttribute {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PathAttributeValue {
     Origin(Origin),
@@ -176,6 +176,7 @@ pub enum PathAttributeValue {
     ClusterList(ClusterList),
     MpReach(MpReach),
     MpUnreach(MpUnreach),
+    BgpLs(BgpLs),
     OnlyToCustomer(OnlyToCustomer),
     /// Accumulated IGP metric attribute
     Aigp(Aigp),
@@ -201,6 +202,7 @@ impl PathAttributeValue {
             Self::ClusterList(_) => ClusterList::can_be_optional(),
             Self::MpReach(_) => MpReach::can_be_optional(),
             Self::MpUnreach(_) => MpUnreach::can_be_optional(),
+            Self::BgpLs(_) => BgpLs::can_be_optional(),
             Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_optional(),
             Self::Aigp(_) => Aigp::can_be_optional(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
@@ -225,6 +227,7 @@ impl PathAttributeValue {
             Self::ClusterList(_) => ClusterList::can_be_transitive(),
             Self::MpReach(_) => MpReach::can_be_transitive(),
             Self::MpUnreach(_) => MpUnreach::can_be_transitive(),
+            Self::BgpLs(_) => BgpLs::can_be_transitive(),
             Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_transitive(),
             Self::Aigp(_) => Aigp::can_be_transitive(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_transitive(),
@@ -249,6 +252,7 @@ impl PathAttributeValue {
             Self::ClusterList(_) => ClusterList::can_be_partial(),
             Self::MpReach(_) => MpReach::can_be_partial(),
             Self::MpUnreach(_) => MpUnreach::can_be_partial(),
+            Self::BgpLs(_) => BgpLs::can_be_partial(),
             Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_partial(),
             Self::Aigp(_) => Aigp::can_be_partial(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),

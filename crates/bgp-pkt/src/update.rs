@@ -37,7 +37,7 @@ use crate::path_attribute::{MpUnreach, PathAttribute, PathAttributeValue};
 /// |   Network Layer Reachability Information (variable) |
 /// +-----------------------------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpUpdateMessage {
     withdrawn_routes: Vec<Ipv4UnicastAddress>,

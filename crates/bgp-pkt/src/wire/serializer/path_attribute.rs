@@ -16,6 +16,7 @@
 //! Serializer for BGP Path Attributes
 
 use crate::bgp_ls::BgpLsNlriWritingError;
+use crate::bgp_ls::BgpLsWritingError;
 use crate::{
     iana::{AigpAttributeType, PathAttributeType},
     nlri::*,
@@ -48,6 +49,7 @@ pub enum PathAttributeWritingError {
     ClusterListError(#[from] ClusterListWritingError),
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
+    BgpLsError(#[from] BgpLsWritingError),
     OnlyToCustomerError(#[from] OnlyToCustomerWritingError),
     AigpError(#[from] AigpWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
@@ -74,6 +76,7 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::ClusterList(value) => value.len(self.extended_length()),
             PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
             PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
+            PathAttributeValue::BgpLs(value) => value.len(self.extended_length()),
             PathAttributeValue::OnlyToCustomer(value) => value.len(self.extended_length()),
             PathAttributeValue::Aigp(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
@@ -159,6 +162,10 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             }
             PathAttributeValue::MpUnreach(value) => {
                 writer.write_u8(PathAttributeType::MpUnreachNlri.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::BgpLs(value) => {
+                writer.write_u8(PathAttributeType::BgpLsAttribute.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::OnlyToCustomer(value) => {
@@ -732,7 +739,7 @@ pub enum MpReachWritingError {
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
-    BgpLsNlriWritingError(#[from] BgpLsNlriWritingError),
+    BgpLsNlriWritingError(#[from] BgpLsWritingError),
     RouteDistinguisherWritingError(#[from] RouteDistinguisherWritingError),
 }
 
@@ -1427,8 +1434,9 @@ impl WritablePduWithOneInput<bool, AigpWritingError> for Aigp {
     }
 }
 
+// TODO restore original visibility
 #[inline]
-fn write_length<T: Sized + WritablePduWithOneInput<bool, E>, E, W: std::io::Write>(
+pub(crate) fn write_length<T: Sized + WritablePduWithOneInput<bool, E>, E, W: std::io::Write>(
     attribute: &T,
     extended_length: bool,
     writer: &mut W,

@@ -1430,6 +1430,48 @@ pub enum BgpLsLinkDescriptorTlv {
     MultiTopologyIdentifier = 263,
 }
 
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNodeAttributeTlv {
+    MultiTopologyIdentifier = 263,
+    NodeFlagBits = 1024,
+    OpaqueNodeAttribute = 1025,
+    NodeNameTlv = 1026,
+    IsIsArea = 1027,
+    LocalNodeIpv4RouterId = 1028,
+    LocalNodeIpv6RouterId = 1029,
+}
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsLinkAttribute {
+    LocalNodeIpv4RouterId = 1028,
+    LocalNodeIpv6RouterId = 1029,
+    RemoteNodeIpv4RouterId = 1030,
+    RemoteNodeIpv6RouterId = 1031,
+    RemoteNodeAdministrativeGroupColor = 1088,
+    MaximumLinkBandwidth = 1089,
+    MaximumReservableLinkBandwidth = 1090,
+    UnreservedBandwidth = 1091,
+    TeDefaultMetric = 1092,
+    LinkProtectionType = 1093,
+    MplsProtocolMask = 1094,
+    IgpMetric = 1095,
+    SharedRiskLinkGroup = 1096,
+    OpaqueLinkAttribute = 1097,
+    LinkName = 1098,
+}
+
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsPrefixAttribute {
+    IgpFlags = 1152,
+    IgpRouteTag = 1153,
+    IgpExtendedRouteTag = 1154,
+    PrefixMetric = 1155,
+    OspfForwardingAddress = 1156,
+    OpaquePrefixAttribute = 1157,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
