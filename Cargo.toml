@@ -17,31 +17,31 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-dashmap = "5.4"
+dashmap = "5.5"
 log = "0.4"
 thiserror = "1.0"
 byteorder = { version = "1.4" }
 chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
-criterion = { version = "0.4" } # Dev dep for bench
+criterion = { version = "0.5" } # Dev dep for bench
 futures = "0.3"
 futures-util = "0.3"
 futures-core = "0.3"
-pin-project = "1.0"
+pin-project = "1.1"
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 tokio-stream = { version = "0.1", features = ["net"] }
-tokio-test = "0.4.2"
+tokio-test = "0.4"
 tower = { version = "0.4", features = ["full"] }
 tower-service = "0.3"
 tower-layer = "0.3"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-bytes = "1.3"
+bytes = "1.5"
 lazy_static = "1.4"
 rand = "0.8"
-ipnet = { version = "2.7", features = ["serde"] }
-strum = "0.24"
-strum_macros = "0.24"
+ipnet = { version = "2.8", features = ["serde"] }
+strum = "0.25"
+strum_macros = "0.25"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 nom = { version = "7.1" }
