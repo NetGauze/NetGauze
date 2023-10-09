@@ -177,12 +177,12 @@ fn test_milli_value() -> Result<(), ie_ser::flowStartMillisecondsWritingError> {
 
 #[test]
 fn test_time_fraction_value() -> Result<(), ie_ser::flowStartMicrosecondsWritingError> {
-    let good_full_wire = [0x58, 0x3d, 0xdf, 0x8b, 0xff, 0xff, 0xff, 0xff];
+    let good_full_wire = [0x58, 0x3d, 0xdf, 0xa7, 0xff, 0xff, 0xff, 0xff];
     let good_half_wire = [0x58, 0x3d, 0xdf, 0x8b, 0x7f, 0xff, 0xff, 0xff];
     let good_zero_wire = [0x58, 0x3d, 0xdf, 0x8b, 0x00, 0x00, 0x00, 0x00];
 
     let good_full = ie::flowStartMicroseconds(
-        Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
+        Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 59)
             .unwrap()
             .with_nanosecond(1_000_000_000)
             .unwrap(),
