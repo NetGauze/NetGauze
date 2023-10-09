@@ -24,9 +24,9 @@ use netgauze_bgp_pkt::{iana::BgpMessageType, nlri::RouteDistinguisher, BgpMessag
 use netgauze_iana::address_family::AddressType;
 
 use crate::iana::{
-    BmpMessageType, BmpPeerTypeCode, BmpStatisticsType, InitiationInformationTlvType,
+    BmpMessageType, BmpPeerTypeCode, BmpStatisticsType, BmpVersion, InitiationInformationTlvType,
     PeerDownReasonCode, PeerTerminationCode, RouteMirroringInformation, RouteMirroringTlvType,
-    TerminationInformationTlvType, BmpVersion
+    TerminationInformationTlvType,
 };
 
 use serde::{Deserialize, Serialize};
@@ -52,19 +52,19 @@ pub enum BmpMessage {
 }
 
 impl BmpMessage {
-
     /// Returns the BMP Version from the BMP Common Header
-    /// u8 because there is no IANA registry for BMP Versions
+    /// as [BmpVersion] because there is no IANA registry for BMP Versions
     pub fn get_version(&self) -> BmpVersion {
         match self {
-            BmpMessage::V3(_) => BmpVersion::Version3
+            BmpMessage::V3(_) => BmpVersion::Version3,
         }
     }
 
-    /// Returns the BMP Message Type ([BmpMessageType]) from the BMP Common Header
+    /// Returns the BMP Message Type ([BmpMessageType]) from the BMP Common
+    /// Header
     pub fn get_type(&self) -> BmpMessageType {
         match &self {
-            BmpMessage::V3(value) => value.get_type()
+            BmpMessage::V3(value) => value.get_type(),
         }
     }
 }
