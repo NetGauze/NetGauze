@@ -26,7 +26,7 @@ use netgauze_iana::address_family::AddressType;
 use crate::iana::{
     BmpMessageType, BmpPeerTypeCode, BmpStatisticsType, InitiationInformationTlvType,
     PeerDownReasonCode, PeerTerminationCode, RouteMirroringInformation, RouteMirroringTlvType,
-    TerminationInformationTlvType,
+    TerminationInformationTlvType, BmpVersion
 };
 
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ pub mod iana;
 pub mod wire;
 
 /// ```text
-/// 0                   1                   2                   3
+///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 /// +-+-+-+-+-+-+-+-+
 /// |    Version    |
@@ -49,6 +49,24 @@ pub mod wire;
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BmpMessage {
     V3(BmpMessageValue),
+}
+
+impl BmpMessage {
+
+    /// Returns the BMP Version from the BMP Common Header
+    /// u8 because there is no IANA registry for BMP Versions
+    pub fn get_version(&self) -> BmpVersion {
+        match self {
+            BmpMessage::V3(_) => BmpVersion::Version3
+        }
+    }
+
+    /// Returns the BMP Message Type ([BmpMessageType]) from the BMP Common Header
+    pub fn get_type(&self) -> BmpMessageType {
+        match &self {
+            BmpMessage::V3(value) => value.get_type()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
