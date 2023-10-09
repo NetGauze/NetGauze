@@ -158,16 +158,8 @@ pub enum BmpPeerTypeWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePdu<BmpPeerTypeWritingError> for BmpPeerType {
-    /// 1-octet type and 1-octet flags
-    const BASE_LENGTH: usize = 2;
-
-    fn len(&self) -> usize {
-        Self::BASE_LENGTH
-    }
-
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpPeerTypeWritingError> {
-        writer.write_u8(self.get_type().into())?;
+impl BmpPeerType {
+    pub fn get_flags_value(&self) -> u8 {
         match self {
             Self::GlobalInstancePeer {
                 ipv6,
@@ -186,21 +178,33 @@ impl WritablePdu<BmpPeerTypeWritingError> for BmpPeerType {
                 post_policy,
                 asn2,
                 adj_rib_out,
-            } => {
-                let flags = compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out);
-                writer.write_u8(flags)?;
-            }
+            } => compute_peer_flags_value(*ipv6, *post_policy, *asn2, *adj_rib_out),
             Self::LocRibInstancePeer { filtered } => {
-                let flags = if *filtered { PEER_FLAGS_IS_FILTERED } else { 0 };
-                writer.write_u8(flags)?;
+                if *filtered {
+                    PEER_FLAGS_IS_FILTERED
+                } else {
+                    0
+                }
             }
             Self::Experimental251 { flags }
             | Self::Experimental252 { flags }
             | Self::Experimental253 { flags }
-            | Self::Experimental254 { flags } => {
-                writer.write_u8(*flags)?;
-            }
+            | Self::Experimental254 { flags } => *flags,
         }
+    }
+}
+
+impl WritablePdu<BmpPeerTypeWritingError> for BmpPeerType {
+    /// 1-octet type and 1-octet flags
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpPeerTypeWritingError> {
+        writer.write_u8(self.get_type().into())?;
+        writer.write_u8(self.get_flags_value())?;
         Ok(())
     }
 }
