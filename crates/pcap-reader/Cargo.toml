@@ -1,14 +1,19 @@
 [package]
 name = "netgauze-pcap-reader"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+Simple PCAP reader
+"""
 
 [dependencies]
 pcap-parser = { version = "0.14", features = ["data"] }
 pdu = "1.4"
 
 [dev-dependencies]
-netgauze-bmp-service = { version = "0.1.0", path = "../bmp-service" }
+netgauze-bmp-service = { version = "0.2.0", path = "../bmp-service" }
 serde_json = { workspace = true }
 bytes = { workspace = true }
 tokio-util = { workspace = true, features = ["codec"] }
