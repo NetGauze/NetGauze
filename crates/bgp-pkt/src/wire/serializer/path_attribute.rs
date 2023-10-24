@@ -24,7 +24,6 @@ use crate::{
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
-use std::net::IpAddr;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum PathAttributeWritingError {
@@ -962,16 +961,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                         .subsequent_address_family()
                         .into(),
                 )?;
-                match next_hop {
-                    IpAddr::V4(addr) => {
-                        writer.write_u8(IPV4_LEN)?;
-                        writer.write_all(&addr.octets())?;
-                    }
-                    IpAddr::V6(addr) => {
-                        writer.write_u8(IPV6_LEN)?;
-                        writer.write_all(&addr.octets())?;
-                    }
-                }
+                next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
                     nlri.write(writer)?
@@ -988,16 +978,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                         .subsequent_address_family()
                         .into(),
                 )?;
-                match next_hop {
-                    IpAddr::V4(addr) => {
-                        writer.write_u8(IPV4_LEN)?;
-                        writer.write_all(&addr.octets())?;
-                    }
-                    IpAddr::V6(addr) => {
-                        writer.write_u8(IPV6_LEN)?;
-                        writer.write_all(&addr.octets())?;
-                    }
-                }
+                next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
                     nlri.write(writer)?
