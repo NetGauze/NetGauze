@@ -27,10 +27,24 @@ test = false
 doc = false
 
 [[bin]]
+name = "fuzz-bgp-pkt-serialize"
+path = "fuzz_targets/fuzz_bgp_pkt_serialize.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "fuzz-bmp-pkt"
 path = "fuzz_targets/fuzz_bmp_pkt.rs"
 test = false
 doc = false
+
+
+[[bin]]
+name = "fuzz-bmp-pkt-serialize"
+path = "fuzz_targets/fuzz_bmp_pkt_serialize.rs"
+test = false
+doc = false
+
 
 [[bin]]
 name = "fuzz-ipfix-pkt"

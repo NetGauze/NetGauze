@@ -15,6 +15,8 @@
 
 //! Representations for BGP Open message
 
+#[cfg(feature = "fuzz")]
+use crate::arbitrary_ipv4;
 use crate::{capabilities::BgpCapability, iana::BgpCapabilityCode, Deserialize, Serialize};
 use std::{collections::HashMap, net::Ipv4Addr};
 
@@ -41,10 +43,12 @@ pub const BGP_VERSION: u8 = 4;
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpOpenMessage {
     version: u8,
     my_as: u16,
     hold_time: u16,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
     bgp_id: Ipv4Addr,
     params: Vec<BgpOpenMessageParameter>, // TODO (AH): rfc5492
 }
@@ -108,6 +112,7 @@ impl BgpOpenMessage {
 /// |  Parm. Type   | Parm. Length  |  Parameter Value (variable)
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-...
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpOpenMessageParameter {
     /// Capabilities Advertisement
     Capabilities(Vec<BgpCapability>),

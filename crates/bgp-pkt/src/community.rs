@@ -15,6 +15,8 @@
 
 //! Representations for normal, extended, and large BGP Communities.
 
+#[cfg(feature = "fuzz")]
+use crate::{arbitrary_ipv4, arbitrary_ipv6};
 use crate::{iana::WellKnownCommunity, nlri::MacAddress};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -23,6 +25,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 ///
 /// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Community(u32);
 
 impl Community {
@@ -68,6 +71,7 @@ impl Community {
 /// Local Data Part 1:  A four-octet operator-defined value.
 /// Local Data Part 2:  A four-octet operator-defined value.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LargeCommunity {
     global_admin: u32,
     local_data1: u32,
@@ -121,6 +125,7 @@ pub trait ExtendedCommunityProperties {
 ///
 /// See [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     TransitiveTwoOctet(TransitiveTwoOctetExtendedCommunity),
@@ -189,6 +194,7 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveTwoOctetExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteTarget {
@@ -266,6 +272,7 @@ impl ExtendedCommunityProperties for TransitiveTwoOctetExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NonTransitiveTwoOctetExtendedCommunity {
     LinkBandwidth {
         global_admin: u16,
@@ -293,6 +300,7 @@ impl ExtendedCommunityProperties for NonTransitiveTwoOctetExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveFourOctetExtendedCommunity {
     /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
     RouteTarget {
@@ -359,6 +367,7 @@ impl ExtendedCommunityProperties for TransitiveFourOctetExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NonTransitiveFourOctetExtendedCommunity {
     Unassigned {
         sub_type: u8,
@@ -378,97 +387,114 @@ impl ExtendedCommunityProperties for NonTransitiveFourOctetExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveIpv4ExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteTarget {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteOrigin {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [draft-ietf-idr-bgp-ifit-capabilities](https://datatracker.ietf.org/doc/draft-ietf-idr-bgp-ifit-capabilities)
     Ipv4Ifit {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
     OspfDomainIdentifier {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [RFC4577](https://datatracker.ietf.org/doc/html/rfc4577)
     OspfRouteID {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [draft-dong-idr-node-target-ext-comm](https://datatracker.ietf.org/doc/draft-dong-idr-node-target-ext-comm)
     NodeTarget {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [RFC6074](https://datatracker.ietf.org/doc/html/rfc6074)
     L2VpnIdentifier {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
     VrfRouteImport {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [draft-ietf-idr-flowspec-redirect](https://datatracker.ietf.org/doc/html/draft-ietf-idr-flowspec-redirect)
     FlowSpecRedirectToIpv4 {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     CiscoVpnDistinguisher {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [RFC7524](https://datatracker.ietf.org/doc/rfc7524)
     InterAreaP2MpSegmentedNextHop {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [draft-ietf-bess-service-chaining](https://datatracker.ietf.org/doc/draft-ietf-bess-service-chaining/)
     RouteTargetRecord {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     VrfRecursiveNextHop {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [draft-zzhang-idr-rt-derived-community](https://datatracker.ietf.org/doc/draft-zzhang-idr-rt-derived-community/)
     RtDerivedEc {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     /// [RFC9081](https://datatracker.ietf.org/doc/rfc9081)
     MulticastVpnRpAddress {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
 
     Unassigned {
         sub_type: u8,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
@@ -485,9 +511,11 @@ impl ExtendedCommunityProperties for TransitiveIpv4ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NonTransitiveIpv4ExtendedCommunity {
     Unassigned {
         sub_type: u8,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         global_admin: Ipv4Addr,
         local_admin: u16,
     },
@@ -504,6 +532,7 @@ impl ExtendedCommunityProperties for NonTransitiveIpv4ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveOpaqueExtendedCommunity {
     /// The Default Gateway community  It is a transitive community,
     /// which means that the first octet is 0x03.  The value of the second
@@ -529,6 +558,7 @@ impl ExtendedCommunityProperties for TransitiveOpaqueExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NonTransitiveOpaqueExtendedCommunity {
     Unassigned { sub_type: u8, value: [u8; 6] },
 }
@@ -544,6 +574,7 @@ impl ExtendedCommunityProperties for NonTransitiveOpaqueExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ExperimentalExtendedCommunity {
     code: u8,
     sub_type: u8,
@@ -583,6 +614,7 @@ impl ExtendedCommunityProperties for ExperimentalExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UnknownExtendedCommunity {
     code: u8,
     sub_type: u8,
@@ -640,6 +672,7 @@ impl ExtendedCommunityProperties for UnknownExtendedCommunity {
 ///
 /// See [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ExtendedCommunityIpv6 {
     /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
     TransitiveIpv6(TransitiveIpv6ExtendedCommunity),
@@ -669,21 +702,25 @@ impl ExtendedCommunityProperties for ExtendedCommunityIpv6 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveIpv6ExtendedCommunity {
     /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
     RouteTarget {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
 
     /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
     RouteOrigin {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
 
     /// [draft-ietf-idr-bgp-ifit-capabilities](https://datatracker.ietf.org/doc/draft-ietf-idr-bgp-ifit-capabilities)
     Ipv6Ifit {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
@@ -691,41 +728,48 @@ pub enum TransitiveIpv6ExtendedCommunity {
     /// [RFC6515](https://datatracker.ietf.org/doc/html/rfc6515) and
     /// [RFC6514](https://datatracker.ietf.org/doc/html/rfc6514)
     VrfRouteImport {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
 
     /// [draft-ietf-idr-flowspec-redirect](https://datatracker.ietf.org/doc/html/draft-ietf-idr-flowspec-redirect)
     FlowSpecRedirectToIpv6 {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
 
     /// [RFC8956](https://datatracker.ietf.org/doc/html/rfc8956)
     FlowSpecRtRedirectToIpv6 {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
 
     CiscoVpnDistinguisher {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
 
     /// [RFC7524](https://datatracker.ietf.org/doc/rfc7524)
     InterAreaP2MpSegmentedNextHop {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
 
     /// [draft-zzhang-idr-rt-derived-community](https://datatracker.ietf.org/doc/draft-zzhang-idr-rt-derived-community/)
     RtDerivedEc {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
 
     Unassigned {
         sub_type: u8,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
@@ -742,9 +786,11 @@ impl ExtendedCommunityProperties for TransitiveIpv6ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NonTransitiveIpv6ExtendedCommunity {
     Unassigned {
         sub_type: u8,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         global_admin: Ipv6Addr,
         local_admin: u16,
     },
@@ -761,6 +807,7 @@ impl ExtendedCommunityProperties for NonTransitiveIpv6ExtendedCommunity {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UnknownExtendedCommunityIpv6 {
     code: u8,
     sub_type: u8,
@@ -800,6 +847,7 @@ impl ExtendedCommunityProperties for UnknownExtendedCommunityIpv6 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum EvpnExtendedCommunity {
     /// MAC Mobility extended community
     /// ```text
