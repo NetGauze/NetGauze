@@ -37,6 +37,7 @@ use crate::path_attribute::PathAttribute;
 /// +-----------------------------------------------------+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpUpdateMessage {
     withdrawn_routes: Vec<Ipv4UnicastAddress>,
     path_attributes: Vec<PathAttribute>,

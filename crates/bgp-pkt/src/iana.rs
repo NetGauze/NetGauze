@@ -21,6 +21,7 @@ use strum_macros::{Display, FromRepr};
 /// BGP Message types as registered in IANA [BGP Message Types](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-1)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpMessageType {
     Open = 1,
     Update = 2,
@@ -33,6 +34,7 @@ pub enum BgpMessageType {
 /// BGP Message type is not one of [`BgpMessageType`], the carried value is the
 /// undefined code.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedBgpMessageType(pub u8);
 
 impl From<BgpMessageType> for u8 {
@@ -55,6 +57,7 @@ impl TryFrom<u8> for BgpMessageType {
 /// BGP Path Attributes as defined by IANA [BGP Path Attributes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-2)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PathAttributeType {
     /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
     Origin = 1,
@@ -157,6 +160,7 @@ impl From<PathAttributeType> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedPathAttributeType(pub u8);
 
 impl TryFrom<u8> for PathAttributeType {
@@ -173,6 +177,7 @@ impl TryFrom<u8> for PathAttributeType {
 /// BGP Error (Notification) Codes as defined by IANA [BGP Error (Notification) Codes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-3)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpErrorNotificationCode {
     /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
     MessageHeaderError = 1,
@@ -203,6 +208,7 @@ impl From<BgpErrorNotificationCode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedBgpErrorNotificationCode(pub u8);
 
 impl TryFrom<u8> for BgpErrorNotificationCode {
@@ -219,6 +225,7 @@ impl TryFrom<u8> for BgpErrorNotificationCode {
 /// Message Header Error sub-codes for [`BgpErrorNotificationCode::MessageHeaderError`] as defined by IANA [Message Header Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-5)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MessageHeaderErrorSubCode {
     /// [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493)
     Unspecific = 0,
@@ -234,6 +241,7 @@ impl From<MessageHeaderErrorSubCode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedMessageHeaderErrorSubCode(pub u8);
 
 impl TryFrom<u8> for MessageHeaderErrorSubCode {
@@ -250,6 +258,7 @@ impl TryFrom<u8> for MessageHeaderErrorSubCode {
 /// OPEN Message Error sub-codes for [`BgpErrorNotificationCode::OpenMessageError`] as defined by IANA [OPEN Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-6)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum OpenMessageErrorSubCode {
     /// [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493)
     Unspecific = 0,
@@ -273,6 +282,7 @@ impl From<OpenMessageErrorSubCode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedOpenMessageErrorSubCode(pub u8);
 
 impl TryFrom<u8> for OpenMessageErrorSubCode {
@@ -289,6 +299,7 @@ impl TryFrom<u8> for OpenMessageErrorSubCode {
 /// UPDATE Message Error sub-codes for [`BgpErrorNotificationCode::UpdateMessageError`] as defined by IANA [UPDATE Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-7)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum UpdateMessageErrorSubCode {
     /// [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493)
     Unspecific = 0,
@@ -311,6 +322,7 @@ impl From<UpdateMessageErrorSubCode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedUpdateMessageErrorSubCode(pub u8);
 
 impl TryFrom<u8> for UpdateMessageErrorSubCode {
@@ -327,6 +339,7 @@ impl TryFrom<u8> for UpdateMessageErrorSubCode {
 /// BGP Finite State Machine Error sub-codes for [`BgpErrorNotificationCode::FiniteStateMachineError`] as defined by IANA [BGP Finite State Machine Error Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-finite-state-machine-error-subcodes)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum FiniteStateMachineErrorSubCode {
     /// [RFC6608](https://datatracker.ietf.org/doc/html/rfc6608)
     UnspecifiedError = 0,
@@ -348,6 +361,7 @@ impl From<FiniteStateMachineErrorSubCode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedFiniteStateMachineErrorSubCode(pub u8);
 
 impl TryFrom<u8> for FiniteStateMachineErrorSubCode {
@@ -364,6 +378,7 @@ impl TryFrom<u8> for FiniteStateMachineErrorSubCode {
 /// BGP Cease NOTIFICATION message Error sub-codes for [`BgpErrorNotificationCode::Cease]` as defined by IANA [BGP Cease NOTIFICATION message subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-8)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum CeaseErrorSubCode {
     /// [RFC4486](https://datatracker.ietf.org/doc/html/rfc4486)
     MaximumNumberOfPrefixesReached = 1,
@@ -403,6 +418,7 @@ impl From<CeaseErrorSubCode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedCeaseErrorSubCode(pub u8);
 
 impl TryFrom<u8> for CeaseErrorSubCode {
@@ -419,6 +435,7 @@ impl TryFrom<u8> for CeaseErrorSubCode {
 /// BGP ROUTE-REFRESH Message Error subcodes for [`BgpErrorNotificationCode::RouteRefreshMessageError`] as defined by IANA [BGP ROUTE-REFRESH Message Error subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-error-subcodes)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteRefreshMessageErrorSubCode {
     /// [RFC7313](https://datatracker.ietf.org/doc/html/rfc7313)
     InvalidMessageLength = 1,
@@ -431,6 +448,7 @@ impl From<RouteRefreshMessageErrorSubCode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedRouteRefreshMessageError(pub u8);
 
 impl TryFrom<u8> for RouteRefreshMessageErrorSubCode {
@@ -447,6 +465,7 @@ impl TryFrom<u8> for RouteRefreshMessageErrorSubCode {
 /// [BGP OPEN Optional Parameter Types](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#bgp-parameters-11)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpOpenMessageParameterType {
     /// [RFC5492](https://datatracker.ietf.org/doc/html/rfc5492)
     Capability = 2,
@@ -462,6 +481,7 @@ impl From<BgpOpenMessageParameterType> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedBgpOpenMessageParameterType(pub u8);
 
 impl TryFrom<u8> for BgpOpenMessageParameterType {
@@ -588,6 +608,7 @@ impl From<BgpCapabilityCode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedBgpCapabilityCode(pub u8);
 
 impl TryFrom<u8> for BgpCapabilityCode {
@@ -604,6 +625,7 @@ impl TryFrom<u8> for BgpCapabilityCode {
 /// [BGP Route Refresh Subcodes](https://www.iana.org/assignments/bgp-parameters/bgp-parameters.xhtml#route-refresh-subcodes)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteRefreshSubcode {
     NormalRequest = 0,
     BeginningOfRouteRefresh = 1,
@@ -617,6 +639,7 @@ impl From<RouteRefreshSubcode> for u8 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedRouteRefreshSubcode(pub u8);
 
 impl TryFrom<u8> for RouteRefreshSubcode {
@@ -633,6 +656,7 @@ impl TryFrom<u8> for RouteRefreshSubcode {
 /// [Route Distinguisher Type Field](https://www.iana.org/assignments/route-distinguisher-types/route-distinguisher-types.xhtml)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteDistinguisherTypeCode {
     As2Administrator = 0,
     Ipv4Administrator = 1,
@@ -648,6 +672,7 @@ impl From<RouteDistinguisherTypeCode> for u16 {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedRouteDistinguisherTypeCode(pub u16);
 
 impl TryFrom<u16> for RouteDistinguisherTypeCode {
@@ -672,6 +697,7 @@ impl TryFrom<u16> for RouteDistinguisherTypeCode {
 /// the RFC.
 #[repr(u32)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum WellKnownCommunity {
     /// [RFC8326](https://datatracker.ietf.org/doc/html/rfc8326)
     GracefulShutdown = 0xFFFF0000,
@@ -701,6 +727,7 @@ pub enum WellKnownCommunity {
 /// collectors defined by [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpDataCollectionCommunityValueCode {
     CustomerRoutes = 0b0000000000000001,
     PeerRoutes = 0b0000000000000010,
@@ -715,6 +742,7 @@ pub enum BgpDataCollectionCommunityValueCode {
 /// Region Identifiers defined [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpDataCollectionCommunityRegionIdentifierCode {
     Africa = 0b00001,
     Oceania = 0b00010,
@@ -727,6 +755,7 @@ pub enum BgpDataCollectionCommunityRegionIdentifierCode {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpExtendedCommunityType {
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
     TransitiveTwoOctet = 0x00,
@@ -854,6 +883,7 @@ pub enum BgpExtendedCommunityType {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedBgpExtendedCommunityType(pub u8);
 
 impl TryFrom<u8> for BgpExtendedCommunityType {
@@ -869,6 +899,7 @@ impl TryFrom<u8> for BgpExtendedCommunityType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpExtendedCommunityIpv6Type {
     /// [RFC7153](https://datatracker.ietf.org/doc/html/rfc7153)
     TransitiveIpv6 = 0x00,
@@ -878,6 +909,7 @@ pub enum BgpExtendedCommunityIpv6Type {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedBgpExtendedCommunityIpv6Type(pub u8);
 
 impl TryFrom<u8> for BgpExtendedCommunityIpv6Type {
@@ -893,6 +925,7 @@ impl TryFrom<u8> for BgpExtendedCommunityIpv6Type {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveTwoOctetExtendedCommunitySubType {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteTarget = 0x02,
@@ -923,6 +956,7 @@ pub enum TransitiveTwoOctetExtendedCommunitySubType {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedTransitiveTwoOctetExtendedCommunitySubType(pub u8);
 
 impl TryFrom<u8> for TransitiveTwoOctetExtendedCommunitySubType {
@@ -938,6 +972,7 @@ impl TryFrom<u8> for TransitiveTwoOctetExtendedCommunitySubType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum NonTransitiveTwoOctetExtendedCommunitySubType {
     /// [draft-ietf-idr-link-bandwidth](https://datatracker.ietf.org/doc/draft-ietf-idr-link-bandwidth/)
     LinkBandwidth = 0x04,
@@ -947,6 +982,7 @@ pub enum NonTransitiveTwoOctetExtendedCommunitySubType {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedNonTransitiveTwoOctetExtendedCommunitySubType(pub u8);
 
 impl TryFrom<u8> for NonTransitiveTwoOctetExtendedCommunitySubType {
@@ -964,6 +1000,7 @@ impl TryFrom<u8> for NonTransitiveTwoOctetExtendedCommunitySubType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveFourOctetExtendedCommunitySubType {
     /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
     RouteTarget = 0x02,
@@ -990,6 +1027,7 @@ pub enum TransitiveFourOctetExtendedCommunitySubType {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedTransitiveFourOctetExtendedCommunitySubType(pub u8);
 
 impl TryFrom<u8> for TransitiveFourOctetExtendedCommunitySubType {
@@ -1005,6 +1043,7 @@ impl TryFrom<u8> for TransitiveFourOctetExtendedCommunitySubType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveIpv4ExtendedCommunitySubType {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteTarget = 0x02,
@@ -1050,6 +1089,7 @@ pub enum TransitiveIpv4ExtendedCommunitySubType {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedTransitiveIpv4ExtendedCommunitySubType(pub u8);
 
 impl TryFrom<u8> for TransitiveIpv4ExtendedCommunitySubType {
@@ -1065,6 +1105,7 @@ impl TryFrom<u8> for TransitiveIpv4ExtendedCommunitySubType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveIpv6ExtendedCommunitySubType {
     /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
     RouteTarget = 0x02,
@@ -1095,6 +1136,7 @@ pub enum TransitiveIpv6ExtendedCommunitySubType {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedTransitiveIpv6ExtendedCommunitySubType(pub u8);
 
 impl TryFrom<u8> for TransitiveIpv6ExtendedCommunitySubType {
@@ -1111,6 +1153,7 @@ impl TryFrom<u8> for TransitiveIpv6ExtendedCommunitySubType {
 /// EVPN Route Types [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum L2EvpnRouteTypeCode {
     /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
     EthernetAutoDiscovery = 0x01,
@@ -1138,6 +1181,7 @@ pub enum L2EvpnRouteTypeCode {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedL2EvpnRouteTypeCode(pub u8);
 
 impl TryFrom<u8> for L2EvpnRouteTypeCode {
@@ -1154,6 +1198,7 @@ impl TryFrom<u8> for L2EvpnRouteTypeCode {
 /// EVPN Extended Community Sub-Types [IANA](https://www.iana.org/assignments/bgp-extended-communities/bgp-extended-communities.xhtml#evpn)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum EvpnExtendedCommunitySubType {
     /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
     MacMobility = 0x00,
@@ -1196,6 +1241,7 @@ pub enum EvpnExtendedCommunitySubType {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedEvpnExtendedCommunitySubType(pub u8);
 
 impl TryFrom<u8> for EvpnExtendedCommunitySubType {
@@ -1212,12 +1258,14 @@ impl TryFrom<u8> for EvpnExtendedCommunitySubType {
 /// Transitive Opaque Extended Community Sub-Types [IANA](https://www.iana.org/assignments/bgp-extended-communities/bgp-extended-communities.xhtml#trans-opaque)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TransitiveOpaqueExtendedCommunitySubType {
     /// [RFC7432](https://datatracker.ietf.org/doc/html/rfc7432)
     DefaultGateway = 0x0d,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedTransitiveOpaqueExtendedCommunitySubType(pub u8);
 
 impl TryFrom<u8> for TransitiveOpaqueExtendedCommunitySubType {
@@ -1235,6 +1283,7 @@ impl TryFrom<u8> for TransitiveOpaqueExtendedCommunitySubType {
 /// [RFC9234](https://datatracker.ietf.org/doc/html/rfc9234)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpRoleValue {
     /// The local AS is a transit provider of the remote AS
     Provider = 0x00,

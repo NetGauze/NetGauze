@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 /// +-------+-------+-------+-------+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpRouteRefreshMessage {
     address_type: AddressType,
     operation_type: RouteRefreshSubcode,

@@ -16,6 +16,8 @@
 //! Contains the extensible definitions for various [`PathAttribute`] that can
 //! be used in [`crate::update::BgpUpdateMessage`].
 
+#[cfg(feature = "fuzz")]
+use crate::{arbitrary_ip, arbitrary_ipv4, arbitrary_ipv6};
 use crate::{
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     nlri::*,
@@ -50,6 +52,7 @@ pub trait PathAttributeValueProperties {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InvalidPathAttribute {
     InvalidOptionalFlagValue(bool),
     InvalidTransitiveFlagValue(bool),
@@ -66,6 +69,7 @@ pub enum InvalidPathAttribute {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PathAttribute {
     /// Optional bit defines whether the attribute is optional (if set to
     /// `true`) or well-known (if set to `false`).
@@ -149,6 +153,7 @@ impl PathAttribute {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PathAttributeValue {
     Origin(Origin),
     AsPath(AsPath),
@@ -258,6 +263,7 @@ impl PathAttributeValue {
 /// ```
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Origin {
     IGP = 0,
     EGP = 1,
@@ -287,6 +293,7 @@ impl From<Origin> for u8 {
 /// Error type used in [`TryFrom`] for [`Origin`].
 /// The value carried is the undefined value being parsed
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedOrigin(pub u8);
 
 impl TryFrom<u8> for Origin {
@@ -305,6 +312,7 @@ impl TryFrom<u8> for Origin {
 /// represented by a triple <path segment type, path segment
 /// length, path segment value>.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum AsPath {
     As2PathSegments(Vec<As2PathSegment>),
     As4PathSegments(Vec<As4PathSegment>),
@@ -335,6 +343,7 @@ impl PathAttributeValueProperties for AsPath {
 /// ```
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum AsPathSegmentType {
     AsSet = 1,
     AsSequence = 2,
@@ -349,6 +358,7 @@ impl From<AsPathSegmentType> for u8 {
 /// Error type used in [`TryFrom`] for [`AsPathSegmentType`].
 /// The value carried is the undefined value being parsed
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UndefinedAsPathSegmentType(pub u8);
 
 impl TryFrom<u8> for AsPathSegmentType {
@@ -379,6 +389,7 @@ impl TryFrom<u8> for AsPathSegmentType {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct As2PathSegment {
     segment_type: AsPathSegmentType,
     as_numbers: Vec<u16>,
@@ -404,6 +415,7 @@ impl As2PathSegment {
 ///  Each AS path segment is represented by a triple:
 /// <path segment type, path segment length, path segment value>.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct As4PathSegment {
     segment_type: AsPathSegmentType,
     as_numbers: Vec<u32>,
@@ -427,6 +439,7 @@ impl As4PathSegment {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct As4Path {
     segments: Vec<As4PathSegment>,
 }
@@ -466,6 +479,7 @@ impl PathAttributeValueProperties for As4Path {
 /// the next hop to the destinations listed in the Network Layer
 /// Reachability Information field of the UPDATE message.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct NextHop {
     next_hop: Ipv4Addr,
 }
@@ -499,6 +513,7 @@ impl PathAttributeValueProperties for NextHop {
 /// discriminate among multiple entry points to a neighboring
 /// autonomous system.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MultiExitDiscriminator {
     metric: u32,
 }
@@ -532,6 +547,7 @@ impl PathAttributeValueProperties for MultiExitDiscriminator {
 /// internal peers of the advertising speaker's degree of
 /// preference for an advertised route.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LocalPreference {
     metric: u32,
 }
@@ -562,6 +578,7 @@ impl PathAttributeValueProperties for LocalPreference {
 
 /// `ATOMIC_AGGREGATE` is a well-known discretionary attribute of length 0.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct AtomicAggregate;
 
 impl PathAttributeValueProperties for AtomicAggregate {
@@ -584,6 +601,7 @@ impl PathAttributeValueProperties for AtomicAggregate {
 /// (encoded as 4 octets). This SHOULD be the same address as
 /// the one used for the BGP Identifier of the speaker.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct As2Aggregator {
     asn: u16,
     origin: Ipv4Addr,
@@ -603,6 +621,7 @@ impl As2Aggregator {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct As4Aggregator {
     asn: u32,
     origin: Ipv4Addr,
@@ -627,6 +646,7 @@ impl As4Aggregator {
 /// This SHOULD be the same address as the one used for the BGP Identifier of
 /// the speaker.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Aggregator {
     As2Aggregator(As2Aggregator),
     As4Aggregator(As4Aggregator),
@@ -648,6 +668,7 @@ impl PathAttributeValueProperties for Aggregator {
 
 /// Path attribute can be of size `u8` or `u16` based on `extended_length` bit.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PathAttributeLength {
     U8(u8),
     U16(u16),
@@ -669,6 +690,7 @@ impl From<PathAttributeLength> for u16 {
 ///
 /// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Communities {
     communities: Vec<Community>,
 }
@@ -698,6 +720,7 @@ impl PathAttributeValueProperties for Communities {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ExtendedCommunities {
     communities: Vec<ExtendedCommunity>,
 }
@@ -727,6 +750,7 @@ impl PathAttributeValueProperties for ExtendedCommunities {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ExtendedCommunitiesIpv6 {
     communities: Vec<ExtendedCommunityIpv6>,
 }
@@ -756,6 +780,7 @@ impl PathAttributeValueProperties for ExtendedCommunitiesIpv6 {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LargeCommunities {
     communities: Vec<LargeCommunity>,
 }
@@ -794,6 +819,7 @@ impl PathAttributeValueProperties for LargeCommunities {
 ///
 /// [RFC4456](https://datatracker.ietf.org/doc/html/rfc4456) defines this value
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Originator(Ipv4Addr);
 
 impl Originator {
@@ -826,6 +852,7 @@ impl PathAttributeValueProperties for Originator {
 ///
 /// [RFC4456](https://datatracker.ietf.org/doc/html/rfc4456) defines this value
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ClusterList(Vec<ClusterId>);
 
 impl ClusterList {
@@ -853,6 +880,7 @@ impl PathAttributeValueProperties for ClusterList {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ClusterId(Ipv4Addr);
 
 impl ClusterId {
@@ -892,16 +920,20 @@ impl ClusterId {
 /// +---------------------------------------------------------+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MpReach {
     Ipv4Unicast {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         next_hop: Ipv4Addr,
         nlri: Vec<Ipv4UnicastAddress>,
     },
     Ipv4Multicast {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
         next_hop: Ipv4Addr,
         nlri: Vec<Ipv4MulticastAddress>,
     },
     Ipv4NlriMplsLabels {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<Ipv4NlriMplsLabelsAddress>,
     },
@@ -911,15 +943,19 @@ pub enum MpReach {
     },
     Ipv6Unicast {
         next_hop_global: Ipv6Addr,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv6UnicastAddress>,
     },
     Ipv6Multicast {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
         next_hop_global: Ipv6Addr,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv6MulticastAddress>,
     },
     Ipv6NlriMplsLabels {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<Ipv6NlriMplsLabelsAddress>,
     },
@@ -928,10 +964,12 @@ pub enum MpReach {
         nlri: Vec<Ipv6MplsVpnUnicastAddress>,
     },
     L2Evpn {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<L2EvpnAddress>,
     },
     RouteTargetMembership {
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<RouteTargetMembershipAddress>,
     },
@@ -972,6 +1010,7 @@ impl PathAttributeValueProperties for MpReach {
 /// +---------------------------------------------------------+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MpUnreach {
     Ipv4Unicast {
         nlri: Vec<Ipv4UnicastAddress>,
@@ -1028,6 +1067,7 @@ impl PathAttributeValueProperties for MpUnreach {
 /// BGP Allows parsing unrecognized attributes as is, and then only consider
 /// the transitive and partial bits of the attribute.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UnknownAttribute {
     code: u8,
     value: Vec<u8>,
@@ -1064,6 +1104,7 @@ impl PathAttributeValueProperties for UnknownAttribute {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct OnlyToCustomer(u32);
 
 impl OnlyToCustomer {
@@ -1092,6 +1133,7 @@ impl PathAttributeValueProperties for OnlyToCustomer {
 
 /// Accumulated IGP Metric Attribute [RFC7311](https://datatracker.ietf.org/doc/html/rfc7311)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Aigp {
     AccumulatedIgpMetric(u64),
 }

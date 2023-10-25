@@ -57,6 +57,7 @@ use strum_macros::{Display, FromRepr};
 /// ```
 #[repr(u16)]
 #[derive(FromRepr, Display, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum AddressFamily {
     IPv4 = 1,
     IPv6 = 2,
@@ -216,6 +217,7 @@ impl TryFrom<u16> for AddressFamily {
 /// ```
 #[repr(u8)]
 #[derive(FromRepr, Display, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum SubsequentAddressFamily {
     /// Network Layer Reachability Information used for unicast forwarding
     /// [RFC4760](https://datatracker.ietf.org/doc/html/RFC4760)

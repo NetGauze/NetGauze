@@ -53,6 +53,7 @@ pub mod wire;
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpMessage {
     Open(BgpOpenMessage),
     Update(BgpUpdateMessage),
@@ -72,4 +73,64 @@ impl BgpMessage {
             Self::RouteRefresh(_) => BgpMessageType::RouteRefresh,
         }
     }
+}
+
+// Custom function to generate arbitrary ipv4 addresses
+#[cfg(feature = "fuzz")]
+pub(crate) fn arbitrary_ipv4(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<std::net::Ipv4Addr> {
+    let value = u.int_in_range(0..=u32::MAX)?;
+    Ok(std::net::Ipv4Addr::from(value))
+}
+
+// Custom function to generate arbitrary ipv4 network address
+#[cfg(feature = "fuzz")]
+pub(crate) fn arbitrary_ipv4net(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<ipnet::Ipv4Net> {
+    loop {
+        let value = u.int_in_range(0..=u32::MAX)?;
+        let mask = u.int_in_range(0..=u8::MAX)?;
+        let addr = std::net::Ipv4Addr::from(value);
+        if let Ok(net) = ipnet::Ipv4Net::new(addr, mask) {
+            return Ok(net);
+        }
+    }
+}
+
+// Custom function to generate arbitrary ipv6 addresses
+#[cfg(feature = "fuzz")]
+pub(crate) fn arbitrary_ipv6(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<std::net::Ipv6Addr> {
+    let value = u.int_in_range(0..=u128::MAX)?;
+    Ok(std::net::Ipv6Addr::from(value))
+}
+
+// Custom function to generate arbitrary ipv6 network address
+#[cfg(feature = "fuzz")]
+pub(crate) fn arbitrary_ipv6net(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<ipnet::Ipv6Net> {
+    loop {
+        let value = u.int_in_range(0..=u128::MAX)?;
+        let mask = u.int_in_range(0..=u8::MAX)?;
+        let addr = std::net::Ipv6Addr::from(value);
+        if let Ok(net) = ipnet::Ipv6Net::new(addr, mask) {
+            return Ok(net);
+        }
+    }
+}
+
+// Custom function to generate arbitrary IPv4 and IPv6 addresses
+#[cfg(feature = "fuzz")]
+pub(crate) fn arbitrary_ip(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<std::net::IpAddr> {
+    let ipv4 = arbitrary_ipv4(u)?;
+    let ipv6 = arbitrary_ipv6(u)?;
+    let choices = [std::net::IpAddr::V4(ipv4), std::net::IpAddr::V6(ipv6)];
+    let addr = u.choose(&choices)?;
+    Ok(*addr)
 }

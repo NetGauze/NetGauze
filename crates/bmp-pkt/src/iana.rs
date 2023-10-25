@@ -41,6 +41,7 @@ pub const PEER_FLAGS_IS_FILTERED: u8 = 0b10000000;
 /// Currently supported BMP versions
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpVersion {
     Version3 = 3,
 }
@@ -70,6 +71,7 @@ impl TryFrom<u8> for BmpVersion {
 /// BMP Message types as registered in IANA [BMP Message Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#message-types)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpMessageType {
     RouteMonitoring = 0,
     StatisticsReport = 1,
@@ -109,6 +111,7 @@ impl TryFrom<u8> for BmpMessageType {
 /// BMP Message types as registered in IANA [BMP Message Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#message-types)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpPeerTypeCode {
     GlobalInstancePeer = 0,
     RdInstancePeer = 1,
@@ -145,6 +148,7 @@ impl TryFrom<u8> for BmpPeerTypeCode {
 /// BMP `InformationTLV` types as registered in IANA [BMP Initiation and Peer Up Information TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#initiation-peer-up-tlvs)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InitiationInformationTlvType {
     String = 0,
     SystemDescription = 1,
@@ -182,6 +186,7 @@ impl TryFrom<u16> for InitiationInformationTlvType {
 /// BMP Termination `InformationTLV` types as registered in IANA [BMP Termination Message TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#termination-message-tlvs)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TerminationInformationTlvType {
     String = 0,
     Reason = 1,
@@ -216,6 +221,7 @@ impl TryFrom<u16> for TerminationInformationTlvType {
 /// BMP peer termination Reason codes as registered in IANA [BMP Termination Message Reason Codes](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#termination-message-reason-codes)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PeerTerminationCode {
     AdministrativelyClosed = 0,
     UnspecifiedReason = 1,
@@ -253,6 +259,7 @@ impl TryFrom<u16> for PeerTerminationCode {
 /// BMP Peer down Reason codes as registered in IANA [BMP Peer Down Reason Codes](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#peer-down-reason-codes)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PeerDownReasonCode {
     LocalSystemClosedNotificationPduFollows = 1,
     LocalSystemClosedFsmEventFollows = 2,
@@ -291,6 +298,7 @@ impl TryFrom<u8> for PeerDownReasonCode {
 /// [BMP Route Mirroring TLVs](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#route-mirroring-tlvs)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMirroringTlvType {
     BgpMessage = 0,
     Information = 1,
@@ -325,6 +333,7 @@ impl TryFrom<u16> for RouteMirroringTlvType {
 /// [BMP Route Mirroring Information Codes](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#route-mirroring-information-codes)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMirroringInformation {
     ErroredPdu = 0,
     MessagesLost = 1,
@@ -359,6 +368,7 @@ impl TryFrom<u16> for RouteMirroringInformation {
 /// [BMP Statistics Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#statistics-types)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpStatisticsType {
     NumberOfPrefixesRejectedByInboundPolicy = 0,
     NumberOfDuplicatePrefixAdvertisements = 1,

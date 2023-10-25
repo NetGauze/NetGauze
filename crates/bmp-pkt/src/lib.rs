@@ -18,7 +18,7 @@ use std::{
     ops::Deref,
 };
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 
 use netgauze_bgp_pkt::{iana::BgpMessageType, nlri::RouteDistinguisher, BgpMessage};
 use netgauze_iana::address_family::AddressType;
@@ -47,6 +47,7 @@ pub mod wire;
 /// +---------------+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpMessage {
     V3(BmpMessageValue),
 }
@@ -70,6 +71,7 @@ impl BmpMessage {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpMessageValue {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport(StatisticsReportMessage),
@@ -129,12 +131,15 @@ impl BmpMessageValue {
 ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerHeader {
     peer_type: BmpPeerType,
     rd: Option<RouteDistinguisher>,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ip)))]
     address: Option<IpAddr>,
     peer_as: u32,
     bgp_id: Ipv4Addr,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_datetime)))]
     timestamp: Option<DateTime<Utc>>,
 }
 
@@ -282,6 +287,7 @@ impl BmpPeerType {
 /// [`InitiationInformation::SystemName`] Information TLVs MUST be sent, any
 /// others are optional. The string TLV MAY be included multiple times.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct InitiationMessage {
     information: Vec<InitiationInformation>,
 }
@@ -310,6 +316,7 @@ impl InitiationMessage {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InitiationInformation {
     /// The Information field contains a free-form UTF-8 string whose length is
     /// given by the Information Length field.
@@ -378,6 +385,7 @@ impl InitiationInformation {
 /// The termination message provides a way for a monitored router to indicate
 /// why it is terminating a session.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TerminationMessage {
     peer_header: PeerHeader,
     information: Vec<TerminationInformation>,
@@ -413,6 +421,7 @@ impl TerminationMessage {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum TerminationInformation {
     String(String),
     Reason(PeerTerminationCode),
@@ -440,6 +449,7 @@ impl TerminationInformation {
 /// Peer Up BGP messages should only carry
 /// [`netgauze_bgp_pkt::BgpMessage::Update`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMonitoringMessageError {
     UnexpectedMessageType(BgpMessageType),
 }
@@ -452,6 +462,7 @@ pub enum RouteMonitoringMessageError {
 /// Following the common BMP header and per-peer header is a BGP Update
 /// PDU.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
     update_message: BgpMessage,
@@ -485,6 +496,7 @@ impl RouteMonitoringMessage {
 /// Route Mirroring messages are used for verbatim duplication of messages as
 /// received.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RouteMirroringMessage {
     peer_header: PeerHeader,
     mirrored: Vec<RouteMirroringValue>,
@@ -508,6 +520,7 @@ impl RouteMirroringMessage {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMirroringValue {
     /// A BGP PDU.  This PDU may or may not be an Update message.
     /// If the BGP Message TLV occurs in the Route Mirroring message,
@@ -560,8 +573,10 @@ impl RouteMirroringValue {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerUpNotificationMessage {
     peer_header: PeerHeader,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ip)))]
     local_address: Option<IpAddr>,
     local_port: Option<u16>,
     remote_port: Option<u16>,
@@ -574,6 +589,7 @@ pub struct PeerUpNotificationMessage {
 /// Peer Up BGP messages should only carry
 /// [`netgauze_bgp_pkt::BgpMessage::Open`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PeerUpNotificationMessageError {
     UnexpectedSentMessageType(BgpMessageType),
     UnexpectedReceivedMessageType(BgpMessageType),
@@ -645,6 +661,7 @@ impl PeerUpNotificationMessage {
 /// Peer Up BGP messages should only carry
 /// [`netgauze_bgp_pkt::BgpMessage::Notification`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PeerDownNotificationMessageError {
     UnexpectedBgpMessageType(BgpMessageType),
     UnexpectedInitiationInformationTlvType(InitiationInformationTlvType),
@@ -663,6 +680,7 @@ pub enum PeerDownNotificationMessageError {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerDownNotificationMessage {
     peer_header: PeerHeader,
     reason: PeerDownNotificationReason,
@@ -718,6 +736,7 @@ impl PeerDownNotificationMessage {
 /// Reason indicates why the session was closed and
 /// [`PeerDownNotificationMessage`] is sent.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PeerDownNotificationReason {
     /// The local system closed the session.  Following the
     /// Reason is a BGP PDU containing a BGP NOTIFICATION message that
@@ -803,6 +822,7 @@ impl PeerDownNotificationReason {
 ///```text
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct StatisticsReportMessage {
     peer_header: PeerHeader,
     counters: Vec<StatisticsCounter>,
@@ -838,6 +858,7 @@ impl StatisticsReportMessage {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum StatisticsCounter {
     NumberOfPrefixesRejectedByInboundPolicy(CounterU32),
     NumberOfDuplicatePrefixAdvertisements(CounterU32),
@@ -930,6 +951,7 @@ impl StatisticsCounter {
 /// until it reaches a maximum value, when it wraps around and starts
 /// increasing again from 0.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct CounterU32(u32);
 
 impl CounterU32 {
@@ -961,6 +983,7 @@ impl Deref for CounterU32 {
 /// decreases below the maximum value (or increases above the minimum
 /// value), the 64-bit Gauge also decreases (or increases).
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GaugeU64(u64);
 
 impl GaugeU64 {
@@ -986,23 +1009,6 @@ impl Deref for GaugeU64 {
 fn arbitrary_ipv4(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Ipv4Addr> {
     let value = u.int_in_range(0..=u32::MAX)?;
     Ok(Ipv4Addr::from(value))
-}
-
-// Custom function to generate arbitrary ipv6 addresses
-#[cfg(feature = "fuzz")]
-fn arbitrary_ipv6(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<std::net::Ipv6Addr> {
-    let value = u.int_in_range(0..=u128::MAX)?;
-    Ok(std::net::Ipv6Addr::from(value))
-}
-
-// Custom function to generate arbitrary IPv4 and IPv6 addresses
-#[cfg(feature = "fuzz")]
-fn arbitrary_ip(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<IpAddr> {
-    let ipv4 = arbitrary_ipv4(u)?;
-    let ipv6 = arbitrary_ipv6(u)?;
-    let choices = [IpAddr::V4(ipv4), IpAddr::V6(ipv6)];
-    let addr = u.choose(&choices)?;
-    Ok(*addr)
 }
 
 /// PeerKey is used to identify a BMP peer. This key is unique only
@@ -1060,5 +1066,32 @@ impl PeerKey {
     }
     pub const fn bgp_id(&self) -> Ipv4Addr {
         self.bgp_id
+    }
+}
+
+// Custom function to generate arbitrary ipv6 addresses
+#[cfg(feature = "fuzz")]
+fn arbitrary_ipv6(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<std::net::Ipv6Addr> {
+    let value = u.int_in_range(0..=u128::MAX)?;
+    Ok(std::net::Ipv6Addr::from(value))
+}
+
+// Custom function to generate arbitrary IPv4 and IPv6 addresses
+#[cfg(feature = "fuzz")]
+fn arbitrary_ip(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<IpAddr> {
+    let ipv4 = arbitrary_ipv4(u)?;
+    let ipv6 = arbitrary_ipv6(u)?;
+    let choices = [IpAddr::V4(ipv4), IpAddr::V6(ipv6)];
+    let addr = u.choose(&choices)?;
+    Ok(*addr)
+}
+
+#[cfg(feature = "fuzz")]
+fn arbitrary_datetime(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<DateTime<Utc>> {
+    loop {
+        let seconds = u.int_in_range(0..=i64::MAX)?;
+        if let chrono::LocalResult::Single(tt) = Utc.timestamp_opt(seconds, 0) {
+            return Ok(tt);
+        }
     }
 }
