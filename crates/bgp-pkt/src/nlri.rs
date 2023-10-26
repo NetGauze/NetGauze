@@ -423,6 +423,10 @@ impl Ipv6MplsVpnUnicastAddress {
     pub const fn network(&self) -> &Ipv6Unicast {
         &self.network
     }
+
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
+    }
 }
 
 impl NlriAddressType for Ipv6MplsVpnUnicastAddress {
