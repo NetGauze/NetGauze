@@ -486,7 +486,7 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
             Ipv4Addr::new(172, 16, 0, 20),
             Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
         ),
-        vec![BgpMessage::Update(BgpUpdateMessage::new(
+        BgpMessage::Update(BgpUpdateMessage::new(
             vec![],
             vec![
                 PathAttribute::from(
@@ -520,7 +520,7 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
             vec![Ipv4UnicastAddress::new_no_path_id(
                 Ipv4Unicast::from_net(Ipv4Net::from_str("172.16.1.0/24").unwrap()).unwrap(),
             )],
-        ))],
+        )),
     )
     .unwrap();
     let bad_peer_header = LocatedRouteMonitoringMessageParsingError::new(
@@ -599,7 +599,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                 Ipv4Addr::new(172, 16, 0, 20),
                 Some(Utc.timestamp_opt(1664656357, 746092000).unwrap()),
             ),
-            vec![BgpMessage::Update(BgpUpdateMessage::new(
+            BgpMessage::Update(BgpUpdateMessage::new(
                 vec![],
                 vec![
                     PathAttribute::from(
@@ -632,7 +632,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
                 vec![Ipv4UnicastAddress::new_no_path_id(
                     Ipv4Unicast::from_net(Ipv4Net::from_str("172.16.1.0/24").unwrap()).unwrap(),
                 )],
-            ))],
+            )),
         )
         .unwrap(),
     );

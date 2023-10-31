@@ -308,16 +308,12 @@ impl WritablePdu<RouteMonitoringMessageWritingError> for RouteMonitoringMessage 
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
-        Self::BASE_LENGTH
-            + self.peer_header.len()
-            + self.updates().iter().map(|msg| msg.len()).sum::<usize>()
+        Self::BASE_LENGTH + self.peer_header.len() + self.update_message().len()
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMonitoringMessageWritingError> {
         self.peer_header.write(writer)?;
-        for msg in self.updates() {
-            msg.write(writer)?;
-        }
+        self.update_message.write(writer)?;
         Ok(())
     }
 }

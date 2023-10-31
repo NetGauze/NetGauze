@@ -292,30 +292,26 @@ impl<'a>
         buf: Span<'a>,
         add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMonitoringMessageParsingError<'a>> {
-        let (mut buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+        let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
         let empty = HashMap::new();
         let add_path_support = add_path.get(&peer_key).unwrap_or(&empty);
         let input = buf;
-        let mut bgp_messages = vec![];
-        while !buf.is_empty() {
-            let marker = buf;
-            let (t, msg): (Span<'_>, BgpMessage) =
-                parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path_support)?;
-            if msg.get_type() != BgpMessageType::Update {
-                return Err(nom::Err::Error(
-                    LocatedRouteMonitoringMessageParsingError::new(
-                        marker,
-                        RouteMonitoringMessageParsingError::RouteMonitoringMessageError(
-                            RouteMonitoringMessageError::UnexpectedMessageType(msg.get_type()),
+        let (buf, update_message): (Span<'_>, BgpMessage) =
+            parse_into_located_two_inputs(buf, peer_header.is_asn4(), add_path_support)?;
+        if update_message.get_type() != BgpMessageType::Update {
+            return Err(nom::Err::Error(
+                LocatedRouteMonitoringMessageParsingError::new(
+                    input,
+                    RouteMonitoringMessageParsingError::RouteMonitoringMessageError(
+                        RouteMonitoringMessageError::UnexpectedMessageType(
+                            update_message.get_type(),
                         ),
                     ),
-                ));
-            }
-            bgp_messages.push(msg);
-            buf = t;
+                ),
+            ));
         }
-        match RouteMonitoringMessage::build(peer_header, bgp_messages) {
+        match RouteMonitoringMessage::build(peer_header, update_message) {
             Ok(msg) => Ok((buf, msg)),
             Err(err) => Err(nom::Err::Error(
                 LocatedRouteMonitoringMessageParsingError::new(

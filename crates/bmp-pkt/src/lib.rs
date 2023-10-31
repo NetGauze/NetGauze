@@ -454,24 +454,22 @@ pub enum RouteMonitoringMessageError {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
-    updates: Vec<BgpMessage>,
+    update_message: BgpMessage,
 }
 
 impl RouteMonitoringMessage {
     pub fn build(
         peer_header: PeerHeader,
-        updates: Vec<BgpMessage>,
+        update_message: BgpMessage,
     ) -> Result<Self, RouteMonitoringMessageError> {
-        for update in &updates {
-            if update.get_type() != BgpMessageType::Update {
-                return Err(RouteMonitoringMessageError::UnexpectedMessageType(
-                    update.get_type(),
-                ));
-            }
+        if update_message.get_type() != BgpMessageType::Update {
+            return Err(RouteMonitoringMessageError::UnexpectedMessageType(
+                update_message.get_type(),
+            ));
         }
         Ok(Self {
             peer_header,
-            updates,
+            update_message,
         })
     }
 
@@ -479,8 +477,8 @@ impl RouteMonitoringMessage {
         &self.peer_header
     }
 
-    pub const fn updates(&self) -> &Vec<BgpMessage> {
-        &self.updates
+    pub const fn update_message(&self) -> &BgpMessage {
+        &self.update_message
     }
 }
 
