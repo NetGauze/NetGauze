@@ -18,8 +18,8 @@
 use crate::{wire::deserializer::path_attribute::PathAttributeParsingError, BgpUpdateMessage};
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
-    parse_till_empty_into_with_one_input_located, parse_till_empty_into_with_two_inputs_located,
-    ReadablePduWithTwoInputs, Span,
+    parse_till_empty_into_with_one_input_located, parse_till_empty_into_with_three_inputs_located,
+    ReadablePduWithThreeInputs, Span,
 };
 use nom::{error::ErrorKind, number::complete::be_u16, IResult};
 use serde::{Deserialize, Serialize};
@@ -49,9 +49,10 @@ pub enum BgpUpdateMessageParsingError {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithThreeInputs<
         'a,
         bool,
+        &HashMap<AddressType, u8>,
         &HashMap<AddressType, bool>,
         LocatedBgpUpdateMessageParsingError<'a>,
     > for BgpUpdateMessage
@@ -59,6 +60,7 @@ impl<'a>
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
+        multiple_labels: &HashMap<AddressType, u8>,
         add_path_map: &HashMap<AddressType, bool>,
     ) -> IResult<Span<'a>, Self, LocatedBgpUpdateMessageParsingError<'a>> {
         let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
@@ -68,8 +70,12 @@ impl<'a>
         let (_, withdrawn_routes) =
             parse_till_empty_into_with_one_input_located(withdrawn_buf, add_path)?;
         let (buf, path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
-        let (_, path_attributes) =
-            parse_till_empty_into_with_two_inputs_located(path_attributes_buf, asn4, add_path_map)?;
+        let (_, path_attributes) = parse_till_empty_into_with_three_inputs_located(
+            path_attributes_buf,
+            asn4,
+            multiple_labels,
+            add_path_map,
+        )?;
         let (buf, nlri_vec) = parse_till_empty_into_with_one_input_located(buf, add_path)?;
         Ok((
             buf,

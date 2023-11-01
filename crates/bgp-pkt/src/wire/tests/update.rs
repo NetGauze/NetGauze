@@ -31,7 +31,8 @@ use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
     test_helpers::{
         test_parse_error_with_one_input, test_parsed_completely,
-        test_parsed_completely_with_one_input, test_parsed_completely_with_two_inputs, test_write,
+        test_parsed_completely_with_one_input, test_parsed_completely_with_three_inputs,
+        test_write,
     },
     Span,
 };
@@ -104,7 +105,13 @@ fn test_empty_update() -> Result<(), BgpMessageWritingError> {
         0xff, 0x00, 0x17, 0x02, 0x00, 0x00, 0x00, 0x00,
     ];
     let good = BgpMessage::Update(BgpUpdateMessage::new(vec![], vec![], vec![]));
-    test_parsed_completely_with_two_inputs(&good_wire, false, &HashMap::new(), &good);
+    test_parsed_completely_with_three_inputs(
+        &good_wire,
+        false,
+        &HashMap::new(),
+        &HashMap::new(),
+        &good,
+    );
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -123,9 +130,10 @@ fn test_withdraw_update() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_two_inputs(
+    test_parsed_completely_with_three_inputs(
         &good_withdraw_wire,
         false,
+        &HashMap::new(),
         &HashMap::new(),
         &good_withdraw,
     );

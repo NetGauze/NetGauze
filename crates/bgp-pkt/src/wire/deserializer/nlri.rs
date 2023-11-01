@@ -27,7 +27,8 @@ use crate::{
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs,
+    ReadablePduWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -183,23 +184,24 @@ pub enum Ipv4MplsVpnUnicastAddressParsingError {
     MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>>
+impl<'a>
+    ReadablePduWithThreeInputs<'a, bool, bool, u8, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>>
     for Ipv4MplsVpnUnicastAddress
 {
     fn from_wire(
         buf: Span<'a>,
         add_path: bool,
+        is_unreach: bool,
+        multiple_labels_limit: u8,
     ) -> IResult<Span<'a>, Self, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>> {
         let input = buf;
-        let (mut buf, prefix_len) = be_u8(buf)?;
-        let mut label_stack = vec![];
-        let mut is_bottom = false;
-        while !is_bottom {
-            let (t, label): (Span<'_>, MplsLabel) = parse_into_located(buf)?;
-            buf = t;
-            is_bottom = label.is_bottom();
-            label_stack.push(label);
-        }
+        let (buf, prefix_len) = be_u8(buf)?;
+        let (buf, label_stack) = parse_mpls_label_stack(buf, is_unreach, multiple_labels_limit)
+            .map_err(|err| match err {
+                nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+                nom::Err::Error(error) => nom::Err::Error(error.into()),
+                nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
+            })?;
         let (buf, path_id) = if add_path {
             let (buf, path_id) = be_u32(buf)?;
             (buf, Some(path_id))
@@ -238,23 +240,24 @@ pub enum Ipv6MplsVpnUnicastAddressParsingError {
     Ipv6UnicastError(#[from_located(module = "self")] Ipv6UnicastParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>>
+impl<'a>
+    ReadablePduWithThreeInputs<'a, bool, bool, u8, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>>
     for Ipv6MplsVpnUnicastAddress
 {
     fn from_wire(
         buf: Span<'a>,
         add_path: bool,
+        is_unreach: bool,
+        multiple_labels_limit: u8,
     ) -> IResult<Span<'a>, Self, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>> {
         let input = buf;
-        let (mut buf, prefix_len) = be_u8(buf)?;
-        let mut label_stack = vec![];
-        let mut is_bottom = false;
-        while !is_bottom {
-            let (t, label): (Span<'_>, MplsLabel) = parse_into_located(buf)?;
-            buf = t;
-            is_bottom = label.is_bottom();
-            label_stack.push(label);
-        }
+        let (buf, prefix_len) = be_u8(buf)?;
+        let (buf, label_stack) = parse_mpls_label_stack(buf, is_unreach, multiple_labels_limit)
+            .map_err(|err| match err {
+                nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+                nom::Err::Error(error) => nom::Err::Error(error.into()),
+                nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
+            })?;
         let (buf, path_id) = if add_path {
             let (buf, path_id) = be_u32(buf)?;
             (buf, Some(path_id))
@@ -992,12 +995,15 @@ pub enum Ipv4NlriMplsLabelsAddressParsingError {
     Ipv4PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4NlriMplsLabelsAddressParsingError<'a>>
+impl<'a>
+    ReadablePduWithThreeInputs<'a, bool, bool, u8, LocatedIpv4NlriMplsLabelsAddressParsingError<'a>>
     for Ipv4NlriMplsLabelsAddress
 {
     fn from_wire(
         buf: Span<'a>,
         add_path: bool,
+        is_unreach: bool,
+        multiple_labels_limit: u8,
     ) -> IResult<Span<'a>, Self, LocatedIpv4NlriMplsLabelsAddressParsingError<'a>> {
         let (buf, path_id) = if add_path {
             let (buf, path_id) = be_u32(buf)?;
@@ -1008,16 +1014,21 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4NlriMplsLabelsAddressParsi
         let input = buf;
         let (buf, mut prefix_len) = be_u8(buf)?;
         let prefix_bytes = prefix_len / 8;
-        let mut labels = Vec::<MplsLabel>::new();
-        let (buf, mut nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
-        while labels.last().map_or(true, |x| !x.is_bottom()) {
-            let (t, label) = parse_into_located(nlri_buf)?;
-            labels.push(label);
-            nlri_buf = t;
-            prefix_len -= MPLS_LABEL_LEN_BITS;
-        }
+        let (buf, nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
+        let (nlri_buf, label_stack) =
+            parse_mpls_label_stack(nlri_buf, is_unreach, multiple_labels_limit).map_err(|err| {
+                match err {
+                    nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+                    nom::Err::Error(error) => nom::Err::Error(error.into()),
+                    nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
+                }
+            })?;
+        prefix_len -= MPLS_LABEL_LEN_BITS * label_stack.len() as u8;
         let (_buf, prefix) = parse_into_located_two_inputs(nlri_buf, prefix_len, input)?;
-        Ok((buf, Ipv4NlriMplsLabelsAddress::new(path_id, labels, prefix)))
+        Ok((
+            buf,
+            Ipv4NlriMplsLabelsAddress::new(path_id, label_stack, prefix),
+        ))
     }
 }
 
@@ -1029,12 +1040,15 @@ pub enum Ipv6NlriMplsLabelsAddressParsingError {
     Ipv6PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv6PrefixParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6NlriMplsLabelsAddressParsingError<'a>>
+impl<'a>
+    ReadablePduWithThreeInputs<'a, bool, bool, u8, LocatedIpv6NlriMplsLabelsAddressParsingError<'a>>
     for Ipv6NlriMplsLabelsAddress
 {
     fn from_wire(
         buf: Span<'a>,
         add_path: bool,
+        is_unreach: bool,
+        multiple_labels_limit: u8,
     ) -> IResult<Span<'a>, Self, LocatedIpv6NlriMplsLabelsAddressParsingError<'a>> {
         let (buf, path_id) = if add_path {
             let (buf, path_id) = be_u32(buf)?;
@@ -1045,15 +1059,41 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6NlriMplsLabelsAddressParsi
         let input = buf;
         let (buf, mut prefix_len) = be_u8(buf)?;
         let prefix_bytes = prefix_len / 8;
-        let mut labels = Vec::<MplsLabel>::new();
-        let (buf, mut nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
-        while labels.last().map_or(true, |x| !x.is_bottom()) {
-            let (t, label) = parse_into_located(nlri_buf)?;
-            labels.push(label);
-            nlri_buf = t;
-            prefix_len -= MPLS_LABEL_LEN_BITS;
-        }
+        let (buf, nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
+        let (nlri_buf, label_stack) =
+            parse_mpls_label_stack(nlri_buf, is_unreach, multiple_labels_limit).map_err(|err| {
+                match err {
+                    nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+                    nom::Err::Error(error) => nom::Err::Error(error.into()),
+                    nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
+                }
+            })?;
+        prefix_len -= MPLS_LABEL_LEN_BITS * label_stack.len() as u8;
         let (_buf, prefix) = parse_into_located_two_inputs(nlri_buf, prefix_len, input)?;
-        Ok((buf, Ipv6NlriMplsLabelsAddress::new(path_id, labels, prefix)))
+        Ok((
+            buf,
+            Ipv6NlriMplsLabelsAddress::new(path_id, label_stack, prefix),
+        ))
     }
+}
+
+#[inline]
+fn parse_mpls_label_stack(
+    buf: Span<'_>,
+    is_unreach: bool,
+    mut multiple_labels_limit: u8,
+) -> IResult<Span<'_>, Vec<MplsLabel>, LocatedMplsLabelParsingError<'_>> {
+    let mut buf = buf;
+    let mut label_stack = Vec::<MplsLabel>::new();
+    let mut is_bottom = false;
+    while !is_bottom && multiple_labels_limit > 0 {
+        let (t, label): (Span<'_>, MplsLabel) = parse_into_located(buf)?;
+        buf = t;
+        if multiple_labels_limit != u8::MAX {
+            multiple_labels_limit -= 1;
+        }
+        is_bottom = label.is_bottom() || is_unreach && label.is_unreach_compatibility();
+        label_stack.push(label);
+    }
+    Ok((buf, label_stack))
 }

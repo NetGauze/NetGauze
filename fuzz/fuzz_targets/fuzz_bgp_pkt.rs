@@ -21,11 +21,18 @@ use libfuzzer_sys::fuzz_target;
 
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{ReadablePduWithTwoInputs, Span};
+use netgauze_parse_utils::{ReadablePduWithThreeInputs, Span};
 
-fuzz_target!(|data: (&[u8], bool, HashMap<AddressType, bool>)| {
-    let (mut buf, asn4, addpath) = data;
-    while let Ok((retbuf, _msg)) = BgpMessage::from_wire(Span::new(buf), asn4, &addpath) {
+fuzz_target!(|data: (
+    &[u8],
+    bool,
+    HashMap<AddressType, u8>,
+    HashMap<AddressType, bool>
+)| {
+    let (mut buf, asn4, multiple_labels, addpath) = data;
+    while let Ok((retbuf, _msg)) =
+        BgpMessage::from_wire(Span::new(buf), asn4, &multiple_labels, &addpath)
+    {
         buf = retbuf.fragment();
     }
 });
