@@ -312,6 +312,33 @@ pub fn parse_till_empty_into_with_two_inputs_located<
     Ok((buf, ret))
 }
 
+/// Keep repeating the parser till the buf is empty
+#[inline]
+pub fn parse_till_empty_into_with_three_inputs_located<
+    'a,
+    I1: Clone,
+    I2: Clone,
+    I3: Clone,
+    Lin: Debug,
+    L: From<Lin>,
+    T: ReadablePduWithThreeInputs<'a, I1, I2, I3, Lin>,
+>(
+    buf: Span<'a>,
+    input1: I1,
+    input2: I2,
+    input3: I3,
+) -> IResult<Span<'a>, Vec<T>, L> {
+    let mut buf = buf;
+    let mut ret = Vec::new();
+    while !buf.is_empty() {
+        let (tmp, element) =
+            parse_into_located_three_inputs(buf, input1.clone(), input2.clone(), input3.clone())?;
+        ret.push(element);
+        buf = tmp;
+    }
+    Ok((buf, ret))
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(remote = "nom::error::ErrorKind")]
 pub enum ErrorKindSerdeDeref {
