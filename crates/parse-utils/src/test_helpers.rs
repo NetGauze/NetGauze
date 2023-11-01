@@ -199,6 +199,32 @@ pub fn test_parse_error_with_two_inputs<'a, T, I, K, E>(
     assert_eq!(parsed.err().unwrap(), expected_err);
 }
 
+/// Fancier assert to for more meaningful error messages
+pub fn test_parse_error_with_three_inputs<'a, T, I1, I2, I3, E>(
+    input: &'a [u8],
+    parser_input1: I1,
+    parser_input2: I2,
+    parser_input3: I3,
+    expected_err: nom::Err<E>,
+) where
+    T: ReadablePduWithThreeInputs<'a, I1, I2, I3, E> + Debug,
+    E: Debug + Eq,
+{
+    let parsed: IResult<BinarySpan<&[u8]>, T, E> =
+        <T as ReadablePduWithThreeInputs<I1, I2, I3, E>>::from_wire(
+            Span::new(input),
+            parser_input1,
+            parser_input2,
+            parser_input3,
+        );
+    assert!(
+        parsed.is_err(),
+        "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
+    );
+
+    assert_eq!(parsed.err().unwrap(), expected_err);
+}
+
 pub fn test_write<T: WritablePdu<E>, E: Eq>(input: &T, expected: &[u8]) -> Result<(), E> {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
