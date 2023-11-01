@@ -20,7 +20,8 @@ use crate::{
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_parse_utils::{
     test_helpers::{
-        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input, test_write,
+        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input,
+        test_parsed_completely_with_three_inputs, test_write,
     },
     Span,
 };
@@ -157,7 +158,7 @@ fn test_ipv4_mpls_vpn_unicast() -> Result<(), Ipv4MplsVpnUnicastAddressWritingEr
         vec![MplsLabel::new([0x00, 0x41, 0x01])],
         Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
     );
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_three_inputs(&good_wire, false, false, 1, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -177,7 +178,7 @@ fn test_ipv6_mpls_vpn_unicast() -> Result<(), Ipv6MplsVpnUnicastAddressWritingEr
         vec![MplsLabel::new([0xe0, 0x08, 0x01])],
         Ipv6Unicast::from_net(Ipv6Net::from_str("fd00:2::4/126").unwrap()).unwrap(),
     );
-    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_parsed_completely_with_three_inputs(&good_wire, false, false, 1, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }

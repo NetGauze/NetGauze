@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use netgauze_bgp_pkt::BgpMessage;
-use netgauze_parse_utils::{ReadablePduWithTwoInputs, Span};
+use netgauze_parse_utils::{ReadablePduWithThreeInputs, Span};
 use std::collections::HashMap;
 
 const OPEN_COMPLEX_NO_PARAMS: [u8; 29] = [
@@ -32,7 +32,7 @@ const OPEN_COMPLEX_RAW: [u8; 123] = [
     0x01, // Send/Receive
     0x03, // Capability 4: Afi IPv6
     0x00, 0x02, // Capability 4: unicast
-    0x01, // Capability 4: send recevie
+    0x01, // Capability 4: send receive
     0x03, 0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x01, 0x04, 0x00, 0x02, 0x00, 0x01, 0x01, 0x04, 0x40,
     0x04, 0x00, 0x47, 0x01, 0x04, 0x00, 0x01, 0x00, 0x85, 0x01, 0x04, 0x00, 0x02, 0x00, 0x85, 0x01,
     0x04, 0x00, 0x01, 0x00, 0x86, 0x01, 0x04, 0x00, 0x02, 0x00, 0x86, 0x01, 0x04, 0x00, 0x01, 0x00,
@@ -41,11 +41,11 @@ const OPEN_COMPLEX_RAW: [u8; 123] = [
 ];
 
 pub fn test_open_message_no_params(span: Span<'_>) {
-    let x = BgpMessage::from_wire(span, true, &HashMap::new());
+    let x = BgpMessage::from_wire(span, true, false, &HashMap::new());
     x.unwrap();
 }
 pub fn test_complex_open_message(span: Span<'_>) {
-    let x = BgpMessage::from_wire(span, true, &HashMap::new());
+    let x = BgpMessage::from_wire(span, true, false, &HashMap::new());
     x.unwrap();
 }
 

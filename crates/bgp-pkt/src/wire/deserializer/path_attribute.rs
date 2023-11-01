@@ -26,9 +26,11 @@ use netgauze_iana::address_family::{
     UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    parse_till_empty, parse_till_empty_into_located, parse_till_empty_into_with_one_input_located,
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input, parse_into_located_three_inputs,
+    parse_into_located_two_inputs, parse_till_empty, parse_till_empty_into_located,
+    parse_till_empty_into_with_one_input_located, parse_till_empty_into_with_three_inputs_located,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs,
+    ReadablePduWithTwoInputs, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -96,9 +98,10 @@ pub trait IntoLocatedPathAttributeParsingError<'a> {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithThreeInputs<
         'a,
         bool,
+        &HashMap<AddressType, u8>,
         &HashMap<AddressType, bool>,
         LocatedPathAttributeParsingError<'a>,
     > for PathAttribute
@@ -106,6 +109,7 @@ impl<'a>
     fn from_wire(
         buf: Span<'a>,
         asn4: bool,
+        multiple_labels: &HashMap<AddressType, u8>,
         add_path_map: &HashMap<AddressType, bool>,
     ) -> IResult<Span<'a>, Self, LocatedPathAttributeParsingError<'a>> {
         let (buf, attributes) = be_u8(buf)?;
@@ -189,14 +193,22 @@ impl<'a>
                 (buf, value)
             }
             Ok(PathAttributeType::MpReachNlri) => {
-                let (buf, value) =
-                    parse_into_located_two_inputs(buf, extended_length, add_path_map)?;
+                let (buf, value) = parse_into_located_three_inputs(
+                    buf,
+                    extended_length,
+                    multiple_labels,
+                    add_path_map,
+                )?;
                 let value = PathAttributeValue::MpReach(value);
                 (buf, value)
             }
             Ok(PathAttributeType::MpUnreachNlri) => {
-                let (buf, value) =
-                    parse_into_located_two_inputs(buf, extended_length, add_path_map)?;
+                let (buf, value) = parse_into_located_three_inputs(
+                    buf,
+                    extended_length,
+                    multiple_labels,
+                    add_path_map,
+                )?;
                 let value = PathAttributeValue::MpUnreach(value);
                 (buf, value)
             }
@@ -597,12 +609,18 @@ pub enum MpReachParsingError {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<'a, bool, &HashMap<AddressType, bool>, LocatedMpReachParsingError<'a>>
-    for MpReach
+    ReadablePduWithThreeInputs<
+        'a,
+        bool,
+        &HashMap<AddressType, u8>,
+        &HashMap<AddressType, bool>,
+        LocatedMpReachParsingError<'a>,
+    > for MpReach
 {
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
+        multiple_labels: &HashMap<AddressType, u8>,
         add_path_map: &HashMap<AddressType, bool>,
     ) -> IResult<Span<'a>, Self, LocatedMpReachParsingError<'a>> {
         let (buf, mp_buf) = if extended_length {
@@ -642,7 +660,14 @@ impl<'a>
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4NlriMplsLabels)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
+                    mp_buf,
+                    add_path,
+                    false,
+                    *multiple_labels
+                        .get(&AddressType::Ipv4NlriMplsLabels)
+                        .unwrap_or(&1),
+                )?;
                 Ok((buf, MpReach::Ipv4NlriMplsLabels { next_hop, nlri }))
             }
             Ok(AddressType::Ipv4MplsLabeledVpn) => {
@@ -651,7 +676,14 @@ impl<'a>
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4MplsLabeledVpn)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
+                    mp_buf,
+                    add_path,
+                    false,
+                    *multiple_labels
+                        .get(&AddressType::Ipv4MplsLabeledVpn)
+                        .unwrap_or(&1),
+                )?;
                 Ok((buf, MpReach::Ipv4MplsVpnUnicast { next_hop, nlri }))
             }
             Ok(AddressType::Ipv6Unicast) => {
@@ -708,7 +740,14 @@ impl<'a>
                 let add_path = add_path_map
                     .get(&AddressType::Ipv6NlriMplsLabels)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
+                    mp_buf,
+                    add_path,
+                    false,
+                    *multiple_labels
+                        .get(&AddressType::Ipv6NlriMplsLabels)
+                        .unwrap_or(&1),
+                )?;
                 Ok((buf, MpReach::Ipv6NlriMplsLabels { next_hop, nlri }))
             }
             Ok(AddressType::Ipv6MplsLabeledVpn) => {
@@ -717,7 +756,14 @@ impl<'a>
                 let add_path = add_path_map
                     .get(&AddressType::Ipv6MplsLabeledVpn)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
+                    mp_buf,
+                    add_path,
+                    false,
+                    *multiple_labels
+                        .get(&AddressType::Ipv6MplsLabeledVpn)
+                        .unwrap_or(&1),
+                )?;
                 Ok((buf, MpReach::Ipv6MplsVpnUnicast { next_hop, nlri }))
             }
             Ok(AddressType::L2VpnBgpEvpn) => {
@@ -798,9 +844,10 @@ pub enum MpUnreachParsingError {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithThreeInputs<
         'a,
         bool,
+        &HashMap<AddressType, u8>,
         &HashMap<AddressType, bool>,
         LocatedMpUnreachParsingError<'a>,
     > for MpUnreach
@@ -808,6 +855,7 @@ impl<'a>
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
+        multiple_labels: &HashMap<AddressType, u8>,
         add_path_map: &HashMap<AddressType, bool>,
     ) -> IResult<Span<'a>, Self, LocatedMpUnreachParsingError<'a>> {
         let (buf, mp_buf) = if extended_length {
@@ -837,14 +885,28 @@ impl<'a>
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4NlriMplsLabels)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
+                    mp_buf,
+                    add_path,
+                    true,
+                    *multiple_labels
+                        .get(&AddressType::Ipv4NlriMplsLabels)
+                        .unwrap_or(&1),
+                )?;
                 Ok((buf, MpUnreach::Ipv4NlriMplsLabels { nlri }))
             }
             Ok(AddressType::Ipv4MplsLabeledVpn) => {
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4Multicast)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
+                    mp_buf,
+                    add_path,
+                    true,
+                    *multiple_labels
+                        .get(&AddressType::Ipv4MplsLabeledVpn)
+                        .unwrap_or(&1),
+                )?;
                 Ok((buf, MpUnreach::Ipv4MplsVpnUnicast { nlri }))
             }
             Ok(AddressType::Ipv6Unicast) => {
@@ -865,14 +927,28 @@ impl<'a>
                 let add_path = add_path_map
                     .get(&AddressType::Ipv6NlriMplsLabels)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
+                    mp_buf,
+                    add_path,
+                    true,
+                    *multiple_labels
+                        .get(&AddressType::Ipv6NlriMplsLabels)
+                        .unwrap_or(&1),
+                )?;
                 Ok((buf, MpUnreach::Ipv6NlriMplsLabels { nlri }))
             }
             Ok(AddressType::Ipv6MplsLabeledVpn) => {
                 let add_path = add_path_map
                     .get(&AddressType::Ipv6MplsLabeledVpn)
                     .map_or(false, |x| *x);
-                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
+                    mp_buf,
+                    add_path,
+                    true,
+                    *multiple_labels
+                        .get(&AddressType::Ipv6MplsLabeledVpn)
+                        .unwrap_or(&1),
+                )?;
                 Ok((buf, MpUnreach::Ipv6MplsVpnUnicast { nlri }))
             }
             Ok(AddressType::L2VpnBgpEvpn) => {

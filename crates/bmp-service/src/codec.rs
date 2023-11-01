@@ -24,7 +24,7 @@ use netgauze_bmp_pkt::{
     BmpMessage, BmpMessageValue, PeerKey,
 };
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
+use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithTwoInputs, Span, WritablePdu};
 use nom::Needed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -51,6 +51,7 @@ impl From<std::io::Error> for BmpCodecDecoderError {
 pub struct BmpCodec {
     /// Helper to track in the decoder if we are inside a BMP message or not
     in_message: bool,
+    multiple_labels: HashMap<PeerKey, HashMap<AddressType, u8>>,
     add_path: HashMap<PeerKey, HashMap<AddressType, bool>>,
 }
 
@@ -76,6 +77,13 @@ impl BmpCodec {
                                 .collect();
                             self.add_path.insert(peer_key, add_path);
                         }
+                        if let Some(BgpCapability::MultipleLabels(labels)) =
+                            capabilities.get(&BgpCapabilityCode::MultipleLabelsCapability)
+                        {
+                            for label in labels {
+                                label.address_type();
+                            }
+                        }
                     }
                     if let BgpMessage::Open(open) = peer_up.received_message() {
                         let capabilities = open.capabilities();
@@ -95,6 +103,26 @@ impl BmpCodec {
                                 .map(|x| (x.address_type(), x.send()))
                                 .collect();
                             self.add_path.insert(peer_key, add_path);
+                        }
+                        if let Some(BgpCapability::MultipleLabels(multiple_labels)) =
+                            capabilities.get(&BgpCapabilityCode::MultipleLabelsCapability)
+                        {
+                            let peer_key = PeerKey::new(
+                                peer_up.peer_header().address(),
+                                peer_up.peer_header().peer_type(),
+                                peer_up.peer_header().rd(),
+                                peer_up.peer_header().peer_as(),
+                                open.bgp_id(),
+                            );
+                            let multiple_labels = multiple_labels
+                                .iter()
+                                // As per RFC8277 counts 0 and 1 are ignored. We assume they're 1
+                                // for parsing purposes.
+                                .map(|x| {
+                                    (x.address_type(), if x.count() > 0 { x.count() } else { 1 })
+                                })
+                                .collect();
+                            self.multiple_labels.insert(peer_key, multiple_labels);
                         }
                     }
                 }
@@ -137,7 +165,11 @@ impl Decoder for BmpCodec {
                 Ok(None)
             } else {
                 self.in_message = false;
-                let msg = match BmpMessage::from_wire(Span::new(buf), &self.add_path) {
+                let msg = match BmpMessage::from_wire(
+                    Span::new(buf),
+                    &self.multiple_labels,
+                    &self.add_path,
+                ) {
                     Ok((span, msg)) => {
                         self.update_add_path(&msg);
                         buf.advance(span.location_offset());

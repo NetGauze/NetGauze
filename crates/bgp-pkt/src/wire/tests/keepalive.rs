@@ -18,7 +18,7 @@ use crate::{
     BgpMessage,
 };
 use netgauze_parse_utils::test_helpers::{
-    combine, test_parsed_completely_with_two_inputs, test_write,
+    combine, test_parsed_completely_with_three_inputs, test_write,
 };
 use std::collections::HashMap;
 
@@ -28,8 +28,20 @@ fn test_keep_alive() -> Result<(), BgpMessageWritingError> {
 
     let good = BgpMessage::KeepAlive;
 
-    test_parsed_completely_with_two_inputs(&good_wire[..], false, &HashMap::new(), &good);
-    test_parsed_completely_with_two_inputs(&good_wire[..], true, &HashMap::new(), &good);
+    test_parsed_completely_with_three_inputs(
+        &good_wire[..],
+        false,
+        &HashMap::new(),
+        &HashMap::new(),
+        &good,
+    );
+    test_parsed_completely_with_three_inputs(
+        &good_wire[..],
+        true,
+        &HashMap::new(),
+        &HashMap::new(),
+        &good,
+    );
 
     test_write(&good, &good_wire[..])?;
     Ok(())

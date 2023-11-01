@@ -43,6 +43,9 @@ impl MplsLabel {
     pub const fn is_bottom(&self) -> bool {
         self.0[2] & 0x01 == 0x01
     }
+    pub const fn is_unreach_compatibility(&self) -> bool {
+        self.0[0] == 0x80 && self.0[1] == 0x00 && self.0[2] == 0x00
+    }
 }
 
 /// Route Distinguisher (RD) is a 8-byte value and encoded as follows:
