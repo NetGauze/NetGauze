@@ -89,6 +89,7 @@ pub enum PathAttributeParsingError {
     ClusterListError(#[from_located(module = "self")] ClusterListParsingError),
     MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
+    OnlyToCustomerError(#[from_located(module = "self")] OnlyToCustomerParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
     InvalidPathAttribute(InvalidPathAttribute),
 }
@@ -210,6 +211,11 @@ impl<'a>
                     add_path_map,
                 )?;
                 let value = PathAttributeValue::MpUnreach(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::OnlyToCustomer) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::OnlyToCustomer(value);
                 (buf, value)
             }
             Ok(_code) => {
@@ -1166,5 +1172,28 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedClusterListParsingError<'a>> f
         };
         let (_, cluster_ids) = parse_till_empty_into_located(data_buf)?;
         Ok((buf, ClusterList::new(cluster_ids)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum OnlyToCustomerParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOnlyToCustomerParsingError<'a>>
+    for OnlyToCustomer
+{
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedOnlyToCustomerParsingError<'a>> {
+        let (buf, data_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (_buf, asn) = be_u32(data_buf)?;
+        Ok((buf, OnlyToCustomer::new(asn)))
     }
 }

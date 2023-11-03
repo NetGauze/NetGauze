@@ -163,6 +163,7 @@ pub enum PathAttributeValue {
     ClusterList(ClusterList),
     MpReach(MpReach),
     MpUnreach(MpUnreach),
+    OnlyToCustomer(OnlyToCustomer),
     UnknownAttribute(UnknownAttribute),
 }
 
@@ -185,6 +186,7 @@ impl PathAttributeValue {
             Self::ClusterList(_) => ClusterList::can_be_optional(),
             Self::MpReach(_) => MpReach::can_be_optional(),
             Self::MpUnreach(_) => MpUnreach::can_be_optional(),
+            Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_optional(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
         }
     }
@@ -207,6 +209,7 @@ impl PathAttributeValue {
             Self::ClusterList(_) => ClusterList::can_be_transitive(),
             Self::MpReach(_) => MpReach::can_be_transitive(),
             Self::MpUnreach(_) => MpUnreach::can_be_transitive(),
+            Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_transitive(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_transitive(),
         }
     }
@@ -229,6 +232,7 @@ impl PathAttributeValue {
             Self::ClusterList(_) => ClusterList::can_be_partial(),
             Self::MpReach(_) => MpReach::can_be_partial(),
             Self::MpUnreach(_) => MpUnreach::can_be_partial(),
+            Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_partial(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
         }
     }
@@ -1051,6 +1055,33 @@ impl PathAttributeValueProperties for UnknownAttribute {
     }
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OnlyToCustomer(u32);
+
+impl OnlyToCustomer {
+    pub const fn new(asn: u32) -> Self {
+        Self(asn)
+    }
+
+    pub const fn asn(&self) -> u32 {
+        self.0
+    }
+}
+
+impl PathAttributeValueProperties for OnlyToCustomer {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_transitive() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1108,5 +1139,7 @@ mod tests {
         assert!(Aggregator::can_be_transitive().unwrap_or(false));
         assert!(MpReach::can_be_optional().unwrap_or(false));
         assert!(!MpReach::can_be_transitive().unwrap_or(false));
+        assert!(OnlyToCustomer::can_be_optional().unwrap_or(false));
+        assert!(OnlyToCustomer::can_be_transitive().unwrap_or(false));
     }
 }

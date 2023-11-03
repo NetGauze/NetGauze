@@ -43,6 +43,7 @@ pub enum PathAttributeWritingError {
     ClusterListError(#[from] ClusterListWritingError),
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
+    OnlyToCustomerError(#[from] OnlyToCustomerWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
 }
 
@@ -67,6 +68,7 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::ClusterList(value) => value.len(self.extended_length()),
             PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
             PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
+            PathAttributeValue::OnlyToCustomer(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
         };
         Self::BASE_LENGTH + value_len
@@ -150,6 +152,10 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             }
             PathAttributeValue::MpUnreach(value) => {
                 writer.write_u8(PathAttributeType::MpUnreachNlri.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::OnlyToCustomer(value) => {
+                writer.write_u8(PathAttributeType::OnlyToCustomer.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::UnknownAttribute(value) => {
@@ -1188,6 +1194,34 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
                 writer.write_all(nlri)?;
             }
         }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum OnlyToCustomerWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePduWithOneInput<bool, OnlyToCustomerWritingError> for OnlyToCustomer {
+    // 1-octet length + 4-octets for ASN
+    const BASE_LENGTH: usize = 5;
+
+    fn len(&self, extended_length: bool) -> usize {
+        if extended_length {
+            Self::BASE_LENGTH + 1
+        } else {
+            Self::BASE_LENGTH
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), OnlyToCustomerWritingError> {
+        write_length(self, extended_length, writer)?;
+        writer.write_u32::<NetworkEndian>(self.asn())?;
         Ok(())
     }
 }

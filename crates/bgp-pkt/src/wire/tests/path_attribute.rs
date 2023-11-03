@@ -2511,3 +2511,26 @@ fn test_path_attr_route_target_membership() -> Result<(), PathAttributeWritingEr
     test_write(&good, &good_wire)?;
     Ok(())
 }
+
+#[test]
+fn test_otc_path_attribute() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [0xc0, 0x23, 0x04, 0x00, 0x00, 0xfd, 0xe9];
+    let good = PathAttribute::from(
+        true,
+        true,
+        false,
+        false,
+        PathAttributeValue::OnlyToCustomer(OnlyToCustomer::new(65001)),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_three_inputs(
+        &good_wire,
+        false,
+        &HashMap::new(),
+        &HashMap::new(),
+        &good,
+    );
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
