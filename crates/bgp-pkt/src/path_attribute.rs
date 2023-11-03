@@ -25,6 +25,9 @@ use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
 
+/// Accumulated IGP Metric Length as defined in RFC7311
+pub(crate) const ACCUMULATED_IGP_METRIC: u16 = 11;
+
 /// General properties to check the validity of a given path attribute value
 pub trait PathAttributeValueProperties {
     /// Check the validity of the `optional` bit in the [`PathAttribute`]:
@@ -164,6 +167,8 @@ pub enum PathAttributeValue {
     MpReach(MpReach),
     MpUnreach(MpUnreach),
     OnlyToCustomer(OnlyToCustomer),
+    /// Accumulated IGP metric attribuyte
+    Aigp(Aigp),
     UnknownAttribute(UnknownAttribute),
 }
 
@@ -187,6 +192,7 @@ impl PathAttributeValue {
             Self::MpReach(_) => MpReach::can_be_optional(),
             Self::MpUnreach(_) => MpUnreach::can_be_optional(),
             Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_optional(),
+            Self::Aigp(_) => Aigp::can_be_optional(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
         }
     }
@@ -210,6 +216,7 @@ impl PathAttributeValue {
             Self::MpReach(_) => MpReach::can_be_transitive(),
             Self::MpUnreach(_) => MpUnreach::can_be_transitive(),
             Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_transitive(),
+            Self::Aigp(_) => Aigp::can_be_transitive(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_transitive(),
         }
     }
@@ -233,6 +240,7 @@ impl PathAttributeValue {
             Self::MpReach(_) => MpReach::can_be_partial(),
             Self::MpUnreach(_) => MpUnreach::can_be_partial(),
             Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_partial(),
+            Self::Aigp(_) => Aigp::can_be_partial(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
         }
     }
@@ -1075,6 +1083,26 @@ impl PathAttributeValueProperties for OnlyToCustomer {
 
     fn can_be_transitive() -> Option<bool> {
         Some(true)
+    }
+
+    fn can_be_partial() -> Option<bool> {
+        Some(false)
+    }
+}
+
+/// Accumulated IGP Metric Attribute [RFC7311](https://datatracker.ietf.org/doc/html/rfc7311)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Aigp {
+    AccumulatedIgpMetric(u64),
+}
+
+impl PathAttributeValueProperties for Aigp {
+    fn can_be_optional() -> Option<bool> {
+        Some(true)
+    }
+
+    fn can_be_transitive() -> Option<bool> {
+        Some(false)
     }
 
     fn can_be_partial() -> Option<bool> {

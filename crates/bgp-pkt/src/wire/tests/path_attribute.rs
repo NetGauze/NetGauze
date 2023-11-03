@@ -2534,3 +2534,29 @@ fn test_otc_path_attribute() -> Result<(), PathAttributeWritingError> {
     test_write(&good, &good_wire)?;
     Ok(())
 }
+
+#[test]
+fn test_aigp_path_attribute() -> Result<(), PathAttributeWritingError> {
+    let good_wire = [
+        0x80, 0x1a, 0x0b, 0x01, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
+    ];
+
+    let good = PathAttribute::from(
+        true,
+        false,
+        false,
+        false,
+        PathAttributeValue::Aigp(Aigp::AccumulatedIgpMetric(4294967295)),
+    )
+    .unwrap();
+
+    test_parsed_completely_with_three_inputs(
+        &good_wire,
+        false,
+        &HashMap::new(),
+        &HashMap::new(),
+        &good,
+    );
+    test_write(&good, &good_wire)?;
+    Ok(())
+}

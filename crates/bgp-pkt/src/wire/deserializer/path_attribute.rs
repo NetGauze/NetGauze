@@ -17,7 +17,10 @@
 //! Deserializer for BGP Path Attributes
 
 use crate::{
-    iana::{PathAttributeType, UndefinedPathAttributeType},
+    iana::{
+        AigpAttributeType, PathAttributeType, UndefinedAigpAttributeType,
+        UndefinedPathAttributeType,
+    },
     path_attribute::*,
     wire::deserializer::{community::*, nlri::*, IpAddrParsingError},
 };
@@ -35,7 +38,7 @@ use netgauze_parse_utils::{
 use netgauze_serde_macros::LocatedError;
 use nom::{
     error::ErrorKind,
-    number::complete::{be_u128, be_u16, be_u32, be_u8},
+    number::complete::{be_u128, be_u16, be_u32, be_u64, be_u8},
     IResult,
 };
 use serde::{Deserialize, Serialize};
@@ -90,6 +93,7 @@ pub enum PathAttributeParsingError {
     MpReachErrorError(#[from_located(module = "self")] MpReachParsingError),
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     OnlyToCustomerError(#[from_located(module = "self")] OnlyToCustomerParsingError),
+    AigpError(#[from_located(module = "self")] AigpParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
     InvalidPathAttribute(InvalidPathAttribute),
 }
@@ -216,6 +220,11 @@ impl<'a>
             Ok(PathAttributeType::OnlyToCustomer) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::OnlyToCustomer(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::AccumulatedIgp) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::Aigp(value);
                 (buf, value)
             }
             Ok(_code) => {
@@ -1172,6 +1181,43 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedClusterListParsingError<'a>> f
         };
         let (_, cluster_ids) = parse_till_empty_into_located(data_buf)?;
         Ok((buf, ClusterList::new(cluster_ids)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum AigpParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    UndefinedAigpAttributeType(#[from_external] UndefinedAigpAttributeType),
+    InvalidLength(u16),
+}
+
+impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAigpParsingError<'a>> for Aigp {
+    fn from_wire(
+        buf: Span<'a>,
+        extended_length: bool,
+    ) -> IResult<Span<'a>, Self, LocatedAigpParsingError<'a>> {
+        let (buf, data_buf) = if extended_length {
+            nom::multi::length_data(be_u16)(buf)?
+        } else {
+            nom::multi::length_data(be_u8)(buf)?
+        };
+        let (data_buf, aigp_type) =
+            nom::combinator::map_res(be_u8, AigpAttributeType::try_from)(data_buf)?;
+        match aigp_type {
+            AigpAttributeType::AccumulatedIgpMetric => {
+                let input = data_buf;
+                let (data_buf, length) = be_u16(data_buf)?;
+                if length != ACCUMULATED_IGP_METRIC {
+                    return Err(nom::Err::Error(LocatedAigpParsingError::new(
+                        input,
+                        AigpParsingError::InvalidLength(length),
+                    )));
+                }
+                let (_buf, metric) = be_u64(data_buf)?;
+                Ok((buf, Aigp::AccumulatedIgpMetric(metric)))
+            }
+        }
     }
 }
 

@@ -16,7 +16,7 @@
 //! Serializer for BGP Path Attributes
 
 use crate::{
-    iana::PathAttributeType,
+    iana::{AigpAttributeType, PathAttributeType},
     nlri::*,
     path_attribute::*,
     wire::serializer::{community::*, nlri::*, IpAddrWritingError},
@@ -44,6 +44,7 @@ pub enum PathAttributeWritingError {
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
     OnlyToCustomerError(#[from] OnlyToCustomerWritingError),
+    AigpError(#[from] AigpWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
 }
 
@@ -69,6 +70,7 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
             PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
             PathAttributeValue::OnlyToCustomer(value) => value.len(self.extended_length()),
+            PathAttributeValue::Aigp(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
         };
         Self::BASE_LENGTH + value_len
@@ -156,6 +158,10 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             }
             PathAttributeValue::OnlyToCustomer(value) => {
                 writer.write_u8(PathAttributeType::OnlyToCustomer.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::Aigp(value) => {
+                writer.write_u8(PathAttributeType::AccumulatedIgp.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::UnknownAttribute(value) => {
@@ -1222,6 +1228,43 @@ impl WritablePduWithOneInput<bool, OnlyToCustomerWritingError> for OnlyToCustome
     ) -> Result<(), OnlyToCustomerWritingError> {
         write_length(self, extended_length, writer)?;
         writer.write_u32::<NetworkEndian>(self.asn())?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum AigpWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePduWithOneInput<bool, AigpWritingError> for Aigp {
+    // 1-octet length + 1-octet for type + 2 octet for length
+    const BASE_LENGTH: usize = 4;
+
+    fn len(&self, extended_length: bool) -> usize {
+        let base = if extended_length {
+            Self::BASE_LENGTH + 1
+        } else {
+            Self::BASE_LENGTH
+        };
+        base + match self {
+            Self::AccumulatedIgpMetric(_) => 8,
+        }
+    }
+
+    fn write<T: std::io::Write>(
+        &self,
+        writer: &mut T,
+        extended_length: bool,
+    ) -> Result<(), AigpWritingError> {
+        write_length(self, extended_length, writer)?;
+        match self {
+            Self::AccumulatedIgpMetric(metric) => {
+                writer.write_u8(AigpAttributeType::AccumulatedIgpMetric as u8)?;
+                writer.write_u16::<NetworkEndian>(ACCUMULATED_IGP_METRIC)?;
+                writer.write_u64::<NetworkEndian>(*metric)?;
+            }
+        }
         Ok(())
     }
 }

@@ -1274,6 +1274,33 @@ impl TryFrom<u8> for BgpRoleValue {
     }
 }
 
+/// Accumulated IGP Type [RFC7311](https://datatracker.ietf.org/doc/html/rfc7311)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum AigpAttributeType {
+    /// Accumulated IGP Metric
+    AccumulatedIgpMetric = 0x01,
+}
+
+impl From<AigpAttributeType> for u8 {
+    fn from(value: AigpAttributeType) -> Self {
+        value as u8
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedAigpAttributeType(pub u8);
+
+impl TryFrom<u8> for AigpAttributeType {
+    type Error = UndefinedAigpAttributeType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedAigpAttributeType(value)),
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
