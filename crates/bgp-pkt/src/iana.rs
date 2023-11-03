@@ -1231,6 +1231,49 @@ impl TryFrom<u8> for TransitiveOpaqueExtendedCommunitySubType {
     }
 }
 
+/// BGP Role Values used in the route leak prevention and detection procedures
+/// [RFC9234](https://datatracker.ietf.org/doc/html/rfc9234)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpRoleValue {
+    /// The local AS is a transit provider of the remote AS
+    Provider = 0x00,
+
+    /// the local AS is a transit customer of the remote AS
+    Customer = 0x01,
+
+    /// the local AS is a Route Server (usually at an Internet exchange point),
+    /// and the remote AS is its RS-Client
+    RS = 0x02,
+
+    /// the local AS is a client of an RS and the RS is the remote AS
+    RsClient = 0x03,
+
+    /// the local and remote ASes are Peers (i.e., have a lateral peering
+    /// relationship)
+    Peer = 0x04,
+}
+
+impl From<BgpRoleValue> for u8 {
+    fn from(value: BgpRoleValue) -> Self {
+        value as u8
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UndefinedBgpRoleValue(pub u8);
+
+impl TryFrom<u8> for BgpRoleValue {
+    type Error = UndefinedBgpRoleValue;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UndefinedBgpRoleValue(value)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

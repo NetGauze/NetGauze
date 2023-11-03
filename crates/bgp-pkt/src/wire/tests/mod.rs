@@ -33,17 +33,17 @@ use netgauze_parse_utils::{
 
 use crate::{
     capabilities::{
-        AddPathAddressFamily, AddPathCapability, BgpCapability, ExtendedNextHopEncoding,
-        ExtendedNextHopEncodingCapability, FourOctetAsCapability, GracefulRestartCapability,
-        MultiProtocolExtensionsCapability, UnrecognizedCapability,
+        AddPathAddressFamily, AddPathCapability, BgpCapability, BgpRoleCapability,
+        ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
+        GracefulRestartCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
     },
     community::{
         ExtendedCommunity, TransitiveFourOctetExtendedCommunity,
         TransitiveTwoOctetExtendedCommunity,
     },
     iana::{
-        RouteRefreshSubcode, UndefinedBgpErrorNotificationCode, UndefinedBgpMessageType,
-        UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
+        BgpRoleValue, RouteRefreshSubcode, UndefinedBgpErrorNotificationCode,
+        UndefinedBgpMessageType, UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
     },
     nlri::*,
     notification::CeaseError,
@@ -1133,6 +1133,59 @@ fn test_evpn_withdraw() -> Result<(), BgpMessageWritingError> {
         )
         .unwrap()],
         vec![],
+    ));
+
+    test_parsed_completely_with_three_inputs(
+        &good_wire,
+        true,
+        &HashMap::new(),
+        &HashMap::from([(AddressType::Ipv6Unicast, true)]),
+        &good,
+    );
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_role_otc_open() -> Result<(), BgpMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x50, 0x01, 0x04, 0xfd, 0xea, 0x00, 0xb4, 0xc0, 0xa8, 0x0a, 0x11, 0x33, 0x02,
+        0x06, 0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x02, 0x02, 0x80, 0x00, 0x02, 0x02, 0x02, 0x00,
+        0x02, 0x02, 0x46, 0x00, 0x02, 0x06, 0x41, 0x04, 0x00, 0x00, 0xfd, 0xea, 0x02, 0x02, 0x06,
+        0x00, 0x02, 0x03, 0x09, 0x01, 0x03, 0x02, 0x06, 0x45, 0x04, 0x00, 0x01, 0x01, 0x01, 0x02,
+        0x04, 0x40, 0x02, 0x40, 0x78,
+    ];
+
+    let good = BgpMessage::Open(BgpOpenMessage::new(
+        65002,
+        180,
+        Ipv4Addr::new(192, 168, 10, 17),
+        vec![
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::MultiProtocolExtensions(
+                MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
+            )]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::CiscoRouteRefresh]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::RouteRefresh]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::EnhancedRouteRefresh]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                FourOctetAsCapability::new(65002),
+            )]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::ExtendedMessage]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::BgpRole(
+                BgpRoleCapability::new(BgpRoleValue::RsClient),
+            )]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::AddPath(
+                AddPathCapability::new(vec![AddPathAddressFamily::new(
+                    AddressType::Ipv4Unicast,
+                    false,
+                    true,
+                )]),
+            )]),
+            BgpOpenMessageParameter::Capabilities(vec![BgpCapability::GracefulRestartCapability(
+                GracefulRestartCapability::new(false, true, 120, vec![]),
+            )]),
+        ],
     ));
 
     test_parsed_completely_with_three_inputs(

@@ -28,6 +28,7 @@ pub enum BGPCapabilityWritingError {
     AddPathCapabilityError(#[from] AddPathCapabilityWritingError),
     ExtendedNextHopEncodingCapabilityError(#[from] ExtendedNextHopEncodingCapabilityWritingError),
     MultipleLabelError(#[from] MultipleLabelWritingError),
+    BgpRoleCapabilityError(#[from] BgpRoleCapabilityWritingError),
 }
 
 impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
@@ -50,6 +51,7 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
             Self::ExtendedNextHopEncoding(value) => value.len() - 1,
             Self::ExtendedMessage => EXTENDED_MESSAGE_CAPABILITY_LENGTH as usize,
             Self::MultipleLabels(value) => value.iter().map(|x| x.len()).sum(),
+            Self::BgpRole(value) => value.len(),
             Self::Experimental(value) => value.value().len(),
             Self::Unrecognized(value) => value.value().len(),
         };
@@ -85,6 +87,11 @@ impl WritablePdu<BGPCapabilityWritingError> for BgpCapability {
                 for addr in value {
                     addr.write(writer)?;
                 }
+            }
+            Self::BgpRole(value) => {
+                writer.write_u8(self.code().unwrap().into())?;
+                writer.write_u8(len)?;
+                value.write(writer)?;
             }
             Self::GracefulRestartCapability(value) => {
                 writer.write_u8(self.code().unwrap().into())?;
@@ -309,6 +316,23 @@ impl WritablePdu<MultipleLabelWritingError> for MultipleLabel {
         writer.write_u16::<NetworkEndian>(self.address_type().address_family().into())?;
         writer.write_u8(self.address_type().subsequent_address_family().into())?;
         writer.write_u8(self.count())?;
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum BgpRoleCapabilityWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePdu<BgpRoleCapabilityWritingError> for BgpRoleCapability {
+    // 1 octet as defined by RFC9234
+    const BASE_LENGTH: usize = BGP_ROLE_CAPABILITY_LENGTH as usize;
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpRoleCapabilityWritingError> {
+        writer.write_u8(self.role().into())?;
         Ok(())
     }
 }

@@ -15,6 +15,7 @@
 
 use crate::{
     capabilities::*,
+    iana::{BgpRoleValue, UndefinedBgpRoleValue},
     wire::{deserializer::capabilities::*, serializer::capabilities::*},
 };
 use netgauze_iana::address_family::{
@@ -340,6 +341,45 @@ fn test_extended_next_hop_encoding_capability() -> Result<(), BGPCapabilityWriti
     Ok(())
 }
 
+#[test]
+fn test_bgp_role_capability() -> Result<(), BGPCapabilityWritingError> {
+    let good_wire = [9, 1, 4];
+    let undefined_role_wire = [9, 1, 255];
+    let invalid_length_wire = [9, 255, 4];
+
+    let good = BgpCapability::BgpRole(BgpRoleCapability::new(BgpRoleValue::Peer));
+
+    let undefined_role = LocatedBgpCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &undefined_role_wire[2..]) },
+        BgpCapabilityParsingError::BgpRoleCapabilityError(
+            BgpRoleCapabilityParsingError::UndefinedBgpRoleValue(UndefinedBgpRoleValue(
+                undefined_role_wire[2],
+            )),
+        ),
+    );
+
+    let invalid_length = LocatedBgpCapabilityParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &invalid_length_wire[1..]) },
+        BgpCapabilityParsingError::BgpRoleCapabilityError(
+            BgpRoleCapabilityParsingError::InvalidLength(invalid_length_wire[1]),
+        ),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
+        &undefined_role_wire,
+        &undefined_role,
+    );
+
+    test_parse_error::<BgpCapability, LocatedBgpCapabilityParsingError<'_>>(
+        &invalid_length_wire,
+        &invalid_length,
+    );
+
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
 #[test]
 fn test_experimental_capabilities() -> Result<(), BGPCapabilityWritingError> {
     // IANA defines the codes 239-254 as reserved for Experimental Use

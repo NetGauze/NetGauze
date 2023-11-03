@@ -16,7 +16,7 @@
 //! BGP Capabilities advertised in BGP Open Messages.
 //! See [RFC5492 Capabilities Advertisement with BGP-4](https://datatracker.ietf.org/doc/html/rfc5492)
 
-use crate::iana::BgpCapabilityCode;
+use crate::iana::{BgpCapabilityCode, BgpRoleValue};
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
@@ -41,6 +41,9 @@ pub(crate) const EXTENDED_NEXT_HOP_ENCODING_LENGTH: u8 = 6;
 
 /// 2-octet NLRI AFI + 1-octet NLRI SAFI + 1-octet flags as per RFC4724
 pub(crate) const GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH: u8 = 4;
+
+/// 1-octet length as defined by RFC9234
+pub(crate) const BGP_ROLE_CAPABILITY_LENGTH: u8 = 1;
 
 /// BGP Capabilities are included as parameters in the
 /// [`crate::open::BgpOpenMessage`] message to indicate support of certain BGP
@@ -81,6 +84,8 @@ pub enum BgpCapability {
 
     MultipleLabels(Vec<MultipleLabel>),
 
+    BgpRole(BgpRoleCapability),
+
     FourOctetAs(FourOctetAsCapability),
 
     /// [RFC8950](https://datatracker.ietf.org/doc/html/rfc8950)
@@ -102,6 +107,7 @@ impl BgpCapability {
             Self::AddPath(_) => Ok(BgpCapabilityCode::AddPathCapability),
             Self::ExtendedMessage => Ok(BgpCapabilityCode::BgpExtendedMessage),
             Self::MultipleLabels(_) => Ok(BgpCapabilityCode::MultipleLabelsCapability),
+            Self::BgpRole(_) => Ok(BgpCapabilityCode::BgpRole),
             Self::FourOctetAs(_) => Ok(BgpCapabilityCode::FourOctetAs),
             Self::ExtendedNextHopEncoding(_) => Ok(BgpCapabilityCode::ExtendedNextHopEncoding),
             Self::Experimental(value) => match value.code() {
@@ -492,5 +498,22 @@ impl MultipleLabel {
 
     pub const fn count(&self) -> u8 {
         self.count
+    }
+}
+
+/// BGP Role used in the route leak prevention and detection procedures
+/// defined by: [RFC9234](https://datatracker.ietf.org/doc/html/rfc9234)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BgpRoleCapability {
+    role: BgpRoleValue,
+}
+
+impl BgpRoleCapability {
+    pub const fn new(role: BgpRoleValue) -> Self {
+        Self { role }
+    }
+
+    pub const fn role(&self) -> BgpRoleValue {
+        self.role
     }
 }

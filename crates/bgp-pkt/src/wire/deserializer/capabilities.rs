@@ -32,6 +32,7 @@ use nom::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::iana::{BgpRoleValue, UndefinedBgpRoleValue};
 use netgauze_serde_macros::LocatedError;
 
 /// BGP Capability Parsing errors
@@ -57,6 +58,7 @@ pub enum BgpCapabilityParsingError {
         #[from_located(module = "self")] ExtendedNextHopEncodingCapabilityParsingError,
     ),
     MultipleLabelError(#[from_located(module = "self")] MultipleLabelParsingError),
+    BgpRoleCapabilityError(#[from_located(module = "self")] BgpRoleCapabilityParsingError),
 }
 
 fn parse_experimental_capability(
@@ -155,7 +157,10 @@ impl<'a> ReadablePdu<'a, LocatedBgpCapabilityParsingError<'a>> for BgpCapability
                     let (buf, cap) = parse_till_empty_into_located(buf)?;
                     Ok((buf, BgpCapability::MultipleLabels(cap)))
                 }
-                BgpCapabilityCode::BgpRole => parse_unrecognized_capability(code.into(), buf),
+                BgpCapabilityCode::BgpRole => {
+                    let (buf, cap) = parse_into_located(buf)?;
+                    Ok((buf, BgpCapability::BgpRole(cap)))
+                }
                 BgpCapabilityCode::GracefulRestartCapability => {
                     let (buf, cap) = parse_into_located(buf)?;
                     Ok((buf, BgpCapability::GracefulRestartCapability(cap)))
@@ -512,5 +517,25 @@ impl<'a> ReadablePdu<'a, LocatedMultipleLabelParsingError<'a>> for MultipleLabel
         };
         let (buf, count) = be_u8(buf)?;
         Ok((buf, MultipleLabel::new(address_type, count)))
+    }
+}
+
+#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum BgpRoleCapabilityParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    InvalidLength(u8),
+    UndefinedBgpRoleValue(#[from_external] UndefinedBgpRoleValue),
+}
+
+impl<'a> ReadablePdu<'a, LocatedBgpRoleCapabilityParsingError<'a>> for BgpRoleCapability {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedBgpRoleCapabilityParsingError<'a>> {
+        let (buf, _) = check_capability_length(buf, BGP_ROLE_CAPABILITY_LENGTH, |x| {
+            BgpRoleCapabilityParsingError::InvalidLength(x)
+        })?;
+        let (buf, role) = nom::combinator::map_res(be_u8, BgpRoleValue::try_from)(buf)?;
+        Ok((buf, BgpRoleCapability::new(role)))
     }
 }
