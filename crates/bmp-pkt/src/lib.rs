@@ -157,28 +157,28 @@ impl PeerHeader {
         }
     }
 
-    pub const fn peer_type(&self) -> &BmpPeerType {
-        &self.peer_type
+    pub const fn peer_type(&self) -> BmpPeerType {
+        self.peer_type
     }
 
-    pub const fn rd(&self) -> &Option<RouteDistinguisher> {
-        &self.rd
+    pub const fn rd(&self) -> Option<RouteDistinguisher> {
+        self.rd
     }
 
-    pub const fn address(&self) -> &Option<IpAddr> {
-        &self.address
+    pub const fn address(&self) -> Option<IpAddr> {
+        self.address
     }
 
-    pub const fn peer_as(&self) -> &u32 {
-        &self.peer_as
+    pub const fn peer_as(&self) -> u32 {
+        self.peer_as
     }
 
-    pub const fn bgp_id(&self) -> &Ipv4Addr {
-        &self.bgp_id
+    pub const fn bgp_id(&self) -> Ipv4Addr {
+        self.bgp_id
     }
 
-    pub const fn timestamp(&self) -> &Option<DateTime<Utc>> {
-        &self.timestamp
+    pub const fn timestamp(&self) -> Option<&DateTime<Utc>> {
+        self.timestamp.as_ref()
     }
 
     pub const fn is_asn4(&self) -> bool {
@@ -616,16 +616,16 @@ impl PeerUpNotificationMessage {
         &self.peer_header
     }
 
-    pub const fn local_address(&self) -> Option<&IpAddr> {
-        self.local_address.as_ref()
+    pub const fn local_address(&self) -> Option<IpAddr> {
+        self.local_address
     }
 
-    pub const fn local_port(&self) -> &Option<u16> {
-        &self.local_port
+    pub const fn local_port(&self) -> Option<u16> {
+        self.local_port
     }
 
-    pub const fn remote_port(&self) -> &Option<u16> {
-        &self.remote_port
+    pub const fn remote_port(&self) -> Option<u16> {
+        self.remote_port
     }
 
     pub const fn sent_message(&self) -> &BgpMessage {
@@ -1046,8 +1046,8 @@ impl PeerKey {
         )
     }
 
-    pub const fn peer_address(&self) -> &Option<IpAddr> {
-        &self.peer_address
+    pub const fn peer_address(&self) -> Option<IpAddr> {
+        self.peer_address
     }
     pub const fn peer_type(&self) -> BmpPeerType {
         self.peer_type

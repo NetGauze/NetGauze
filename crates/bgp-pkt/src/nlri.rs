@@ -93,12 +93,12 @@ impl LabeledIpv4NextHop {
         Self { rd, next_hop }
     }
 
-    pub const fn rd(&self) -> &RouteDistinguisher {
-        &self.rd
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
     }
 
-    pub const fn next_hop(&self) -> &Ipv4Addr {
-        &self.next_hop
+    pub const fn next_hop(&self) -> Ipv4Addr {
+        self.next_hop
     }
 }
 
@@ -113,12 +113,12 @@ impl LabeledIpv6NextHop {
         Self { rd, next_hop }
     }
 
-    pub const fn rd(&self) -> &RouteDistinguisher {
-        &self.rd
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
     }
 
-    pub const fn next_hop(&self) -> &Ipv6Addr {
-        &self.next_hop
+    pub const fn next_hop(&self) -> Ipv6Addr {
+        self.next_hop
     }
 }
 
@@ -150,8 +150,8 @@ impl Ipv4Unicast {
         Ok(Self(net))
     }
 
-    pub const fn address(&self) -> &Ipv4Net {
-        &self.0
+    pub const fn address(&self) -> Ipv4Net {
+        self.0
     }
 }
 
@@ -237,16 +237,16 @@ impl Ipv4MplsVpnUnicastAddress {
         self.path_id
     }
 
-    pub const fn rd(&self) -> &RouteDistinguisher {
-        &self.rd
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
     }
 
     pub const fn label_stack(&self) -> &Vec<MplsLabel> {
         &self.label_stack
     }
 
-    pub const fn network(&self) -> &Ipv4Unicast {
-        &self.network
+    pub const fn network(&self) -> Ipv4Unicast {
+        self.network
     }
 }
 
@@ -273,8 +273,8 @@ impl Ipv4Multicast {
         Ok(Self(net))
     }
 
-    pub const fn address(&self) -> &Ipv4Net {
-        &self.0
+    pub const fn address(&self) -> Ipv4Net {
+        self.0
     }
 }
 
@@ -336,8 +336,8 @@ impl Ipv6Unicast {
         Ok(Self(net))
     }
 
-    pub const fn address(&self) -> &Ipv6Net {
-        &self.0
+    pub const fn address(&self) -> Ipv6Net {
+        self.0
     }
 }
 
@@ -412,16 +412,16 @@ impl Ipv6MplsVpnUnicastAddress {
         }
     }
 
-    pub const fn rd(&self) -> &RouteDistinguisher {
-        &self.rd
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
     }
 
     pub const fn label_stack(&self) -> &Vec<MplsLabel> {
         &self.label_stack
     }
 
-    pub const fn network(&self) -> &Ipv6Unicast {
-        &self.network
+    pub const fn network(&self) -> Ipv6Unicast {
+        self.network
     }
 
     pub const fn path_id(&self) -> Option<u32> {
@@ -456,8 +456,8 @@ impl Ipv6Multicast {
         Ok(Self(net))
     }
 
-    pub const fn address(&self) -> &Ipv6Net {
-        &self.0
+    pub const fn address(&self) -> Ipv6Net {
+        self.0
     }
 }
 
@@ -686,8 +686,8 @@ impl MacIpAdvertisement {
         &self.mac
     }
 
-    pub const fn ip(&self) -> Option<&IpAddr> {
-        self.ip.as_ref()
+    pub const fn ip(&self) -> Option<IpAddr> {
+        self.ip
     }
 
     pub const fn mpls_label1(&self) -> &MplsLabel {
@@ -734,8 +734,8 @@ impl InclusiveMulticastEthernetTagRoute {
         &self.tag
     }
 
-    pub const fn ip(&self) -> &IpAddr {
-        &self.ip
+    pub const fn ip(&self) -> IpAddr {
+        self.ip
     }
 }
 
@@ -778,8 +778,8 @@ impl EthernetSegmentRoute {
         &self.segment_id
     }
 
-    pub const fn ip(&self) -> &IpAddr {
-        &self.ip
+    pub const fn ip(&self) -> IpAddr {
+        self.ip
     }
 }
 
@@ -849,11 +849,11 @@ impl L2EvpnIpv4PrefixRoute {
     pub const fn tag(&self) -> &EthernetTag {
         &self.tag
     }
-    pub const fn prefix(&self) -> &Ipv4Net {
-        &self.prefix
+    pub const fn prefix(&self) -> Ipv4Net {
+        self.prefix
     }
-    pub const fn gateway(&self) -> &Ipv4Addr {
-        &self.gateway
+    pub const fn gateway(&self) -> Ipv4Addr {
+        self.gateway
     }
 
     pub const fn label(&self) -> &MplsLabel {
@@ -920,11 +920,11 @@ impl L2EvpnIpv6PrefixRoute {
     pub const fn tag(&self) -> &EthernetTag {
         &self.tag
     }
-    pub const fn prefix(&self) -> &Ipv6Net {
-        &self.prefix
+    pub const fn prefix(&self) -> Ipv6Net {
+        self.prefix
     }
-    pub const fn gateway(&self) -> &Ipv6Addr {
-        &self.gateway
+    pub const fn gateway(&self) -> Ipv6Addr {
+        self.gateway
     }
 
     pub const fn label(&self) -> &MplsLabel {
@@ -1165,7 +1165,7 @@ mod tests {
 
         assert!(unicast.is_ok());
         assert!(unicast.is_ok());
-        assert_eq!(unicast.unwrap().address(), &unicast_addr);
+        assert_eq!(unicast.unwrap().address(), unicast_addr);
         assert_eq!(Ipv4UnicastAddress::address_type(), AddressType::Ipv4Unicast);
         assert_eq!(multicast, Err(InvalidIpv4UnicastNetwork(multicast_addr)));
     }
@@ -1180,7 +1180,7 @@ mod tests {
 
         assert!(multicast.is_ok());
         assert!(multicast.is_ok());
-        assert_eq!(multicast.unwrap().address(), &multicast_addr);
+        assert_eq!(multicast.unwrap().address(), multicast_addr);
         assert_eq!(
             Ipv4MulticastAddress::address_type(),
             AddressType::Ipv4Multicast
@@ -1197,7 +1197,7 @@ mod tests {
         let multicast = Ipv6Unicast::try_from(multicast_addr);
 
         assert!(unicast.is_ok());
-        assert_eq!(unicast.unwrap().address(), &unicast_addr);
+        assert_eq!(unicast.unwrap().address(), unicast_addr);
         assert_eq!(Ipv6UnicastAddress::address_type(), AddressType::Ipv6Unicast);
         assert_eq!(multicast, Err(InvalidIpv6UnicastNetwork(multicast_addr)));
     }
@@ -1211,7 +1211,7 @@ mod tests {
         let multicast = Ipv6Multicast::try_from(multicast_addr);
 
         assert!(multicast.is_ok());
-        assert_eq!(multicast.unwrap().address(), &multicast_addr);
+        assert_eq!(multicast.unwrap().address(), multicast_addr);
         assert_eq!(
             Ipv6MulticastAddress::address_type(),
             AddressType::Ipv6Multicast

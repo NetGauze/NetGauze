@@ -83,10 +83,10 @@ impl BmpCodec {
                             capabilities.get(&BgpCapabilityCode::AddPathCapability)
                         {
                             let peer_key = PeerKey::new(
-                                *peer_up.peer_header().address(),
-                                *peer_up.peer_header().peer_type(),
-                                *peer_up.peer_header().rd(),
-                                *peer_up.peer_header().peer_as(),
+                                peer_up.peer_header().address(),
+                                peer_up.peer_header().peer_type(),
+                                peer_up.peer_header().rd(),
+                                peer_up.peer_header().peer_as(),
                                 open.bgp_id(),
                             );
                             let add_path = add_path

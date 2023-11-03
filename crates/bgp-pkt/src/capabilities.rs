@@ -325,8 +325,8 @@ impl GracefulRestartAddressFamily {
         self.forwarding_state
     }
 
-    pub const fn address_type(&self) -> &AddressType {
-        &self.address_type
+    pub const fn address_type(&self) -> AddressType {
+        self.address_type
     }
 }
 

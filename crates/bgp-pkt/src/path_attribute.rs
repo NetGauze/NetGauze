@@ -462,8 +462,8 @@ impl NextHop {
         Self { next_hop }
     }
 
-    pub const fn next_hop(&self) -> &Ipv4Addr {
-        &self.next_hop
+    pub const fn next_hop(&self) -> Ipv4Addr {
+        self.next_hop
     }
 }
 
@@ -585,8 +585,8 @@ impl As2Aggregator {
     pub const fn asn(&self) -> &u16 {
         &self.asn
     }
-    pub const fn origin(&self) -> &Ipv4Addr {
-        &self.origin
+    pub const fn origin(&self) -> Ipv4Addr {
+        self.origin
     }
 }
 
@@ -604,8 +604,8 @@ impl As4Aggregator {
     pub const fn asn(&self) -> &u32 {
         &self.asn
     }
-    pub const fn origin(&self) -> &Ipv4Addr {
-        &self.origin
+    pub const fn origin(&self) -> Ipv4Addr {
+        self.origin
     }
 }
 
@@ -789,8 +789,8 @@ impl Originator {
         Self(id)
     }
 
-    pub const fn id(&self) -> &Ipv4Addr {
-        &self.0
+    pub const fn id(&self) -> Ipv4Addr {
+        self.0
     }
 }
 
@@ -848,8 +848,8 @@ impl ClusterId {
         Self(id)
     }
 
-    pub const fn id(&self) -> &Ipv4Addr {
-        &self.0
+    pub const fn id(&self) -> Ipv4Addr {
+        self.0
     }
 }
 

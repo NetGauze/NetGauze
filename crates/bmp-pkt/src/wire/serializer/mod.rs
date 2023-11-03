@@ -247,7 +247,7 @@ impl WritablePdu<PeerHeaderWritingError> for PeerHeader {
             }
             None => writer.write_u128::<NetworkEndian>(0)?,
         }
-        writer.write_u32::<NetworkEndian>(*self.peer_as())?;
+        writer.write_u32::<NetworkEndian>(self.peer_as())?;
         writer.write_all(&self.bgp_id().octets())?;
         match self.timestamp() {
             None => writer.write_u64::<NetworkEndian>(0)?,
