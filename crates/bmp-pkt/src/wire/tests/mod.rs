@@ -693,7 +693,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
                 Ipv4Addr::new(10, 0, 0, 1),
                 Some(Utc.timestamp_opt(1664821826, 645593000).unwrap()),
             ),
-            IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap()),
+            Some(IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap())),
             Some(179),
             Some(29834),
             BgpMessage::Open(BgpOpenMessage::new(
@@ -788,6 +788,70 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_wire, &HashMap::new(), &bad);
 
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x9a, 0x03, 0x03, 0x80, 0x00, 0x00, 0xfb, 0xf3, 0x00, 0x00, 0x00,
+        0x47, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x00, 0x02, 0x3d, 0x64, 0x5a, 0x2d, 0x87, 0x00,
+        0x00, 0x94, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x2b, 0x01, 0x04, 0x5b, 0xa0,
+        0x00, 0xb4, 0xc0, 0x00, 0x02, 0x3d, 0x0e, 0x02, 0x0c, 0x41, 0x04, 0x00, 0x01, 0x00, 0x01,
+        0x01, 0x04, 0x00, 0x02, 0x00, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x2b, 0x01, 0x04, 0x5b, 0xa0, 0x00, 0xb4,
+        0xc0, 0x00, 0x02, 0x3d, 0x0e, 0x02, 0x0c, 0x41, 0x04, 0x00, 0x01, 0x00, 0x01, 0x01, 0x04,
+        0x00, 0x02, 0x00, 0x01,
+    ];
+
+    let good = BmpMessage::V3(BmpMessageValue::PeerUpNotification(
+        PeerUpNotificationMessage::build(
+            PeerHeader::new(
+                BmpPeerType::LocRibInstancePeer { filtered: true },
+                Some(RouteDistinguisher::As2Administrator {
+                    asn2: 64499,
+                    number: 71,
+                }),
+                None,
+                65537,
+                Ipv4Addr::new(192, 0, 2, 61),
+                Some(Utc.timestamp_opt(1683631495, 38000000).unwrap()),
+            ),
+            None,
+            None,
+            None,
+            BgpMessage::Open(BgpOpenMessage::new(
+                23456,
+                180,
+                Ipv4Addr::new(192, 0, 2, 61),
+                vec![BgpOpenMessageParameter::Capabilities(vec![
+                    BgpCapability::FourOctetAs(FourOctetAsCapability::new(65537)),
+                    BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                        AddressType::Ipv6Unicast,
+                    )),
+                ])],
+            )),
+            BgpMessage::Open(BgpOpenMessage::new(
+                23456,
+                180,
+                Ipv4Addr::new(192, 0, 2, 61),
+                vec![BgpOpenMessageParameter::Capabilities(vec![
+                    BgpCapability::FourOctetAs(FourOctetAsCapability::new(65537)),
+                    BgpCapability::MultiProtocolExtensions(MultiProtocolExtensionsCapability::new(
+                        AddressType::Ipv6Unicast,
+                    )),
+                ])],
+            )),
+            vec![],
+        )
+        .unwrap(),
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, &HashMap::new(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }

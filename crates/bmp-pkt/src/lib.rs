@@ -562,7 +562,7 @@ impl RouteMirroringValue {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PeerUpNotificationMessage {
     peer_header: PeerHeader,
-    local_address: IpAddr,
+    local_address: Option<IpAddr>,
     local_port: Option<u16>,
     remote_port: Option<u16>,
     sent_message: BgpMessage,
@@ -582,7 +582,7 @@ pub enum PeerUpNotificationMessageError {
 impl PeerUpNotificationMessage {
     pub fn build(
         peer_header: PeerHeader,
-        local_address: IpAddr,
+        local_address: Option<IpAddr>,
         local_port: Option<u16>,
         remote_port: Option<u16>,
         sent_message: BgpMessage,
@@ -616,8 +616,8 @@ impl PeerUpNotificationMessage {
         &self.peer_header
     }
 
-    pub const fn local_address(&self) -> &IpAddr {
-        &self.local_address
+    pub const fn local_address(&self) -> Option<&IpAddr> {
+        self.local_address.as_ref()
     }
 
     pub const fn local_port(&self) -> &Option<u16> {

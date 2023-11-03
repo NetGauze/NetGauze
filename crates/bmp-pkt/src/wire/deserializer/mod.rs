@@ -441,15 +441,15 @@ pub enum PeerUpNotificationMessageParsingError {
 /// `GlobalInstancePeer`, `RdInstancePeer`, and `LocalInstancePeer` have V flag
 /// defined.
 ///
-/// For experimental we assume ipv6 since this will not fail and still parse all
-/// the information
+/// For `LocRibInstancePeer` and experimental we assume ipv6 since this will not
+/// fail and still parse all the information
 #[inline]
 const fn check_is_ipv6(peer_type: &BmpPeerType) -> Result<bool, BmpPeerTypeCode> {
     match peer_type {
         BmpPeerType::GlobalInstancePeer { ipv6, .. } => Ok(*ipv6),
         BmpPeerType::RdInstancePeer { ipv6, .. } => Ok(*ipv6),
         BmpPeerType::LocalInstancePeer { ipv6, .. } => Ok(*ipv6),
-        BmpPeerType::LocRibInstancePeer { .. } => Err(peer_type.get_type()),
+        BmpPeerType::LocRibInstancePeer { .. } => Ok(true),
         BmpPeerType::Experimental251 { .. } => Ok(true),
         BmpPeerType::Experimental252 { .. } => Ok(true),
         BmpPeerType::Experimental253 { .. } => Ok(true),
@@ -485,11 +485,13 @@ impl<'a>
             }
         };
         let (buf, address) = be_u128(buf)?;
-        let local_address = if ipv6 {
-            IpAddr::V6(Ipv6Addr::from(address))
+        let local_address = if address == 0u128 {
+            None
+        } else if ipv6 {
+            Some(IpAddr::V6(Ipv6Addr::from(address)))
         } else {
             // the upper bits should be zero and can be ignored
-            IpAddr::V4(Ipv4Addr::from(address as u32))
+            Some(IpAddr::V4(Ipv4Addr::from(address as u32)))
         };
         let (buf, local_port) = be_u16(buf)?;
         let local_port = if local_port == 0 {

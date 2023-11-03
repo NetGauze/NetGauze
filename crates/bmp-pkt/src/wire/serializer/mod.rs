@@ -434,12 +434,15 @@ impl WritablePdu<PeerUpNotificationMessageWritingError> for PeerUpNotificationMe
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), PeerUpNotificationMessageWritingError> {
         self.peer_header().write(writer)?;
         match self.local_address {
-            IpAddr::V4(addr) => {
+            Some(IpAddr::V4(addr)) => {
                 writer.write_u64::<NetworkEndian>(0)?;
                 writer.write_u32::<NetworkEndian>(0)?;
                 writer.write_all(&addr.octets())?;
             }
-            IpAddr::V6(addr) => writer.write_all(&addr.octets())?,
+            Some(IpAddr::V6(addr)) => writer.write_all(&addr.octets())?,
+            None => {
+                writer.write_all(&[0x00; 16])?;
+            }
         }
         writer.write_u16::<NetworkEndian>(self.local_port.unwrap_or_default())?;
         writer.write_u16::<NetworkEndian>(self.remote_port.unwrap_or_default())?;
