@@ -139,26 +139,98 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
     let mut ret = vec![];
     for child in &children {
         let name = get_string_child(child, (IANA_NAMESPACE, "name").into());
-        if Some(true)
-            == name
-                .as_ref()
-                .map(|x| x.as_str() == UNASSIGNED || x.as_str() == RESERVED)
-        {
-            continue;
-        }
-        let data_type = get_string_child(child, (IANA_NAMESPACE, "dataType").into());
+        let name = match name {
+            Some(name) => {
+                if name.as_str() == ASSIGNED_FOR_NF_V9 {
+                    log::info!("Skipping Netflow V9 element {name}");
+                    continue;
+                }
+                if name == UNASSIGNED.to_string() {
+                    log::info!("Skipping unsigned name: {child:?}");
+                    continue;
+                }
+                if name == RESERVED.to_string() {
+                    log::info!("Skipping reserved name: {child:?}");
+                    continue;
+                }
+                name
+            }
+            None => {
+                log::info!("Skipping a child with no name: {child:?}");
+                continue;
+            }
+        };
+
+        let data_type = match get_string_child(child, (IANA_NAMESPACE, "dataType").into()) {
+            Some(data_type) => {
+                if name.as_str() == "samplerId" {
+                    "unsigned32".to_string()
+                } else {
+                    data_type
+                }
+            }
+            None => {
+                log::info!("Skipping {name} a child with no data type defined: {child:?}");
+                continue;
+            }
+        };
         let group = get_string_child(child, (IANA_NAMESPACE, "group").into());
         let data_type_semantics =
             get_string_child(child, (IANA_NAMESPACE, "dataTypeSemantics").into());
         let element_id = get_string_child(child, (IANA_NAMESPACE, "elementId").into())
             .map(|x| x.as_str().parse::<u16>());
+        let element_id = match element_id {
+            Some(Ok(element_id)) => element_id,
+            Some(Err(err)) => {
+                log::info!(
+                    "Skipping {name} a child with invalid element id defined `{err:?}`: {child:?}"
+                );
+                continue;
+            }
+            None => {
+                log::info!("Skipping {name} a child with no element id defined: {child:?}");
+                continue;
+            }
+        };
         let applicability = get_string_child(child, (IANA_NAMESPACE, "applicability").into());
-        let status = get_string_child(child, (IANA_NAMESPACE, "status").into());
-        let description = parse_description_string(child);
+        let status = match get_string_child(child, (IANA_NAMESPACE, "status").into()) {
+            Some(status) => status,
+            None => {
+                log::info!("Skipping {name} a child with no status defined: {child:?}");
+                continue;
+            }
+        };
+        let description = match parse_description_string(child) {
+            Some(description) => description,
+            None => {
+                log::info!("Skipping {name} a child with no description defined: {child:?}");
+                continue;
+            }
+        };
 
-        let revision = get_string_child(child, (IANA_NAMESPACE, "revision").into())
-            .map(|x| x.as_str().parse::<u32>());
-        let date = get_string_child(child, (IANA_NAMESPACE, "date").into());
+        let revision = match get_string_child(child, (IANA_NAMESPACE, "revision").into()) {
+            Some(revision) => {
+                let rev = match revision.as_str().parse::<u32>() {
+                    Ok(rev) => rev,
+                    Err(err) => {
+                        log::info!("Skipping {name} a child with invalid revision defined `{err:?}`: {child:?}");
+                        continue;
+                    }
+                };
+                rev
+            }
+            None => {
+                log::info!("Skipping {name} a child with no revision defined: {child:?}");
+                continue;
+            }
+        };
+        let date = match get_string_child(child, (IANA_NAMESPACE, "date").into()) {
+            Some(date) => date,
+            None => {
+                log::info!("Skipping {name} a child with no date defined: {child:?}");
+                continue;
+            }
+        };
         let references = if let Some(references) = child
             .children()
             .find(|x| x.tag_name() == (IANA_NAMESPACE, "references").into())
@@ -178,38 +250,18 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
         });
         let range = get_string_child(child, (IANA_NAMESPACE, "range").into());
 
-        if Some(true) == name.as_ref().map(|x| x.as_str() == ASSIGNED_FOR_NF_V9) {
-            log::info!(
-                "Skipping Netflow V9 element {:?} with element id: {:?}",
-                name,
-                element_id
-            );
-            continue;
-        }
-
-        if name.is_none() {
-            log::info!("Skipping a child with no name: {:?}", child);
-            continue;
-        }
-        let data_type = data_type.map(|x| {
-            if name == Some("samplerId".to_string()) {
-                "unsigned32".to_string()
-            } else {
-                x
-            }
-        });
         let ie = InformationElement {
             pen,
-            name: name.unwrap(),
-            data_type: data_type.unwrap(),
+            name,
+            data_type,
             group,
             data_type_semantics,
-            element_id: element_id.unwrap().unwrap(),
+            element_id,
             applicability,
-            status: status.unwrap(),
-            description: description.unwrap(),
-            revision: revision.unwrap().unwrap(),
-            date: date.unwrap(),
+            status,
+            description,
+            revision,
+            date,
             references,
             xrefs,
             units,
