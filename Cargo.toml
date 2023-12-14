@@ -3,6 +3,7 @@
 members = [
     "crates/pcap-reader",
     "crates/bgp-pkt",
+    "crates/bgp-speaker",
     "crates/bmp-service",
     "crates/bmp-pkt",
     "crates/iana",
@@ -49,3 +50,4 @@ reqwest = { version = "0.11", features = ["blocking"] }
 roxmltree = "0.19"
 arbitrary = { version = "1", features = ["derive"] }
 arbitrary_ext = { version = "0.3" }
+async-trait = "0.1"

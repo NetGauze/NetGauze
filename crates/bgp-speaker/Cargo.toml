@@ -1,0 +1,53 @@
+[package]
+name = "netgauze-bgp-speaker"
+version = "0.2.0"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+BGP Speaker: Establish connection and exchange messages with other BGP peers
+"""
+keywords = ["bgp", "protocol"]
+categories = ["network-programming"]
+
+[dependencies]
+netgauze-bgp-pkt = { version = "0.2.0", path = "../bgp-pkt", features = ["serde"] }
+netgauze-iana = { version = "0.2.0", path = "../iana" }
+netgauze-locate = { version = "0.2.0", path = "../locate" }
+netgauze-parse-utils = { version = "0.2.0", path = "../parse-utils" }
+byteorder = { workspace = true }
+chrono = { workspace = true, default-features = false, features = ["std", "serde", "clock"] }
+
+tokio = { workspace = true, features = ["full"] }
+tokio-util = { workspace = true, features = ["codec"] }
+futures = { workspace = true }
+futures-util = { workspace = true }
+futures-core = { workspace = true }
+bytes = { workspace = true }
+pin-project = { workspace = true }
+tokio-stream = { workspace = true, features = ["net"] }
+log = { workspace = true }
+nom = { workspace = true }
+ipnet = { workspace = true }
+rand = { workspace = true }
+async-trait = { workspace = true }
+strum_macros = { workspace = true }
+
+arbitrary = { workspace = true, optional = true }
+arbitrary_ext = { workspace = true, optional = true }
+
+
+[features]
+fuzz = ["arbitrary", "arbitrary_ext"]
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+env_logger = "*"
+test-log = "0.2"
+clap = { version = "4.4", features = ["derive"] }
+
+[profile.release]
+debug = 1
