@@ -147,5 +147,18 @@ pub fn main() {
 
 # Development documentation
 
-*Running Packet Serde benchmarks*
-```cargo bench --features bench```
+* Running Packet Serde benchmarks*
+  ```cargo bench --features bench```
+
+* Using this library to fuzz other code accepting `BgpMessage`
+
+```rust
+#![no_main]
+
+use libfuzzer_sys::fuzz_target;
+use netgauze_bgp_pkt::BgpMessage;
+
+fuzz_target!(|data: BgpMessage| {
+    // Some fuzzing target that accepts BgpMessage as input and need to be fuzzed
+});
+```

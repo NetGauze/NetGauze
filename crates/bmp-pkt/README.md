@@ -36,10 +36,10 @@ fn main() {
         ],
     )));
 
-   println!(
-      "JSON representation of BMP packet: {}",
-      serde_json::to_string(&bmp_msg).unwrap()
-   );
+    println!(
+        "JSON representation of BMP packet: {}",
+        serde_json::to_string(&bmp_msg).unwrap()
+    );
 
     // Serialize the message into it's BGP binary format
     let mut buf: Vec<u8> = vec![];
@@ -67,3 +67,18 @@ fn main() {
 2. [RFC 8671](https://datatracker.ietf.org/doc/html/rfc8671) Support for Adj-RIB-Out in the BGP Monitoring Protocol (
    BMP).
 3. [RFC 9069](https://datatracker.ietf.org/doc/html/rfc9069) Support for Local RIB in the BGP Monitoring Protocol (BMP).
+
+# Development documentation
+
+* Using this library to fuzz other code accepting `BmpMessage`
+
+```rust
+#![no_main]
+
+use libfuzzer_sys::fuzz_target;
+use netgauze_bmp_pkt::BmpMessage;
+
+fuzz_target!(|data: BmpMessage| {
+    // Some fuzzing target that accepts BmpMessage as input and need to be fuzzed
+});
+```
