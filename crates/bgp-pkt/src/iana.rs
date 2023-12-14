@@ -1350,6 +1350,10 @@ impl TryFrom<u8> for AigpAttributeType {
         }
     }
 }
+
+/// Reserved by RFC6793 for AS4 that are non-mappable to AS2
+pub const AS_TRANS: u16 = 23456;
+
 #[cfg(test)]
 mod tests {
     use super::*;
