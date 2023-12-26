@@ -186,7 +186,7 @@ impl LocatedError {
                                 ));
                             }
                             Some(parsed_attr) => {
-                                match parsed_attr.value.get(0) {
+                                match parsed_attr.value.first() {
                                     None => {
                                         return Err(syn::Error::new(
                                             attr.span(),

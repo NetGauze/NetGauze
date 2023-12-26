@@ -145,11 +145,11 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
                     log::info!("Skipping Netflow V9 element {name}");
                     continue;
                 }
-                if name == UNASSIGNED.to_string() {
+                if name == *UNASSIGNED {
                     log::info!("Skipping unsigned name: {child:?}");
                     continue;
                 }
-                if name == RESERVED.to_string() {
+                if name == *RESERVED {
                     log::info!("Skipping reserved name: {child:?}");
                     continue;
                 }
