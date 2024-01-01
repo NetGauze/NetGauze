@@ -91,7 +91,7 @@ pub trait PeerPolicy<
 
 #[derive(Debug, Clone)]
 pub struct EchoCapabilitiesPolicy<A, I, D> {
-    my_as: u32,
+    my_asn: u32,
     my_bgp_id: Ipv4Addr,
     remote_as: Option<u32>,
     hold_timer_duration: u16,
@@ -104,13 +104,13 @@ pub struct EchoCapabilitiesPolicy<A, I, D> {
 
 impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
     pub fn new(
-        my_as: u32,
+        my_asn: u32,
         my_bgp_id: Ipv4Addr,
         hold_timer_duration: u16,
         capabilities: HashMap<BgpCapabilityCode, BgpCapability>,
     ) -> Self {
         Self {
-            my_as,
+            my_asn,
             my_bgp_id,
             remote_as: None,
             hold_timer_duration,
@@ -143,10 +143,10 @@ impl<
             }
         }
         BgpOpenMessage::new(
-            if self.my_as > u16::MAX as u32 {
+            if self.my_asn > u16::MAX as u32 {
                 AS_TRANS
             } else {
-                self.my_as as u16
+                self.my_asn as u16
             },
             self.hold_timer_duration,
             self.my_bgp_id,
@@ -160,12 +160,7 @@ impl<
         _connection: &Connection<A, I, D>,
     ) -> ConnectionEvent<A> {
         if let ConnectionEvent::BGPOpen(ref open) = event {
-            let mut asn = open.my_as() as u32;
-            if let Some(BgpCapability::FourOctetAs(asn4_cap)) =
-                open.capabilities().get(&BgpCapabilityCode::FourOctetAs)
-            {
-                asn = asn4_cap.asn4();
-            }
+            let asn = open.my_asn4();
             self.remote_as.replace(asn);
             self.peer_capabilities = open.capabilities().values().cloned().cloned().collect();
         }
@@ -404,8 +399,8 @@ impl PeerConfigBuilder {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerProperties<A> {
-    my_as: u32,
-    peer_as: u32,
+    my_asn: u32,
+    peer_asn: u32,
     my_bgp_id: Ipv4Addr,
     peer_bgp_id: Ipv4Addr,
     peer_addr: A,
@@ -415,8 +410,8 @@ pub struct PeerProperties<A> {
 
 impl<A: Clone> PeerProperties<A> {
     pub const fn new(
-        my_as: u32,
-        peer_as: u32,
+        my_asn: u32,
+        peer_asn: u32,
         my_bgp_id: Ipv4Addr,
         peer_bgp_id: Ipv4Addr,
         peer_addr: A,
@@ -424,8 +419,8 @@ impl<A: Clone> PeerProperties<A> {
         allow_dynamic_bgp_id: bool,
     ) -> Self {
         Self {
-            my_as,
-            peer_as,
+            my_asn,
+            peer_asn,
             my_bgp_id,
             peer_bgp_id,
             peer_addr,
@@ -434,11 +429,11 @@ impl<A: Clone> PeerProperties<A> {
         }
     }
 
-    pub const fn my_as(&self) -> u32 {
-        self.my_as
+    pub const fn my_asn(&self) -> u32 {
+        self.my_asn
     }
-    pub const fn peer_as(&self) -> u32 {
-        self.peer_as
+    pub const fn peer_asn(&self) -> u32 {
+        self.peer_asn
     }
     pub const fn my_bgp_id(&self) -> Ipv4Addr {
         self.my_bgp_id

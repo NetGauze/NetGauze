@@ -283,7 +283,7 @@ pub struct Connection<
     state: ConnectionState,
     connection_type: ConnectionType,
     config: ConnectionConfig,
-    my_as: u32,
+    my_asn: u32,
     #[pin]
     peer_asn: Option<u32>,
     my_bgp_id: Ipv4Addr,
@@ -322,11 +322,11 @@ impl<
         config: ConnectionConfig,
         inner: Framed<I, D>,
     ) -> Self {
-        let my_as = peer_properties.my_as();
+        let my_asn = peer_properties.my_asn();
         let peer_asn = if peer_properties.allow_dynamic_as() {
             None
         } else {
-            Some(peer_properties.peer_as())
+            Some(peer_properties.peer_asn())
         };
         let my_bgp_id = peer_properties.my_bgp_id();
         let peer_bgp_id = if peer_properties.allow_dynamic_bgp_id() {
@@ -340,7 +340,7 @@ impl<
             state: ConnectionState::Connected,
             connection_type,
             config,
-            my_as,
+            my_asn,
             peer_asn,
             my_bgp_id,
             peer_bgp_id,
@@ -412,14 +412,7 @@ impl<
             .flat_map(|cap| cap.code().map(|code| (code, cap.clone())))
             .collect::<HashMap<BgpCapabilityCode, BgpCapability>>();
 
-        let remote_asn = if let Some(BgpCapability::FourOctetAs(asn4_cap)) =
-            caps.get(&BgpCapabilityCode::FourOctetAs)
-        {
-            asn4_cap.asn4()
-        } else {
-            open.my_as() as u32
-        };
-        self.peer_asn = Some(remote_asn);
+        self.peer_asn = Some(open.my_asn4());
         self.peer_bgp_id = Some(open.bgp_id());
         self.peer_capabilities = Some(caps);
         self.peer_hold_time = Some(open.hold_time());
