@@ -89,6 +89,24 @@ impl BgpOpenMessage {
         &self.params
     }
 
+    /// Read the ASN4 value
+    pub fn my_asn4(&self) -> u32 {
+        self.params
+            .iter()
+            .flat_map(|x| match x {
+                BgpOpenMessageParameter::Capabilities(capabilities_vec) => capabilities_vec,
+            })
+            .find(|cap| cap.code() == Ok(BgpCapabilityCode::FourOctetAs))
+            .map(|cap| {
+                if let BgpCapability::FourOctetAs(asn4) = cap {
+                    asn4.asn4()
+                } else {
+                    self.my_as as u32
+                }
+            })
+            .unwrap_or(self.my_as as u32)
+    }
+
     /// Shortcut to get a list of all the capabilities from all the parameters
     pub fn capabilities(&self) -> HashMap<BgpCapabilityCode, &BgpCapability> {
         return self
