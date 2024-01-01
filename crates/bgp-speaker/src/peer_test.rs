@@ -622,7 +622,7 @@ async fn test_connect_bgp_header_err() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_connect_bgp_open_err() {
+async fn test_connect_bgp_open_err_unsupported_version() {
     let policy = EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new());
     let mut io_builder = BgpIoMockBuilder::new();
     let bgp_version = 0x03;
@@ -659,6 +659,57 @@ async fn test_connect_bgp_open_err() {
         Ok(BgpEvent::BGPOpenMsgErr(
             OpenMessageError::UnsupportedVersionNumber {
                 value: vec![bgp_version]
+            }
+        ))
+    );
+    assert_eq!(peer.fsm_state(), FsmState::Idle);
+    assert_eq!(peer.stats().connect_retry_counter(), 1);
+    assert!(peer.connection().is_none());
+    assert!(peer.tracked_connection().is_none());
+}
+
+#[test_log::test(tokio::test)]
+async fn test_connect_bgp_open_err_unacceptable_hold_time() {
+    let policy = EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new());
+    let mut io_builder = BgpIoMockBuilder::new();
+    let hold_time = 0;
+    let peer_open = BgpOpenMessage::new(
+        PEER_AS as u16,
+        hold_time,
+        PEER_BGP_ID,
+        vec![Capabilities(vec![])],
+    );
+
+    io_builder
+        .read(BgpMessage::Open(peer_open.clone()))
+        .write(BgpMessage::Notification(
+            BgpNotificationMessage::OpenMessageError(OpenMessageError::UnacceptableHoldTime {
+                value: hold_time.to_be_bytes().to_vec(),
+            }),
+        ));
+    let active_connect = MockActiveConnect {
+        peer_addr: PEER_ADDR,
+        io_builder,
+        connect_delay: Duration::from_secs(0),
+    };
+    let config = PeerConfigBuilder::new()
+        .open_delay_timer_duration(1)
+        .send_notif_without_open(true)
+        .build();
+    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    peer.add_admin_event(PeerAdminEvents::ManualStart);
+    let event = peer.run().await.unwrap();
+    assert_eq!(event, BgpEvent::ManualStart);
+
+    let event = peer.run().await;
+    assert_eq!(event, Ok(BgpEvent::TcpConnectionRequestAcked(PEER_ADDR)));
+
+    let event = peer.run().await;
+    assert_eq!(
+        event,
+        Ok(BgpEvent::BGPOpenMsgErr(
+            OpenMessageError::UnacceptableHoldTime {
+                value: hold_time.to_be_bytes().to_vec(),
             }
         ))
     );

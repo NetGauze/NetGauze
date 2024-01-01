@@ -425,24 +425,16 @@ impl<
         self.peer_hold_time = Some(open.hold_time());
     }
 
-    fn set_negotiated_timers(&mut self) -> Result<(), BgpNotificationMessage> {
+    fn set_negotiated_timers(&mut self) {
         // Peer is configured not to use any timers
         if self.config.hold_timer_duration().is_zero() {
             self.hold_timer_duration = Duration::from_secs(0);
             self.keepalive_timer_duration = Duration::from_secs(0);
-            return Ok(());
+            return;
         }
 
         match self.peer_hold_time {
             Some(received_hold_time) => {
-                if (0u16..3u16).contains(&received_hold_time) {
-                    let notif = BgpNotificationMessage::OpenMessageError(
-                        OpenMessageError::UnacceptableHoldTime {
-                            value: received_hold_time.to_be_bytes().to_vec(),
-                        },
-                    );
-                    return Err(notif);
-                }
                 self.hold_timer_duration = Duration::from_secs(
                     self.config.hold_timer_duration.min(received_hold_time) as u64,
                 );
@@ -452,7 +444,6 @@ impl<
             }
         }
         self.keepalive_timer_duration = self.hold_timer_duration.div_f32(3.0);
-        Ok(())
     }
 
     pub async fn handle_event<P: PeerPolicy<A, I, D>>(
@@ -551,10 +542,7 @@ impl<
             ConnectionEvent::BGPOpenWithDelayOpenTimer(ref open) => {
                 self.open_delay_timer.take();
                 self.read_open_msg(open);
-                if let Err(notif) = self.set_negotiated_timers() {
-                    self.send(BgpMessage::Notification(notif)).await?;
-                    return Err(FsmStateError::UnacceptableHoldTime);
-                }
+                self.set_negotiated_timers();
                 let open = policy.open_message().await;
                 if !self.keepalive_timer_duration.is_zero() {
                     let mut interval = tokio::time::interval(self.keepalive_timer_duration);
@@ -641,10 +629,7 @@ impl<
             ConnectionEvent::BGPOpen(ref open) => {
                 self.open_delay_timer.take();
                 self.read_open_msg(open);
-                if let Err(notif) = self.set_negotiated_timers() {
-                    self.send(BgpMessage::Notification(notif)).await?;
-                    return Err(FsmStateError::UnacceptableHoldTime);
-                }
+                self.set_negotiated_timers();
                 if !self.keepalive_timer_duration.is_zero() {
                     let mut interval = tokio::time::interval(self.keepalive_timer_duration);
                     interval.reset();
@@ -920,14 +905,29 @@ where
                             match msg {
                                 BgpMessage::Open(open) => {
                                     this.stats.open_received += 1;
+                                    // Check hold time
+                                    if (0u16..3u16).contains(&open.hold_time()) {
+                                        return Some(ConnectionEvent::BGPOpenMsgErr(
+                                            OpenMessageError::UnacceptableHoldTime {
+                                                value: open.hold_time().to_be_bytes().to_vec(),
+                                            }))
+                                    }
+                                    // Check Peer ASN number
                                     if let Some(peer_asn) = *this.peer_asn {
                                         if peer_asn != open.my_asn4() {
-                                            return Some(ConnectionEvent::BGPOpenMsgErr(OpenMessageError::BadPeerAs {value: peer_asn.to_be_bytes().to_vec()}))
+                                            return Some(ConnectionEvent::BGPOpenMsgErr(
+                                                OpenMessageError::BadPeerAs {
+                                                    value: peer_asn.to_be_bytes().to_vec()
+                                                }))
                                         }
                                     }
+                                    // Check Peer BGP ID
                                     if let Some(peer_bgp_id) = *this.peer_bgp_id {
                                         if peer_bgp_id != open.bgp_id() {
-                                            return Some(ConnectionEvent::BGPOpenMsgErr(OpenMessageError::BadBgpIdentifier {value: open.bgp_id().octets().to_vec()}))
+                                            return Some(ConnectionEvent::BGPOpenMsgErr(
+                                                OpenMessageError::BadBgpIdentifier {
+                                                    value: open.bgp_id().octets().to_vec()
+                                                }))
                                         }
                                     }
                                     if this.open_delay_timer.is_some() {

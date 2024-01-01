@@ -30,7 +30,6 @@ pub enum FsmState {
 #[derive(Debug, Eq, PartialEq)]
 pub enum FsmStateError<A> {
     BgpMessageWritingError(BgpMessageWritingError),
-    UnacceptableHoldTime,
     InvalidConnectionStateTransition(BgpEvent<A>, FsmState, ConnectionState, ConnectionState),
 }
 
@@ -46,7 +45,6 @@ impl<A: Display> Display for FsmStateError<A> {
             FsmStateError::BgpMessageWritingError(err) => {
                 write!(f, "BgpMessageWritingError({err:?})")
             }
-            FsmStateError::UnacceptableHoldTime => write!(f, "UnacceptableHoldTime"),
             FsmStateError::InvalidConnectionStateTransition(event, fsm, frm, to) => write!(
                 f,
                 "InvalidConnectionStateTransition({event}, {fsm}, {frm}, {to})"
