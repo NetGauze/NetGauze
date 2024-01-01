@@ -1244,7 +1244,8 @@ fn test_router_mirroring_value() -> Result<(), RouteMirroringValueWritingError> 
     let good_experimental_65533_wire = [0xff, 0xfd, 0, 2, 1, 2];
     let good_experimental_65534_wire = [0xff, 0xfe, 0, 2, 1, 2];
 
-    let good_bgp = RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive);
+    let good_bgp =
+        RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(BgpMessage::KeepAlive));
     let good_information = RouteMirroringValue::Information(RouteMirroringInformation::ErroredPdu);
     let good_experimental_65531 = RouteMirroringValue::Experimental65531(vec![1, 2]);
     let good_experimental_65532 = RouteMirroringValue::Experimental65532(vec![1, 2]);
@@ -1327,7 +1328,9 @@ fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
             Ipv4Addr::new(172, 16, 0, 20),
             Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
         ),
-        vec![RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive)],
+        vec![RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(
+            BgpMessage::KeepAlive,
+        ))],
     )));
     test_parsed_completely_with_two_inputs(&good_wire, &HashMap::new(), &HashMap::new(), &good);
 

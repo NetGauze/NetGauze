@@ -521,11 +521,18 @@ impl RouteMirroringMessage {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum MirroredBgpMessage {
+    Parsed(BgpMessage),
+    Raw(Vec<u8>),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMirroringValue {
     /// A BGP PDU.  This PDU may or may not be an Update message.
     /// If the BGP Message TLV occurs in the Route Mirroring message,
     /// it MUST occur last in the list of TLVs.
-    BgpMessage(BgpMessage),
+    BgpMessage(MirroredBgpMessage),
 
     /// A 2-byte code that provides information about the mirrored message or
     /// message stream.
