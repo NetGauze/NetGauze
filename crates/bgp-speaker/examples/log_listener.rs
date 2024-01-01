@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use clap::Parser;
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
 };
 use tokio::net::TcpStream;
-use clap::Parser;
 
 use netgauze_bgp_pkt::{
     capabilities::{BgpCapability, FourOctetAsCapability},
@@ -31,7 +31,6 @@ use netgauze_bgp_speaker::{
     peer::{EchoCapabilitiesPolicy, PeerConfigBuilder, PeerHandle, PeerProperties},
     supervisor::PeerSupervisor,
 };
-
 
 #[derive(clap::Parser, Debug)]
 struct Args {
