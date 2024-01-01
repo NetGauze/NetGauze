@@ -4,8 +4,8 @@
 use chrono::{TimeZone, Utc};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bmp_pkt::{
-    iana::RouteMirroringInformation, BmpMessage, BmpMessageValue, BmpPeerType, PeerHeader,
-    RouteMirroringMessage, RouteMirroringValue,
+    iana::RouteMirroringInformation, BmpMessage, BmpMessageValue, BmpPeerType, MirroredBgpMessage,
+    PeerHeader, RouteMirroringMessage, RouteMirroringValue,
 };
 use netgauze_parse_utils::{ReadablePduWithTwoInputs, Span, WritablePdu};
 use std::{
@@ -27,7 +27,7 @@ fn main() {
         ),
         vec![
             RouteMirroringValue::Information(RouteMirroringInformation::Experimental65531),
-            RouteMirroringValue::BgpMessage(BgpMessage::KeepAlive),
+            RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(BgpMessage::KeepAlive)),
         ],
     )));
 

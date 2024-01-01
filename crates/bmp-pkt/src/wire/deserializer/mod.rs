@@ -780,7 +780,10 @@ impl<'a>
             RouteMirroringTlvType::BgpMessage => {
                 let (buf, msg) =
                     parse_into_located_three_inputs(buf, asn4, multiple_labels, add_path)?;
-                (buf, RouteMirroringValue::BgpMessage(msg))
+                (
+                    buf,
+                    RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(msg)),
+                )
             }
             RouteMirroringTlvType::Information => {
                 let (buf, information) =

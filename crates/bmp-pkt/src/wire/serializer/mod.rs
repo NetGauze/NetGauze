@@ -273,7 +273,10 @@ impl WritablePdu<RouteMirroringValueWritingError> for RouteMirroringValue {
     fn len(&self) -> usize {
         Self::BASE_LENGTH
             + match self {
-                Self::BgpMessage(msg) => msg.len(),
+                Self::BgpMessage(msg) => match msg {
+                    MirroredBgpMessage::Parsed(msg) => msg.len(),
+                    MirroredBgpMessage::Raw(msg) => msg.len(),
+                },
                 Self::Information(_) => 2, // Information are always 2-octets
                 Self::Experimental65531(value) => value.len(),
                 Self::Experimental65532(value) => value.len(),
@@ -286,7 +289,10 @@ impl WritablePdu<RouteMirroringValueWritingError> for RouteMirroringValue {
         writer.write_u16::<NetworkEndian>(self.get_type().into())?;
         writer.write_u16::<NetworkEndian>((self.len() - Self::BASE_LENGTH) as u16)?;
         match self {
-            Self::BgpMessage(msg) => msg.write(writer)?,
+            Self::BgpMessage(msg) => match msg {
+                MirroredBgpMessage::Parsed(msg) => msg.write(writer)?,
+                MirroredBgpMessage::Raw(raw) => writer.write_all(&raw)?,
+            },
             Self::Information(info) => writer.write_u16::<NetworkEndian>((*info).into())?,
             Self::Experimental65531(value) => writer.write_all(value)?,
             Self::Experimental65532(value) => writer.write_all(value)?,
