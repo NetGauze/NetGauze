@@ -446,6 +446,22 @@ impl<
         self.keepalive_timer_duration = self.hold_timer_duration.div_f32(3.0);
     }
 
+    #[inline]
+    fn start_hold_timer(&mut self) {
+        if self.config.hold_timer_duration_large_value != 0 {
+            log::debug!(
+                "[{}][{}] Set hold timer to: {:?}",
+                self.peer_addr,
+                self.state,
+                self.config.hold_timer_duration_large_value
+            );
+            self.hold_timer_duration = self.config.hold_timer_duration_large_value();
+            let mut interval = tokio::time::interval(self.hold_timer_duration);
+            interval.reset();
+            self.hold_timer.replace(interval);
+        }
+    }
+
     pub async fn handle_event<P: PeerPolicy<A, I, D>>(
         &mut self,
         policy: &mut P,
@@ -492,18 +508,7 @@ impl<
     ) -> Result<ConnectionEvent<A>, FsmStateError<A>> {
         match event {
             ConnectionEvent::DelayOpenTimerExpires => {
-                if self.config.hold_timer_duration_large_value != 0 {
-                    log::debug!(
-                        "[{}][{}] Set hold timer to: {:?}",
-                        self.peer_addr,
-                        self.state,
-                        self.config.hold_timer_duration_large_value
-                    );
-                    self.hold_timer_duration = self.config.hold_timer_duration_large_value();
-                    let mut interval = tokio::time::interval(self.hold_timer_duration);
-                    interval.reset();
-                    self.hold_timer.replace(interval);
-                }
+                self.start_hold_timer();
                 let open = policy.open_message().await;
                 self.send(BgpMessage::Open(open)).await?;
                 self.state = ConnectionState::OpenSent;
@@ -511,18 +516,7 @@ impl<
             ConnectionEvent::TcpConnectionRequestAcked(_)
             | ConnectionEvent::TcpConnectionConfirmed(_) => {
                 if self.config.open_delay_timer_duration == 0 {
-                    if self.config.hold_timer_duration_large_value != 0 {
-                        log::debug!(
-                            "[{}][{}] Set hold timer to: {:?}",
-                            self.peer_addr,
-                            self.state,
-                            self.config.hold_timer_duration_large_value
-                        );
-                        self.hold_timer_duration = self.config.hold_timer_duration_large_value();
-                        let mut interval = tokio::time::interval(self.hold_timer_duration);
-                        interval.reset();
-                        self.hold_timer.replace(interval);
-                    }
+                    self.start_hold_timer();
                     let open = policy.open_message().await;
                     self.send(BgpMessage::Open(open)).await?;
                     self.state = ConnectionState::OpenSent;
