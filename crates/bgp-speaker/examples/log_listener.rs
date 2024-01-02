@@ -52,7 +52,9 @@ fn create_peer(
         BgpCapabilityCode::FourOctetAs,
         BgpCapability::FourOctetAs(FourOctetAsCapability::new(my_asn)),
     );
-    let config = PeerConfigBuilder::new().build();
+    let config = PeerConfigBuilder::new()
+        .open_delay_timer_duration(1)
+        .build();
     let policy = EchoCapabilitiesPolicy::new(
         600,
         my_bgp_id,
