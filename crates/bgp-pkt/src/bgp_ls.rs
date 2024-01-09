@@ -121,7 +121,7 @@ pub enum BgpLsLinkAttributeTlv {
     ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     ///      |                  Shared Risk Link Group Value                 |
     ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    SharedRiskLinkGroup(), // TODO unimplemented
+    SharedRiskLinkGroup(Vec<SharedRiskLinkGroupValue>),
 
     ///      0                   1                   2                   3
     ///      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -168,23 +168,24 @@ impl WritablePdu<BgpLsWritingError> for BgpLsLinkAttributeTlv {
     const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
 
     fn len(&self) -> usize {
-        match self {
-            BgpLsLinkAttributeTlv::LocalNodeIpv4RouterId(_) => 4,
-            BgpLsLinkAttributeTlv::LocalNodeIpv6RouterId(_) => 16,
-            BgpLsLinkAttributeTlv::RemoteNodeIpv4RouterId(_) => 4,
-            BgpLsLinkAttributeTlv::RemoteNodeIpv6RouterId(_) => 16,
-            BgpLsLinkAttributeTlv::RemoteNodeAdministrativeGroupColor(_) => 4,
-            BgpLsLinkAttributeTlv::MaximumLinkBandwidth(_) => 4,
-            BgpLsLinkAttributeTlv::MaximumReservableLinkBandwidth(_) => 4,
-            BgpLsLinkAttributeTlv::UnreservedBandwidth(_) => 4 * 8,
-            BgpLsLinkAttributeTlv::TeDefaultMetric(_) => 4,
-            BgpLsLinkAttributeTlv::LinkProtectionType { .. } => 2,
-            BgpLsLinkAttributeTlv::MplsProtocolMask { .. } => 1,
-            BgpLsLinkAttributeTlv::IgpMetric(metric) => metric.len(),
-            BgpLsLinkAttributeTlv::SharedRiskLinkGroup() => unimplemented!(),
-            BgpLsLinkAttributeTlv::OpaqueLinkAttribute(attr) => attr.len(),
-            BgpLsLinkAttributeTlv::LinkName(name) => name.len(),
-        }
+        Self::BASE_LENGTH +
+            match self {
+                BgpLsLinkAttributeTlv::LocalNodeIpv4RouterId(_) => 4,
+                BgpLsLinkAttributeTlv::LocalNodeIpv6RouterId(_) => 16,
+                BgpLsLinkAttributeTlv::RemoteNodeIpv4RouterId(_) => 4,
+                BgpLsLinkAttributeTlv::RemoteNodeIpv6RouterId(_) => 16,
+                BgpLsLinkAttributeTlv::RemoteNodeAdministrativeGroupColor(_) => 4,
+                BgpLsLinkAttributeTlv::MaximumLinkBandwidth(_) => 4,
+                BgpLsLinkAttributeTlv::MaximumReservableLinkBandwidth(_) => 4,
+                BgpLsLinkAttributeTlv::UnreservedBandwidth(_) => 4 * 8,
+                BgpLsLinkAttributeTlv::TeDefaultMetric(_) => 4,
+                BgpLsLinkAttributeTlv::LinkProtectionType { .. } => 2,
+                BgpLsLinkAttributeTlv::MplsProtocolMask { .. } => 1,
+                BgpLsLinkAttributeTlv::IgpMetric(metric) => metric.len(),
+                BgpLsLinkAttributeTlv::SharedRiskLinkGroup(groups) => 4 * groups.len(),
+                BgpLsLinkAttributeTlv::OpaqueLinkAttribute(attr) => attr.len(),
+                BgpLsLinkAttributeTlv::LinkName(name) => name.len(),
+            }
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
@@ -204,10 +205,54 @@ impl WritablePdu<BgpLsWritingError> for BgpLsLinkAttributeTlv {
                 }
             }
             BgpLsLinkAttributeTlv::TeDefaultMetric(metric) => writer.write_u32::<NetworkEndian>(*metric)?,
-            BgpLsLinkAttributeTlv::LinkProtectionType { .. } => unimplemented!(),
-            BgpLsLinkAttributeTlv::MplsProtocolMask { .. } => unimplemented!(),
+            BgpLsLinkAttributeTlv::LinkProtectionType { extra_traffic, unprotected, shared, dedicated1c1, dedicated1p1, enhanced } => {
+                let mut protection_cap = 0;
+
+                if *extra_traffic {
+                    protection_cap |= LinkProtectionType::ExtraTraffic as u8
+                }
+
+                if *unprotected {
+                    protection_cap |= LinkProtectionType::Unprotected as u8
+                }
+
+                if *shared {
+                    protection_cap |= LinkProtectionType::Shared as u8
+                }
+
+                if *dedicated1c1 {
+                    protection_cap |= LinkProtectionType::Dedicated1c1 as u8
+                }
+
+                if *dedicated1p1 {
+                    protection_cap |= LinkProtectionType::Dedicated1p1 as u8
+                }
+
+                if *enhanced {
+                    protection_cap |= LinkProtectionType::Enhanced as u8
+                }
+
+                writer.write_u8(protection_cap)?
+            }
+            BgpLsLinkAttributeTlv::MplsProtocolMask { ldp, rsvp_te } => {
+                let mut flags = 0;
+
+                if *ldp {
+                    flags |= MplsProtocolMask::LabelDistributionProtocol as u8
+                }
+
+                if *rsvp_te {
+                    flags |= MplsProtocolMask::ExtensionToRsvpForLspTunnels as u8
+                }
+
+                writer.write_u8(flags)?
+            }
             BgpLsLinkAttributeTlv::IgpMetric(metric) => writer.write_all(metric)?,
-            BgpLsLinkAttributeTlv::SharedRiskLinkGroup() => unimplemented!(),
+            BgpLsLinkAttributeTlv::SharedRiskLinkGroup(groups) => {
+                for group in groups {
+                    writer.write_u32::<NetworkEndian>(group.value())?;
+                }
+            },
             BgpLsLinkAttributeTlv::OpaqueLinkAttribute(attr) => writer.write_all(attr)?,
             BgpLsLinkAttributeTlv::LinkName(ascii) => writer.write_all(ascii.as_bytes())?,
         }
@@ -241,7 +286,7 @@ pub enum BgpLsPrefixAttributeTlv {
         isis_up_down: bool,
         ospf_no_unicast: bool,
         ospf_local_address: bool,
-        ospf_propagate_nssa: bool
+        ospf_propagate_nssa: bool,
     },
 
     ///      0                   1                   2                   3
@@ -296,11 +341,10 @@ pub enum BgpLsPrefixAttributeTlv {
     ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     ///      //              Opaque Prefix Attributes  (variable)           //
     ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    OpaquePrefixAttribute(Vec<u8>)
+    OpaquePrefixAttribute(Vec<u8>),
 }
 
 impl BgpLsPrefixAttributeTlv {
-
     pub fn get_type(&self) -> iana::BgpLsPrefixAttribute {
         match self {
             BgpLsPrefixAttributeTlv::IgpFlags { .. } => iana::BgpLsPrefixAttribute::IgpFlags,
@@ -328,11 +372,30 @@ impl WritablePdu<BgpLsWritingError> for BgpLsPrefixAttributeTlv {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
-
         write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
 
         match self {
-            BgpLsPrefixAttributeTlv::IgpFlags { .. } => unimplemented!(),
+            BgpLsPrefixAttributeTlv::IgpFlags { isis_up_down, ospf_no_unicast, ospf_local_address, ospf_propagate_nssa } => {
+                let mut igp_flags = 0;
+
+                if *isis_up_down {
+                    igp_flags |= IgpFlags::IsIsUp as u8
+                }
+
+                if *ospf_no_unicast {
+                    igp_flags |= IgpFlags::OspfNoUnicast as u8
+                }
+
+                if *ospf_local_address {
+                    igp_flags |= IgpFlags::OspfLocalAddress as u8
+                }
+
+                if *ospf_propagate_nssa {
+                    igp_flags |= IgpFlags::OspfPropagateNssa as u8
+                }
+
+                writer.write_u8(igp_flags)?
+            }
             BgpLsPrefixAttributeTlv::IgpRouteTag(tags) => {
                 for tag in tags {
                     writer.write_u32::<NetworkEndian>(*tag)?;
@@ -512,7 +575,7 @@ impl BgpLsNlri {
 pub enum BgpLsWritingError {
     StdIoError(#[from_std_io_error] String),
     NodeNameTlvStringTooLongError,
-    AddrWritingError(#[from] IpAddrWritingError)
+    AddrWritingError(#[from] IpAddrWritingError),
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsNlri {
@@ -604,6 +667,33 @@ pub enum OspfRouteType {
     External2 = 4,
     Nssa1 = 5,
     Nssa2 = 6,
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum MplsProtocolMask {
+    LabelDistributionProtocol = 0b10000000,
+    ExtensionToRsvpForLspTunnels = 0b01000000,
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum LinkProtectionType {
+    ExtraTraffic = 0x01,
+    Unprotected = 0x02,
+    Shared = 0x04,
+    Dedicated1c1 = 0x08,
+    Dedicated1p1 = 0x10,
+    Enhanced = 0x20,
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum IgpFlags {
+    IsIsUp = 0b10000000,
+    OspfNoUnicast = 0b01000000,
+    OspfLocalAddress = 0b00100000,
+    OspfPropagateNssa = 0b00010000,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -1019,6 +1109,17 @@ impl WritablePdu<BgpLsWritingError> for MultiTopologyId {
     }
 }
 
+/// TODO unimplemented: figure out what
+///  "In Link-State NLRI, both IPv4 and IPv6 SRLG information are carried in a single TLV."
+///  means (https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.5)
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct SharedRiskLinkGroupValue(u32);
+
+impl SharedRiskLinkGroupValue {
+    fn value(&self) -> u32 {
+        self.0
+    }
+}
 
 #[test]
 fn test_bgp_ls() {}
