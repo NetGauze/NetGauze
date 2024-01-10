@@ -56,7 +56,7 @@ fn create_peer(
         .open_delay_timer_duration(1)
         .build();
     let policy = EchoCapabilitiesPolicy::new(
-        600,
+        my_asn,
         my_bgp_id,
         config.hold_timer_duration_large_value().as_secs() as u16,
         caps,
