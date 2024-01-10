@@ -1054,7 +1054,7 @@ pub mod test {
         BgpMessage,
     };
     use std::{
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         io,
         net::{IpAddr, Ipv4Addr, SocketAddr},
         time::Duration,
@@ -1101,7 +1101,13 @@ pub mod test {
 
     #[tokio::test]
     async fn test_connected_delay_open_timer_expires() -> io::Result<()> {
-        let mut policy = EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            MY_BGP_ID,
+            HOLD_TIME,
+            HashMap::new(),
+            HashSet::new(),
+        );
         let open_delay_duration = Duration::from_secs(1);
         let io = BgpIoMockBuilder::new()
             .wait(open_delay_duration)
@@ -1130,7 +1136,13 @@ pub mod test {
 
     #[tokio::test]
     async fn test_connected_open_with_delay_open_timer() -> io::Result<()> {
-        let mut policy = EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            MY_BGP_ID,
+            HOLD_TIME,
+            HashMap::new(),
+            HashSet::new(),
+        );
         let open_delay_duration = Duration::from_secs(1);
         let io = BgpIoMockBuilder::new()
             .read(BgpMessage::Open(BgpOpenMessage::new(
@@ -1185,7 +1197,13 @@ pub mod test {
 
     #[tokio::test]
     async fn test_connected_bgp_header_err() -> io::Result<()> {
-        let mut policy = EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            MY_BGP_ID,
+            HOLD_TIME,
+            HashMap::new(),
+            HashSet::new(),
+        );
         let open_delay_duration = Duration::from_secs(1);
         let io = BgpIoMockBuilder::new()
             .read_u8(&[
@@ -1217,7 +1235,13 @@ pub mod test {
 
     #[tokio::test]
     async fn test_connected_open_sent() -> io::Result<()> {
-        let mut policy = EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            MY_BGP_ID,
+            HOLD_TIME,
+            HashMap::new(),
+            HashSet::new(),
+        );
         let io = BgpIoMockBuilder::new()
             .write(BgpMessage::Open(BgpOpenMessage::new(
                 MY_AS as u16,
@@ -1240,7 +1264,13 @@ pub mod test {
 
     #[tokio::test]
     async fn test_open_sent_hold_timer_expires() -> io::Result<()> {
-        let mut policy = EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            MY_BGP_ID,
+            HOLD_TIME,
+            HashMap::new(),
+            HashSet::new(),
+        );
         let hold_time_seconds = 1;
         let io = BgpIoMockBuilder::new()
             .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -1283,8 +1313,13 @@ pub mod test {
     async fn test_open_sent_bgp_open() -> io::Result<()> {
         let peer_hold_time = 120;
         let our_hold_time = 240;
-        let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, our_hold_time, HashMap::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            MY_BGP_ID,
+            our_hold_time,
+            HashMap::new(),
+            HashSet::new(),
+        );
         let open = BgpOpenMessage::new(
             MY_AS as u16,
             peer_hold_time,
@@ -1333,7 +1368,13 @@ pub mod test {
 
     #[tokio::test]
     async fn test_open_sent_tcp_connection_fails() -> io::Result<()> {
-        let mut policy = EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            MY_BGP_ID,
+            HOLD_TIME,
+            HashMap::new(),
+            HashSet::new(),
+        );
         let hold_time_seconds = 1;
         let io = BgpIoMockBuilder::new()
             .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -1367,8 +1408,13 @@ pub mod test {
     #[tokio::test]
     async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
         let hold_time_seconds = 3;
-        let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time_seconds as u16, HashMap::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            MY_BGP_ID,
+            hold_time_seconds as u16,
+            HashMap::new(),
+            HashSet::new(),
+        );
         let open = BgpOpenMessage::new(
             MY_AS as u16,
             hold_time_seconds as u16,

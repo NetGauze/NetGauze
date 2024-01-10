@@ -23,7 +23,7 @@ use crate::{
 };
 use netgauze_bgp_pkt::{wire::serializer::BgpMessageWritingError, BgpMessage};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     net::Ipv4Addr,
 };
@@ -138,6 +138,7 @@ impl<
             self.my_bgp_id,
             peer_config.hold_timer_duration_large_value,
             HashMap::new(),
+            HashSet::new(),
         );
         let rx = self.add_peer(peer_properties, peer_config, active_connect, policy)?;
         let peer_handle = self.peer_handler(peer_bgp_id).unwrap();

@@ -15,7 +15,7 @@
 
 use clap::Parser;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
 };
 use tokio::net::TcpStream;
@@ -60,6 +60,7 @@ fn create_peer(
         my_bgp_id,
         config.hold_timer_duration_large_value().as_secs() as u16,
         caps,
+        HashSet::new(),
     );
 
     let properties = PeerProperties::new(

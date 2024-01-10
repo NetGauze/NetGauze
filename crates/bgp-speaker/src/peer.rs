@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error::Error,
     fmt::{Debug, Display},
     marker::PhantomData,
@@ -89,6 +89,10 @@ pub trait PeerPolicy<
     ) -> Option<PeerEvent<A, I>>;
 }
 
+/// Echo back BGP Capabilities to a peer. With the options to force using a
+/// capability and rejecting some capabilities. For this policy to be effective,
+/// OpenDelayTimer must be set to large enough value. Otherwise, only initially
+/// defined `capabilities` are sent to the peer.
 #[derive(Debug, Clone)]
 pub struct EchoCapabilitiesPolicy<A, I, D> {
     my_asn: u32,
@@ -96,6 +100,7 @@ pub struct EchoCapabilitiesPolicy<A, I, D> {
     remote_as: Option<u32>,
     hold_timer_duration: u16,
     capabilities: HashMap<BgpCapabilityCode, BgpCapability>,
+    reject_capabilities: HashSet<BgpCapabilityCode>,
     peer_capabilities: Vec<BgpCapability>,
     _address_marker: PhantomData<A>,
     _inner_marker: PhantomData<I>,
@@ -108,6 +113,7 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
         my_bgp_id: Ipv4Addr,
         hold_timer_duration: u16,
         capabilities: HashMap<BgpCapabilityCode, BgpCapability>,
+        reject_capabilities: HashSet<BgpCapabilityCode>,
     ) -> Self {
         Self {
             my_asn,
@@ -115,6 +121,7 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
             remote_as: None,
             hold_timer_duration,
             capabilities,
+            reject_capabilities,
             peer_capabilities: vec![],
             _address_marker: PhantomData,
             _inner_marker: PhantomData,
@@ -137,17 +144,24 @@ impl<
         let mut capabilities: Vec<BgpCapability> = self.capabilities.values().cloned().collect();
         for cap in &self.peer_capabilities {
             if let Ok(code) = cap.code() {
-                if self.capabilities.get(&code).is_none() {
+                // Check that the capability has not been added before and not in the reject
+                // list
+                if !self.capabilities.contains_key(&code)
+                    && !self.reject_capabilities.contains(&code)
+                {
                     capabilities.push(cap.clone());
                 }
             }
         }
+        // ASN in BGP header is always 2-octets,
+        // 4-octets are encoded in as a BGP Capability
+        let my_asn = if self.my_asn > u16::MAX as u32 {
+            AS_TRANS
+        } else {
+            self.my_asn as u16
+        };
         BgpOpenMessage::new(
-            if self.my_asn > u16::MAX as u32 {
-                AS_TRANS
-            } else {
-                self.my_asn as u16
-            },
+            my_asn,
             self.hold_timer_duration,
             self.my_bgp_id,
             vec![BgpOpenMessageParameter::Capabilities(capabilities)],
@@ -159,10 +173,13 @@ impl<
         event: ConnectionEvent<A>,
         _connection: &Connection<A, I, D>,
     ) -> ConnectionEvent<A> {
-        if let ConnectionEvent::BGPOpen(ref open) = event {
-            let asn = open.my_asn4();
-            self.remote_as.replace(asn);
-            self.peer_capabilities = open.capabilities().values().cloned().cloned().collect();
+        match &event {
+            ConnectionEvent::BGPOpen(open) | ConnectionEvent::BGPOpenWithDelayOpenTimer(open) => {
+                let asn = open.my_asn4();
+                self.remote_as.replace(asn);
+                self.peer_capabilities = open.capabilities().values().cloned().cloned().collect();
+            }
+            _ => {}
         }
         event
     }
