@@ -17,8 +17,21 @@ libfuzzer-sys = "0.4"
 netgauze-parse-utils = { path = "../crates/parse-utils" }
 netgauze-iana = { path = "../crates/iana", features = ["fuzz"] }
 netgauze-bgp-pkt = { path = "../crates/bgp-pkt", features = ["serde", "fuzz"] }
+netgauze-bgp-speaker = { path = "../crates/bgp-speaker", features = ["fuzz"] }
 netgauze-bmp-pkt = { path = "../crates/bmp-pkt", features = ["serde", "fuzz"] }
 netgauze-flow-pkt = { path = "../crates/flow-pkt", features = ["serde"] }
+
+async-trait = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-test = { workspace = true }
+futures-core = { workspace = true }
+
+[[bin]]
+name = "fuzz-bgp-peer"
+path = "fuzz_targets/fuzz_bgp_peer.rs"
+test = false
+doc = false
 
 [[bin]]
 name = "fuzz-bgp-pkt"
