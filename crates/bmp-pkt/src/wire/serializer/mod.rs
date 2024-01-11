@@ -291,7 +291,7 @@ impl WritablePdu<RouteMirroringValueWritingError> for RouteMirroringValue {
         match self {
             Self::BgpMessage(msg) => match msg {
                 MirroredBgpMessage::Parsed(msg) => msg.write(writer)?,
-                MirroredBgpMessage::Raw(raw) => writer.write_all(&raw)?,
+                MirroredBgpMessage::Raw(raw) => writer.write_all(raw)?,
             },
             Self::Information(info) => writer.write_u16::<NetworkEndian>((*info).into())?,
             Self::Experimental65531(value) => writer.write_all(value)?,
