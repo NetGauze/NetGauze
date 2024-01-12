@@ -14,25 +14,47 @@
 // limitations under the License.
 
 #![no_main]
-
-use std::collections::HashMap;
+#![allow(clippy::type_complexity)]
 
 use libfuzzer_sys::fuzz_target;
+use std::collections::HashMap;
 
-use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::{wire::deserializer::BgpParsingContext, BgpMessage};
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{ReadablePduWithThreeInputs, Span};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
+// We don't pass BgpParsingContext as fuzzed input since we don't want to generate BgpParsingContext::parsing_errors.
 fuzz_target!(|data: (
     &[u8],
     bool,
     HashMap<AddressType, u8>,
-    HashMap<AddressType, bool>
+    HashMap<AddressType, bool>,
+    bool,
+    bool,
+    bool,
+    bool
 )| {
-    let (mut buf, asn4, multiple_labels, addpath) = data;
-    while let Ok((retbuf, _msg)) =
-        BgpMessage::from_wire(Span::new(buf), asn4, &multiple_labels, &addpath)
-    {
+    let (
+        mut buf,
+        asn4,
+        multiple_labels,
+        add_path,
+        fail_on_non_unicast_withdraw_nlri,
+        fail_on_non_unicast_update_nlri,
+        fail_on_capability_error,
+        fail_on_malformed_path_attr,
+    ) = data;
+    let mut ctx = BgpParsingContext::new(
+        asn4,
+        multiple_labels,
+        add_path,
+        fail_on_non_unicast_withdraw_nlri,
+        fail_on_non_unicast_update_nlri,
+        fail_on_capability_error,
+        fail_on_malformed_path_attr,
+    );
+    while let Ok((retbuf, _msg)) = BgpMessage::from_wire(Span::new(buf), &mut ctx) {
         buf = retbuf.fragment();
+        ctx.reset_parsing_errors();
     }
 });
