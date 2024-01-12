@@ -21,19 +21,20 @@ use crate::{
         AigpAttributeType, PathAttributeType, UndefinedAigpAttributeType,
         UndefinedPathAttributeType,
     },
+    nlri::LabeledNextHop,
     path_attribute::*,
-    wire::deserializer::{community::*, nlri::*, IpAddrParsingError},
+    wire::deserializer::{community::*, nlri::*, BgpParsingContext, IpAddrParsingError},
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, SubsequentAddressFamily, UndefinedAddressFamily,
     UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_into_located_three_inputs,
-    parse_into_located_two_inputs, parse_till_empty, parse_till_empty_into_located,
-    parse_till_empty_into_with_one_input_located, parse_till_empty_into_with_three_inputs_located,
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs,
-    ReadablePduWithTwoInputs, Span,
+    parse_into_located_one_input, parse_into_located_three_inputs, parse_into_located_two_inputs,
+    parse_till_empty, parse_till_empty_into_located, parse_till_empty_into_with_one_input_located,
+    parse_till_empty_into_with_three_inputs_located, ErrorKindSerdeDeref, LocatedParsingError,
+    ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs, ReadablePduWithTwoInputs,
+    Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -44,13 +45,13 @@ use nom::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
 
 const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
 const TRANSITIVE_PATH_ATTRIBUTE_MASK: u8 = 0x40;
 const PARTIAL_PATH_ATTRIBUTE_MASK: u8 = 0x20;
-const EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK: u8 = 0x10;
+pub(crate) const EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK: u8 = 0x10;
 const ORIGIN_LEN: u16 = 1;
 const NEXT_HOP_LEN: u16 = 4;
 const MULTI_EXIT_DISCRIMINATOR_LEN: u16 = 4;
@@ -95,28 +96,21 @@ pub enum PathAttributeParsingError {
     OnlyToCustomerError(#[from_located(module = "self")] OnlyToCustomerParsingError),
     AigpError(#[from_located(module = "self")] AigpParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
-    InvalidPathAttribute(InvalidPathAttribute),
+    InvalidPathAttribute(InvalidPathAttribute, PathAttributeValue),
 }
 
 pub trait IntoLocatedPathAttributeParsingError<'a> {
     fn into_located_attribute_parsing_error(self) -> LocatedPathAttributeParsingError<'a>;
 }
 
-impl<'a>
-    ReadablePduWithThreeInputs<
-        'a,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
-        LocatedPathAttributeParsingError<'a>,
-    > for PathAttribute
+impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttributeParsingError<'a>>
+    for PathAttribute
 {
     fn from_wire(
         buf: Span<'a>,
-        asn4: bool,
-        multiple_labels: &HashMap<AddressType, u8>,
-        add_path_map: &HashMap<AddressType, bool>,
+        ctx: &mut BgpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedPathAttributeParsingError<'a>> {
+        let (asn4, multiple_labels, add_path_map) = (ctx.asn4, &ctx.multiple_labels, &ctx.add_path);
         let (buf, attributes) = be_u8(buf)?;
         let buf_before_code = buf;
         let (buf, code) = be_u8(buf)?;
@@ -241,10 +235,10 @@ impl<'a>
         let attr = match PathAttribute::from(optional, transitive, partial, extended_length, value)
         {
             Ok(attr) => attr,
-            Err(err) => {
+            Err((value, err)) => {
                 return Err(nom::Err::Error(LocatedPathAttributeParsingError::new(
                     buf,
-                    PathAttributeParsingError::InvalidPathAttribute(err),
+                    PathAttributeParsingError::InvalidPathAttribute(err, value),
                 )))
             }
         };
@@ -292,6 +286,9 @@ pub enum AsPathParsingError {
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    /// RFC 7606: An AS_PATH is considered malformed, if it has a Path Segment
+    /// Length field of zero.
+    ZeroSegmentLength,
     UndefinedAsPathSegmentType(#[from_external] UndefinedAsPathSegmentType),
 }
 
@@ -320,7 +317,16 @@ impl<'a> ReadablePdu<'a, LocatedAsPathParsingError<'a>> for As2PathSegment {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
         let (buf, segment_type) =
             nom::combinator::map_res(be_u8, AsPathSegmentType::try_from)(buf)?;
-        let (buf, as_numbers) = nom::multi::length_count(be_u8, be_u16)(buf)?;
+        let before = buf;
+        let (buf, count) = be_u8(buf)?;
+        if count == 0 {
+            return Err(nom::Err::Error(LocatedAsPathParsingError::new(
+                before,
+                AsPathParsingError::ZeroSegmentLength,
+            )));
+        }
+        let count = count as usize;
+        let (buf, as_numbers) = nom::multi::many_m_n(count, count, be_u16)(buf)?;
         Ok((buf, As2PathSegment::new(segment_type, as_numbers)))
     }
 }
@@ -329,7 +335,16 @@ impl<'a> ReadablePdu<'a, LocatedAsPathParsingError<'a>> for As4PathSegment {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedAsPathParsingError<'a>> {
         let (buf, segment_type) =
             nom::combinator::map_res(be_u8, AsPathSegmentType::try_from)(buf)?;
-        let (buf, as_numbers) = nom::multi::length_count(be_u8, be_u32)(buf)?;
+        let before = buf;
+        let (buf, count) = be_u8(buf)?;
+        if count == 0 {
+            return Err(nom::Err::Error(LocatedAsPathParsingError::new(
+                before,
+                AsPathParsingError::ZeroSegmentLength,
+            )));
+        }
+        let count = count as usize;
+        let (buf, as_numbers) = nom::multi::many_m_n(count, count, be_u32)(buf)?;
         Ok((buf, As4PathSegment::new(segment_type, as_numbers)))
     }
 }
@@ -577,10 +592,10 @@ pub enum MpReachParsingError {
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    InvalidIpAddressType(u8),
     UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
     UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
-    IpAddrError(#[from_located(module = "crate::wire::deserializer")] IpAddrParsingError),
+    IpAddrError(AddressType, IpAddrParsingError),
+    LabeledNextHopError(AddressType, LabeledNextHopParsingError),
     Ipv4UnicastAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")] Ipv4UnicastAddressParsingError,
     ),
@@ -613,9 +628,6 @@ pub enum MpReachParsingError {
     ),
     L2EvpnAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")] L2EvpnAddressParsingError,
-    ),
-    LabeledNextHopError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] LabeledNextHopParsingError,
     ),
     RouteTargetMembershipAddressError(
         #[from_located(module = "crate::wire::deserializer::nlri")]
@@ -670,7 +682,8 @@ impl<'a>
                 Ok((buf, MpReach::Ipv4Multicast { next_hop, nlri }))
             }
             Ok(AddressType::Ipv4NlriMplsLabels) => {
-                let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
+                let (mp_buf, next_hop) =
+                    parse_ip_next_hop(mp_buf, AddressType::Ipv4NlriMplsLabels)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4NlriMplsLabels)
@@ -686,7 +699,8 @@ impl<'a>
                 Ok((buf, MpReach::Ipv4NlriMplsLabels { next_hop, nlri }))
             }
             Ok(AddressType::Ipv4MplsLabeledVpn) => {
-                let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
+                let (mp_buf, next_hop) =
+                    parse_labeled_next_hop(mp_buf, AddressType::Ipv4MplsLabeledVpn)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4MplsLabeledVpn)
@@ -750,7 +764,8 @@ impl<'a>
                 ))
             }
             Ok(AddressType::Ipv6NlriMplsLabels) => {
-                let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
+                let (mp_buf, next_hop) =
+                    parse_ip_next_hop(mp_buf, AddressType::Ipv6NlriMplsLabels)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::Ipv6NlriMplsLabels)
@@ -766,7 +781,8 @@ impl<'a>
                 Ok((buf, MpReach::Ipv6NlriMplsLabels { next_hop, nlri }))
             }
             Ok(AddressType::Ipv6MplsLabeledVpn) => {
-                let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
+                let (mp_buf, next_hop) =
+                    parse_labeled_next_hop(mp_buf, AddressType::Ipv6MplsLabeledVpn)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::Ipv6MplsLabeledVpn)
@@ -782,7 +798,7 @@ impl<'a>
                 Ok((buf, MpReach::Ipv6MplsVpnUnicast { next_hop, nlri }))
             }
             Ok(AddressType::L2VpnBgpEvpn) => {
-                let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
+                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, AddressType::L2VpnBgpEvpn)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::L2VpnBgpEvpn)
@@ -791,7 +807,8 @@ impl<'a>
                 Ok((buf, MpReach::L2Evpn { next_hop, nlri }))
             }
             Ok(AddressType::RouteTargetConstrains) => {
-                let (mp_buf, next_hop) = parse_into_located(mp_buf)?;
+                let (mp_buf, next_hop) =
+                    parse_ip_next_hop(mp_buf, AddressType::RouteTargetConstrains)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::L2VpnBgpEvpn)
@@ -809,6 +826,66 @@ impl<'a>
             )),
         }
     }
+}
+
+#[inline]
+fn parse_ip_next_hop(
+    mp_buf: Span<'_>,
+    address_type: AddressType,
+) -> IResult<Span<'_>, IpAddr, LocatedMpReachParsingError<'_>> {
+    let (mp_buf, next_hop) = match IpAddr::from_wire(mp_buf) {
+        Ok((mp_buf, next_hop)) => (mp_buf, next_hop),
+        Err(err) => {
+            return Err(match err {
+                nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+                nom::Err::Error(error) => {
+                    let (e, s) = (error.error, error.span);
+                    nom::Err::Error(LocatedMpReachParsingError::new(
+                        s,
+                        MpReachParsingError::IpAddrError(address_type, e),
+                    ))
+                }
+                nom::Err::Failure(failure) => {
+                    let (e, s) = (failure.error, failure.span);
+                    nom::Err::Failure(LocatedMpReachParsingError::new(
+                        s,
+                        MpReachParsingError::IpAddrError(address_type, e),
+                    ))
+                }
+            });
+        }
+    };
+    Ok((mp_buf, next_hop))
+}
+
+#[inline]
+fn parse_labeled_next_hop(
+    mp_buf: Span<'_>,
+    address_type: AddressType,
+) -> IResult<Span<'_>, LabeledNextHop, LocatedMpReachParsingError<'_>> {
+    let (mp_buf, next_hop) = match LabeledNextHop::from_wire(mp_buf) {
+        Ok((mp_buf, next_hop)) => (mp_buf, next_hop),
+        Err(err) => {
+            return Err(match err {
+                nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+                nom::Err::Error(error) => {
+                    let (e, s) = (error.error().clone(), *error.span());
+                    nom::Err::Error(LocatedMpReachParsingError::new(
+                        s,
+                        MpReachParsingError::LabeledNextHopError(address_type, e),
+                    ))
+                }
+                nom::Err::Failure(failure) => {
+                    let (e, s) = (failure.error().clone(), *failure.span());
+                    nom::Err::Failure(LocatedMpReachParsingError::new(
+                        s,
+                        MpReachParsingError::LabeledNextHopError(address_type, e),
+                    ))
+                }
+            });
+        }
+    };
+    Ok((mp_buf, next_hop))
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]

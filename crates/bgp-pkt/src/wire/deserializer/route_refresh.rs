@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 
 use netgauze_serde_macros::LocatedError;
 
+use crate::notification::RouteRefreshError;
 use netgauze_parse_utils::ErrorKindSerdeDeref;
 
 /// BGP Route Refresh Message Parsing errors
@@ -66,5 +67,18 @@ impl<'a> ReadablePdu<'a, LocatedBgpRouteRefreshMessageParsingError<'a>> for BgpR
             }
         };
         Ok((buf, BgpRouteRefreshMessage::new(address_type, op)))
+    }
+}
+
+impl From<BgpRouteRefreshMessageParsingError> for RouteRefreshError {
+    fn from(_value: BgpRouteRefreshMessageParsingError) -> Self {
+        // Mapping all RouteRefresh errors to invalid length
+        // TODO implement RFC 7313 error handling: If the length, excluding the
+        // fixed-size message header, of the received ROUTE-REFRESH message with Message
+        // Subtype 1 and 2 is not 4, then the BGP speaker MUST send a NOTIFICATION
+        // message with the Error Code of "ROUTE-REFRESH Message Error" and the subcode
+        // of "Invalid Message Length". The Data field of the NOTIFICATION message MUST
+        // ontain the complete ROUTE-REFRESH message.
+        RouteRefreshError::InvalidMessageLength { value: vec![] }
     }
 }
