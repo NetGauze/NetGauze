@@ -24,7 +24,7 @@ use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
-use crate::bgp_ls::{BgpLsAttribute, BgpLsNlri};
+use crate::bgp_ls::{BgpLsAttribute, BgpLsNlri, BgpLsVpnNlri};
 
 /// General properties to check the validity of a given path attribute value
 pub trait PathAttributeValueProperties {
@@ -1009,8 +1009,9 @@ pub enum MpReach {
     ///    itself
     /// 
     BgpLs {
-        // TODO add nexthop
-        nlri: BgpLsNlri
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
+        next_hop: IpAddr,
+        nlri: Vec<BgpLsNlri>
     },
 
     ///
@@ -1038,9 +1039,9 @@ pub enum MpReach {
     ///    Route Distinguisher.
     ///
     BgpLsVpn {
-        // TODO add nexthop
-        rd: RouteDistinguisher,
-        nlri: BgpLsNlri
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
+        next_hop: LabeledNextHop,
+        nlri: Vec<BgpLsVpnNlri>
     },
     Unknown {
         afi: AddressFamily,

@@ -15,8 +15,7 @@
 
 //! Serializer for BGP Path Attributes
 
-use crate::bgp_ls::BgpLsNlriWritingError;
-use crate::bgp_ls::BgpLsWritingError;
+use crate::bgp_ls::{BgpLsNlri, BgpLsVpnNlri};
 use crate::wire::serializer::bgp_ls::BgpLsWritingError;
 use crate::{
     iana::{AigpAttributeType, PathAttributeType},
@@ -28,6 +27,7 @@ use crate::{
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
+use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::net::IpAddr;
@@ -858,24 +858,23 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 safi: _,
                 value,
             } => value.len(),
-            Self::BgpLs { nlri, nlri_type: _ } => {
-                let ls_nlri_len = nlri.len();
+            Self::BgpLs { nlri, next_hop } => {
+                let next_hop_len = if next_hop.is_ipv4() {
+                    IPV4_LEN as usize
+                } else {
+                    IPV6_LEN as usize
+                };
 
-                2 /* nlri type field */
-                    + 2 /* total nlri length field */
-                    + ls_nlri_len
+                let ls_nlri_len: usize = nlri.iter().map(&BgpLsNlri::len).sum();
+
+                next_hop_len + ls_nlri_len
             }
-            Self::BgpLsVpn {
-                nlri_type: _,
-                rd: _,
-                nlri,
-            } => {
-                let ls_nlri_len = nlri.len();
+            Self::BgpLsVpn { nlri, next_hop } => {
+                let next_hop_len = next_hop.len();
 
-                2 /* nlri type field */
-                    + 2 /* total nlri length field */
-                    + 8 /* rd */
-                    + ls_nlri_len
+                let ls_nlri_len: usize = nlri.iter().map(&BgpLsVpnNlri::len).sum();
+
+                next_hop_len + ls_nlri_len
             }
         };
         Self::BASE_LENGTH + usize::from(extended_length) + payload_len
@@ -1143,24 +1142,30 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     nlri.write(writer)?
                 }
             }
-            Self::BgpLs { nlri } => {
-                let total_tlv_length: u16 = nlri.len() as u16;
+            Self::BgpLs { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(AddressType::BgpLs.address_family().into())?;
+                writer.write_u8(AddressType::BgpLs.subsequent_address_family().into())?;
+                next_hop.write(writer)?;
 
-                writer.write_u16::<NetworkEndian>(nlri.get_type() as u16)?;
-                writer.write_u16::<NetworkEndian>(total_tlv_length)?;
-                nlri.write(writer)?;
+                writer.write_u8(0)?;
+
+                for nlri in nlri {
+                    nlri.write(writer)?;
+                }
             }
-            Self::BgpLsVpn {
-                nlri_type,
-                rd,
-                nlri,
-            } => {
-                let total_tlv_length: u16 = (8 /* rd */ + nlri.len()) as u16;
+            Self::BgpLsVpn { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(AddressType::BgpLs.address_family().into())?;
+                writer.write_u8(AddressType::BgpLsVpn.subsequent_address_family().into())?;
 
-                writer.write_u16::<NetworkEndian>(nlri.get_type() as u16)?;
-                writer.write_u16::<NetworkEndian>(total_tlv_length)?;
-                rd.write(writer)?;
-                nlri.write(writer)?;
+                // The RD of the next-hop is set to all zeros (https://www.rfc-editor.org/rfc/rfc7752#section-3.4)
+                writer.write(&[0u8; 8])?;
+                next_hop.next_hop().write(writer)?;
+
+                writer.write_u8(0)?;
+
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
             }
             Self::Unknown { afi, safi, value } => {
                 writer.write_u16::<NetworkEndian>(*afi as u16)?;

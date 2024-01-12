@@ -5,13 +5,14 @@ use strum_macros::{Display, FromRepr};
 use netgauze_parse_utils::{WritablePdu};
 use crate::bgp_ls::BgpLsMtIdError::{IsIsMtIdInvalidValue, OspfMtIdInvalidValue};
 use crate::iana;
-use crate::iana::BgpLsDescriptorTlvs::{LocalNodeDescriptor, RemoteNodeDescriptor};
-use crate::iana::{BgpLsDescriptorTlvs, BgpLsProtocolId};
+use crate::iana::BgpLsNodeDescriptorTlvType::{LocalNodeDescriptor, RemoteNodeDescriptor};
+use crate::iana::{BgpLsNodeDescriptorTlvType, BgpLsProtocolId};
+use crate::nlri::RouteDistinguisher;
 use crate::path_attribute::PathAttributeValueProperties;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BgpLsAttribute {
-    pub tlvs: Vec<BgpLsAttributeTlv>
+    pub tlvs: Vec<BgpLsAttributeTlv>,
 }
 
 impl PathAttributeValueProperties for BgpLsAttribute {
@@ -156,10 +157,10 @@ pub enum BgpLsAttributeTlv {
     ///            | Reserved | Reserved for future use.  |           |
     ///            +----------+---------------------------+-----------+
     IgpFlags {
-    isis_up_down: bool,
-    ospf_no_unicast: bool,
-    ospf_local_address: bool,
-    ospf_propagate_nssa: bool,
+        isis_up_down: bool,
+        ospf_no_unicast: bool,
+        ospf_local_address: bool,
+        ospf_propagate_nssa: bool,
     },
 
     ///      0                   1                   2                   3
@@ -234,7 +235,6 @@ pub enum BgpLsAttributeTlv {
 }
 
 impl BgpLsAttributeTlv {
-
     pub const NODE_NAME_TLV_MAX_LEN: u8 = 255;
 
     pub fn get_type(&self) -> iana::BgpLsAttributeTlv {
@@ -269,21 +269,36 @@ impl BgpLsAttributeTlv {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BgpLsNlri(pub BgpLsNlriValue);
+
+impl BgpLsNlri {
+    pub fn nlri(&self) -> &BgpLsNlriValue {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BgpLsVpnNlri {
+    pub rd: RouteDistinguisher,
+    pub nlri: BgpLsNlriValue,
+}
+
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum BgpLsNlri {
+pub enum BgpLsNlriValue {
     Node(BgpLsNlriNode),
     Link(BgpLsNlriLink),
     Ipv4Prefix(BgpLsNlriIpPrefix),
     Ipv6Prefix(BgpLsNlriIpPrefix),
 }
 
-impl BgpLsNlri {
+impl BgpLsNlriValue {
     pub fn get_type(&self) -> iana::BgpLsNlriType {
         match self {
-            BgpLsNlri::Node(_) => iana::BgpLsNlriType::Node,
-            BgpLsNlri::Link(_) => iana::BgpLsNlriType::Link,
-            BgpLsNlri::Ipv4Prefix(_) => iana::BgpLsNlriType::Ipv4TopologyPrefix,
-            BgpLsNlri::Ipv6Prefix(_) => iana::BgpLsNlriType::Ipv6TopologyPrefix,
+            BgpLsNlriValue::Node(_) => iana::BgpLsNlriType::Node,
+            BgpLsNlriValue::Link(_) => iana::BgpLsNlriType::Link,
+            BgpLsNlriValue::Ipv4Prefix(_) => iana::BgpLsNlriType::Ipv4TopologyPrefix,
+            BgpLsNlriValue::Ipv6Prefix(_) => iana::BgpLsNlriType::Ipv6TopologyPrefix,
         }
     }
 }
@@ -292,12 +307,12 @@ impl BgpLsNlri {
 pub struct BgpLsNlriIpPrefix {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptors: Vec<BgpLsNodeDescriptorTlv>,
-    pub prefix_descriptors: Vec<BgpLsPrefixDescriptorTlv>,
+    pub local_node_descriptors: BgpLsNodeDescriptorTlv,
+    pub prefix_descriptor_tlvs: Vec<BgpLsPrefixDescriptorTlv>,
 }
 
 // TODO does this go into IANA?
-#[repr(u16)]
+#[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum OspfRouteType {
     IntraArea = 1,
@@ -306,6 +321,27 @@ pub enum OspfRouteType {
     External2 = 4,
     Nssa1 = 5,
     Nssa2 = 6,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UnknownOspfRouteType(pub u8);
+
+impl From<OspfRouteType> for u8 {
+    fn from(value: OspfRouteType) -> Self {
+        value as u8
+    }
+}
+
+impl TryFrom<u8> for OspfRouteType {
+    type Error = UnknownOspfRouteType;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UnknownOspfRouteType(value)),
+        }
+    }
 }
 
 #[repr(u8)]
@@ -348,10 +384,10 @@ pub enum NodeFlagsBits {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct BgpLsIpReachabilityInformationData(IpNet);
+pub struct IpReachabilityInformationData(pub IpNet);
 
 
-impl BgpLsIpReachabilityInformationData {
+impl IpReachabilityInformationData {
     /// Count of most significant bytes of the Prefix to send
     /// as described in [RFC7752 Section-3.2.3.2](https://datatracker.ietf.org/doc/html/rfc7752#section-3.2.3.2)
     pub fn most_significant_bytes(prefix_len: u8) -> usize {
@@ -377,15 +413,15 @@ impl BgpLsIpReachabilityInformationData {
 pub enum BgpLsPrefixDescriptorTlv {
     MultiTopologyIdentifier(MultiTopologyIdData),
     OspfRouteType(OspfRouteType),
-    IpReachabilityInformation(BgpLsIpReachabilityInformationData),
+    IpReachabilityInformation(IpReachabilityInformationData),
 }
 
 impl BgpLsPrefixDescriptorTlv {
-    pub fn get_type(&self) -> iana::BgpLsPrefixDescriptorTlv {
+    pub fn get_type(&self) -> iana::BgpLsPrefixDescriptorTlvType {
         match self {
-            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(..) => iana::BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier,
-            BgpLsPrefixDescriptorTlv::OspfRouteType(_) => iana::BgpLsPrefixDescriptorTlv::OspfRouteType,
-            BgpLsPrefixDescriptorTlv::IpReachabilityInformation(_) => iana::BgpLsPrefixDescriptorTlv::IpReachabilityInformation,
+            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(..) => iana::BgpLsPrefixDescriptorTlvType::MultiTopologyIdentifier,
+            BgpLsPrefixDescriptorTlv::OspfRouteType(_) => iana::BgpLsPrefixDescriptorTlvType::OspfRouteType,
+            BgpLsPrefixDescriptorTlv::IpReachabilityInformation(_) => iana::BgpLsPrefixDescriptorTlvType::IpReachabilityInformation,
         }
     }
 }
@@ -394,7 +430,7 @@ impl BgpLsPrefixDescriptorTlv {
 pub struct BgpLsNlriNode {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptors_tlvs: Vec<BgpLsNodeDescriptorTlv>,
+    pub local_node_descriptors: BgpLsNodeDescriptorTlv,
 }
 
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -404,7 +440,7 @@ pub enum BgpLsNodeDescriptorTlv {
 }
 
 impl BgpLsNodeDescriptorTlv {
-    pub fn get_type(&self) -> BgpLsDescriptorTlvs {
+    pub fn get_type(&self) -> BgpLsNodeDescriptorTlvType {
         match self {
             BgpLsNodeDescriptorTlv::Local(_) => LocalNodeDescriptor,
             BgpLsNodeDescriptorTlv::Remote(_) => RemoteNodeDescriptor
@@ -442,14 +478,14 @@ pub enum BgpLsLinkDescriptorTlv {
 }
 
 impl BgpLsLinkDescriptorTlv {
-    pub fn get_type(&self) -> iana::BgpLsLinkDescriptorTlv {
+    pub fn get_type(&self) -> iana::BgpLsLinkDescriptorTlvType {
         match self {
-            BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers { .. } => iana::BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers,
-            BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(..) => iana::BgpLsLinkDescriptorTlv::IPv4InterfaceAddress,
-            BgpLsLinkDescriptorTlv::IPv4NeighborAddress(..) => iana::BgpLsLinkDescriptorTlv::IPv4NeighborAddress,
-            BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(..) => iana::BgpLsLinkDescriptorTlv::IPv6InterfaceAddress,
-            BgpLsLinkDescriptorTlv::IPv6NeighborAddress(..) => iana::BgpLsLinkDescriptorTlv::IPv6NeighborAddress,
-            BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(..) => iana::BgpLsLinkDescriptorTlv::MultiTopologyIdentifier,
+            BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers { .. } => iana::BgpLsLinkDescriptorTlvType::LinkLocalRemoteIdentifiers,
+            BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(..) => iana::BgpLsLinkDescriptorTlvType::IPv4InterfaceAddress,
+            BgpLsLinkDescriptorTlv::IPv4NeighborAddress(..) => iana::BgpLsLinkDescriptorTlvType::IPv4NeighborAddress,
+            BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(..) => iana::BgpLsLinkDescriptorTlvType::IPv6InterfaceAddress,
+            BgpLsLinkDescriptorTlv::IPv6NeighborAddress(..) => iana::BgpLsLinkDescriptorTlvType::IPv6NeighborAddress,
+            BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(..) => iana::BgpLsLinkDescriptorTlvType::MultiTopologyIdentifier,
         }
     }
 }
@@ -477,8 +513,8 @@ impl BgpLsNodeDescriptorSubTlv {
 pub struct BgpLsNlriLink {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptor_tlvs: Vec<BgpLsNodeDescriptorTlv>,
-    pub remote_node_descriptor_tlvs: Vec<BgpLsNodeDescriptorTlv>,
+    pub local_node_descriptors: BgpLsNodeDescriptorTlv,
+    pub remote_node_descriptors: BgpLsNodeDescriptorTlv,
     pub link_descriptor_tlvs: Vec<BgpLsLinkDescriptorTlv>,
 }
 
@@ -499,6 +535,7 @@ impl MultiTopologyIdData {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct MultiTopologyId(pub u16);
+
 impl MultiTopologyId {
     pub fn value(&self) -> u16 {
         self.0
@@ -537,9 +574,7 @@ impl MultiTopologyId {
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct IsIsMtId(u16);
 
-/// TODO unimplemented: figure out what
-///  "In Link-State NLRI, both IPv4 and IPv6 SRLG information are carried in a single TLV."
-///  means (https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.5)
+/// TODO unimplemented: we don't care about what they it's just a u32 (https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.5)
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct SharedRiskLinkGroupValue(u32);
 

@@ -418,6 +418,7 @@ pub enum AddressType {
     Ipv6NlriMplsLabels,
     L2VpnBgpEvpn,
     BgpLs,
+    BgpLsVpn,
     RouteTargetConstrains,
 }
 
@@ -472,6 +473,7 @@ impl AddressType {
 
             Self::L2VpnBgpEvpn => AddressFamily::L2vpn,
             Self::BgpLs => AddressFamily::BgpLs,
+            Self::BgpLsVpn => AddressFamily::BgpLs,
             Self::RouteTargetConstrains => AddressFamily::IPv4,
         }
     }
@@ -499,6 +501,7 @@ impl AddressType {
             Self::L2VpnBgpEvpn => SubsequentAddressFamily::BgpEvpn,
 
             Self::BgpLs => SubsequentAddressFamily::BgpLs,
+            Self::BgpLsVpn => SubsequentAddressFamily::BgpLsVpn,
             Self::RouteTargetConstrains => SubsequentAddressFamily::RouteTargetConstrains,
         }
     }

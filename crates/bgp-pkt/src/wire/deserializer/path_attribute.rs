@@ -16,6 +16,7 @@
 
 //! Deserializer for BGP Path Attributes
 
+use crate::wire::deserializer::bgp_ls::{BgpLsAttributeParsingError, BgpLsNlriParsingError};
 use crate::{
     iana::{
         AigpAttributeType, PathAttributeType, UndefinedAigpAttributeType,
@@ -51,7 +52,6 @@ use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
-use crate::wire::deserializer::bgp_ls::BgpLsAttributeParsingError;
 
 const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
 const TRANSITIVE_PATH_ATTRIBUTE_MASK: u8 = 0x40;
@@ -644,6 +644,9 @@ pub enum MpReachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")]
         RouteTargetMembershipAddressParsingError,
     ),
+    BgpLsNlriParsingError(
+        #[from_located(module = "crate::wire::deserializer::bgp_ls")] BgpLsNlriParsingError,
+    ),
 }
 
 impl<'a>
@@ -845,6 +848,20 @@ impl<'a>
                     .map_or(false, |x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::RouteTargetMembership { next_hop, nlri }))
+            }
+            Ok(AddressType::BgpLs) => {
+                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, AddressType::BgpLs)?;
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                // TODO does this need add-path ?
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpReach::BgpLs { next_hop, nlri }))
+            }
+            Ok(AddressType::BgpLsVpn) => {
+                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, AddressType::BgpLsVpn)?;
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                // TODO does this need add-path ?
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpReach::BgpLsVpn { next_hop, nlri }))
             }
             Ok(_) | Err(_) => Ok((
                 buf,
