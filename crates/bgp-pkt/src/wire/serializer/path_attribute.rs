@@ -17,6 +17,7 @@
 
 use crate::bgp_ls::BgpLsNlriWritingError;
 use crate::bgp_ls::BgpLsWritingError;
+use crate::wire::serializer::bgp_ls::BgpLsWritingError;
 use crate::{
     iana::{AigpAttributeType, PathAttributeType},
     nlri::*,

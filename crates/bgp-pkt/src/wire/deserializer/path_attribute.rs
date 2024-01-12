@@ -51,6 +51,7 @@ use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
 };
+use crate::wire::deserializer::bgp_ls::BgpLsAttributeParsingError;
 
 const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
 const TRANSITIVE_PATH_ATTRIBUTE_MASK: u8 = 0x40;
@@ -99,6 +100,7 @@ pub enum PathAttributeParsingError {
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     OnlyToCustomerError(#[from_located(module = "self")] OnlyToCustomerParsingError),
     AigpError(#[from_located(module = "self")] AigpParsingError),
+    BgpLsError(#[from_located(module = "self")] BgpLsAttributeParsingError),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
     InvalidPathAttribute(InvalidPathAttribute, PathAttributeValue),
 }
@@ -223,6 +225,11 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttribut
             Ok(PathAttributeType::AccumulatedIgp) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::Aigp(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::BgpLsAttribute) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::BgpLs(value);
                 (buf, value)
             }
             Ok(_code) => {

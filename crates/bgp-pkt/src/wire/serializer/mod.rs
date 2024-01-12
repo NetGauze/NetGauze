@@ -23,6 +23,7 @@ pub mod open;
 pub mod path_attribute;
 pub mod route_refresh;
 pub mod update;
+mod bgp_ls;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
 use std::net::IpAddr;

@@ -23,6 +23,7 @@ pub mod open;
 pub mod path_attribute;
 pub mod route_refresh;
 pub mod update;
+mod bgp_ls;
 
 use ipnet::{Ipv4Net, Ipv6Net};
 use std::{

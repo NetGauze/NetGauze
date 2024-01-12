@@ -1400,7 +1400,6 @@ pub enum BgpLsDescriptorTlvs {
     RemoteNodeDescriptor = 257
 }
 
-
 /// BGP-LS Node Descriptor Sub-TLVs [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#node-descriptor-link-descriptor-prefix-descriptor-attribute-tlv)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -1430,9 +1429,62 @@ pub enum BgpLsLinkDescriptorTlv {
     MultiTopologyIdentifier = 263,
 }
 
+/// Aggregate of [BgpLsLinkAttribute] [BgpLsNodeAttribute] [BgpLsPrefixAttribute]
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BgpLsNodeAttributeTlv {
+pub enum BgpLsAttributeTlv {
+    MultiTopologyIdentifier = 263,
+    NodeFlagBits = 1024,
+    OpaqueNodeAttribute = 1025,
+    NodeNameTlv = 1026,
+    IsIsArea = 1027,
+    LocalNodeIpv4RouterId = 1028,
+    LocalNodeIpv6RouterId = 1029,
+    RemoteNodeIpv4RouterId = 1030,
+    RemoteNodeIpv6RouterId = 1031,
+    RemoteNodeAdministrativeGroupColor = 1088,
+    MaximumLinkBandwidth = 1089,
+    MaximumReservableLinkBandwidth = 1090,
+    UnreservedBandwidth = 1091,
+    TeDefaultMetric = 1092,
+    LinkProtectionType = 1093,
+    MplsProtocolMask = 1094,
+    IgpMetric = 1095,
+    SharedRiskLinkGroup = 1096,
+    OpaqueLinkAttribute = 1097,
+    LinkName = 1098,
+    IgpFlags = 1152,
+    IgpRouteTag = 1153,
+    IgpExtendedRouteTag = 1154,
+    PrefixMetric = 1155,
+    OspfForwardingAddress = 1156,
+    OpaquePrefixAttribute = 1157,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UnknownBgpLsAttributeTlvType(pub u16);
+
+impl From<BgpLsAttributeTlv> for u16 {
+    fn from(afi: BgpLsAttributeTlv) -> Self {
+        afi as u16
+    }
+}
+
+impl TryFrom<u16> for BgpLsAttributeTlv {
+    type Error = UnknownBgpLsAttributeTlvType;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UnknownBgpLsAttributeTlvType(value)),
+        }
+    }
+}
+
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNodeAttribute {
     MultiTopologyIdentifier = 263,
     NodeFlagBits = 1024,
     OpaqueNodeAttribute = 1025,
