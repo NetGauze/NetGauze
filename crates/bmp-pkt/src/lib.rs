@@ -18,9 +18,9 @@ use std::{
     ops::Deref,
 };
 
-use chrono::{DateTime, Utc};
 #[cfg(feature = "fuzz")]
 use chrono::TimeZone;
+use chrono::{DateTime, Utc};
 
 use netgauze_bgp_pkt::{iana::BgpMessageType, nlri::RouteDistinguisher, BgpMessage};
 use netgauze_iana::address_family::AddressType;
