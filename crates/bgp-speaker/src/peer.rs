@@ -39,7 +39,7 @@ use netgauze_bgp_pkt::{
     iana::{BgpCapabilityCode, AS_TRANS},
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
-    wire::serializer::BgpMessageWritingError,
+    wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
     BgpMessage,
 };
 
@@ -60,7 +60,7 @@ type PeerJoinHandle<A> = JoinHandle<Result<(), SendError<PeerStateResult<A>>>>;
 pub trait PeerPolicy<
     A,
     I: AsyncWrite + AsyncRead,
-    D: Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+    D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
         + Encoder<BgpMessage, Error = BgpMessageWritingError>,
 >
 {
@@ -134,7 +134,7 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
 impl<
         A: Send + Sync + 'static,
         I: AsyncWrite + AsyncRead + Send + Sync + 'static,
-        D: Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+        D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>
             + Send
             + Sync,
@@ -473,7 +473,7 @@ impl<A: Clone> PeerProperties<A> {
 pub struct Peer<
     A,
     I: AsyncWrite + AsyncRead,
-    D: Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+    D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
         + Encoder<BgpMessage, Error = BgpMessageWritingError>,
     C: ActiveConnect<A, I, D>,
     P: PeerPolicy<A, I, D>,
@@ -496,7 +496,7 @@ impl<
         A: Display + Debug + Clone,
         I: AsyncWrite + AsyncRead + Unpin,
         D: BgpCodecInitializer<Peer<A, I, D, C, P>>
-            + Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+            + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>,
         C: ActiveConnect<A, I, D>,
         P: PeerPolicy<A, I, D>,
@@ -820,10 +820,10 @@ impl<
 
     async fn handle_tracked_connection_event(
         &mut self,
-        open_message: Result<BgpOpenMessage, ()>,
+        value: Result<BgpOpenMessage, ()>,
     ) -> Result<BgpEvent<A>, FsmStateError<A>> {
         match (
-            open_message,
+            value,
             self.connection.take(),
             self.tracked_connection.take(),
         ) {
@@ -998,9 +998,10 @@ impl<
                 | ConnectionEvent::BGPOpen(_)
                 | ConnectionEvent::NotifMsg(_)
                 | ConnectionEvent::KeepAliveMsg
-                | ConnectionEvent::UpdateMsg(_)
+                | ConnectionEvent::UpdateMsg(_, _)
                 | ConnectionEvent::UpdateMsgErr(_)
-                | ConnectionEvent::RouteRefresh(_) => {
+                | ConnectionEvent::RouteRefresh(_)
+                | ConnectionEvent::RouteRefreshErr(_) => {
                     self.connect_retry_timer.take();
                     conn.open_delay_timer().take();
                     self.stats.connect_retry_counter += 1;
@@ -1080,9 +1081,10 @@ impl<
                     | ConnectionEvent::BGPOpenWithDelayOpenTimer(_)
                     | ConnectionEvent::KeepAliveMsg
                     | ConnectionEvent::NotifMsg(_)
-                    | ConnectionEvent::UpdateMsg(_)
+                    | ConnectionEvent::UpdateMsg(_, _)
                     | ConnectionEvent::UpdateMsgErr(_)
-                    | ConnectionEvent::RouteRefresh(_) => {
+                    | ConnectionEvent::RouteRefresh(_)
+                    | ConnectionEvent::RouteRefreshErr(_) => {
                         self.connect_retry_timer.take();
                         self.stats.connect_retry_counter += 1;
                         self.connection.take();
@@ -1151,9 +1153,10 @@ impl<
                 | ConnectionEvent::DelayOpenTimerExpires
                 | ConnectionEvent::BGPOpenWithDelayOpenTimer(_)
                 | ConnectionEvent::NotifMsg(_)
-                | ConnectionEvent::UpdateMsg(_)
+                | ConnectionEvent::UpdateMsg(_, _)
                 | ConnectionEvent::UpdateMsgErr(_)
-                | ConnectionEvent::RouteRefresh(_) => {
+                | ConnectionEvent::RouteRefresh(_)
+                | ConnectionEvent::RouteRefreshErr(_) => {
                     self.connect_retry_timer.take();
                     self.stats.connect_retry_counter += 1;
                     self.connection.take();
@@ -1201,7 +1204,7 @@ impl<
                 match event {
                     ConnectionEvent::KeepAliveTimerExpires
                     | ConnectionEvent::KeepAliveMsg
-                    | ConnectionEvent::UpdateMsg(_)
+                    | ConnectionEvent::UpdateMsg(_, _)
                     | ConnectionEvent::RouteRefresh(_) => {
                         // stay in the same FSM state
                     }
@@ -1230,6 +1233,7 @@ impl<
                 | ConnectionEvent::BGPHeaderErr(_)
                 | ConnectionEvent::BGPOpenMsgErr(_)
                 | ConnectionEvent::UpdateMsgErr(_) // TODO handle update errors according to RFC 7606
+                | ConnectionEvent::RouteRefreshErr(_)
                 | ConnectionEvent::NotifMsg(_)
                 | ConnectionEvent::NotifMsgVerErr => {
                     self.connection.take();
@@ -1424,7 +1428,7 @@ impl<
 {
     pub fn new<
         D: BgpCodecInitializer<Peer<A, I, D, C, P>>
-            + Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+            + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>
             + Send
             + Sync,
@@ -1453,7 +1457,7 @@ impl<
 
     pub async fn handle_peer_event<
         D: BgpCodecInitializer<Peer<A, I, D, C, P>>
-            + Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+            + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>,
         C: ActiveConnect<A, I, D> + Send,
         P: PeerPolicy<A, I, D>,
@@ -1494,7 +1498,7 @@ impl<
 
     fn start_peer<
         D: BgpCodecInitializer<Peer<A, I, D, C, P>>
-            + Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+            + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>
             + Send,
         C: ActiveConnect<A, I, D> + Send + Sync + 'static,

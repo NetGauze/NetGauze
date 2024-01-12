@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use nom::Needed;
@@ -22,11 +20,13 @@ use tokio_util::codec::{Decoder, Encoder};
 
 use netgauze_bgp_pkt::{
     iana::BgpCapabilityCode,
-    wire::{deserializer::BgpMessageParsingError, serializer::BgpMessageWritingError},
+    wire::{
+        deserializer::{BgpMessageParsingError, BgpParsingContext, BgpParsingIgnoredErrors},
+        serializer::BgpMessageWritingError,
+    },
     BgpMessage,
 };
-use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithThreeInputs, Span, WritablePdu};
+use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 
 pub trait BgpCodecInitializer<Peer> {
     fn new(peer: &Peer) -> Self;
@@ -36,8 +36,7 @@ pub trait BgpCodecInitializer<Peer> {
 pub struct BgpCodec {
     asn4_sent: Option<bool>,
     asn4_received: Option<bool>,
-    multiple_labels: HashMap<AddressType, u8>,
-    add_path: HashMap<AddressType, bool>,
+    ctx: BgpParsingContext,
 }
 
 impl BgpCodec {
@@ -45,8 +44,7 @@ impl BgpCodec {
         Self {
             asn4_sent: Some(asn4),
             asn4_received: Some(asn4),
-            multiple_labels: HashMap::new(),
-            add_path: HashMap::new(),
+            ctx: BgpParsingContext::default(),
         }
     }
 }
@@ -71,7 +69,7 @@ impl From<std::io::Error> for BgpCodecDecoderError {
 }
 
 impl Decoder for BgpCodec {
-    type Item = BgpMessage;
+    type Item = (BgpMessage, BgpParsingIgnoredErrors);
     type Error = BgpCodecDecoderError;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -86,12 +84,8 @@ impl Decoder for BgpCodec {
                 }
                 // ASN4 capability is used only when both peers agree on enabling ASN4
                 let asn4 = self.asn4_received.unwrap_or(false) && self.asn4_sent.unwrap_or(false);
-                let ret = BgpMessage::from_wire(
-                    Span::new(buf),
-                    asn4,
-                    &self.multiple_labels,
-                    &self.add_path,
-                );
+                self.ctx.set_asn4(asn4);
+                let ret = BgpMessage::from_wire(Span::new(buf), &mut self.ctx);
                 let decoding_result = match ret {
                     Ok((_span, msg)) => {
                         buf.advance(length);
@@ -103,7 +97,7 @@ impl Decoder for BgpCodec {
                             log::debug!("Sending ASN4 received to: {asn4}");
                             self.asn4_received = Some(asn4);
                         }
-                        Ok(Some(msg))
+                        Ok(Some((msg, self.ctx.reset_parsing_errors())))
                     }
                     Err(error) => {
                         log::error!("Error: {:?} buf: {:?}", error, buf.to_vec());

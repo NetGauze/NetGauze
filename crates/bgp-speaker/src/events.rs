@@ -13,29 +13,91 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::cmp::Ordering;
+use tokio::sync::mpsc;
+
 use netgauze_bgp_pkt::{
     notification::{
-        BgpNotificationMessage, MessageHeaderError, OpenMessageError, UpdateMessageError,
+        BgpNotificationMessage, MessageHeaderError, OpenMessageError, RouteRefreshError,
+        UpdateMessageError,
     },
     open::BgpOpenMessage,
+    route_refresh::BgpRouteRefreshMessage,
     update::BgpUpdateMessage,
+    wire::deserializer::{
+        notification::BgpNotificationMessageParsingError, BgpMessageParsingError,
+    },
     BgpMessage,
 };
 
 use crate::codec::BgpCodecDecoderError;
-use netgauze_bgp_pkt::{
-    route_refresh::BgpRouteRefreshMessage,
-    wire::deserializer::{
-        open::{BgpOpenMessageParsingError, BgpParameterParsingError},
-        path_attribute::PathAttributeParsingError,
-        update::BgpUpdateMessageParsingError,
-        BgpMessageParsingError,
-    },
-};
-use tokio::sync::mpsc;
 
 pub type BgpMsgReceiver = mpsc::Receiver<BgpMessage>;
 pub type BgpMsgSender = mpsc::Sender<BgpMessage>;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum UpdateTreatment {
+    /// Treat update normally, errors were discovered
+    Normal,
+
+    /// RFC7606: In this approach, the malformed attribute MUST be discarded and
+    /// the UPDATE message continues to be processed. This approach MUST NOT be
+    /// used except in the case of an attribute that has no effect on route
+    /// selection or installation.
+    AttributeDiscard,
+
+    /// RFC7606: In this approach, the UPDATE message containing the path
+    /// attribute in question MUST be treated as though all contained routes had
+    /// been withdrawn just as if they had been listed in the WITHDRAWN ROUTES
+    /// field (or in the MP_UNREACH_NLRI attribute if appropriate) of the UPDATE
+    /// message, thus causing them to be removed from the Adj-RIB-In according
+    /// to the procedures of [RFC4271].
+    TreatAsWithdraw,
+
+    /// RFC7606: Section 7 of [RFC4760] allows a BGP speaker that detects an
+    /// error in a message for a given AFI/SAFI to optionally "ignore all the
+    /// subsequent routes with that AFI/SAFI received over that session". We
+    /// refer to this as "disabling a particular AFI/SAFI" or "AFI/SAFI
+    /// disable".
+    ResetAddressFamily(u16, u8),
+
+    /// RFC7606: This is the approach used throughout the base BGP specification
+    /// [RFC4271], where a NOTIFICATION is sent and the session terminated.
+    SessionReset,
+}
+
+impl PartialOrd for UpdateTreatment {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for UpdateTreatment {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::Normal, Self::Normal) => Ordering::Equal,
+            (Self::Normal, _) => Ordering::Less,
+
+            (Self::AttributeDiscard, Self::Normal) => Ordering::Greater,
+            (Self::AttributeDiscard, Self::AttributeDiscard) => Ordering::Equal,
+            (Self::AttributeDiscard, _) => Ordering::Less,
+
+            (Self::TreatAsWithdraw, Self::Normal) => Ordering::Greater,
+            (Self::TreatAsWithdraw, Self::AttributeDiscard) => Ordering::Greater,
+            (Self::TreatAsWithdraw, Self::TreatAsWithdraw) => Ordering::Equal,
+            (Self::TreatAsWithdraw, _) => Ordering::Less,
+
+            (Self::ResetAddressFamily(_, _), Self::Normal) => Ordering::Greater,
+            (Self::ResetAddressFamily(_, _), Self::AttributeDiscard) => Ordering::Greater,
+            (Self::ResetAddressFamily(_, _), Self::TreatAsWithdraw) => Ordering::Greater,
+            (Self::ResetAddressFamily(_, _), Self::ResetAddressFamily(_, _)) => Ordering::Equal,
+            (Self::ResetAddressFamily(_, _), Self::SessionReset) => Ordering::Less,
+
+            (Self::SessionReset, Self::SessionReset) => Ordering::Equal,
+            (Self::SessionReset, _) => Ordering::Greater,
+        }
+    }
+}
 
 #[derive(Debug, Eq, PartialEq, strum_macros::Display)]
 pub enum BgpEvent<A> {
@@ -231,16 +293,26 @@ pub enum BgpEvent<A> {
     /// Event 25: NotifMsg
     NotifMsg(BgpNotificationMessage),
 
+    /// Error encountered while parsing a BGP Notification message
+    ///
+    /// This event is not defined in RFC4271.
+    /// In [RFC4271 Section 6.4](https://www.rfc-editor.org/rfc/rfc4271#section-6.4),
+    /// it states that errors in parsing notification messages should be logged
+    /// locally and ignored.
+    NotifMsgErr(BgpNotificationMessageParsingError),
+
     /// Event 26: KeepAliveMsg
     KeepAliveMsg,
 
     /// Event 27: UpdateMsg
-    UpdateMsg(BgpUpdateMessage),
+    UpdateMsg(BgpUpdateMessage, UpdateTreatment),
 
     /// Event 28: UpdateMsgErr
     UpdateMsgErr(UpdateMessageError),
 
     RouteRefresh(BgpRouteRefreshMessage),
+
+    RouteRefreshErr(RouteRefreshError),
 }
 
 /// Subset of BGP Events defined [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271) that
@@ -320,16 +392,26 @@ pub enum ConnectionEvent<A> {
     /// Event 25: NotifMsg
     NotifMsg(BgpNotificationMessage),
 
+    /// Error encountered while parsing a BGP Notification message
+    ///
+    /// This event is not defined in RFC4271.
+    /// In [RFC4271 Section 6.4](https://www.rfc-editor.org/rfc/rfc4271#section-6.4),
+    /// it states that errors in parsing notification messages should be logged
+    /// locally and ignored.
+    NotifMsgErr(BgpNotificationMessageParsingError),
+
     /// Event 26: KeepAliveMsg
     KeepAliveMsg,
 
     /// Event 27: UpdateMsg
-    UpdateMsg(BgpUpdateMessage),
+    UpdateMsg(BgpUpdateMessage, UpdateTreatment),
 
     /// Event 28: UpdateMsgErr
     UpdateMsgErr(UpdateMessageError),
 
     RouteRefresh(BgpRouteRefreshMessage),
+
+    RouteRefreshErr(RouteRefreshError),
 }
 
 impl<A> From<BgpCodecDecoderError> for ConnectionEvent<A> {
@@ -350,9 +432,9 @@ impl<A> From<BgpCodecDecoderError> for ConnectionEvent<A> {
                         value: header.to_be_bytes().to_vec(),
                     })
                 }
-                BgpMessageParsingError::UndefinedBgpMessageType(t) => {
+                BgpMessageParsingError::UndefinedBgpMessageType(msg_type) => {
                     ConnectionEvent::BGPHeaderErr(MessageHeaderError::BadMessageType {
-                        value: vec![t.0],
+                        value: vec![msg_type.0],
                     })
                 }
                 BgpMessageParsingError::BadMessageLength(length) => {
@@ -360,169 +442,17 @@ impl<A> From<BgpCodecDecoderError> for ConnectionEvent<A> {
                         value: length.to_be_bytes().to_vec(),
                     })
                 }
-                BgpMessageParsingError::BgpOpenMessageParsingError(err) => match err {
-                    BgpOpenMessageParsingError::NomError(_) => {
-                        ConnectionEvent::BGPOpenMsgErr(OpenMessageError::Unspecific {
-                            value: vec![],
-                        })
-                    }
-                    BgpOpenMessageParsingError::UnsupportedVersionNumber(version) => {
-                        ConnectionEvent::BGPOpenMsgErr(OpenMessageError::UnsupportedVersionNumber {
-                            value: vec![version],
-                        })
-                    }
-                    BgpOpenMessageParsingError::ParameterError(param_err) => match param_err {
-                        BgpParameterParsingError::NomError(_) => {
-                            ConnectionEvent::BGPOpenMsgErr(OpenMessageError::Unspecific {
-                                value: vec![],
-                            })
-                        }
-                        BgpParameterParsingError::UndefinedParameterType(t) => {
-                            ConnectionEvent::BGPOpenMsgErr(
-                                OpenMessageError::UnsupportedOptionalParameter { value: vec![t.0] },
-                            )
-                        }
-                        BgpParameterParsingError::CapabilityError(_) => {
-                            ConnectionEvent::BGPOpenMsgErr(
-                                OpenMessageError::UnsupportedCapability { value: vec![] },
-                            )
-                        }
-                    },
-                },
-                BgpMessageParsingError::BgpUpdateMessageParsingError(update_err) => {
-                    match update_err {
-                        BgpUpdateMessageParsingError::NomError(_) => {
-                            ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                value: vec![],
-                            })
-                        }
-                        BgpUpdateMessageParsingError::PathAttributeError(path_err) => {
-                            match path_err {
-                                PathAttributeParsingError::NomError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::OriginError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(
-                                        UpdateMessageError::InvalidOriginAttribute {
-                                            value: vec![],
-                                        },
-                                    )
-                                }
-                                PathAttributeParsingError::AsPathError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(
-                                        UpdateMessageError::MalformedAsPath { value: vec![] },
-                                    )
-                                }
-                                PathAttributeParsingError::NextHopError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(
-                                        UpdateMessageError::InvalidNextHopAttribute {
-                                            value: vec![],
-                                        },
-                                    )
-                                }
-                                PathAttributeParsingError::MultiExitDiscriminatorError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::LocalPreferenceError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::AtomicAggregateError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::AggregatorError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::CommunitiesError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::ExtendedCommunitiesError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::ExtendedCommunitiesErrorIpv6(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::LargeCommunitiesError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::OriginatorError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(
-                                        UpdateMessageError::InvalidOriginAttribute {
-                                            value: vec![],
-                                        },
-                                    )
-                                }
-                                PathAttributeParsingError::ClusterListError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::MpReachErrorError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::MpUnreachErrorError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::OnlyToCustomerError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::AigpError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::UnknownAttributeError(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                                PathAttributeParsingError::InvalidPathAttribute(_) => {
-                                    ConnectionEvent::UpdateMsgErr(UpdateMessageError::Unspecific {
-                                        value: vec![],
-                                    })
-                                }
-                            }
-                        }
-                        BgpUpdateMessageParsingError::Ipv4UnicastError(_) => {
-                            ConnectionEvent::UpdateMsgErr(UpdateMessageError::InvalidNetworkField {
-                                value: vec![],
-                            })
-                        }
-                        BgpUpdateMessageParsingError::Ipv4UnicastAddressError(_) => {
-                            ConnectionEvent::UpdateMsgErr(UpdateMessageError::InvalidNetworkField {
-                                value: vec![],
-                            })
-                        }
-                    }
+                BgpMessageParsingError::BgpOpenMessageParsingError(err) => {
+                    ConnectionEvent::BGPOpenMsgErr(err.into())
                 }
-                BgpMessageParsingError::BgpNotificationMessageParsingError(_) => {
-                    ConnectionEvent::NotifMsgVerErr
+                BgpMessageParsingError::BgpUpdateMessageParsingError(err) => {
+                    ConnectionEvent::UpdateMsgErr(err.into())
                 }
-                BgpMessageParsingError::BgpRouteRefreshMessageParsingError(_) => {
-                    ConnectionEvent::NotifMsgVerErr
+                BgpMessageParsingError::BgpNotificationMessageParsingError(err) => {
+                    ConnectionEvent::NotifMsgErr(err)
+                }
+                BgpMessageParsingError::BgpRouteRefreshMessageParsingError(err) => {
+                    ConnectionEvent::RouteRefreshErr(err.into())
                 }
             },
         }
@@ -550,10 +480,12 @@ impl<A> From<ConnectionEvent<A>> for BgpEvent<A> {
             ConnectionEvent::BGPOpenMsgErr(err) => BgpEvent::BGPOpenMsgErr(err),
             ConnectionEvent::NotifMsgVerErr => BgpEvent::NotifMsgVerErr,
             ConnectionEvent::NotifMsg(msg) => BgpEvent::NotifMsg(msg),
+            ConnectionEvent::NotifMsgErr(err) => BgpEvent::NotifMsgErr(err),
             ConnectionEvent::KeepAliveMsg => BgpEvent::KeepAliveMsg,
-            ConnectionEvent::UpdateMsg(msg) => BgpEvent::UpdateMsg(msg),
+            ConnectionEvent::UpdateMsg(msg, treatment) => BgpEvent::UpdateMsg(msg, treatment),
             ConnectionEvent::UpdateMsgErr(msg) => BgpEvent::UpdateMsgErr(msg),
             ConnectionEvent::RouteRefresh(msg) => BgpEvent::RouteRefresh(msg),
+            ConnectionEvent::RouteRefreshErr(msg) => BgpEvent::RouteRefreshErr(msg),
         }
     }
 }
