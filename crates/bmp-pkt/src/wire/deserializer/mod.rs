@@ -24,7 +24,9 @@ use std::{
 
 use netgauze_bgp_pkt::{
     iana::BgpMessageType,
-    wire::deserializer::{nlri::RouteDistinguisherParsingError, BgpMessageParsingError},
+    wire::deserializer::{
+        nlri::RouteDistinguisherParsingError, BgpMessageParsingError, BgpParsingContext,
+    },
     BgpMessage,
 };
 use netgauze_iana::address_family::{
@@ -38,9 +40,8 @@ use nom::{
 };
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_three_inputs, parse_into_located_two_inputs,
-    parse_till_empty_into_located, parse_till_empty_into_with_three_inputs_located,
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithThreeInputs, ReadablePduWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -56,17 +57,15 @@ pub enum BmpMessageParsingError {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithOneInput<
         'a,
-        &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        &mut HashMap<PeerKey, BgpParsingContext>,
         LocatedBmpMessageParsingError<'a>,
     > for BmpMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        multiple_labels: &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
     ) -> IResult<Span<'a>, Self, LocatedBmpMessageParsingError<'a>> {
         let (buf, version) = nom::combinator::map_res(be_u8, BmpVersion::try_from)(buf)?;
         let input = buf;
@@ -82,7 +81,7 @@ impl<'a>
 
         let (buf, msg) = match version {
             BmpVersion::Version3 => {
-                let (buf, value) = parse_into_located_two_inputs(buf, multiple_labels, add_path)?;
+                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
                 (buf, BmpMessage::V3(value))
             }
         };
@@ -120,22 +119,20 @@ pub enum BmpMessageValueParsingError {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithOneInput<
         'a,
-        &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        &mut HashMap<PeerKey, BgpParsingContext>,
         LocatedBmpMessageValueParsingError<'a>,
     > for BmpMessageValue
 {
     fn from_wire(
         buf: Span<'a>,
-        multiple_labels: &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
     ) -> IResult<Span<'a>, Self, LocatedBmpMessageValueParsingError<'a>> {
         let (buf, msg_type) = nom::combinator::map_res(be_u8, BmpMessageType::try_from)(buf)?;
         let (buf, msg) = match msg_type {
             BmpMessageType::RouteMonitoring => {
-                let (buf, value) = parse_into_located_two_inputs(buf, multiple_labels, add_path)?;
+                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
                 (buf, BmpMessageValue::RouteMonitoring(value))
             }
             BmpMessageType::StatisticsReport => {
@@ -143,11 +140,11 @@ impl<'a>
                 (buf, BmpMessageValue::StatisticsReport(value))
             }
             BmpMessageType::PeerDownNotification => {
-                let (buf, value) = parse_into_located_two_inputs(buf, multiple_labels, add_path)?;
+                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
                 (buf, BmpMessageValue::PeerDownNotification(value))
             }
             BmpMessageType::PeerUpNotification => {
-                let (buf, value) = parse_into_located_two_inputs(buf, multiple_labels, add_path)?;
+                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
                 (buf, BmpMessageValue::PeerUpNotification(value))
             }
             BmpMessageType::Initiation => {
@@ -159,7 +156,7 @@ impl<'a>
                 (buf, BmpMessageValue::Termination(init))
             }
             BmpMessageType::RouteMirroring => {
-                let (buf, init) = parse_into_located_two_inputs(buf, multiple_labels, add_path)?;
+                let (buf, init) = parse_into_located_one_input(buf, ctx)?;
                 (buf, BmpMessageValue::RouteMirroring(init))
             }
             BmpMessageType::Experimental251 => {
@@ -286,33 +283,23 @@ pub enum RouteMonitoringMessageParsingError {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithOneInput<
         'a,
-        &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        &mut HashMap<PeerKey, BgpParsingContext>,
         LocatedRouteMonitoringMessageParsingError<'a>,
     > for RouteMonitoringMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        multiple_labels: &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMonitoringMessageParsingError<'a>> {
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
-        let empty_add_path = HashMap::new();
-        let empty_multiple_labels = HashMap::new();
-        let add_path_support = add_path.get(&peer_key).unwrap_or(&empty_add_path);
-        let multiple_labels_support = multiple_labels
-            .get(&peer_key)
-            .unwrap_or(&empty_multiple_labels);
+        let bgp_ctx = ctx.entry(peer_key).or_default();
+        bgp_ctx.set_asn4(peer_header.is_asn4());
         let input = buf;
-        let (buf, update_message): (Span<'_>, BgpMessage) = parse_into_located_three_inputs(
-            buf,
-            peer_header.is_asn4(),
-            multiple_labels_support,
-            add_path_support,
-        )?;
+        let (buf, update_message): (Span<'_>, BgpMessage) =
+            parse_into_located_one_input(buf, bgp_ctx)?;
         if update_message.get_type() != BgpMessageType::Update {
             return Err(nom::Err::Error(
                 LocatedRouteMonitoringMessageParsingError::new(
@@ -472,27 +459,19 @@ const fn check_is_ipv6(peer_type: &BmpPeerType) -> Result<bool, BmpPeerTypeCode>
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithOneInput<
         'a,
-        &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        &mut HashMap<PeerKey, BgpParsingContext>,
         LocatedPeerUpNotificationMessageParsingError<'a>,
     > for PeerUpNotificationMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        multiple_labels: &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
     ) -> IResult<Span<'a>, Self, LocatedPeerUpNotificationMessageParsingError<'a>> {
         let input = buf;
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
-        let empty_add_path = HashMap::new();
-        let empty_multiple_labels = HashMap::new();
-        let add_path_support = add_path.get(&peer_key).unwrap_or(&empty_add_path);
-        let multiple_labels_support = multiple_labels
-            .get(&peer_key)
-            .unwrap_or(&empty_multiple_labels);
         let ipv6 = match check_is_ipv6(&peer_header.peer_type) {
             Ok(ipv6) => ipv6,
             Err(code) => {
@@ -525,18 +504,12 @@ impl<'a>
         } else {
             Some(remote_port)
         };
-        let (buf, sent_message) = parse_into_located_three_inputs(
-            buf,
-            peer_header.is_asn4(),
-            multiple_labels_support,
-            add_path_support,
-        )?;
-        let (buf, received_message) = parse_into_located_three_inputs(
-            buf,
-            peer_header.is_asn4(),
-            multiple_labels_support,
-            add_path_support,
-        )?;
+        let bgp_ctx = ctx.entry(peer_key).or_default();
+        bgp_ctx.set_asn4(peer_header.is_asn4());
+        let (buf, sent_message) = parse_into_located_one_input(buf, bgp_ctx)?;
+        let bgp_ctx = ctx.entry(peer_key).or_default();
+        bgp_ctx.set_asn4(peer_header.is_asn4());
+        let (buf, received_message) = parse_into_located_one_input(buf, bgp_ctx)?;
         let (buf, information) = parse_till_empty_into_located(buf)?;
         let peer_up_msg = PeerUpNotificationMessage::build(
             peer_header,
@@ -571,33 +544,22 @@ pub enum PeerDownNotificationMessageParsingError {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithOneInput<
         'a,
-        &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        &mut HashMap<PeerKey, BgpParsingContext>,
         LocatedPeerDownNotificationMessageParsingError<'a>,
     > for PeerDownNotificationMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        multiple_labels: &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
     ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationMessageParsingError<'a>> {
         let input = buf;
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
-        let empty_add_path = HashMap::new();
-        let empty_multiple_labels = HashMap::new();
-        let add_path_support = add_path.get(&peer_key).unwrap_or(&empty_add_path);
-        let multiple_labels_support = multiple_labels
-            .get(&peer_key)
-            .unwrap_or(&empty_multiple_labels);
-        let (buf, reason) = parse_into_located_three_inputs(
-            buf,
-            peer_header.is_asn4(),
-            multiple_labels_support,
-            add_path_support,
-        )?;
+        let bgp_ctx = ctx.entry(peer_key).or_default();
+        bgp_ctx.set_asn4(peer_header.is_asn4());
+        let (buf, reason) = parse_into_located_one_input(buf, bgp_ctx)?;
         let msg = PeerDownNotificationMessage::build(peer_header, reason);
         match msg {
             Ok(msg) => Ok((buf, msg)),
@@ -625,26 +587,21 @@ pub enum PeerDownNotificationReasonParsingError {
 }
 
 impl<'a>
-    ReadablePduWithThreeInputs<
+    ReadablePduWithOneInput<
         'a,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPeerDownNotificationReasonParsingError<'a>,
     > for PeerDownNotificationReason
 {
     fn from_wire(
         buf: Span<'a>,
-        asn4: bool,
-        multiple_labels: &HashMap<AddressType, u8>,
-        add_path: &HashMap<AddressType, bool>,
+        bgp_ctx: &mut BgpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationReasonParsingError<'a>> {
         let (buf, reason_code) =
             nom::combinator::map_res(be_u8, PeerDownReasonCode::try_from)(buf)?;
         match reason_code {
             PeerDownReasonCode::LocalSystemClosedNotificationPduFollows => {
-                let (buf, msg) =
-                    parse_into_located_three_inputs(buf, asn4, multiple_labels, add_path)?;
+                let (buf, msg) = parse_into_located_one_input(buf, bgp_ctx)?;
                 Ok((
                     buf,
                     PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg),
@@ -658,8 +615,7 @@ impl<'a>
                 ))
             }
             PeerDownReasonCode::RemoteSystemClosedNotificationPduFollows => {
-                let (buf, msg) =
-                    parse_into_located_three_inputs(buf, asn4, multiple_labels, add_path)?;
+                let (buf, msg) = parse_into_located_one_input(buf, bgp_ctx)?;
                 Ok((
                     buf,
                     PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(msg),
@@ -717,32 +673,26 @@ pub enum RouteMirroringMessageParsingError {
 }
 
 impl<'a>
-    ReadablePduWithTwoInputs<
+    ReadablePduWithOneInput<
         'a,
-        &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        &mut HashMap<PeerKey, BgpParsingContext>,
         LocatedRouteMirroringMessageParsingError<'a>,
     > for RouteMirroringMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        multiple_labels: &HashMap<PeerKey, HashMap<AddressType, u8>>,
-        add_path: &HashMap<PeerKey, HashMap<AddressType, bool>>,
+        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
     ) -> IResult<Span<'a>, Self, LocatedRouteMirroringMessageParsingError<'a>> {
-        let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+        let (mut buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
-        let empty_add_path = HashMap::new();
-        let empty_multiple_labels = HashMap::new();
-        let add_path_support = add_path.get(&peer_key).unwrap_or(&empty_add_path);
-        let multiple_labels_support = multiple_labels
-            .get(&peer_key)
-            .unwrap_or(&empty_multiple_labels);
-        let (buf, mirrored) = parse_till_empty_into_with_three_inputs_located(
-            buf,
-            peer_header.is_asn4(),
-            multiple_labels_support,
-            add_path_support,
-        )?;
+        let bgp_ctx = ctx.entry(peer_key).or_default();
+        bgp_ctx.set_asn4(peer_header.is_asn4());
+        let mut mirrored = Vec::new();
+        while !buf.is_empty() {
+            let (tmp, element) = parse_into_located_one_input(buf, &mut *bgp_ctx)?;
+            mirrored.push(element);
+            buf = tmp;
+        }
         Ok((buf, RouteMirroringMessage::new(peer_header, mirrored)))
     }
 }
@@ -759,27 +709,19 @@ pub enum RouteMirroringValueParsingError {
 }
 
 impl<'a>
-    ReadablePduWithThreeInputs<
-        'a,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
-        LocatedRouteMirroringValueParsingError<'a>,
-    > for RouteMirroringValue
+    ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedRouteMirroringValueParsingError<'a>>
+    for RouteMirroringValue
 {
     fn from_wire(
         buf: Span<'a>,
-        asn4: bool,
-        multiple_labels: &HashMap<AddressType, u8>,
-        add_path: &HashMap<AddressType, bool>,
+        bgp_ctx: &mut BgpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedRouteMirroringValueParsingError<'a>> {
         let (buf, code) = nom::combinator::map_res(be_u16, RouteMirroringTlvType::try_from)(buf)?;
         let (_, length): (_, u16) = nom::combinator::peek(be_u16)(buf)?;
         let (reminder, buf) = nom::multi::length_data(be_u16)(buf)?;
         let (buf, value) = match code {
             RouteMirroringTlvType::BgpMessage => {
-                let (buf, msg) =
-                    parse_into_located_three_inputs(buf, asn4, multiple_labels, add_path)?;
+                let (buf, msg) = parse_into_located_one_input(buf, bgp_ctx)?;
                 (
                     buf,
                     RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(msg)),

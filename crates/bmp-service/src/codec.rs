@@ -23,8 +23,9 @@ use netgauze_bmp_pkt::{
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
     BmpMessage, BmpMessageValue, PeerKey,
 };
-use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithTwoInputs, Span, WritablePdu};
+
+use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
+use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 use nom::Needed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -51,8 +52,7 @@ impl From<std::io::Error> for BmpCodecDecoderError {
 pub struct BmpCodec {
     /// Helper to track in the decoder if we are inside a BMP message or not
     in_message: bool,
-    multiple_labels: HashMap<PeerKey, HashMap<AddressType, u8>>,
-    add_path: HashMap<PeerKey, HashMap<AddressType, bool>>,
+    ctx: HashMap<PeerKey, BgpParsingContext>,
 }
 
 impl BmpCodec {
@@ -61,7 +61,7 @@ impl BmpCodec {
             BmpMessage::V3(value) => match value {
                 BmpMessageValue::PeerDownNotification(peer_down) => {
                     let peer_key = PeerKey::from_peer_header(peer_down.peer_header());
-                    self.add_path.remove(&peer_key);
+                    self.ctx.remove(&peer_key);
                 }
                 BmpMessageValue::PeerUpNotification(peer_up) => {
                     if let BgpMessage::Open(open) = peer_up.sent_message() {
@@ -70,18 +70,23 @@ impl BmpCodec {
                             capabilities.get(&BgpCapabilityCode::AddPathCapability)
                         {
                             let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
-                            let add_path = add_path
-                                .address_families()
-                                .iter()
-                                .map(|x| (x.address_type(), x.receive()))
-                                .collect();
-                            self.add_path.insert(peer_key, add_path);
+                            let bgp_ctx = self.ctx.entry(peer_key).or_default();
+                            for add_path_family in add_path.address_families() {
+                                bgp_ctx.add_path_mut().insert(
+                                    add_path_family.address_type(),
+                                    add_path_family.receive(),
+                                );
+                            }
                         }
                         if let Some(BgpCapability::MultipleLabels(labels)) =
                             capabilities.get(&BgpCapabilityCode::MultipleLabelsCapability)
                         {
+                            let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
+                            let bgp_ctx = self.ctx.entry(peer_key).or_default();
                             for label in labels {
-                                label.address_type();
+                                bgp_ctx
+                                    .multiple_labels_mut()
+                                    .insert(label.address_type(), label.count());
                             }
                         }
                     }
@@ -97,12 +102,13 @@ impl BmpCodec {
                                 peer_up.peer_header().peer_as(),
                                 open.bgp_id(),
                             );
-                            let add_path = add_path
-                                .address_families()
-                                .iter()
-                                .map(|x| (x.address_type(), x.send()))
-                                .collect();
-                            self.add_path.insert(peer_key, add_path);
+                            let bgp_ctx = self.ctx.entry(peer_key).or_default();
+                            for add_path_family in add_path.address_families() {
+                                bgp_ctx.add_path_mut().insert(
+                                    add_path_family.address_type(),
+                                    add_path_family.receive(),
+                                );
+                            }
                         }
                         if let Some(BgpCapability::MultipleLabels(multiple_labels)) =
                             capabilities.get(&BgpCapabilityCode::MultipleLabelsCapability)
@@ -114,15 +120,12 @@ impl BmpCodec {
                                 peer_up.peer_header().peer_as(),
                                 open.bgp_id(),
                             );
-                            let multiple_labels = multiple_labels
-                                .iter()
-                                // As per RFC8277 counts 0 and 1 are ignored. We assume they're 1
-                                // for parsing purposes.
-                                .map(|x| {
-                                    (x.address_type(), if x.count() > 0 { x.count() } else { 1 })
-                                })
-                                .collect();
-                            self.multiple_labels.insert(peer_key, multiple_labels);
+                            let bgp_ctx = self.ctx.entry(peer_key).or_default();
+                            for label in multiple_labels {
+                                bgp_ctx
+                                    .multiple_labels_mut()
+                                    .insert(label.address_type(), label.count());
+                            }
                         }
                     }
                 }
@@ -165,11 +168,7 @@ impl Decoder for BmpCodec {
                 Ok(None)
             } else {
                 self.in_message = false;
-                let msg = match BmpMessage::from_wire(
-                    Span::new(buf),
-                    &self.multiple_labels,
-                    &self.add_path,
-                ) {
+                let msg = match BmpMessage::from_wire(Span::new(buf), &mut self.ctx) {
                     Ok((span, msg)) => {
                         self.update_add_path(&msg);
                         buf.advance(span.location_offset());
