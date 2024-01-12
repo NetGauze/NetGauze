@@ -25,8 +25,7 @@ use nom::error::ErrorKind;
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
     test_helpers::{
-        combine, test_parse_error_with_three_inputs, test_parsed_completely,
-        test_parsed_completely_with_three_inputs, test_write,
+        combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
     },
     Span,
 };
@@ -53,8 +52,13 @@ use crate::{
     wire::{
         deserializer::{
             notification::{BgpNotificationMessageParsingError, CeaseErrorParsingError},
+            path_attribute::{
+                AsPathParsingError, LocalPreferenceParsingError,
+                MultiExitDiscriminatorParsingError, NextHopParsingError, OriginParsingError,
+                PathAttributeParsingError,
+            },
             route_refresh::BgpRouteRefreshMessageParsingError,
-            BgpMessageParsingError, LocatedBgpMessageParsingError,
+            BgpMessageParsingError, BgpParsingContext, LocatedBgpMessageParsingError,
         },
         serializer::BgpMessageWritingError,
     },
@@ -85,18 +89,14 @@ fn test_bgp_message_not_synchronized_marker() {
         unsafe { Span::new_from_raw_offset(0, &invalid_wire[0..]) },
         BgpMessageParsingError::ConnectionNotSynchronized(0u128),
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &invalid_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(invalid),
+        &mut BgpParsingContext::asn2_default(),
+        &invalid,
     );
 }
 
@@ -166,129 +166,87 @@ fn test_bgp_message_length_bounds() {
         BgpMessageParsingError::BadMessageLength(4097),
     );
 
-    test_parsed_completely_with_three_inputs(
-        &good_wire[..],
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
-        &good,
-    );
-    test_parse_error_with_three_inputs::<
+    test_parsed_completely_with_one_input(&good_wire[..], &mut BgpParsingContext::default(), &good);
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &open_underflow_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(open_underflow),
+        &mut BgpParsingContext::asn2_default(),
+        &open_underflow,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &open_less_than_min_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(open_less_than_min),
+        &mut BgpParsingContext::asn2_default(),
+        &open_less_than_min,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &update_less_than_min_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(update_less_than_min),
+        &mut BgpParsingContext::asn2_default(),
+        &update_less_than_min,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &notification_less_than_min_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(notification_less_than_min),
+        &mut BgpParsingContext::asn2_default(),
+        &notification_less_than_min,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &keepalive_less_than_min_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(keepalive_less_than_min),
+        &mut BgpParsingContext::asn2_default(),
+        &keepalive_less_than_min,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &route_refresh_less_than_min_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(route_refresh_less_than_min),
+        &mut BgpParsingContext::asn2_default(),
+        &route_refresh_less_than_min,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &overflow_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(overflow),
+        &mut BgpParsingContext::asn2_default(),
+        &overflow,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &keepalive_overflow_extended_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(keepalive_overflow_extended),
+        &mut BgpParsingContext::asn2_default(),
+        &keepalive_overflow_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &open_overflow_extended_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(open_overflow_extended),
+        &mut BgpParsingContext::asn2_default(),
+        &open_overflow_extended,
     );
 }
 
@@ -299,26 +257,22 @@ fn test_bgp_message_undefined_message_type() {
         unsafe { Span::new_from_raw_offset(18, &invalid_wire[18..]) },
         BgpMessageParsingError::UndefinedBgpMessageType(UndefinedBgpMessageType(0xff)),
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
-    >(
-        &invalid_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(invalid),
-    );
+    >(&invalid_wire, &mut BgpParsingContext::default(), &invalid);
 }
 
 #[test]
 fn test_bgp_message_open_no_params() -> Result<(), BgpMessageWritingError> {
     let good_no_params_wire = combine(vec![&[BGP_VERSION], MY_AS, HOLD_TIME, BGP_ID, &[0x00u8]]);
     let good_no_params_msg = BgpOpenMessage::new(258, 772, Ipv4Addr::from(4278190081), vec![]);
-    test_parsed_completely(&good_no_params_wire, &good_no_params_msg);
+    test_parsed_completely_with_one_input(
+        &good_no_params_wire,
+        &mut BgpParsingContext::default(),
+        &good_no_params_msg,
+    );
     test_write(&good_no_params_msg, &good_no_params_wire)?;
     Ok(())
 }
@@ -358,39 +312,28 @@ fn test_bgp_message_notification() -> Result<(), BgpMessageWritingError> {
             )),
         ),
     );
-
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_cease_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_cease,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &bad_undefined_notif_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_undefined_notif),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_undefined_notif,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
     >(
         &bad_undefined_cease_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_undefined_cease),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_undefined_cease,
     );
 
     test_write(&good_cease, &good_cease_wire)?;
@@ -418,26 +361,16 @@ fn test_bgp_message_route_refresh() -> Result<(), BgpMessageWritingError> {
         ),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_normal_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_normal,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         BgpMessage,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedBgpMessageParsingError<'_>,
-    >(
-        &bad_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad),
-    );
+    >(&bad_wire, &mut BgpParsingContext::asn2_default(), &bad);
     test_write(&good_normal, &good_normal_wire)?;
 
     Ok(())
@@ -483,11 +416,9 @@ fn test_bgp_message_open1() -> Result<(), BgpMessageWritingError> {
         ],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -545,11 +476,9 @@ fn test_bgp_message_open_multi_protocol() -> Result<(), BgpMessageWritingError> 
         ],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -588,11 +517,9 @@ fn test_rd_withdraw() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -706,11 +633,9 @@ fn test_rd_announce() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -807,11 +732,17 @@ fn test_bgp_add_path() -> Result<(), BgpMessageWritingError> {
         ],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::from([(AddressType::Ipv4Unicast, true)]),
+        &mut BgpParsingContext::new(
+            true,
+            HashMap::new(),
+            HashMap::from([(AddressType::Ipv4Unicast, true)]),
+            true,
+            true,
+            true,
+            true,
+        ),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -835,11 +766,17 @@ fn test_bgp_add_path_withdraw() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::from([(AddressType::Ipv4Unicast, true)]),
+        &mut BgpParsingContext::new(
+            true,
+            HashMap::new(),
+            HashMap::from([(AddressType::Ipv4Unicast, true)]),
+            true,
+            true,
+            true,
+            true,
+        ),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -900,11 +837,17 @@ fn test_bgp_add_path_mp_ipv6_unicast() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::from([(AddressType::Ipv6Unicast, true)]),
+        &mut BgpParsingContext::new(
+            true,
+            HashMap::new(),
+            HashMap::from([(AddressType::Ipv6Unicast, true)]),
+            true,
+            true,
+            true,
+            true,
+        ),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -1029,11 +972,17 @@ fn test_evpn_mp_reach() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::from([(AddressType::Ipv6Unicast, true)]),
+        &mut BgpParsingContext::new(
+            true,
+            HashMap::new(),
+            HashMap::from([(AddressType::Ipv6Unicast, true)]),
+            true,
+            true,
+            true,
+            true,
+        ),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -1135,11 +1084,17 @@ fn test_evpn_withdraw() -> Result<(), BgpMessageWritingError> {
         vec![],
     ));
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::from([(AddressType::Ipv6Unicast, true)]),
+        &mut BgpParsingContext::new(
+            true,
+            HashMap::new(),
+            HashMap::from([(AddressType::Ipv6Unicast, true)]),
+            true,
+            true,
+            true,
+            true,
+        ),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -1187,14 +1142,116 @@ fn test_bgp_role_otc_open() -> Result<(), BgpMessageWritingError> {
             )]),
         ],
     ));
-
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::from([(AddressType::Ipv6Unicast, true)]),
+        &mut BgpParsingContext::new(
+            true,
+            HashMap::new(),
+            HashMap::from([(AddressType::Ipv6Unicast, true)]),
+            true,
+            true,
+            true,
+            true,
+        ),
         &good,
     );
     test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bgp_rfc7606_attr() -> Result<(), BgpMessageWritingError> {
+    let good_wire = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x59, 0x02, 0x00, 0x00, 0x00, 0x30, 0x40, 0x01, 0x01,
+        0x0ff, // Undefined origin type = 0xff
+        0x40, 0x02, 0x06, 0x02, 0xff, 0x00, 0x00, 0xfb, 0xff, // Segment count is 0xff
+        0x40, 0x03, 0xff, 0x0a, 0x00, 0x0e, 0x01, // Next hop size is 0xff, rather than 0x04
+        0x80, 0x04, 0xff, 0x00, 0x00, 0x00, 0x00, // MED length is 0xff, rather than 0x04
+        0x40, 0x05, 0xff, 0x00, 0x00, 0x00,
+        0x64, // LOCAL PREF length is 0xff, rather than 0x04
+        0x80, 0x0a, 0x04, 0x0a, 0x00, 0x22, 0x04, // TODO: find invalid case for Cluster List
+        0x80, 0x09, 0x04, 0x0a, 0x00, 0x0f, 0x01, 0x00, 0x00, 0x00, 0x01, 0x20, 0x05, 0x05, 0x05,
+        0x05, 0x00, 0x00, 0x00, 0x01, 0x20, 0xc0, 0xa8, 0x01, 0x05,
+    ];
+
+    let good = BgpMessage::Update(BgpUpdateMessage::new(
+        vec![],
+        vec![
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::ClusterList(ClusterList::new(vec![ClusterId::new(
+                    Ipv4Addr::new(10, 0, 34, 4),
+                )])),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::Originator(Originator::new(Ipv4Addr::new(10, 0, 15, 1))),
+            )
+            .unwrap(),
+        ],
+        vec![
+            Ipv4UnicastAddress::new(
+                Some(1),
+                Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(5, 5, 5, 5), 32).unwrap())
+                    .unwrap(),
+            ),
+            Ipv4UnicastAddress::new(
+                Some(1),
+                Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 5), 32).unwrap())
+                    .unwrap(),
+            ),
+        ],
+    ));
+
+    let mut ctx = BgpParsingContext::new(
+        true,
+        HashMap::new(),
+        HashMap::from([(AddressType::Ipv4Unicast, true)]),
+        true,
+        true,
+        true,
+        false,
+    );
+    test_parsed_completely_with_one_input(&good_wire, &mut ctx, &good);
+    let parsing_errors = ctx.reset_parsing_errors();
+    assert!(!parsing_errors.path_attr_errors().is_empty());
+    assert_eq!(
+        Some(&PathAttributeParsingError::OriginError(
+            OriginParsingError::UndefinedOrigin(UndefinedOrigin(0xff))
+        )),
+        parsing_errors.path_attr_errors().get(0)
+    );
+    assert_eq!(
+        Some(&PathAttributeParsingError::AsPathError(
+            AsPathParsingError::NomError(ErrorKind::Eof)
+        )),
+        parsing_errors.path_attr_errors().get(1)
+    );
+    assert_eq!(
+        Some(&PathAttributeParsingError::NextHopError(
+            NextHopParsingError::InvalidNextHopLength(PathAttributeLength::U8(0xff))
+        )),
+        parsing_errors.path_attr_errors().get(2)
+    );
+    assert_eq!(
+        Some(&PathAttributeParsingError::MultiExitDiscriminatorError(
+            MultiExitDiscriminatorParsingError::InvalidLength(PathAttributeLength::U8(0xff))
+        )),
+        parsing_errors.path_attr_errors().get(3)
+    );
+    assert_eq!(
+        Some(&PathAttributeParsingError::LocalPreferenceError(
+            LocalPreferenceParsingError::InvalidLength(PathAttributeLength::U8(0xff))
+        )),
+        parsing_errors.path_attr_errors().get(4)
+    );
     Ok(())
 }

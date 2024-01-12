@@ -45,10 +45,13 @@ use netgauze_parse_utils::{test_helpers::*, Span};
 use crate::{
     community::*,
     iana::UndefinedRouteDistinguisherTypeCode,
-    wire::deserializer::nlri::{
-        Ipv4MplsVpnUnicastAddressParsingError, Ipv4MulticastAddressParsingError,
-        Ipv4UnicastAddressParsingError, Ipv6MulticastAddressParsingError,
-        Ipv6UnicastAddressParsingError, RouteDistinguisherParsingError,
+    wire::deserializer::{
+        nlri::{
+            Ipv4MplsVpnUnicastAddressParsingError, Ipv4MulticastAddressParsingError,
+            Ipv4UnicastAddressParsingError, Ipv6MulticastAddressParsingError,
+            Ipv6UnicastAddressParsingError, RouteDistinguisherParsingError,
+        },
+        BgpParsingContext,
     },
 };
 use nom::error::ErrorKind;
@@ -146,45 +149,33 @@ fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
         PathAttributeParsingError::OriginError(OriginParsingError::NomError(ErrorKind::Eof)),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_extended_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &bad_extended_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_extended),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &bad_incomplete_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_incomplete),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_incomplete,
     );
 
     test_write(&good, &good_wire)?;
@@ -196,13 +187,17 @@ fn test_path_attribute_origin() -> Result<(), PathAttributeWritingError> {
 fn test_as2_path_segment() -> Result<(), AsPathWritingError> {
     let good_set_wire = [0x01, 0x01, 0x00, 0x01];
     let good_seq_wire = [0x02, 0x01, 0x00, 0x01];
-    let good_empty_wire = [0x01, 0x00];
+    let bad_empty_wire = [0x01, 0x00];
     let bad_undefined_segment_type_wire = [0x00, 0x01, 0x00, 0x01];
     let bad_incomplete_wire = [0x01, 0x01, 0x00];
 
     let set = As2PathSegment::new(AsPathSegmentType::AsSet, vec![1]);
     let seq = As2PathSegment::new(AsPathSegmentType::AsSequence, vec![1]);
-    let empty = As2PathSegment::new(AsPathSegmentType::AsSet, vec![]);
+
+    let bad_empty = LocatedAsPathParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_empty_wire[1..]) },
+        AsPathParsingError::ZeroSegmentLength,
+    );
 
     let bad_undefined_segment_type = LocatedAsPathParsingError::new(
         Span::new(&bad_undefined_segment_type_wire),
@@ -215,7 +210,7 @@ fn test_as2_path_segment() -> Result<(), AsPathWritingError> {
 
     test_parsed_completely(&good_set_wire, &set);
     test_parsed_completely(&good_seq_wire, &seq);
-    test_parsed_completely(&good_empty_wire, &empty);
+    test_parse_error::<As2PathSegment, LocatedAsPathParsingError<'_>>(&bad_empty_wire, &bad_empty);
     test_parse_error::<As2PathSegment, LocatedAsPathParsingError<'_>>(
         &bad_undefined_segment_type_wire,
         &bad_undefined_segment_type,
@@ -227,7 +222,6 @@ fn test_as2_path_segment() -> Result<(), AsPathWritingError> {
 
     test_write(&set, &good_set_wire)?;
     test_write(&seq, &good_seq_wire)?;
-    test_write(&empty, &good_empty_wire)?;
     Ok(())
 }
 
@@ -235,12 +229,16 @@ fn test_as2_path_segment() -> Result<(), AsPathWritingError> {
 fn test_as4_path_segment() -> Result<(), AsPathWritingError> {
     let good_set_wire = [0x01, 0x01, 0x00, 0x00, 0x00, 0x01];
     let good_seq_wire = [0x02, 0x01, 0x00, 0x00, 0x00, 0x01];
-    let good_empty_wire = [0x01, 0x00];
+    let bad_empty_wire = [0x01, 0x00];
     let undefined_segment_type_wire = [0x00, 0x01, 0x00, 0x00, 0x00, 0x01];
 
     let set = As4PathSegment::new(AsPathSegmentType::AsSet, vec![1]);
     let seq = As4PathSegment::new(AsPathSegmentType::AsSequence, vec![1]);
-    let empty = As4PathSegment::new(AsPathSegmentType::AsSet, vec![]);
+
+    let bad_empty = LocatedAsPathParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_empty_wire[1..]) },
+        AsPathParsingError::ZeroSegmentLength,
+    );
 
     let undefined_segment_type = LocatedAsPathParsingError::new(
         unsafe { Span::new_from_raw_offset(0, &undefined_segment_type_wire) },
@@ -249,7 +247,8 @@ fn test_as4_path_segment() -> Result<(), AsPathWritingError> {
 
     test_parsed_completely(&good_set_wire, &set);
     test_parsed_completely(&good_seq_wire, &seq);
-    test_parsed_completely(&good_empty_wire, &empty);
+
+    test_parse_error::<As4PathSegment, LocatedAsPathParsingError<'_>>(&bad_empty_wire, &bad_empty);
     test_parse_error::<As4PathSegment, LocatedAsPathParsingError<'_>>(
         &undefined_segment_type_wire,
         &undefined_segment_type,
@@ -257,7 +256,6 @@ fn test_as4_path_segment() -> Result<(), AsPathWritingError> {
 
     test_write(&set, &good_set_wire)?;
     test_write(&seq, &good_seq_wire)?;
-    test_write(&empty, &good_empty_wire)?;
     Ok(())
 }
 
@@ -386,32 +384,24 @@ fn test_path_attribute_as2_path() -> Result<(), PathAttributeWritingError> {
         )),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire_extended,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &undefined_segment_type_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(undefined_segment_type),
+        &mut BgpParsingContext::asn2_default(),
+        &undefined_segment_type,
     );
     test_write(&good_extended, &good_wire_extended)?;
     Ok(())
@@ -450,18 +440,10 @@ fn test_path_attribute_as4_path() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
-        &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
-        &good,
-    );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+    test_parsed_completely_with_one_input(
         &good_wire_extended,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_extended,
     );
     test_write(&good, &good_wire)?;
@@ -515,25 +497,19 @@ fn test_path_attribute_as4_path_transitional() -> Result<(), PathAttributeWritin
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire_extended,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire_partial,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_partial,
     );
 
@@ -592,33 +568,21 @@ fn test_path_attribute_next_hop() -> Result<(), PathAttributeWritingError> {
         )),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire_extended,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
-    >(
-        &bad_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad),
-    );
+    >(&bad_wire, &mut BgpParsingContext::asn2_default(), &bad);
     test_write(&good, &good_wire)?;
     test_write(&good_extended, &good_wire_extended)?;
     Ok(())
@@ -679,32 +643,24 @@ fn test_path_attribute_multi_exit_discriminator() -> Result<(), PathAttributeWri
         ),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire_extended,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &bad_eof_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_eof),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_eof,
     );
 
     test_write(&good, &good_wire)?;
@@ -770,18 +726,14 @@ fn test_path_attribute_local_preference() -> Result<(), PathAttributeWritingErro
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_extended_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_extended,
     );
     test_write(&good, &good_wire)?;
@@ -862,45 +814,33 @@ fn test_path_attribute_atomic_aggregate() -> Result<(), PathAttributeWritingErro
         ),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_extended_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &bad_length_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_length),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_length,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &bad_extended_length_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_extended_length),
+        &mut BgpParsingContext::default(),
+        &bad_extended_length,
     );
 
     test_write(&good, &good_wire)?;
@@ -1055,59 +995,43 @@ fn test_path_attribute_as2_aggregator() -> Result<(), PathAttributeWritingError>
         )),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_partial_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_partial,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_extended_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_extended,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_partial_extended_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_partial_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &bad_length_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_length),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_length,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &bad_incomplete_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_incomplete),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_incomplete,
     );
 
     test_write(&good, &good_wire)?;
@@ -1180,32 +1104,20 @@ fn test_parse_path_attribute_as4_aggregator() -> Result<(), PathAttributeWriting
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
-        &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
-        &good,
-    );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+    test_parsed_completely_with_one_input(
         &good_partial_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_partial,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_extended_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_partial_extended_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_partial_extended,
     );
 
@@ -1269,32 +1181,24 @@ fn test_parse_path_attribute_communities() -> Result<(), PathAttributeWritingErr
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_zero_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_zero,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_one_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_one,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_two_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good_two,
     );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_two_wire_extended,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_two_extended,
     );
     test_write(&good_zero, &good_zero_wire)?;
@@ -1474,25 +1378,19 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_unicast() -> Result<(), PathAttr
         )),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &invalid_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(invalid),
+        &mut BgpParsingContext::asn2_default(),
+        &invalid,
     );
 
     test_write(&good, &good_wire)?;
@@ -1538,25 +1436,19 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv4_multicast() -> Result<(), PathAt
         ),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &invalid_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(invalid),
+        &mut BgpParsingContext::asn2_default(),
+        &invalid,
     );
 
     test_write(&good, &good_wire)?;
@@ -1617,25 +1509,19 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_unicast() -> Result<(), PathAttr
         )),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &invalid_addr_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(invalid),
+        &mut BgpParsingContext::asn2_default(),
+        &invalid,
     );
 
     test_write(&good, &good_wire)?;
@@ -1701,25 +1587,19 @@ fn test_parse_path_attribute_mp_reach_nlri_ipv6_multicast() -> Result<(), PathAt
         ),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &invalid_addr_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(invalid),
+        &mut BgpParsingContext::asn2_default(),
+        &invalid,
     );
 
     test_write(&good, &good_wire)?;
@@ -1772,25 +1652,19 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_unicast() -> Result<(), PathAt
         ),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &invalid_afi_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(invalid_afi),
+        &mut BgpParsingContext::asn2_default(),
+        &invalid_afi,
     );
 
     test_write(&good, &good_wire)?;
@@ -1841,25 +1715,19 @@ fn test_parse_path_attribute_mp_unreach_nlri_ipv6_multicast(
         ),
     );
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &invalid_afi_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(invalid_afi),
+        &mut BgpParsingContext::asn2_default(),
+        &invalid_afi,
     );
 
     test_write(&good, &good_wire)?;
@@ -1894,11 +1762,9 @@ fn test_mp_reach_labeled_vpn_ipv4() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -1958,52 +1824,64 @@ fn test_mp_reach_multi_labels_vp_ipv4() -> Result<(), PathAttributeWritingError>
     );
 
     // Test valid input
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::from([(AddressType::Ipv4MplsLabeledVpn, 2)]),
-        &HashMap::new(),
+        &mut BgpParsingContext::new(
+            false,
+            HashMap::from([(AddressType::Ipv4MplsLabeledVpn, 2)]),
+            HashMap::new(),
+            true,
+            true,
+            true,
+            true,
+        ),
         &good,
     );
 
     // Test with MAX limit
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::from([(AddressType::Ipv4MplsLabeledVpn, u8::MAX)]),
-        &HashMap::new(),
+        &mut BgpParsingContext::new(
+            false,
+            HashMap::from([(AddressType::Ipv4MplsLabeledVpn, u8::MAX)]),
+            HashMap::new(),
+            true,
+            true,
+            true,
+            true,
+        ),
         &good,
     );
 
     // Test with no limit spec, should default to one label and fail since there's
     // two labels
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(limit_exceeded1),
+        &mut BgpParsingContext::asn2_default(),
+        &limit_exceeded1,
     );
 
     // Test with with one label limit, should fail since there's two labels
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &good_wire,
-        false,
-        &HashMap::from([(AddressType::Ipv4MplsLabeledVpn, 1)]),
-        &HashMap::new(),
-        nom::Err::Error(limit_exceeded2),
+        &mut BgpParsingContext::new(
+            false,
+            HashMap::from([(AddressType::Ipv4MplsLabeledVpn, 1)]),
+            HashMap::new(),
+            true,
+            true,
+            true,
+            true,
+        ),
+        &limit_exceeded2,
     );
 
     test_write(&good, &good_wire)?;
@@ -2054,11 +1932,9 @@ fn test_mp_reach_labeled_vpn_ipv6() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2088,11 +1964,9 @@ fn test_mp_reach_nlri_mpls_labels_ipv6() -> Result<(), PathAttributeWritingError
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2120,11 +1994,9 @@ fn test_transitive_two_octet_extended_community() -> Result<(), PathAttributeWri
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2152,11 +2024,9 @@ fn test_non_transitive_two_octet_extended_community() -> Result<(), PathAttribut
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2182,11 +2052,9 @@ fn test_transitive_ipv4_extended_community() -> Result<(), PathAttributeWritingE
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2209,11 +2077,9 @@ fn test_unknown_extended_community() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2253,11 +2119,9 @@ fn test_multiple_extended_communities() -> Result<(), PathAttributeWritingError>
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2280,11 +2144,9 @@ fn test_large_community() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2303,11 +2165,9 @@ fn test_originator() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2328,11 +2188,9 @@ fn test_cluster_list() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2385,32 +2243,20 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
         )),
     );
 
-    test_parsed_completely_with_three_inputs(
-        &good_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
-        &good,
-    );
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+    test_parsed_completely_with_one_input(
         &good_extended_wire,
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::default(),
         &good_extended,
     );
-    test_parse_error_with_three_inputs::<
+    test_parse_error_with_one_input::<
         PathAttribute,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
+        &mut BgpParsingContext,
         LocatedPathAttributeParsingError<'_>,
     >(
         &bad_incomplete_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
-        nom::Err::Error(bad_incomplete),
+        &mut BgpParsingContext::asn2_default(),
+        &bad_incomplete,
     );
 
     test_write(&good, &good_wire)?;
@@ -2500,11 +2346,9 @@ fn test_path_attr_route_target_membership() -> Result<(), PathAttributeWritingEr
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
 
@@ -2524,11 +2368,9 @@ fn test_otc_path_attribute() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;
@@ -2550,11 +2392,9 @@ fn test_aigp_path_attribute() -> Result<(), PathAttributeWritingError> {
     )
     .unwrap();
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire,
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
     test_write(&good, &good_wire)?;

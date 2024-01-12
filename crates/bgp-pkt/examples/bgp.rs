@@ -1,11 +1,11 @@
 //! Simple example of constructing BGP packet
 //! in addition to serializing and deserializing BGP packet from wire format.
 
-use std::{collections::HashMap, io::Cursor, net::Ipv4Addr};
+use std::{io::Cursor, net::Ipv4Addr};
 
-use netgauze_bgp_pkt::{capabilities::*, open::*, *};
+use netgauze_bgp_pkt::{capabilities::*, open::*, wire::deserializer::BgpParsingContext, *};
 use netgauze_iana::address_family::*;
-use netgauze_parse_utils::{ReadablePduWithThreeInputs, Span, WritablePdu};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
 
 pub fn main() {
     // Construct a new BGP message
@@ -59,6 +59,6 @@ pub fn main() {
 
     // Deserialize the message from binary format
     let (_, msg_back) =
-        BgpMessage::from_wire(Span::new(&buf), true, &HashMap::new(), &HashMap::new()).unwrap();
+        BgpMessage::from_wire(Span::new(&buf), &mut BgpParsingContext::default()).unwrap();
     assert_eq!(msg, msg_back);
 }

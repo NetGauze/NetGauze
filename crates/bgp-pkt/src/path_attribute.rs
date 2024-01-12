@@ -91,27 +91,36 @@ impl PathAttribute {
         partial: bool,
         extended_length: bool,
         value: PathAttributeValue,
-    ) -> Result<PathAttribute, InvalidPathAttribute> {
+    ) -> Result<PathAttribute, (PathAttributeValue, InvalidPathAttribute)> {
         if value
             .can_be_optional()
             .map(|x| x != optional)
             .unwrap_or(false)
         {
-            return Err(InvalidPathAttribute::InvalidOptionalFlagValue(optional));
+            return Err((
+                value,
+                InvalidPathAttribute::InvalidOptionalFlagValue(optional),
+            ));
         }
         if value
             .can_be_transitive()
             .map(|x| x != transitive)
             .unwrap_or(false)
         {
-            return Err(InvalidPathAttribute::InvalidTransitiveFlagValue(transitive));
+            return Err((
+                value,
+                InvalidPathAttribute::InvalidTransitiveFlagValue(transitive),
+            ));
         }
         if value
             .can_be_partial()
             .map(|x| x != partial)
             .unwrap_or(false)
         {
-            return Err(InvalidPathAttribute::InvalidPartialFlagValue(partial));
+            return Err((
+                value,
+                InvalidPathAttribute::InvalidPartialFlagValue(partial),
+            ));
         }
 
         Ok(PathAttribute {

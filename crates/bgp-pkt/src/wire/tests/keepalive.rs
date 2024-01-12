@@ -14,13 +14,14 @@
 // limitations under the License.
 
 use crate::{
-    wire::{serializer::BgpMessageWritingError, tests::BGP_MARKER},
+    wire::{
+        deserializer::BgpParsingContext, serializer::BgpMessageWritingError, tests::BGP_MARKER,
+    },
     BgpMessage,
 };
 use netgauze_parse_utils::test_helpers::{
-    combine, test_parsed_completely_with_three_inputs, test_write,
+    combine, test_parsed_completely_with_one_input, test_write,
 };
-use std::collections::HashMap;
 
 #[test]
 fn test_keep_alive() -> Result<(), BgpMessageWritingError> {
@@ -28,20 +29,12 @@ fn test_keep_alive() -> Result<(), BgpMessageWritingError> {
 
     let good = BgpMessage::KeepAlive;
 
-    test_parsed_completely_with_three_inputs(
+    test_parsed_completely_with_one_input(
         &good_wire[..],
-        false,
-        &HashMap::new(),
-        &HashMap::new(),
+        &mut BgpParsingContext::asn2_default(),
         &good,
     );
-    test_parsed_completely_with_three_inputs(
-        &good_wire[..],
-        true,
-        &HashMap::new(),
-        &HashMap::new(),
-        &good,
-    );
+    test_parsed_completely_with_one_input(&good_wire[..], &mut BgpParsingContext::default(), &good);
 
     test_write(&good, &good_wire[..])?;
     Ok(())

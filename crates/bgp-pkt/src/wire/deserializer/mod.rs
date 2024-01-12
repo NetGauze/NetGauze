@@ -39,15 +39,18 @@ use nom::{
 use serde::{Deserialize, Serialize};
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_three_inputs, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithThreeInputs, ReadablePduWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePdu,
+    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
 };
 
 use crate::{
     iana::{BgpMessageType, UndefinedBgpMessageType},
+    notification::{BgpNotificationMessage, FiniteStateMachineError, MessageHeaderError},
     wire::{
         deserializer::{
+            capabilities::BgpCapabilityParsingError,
             notification::BgpNotificationMessageParsingError, open::BgpOpenMessageParsingError,
+            path_attribute::PathAttributeParsingError,
             route_refresh::BgpRouteRefreshMessageParsingError,
             update::BgpUpdateMessageParsingError,
         },
@@ -66,6 +69,142 @@ pub const BGP_MIN_MESSAGE_LENGTH: u16 = 19;
 /// [`BgpMessage::KeepAlive`] according to the updated
 /// [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654)
 pub const BGP_MAX_MESSAGE_LENGTH: u16 = 4096;
+
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub struct BgpParsingIgnoredErrors {
+    non_unicast_withdraw_nlri: Vec<Ipv4Net>,
+    non_unicast_update_nlri: Vec<Ipv4Net>,
+    capability_errors: Vec<BgpCapabilityParsingError>,
+    path_attr_errors: Vec<PathAttributeParsingError>,
+}
+
+impl BgpParsingIgnoredErrors {
+    pub const fn non_unicast_withdraw_nlri(&self) -> &Vec<Ipv4Net> {
+        &self.non_unicast_withdraw_nlri
+    }
+
+    pub const fn non_unicast_update_nlri(&self) -> &Vec<Ipv4Net> {
+        &self.non_unicast_update_nlri
+    }
+
+    pub const fn capability_errors(&self) -> &Vec<BgpCapabilityParsingError> {
+        &self.capability_errors
+    }
+
+    pub const fn path_attr_errors(&self) -> &Vec<PathAttributeParsingError> {
+        &self.path_attr_errors
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BgpParsingContext {
+    asn4: bool,
+    multiple_labels: HashMap<AddressType, u8>,
+    add_path: HashMap<AddressType, bool>,
+    fail_on_non_unicast_withdraw_nlri: bool,
+    fail_on_non_unicast_update_nlri: bool,
+    fail_on_capability_error: bool,
+    fail_on_malformed_path_attr: bool,
+    parsing_errors: BgpParsingIgnoredErrors,
+}
+
+impl BgpParsingContext {
+    pub fn new(
+        asn4: bool,
+        multiple_labels: HashMap<AddressType, u8>,
+        add_path: HashMap<AddressType, bool>,
+        fail_on_non_unicast_withdraw_nlri: bool,
+        fail_on_non_unicast_update_nlri: bool,
+        fail_on_capability_error: bool,
+        fail_on_malformed_path_attr: bool,
+    ) -> Self {
+        Self {
+            asn4,
+            multiple_labels,
+            add_path,
+            fail_on_non_unicast_withdraw_nlri,
+            fail_on_non_unicast_update_nlri,
+            fail_on_capability_error,
+            fail_on_malformed_path_attr,
+            parsing_errors: BgpParsingIgnoredErrors::default(),
+        }
+    }
+
+    pub fn asn2_default() -> Self {
+        Self::new(
+            false,
+            HashMap::new(),
+            HashMap::new(),
+            false,
+            false,
+            false,
+            false,
+        )
+    }
+
+    pub const fn asn4(&self) -> bool {
+        self.asn4
+    }
+
+    pub fn set_asn4(&mut self, value: bool) {
+        self.asn4 = value
+    }
+
+    pub const fn multiple_labels(&self) -> &HashMap<AddressType, u8> {
+        &self.multiple_labels
+    }
+
+    pub fn multiple_labels_mut(&mut self) -> &mut HashMap<AddressType, u8> {
+        &mut self.multiple_labels
+    }
+
+    pub const fn add_path(&self) -> &HashMap<AddressType, bool> {
+        &self.add_path
+    }
+
+    pub fn add_path_mut(&mut self) -> &mut HashMap<AddressType, bool> {
+        &mut self.add_path
+    }
+
+    pub const fn fail_on_non_unicast_withdraw_nlri(&self) -> bool {
+        self.fail_on_non_unicast_withdraw_nlri
+    }
+
+    pub const fn fail_on_non_unicast_update_nlri(&self) -> bool {
+        self.fail_on_non_unicast_update_nlri
+    }
+
+    pub const fn fail_on_capability_error(&self) -> bool {
+        self.fail_on_capability_error
+    }
+
+    pub const fn fail_on_malformed_path_attr(&self) -> bool {
+        self.fail_on_malformed_path_attr
+    }
+
+    pub const fn parsing_errors(&self) -> &BgpParsingIgnoredErrors {
+        &self.parsing_errors
+    }
+
+    // Move out existing parsing errors and replace it with a new empty instant
+    pub fn reset_parsing_errors(&mut self) -> BgpParsingIgnoredErrors {
+        std::mem::take(&mut self.parsing_errors)
+    }
+}
+
+impl Default for BgpParsingContext {
+    fn default() -> Self {
+        Self::new(
+            true,
+            HashMap::new(),
+            HashMap::new(),
+            false,
+            false,
+            false,
+            false,
+        )
+    }
+}
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4PrefixParsingError {
@@ -287,20 +426,12 @@ fn parse_bgp_message_length_and_type(
     Ok((buf, (length, message_type, reminder_buf)))
 }
 
-impl<'a>
-    ReadablePduWithThreeInputs<
-        'a,
-        bool,
-        &HashMap<AddressType, u8>,
-        &HashMap<AddressType, bool>,
-        LocatedBgpMessageParsingError<'a>,
-    > for BgpMessage
+impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpMessageParsingError<'a>>
+    for BgpMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        asn4: bool,
-        multiple_labels: &HashMap<AddressType, u8>,
-        add_path: &HashMap<AddressType, bool>,
+        ctx: &mut BgpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedBgpMessageParsingError<'a>> {
         let (buf, _) = nom::combinator::map_res(be_u128, |x| {
             if x == u128::MAX {
@@ -315,12 +446,11 @@ impl<'a>
         let (buf, (_, message_type, reminder_buf)) = parse_bgp_message_length_and_type(buf)?;
         let (buf, msg) = match message_type {
             BgpMessageType::Open => {
-                let (buf, open) = parse_into_located(buf)?;
+                let (buf, open) = parse_into_located_one_input(buf, ctx)?;
                 (buf, BgpMessage::Open(open))
             }
             BgpMessageType::Update => {
-                let (buf, update) =
-                    parse_into_located_three_inputs(buf, asn4, multiple_labels, add_path)?;
+                let (buf, update) = parse_into_located_one_input(buf, ctx)?;
                 (buf, BgpMessage::Update(update))
             }
             BgpMessageType::Notification => {
@@ -342,5 +472,51 @@ impl<'a>
             )));
         }
         Ok((reminder_buf, msg))
+    }
+}
+
+impl From<BgpMessageParsingError> for BgpNotificationMessage {
+    fn from(value: BgpMessageParsingError) -> Self {
+        match value {
+            BgpMessageParsingError::NomError(_) => {
+                // TODO: more detailed error
+                BgpNotificationMessage::MessageHeaderError(MessageHeaderError::Unspecific {
+                    value: vec![],
+                })
+            }
+            BgpMessageParsingError::ConnectionNotSynchronized(header) => {
+                BgpNotificationMessage::MessageHeaderError(
+                    MessageHeaderError::ConnectionNotSynchronized {
+                        value: header.to_be_bytes().to_vec(),
+                    },
+                )
+            }
+            BgpMessageParsingError::UndefinedBgpMessageType(msg_type) => {
+                BgpNotificationMessage::MessageHeaderError(MessageHeaderError::BadMessageType {
+                    value: msg_type.0.to_be_bytes().to_vec(),
+                })
+            }
+            BgpMessageParsingError::BadMessageLength(bad_length) => {
+                BgpNotificationMessage::MessageHeaderError(MessageHeaderError::BadMessageLength {
+                    value: bad_length.to_be_bytes().to_vec(),
+                })
+            }
+            BgpMessageParsingError::BgpOpenMessageParsingError(open_err) => {
+                BgpNotificationMessage::OpenMessageError(open_err.into())
+            }
+            BgpMessageParsingError::BgpUpdateMessageParsingError(update_err) => {
+                BgpNotificationMessage::UpdateMessageError(update_err.into())
+            }
+            BgpMessageParsingError::BgpNotificationMessageParsingError(_notification) => {
+                // Notification messages parsing should be ignored and consider a session
+                // closed.
+                BgpNotificationMessage::FiniteStateMachineError(
+                    FiniteStateMachineError::Unspecific { value: vec![] },
+                )
+            }
+            BgpMessageParsingError::BgpRouteRefreshMessageParsingError(route_refresh_error) => {
+                BgpNotificationMessage::RouteRefreshError(route_refresh_error.into())
+            }
+        }
     }
 }
