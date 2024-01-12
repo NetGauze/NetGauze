@@ -21,7 +21,10 @@ use crate::{
         PeerPolicy, PeerProperties, PeerStateResult,
     },
 };
-use netgauze_bgp_pkt::{wire::serializer::BgpMessageWritingError, BgpMessage};
+use netgauze_bgp_pkt::{
+    wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
+    BgpMessage,
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
@@ -62,7 +65,7 @@ impl<
 
     pub fn add_peer<
         D: BgpCodecInitializer<Peer<A, I, D, C, P>>
-            + Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+            + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>
             + Send
             + Sync,
@@ -107,7 +110,7 @@ impl<
     #[allow(clippy::type_complexity)]
     pub fn dynamic_peer<
         D: BgpCodecInitializer<Peer<A, I, D, C, EchoCapabilitiesPolicy<A, I, D>>>
-            + Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+            + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>
             + Send
             + Sync

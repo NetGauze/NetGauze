@@ -649,7 +649,7 @@ async fn test_connect_bgp_open_err_unsupported_version() {
         .read_u8(&[bgp_version])
         .write(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![bgp_version],
+                value: vec![0x00, 0x04],
             }),
         ));
     let active_connect = MockActiveConnect {
@@ -674,7 +674,7 @@ async fn test_connect_bgp_open_err_unsupported_version() {
         event,
         Ok(BgpEvent::BGPOpenMsgErr(
             OpenMessageError::UnsupportedVersionNumber {
-                value: vec![bgp_version]
+                value: vec![0x00, 0x04]
             }
         ))
     );
@@ -689,7 +689,7 @@ async fn test_connect_bgp_open_err_unacceptable_hold_time() {
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
-    let hold_time = 0;
+    let hold_time = 1;
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -917,7 +917,10 @@ async fn test_connect_update_msg() {
     assert_eq!(peer.fsm_state(), FsmState::Connect);
 
     let event = peer.run().await;
-    assert_eq!(event, Ok(BgpEvent::UpdateMsg(update)));
+    assert_eq!(
+        event,
+        Ok(BgpEvent::UpdateMsg(update, UpdateTreatment::Normal,))
+    );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
     assert!(peer.connection().is_none());
@@ -957,7 +960,7 @@ async fn test_connect_update_err_msg() {
     assert_eq!(
         event,
         Ok(BgpEvent::UpdateMsgErr(
-            UpdateMessageError::InvalidNetworkField { value: vec![] }
+            UpdateMessageError::MalformedAttributeList { value: vec![] }
         ))
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
@@ -1459,7 +1462,7 @@ async fn test_active_bgp_open_err() {
         .read_u8(&[bgp_version])
         .write(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![bgp_version],
+                value: vec![0x00, 0x04],
             }),
         ));
 
@@ -1495,7 +1498,7 @@ async fn test_active_bgp_open_err() {
         event,
         Ok(BgpEvent::BGPOpenMsgErr(
             OpenMessageError::UnsupportedVersionNumber {
-                value: vec![bgp_version]
+                value: vec![0x00, 0x04]
             }
         ))
     );
@@ -1520,10 +1523,9 @@ async fn test_active_notif_version_err_with_open_delay() {
 
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
-    let bgp_version = 0x03;
     passive_io_builder.read(BgpMessage::Notification(
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![bgp_version],
+            value: vec![0x00, 0x04],
         }),
     ));
 
@@ -1745,7 +1747,10 @@ async fn test_active_update_msg() {
     assert_eq!(peer.fsm_state(), FsmState::Active);
 
     let event = peer.run().await;
-    assert_eq!(event, Ok(BgpEvent::UpdateMsg(update)));
+    assert_eq!(
+        event,
+        Ok(BgpEvent::UpdateMsg(update, UpdateTreatment::Normal))
+    );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
     assert!(peer.connection().is_none());
@@ -1797,7 +1802,7 @@ async fn test_active_update_err_msg() -> Result<(), FsmStateError<SocketAddr>> {
 
     assert_eq!(
         event,
-        BgpEvent::UpdateMsgErr(UpdateMessageError::InvalidNetworkField { value: vec![] })
+        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList { value: vec![] })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
@@ -2252,7 +2257,7 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
         .read_u8(&[bgp_version])
         .write(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![bgp_version],
+                value: vec![0x00, 0x04],
             }),
         ));
 
@@ -2283,7 +2288,7 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
     assert_eq!(
         event,
         BgpEvent::BGPOpenMsgErr(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![bgp_version]
+            value: vec![0x00, 0x04]
         })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
@@ -2487,7 +2492,6 @@ async fn test_open_sent_collision_dump_tracked_connection() -> Result<(), FsmSta
 async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
-    let bgp_version = 0x03;
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -2498,7 +2502,7 @@ async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAd
         )))
         .read(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![bgp_version],
+                value: vec![0x00, 0x04],
             }),
         ));
 
@@ -2685,7 +2689,7 @@ async fn test_open_sent_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
     assert!(peer.tracked_connection().is_none());
 
     let event = peer.run().await?;
-    assert_eq!(event, BgpEvent::UpdateMsg(update));
+    assert_eq!(event, BgpEvent::UpdateMsg(update, UpdateTreatment::Normal));
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
     assert!(peer.connect_retry_timer().is_none());
@@ -2743,7 +2747,7 @@ async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
     let event = peer.run().await?;
     assert_eq!(
         event,
-        BgpEvent::UpdateMsgErr(UpdateMessageError::InvalidNetworkField { value: vec![] })
+        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList { value: vec![] })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
@@ -3205,7 +3209,6 @@ async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<Socke
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
-    let bgp_version = 0x03;
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -3224,7 +3227,7 @@ async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<Socke
         .write(BgpMessage::KeepAlive)
         .read(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-                value: vec![bgp_version],
+                value: vec![0x00, 0x04],
             }),
         ));
 
@@ -3541,7 +3544,7 @@ async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr
     let bgp_version = 0x03;
     let notif =
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![bgp_version],
+            value: vec![0x00, 0x04],
         });
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
@@ -3597,7 +3600,7 @@ async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr
     assert_eq!(
         event,
         BgpEvent::BGPOpenMsgErr(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![bgp_version]
+            value: vec![0x00, 0x04]
         })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
@@ -3796,7 +3799,7 @@ async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>>
     assert_eq!(peer.fsm_state(), FsmState::OpenConfirm);
 
     let event = peer.run().await?;
-    assert_eq!(event, BgpEvent::UpdateMsg(update));
+    assert_eq!(event, BgpEvent::UpdateMsg(update, UpdateTreatment::Normal,));
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
     assert!(peer.connect_retry_timer().is_none());
@@ -3868,7 +3871,7 @@ async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>>
     let event = peer.run().await?;
     assert_eq!(
         event,
-        BgpEvent::UpdateMsgErr(UpdateMessageError::InvalidNetworkField { value: vec![] })
+        BgpEvent::UpdateMsgErr(UpdateMessageError::MalformedAttributeList { value: vec![] })
     );
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     assert_eq!(peer.stats().connect_retry_counter(), 1);
@@ -4694,10 +4697,9 @@ async fn test_established_notif_version_error() -> Result<(), FsmStateError<Sock
         PEER_BGP_ID,
         vec![Capabilities(vec![])],
     );
-    let bgp_version = 0x03;
     let notif =
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
-            value: vec![bgp_version],
+            value: vec![0x00, 0x04],
         });
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -4949,7 +4951,7 @@ async fn test_established_update_msg() -> Result<(), FsmStateError<SocketAddr>> 
     assert_eq!(peer.fsm_state(), FsmState::Established);
 
     let event = peer.run().await?;
-    assert_eq!(event, BgpEvent::UpdateMsg(update));
+    assert_eq!(event, BgpEvent::UpdateMsg(update, UpdateTreatment::Normal));
     assert_eq!(peer.fsm_state(), FsmState::Established);
     Ok(())
 }

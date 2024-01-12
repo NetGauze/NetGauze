@@ -37,18 +37,30 @@ use tokio_util::codec::{Decoder, Encoder, Framed};
 
 use netgauze_bgp_pkt::{
     capabilities::BgpCapability,
-    iana::BgpCapabilityCode,
+    iana::{BgpCapabilityCode, PathAttributeType},
     notification::{
         BgpNotificationMessage, FiniteStateMachineError, HoldTimerExpiredError, OpenMessageError,
+        UpdateMessageError,
     },
     open::{BgpOpenMessage, BgpOpenMessageParameter},
-    wire::serializer::BgpMessageWritingError,
+    path_attribute::{InvalidPathAttribute, PathAttributeValue},
+    update::BgpUpdateMessage,
+    wire::{
+        deserializer::{
+            path_attribute::{
+                MpReachParsingError, MpUnreachParsingError, PathAttributeParsingError,
+            },
+            BgpParsingIgnoredErrors,
+        },
+        serializer::BgpMessageWritingError,
+    },
     BgpMessage,
 };
+use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 
 use crate::{
     codec::{BgpCodec, BgpCodecDecoderError},
-    events::ConnectionEvent,
+    events::{ConnectionEvent, UpdateTreatment},
     fsm::FsmStateError,
     peer::{PeerConfig, PeerPolicy, PeerProperties},
 };
@@ -276,7 +288,7 @@ impl ConnectionConfigBuilder {
 pub struct Connection<
     A,
     I: AsyncRead + AsyncWrite,
-    D: Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+    D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
         + Encoder<BgpMessage, Error = BgpMessageWritingError>,
 > {
     peer_addr: A,
@@ -310,7 +322,7 @@ pub struct Connection<
 impl<
         A: Clone + Display,
         I: AsyncRead + AsyncWrite + Unpin,
-        D: Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+        D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>,
     > Connection<A, I, D>
 {
@@ -582,15 +594,23 @@ impl<
             ConnectionEvent::NotifMsgVerErr => {
                 self.state = ConnectionState::Terminate;
             }
+            ConnectionEvent::NotifMsgErr(ref err) => {
+                log::error!(
+                    "[{}][{}] Error parsing notification message from peer: {err:?}",
+                    self.peer_addr,
+                    self.state,
+                );
+            }
             ConnectionEvent::HoldTimerExpires
             | ConnectionEvent::KeepAliveTimerExpires
             | ConnectionEvent::TcpConnectionFails
             | ConnectionEvent::BGPOpen(_)
             | ConnectionEvent::NotifMsg(_)
             | ConnectionEvent::KeepAliveMsg
-            | ConnectionEvent::UpdateMsg(_)
+            | ConnectionEvent::UpdateMsg(_, _)
             | ConnectionEvent::UpdateMsgErr(_)
-            | ConnectionEvent::RouteRefresh(_) => {
+            | ConnectionEvent::RouteRefresh(_)
+            | ConnectionEvent::RouteRefreshErr(_) => {
                 self.state = ConnectionState::Terminate;
             }
         };
@@ -657,15 +677,23 @@ impl<
                 }
                 self.state = ConnectionState::Terminate;
             }
+            ConnectionEvent::NotifMsgErr(ref err) => {
+                log::error!(
+                    "[{}][{}] Error parsing notification message from peer: {err:?}",
+                    self.peer_addr,
+                    self.state,
+                );
+            }
             ConnectionEvent::NotifMsgVerErr => self.state = ConnectionState::Terminate,
             ConnectionEvent::KeepAliveTimerExpires
             | ConnectionEvent::DelayOpenTimerExpires
             | ConnectionEvent::BGPOpenWithDelayOpenTimer(_)
             | ConnectionEvent::NotifMsg(_)
             | ConnectionEvent::KeepAliveMsg
-            | ConnectionEvent::UpdateMsg(_)
+            | ConnectionEvent::UpdateMsg(_, _)
             | ConnectionEvent::UpdateMsgErr(_)
-            | ConnectionEvent::RouteRefresh(_) => {
+            | ConnectionEvent::RouteRefresh(_)
+            | ConnectionEvent::RouteRefreshErr(_) => {
                 let notif = BgpNotificationMessage::FiniteStateMachineError(
                     FiniteStateMachineError::ReceiveUnexpectedMessageInOpenSentState {
                         value: vec![],
@@ -756,11 +784,19 @@ impl<
             ConnectionEvent::TcpConnectionFails => {
                 self.state = ConnectionState::Terminate;
             }
+            ConnectionEvent::NotifMsgErr(ref err) => {
+                log::error!(
+                    "[{}][{}] Error parsing notification message from peer: {err:?}",
+                    self.peer_addr,
+                    self.state,
+                );
+            }
             ConnectionEvent::DelayOpenTimerExpires
             | ConnectionEvent::BGPOpenWithDelayOpenTimer(_)
-            | ConnectionEvent::UpdateMsg(_)
+            | ConnectionEvent::UpdateMsg(_, _)
             | ConnectionEvent::UpdateMsgErr(_)
-            | ConnectionEvent::RouteRefresh(_) => {
+            | ConnectionEvent::RouteRefresh(_)
+            | ConnectionEvent::RouteRefreshErr(_) => {
                 let notif = BgpNotificationMessage::FiniteStateMachineError(
                     FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState {
                         value: vec![],
@@ -823,8 +859,9 @@ impl<
                     x.reset()
                 }
             }
-            ConnectionEvent::UpdateMsg(_) | ConnectionEvent::RouteRefresh(_) => {}
+            ConnectionEvent::UpdateMsg(_, _) | ConnectionEvent::RouteRefresh(_) => {}
             ConnectionEvent::UpdateMsgErr(_) => self.state = ConnectionState::Terminate,
+            ConnectionEvent::RouteRefreshErr(_) => self.state = ConnectionState::Terminate,
             ConnectionEvent::TcpConnectionFails => {
                 self.state = ConnectionState::Terminate;
             }
@@ -832,15 +869,447 @@ impl<
             | ConnectionEvent::TcpConnectionConfirmed(_) => {
                 self.state = ConnectionState::Terminate;
             }
+            ConnectionEvent::NotifMsgErr(ref err) => {
+                log::error!(
+                    "[{}][{}] Error parsing notification message from peer: {err:?}",
+                    self.peer_addr,
+                    self.state,
+                );
+            }
         }
         Ok(event)
     }
 }
 
+fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
+    let mut treatment = UpdateTreatment::Normal;
+    for path_err in errors.path_attr_errors() {
+        match path_err {
+            PathAttributeParsingError::NomError(_) => {
+                if treatment < UpdateTreatment::TreatAsWithdraw {
+                    treatment = UpdateTreatment::TreatAsWithdraw
+                }
+            }
+            PathAttributeParsingError::OriginError(_)
+            | PathAttributeParsingError::AsPathError(_)
+            | PathAttributeParsingError::NextHopError(_)
+            | PathAttributeParsingError::MultiExitDiscriminatorError(_)
+            | PathAttributeParsingError::LocalPreferenceError(_) => {
+                // RFC 7606 "Treat-as-withdraw" MUST be used for the cases that specify a
+                // session reset and involve any of the attributes ORIGIN, AS_PATH,  NEXT_HOP,
+                // MULTI_EXIT_DISC, or LOCAL_PREF.
+                if treatment < UpdateTreatment::TreatAsWithdraw {
+                    treatment = UpdateTreatment::TreatAsWithdraw
+                }
+            }
+            PathAttributeParsingError::AtomicAggregateError(_)
+            | PathAttributeParsingError::AggregatorError(_) => {
+                if treatment < UpdateTreatment::AttributeDiscard {
+                    treatment = UpdateTreatment::AttributeDiscard
+                }
+            }
+            PathAttributeParsingError::CommunitiesError(_)
+            | PathAttributeParsingError::ExtendedCommunitiesError(_)
+            | PathAttributeParsingError::ExtendedCommunitiesErrorIpv6(_)
+            | PathAttributeParsingError::LargeCommunitiesError(_) => {
+                // RFC 7606 An UPDATE message with a malformed Community attribute SHALL be
+                // handled using the approach of "treat-as-withdraw".
+                if treatment < UpdateTreatment::TreatAsWithdraw {
+                    treatment = UpdateTreatment::TreatAsWithdraw
+                }
+            }
+            PathAttributeParsingError::OriginatorError(_) => {
+                // RFC 7606  If malformed, the UPDATE message SHALL be handled using the
+                // approach of "treat-as-withdraw".
+                if treatment < UpdateTreatment::TreatAsWithdraw {
+                    treatment = UpdateTreatment::TreatAsWithdraw
+                }
+            }
+            PathAttributeParsingError::ClusterListError(_) => {
+                // RFC 7606  If malformed, the UPDATE message SHALL be handled using the
+                // approach of "treat-as-withdraw".
+                if treatment < UpdateTreatment::TreatAsWithdraw {
+                    treatment = UpdateTreatment::TreatAsWithdraw
+                }
+            }
+            PathAttributeParsingError::MpReachErrorError(err) => {
+                match err {
+                    MpReachParsingError::NomError(_) => {
+                        // No meaningful AFI/SAFI read
+                        if treatment < UpdateTreatment::SessionReset {
+                            treatment = UpdateTreatment::SessionReset
+                        }
+                    }
+                    MpReachParsingError::UndefinedAddressFamily(_)
+                    | MpReachParsingError::UndefinedSubsequentAddressFamily(_) => {
+                        // AFI/SAFI is not supported, this would've been blocked from open message
+                        // in the first place
+                        if treatment < UpdateTreatment::SessionReset {
+                            treatment = UpdateTreatment::SessionReset
+                        }
+                    }
+                    MpReachParsingError::IpAddrError(address_type, _) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            address_type.address_family().into(),
+                            address_type.subsequent_address_family().into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::LabeledNextHopError(address_type, _) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            address_type.address_family().into(),
+                            address_type.subsequent_address_family().into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::Ipv4UnicastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::Unicast.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::Ipv4MulticastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::Multicast.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::Ipv4NlriMplsLabelsAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::NlriMplsLabels.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::Ipv4MplsVpnUnicastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::MplsVpn.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::Ipv6UnicastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv6.into(),
+                            SubsequentAddressFamily::Unicast.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::Ipv6NlriMplsLabelsAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv6.into(),
+                            SubsequentAddressFamily::NlriMplsLabels.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::Ipv6MulticastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv6.into(),
+                            SubsequentAddressFamily::Multicast.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::Ipv6MplsVpnUnicastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv6.into(),
+                            SubsequentAddressFamily::MplsVpn.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::L2EvpnAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::L2vpn.into(),
+                            SubsequentAddressFamily::BgpEvpn.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpReachParsingError::RouteTargetMembershipAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::RouteTargetConstrains.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                }
+            }
+            PathAttributeParsingError::MpUnreachErrorError(err) => {
+                match err {
+                    MpUnreachParsingError::NomError(_) => {
+                        // No meaningful AFI/SAFI read
+                        if treatment < UpdateTreatment::SessionReset {
+                            treatment = UpdateTreatment::SessionReset
+                        }
+                    }
+                    MpUnreachParsingError::UndefinedAddressFamily(_)
+                    | MpUnreachParsingError::UndefinedSubsequentAddressFamily(_) => {
+                        // AFI/SAFI is not supported, this would've been blocked from open message
+                        // in the first place
+                        if treatment < UpdateTreatment::SessionReset {
+                            treatment = UpdateTreatment::SessionReset
+                        }
+                    }
+                    MpUnreachParsingError::Ipv4UnicastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::Unicast.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::Ipv4MulticastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::Multicast.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::Ipv4NlriMplsLabelsAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::NlriMplsLabels.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::Ipv4MplsVpnUnicastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::MplsVpn.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::Ipv6UnicastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv6.into(),
+                            SubsequentAddressFamily::Unicast.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::Ipv6NlriMplsLabelsAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv6.into(),
+                            SubsequentAddressFamily::NlriMplsLabels.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::Ipv6MulticastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv6.into(),
+                            SubsequentAddressFamily::Multicast.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::Ipv6MplsVpnUnicastAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv6.into(),
+                            SubsequentAddressFamily::MplsVpn.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::L2EvpnAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::L2vpn.into(),
+                            SubsequentAddressFamily::BgpEvpn.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                    MpUnreachParsingError::RouteTargetMembershipAddressError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::RouteTargetConstrains.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
+                }
+            }
+            PathAttributeParsingError::OnlyToCustomerError(_) => {
+                if treatment < UpdateTreatment::AttributeDiscard {
+                    treatment = UpdateTreatment::AttributeDiscard
+                }
+            }
+            PathAttributeParsingError::AigpError(_) => {
+                if treatment < UpdateTreatment::AttributeDiscard {
+                    treatment = UpdateTreatment::AttributeDiscard
+                }
+            }
+            PathAttributeParsingError::UnknownAttributeError(_) => {
+                // Keep treatment as is
+            }
+            PathAttributeParsingError::InvalidPathAttribute(err, _) => {
+                // RFC 7606:  If the value of either the Optional or Transitive bits in the
+                // Attribute Flags is in conflict with their specified values, then the
+                // attribute MUST be treated as malformed and the "treat-as-withdraw" approach
+                // used, unless the specification for the attribute mandates different handling
+                // for incorrect Attribute Flags.
+                match err {
+                    InvalidPathAttribute::InvalidOptionalFlagValue(_)
+                    | InvalidPathAttribute::InvalidTransitiveFlagValue(_) => {
+                        if treatment < UpdateTreatment::TreatAsWithdraw {
+                            treatment = UpdateTreatment::TreatAsWithdraw
+                        }
+                    }
+                    InvalidPathAttribute::InvalidPartialFlagValue(_) => {
+                        // Keep treatment as is
+                    }
+                }
+            }
+        }
+    }
+    treatment
+}
+
+fn handle_open_message<A>(
+    open: BgpOpenMessage,
+    peer_asn: Option<u32>,
+    peer_bgp_id: Option<Ipv4Addr>,
+    delay_timer_running: bool,
+) -> Option<ConnectionEvent<A>> {
+    // Check Peer ASN number
+    if let Some(peer_asn) = peer_asn {
+        if peer_asn != open.my_asn4() {
+            return Some(ConnectionEvent::BGPOpenMsgErr(
+                OpenMessageError::BadPeerAs {
+                    value: peer_asn.to_be_bytes().to_vec(),
+                },
+            ));
+        }
+    }
+    // Check Peer BGP ID
+    if let Some(peer_bgp_id) = peer_bgp_id {
+        if peer_bgp_id != open.bgp_id() {
+            return Some(ConnectionEvent::BGPOpenMsgErr(
+                OpenMessageError::BadBgpIdentifier {
+                    value: open.bgp_id().octets().to_vec(),
+                },
+            ));
+        }
+    }
+    if delay_timer_running {
+        Some(ConnectionEvent::BGPOpenWithDelayOpenTimer(open))
+    } else {
+        Some(ConnectionEvent::BGPOpen(open))
+    }
+}
+
+fn handle_update_message<A>(
+    update: BgpUpdateMessage,
+    parsing_errors: BgpParsingIgnoredErrors,
+) -> Option<ConnectionEvent<A>> {
+    // RFC 7606 If any of the well-known mandatory attributes are not present in an
+    // UPDATE message, then "treat-as-withdraw" MUST be used. (Note that [RFC4760]
+    // reclassifies NEXT_HOP as what is effectively discretionary.)
+    let end_of_rib = update.end_of_rib();
+    let mut has_origin = false;
+    let mut has_asn_path = false;
+    let mut has_next_hop = false;
+    let mut bgp_mp_reach_count = 0;
+    let mut bgp_mp_unreach_count = 0;
+    for attr in update.path_attributes() {
+        if has_origin && has_asn_path {
+            break;
+        }
+        if let PathAttributeValue::Origin(_) = attr.value() {
+            has_origin = true;
+        } else if let PathAttributeValue::AsPath(_) = attr.value() {
+            has_asn_path = true;
+        } else if let PathAttributeValue::As4Path(_) = attr.value() {
+            has_asn_path = true;
+        } else if let PathAttributeValue::NextHop(_) = attr.value() {
+            has_next_hop = true;
+        } else if let PathAttributeValue::MpReach(_) = attr.value() {
+            bgp_mp_reach_count += 1;
+        } else if let PathAttributeValue::MpUnreach(_) = attr.value() {
+            bgp_mp_unreach_count += 1;
+        }
+    }
+    if end_of_rib.is_none() && !has_origin {
+        return Some(ConnectionEvent::UpdateMsgErr(
+            UpdateMessageError::MissingWellKnownAttribute {
+                value: vec![PathAttributeType::Origin as u8],
+            },
+        ));
+    }
+    if end_of_rib.is_none() && !has_asn_path {
+        return Some(ConnectionEvent::UpdateMsgErr(
+            UpdateMessageError::MissingWellKnownAttribute {
+                value: vec![PathAttributeType::AsPath as u8],
+            },
+        ));
+    }
+    if end_of_rib.is_none()
+        && bgp_mp_reach_count == 0
+        && bgp_mp_unreach_count == 0
+        && !has_next_hop
+        && !update.nlri().is_empty()
+    {
+        // RFC7606: RFC4760 reclassifies NEXT_HOP as what is effectively discretionary.
+        // Complain if BGP-MP is not used and there are reachable NLRI announced.
+        return Some(ConnectionEvent::UpdateMsgErr(
+            UpdateMessageError::MissingWellKnownAttribute {
+                value: vec![PathAttributeType::NextHop as u8],
+            },
+        ));
+    }
+    if bgp_mp_reach_count > 1 || bgp_mp_unreach_count > 1 {
+        // RFC7606: If the MP_REACH_NLRI attribute or the MP_UNREACH_NLRI [RFC4760]
+        // attribute appears more than once in the UPDATE message, then a NOTIFICATION
+        // message MUST be sent with the Error Subcode "Malformed Attribute List".
+        return Some(ConnectionEvent::UpdateMsgErr(
+            UpdateMessageError::MalformedAttributeList { value: vec![] },
+        ));
+    }
+    let treatment = update_treatment(&parsing_errors);
+    Some(ConnectionEvent::UpdateMsg(update, treatment))
+}
+
 impl<
-        A,
+        A: Display,
         I: AsyncRead + AsyncWrite,
-        D: Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+        D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>,
     > Stream for Connection<A, I, D>
 where
@@ -885,47 +1354,28 @@ where
                         Some(Err(err)) => {
                             Some(err.into())
                         },
-                        Some(Ok(msg)) => {
+                        Some(Ok((msg, parsing_errors))) => {
                             let current = Utc::now();
                             this.stats.messages_received += 1;
                             this.stats.last_received = Some(current);
                             match msg {
                                 BgpMessage::Open(open) => {
                                     this.stats.open_received += 1;
-                                    // Check hold time
-                                    if (0u16..3u16).contains(&open.hold_time()) {
-                                        return Some(ConnectionEvent::BGPOpenMsgErr(
-                                            OpenMessageError::UnacceptableHoldTime {
-                                                value: open.hold_time().to_be_bytes().to_vec(),
-                                            }))
-                                    }
-                                    // Check Peer ASN number
-                                    if let Some(peer_asn) = *this.peer_asn {
-                                        if peer_asn != open.my_asn4() {
-                                            return Some(ConnectionEvent::BGPOpenMsgErr(
-                                                OpenMessageError::BadPeerAs {
-                                                    value: peer_asn.to_be_bytes().to_vec()
-                                                }))
+                                    // As per RFC5492 Section 5, Capability errors are ignored
+                                    if log::log_enabled!(log::Level::Debug) {
+                                        for cap_err in parsing_errors.capability_errors() {
+                                            log::debug!(
+                                                "[{}][{}] Ignored BGP Capability parsing error: {cap_err:?}",
+                                                this.peer_addr,
+                                                this.state,
+                                            );
                                         }
                                     }
-                                    // Check Peer BGP ID
-                                    if let Some(peer_bgp_id) = *this.peer_bgp_id {
-                                        if peer_bgp_id != open.bgp_id() {
-                                            return Some(ConnectionEvent::BGPOpenMsgErr(
-                                                OpenMessageError::BadBgpIdentifier {
-                                                    value: open.bgp_id().octets().to_vec()
-                                                }))
-                                        }
-                                    }
-                                    if this.open_delay_timer.is_some() {
-                                       Some(ConnectionEvent::BGPOpenWithDelayOpenTimer(open))
-                                    } else {
-                                        Some(ConnectionEvent::BGPOpen(open))
-                                    }
+                                    handle_open_message(open, *this.peer_asn, *this.peer_bgp_id, this.open_delay_timer.is_some())
                                 }
                                 BgpMessage::Update(update) => {
                                     this.stats.update_received += 1;
-                                    Some(ConnectionEvent::UpdateMsg(update))
+                                    handle_update_message(update, parsing_errors)
                                 }
                                 BgpMessage::Notification(notif) => {
                                     this.stats.notification_received += 1;
@@ -958,7 +1408,7 @@ where
 impl<
         A: Clone + Display,
         I: AsyncRead + AsyncWrite,
-        D: Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+        D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>,
     > Sink<BgpMessage> for Connection<A, I, D>
 {
@@ -1024,7 +1474,7 @@ impl<
 pub trait ActiveConnect<
     P,
     I: AsyncRead + AsyncWrite,
-    D: Decoder<Item = BgpMessage, Error = BgpCodecDecoderError>
+    D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
         + Encoder<BgpMessage, Error = BgpMessageWritingError>,
 >
 {
