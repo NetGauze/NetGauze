@@ -41,11 +41,11 @@ const OPEN_COMPLEX_RAW: [u8; 123] = [
 ];
 
 pub fn test_open_message_no_params(span: Span<'_>) {
-    let x = BgpMessage::from_wire(span, true, false, &HashMap::new());
+    let x = BgpMessage::from_wire(span, true, &HashMap::new(), &HashMap::new());
     x.unwrap();
 }
 pub fn test_complex_open_message(span: Span<'_>) {
-    let x = BgpMessage::from_wire(span, true, false, &HashMap::new());
+    let x = BgpMessage::from_wire(span, true, &HashMap::new(), &HashMap::new());
     x.unwrap();
 }
 
