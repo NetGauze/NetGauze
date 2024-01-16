@@ -1,7 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use netgauze_bgp_pkt::BgpMessage;
-use netgauze_parse_utils::{ReadablePduWithThreeInputs, Span};
-use std::collections::HashMap;
+use netgauze_bgp_pkt::{wire::deserializer::BgpParsingContext, BgpMessage};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
 const OPEN_COMPLEX_NO_PARAMS: [u8; 29] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -41,11 +40,11 @@ const OPEN_COMPLEX_RAW: [u8; 123] = [
 ];
 
 pub fn test_open_message_no_params(span: Span<'_>) {
-    let x = BgpMessage::from_wire(span, true, &HashMap::new(), &HashMap::new());
+    let x = BgpMessage::from_wire(span, &mut BgpParsingContext::default());
     x.unwrap();
 }
 pub fn test_complex_open_message(span: Span<'_>) {
-    let x = BgpMessage::from_wire(span, true, &HashMap::new(), &HashMap::new());
+    let x = BgpMessage::from_wire(span, &mut BgpParsingContext::default());
     x.unwrap();
 }
 
