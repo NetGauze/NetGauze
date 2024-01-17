@@ -25,7 +25,8 @@ use netgauze_bmp_pkt::{BmpMessage, PeerKey};
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
-// We don't pass BgpParsingContext as fuzzed input since we don't want to generate BgpParsingContext::parsing_errors.
+// We don't pass BgpParsingContext as fuzzed input since we don't want to
+// generate BgpParsingContext::parsing_errors.
 fuzz_target!(|data: (
     &[u8],
     HashMap<
