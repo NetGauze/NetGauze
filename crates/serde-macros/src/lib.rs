@@ -242,7 +242,7 @@ impl LocatedError {
         let from_located = LocatedError::get_from_located(en)?;
 
         let mut output = quote! {
-            #[derive(Eq, PartialEq, Clone, Debug)]
+            #[derive(PartialEq, Clone, Debug)]
             #[automatically_derived]
             pub struct #located_struct_name<'a> {
                 span: netgauze_parse_utils::Span<'a>,
@@ -332,19 +332,19 @@ impl LocatedError {
 /// ```no_compile
 /// use netgauze_serde_macros::LocatedError;
 ///
-/// #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+/// #[derive(LocatedError, PartialEq, Clone, Debug)]
 /// pub enum ExtendedCommunityParsingError {
 ///     NomError(#[from_nom] nom::error::ErrorKind),
 ///     CommunityError(#[from_located(module = "self")] CommunityParsingError),
 ///     UndefinedCapabilityCode(#[from_external] UndefinedBgpCapabilityCode),
 /// }
 ///
-/// #[derive(LocatedError, Eq, PartialEq, Clone, Debug)]
+/// #[derive(LocatedError, PartialEq, Clone, Debug)]
 /// pub enum CommunityParsingError {
 ///     NomError(#[from_nom] nom::error::ErrorKind),
 /// }
 ///
-/// #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+/// #[derive(Copy, Clone, PartialEq, Debug)]
 /// pub struct UndefinedBgpCapabilityCode(pub u8);
 /// ```
 #[proc_macro_derive(LocatedError, attributes(from_nom, from_external, from_located))]
@@ -416,13 +416,13 @@ impl WritingError {
 /// ```no_compile
 /// use netgauze_serde_macros::WritingError;
 ///
-/// #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+/// #[derive(WritingError, PartialEq, Clone, Debug)]
 /// pub enum BgpOpenMessageWritingError {
 ///     // std::io::Error will be converted to this value
 ///     StdIOError(#[from_std_io_error] String),
 /// }
 ///
-/// #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+/// #[derive(WritingError, PartialEq, Clone, Debug)]
 /// pub enum BgpMessageWritingError {
 ///     // std::io::Error will be converted to this value
 ///     StdIOError(#[from_std_io_error] String),

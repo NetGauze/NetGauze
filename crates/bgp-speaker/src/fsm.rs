@@ -27,7 +27,7 @@ pub enum FsmState {
     Established,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum FsmStateError<A> {
     BgpMessageWritingError(BgpMessageWritingError),
     InvalidConnectionStateTransition(BgpEvent<A>, FsmState, ConnectionState, ConnectionState),

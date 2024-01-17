@@ -70,7 +70,7 @@ pub const BGP_MIN_MESSAGE_LENGTH: u16 = 19;
 /// [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654)
 pub const BGP_MAX_MESSAGE_LENGTH: u16 = 4096;
 
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct BgpParsingIgnoredErrors {
     non_unicast_withdraw_nlri: Vec<Ipv4Net>,
     non_unicast_update_nlri: Vec<Ipv4Net>,
@@ -206,7 +206,7 @@ impl Default for BgpParsingContext {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4PrefixParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -257,7 +257,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4PrefixParsingErro
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6PrefixParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -306,7 +306,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6PrefixParsingErro
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum IpAddrParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -338,7 +338,7 @@ impl<'a> ReadablePdu<'a, LocatedIpAddrParsingError<'a>> for IpAddr {
 }
 
 /// BGP Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.

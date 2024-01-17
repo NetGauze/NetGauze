@@ -34,7 +34,7 @@ use tokio_util::codec::{Decoder, Encoder};
 /// Min length for a valid BMP Message: 1-octet version + 4-octet length
 pub(crate) const BMP_MESSAGE_MIN_LENGTH: usize = 5;
 
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum BmpCodecDecoderError {
     IoError(String),
     Incomplete(Option<usize>),

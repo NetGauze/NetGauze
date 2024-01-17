@@ -51,7 +51,7 @@ pub trait PathAttributeValueProperties {
     fn can_be_partial() -> Option<bool>;
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum InvalidPathAttribute {
     InvalidOptionalFlagValue(bool),

@@ -46,7 +46,7 @@ pub(crate) const L2_EVPN_IPV4_PREFIX_ROUTE_LEN: usize = 34;
 /// [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136)
 pub(crate) const L2_EVPN_IPV6_PREFIX_ROUTE_LEN: usize = 58;
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MplsLabelParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -61,7 +61,7 @@ impl<'a> ReadablePdu<'a, LocatedMplsLabelParsingError<'a>> for MplsLabel {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteDistinguisherParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -110,7 +110,7 @@ impl<'a> ReadablePdu<'a, LocatedRouteDistinguisherParsingError<'a>> for RouteDis
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum LabeledIpv4NextHopParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -128,7 +128,7 @@ impl<'a> ReadablePdu<'a, LocatedLabeledIpv4NextHopParsingError<'a>> for LabeledI
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum LabeledIpv6NextHopParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -146,7 +146,7 @@ impl<'a> ReadablePdu<'a, LocatedLabeledIpv6NextHopParsingError<'a>> for LabeledI
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum LabeledNextHopParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -174,7 +174,7 @@ impl<'a> ReadablePdu<'a, LocatedLabeledNextHopParsingError<'a>> for LabeledNextH
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4MplsVpnUnicastAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -230,7 +230,7 @@ impl<'a>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6MplsVpnUnicastAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -286,7 +286,7 @@ impl<'a>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6UnicastParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -321,7 +321,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6UnicastParsingErr
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6UnicastAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -346,7 +346,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6UnicastAddressParsingError
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6MulticastParsingError {
     Ipv6PrefixError(
         #[from_external]
@@ -363,7 +363,7 @@ impl<'a> ReadablePdu<'a, LocatedIpv6MulticastParsingError<'a>> for Ipv6Multicast
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6MulticastAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -388,7 +388,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv6MulticastAddressParsingErr
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4UnicastParsingError {
     Ipv4PrefixError(
         #[from_external]
@@ -421,7 +421,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4UnicastParsingErr
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4UnicastAddressParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -448,7 +448,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4UnicastAddressParsingError
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4MulticastParsingError {
     Ipv4PrefixError(
         #[from_external]
@@ -465,7 +465,7 @@ impl<'a> ReadablePdu<'a, LocatedIpv4MulticastParsingError<'a>> for Ipv4Multicast
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4MulticastAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -490,7 +490,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedIpv4MulticastAddressParsingErr
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MacAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -507,7 +507,7 @@ impl<'a> ReadablePdu<'a, LocatedMacAddressParsingError<'a>> for MacAddress {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum EthernetSegmentIdentifierParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -538,7 +538,7 @@ impl<'a> ReadablePdu<'a, LocatedEthernetSegmentIdentifierParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum EthernetTagParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -551,7 +551,7 @@ impl<'a> ReadablePdu<'a, LocatedEthernetTagParsingError<'a>> for EthernetTag {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum EthernetAutoDiscoveryParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -578,7 +578,7 @@ impl<'a> ReadablePdu<'a, LocatedEthernetAutoDiscoveryParsingError<'a>> for Ether
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MacIpAdvertisementParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -643,7 +643,7 @@ impl<'a> ReadablePdu<'a, LocatedMacIpAdvertisementParsingError<'a>> for MacIpAdv
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum InclusiveMulticastEthernetTagRouteParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -684,7 +684,7 @@ impl<'a> ReadablePdu<'a, LocatedInclusiveMulticastEthernetTagRouteParsingError<'
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum EthernetSegmentRouteParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -725,7 +725,7 @@ impl<'a> ReadablePdu<'a, LocatedEthernetSegmentRouteParsingError<'a>> for Ethern
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum L2EvpnRouteParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -781,7 +781,7 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnRouteParsingError<'a>> for L2EvpnRoute {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum L2EvpnAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -804,7 +804,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedL2EvpnAddressParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum L2EvpnIpv4PrefixRouteParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -850,7 +850,7 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv4PrefixRouteParsingError<'a>> for L2Evp
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum L2EvpnIpv6PrefixRouteParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -896,7 +896,7 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv6PrefixRouteParsingError<'a>> for L2Evp
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum L2EvpnIpPrefixRouteParsingError {
     InvalidBufferLength(usize),
     L2EvpnIpv4PrefixRouteError(#[from_located(module = "self")] L2EvpnIpv4PrefixRouteParsingError),
@@ -926,7 +926,7 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnIpPrefixRouteParsingError<'a>> for L2EvpnI
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteTargetMembershipAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -968,7 +968,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedRouteTargetMembershipAddressPa
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteTargetMembershipParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -987,7 +987,7 @@ impl<'a> ReadablePduWithOneInput<'a, u8, LocatedRouteTargetMembershipParsingErro
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4NlriMplsLabelsAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -1032,7 +1032,7 @@ impl<'a>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6NlriMplsLabelsAddressParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

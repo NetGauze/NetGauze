@@ -36,7 +36,7 @@ use nom::{error::ErrorKind, number::complete::be_u8, IResult};
 use serde::{Deserialize, Serialize};
 
 /// BGP Notification Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpNotificationMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -91,7 +91,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpNotificationMessageParsingError<'a>> for BgpN
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MessageHeaderErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -137,7 +137,7 @@ impl<'a> ReadablePdu<'a, LocatedMessageHeaderErrorParsingError<'a>> for MessageH
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum OpenMessageErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -207,7 +207,7 @@ impl<'a> ReadablePdu<'a, LocatedOpenMessageErrorParsingError<'a>> for OpenMessag
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum UpdateMessageErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -295,7 +295,7 @@ impl<'a> ReadablePdu<'a, LocatedUpdateMessageErrorParsingError<'a>> for UpdateMe
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum HoldTimerExpiredErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -319,7 +319,7 @@ impl<'a> ReadablePdu<'a, LocatedHoldTimerExpiredErrorParsingError<'a>> for HoldT
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FiniteStateMachineErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -367,7 +367,7 @@ impl<'a> ReadablePdu<'a, LocatedFiniteStateMachineErrorParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum CeaseErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -446,7 +446,7 @@ impl<'a> ReadablePdu<'a, LocatedCeaseErrorParsingError<'a>> for CeaseError {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteRefreshErrorParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.

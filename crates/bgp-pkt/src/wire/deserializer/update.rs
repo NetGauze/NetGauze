@@ -45,7 +45,7 @@ use netgauze_parse_utils::ErrorKindSerdeDeref;
 use netgauze_serde_macros::LocatedError;
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpUpdateMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.

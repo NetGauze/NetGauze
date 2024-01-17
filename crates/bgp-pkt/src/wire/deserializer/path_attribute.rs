@@ -68,7 +68,7 @@ const fn check_length(attr_len: PathAttributeLength, expected: u16) -> bool {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum PathAttributeParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -246,7 +246,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttribut
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum OriginParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -280,7 +280,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOriginParsingError<'a>> for Or
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum AsPathParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -364,7 +364,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAsPathParsingError<'a>> for As
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum NextHopParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -399,7 +399,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedNextHopParsingError<'a>> for N
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MultiExitDiscriminatorParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -437,7 +437,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMultiExitDiscriminatorParsingE
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum LocalPreferenceParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -473,7 +473,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum AtomicAggregateParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -507,7 +507,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum AggregatorParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -586,7 +586,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAggregatorParsingError<'a>> fo
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MpReachParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -888,7 +888,7 @@ fn parse_labeled_next_hop(
     Ok((mp_buf, next_hop))
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MpUnreachParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -1069,7 +1069,7 @@ impl<'a>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum UnknownAttributeParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -1099,7 +1099,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum CommunitiesParsingError {
     /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
@@ -1125,7 +1125,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedCommunitiesParsingError<'a>> f
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExtendedCommunitiesParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -1152,7 +1152,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedExtendedCommunitiesParsingErro
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExtendedCommunitiesIpv6ParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -1179,7 +1179,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedExtendedCommunitiesIpv6Parsing
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum LargeCommunitiesParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -1205,7 +1205,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedLargeCommunitiesParsingError<'
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum OriginatorParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -1226,7 +1226,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOriginatorParsingError<'a>> fo
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ClusterIdParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -1239,7 +1239,7 @@ impl<'a> ReadablePdu<'a, LocatedClusterIdParsingError<'a>> for ClusterId {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ClusterListParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -1261,7 +1261,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedClusterListParsingError<'a>> f
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum AigpParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -1298,7 +1298,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAigpParsingError<'a>> for Aigp
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum OnlyToCustomerParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

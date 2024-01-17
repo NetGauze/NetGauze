@@ -55,7 +55,7 @@ impl<Peer> BgpCodecInitializer<Peer> for BgpCodec {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BgpCodecDecoderError {
     IoError(String),
     Incomplete(Option<usize>),
