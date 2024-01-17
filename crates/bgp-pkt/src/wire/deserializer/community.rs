@@ -29,7 +29,7 @@ use netgauze_serde_macros::LocatedError;
 
 use crate::{community::*, iana::*, wire::deserializer::nlri::MacAddressParsingError};
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum CommunityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -44,7 +44,7 @@ impl<'a> ReadablePdu<'a, LocatedCommunityParsingError<'a>> for Community {
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -213,7 +213,7 @@ impl<'a> ReadablePdu<'a, LocatedExtendedCommunityParsingError<'a>> for ExtendedC
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum LargeCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -231,7 +231,7 @@ impl<'a> ReadablePdu<'a, LocatedLargeCommunityParsingError<'a>> for LargeCommuni
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum TransitiveTwoOctetExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -317,7 +317,7 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveTwoOctetExtendedCommunityParsingError<
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExtendedCommunityIpv6ParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -356,7 +356,7 @@ impl<'a> ReadablePdu<'a, LocatedExtendedCommunityIpv6ParsingError<'a>> for Exten
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum NonTransitiveTwoOctetExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -395,7 +395,7 @@ impl<'a> ReadablePdu<'a, LocatedNonTransitiveTwoOctetExtendedCommunityParsingErr
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum TransitiveIpv4ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -512,7 +512,7 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveIpv4ExtendedCommunityParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum NonTransitiveIpv4ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -537,7 +537,7 @@ impl<'a> ReadablePdu<'a, LocatedNonTransitiveIpv4ExtendedCommunityParsingError<'
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum TransitiveFourOctetExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -611,7 +611,7 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveFourOctetExtendedCommunityParsingError
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum NonTransitiveFourOctetExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -636,7 +636,7 @@ impl<'a> ReadablePdu<'a, LocatedNonTransitiveFourOctetExtendedCommunityParsingEr
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum TransitiveOpaqueExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -671,7 +671,7 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveOpaqueExtendedCommunityParsingError<'a
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum NonTransitiveOpaqueExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -703,7 +703,7 @@ impl<'a> ReadablePdu<'a, LocatedNonTransitiveOpaqueExtendedCommunityParsingError
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum EvpnExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -774,7 +774,7 @@ impl<'a> ReadablePdu<'a, LocatedEvpnExtendedCommunityParsingError<'a>> for EvpnE
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExperimentalExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -805,7 +805,7 @@ impl<'a> ReadablePduWithOneInput<'a, u8, LocatedExperimentalExtendedCommunityPar
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum UnknownExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -833,7 +833,7 @@ impl<'a> ReadablePduWithOneInput<'a, u8, LocatedUnknownExtendedCommunityParsingE
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum TransitiveIpv6ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -914,7 +914,7 @@ impl<'a> ReadablePdu<'a, LocatedTransitiveIpv6ExtendedCommunityParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum NonTransitiveIpv6ExtendedCommunityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -939,7 +939,7 @@ impl<'a> ReadablePdu<'a, LocatedNonTransitiveIpv6ExtendedCommunityParsingError<'
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum UnknownExtendedCommunityIpv6ParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

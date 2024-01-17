@@ -132,7 +132,7 @@ where
 pub fn test_parse_error<'a, T, E>(input: &'a [u8], expected_err: &E)
 where
     T: ReadablePdu<'a, E> + Debug,
-    E: Debug + Eq,
+    E: Debug + PartialEq,
 {
     let parsed: IResult<BinarySpan<&[u8]>, T, E> =
         <T as ReadablePdu<E>>::from_wire(Span::new(input));
@@ -157,7 +157,7 @@ pub fn test_parse_error_with_one_input<'a, T, I, E>(
     expected_err: &'a E,
 ) where
     T: ReadablePduWithOneInput<'a, I, E> + Debug,
-    E: Debug + Eq,
+    E: Debug + PartialEq,
 {
     let parsed: IResult<BinarySpan<&[u8]>, T, E> =
         <T as ReadablePduWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
@@ -183,7 +183,7 @@ pub fn test_parse_error_with_two_inputs<'a, T, I, K, E>(
     expected_err: nom::Err<E>,
 ) where
     T: ReadablePduWithTwoInputs<'a, I, K, E> + Debug,
-    E: Debug + Eq,
+    E: Debug + PartialEq,
 {
     let parsed: IResult<BinarySpan<&[u8]>, T, E> =
         <T as ReadablePduWithTwoInputs<I, K, E>>::from_wire(
@@ -208,7 +208,7 @@ pub fn test_parse_error_with_three_inputs<'a, T, I1, I2, I3, E>(
     expected_err: nom::Err<E>,
 ) where
     T: ReadablePduWithThreeInputs<'a, I1, I2, I3, E> + Debug,
-    E: Debug + Eq,
+    E: Debug + PartialEq,
 {
     let parsed: IResult<BinarySpan<&[u8]>, T, E> =
         <T as ReadablePduWithThreeInputs<I1, I2, I3, E>>::from_wire(

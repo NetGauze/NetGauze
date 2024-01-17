@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpOpenMessageParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -49,7 +49,7 @@ pub enum BgpOpenMessageParsingError {
 }
 
 /// BGP Open Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpParameterParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.

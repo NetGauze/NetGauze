@@ -36,7 +36,7 @@ use crate::iana::{BgpRoleValue, UndefinedBgpRoleValue};
 use netgauze_serde_macros::LocatedError;
 
 /// BGP Capability Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -252,7 +252,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpCapabilityParsingError<'a>> for BgpCapability
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FourOctetAsCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -273,7 +273,7 @@ impl<'a> ReadablePdu<'a, LocatedFourOctetAsCapabilityParsingError<'a>> for FourO
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MultiProtocolExtensionsCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -314,7 +314,7 @@ impl<'a> ReadablePdu<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum GracefulRestartCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -378,7 +378,7 @@ impl<'a> ReadablePdu<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum AddPathCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -432,7 +432,7 @@ impl<'a> ReadablePdu<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathAd
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum ExtendedNextHopEncodingCapabilityParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -492,7 +492,7 @@ impl<'a> ReadablePdu<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MultipleLabelParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -520,7 +520,7 @@ impl<'a> ReadablePdu<'a, LocatedMultipleLabelParsingError<'a>> for MultipleLabel
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpRoleCapabilityParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

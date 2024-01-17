@@ -37,7 +37,7 @@ use crate::notification::RouteRefreshError;
 use netgauze_parse_utils::ErrorKindSerdeDeref;
 
 /// BGP Route Refresh Message Parsing errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpRouteRefreshMessageParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

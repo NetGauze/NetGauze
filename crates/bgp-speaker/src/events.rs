@@ -99,7 +99,7 @@ impl Ord for UpdateTreatment {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, strum_macros::Display)]
+#[derive(Debug, PartialEq, strum_macros::Display)]
 pub enum BgpEvent<A> {
     /// **Event 1:** Local system administrator manually starts the peer
     /// connection.
@@ -318,7 +318,7 @@ pub enum BgpEvent<A> {
 /// Subset of BGP Events defined [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271) that
 /// are related to the events occurring after connection is successfully made in
 /// [crate::fsm::FsmState::Connect] or [crate::fsm::FsmState::Active] states.
-#[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
+#[derive(Debug, Clone, PartialEq, strum_macros::Display)]
 pub enum ConnectionEvent<A> {
     /// ***Event 10***: HoldTimer_Expires an event generated when the HoldTimer
     /// expires.
