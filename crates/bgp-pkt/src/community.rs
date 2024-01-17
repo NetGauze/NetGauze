@@ -942,10 +942,11 @@ pub enum EvpnExtendedCommunity {
         ///         this flag indicates that the advertising PE is the
         ///         backup PE.
         ///
-        /// C        If set to 1, a control word [RFC4448] MUST be present
-        ///          when sending EVPN packets to this PE.  It is
-        ///         recommended that the control word be included in the
-        ///         absence of an entropy label [RFC6790].
+        /// C       If set to 1, a control word [RFC4448](https://datatracker.ietf.org/doc/rfc4448)
+        ///         MUST be present when sending EVPN packets to this PE.
+        ///         It is recommended that the control word be included in the
+        ///         absence of an entropy label
+        ///         [RFC6790](https://datatracker.ietf.org/doc/rfc6790).
         control_flags: u16,
 
         /// L2 MTU is a 2-octet value indicating the MTU in bytes.

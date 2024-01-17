@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{InformationElement, SimpleRegistry, Xref};
+use regex::{Captures, Regex, Replacer};
 use roxmltree::{ExpandedName, Node};
 
 const IANA_NAMESPACE: &str = "http://www.iana.org/assignments";
@@ -24,6 +25,26 @@ const ID_UNITS: &str = "ipfix-information-element-units";
 const UNASSIGNED: &str = "Unassigned";
 const RESERVED: &str = "Reserved";
 const ASSIGNED_FOR_NF_V9: &str = "Assigned for NetFlow v9 compatibility";
+
+struct RfcLinkSwapper;
+impl Replacer for RfcLinkSwapper {
+    fn replace_append(&mut self, caps: &Captures<'_>, dst: &mut String) {
+        dst.push_str("[RFC");
+        dst.push_str(&caps["RFCNUM"]);
+        dst.push_str("](https://datatracker.ietf.org/doc/rfc");
+        dst.push_str(&caps["RFCNUM"]);
+        dst.push(')');
+    }
+}
+
+struct HttpLinkSwapper;
+impl Replacer for HttpLinkSwapper {
+    fn replace_append(&mut self, caps: &Captures<'_>, dst: &mut String) {
+        dst.push('<');
+        dst.push_str(&caps["href"]);
+        dst.push('>');
+    }
+}
 
 /// Find descendant node by it's ID
 /// If multiple nodes with the same ID exists, the first one is returned
@@ -125,7 +146,11 @@ pub fn parse_description_string(node: &Node<'_, '_>) -> Option<String> {
                 }
             }
         }
-        Some(desc_text)
+        let re = Regex::new(r"\[RFC(?<RFCNUM>\d+)]").unwrap();
+        let desc_text = re.replace(&desc_text, RfcLinkSwapper).to_string();
+        let re = Regex::new(r"(?<href>https?://(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*))").unwrap();
+        let desc_text = re.replace(&desc_text, HttpLinkSwapper);
+        Some(desc_text.to_string())
     } else {
         None
     }

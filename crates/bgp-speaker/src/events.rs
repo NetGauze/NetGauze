@@ -51,18 +51,20 @@ pub enum UpdateTreatment {
     /// been withdrawn just as if they had been listed in the WITHDRAWN ROUTES
     /// field (or in the MP_UNREACH_NLRI attribute if appropriate) of the UPDATE
     /// message, thus causing them to be removed from the Adj-RIB-In according
-    /// to the procedures of [RFC4271].
+    /// to the procedures of
+    /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271).
     TreatAsWithdraw,
 
-    /// RFC7606: Section 7 of [RFC4760] allows a BGP speaker that detects an
-    /// error in a message for a given AFI/SAFI to optionally "ignore all the
-    /// subsequent routes with that AFI/SAFI received over that session". We
-    /// refer to this as "disabling a particular AFI/SAFI" or "AFI/SAFI
-    /// disable".
+    /// RFC7606: Section 7 of [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
+    /// allows a BGP speaker that detects an error in a message for a given
+    /// AFI/SAFI to optionally "ignore all the subsequent routes with that
+    /// AFI/SAFI received over that session". We refer to this as "disabling a
+    /// particular AFI/SAFI" or "AFI/SAFI disable".
     ResetAddressFamily(u16, u8),
 
     /// RFC7606: This is the approach used throughout the base BGP specification
-    /// [RFC4271], where a NOTIFICATION is sent and the session terminated.
+    /// [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271),
+    /// where a NOTIFICATION is sent and the session terminated.
     SessionReset,
 }
 
@@ -108,7 +110,7 @@ pub enum BgpEvent<A> {
     ///
     /// **Optional Attribute Status:**
     ///    * The
-    ///      [`PassiveTcpEstablishment`](crate::peer::config::BgpPeerConfig::passive_tcp_establishment)
+    ///      [`PassiveTcpEstablishment`](crate::peer::PeerConfig::passive_tcp_establishment)
     ///      attribute *SHOULD* be set to _FALSE_.
     ManualStart,
 
@@ -126,15 +128,17 @@ pub enum BgpEvent<A> {
     /// **Status:** Optional, depending on local system
     ///
     /// **Optional Attribute Status:**
-    ///    * The [`AllowAutomaticStart`](crate::peer::config::BgpPeerConfig::allow_auto_start)
+    ///    * The [`AllowAutomaticStart`](crate::peer::PeerConfig::allow_auto_start)
     ///      attribute *SHOULD* be set to _TRUE_ is this event occurs.
-    ///    * The [`DampPeerOscillations`](crate::peer::config::BgpPeerConfig::damp_peer_oscillation)
+    ///    * The [`PassiveTcpEstablishment`](crate::peer::PeerConfig::passive_tcp_establishment)
     ///      attribute *SHOULD* be set to _FALSE_ is this event occurs.
+    ///    * The `DampPeerOscillations` is supported, it SHOULD be set to FALSE
+    ///      when this event occurs.
     AutomaticStart,
 
     /// **Event 4:** Local system administrator manually starts the peer
     /// connection, but has
-    /// [`PassiveTcpEstablishment`](crate::peer::config::BgpPeerConfig::passive_tcp_establishment)
+    /// [`PassiveTcpEstablishment`](crate::peer::PeerConfig::passive_tcp_establishment)
     /// enabled. The _PassiveTcpEstablishment_ optional attribute indicates
     /// that the peer will listen prior to establishing the connection.
     ///
@@ -142,11 +146,10 @@ pub enum BgpEvent<A> {
     ///
     /// **Optional Attribute Status:**
     ///    * The
-    ///      [`PassiveTcpEstablishment`](crate::peer::config::BgpPeerConfig::passive_tcp_establishment)
+    ///      [`PassiveTcpEstablishment`](crate::peer::PeerConfig::passive_tcp_establishment)
     ///      attribute *SHOULD* be set to _TRUE_ is this event occurs.
-    ///    * The
-    ///      [`DampPeerOscillations`](crate::peer::config::BgpPeerConfig::damp_peer_oscillation)
-    ///      attribute *SHOULD* be set to _FALSE_ is this event occurs.
+    ///    * The `DampPeerOscillations` attribute *SHOULD* be set to _FALSE_ is
+    ///      this event occurs.
     ManualStartWithPassiveTcp,
 
     /// Event 5: AutomaticStart_with_PassiveTcpEstablishment
@@ -177,7 +180,7 @@ pub enum BgpEvent<A> {
     KeepAliveTimerExpires,
 
     /// ***Event 12:*** DelayOpenTimer_Expires triggered when
-    /// [Connection::open_delay_timer] expires.
+    /// [crate::connection::Connection::open_delay_timer] expires.
     ///
     /// **Status:** Optional
     ///
@@ -333,7 +336,7 @@ pub enum ConnectionEvent<A> {
     KeepAliveTimerExpires,
 
     /// ***Event 12:*** DelayOpenTimer_Expires triggered when
-    /// [Connection::open_delay_timer] expires.
+    /// [crate::connection::Connection::open_delay_timer] expires.
     ///
     /// **Status:** Optional
     ///
