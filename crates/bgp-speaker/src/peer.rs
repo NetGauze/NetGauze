@@ -914,6 +914,9 @@ impl<
                         ));
                     }
                 }
+                ConnectionEvent::NotifMsgErr(_) => {
+                    // Ignore notif message parsing errors
+                }
                 _ => {
                     return Err(FsmStateError::InvalidConnectionStateTransition(
                         event.clone().into(),
@@ -1026,12 +1029,19 @@ impl<
                 ));
             }
             (ConnectionState::OpenSent, ConnectionState::OpenSent, event) => {
-                return Err(FsmStateError::InvalidConnectionStateTransition(
-                    event.clone().into(),
-                    self.fsm_state,
-                    conn_state_before,
-                    conn_state_after,
-                ));
+                match event {
+                    ConnectionEvent::NotifMsgErr(_) => {
+                        // Ignore notif message parsing errors
+                    }
+                    _ => {
+                        return Err(FsmStateError::InvalidConnectionStateTransition(
+                            event.clone().into(),
+                            self.fsm_state,
+                            conn_state_before,
+                            conn_state_after,
+                        ));
+                    }
+                }
             }
             (ConnectionState::OpenSent, ConnectionState::OpenConfirm, event) => match event {
                 ConnectionEvent::BGPOpen(_) => {
@@ -1118,8 +1128,9 @@ impl<
             }
             (ConnectionState::OpenConfirm, ConnectionState::OpenConfirm, event) => {
                 match event {
-                    ConnectionEvent::KeepAliveTimerExpires => {
+                    ConnectionEvent::KeepAliveTimerExpires | ConnectionEvent::NotifMsgErr(_) => {
                         // stay in the same FSM state
+                        // Ignore notif message parsing errors
                     }
                     _ => {
                         return Err(FsmStateError::InvalidConnectionStateTransition(
@@ -1205,7 +1216,8 @@ impl<
                     ConnectionEvent::KeepAliveTimerExpires
                     | ConnectionEvent::KeepAliveMsg
                     | ConnectionEvent::UpdateMsg(_, _)
-                    | ConnectionEvent::RouteRefresh(_) => {
+                    | ConnectionEvent::RouteRefresh(_)
+                    | ConnectionEvent::NotifMsgErr(_) => {
                         // stay in the same FSM state
                     }
                     ConnectionEvent::NotifMsg(_) | ConnectionEvent::NotifMsgVerErr => {
