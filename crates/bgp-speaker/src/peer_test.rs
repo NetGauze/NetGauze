@@ -31,6 +31,7 @@ const HOLD_TIME: u16 = 180;
 const MY_BGP_ID: Ipv4Addr = Ipv4Addr::new(192, 168, 0, 1);
 
 const PEER_BGP_ID: Ipv4Addr = Ipv4Addr::new(192, 168, 0, 2);
+const PEER_KEY: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 0, 2));
 const PEER_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 0, 2)), 179);
 
 const PROPERTIES: PeerProperties<SocketAddr> = PeerProperties::new(
@@ -54,7 +55,7 @@ async fn test_idle_manual_start() {
         connect_delay: Duration::from_secs(0),
     };
     let config = PeerConfigBuilder::new().build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -86,7 +87,7 @@ async fn test_idle_manual_start_with_passive_tcp() {
     let config = PeerConfigBuilder::new()
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -110,7 +111,7 @@ async fn test_idle_automatic_start() {
         connect_delay: Duration::from_secs(0),
     };
     let config = PeerConfigBuilder::new().build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::AutomaticStart);
@@ -143,7 +144,7 @@ async fn test_idle_automatic_start_with_passive() {
     let config = PeerConfigBuilder::new()
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
 
     assert_eq!(peer.fsm_state(), FsmState::Idle);
     peer.add_admin_event(PeerAdminEvents::AutomaticStart);
@@ -169,7 +170,7 @@ async fn test_connect_manual_start() {
     let config = PeerConfigBuilder::new()
         .open_delay_timer_duration(1)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -197,7 +198,7 @@ async fn test_connect_automatic_start() {
     let config = PeerConfigBuilder::new()
         .open_delay_timer_duration(1)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::AutomaticStart);
@@ -229,7 +230,7 @@ async fn test_connect_manual_stop() {
         .open_delay_timer_duration(1)
         .build();
 
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     // Check start is correct
@@ -281,7 +282,7 @@ async fn test_connect_retry_timer_expires() {
         .open_delay_timer_duration(3)
         .build();
 
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     // Check start is correct
@@ -325,7 +326,7 @@ async fn test_connect_delay_open_timer_expires() {
     let config = PeerConfigBuilder::new()
         .open_delay_timer_duration(delay_open_duration)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await.unwrap();
     assert_eq!(event, BgpEvent::ManualStart);
@@ -375,7 +376,7 @@ async fn test_connect_tcp_connection_confirmed() {
         .open_delay_timer_duration(0)
         .build();
 
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     // Check start is correct
@@ -425,7 +426,7 @@ async fn test_connect_tcp_connection_confirmed_with_open_delay() {
         .open_delay_timer_duration(1)
         .build();
 
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     // Check start is correct
@@ -467,7 +468,7 @@ async fn test_connect_tcp_connection_fails() {
         .open_delay_timer_duration(0)
         .build();
 
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     // Check start is correct
@@ -525,7 +526,7 @@ async fn test_connect_bgp_open_with_delay() {
     let config = PeerConfigBuilder::new()
         .open_delay_timer_duration(delay_open_duration)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await.unwrap();
     assert_eq!(event, BgpEvent::ManualStart);
@@ -572,6 +573,7 @@ async fn test_connect_tcp_cr_acked() {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -613,7 +615,7 @@ async fn test_connect_bgp_header_err() {
     let config = PeerConfigBuilder::new()
         .open_delay_timer_duration(1)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await.unwrap();
     assert_eq!(event, BgpEvent::ManualStart);
@@ -661,7 +663,7 @@ async fn test_connect_bgp_open_err_unsupported_version() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await.unwrap();
     assert_eq!(event, BgpEvent::ManualStart);
@@ -713,7 +715,7 @@ async fn test_connect_bgp_open_err_unacceptable_hold_time() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await.unwrap();
     assert_eq!(event, BgpEvent::ManualStart);
@@ -762,7 +764,7 @@ async fn test_connect_notif_version_err_with_open_delay() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await.unwrap();
     assert_eq!(event, BgpEvent::ManualStart);
@@ -796,7 +798,7 @@ async fn test_connect_automatic_stop() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await;
     assert_eq!(event, Ok(BgpEvent::ManualStart));
@@ -840,7 +842,7 @@ async fn test_connect_notif_msg() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await;
     assert_eq!(event, Ok(BgpEvent::ManualStart));
@@ -873,7 +875,7 @@ async fn test_connect_keepalive_msg() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await;
     assert_eq!(event, Ok(BgpEvent::ManualStart));
@@ -907,7 +909,7 @@ async fn test_connect_update_msg() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await;
     assert_eq!(event, Ok(BgpEvent::ManualStart));
@@ -947,7 +949,7 @@ async fn test_connect_update_err_msg() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await;
     assert_eq!(event, Ok(BgpEvent::ManualStart));
@@ -989,7 +991,7 @@ async fn test_connect_route_refresh_msg() {
         .open_delay_timer_duration(1)
         .send_notif_without_open(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await;
     assert_eq!(event, Ok(BgpEvent::ManualStart));
@@ -1020,7 +1022,7 @@ async fn test_active_manual_start() {
         .open_delay_timer_duration(1)
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1052,7 +1054,7 @@ async fn test_active_automatic_start() {
         .open_delay_timer_duration(1)
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1086,7 +1088,7 @@ async fn test_active_connect_retry_timer_expires() {
         .connect_retry_duration(1)
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1132,7 +1134,7 @@ async fn test_active_delay_open_timer_expires() {
         .open_delay_timer_duration(open_delay)
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1190,7 +1192,7 @@ async fn test_active_tcp_connection_confirmed() {
         .connect_retry_duration(1)
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1234,7 +1236,7 @@ async fn test_active_tcp_connection_confirmed_with_open_delay() {
         .connect_retry_duration(1)
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1276,7 +1278,7 @@ async fn test_active_tcp_connection_fails() -> Result<(), FsmStateError<SocketAd
         .connect_retry_duration(1)
         .passive_tcp_establishment(true)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1343,7 +1345,7 @@ async fn test_active_bgp_open_with_open_delay() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1415,7 +1417,7 @@ async fn test_active_bgp_header_err() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1477,7 +1479,7 @@ async fn test_active_bgp_open_err() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1540,7 +1542,7 @@ async fn test_active_notif_version_err_with_open_delay() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1587,7 +1589,7 @@ async fn test_active_automatic_stop() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1636,7 +1638,7 @@ async fn test_active_notif_msg() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1683,7 +1685,7 @@ async fn test_active_keepalive_msg() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1730,7 +1732,7 @@ async fn test_active_update_msg() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1782,7 +1784,7 @@ async fn test_active_update_err_msg() -> Result<(), FsmStateError<SocketAddr>> {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1837,7 +1839,7 @@ async fn test_active_route_refresh_msg() {
         .passive_tcp_establishment(true)
         .hold_timer_duration(0)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     assert_eq!(peer.fsm_state(), FsmState::Idle);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
@@ -1885,6 +1887,7 @@ async fn test_open_sent_manual_stop() {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -1932,6 +1935,7 @@ async fn test_open_sent_automatic_stop() {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -1986,7 +1990,7 @@ async fn test_open_sent_hold_timer_expires() {
         .hold_timer_duration(hold_time)
         .hold_timer_duration_large_value(hold_time)
         .build();
-    let mut peer = Peer::new(PROPERTIES.clone(), config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, PROPERTIES.clone(), config, policy, active_connect);
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await;
     assert_eq!(event, Ok(BgpEvent::ManualStart));
@@ -2030,6 +2034,7 @@ async fn test_open_sent_tcp_connection_confirmed() -> Result<(), FsmStateError<S
     )));
 
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2092,6 +2097,7 @@ async fn test_open_sent_tcp_connections_fails() -> Result<(), FsmStateError<Sock
         connect_delay: Duration::from_secs(1),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2148,6 +2154,7 @@ async fn test_open_sent_bgp_open() -> Result<(), FsmStateError<SocketAddr>> {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2205,6 +2212,7 @@ async fn test_open_sent_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2267,6 +2275,7 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2354,7 +2363,13 @@ async fn test_open_sent_collision_dump_main_connection() -> Result<(), FsmStateE
         .write(BgpMessage::KeepAlive)
         .read(BgpMessage::KeepAlive);
 
-    let mut peer = Peer::new(properties, PeerConfig::default(), policy, active_connect);
+    let mut peer = Peer::new(
+        PEER_KEY,
+        properties,
+        PeerConfig::default(),
+        policy,
+        active_connect,
+    );
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await?;
@@ -2452,7 +2467,13 @@ async fn test_open_sent_collision_dump_tracked_connection() -> Result<(), FsmSta
         ))
         .wait(Duration::from_secs(1));
 
-    let mut peer = Peer::new(properties, PeerConfig::default(), policy, active_connect);
+    let mut peer = Peer::new(
+        PEER_KEY,
+        properties,
+        PeerConfig::default(),
+        policy,
+        active_connect,
+    );
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await?;
@@ -2512,6 +2533,7 @@ async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAd
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2566,6 +2588,7 @@ async fn test_open_sent_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2618,6 +2641,7 @@ async fn test_open_sent_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2671,6 +2695,7 @@ async fn test_open_sent_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2727,6 +2752,7 @@ async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2786,6 +2812,7 @@ async fn test_open_sent_route_refresh_msg() -> Result<(), FsmStateError<SocketAd
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2841,6 +2868,7 @@ async fn test_open_confirm_starts() -> Result<(), FsmStateError<SocketAddr>> {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2910,6 +2938,7 @@ async fn test_open_confirm_manual_stop() -> Result<(), FsmStateError<SocketAddr>
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -2974,6 +3003,7 @@ async fn test_open_confirm_automatic_stop() -> Result<(), FsmStateError<SocketAd
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3044,6 +3074,7 @@ async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<Sock
     };
 
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3114,6 +3145,7 @@ async fn test_open_confirm_keep_alive_timer_expires() -> Result<(), FsmStateErro
     };
 
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3173,6 +3205,7 @@ async fn test_open_confirm_notif_msg() -> Result<(), FsmStateError<SocketAddr>> 
     };
 
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3238,6 +3271,7 @@ async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<Socke
     };
 
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3327,7 +3361,13 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
         .write(BgpMessage::KeepAlive)
         .read(BgpMessage::KeepAlive);
 
-    let mut peer = Peer::new(properties, PeerConfig::default(), policy, active_connect);
+    let mut peer = Peer::new(
+        PEER_KEY,
+        properties,
+        PeerConfig::default(),
+        policy,
+        active_connect,
+    );
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await?;
@@ -3430,7 +3470,13 @@ async fn test_open_confirm_collision_dump_tracked_connection(
         ))
         .wait(Duration::from_secs(1));
 
-    let mut peer = Peer::new(properties, PeerConfig::default(), policy, active_connect);
+    let mut peer = Peer::new(
+        PEER_KEY,
+        properties,
+        PeerConfig::default(),
+        policy,
+        active_connect,
+    );
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await?;
@@ -3505,6 +3551,7 @@ async fn test_open_confirm_open_msg() -> Result<(), FsmStateError<SocketAddr>> {
     };
 
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3575,6 +3622,7 @@ async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr
     };
 
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3648,6 +3696,7 @@ async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAd
     };
 
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3713,6 +3762,7 @@ async fn test_open_confirm_keep_alive_msg() -> Result<(), FsmStateError<SocketAd
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3777,6 +3827,7 @@ async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>>
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3847,6 +3898,7 @@ async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>>
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3920,6 +3972,7 @@ async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<Socke
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -3980,6 +4033,7 @@ async fn test_established_starts() -> Result<(), FsmStateError<SocketAddr>> {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4054,6 +4108,7 @@ async fn test_established_manual_stop() -> Result<(), FsmStateError<SocketAddr>>
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4123,6 +4178,7 @@ async fn test_established_automatic_stop() -> Result<(), FsmStateError<SocketAdd
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4196,6 +4252,7 @@ async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<Socke
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4271,6 +4328,7 @@ async fn test_established_keep_alive_timer_expires() -> Result<(), FsmStateError
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4370,7 +4428,7 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
         .collision_detect_established_state(true)
         .build();
 
-    let mut peer = Peer::new(properties, config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, properties, config, policy, active_connect);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await?;
@@ -4485,7 +4543,7 @@ async fn test_established_collision_dump_tracked_connection(
         .collision_detect_established_state(true)
         .build();
 
-    let mut peer = Peer::new(properties, config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, properties, config, policy, active_connect);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await?;
@@ -4585,7 +4643,7 @@ async fn test_established_reject_connection_tracking_disabled(
         .collision_detect_established_state(false)
         .build();
 
-    let mut peer = Peer::new(properties, config, policy, active_connect);
+    let mut peer = Peer::new(PEER_KEY, properties, config, policy, active_connect);
 
     peer.add_admin_event(PeerAdminEvents::ManualStart);
     let event = peer.run().await?;
@@ -4652,6 +4710,7 @@ async fn test_established_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4721,6 +4780,7 @@ async fn test_established_notif_version_error() -> Result<(), FsmStateError<Sock
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4799,6 +4859,7 @@ async fn test_established_tcp_connection_fails() -> Result<(), FsmStateError<Soc
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4864,6 +4925,7 @@ async fn test_established_keep_alive_msg() -> Result<(), FsmStateError<SocketAdd
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
@@ -4925,6 +4987,7 @@ async fn test_established_update_msg() -> Result<(), FsmStateError<SocketAddr>> 
         connect_delay: Duration::from_secs(0),
     };
     let mut peer = Peer::new(
+        PEER_KEY,
         PROPERTIES.clone(),
         PeerConfig::default(),
         policy,
