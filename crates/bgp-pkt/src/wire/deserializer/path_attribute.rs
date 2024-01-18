@@ -23,7 +23,10 @@ use crate::{
     },
     nlri::LabeledNextHop,
     path_attribute::*,
-    wire::deserializer::{community::*, nlri::*, BgpParsingContext, IpAddrParsingError},
+    wire::{
+        deserializer::{community::*, nlri::*, BgpParsingContext, IpAddrParsingError},
+        ACCUMULATED_IGP_METRIC,
+    },
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, SubsequentAddressFamily, UndefinedAddressFamily,

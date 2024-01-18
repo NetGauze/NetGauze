@@ -27,9 +27,6 @@ use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
 
-/// Accumulated IGP Metric Length as defined in RFC7311
-pub(crate) const ACCUMULATED_IGP_METRIC: u16 = 11;
-
 /// General properties to check the validity of a given path attribute value
 pub trait PathAttributeValueProperties {
     /// Check the validity of the `optional` bit in the [`PathAttribute`]:

@@ -13,7 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::capabilities::*;
+use crate::{
+    capabilities::*,
+    wire::{
+        BGP_ROLE_CAPABILITY_LENGTH, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
+        EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
+        FOUR_OCTET_AS_CAPABILITY_LENGTH, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH,
+        ROUTE_REFRESH_CAPABILITY_LENGTH,
+    },
+};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;

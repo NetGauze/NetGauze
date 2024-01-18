@@ -32,7 +32,15 @@ use nom::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::iana::{BgpRoleValue, UndefinedBgpRoleValue};
+use crate::{
+    iana::{BgpRoleValue, UndefinedBgpRoleValue},
+    wire::{
+        BGP_ROLE_CAPABILITY_LENGTH, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
+        EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
+        FOUR_OCTET_AS_CAPABILITY_LENGTH, GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH,
+        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
+    },
+};
 use netgauze_serde_macros::LocatedError;
 
 /// BGP Capability Parsing errors

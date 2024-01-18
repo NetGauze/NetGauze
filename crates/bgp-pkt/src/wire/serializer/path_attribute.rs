@@ -19,7 +19,10 @@ use crate::{
     iana::{AigpAttributeType, PathAttributeType},
     nlri::*,
     path_attribute::*,
-    wire::serializer::{community::*, nlri::*, IpAddrWritingError},
+    wire::{
+        serializer::{community::*, nlri::*, IpAddrWritingError},
+        ACCUMULATED_IGP_METRIC,
+    },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
