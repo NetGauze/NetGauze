@@ -16,7 +16,7 @@
 use clap::Parser;
 use std::{
     collections::{HashMap, HashSet},
-    net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
 };
 use tokio::net::TcpStream;
 
@@ -29,7 +29,7 @@ use netgauze_bgp_speaker::{
     connection::TcpActiveConnect,
     listener::BgpListener,
     peer::{EchoCapabilitiesPolicy, PeerConfigBuilder, PeerHandle, PeerProperties},
-    supervisor::PeerSupervisor,
+    supervisor::PeersSupervisor,
 };
 
 #[derive(clap::Parser, Debug)]
@@ -45,7 +45,7 @@ fn create_peer(
     my_bgp_id: Ipv4Addr,
     peer_bgp_id: Ipv4Addr,
     peer_addr: SocketAddr,
-    supervisor: &mut PeerSupervisor<SocketAddr, TcpStream>,
+    supervisor: &mut PeersSupervisor<IpAddr, SocketAddr, TcpStream>,
 ) -> PeerHandle<SocketAddr, TcpStream> {
     let mut caps = HashMap::new();
     caps.insert(
@@ -73,10 +73,9 @@ fn create_peer(
         true,
     );
 
-    let mut received_rx = supervisor
-        .add_peer(properties, config, TcpActiveConnect, policy)
+    let (mut received_rx, peer_handle) = supervisor
+        .create_peer(peer_addr.ip(), properties, config, TcpActiveConnect, policy)
         .unwrap();
-    let peer_handle = supervisor.peer_handler(peer_bgp_id).unwrap();
     peer_handle.start().unwrap();
     tokio::spawn(async move {
         while let Some(event) = received_rx.recv().await {
@@ -98,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     let my_asn = args.my_asn;
     let my_bgp_id = args.my_bgp_id;
 
-    let mut supervisor = PeerSupervisor::new(my_asn, my_bgp_id);
+    let mut supervisor = PeersSupervisor::new(my_asn, my_bgp_id);
 
     let mut listener = BgpListener::new(
         vec![

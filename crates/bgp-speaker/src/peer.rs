@@ -471,6 +471,7 @@ impl<A: Clone> PeerProperties<A> {
 
 #[derive(Debug)]
 pub struct Peer<
+    K,
     A,
     I: AsyncWrite + AsyncRead,
     D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
@@ -478,6 +479,7 @@ pub struct Peer<
     C: ActiveConnect<A, I, D>,
     P: PeerPolicy<A, I, D>,
 > {
+    peer_key: K,
     properties: PeerProperties<A>,
     policy: P,
     peer_state: PeerState,
@@ -493,22 +495,25 @@ pub struct Peer<
 }
 
 impl<
+        K: Display + Copy,
         A: Display + Debug + Clone,
         I: AsyncWrite + AsyncRead + Unpin,
-        D: BgpCodecInitializer<Peer<A, I, D, C, P>>
+        D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
             + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>,
         C: ActiveConnect<A, I, D>,
         P: PeerPolicy<A, I, D>,
-    > Peer<A, I, D, C, P>
+    > Peer<K, A, I, D, C, P>
 {
     pub fn new(
+        peer_key: K,
         properties: PeerProperties<A>,
         config: PeerConfig,
         policy: P,
         active_connect: C,
     ) -> Self {
         Self {
+            peer_key,
             properties,
             policy,
             peer_state: PeerState::AdminDown,
@@ -562,7 +567,7 @@ impl<
         self.fsm_state = new_state;
         log::info!(
             "[{}][{}] FSM state transitions from {} to {}",
-            self.properties.peer_bgp_id,
+            self.peer_key,
             self.fsm_state,
             before,
             new_state
@@ -572,7 +577,7 @@ impl<
         if self.connection.is_some() {
             log::debug!(
                 "[{}][{}] tracking a second connection: {}",
-                self.properties.peer_bgp_id,
+                self.peer_key,
                 self.fsm_state,
                 connection.peer_addr()
             );
@@ -589,7 +594,7 @@ impl<
             if before != after {
                 log::info!(
                     "[{}][{}] FSM transitioned from {before} to {after}",
-                    self.properties.peer_bgp_id,
+                    self.peer_key,
                     self.fsm_state
                 );
             }
@@ -630,7 +635,7 @@ impl<
         {
             log::info!(
                 "[{}][{}] Connection Rejected: {}",
-                self.properties.peer_bgp_id,
+                self.peer_key,
                 self.fsm_state,
                 peer_addr
             );
@@ -646,11 +651,7 @@ impl<
             }
             return Ok(None);
         }
-        log::info!(
-            "[{}][{}] Passive connected",
-            self.properties.peer_bgp_id,
-            self.fsm_state
-        );
+        log::info!("[{}][{}] Passive connected", self.peer_key, self.fsm_state);
         self.connect_retry_timer.take();
         let mut connection =
             self.create_connection(peer_addr.clone(), tcp_stream, ConnectionType::Passive)?;
@@ -672,7 +673,7 @@ impl<
                 // connection is not good anymore.
                 log::info!(
                     "[{}][{}] Error writing to tracked connection at state {} : {err:?}",
-                    self.properties.peer_bgp_id,
+                    self.peer_key,
                     self.fsm_state,
                     tracked.state()
                 );
@@ -702,11 +703,7 @@ impl<
     }
 
     async fn shutdown(&mut self) {
-        log::info!(
-            "[{}][{}] Shutting down peer",
-            self.properties.peer_bgp_id,
-            self.fsm_state
-        );
+        log::info!("[{}][{}] Shutting down peer", self.peer_key, self.fsm_state);
         self.connect_retry_timer.take();
         self.peer_state = PeerState::AdminDown;
         self.fsm_transition(FsmState::Idle);
@@ -1427,19 +1424,21 @@ impl<
 }
 
 #[derive(Debug)]
-pub struct PeerController<A, I: AsyncWrite + AsyncRead> {
+pub struct PeerController<K, A, I: AsyncWrite + AsyncRead> {
     properties: PeerProperties<A>,
     join_handle: PeerJoinHandle<A>,
     peer_events_tx: mpsc::UnboundedSender<PeerEvent<A, I>>,
+    _marker: PhantomData<K>,
 }
 
 impl<
+        K: Display + Copy + Send + Sync + 'static,
         A: Display + Debug + Clone + Send + Sync + 'static,
         I: AsyncWrite + AsyncRead + Send + Unpin + 'static,
-    > PeerController<A, I>
+    > PeerController<K, A, I>
 {
     pub fn new<
-        D: BgpCodecInitializer<Peer<A, I, D, C, P>>
+        D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
             + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>
             + Send
@@ -1447,6 +1446,7 @@ impl<
         C: ActiveConnect<A, I, D> + Send + Sync + 'static,
         P: PeerPolicy<A, I, D> + Send + Sync + 'static,
     >(
+        peer_key: K,
         properties: PeerProperties<A>,
         config: PeerConfig,
         received_events_tx: mpsc::UnboundedSender<PeerStateResult<A>>,
@@ -1454,6 +1454,7 @@ impl<
         active_connect: C,
     ) -> Self {
         let (join_handle, peer_events_tx) = Self::start_peer(
+            peer_key,
             properties.clone(),
             config,
             received_events_tx,
@@ -1464,17 +1465,18 @@ impl<
             properties,
             join_handle,
             peer_events_tx,
+            _marker: PhantomData,
         }
     }
 
     pub async fn handle_peer_event<
-        D: BgpCodecInitializer<Peer<A, I, D, C, P>>
+        D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
             + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>,
         C: ActiveConnect<A, I, D> + Send,
         P: PeerPolicy<A, I, D>,
     >(
-        peer: &mut Peer<A, I, D, C, P>,
+        peer: &mut Peer<K, A, I, D, C, P>,
         peer_event: Option<PeerEvent<A, I>>,
     ) -> Result<(), FsmStateError<A>> {
         if let Some(event) = peer_event {
@@ -1509,13 +1511,14 @@ impl<
     }
 
     fn start_peer<
-        D: BgpCodecInitializer<Peer<A, I, D, C, P>>
+        D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
             + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
             + Encoder<BgpMessage, Error = BgpMessageWritingError>
             + Send,
         C: ActiveConnect<A, I, D> + Send + Sync + 'static,
         P: PeerPolicy<A, I, D> + Send + Sync + 'static,
     >(
+        peer_key: K,
         properties: PeerProperties<A>,
         config: PeerConfig,
         received_events_tx: mpsc::UnboundedSender<PeerStateResult<A>>,
@@ -1525,7 +1528,7 @@ impl<
         let (peer_tx, mut peer_rx) = mpsc::unbounded_channel();
         let rec_tx = received_events_tx.clone();
         let handle = tokio::spawn(async move {
-            let mut peer = Peer::new(properties, config, policy, active_connect);
+            let mut peer = Peer::new(peer_key, properties, config, policy, active_connect);
             loop {
                 tokio::select! {
                     biased;
@@ -1576,7 +1579,7 @@ impl<
     }
 }
 
-impl<A, I: AsyncWrite + AsyncRead> Drop for PeerController<A, I> {
+impl<K, A, I: AsyncWrite + AsyncRead> Drop for PeerController<K, A, I> {
     fn drop(&mut self) {
         self.join_handle.abort();
     }

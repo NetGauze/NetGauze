@@ -18,21 +18,20 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     io,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     pin::Pin,
     task::{Context, Poll},
 };
 
 use crate::connection::TcpActiveConnect;
 use futures_util::stream::FuturesUnordered;
-use rand::RngCore;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::{TcpListener, TcpStream},
 };
 use tokio_stream::StreamExt;
 
-use crate::{fsm::FsmState, peer::PeerHandle, supervisor::PeerSupervisor};
+use crate::{fsm::FsmState, peer::PeerHandle, supervisor::PeersSupervisor};
 
 /// A modified version of Tokio's TcpListenerStream wrapper that returns the
 /// peer socket along the incoming stream
@@ -68,6 +67,8 @@ impl Stream for TcpListenerStream {
 #[derive(Debug)]
 pub struct BgpListener<A: Display, I: AsyncWrite + AsyncRead> {
     sockets: Vec<SocketAddr>,
+    /// Holding PeerHandle to control peers, and indexed by ip address of the
+    /// peer
     peers: HashMap<IpAddr, PeerHandle<A, I>>,
     // TODO: change the flag to a policy trait
     allow_dynamic_peers: bool,
@@ -86,22 +87,22 @@ impl<
         }
     }
 
-    pub fn reg_peer(&mut self, peer: IpAddr, peer_handle: PeerHandle<A, I>) {
-        self.peers.insert(peer, peer_handle);
+    pub fn reg_peer(&mut self, peer_ip: IpAddr, peer_handle: PeerHandle<A, I>) {
+        self.peers.insert(peer_ip, peer_handle);
     }
 }
 
 impl BgpListener<SocketAddr, TcpStream> {
     async fn accept_peer_connection(
         &mut self,
-        peer: IpAddr,
+        peer_key: IpAddr,
         peer_addr: SocketAddr,
         stream: TcpStream,
-        peer_supervisor: &mut PeerSupervisor<SocketAddr, TcpStream>,
+        peer_supervisor: &mut PeersSupervisor<IpAddr, SocketAddr, TcpStream>,
     ) {
-        match self.peers.get_mut(&peer) {
+        match self.peers.get_mut(&peer_key) {
             Some(peer_handle) => {
-                log::info!("Accepted Connection: {peer_addr}");
+                log::info!("Accepted Connection for peer {peer_key}");
                 if let Err(err) = peer_handle.accept_connection(peer_addr, stream) {
                     log::error!("Error sending event to peer: {err:?}");
                 }
@@ -110,18 +111,9 @@ impl BgpListener<SocketAddr, TcpStream> {
                 if !self.allow_dynamic_peers {
                     log::info!("No peer configured for: {peer_addr}");
                 } else {
-                    // Initial Peer BGP ID
-                    let peer_bgp_id = match peer_addr {
-                        SocketAddr::V4(ipv4) => *ipv4.ip(),
-                        SocketAddr::V6(_) => {
-                            let mut rng = rand::thread_rng();
-                            let id = rng.next_u32();
-                            Ipv4Addr::from(id)
-                        }
-                    };
                     // TODO: rewrite for more clear logic and dynamic peer handling factory
                     if let Ok((mut rx, mut peer_handle)) =
-                        peer_supervisor.dynamic_peer(peer_bgp_id, peer_addr, TcpActiveConnect)
+                        peer_supervisor.dynamic_peer(peer_key, peer_addr, TcpActiveConnect)
                     {
                         if let Err(err) = peer_handle.start() {
                             log::error!("Error starting dynamic peer: {err:?}");
@@ -142,7 +134,7 @@ impl BgpListener<SocketAddr, TcpStream> {
                                 log::info!(
                                     "[{peer_addr}] Accepted Dynamic Connection: {peer_addr}"
                                 );
-                                self.peers.insert(peer, peer_handle);
+                                self.peers.insert(peer_key, peer_handle);
                                 tokio::spawn(async move {
                                     while let Some(event) = rx.recv().await {
                                         log::info!(
@@ -161,7 +153,7 @@ impl BgpListener<SocketAddr, TcpStream> {
 
     pub async fn run(
         &mut self,
-        peer_supervisor: &mut PeerSupervisor<SocketAddr, TcpStream>,
+        peer_supervisor: &mut PeersSupervisor<IpAddr, SocketAddr, TcpStream>,
     ) -> Result<(), io::Error> {
         log::info!("Configured listening socket: {:?}", self.sockets);
         let mut listening_sockets = Vec::with_capacity(self.sockets.len());
@@ -176,7 +168,7 @@ impl BgpListener<SocketAddr, TcpStream> {
             for incoming in &mut listening_sockets {
                 listen_futures.push(incoming.next());
             }
-            log::info!("Bound listening socket: {:?}", self.sockets);
+            log::info!("BGP Listener listening on sockets: {:?}", self.sockets);
             while let Some(Some(Ok((stream, peer_addr)))) = listen_futures.next().await {
                 self.accept_peer_connection(peer_addr.ip(), peer_addr, stream, peer_supervisor)
                     .await;

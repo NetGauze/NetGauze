@@ -440,7 +440,7 @@ fuzz_target!(|data: (
             true,
         );
 
-        let mut peer = Peer::new(properties, config, policy, active_connect);
+        let mut peer = Peer::new(peer_addr.ip(), properties, config, policy, active_connect);
         peer.add_admin_event(PeerAdminEvents::ManualStart);
         loop {
             let ret = tokio::time::timeout(Duration::from_millis(100), peer.run()).await;
