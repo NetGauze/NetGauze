@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule: [ cron: "40 1 * * *" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    name: stable / fmt
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: cargo fmt --check
+        run: cargo fmt --check
+
+  test:
+    name: Rust ${{matrix.rust}}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # TODO: enable msrv checks once NetGauze is more stable
+        rust: [ nightly, beta, stable ]
+    timeout-minutes: 45
+    env:
+      TRYBUILD: overwrite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{matrix.rust}}
+      - name: Enable type layout randomization
+        run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
+        if: matrix.rust == 'nightly'
+      - run: cargo test
+
+  xplat:
+    name: ${{matrix.name}}
+    runs-on: ${{matrix.os}}-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos
+          - name: Windows
+            os: windows
+    timeout-minutes: 45
+    env:
+      TRYBUILD: overwrite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - name: Enable type layout randomization
+        run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
+      - run: cargo test
+
+  # TODO: enable min version checks once NetGauze is more stable
+  #  minimal:
+  #    name: Minimal versions
+  #    runs-on: ubuntu-latest
+  #    timeout-minutes: 45
+  #    env:
+  #      TRYBUILD: overwrite
+  #    steps:
+  #      - uses: actions/checkout@v4
+  #      - uses: dtolnay/rust-toolchain@nightly
+  #      - run: cargo generate-lockfile -Z minimal-versions
+  #      - run: cargo check --locked
+
+  doc:
+    name: Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RUSTDOCFLAGS: -Dwarnings --cfg docsrs
+      TRYBUILD: overwrite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/install@cargo-docs-rs
+      - run: cargo doc --no-deps --all-features
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@clippy
+      - run: cargo clippy # TODO: enable more strict clippy: --tests  -- -Dclippy::all -Dclippy::pedantic
+
+  coverage:
+    # use llvm-cov to build and collect coverage and outputs in a format that is compatible with
+    # codecov.io
+    runs-on: ubuntu-latest
+    name: ubuntu / stable / coverage
+    env:
+      TRYBUILD: overwrite
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - name: cargo install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: cargo generate-lockfile
+        if: hashFiles('Cargo.lock') == ''
+        run: cargo generate-lockfile
+      - name: cargo llvm-cov
+        run: cargo llvm-cov --locked --all-features --lcov --output-path lcov.info
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
