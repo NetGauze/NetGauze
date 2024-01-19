@@ -23,7 +23,7 @@ fn main() {
             Some(IpAddr::V6(Ipv6Addr::from_str("2001::1").unwrap())),
             65000,
             Ipv4Addr::new(172, 10, 0, 1),
-            Some(Utc.with_ymd_and_hms(2023, 01, 01, 01, 00, 00).unwrap()),
+            Some(Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0).unwrap()),
         ),
         vec![
             RouteMirroringValue::Information(RouteMirroringInformation::Experimental65531),

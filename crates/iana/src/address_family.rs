@@ -745,7 +745,7 @@ mod tests {
                     valid_address.address_family(),
                     valid_address.subsequent_address_family()
                 )
-            )
+            );
         }
     }
 }

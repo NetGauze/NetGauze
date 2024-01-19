@@ -73,8 +73,8 @@ fn parse_xref(node: &Node<'_, '_>) -> Vec<Xref> {
         .collect::<Vec<_>>();
     let mut xrefs = Vec::new();
     for child in children {
-        let ty = child.attribute("type").map(|x| x.to_string());
-        let data = child.attribute("data").map(|x| x.to_string());
+        let ty = child.attribute("type").map(ToString::to_string);
+        let data = child.attribute("data").map(ToString::to_string);
         if let (Some(ty), Some(data)) = (ty, data) {
             xrefs.push(Xref { ty, data });
         }
@@ -164,40 +164,36 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
     let mut ret = vec![];
     for child in &children {
         let name = get_string_child(child, (IANA_NAMESPACE, "name").into());
-        let name = match name {
-            Some(name) => {
-                if name.as_str() == ASSIGNED_FOR_NF_V9 {
-                    log::info!("Skipping Netflow V9 element {name}");
-                    continue;
-                }
-                if name == *UNASSIGNED {
-                    log::info!("Skipping unsigned name: {child:?}");
-                    continue;
-                }
-                if name == *RESERVED {
-                    log::info!("Skipping reserved name: {child:?}");
-                    continue;
-                }
-                name
-            }
-            None => {
-                log::info!("Skipping a child with no name: {child:?}");
+        let name = if let Some(name) = name {
+            if name.as_str() == ASSIGNED_FOR_NF_V9 {
+                log::info!("Skipping Netflow V9 element {name}");
                 continue;
             }
+            if name == *UNASSIGNED {
+                log::info!("Skipping unsigned name: {child:?}");
+                continue;
+            }
+            if name == *RESERVED {
+                log::info!("Skipping reserved name: {child:?}");
+                continue;
+            }
+            name
+        } else {
+            log::info!("Skipping a child with no name: {child:?}");
+            continue;
         };
 
-        let data_type = match get_string_child(child, (IANA_NAMESPACE, "dataType").into()) {
-            Some(data_type) => {
+        let Some(data_type) =
+            get_string_child(child, (IANA_NAMESPACE, "dataType").into()).map(|data_type| {
                 if name.as_str() == "samplerId" {
                     "unsigned32".to_string()
                 } else {
                     data_type
                 }
-            }
-            None => {
-                log::info!("Skipping {name} a child with no data type defined: {child:?}");
-                continue;
-            }
+            })
+        else {
+            log::info!("Skipping {name} a child with no data type defined: {child:?}");
+            continue;
         };
         let group = get_string_child(child, (IANA_NAMESPACE, "group").into());
         let data_type_semantics =
@@ -218,13 +214,13 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
             }
         };
         let applicability = get_string_child(child, (IANA_NAMESPACE, "applicability").into());
-        let status = match get_string_child(child, (IANA_NAMESPACE, "status").into()) {
-            Some(status) => status,
-            None => {
+        let status =
+            if let Some(status) = get_string_child(child, (IANA_NAMESPACE, "status").into()) {
+                status
+            } else {
                 log::info!("Skipping {name} a child with no status defined: {child:?}");
                 continue;
-            }
-        };
+            };
         let description = match parse_description_string(child) {
             Some(description) => description,
             None => {
@@ -233,28 +229,26 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
             }
         };
 
-        let revision = match get_string_child(child, (IANA_NAMESPACE, "revision").into()) {
-            Some(revision) => {
-                let rev = match revision.as_str().parse::<u32>() {
-                    Ok(rev) => rev,
-                    Err(err) => {
-                        log::info!("Skipping {name} a child with invalid revision defined `{err:?}`: {child:?}");
-                        continue;
-                    }
-                };
-                rev
-            }
-            None => {
-                log::info!("Skipping {name} a child with no revision defined: {child:?}");
-                continue;
-            }
+        let revision = if let Some(revision) =
+            get_string_child(child, (IANA_NAMESPACE, "revision").into())
+        {
+            let rev = match revision.as_str().parse::<u32>() {
+                Ok(rev) => rev,
+                Err(err) => {
+                    log::info!("Skipping {name} a child with invalid revision defined `{err:?}`: {child:?}");
+                    continue;
+                }
+            };
+            rev
+        } else {
+            log::info!("Skipping {name} a child with no revision defined: {child:?}");
+            continue;
         };
-        let date = match get_string_child(child, (IANA_NAMESPACE, "date").into()) {
-            Some(date) => date,
-            None => {
-                log::info!("Skipping {name} a child with no date defined: {child:?}");
-                continue;
-            }
+        let date = if let Some(data) = get_string_child(child, (IANA_NAMESPACE, "date").into()) {
+            data
+        } else {
+            log::info!("Skipping {name} a child with no date defined: {child:?}");
+            continue;
         };
         let references = if let Some(references) = child
             .children()

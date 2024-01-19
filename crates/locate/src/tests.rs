@@ -106,7 +106,7 @@ fn it_should_compare_elements() {
 }
 
 #[test]
-#[allow(unused_parens)]
+#[allow(unused_parens, clippy::double_parens)]
 fn it_should_find_token() {
     assert!(StrSpan::new("foobar").find_token('a'));
     assert!(StrSpan::new("foobar").find_token(b'a'));

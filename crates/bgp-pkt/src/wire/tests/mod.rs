@@ -1227,7 +1227,7 @@ fn test_bgp_rfc7606_attr() -> Result<(), BgpMessageWritingError> {
         Some(&PathAttributeParsingError::OriginError(
             OriginParsingError::UndefinedOrigin(UndefinedOrigin(0xff))
         )),
-        parsing_errors.path_attr_errors().get(0)
+        parsing_errors.path_attr_errors().first()
     );
     assert_eq!(
         Some(&PathAttributeParsingError::AsPathError(

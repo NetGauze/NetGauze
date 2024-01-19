@@ -79,11 +79,10 @@ fn filter_attribute_by_name(
     Ok((variants, idents))
 }
 
-#[allow(clippy::type_complexity)]
 fn filter_attribute_by_name_with_module(
     enum_data: &syn::DataEnum,
     filter: &str,
-) -> syn::Result<(Vec<syn::Ident>, Vec<(Vec<syn::Ident>, syn::Ident)>)> {
+) -> (Vec<syn::Ident>, Vec<(Vec<syn::Ident>, syn::Ident)>) {
     let mut variants = vec![];
     let mut idents = vec![];
     for variant in &enum_data.variants {
@@ -113,7 +112,7 @@ fn filter_attribute_by_name_with_module(
             }
         }
     }
-    Ok((variants, idents))
+    (variants, idents)
 }
 
 #[derive(Debug)]
@@ -215,7 +214,7 @@ impl LocatedError {
                                 }
                             }
                         };
-                        ret.push((located_variants, located_ident, located_module))
+                        ret.push((located_variants, located_ident, located_module));
                     }
                 }
             }
@@ -224,14 +223,11 @@ impl LocatedError {
     }
 
     fn from(input: &syn::DeriveInput) -> Result<proc_macro::TokenStream, syn::Error> {
-        let en = match &input.data {
-            syn::Data::Enum(en) => en,
-            _ => {
-                return Err(syn::Error::new(
-                    input.span(),
-                    "Works only with enum error types",
-                ));
-            }
+        let syn::Data::Enum(en) = &input.data else {
+            return Err(syn::Error::new(
+                input.span(),
+                "Works only with enum error types",
+            ));
         };
         let ident = input.ident.clone();
         let located_struct_name: syn::Ident = format_ident!("Located{}", ident);
@@ -361,17 +357,14 @@ struct WritingError {}
 
 impl WritingError {
     fn from(input: &syn::DeriveInput) -> Result<proc_macro::TokenStream, syn::Error> {
-        let en = match &input.data {
-            syn::Data::Enum(en) => en,
-            _ => {
-                return Err(syn::Error::new(
-                    input.span(),
-                    "Works only with enum error types",
-                ));
-            }
+        let syn::Data::Enum(en) = &input.data else {
+            return Err(syn::Error::new(
+                input.span(),
+                "Works only with enum error types",
+            ));
         };
         let ident = input.ident.clone();
-        let (from_variants, from_idents) = filter_attribute_by_name_with_module(en, "from")?;
+        let (from_variants, from_idents) = filter_attribute_by_name_with_module(en, "from");
         let (from_std_io_error_variants, _) = filter_attribute_by_name(en, "from_std_io_error")?;
 
         let mut output = quote! {

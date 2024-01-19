@@ -282,7 +282,7 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
 
     let good = NetFlowV9Packet::new(
         201984782,
-        Utc.with_ymd_and_hms(2023, 1, 28, 15, 56, 09).unwrap(),
+        Utc.with_ymd_and_hms(2023, 1, 28, 15, 56, 9).unwrap(),
         14925203,
         2081,
         vec![Set::Data {

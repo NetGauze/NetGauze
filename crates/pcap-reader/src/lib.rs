@@ -231,6 +231,7 @@ mod tests {
 
     use super::*;
 
+    #[allow(clippy::while_let_on_iterator)]
     #[test]
     fn it_pcap() {
         let mut path = env!("CARGO_MANIFEST_DIR").to_owned();
@@ -245,6 +246,8 @@ mod tests {
         }
         assert_eq!(results.len(), 20)
     }
+
+    #[allow(clippy::while_let_on_iterator)]
     #[test]
     fn it_pcapng() {
         let mut path = env!("CARGO_MANIFEST_DIR").to_owned();

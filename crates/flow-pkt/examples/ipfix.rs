@@ -11,7 +11,7 @@ fn main() {
 
     // IPFIX template packet
     let ipfix_template = IpfixPacket::new(
-        Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 00).unwrap(),
+        Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 0).unwrap(),
         3812,
         0,
         vec![Set::Template(vec![TemplateRecord::new(
@@ -45,7 +45,7 @@ fn main() {
 
     // IPFIX data packet
     let ipfix_data = IpfixPacket::new(
-        Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 01).unwrap(),
+        Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 1).unwrap(),
         3812,
         0,
         vec![Set::Data {

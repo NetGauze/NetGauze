@@ -44,6 +44,7 @@ pub mod test {
 
     /// Wrap [Builder] allowing it to accept BgpMessages for read and write
     /// mocks rather than `&[u8]`.
+    #[derive(Default, Debug)]
     pub struct BgpIoMockBuilder {
         io_builder: Builder,
     }
