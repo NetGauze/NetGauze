@@ -36,7 +36,7 @@ use tokio_util::codec::{Decoder, Encoder, Framed};
 
 use netgauze_bgp_pkt::{
     capabilities::BgpCapability,
-    iana::{BgpCapabilityCode, AS_TRANS},
+    iana::AS_TRANS,
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
@@ -99,9 +99,9 @@ pub struct EchoCapabilitiesPolicy<A, I, D> {
     my_bgp_id: Ipv4Addr,
     remote_as: Option<u32>,
     hold_timer_duration: u16,
-    capabilities: HashMap<BgpCapabilityCode, BgpCapability>,
-    reject_capabilities: HashSet<BgpCapabilityCode>,
-    peer_capabilities: Vec<BgpCapability>,
+    capabilities: HashSet<BgpCapability>,
+    reject_capabilities: HashSet<BgpCapability>,
+    peer_capabilities: HashSet<BgpCapability>,
     _address_marker: PhantomData<A>,
     _inner_marker: PhantomData<I>,
     _codec_marker: PhantomData<D>,
@@ -112,8 +112,8 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
         my_asn: u32,
         my_bgp_id: Ipv4Addr,
         hold_timer_duration: u16,
-        capabilities: HashMap<BgpCapabilityCode, BgpCapability>,
-        reject_capabilities: HashSet<BgpCapabilityCode>,
+        capabilities: HashSet<BgpCapability>,
+        reject_capabilities: HashSet<BgpCapability>,
     ) -> Self {
         Self {
             my_asn,
@@ -122,7 +122,7 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
             hold_timer_duration,
             capabilities,
             reject_capabilities,
-            peer_capabilities: vec![],
+            peer_capabilities: HashSet::new(),
             _address_marker: PhantomData,
             _inner_marker: PhantomData,
             _codec_marker: PhantomData,
@@ -141,16 +141,12 @@ impl<
     > PeerPolicy<A, I, D> for EchoCapabilitiesPolicy<A, I, D>
 {
     async fn open_message(&mut self) -> BgpOpenMessage {
-        let mut capabilities: Vec<BgpCapability> = self.capabilities.values().cloned().collect();
+        let mut capabilities: HashSet<BgpCapability> = self.capabilities.iter().cloned().collect();
         for cap in &self.peer_capabilities {
-            if let Ok(code) = cap.code() {
-                // Check that the capability has not been added before and not in the reject
-                // list
-                if !self.capabilities.contains_key(&code)
-                    && !self.reject_capabilities.contains(&code)
-                {
-                    capabilities.push(cap.clone());
-                }
+            // Check that the capability has not been added before and not in the reject
+            // list
+            if !self.capabilities.contains(cap) && !self.reject_capabilities.contains(cap) {
+                capabilities.insert(cap.clone());
             }
         }
         // ASN in BGP header is always 2-octets,
@@ -164,7 +160,9 @@ impl<
             my_asn,
             self.hold_timer_duration,
             self.my_bgp_id,
-            vec![BgpOpenMessageParameter::Capabilities(capabilities)],
+            vec![BgpOpenMessageParameter::Capabilities(
+                capabilities.iter().cloned().collect::<Vec<BgpCapability>>(),
+            )],
         )
     }
 

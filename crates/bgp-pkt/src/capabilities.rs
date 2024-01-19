@@ -37,7 +37,7 @@ use strum_macros::{Display, FromRepr};
 /// ~                              ~
 /// +------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpCapability {
     /// Defined in [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
@@ -144,7 +144,7 @@ impl BgpCapability {
 
 /// Generic struct to carry all the unsupported BGP capabilities
 #[repr(C)]
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UnrecognizedCapability {
     code: u8,
@@ -167,7 +167,7 @@ impl UnrecognizedCapability {
 
 /// Experimental Capabilities Codes as defined by [RFC8810](https://datatracker.ietf.org/doc/html/RFC8810)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Display, FromRepr, Hash, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ExperimentalCapabilityCode {
     Experimental239 = 239,
@@ -190,7 +190,7 @@ pub enum ExperimentalCapabilityCode {
 
 /// Generic struct to carry all capabilities that are designated as experimental
 /// by IANA See [RFC8810](https://datatracker.ietf.org/doc/html/RFC8810)
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ExperimentalCapability {
     code: ExperimentalCapabilityCode,
@@ -220,7 +220,7 @@ impl ExperimentalCapability {
 /// |      AFI      | Res.  | SAFI  |
 /// +-------+-------+-------+-------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MultiProtocolExtensionsCapability {
     address_type: AddressType,
@@ -237,7 +237,7 @@ impl MultiProtocolExtensionsCapability {
 }
 
 /// Defined in [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793)
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FourOctetAsCapability {
     asn4: u32,
@@ -255,7 +255,7 @@ impl FourOctetAsCapability {
 
 /// Defined in [RFC4724](https://datatracker.ietf.org/doc/html/rfc4724)
 /// and [RFC8538](https://datatracker.ietf.org/doc/html/rfc8538)
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GracefulRestartCapability {
     restart: bool,
@@ -296,7 +296,7 @@ impl GracefulRestartCapability {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct GracefulRestartAddressFamily {
     forwarding_state: bool,
@@ -324,7 +324,7 @@ impl GracefulRestartAddressFamily {
 /// without replacing any previous ones.
 ///
 /// See [RFC7911](https://datatracker.ietf.org/doc/html/RFC7911)
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct AddPathCapability {
     address_families: Vec<AddPathAddressFamily>,
@@ -350,7 +350,7 @@ impl AddPathCapability {
 /// | Send/Receive (1 octet)                         |
 /// +------------------------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct AddPathAddressFamily {
     address_type: AddressType,
@@ -406,7 +406,7 @@ impl AddPathAddressFamily {
 /// | Nexthop AFI - N (2 octets)                          |
 /// +-----------------------------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ExtendedNextHopEncodingCapability {
     encodings: Vec<ExtendedNextHopEncoding>,
@@ -433,7 +433,7 @@ impl ExtendedNextHopEncodingCapability {
 /// | Nexthop AFI - 1 (2 octets)                          |
 /// +-----------------------------------------------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ExtendedNextHopEncoding {
     address_type: AddressType,
@@ -466,7 +466,7 @@ impl ExtendedNextHopEncoding {
 /// |              AFI              |    SAFI       |    Count      ~
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MultipleLabel {
     address_type: AddressType,
@@ -492,7 +492,7 @@ impl MultipleLabel {
 
 /// BGP Role used in the route leak prevention and detection procedures
 /// defined by: [RFC9234](https://datatracker.ietf.org/doc/html/rfc9234)
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpRoleCapability {
     role: BgpRoleValue,

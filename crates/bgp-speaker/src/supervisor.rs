@@ -151,7 +151,7 @@ impl<
             self.my_asn,
             self.my_bgp_id,
             peer_config.hold_timer_duration_large_value,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let (rx, peer_handle) = self.create_peer(
@@ -194,14 +194,14 @@ mod tests {
             peer_properties,
             PeerConfig::default(),
             TcpActiveConnect,
-            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashMap::new(), HashSet::new()),
+            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashSet::new(), HashSet::new()),
         )?;
         let second_create = supervisor.create_peer(
             peer_addr.ip(),
             peer_properties,
             PeerConfig::default(),
             TcpActiveConnect,
-            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashMap::new(), HashSet::new()),
+            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashSet::new(), HashSet::new()),
         );
         let removed_peer = supervisor.remove_peer(&peer_addr.ip());
         let non_existing_peer = supervisor.remove_peer(&peer_addr.ip());
@@ -237,7 +237,7 @@ mod tests {
             peer_properties,
             PeerConfig::default(),
             TcpActiveConnect,
-            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashMap::new(), HashSet::new()),
+            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashSet::new(), HashSet::new()),
         );
 
         let removed_peer = supervisor.remove_peer(&peer_addr.ip());

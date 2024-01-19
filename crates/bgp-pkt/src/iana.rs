@@ -1282,7 +1282,7 @@ impl TryFrom<u8> for TransitiveOpaqueExtendedCommunitySubType {
 /// BGP Role Values used in the route leak prevention and detection procedures
 /// [RFC9234](https://datatracker.ietf.org/doc/html/rfc9234)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Display, FromRepr, Hash, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpRoleValue {
     /// The local AS is a transit provider of the remote AS

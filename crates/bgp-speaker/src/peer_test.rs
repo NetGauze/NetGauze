@@ -47,7 +47,7 @@ const PROPERTIES: PeerProperties<SocketAddr> = PeerProperties::new(
 #[test_log::test(tokio::test)]
 async fn test_idle_manual_start() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -71,7 +71,7 @@ async fn test_idle_manual_start() {
 #[test_log::test(tokio::test)]
 async fn test_idle_manual_start_with_passive_tcp() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
         MY_AS as u16,
@@ -103,7 +103,7 @@ async fn test_idle_manual_start_with_passive_tcp() {
 #[test_log::test(tokio::test)]
 async fn test_idle_automatic_start() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -128,7 +128,7 @@ async fn test_idle_automatic_start() {
 #[test_log::test(tokio::test)]
 async fn test_idle_automatic_start_with_passive() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
         MY_AS as u16,
@@ -160,7 +160,7 @@ async fn test_idle_automatic_start_with_passive() {
 #[test_log::test(tokio::test)]
 async fn test_connect_manual_start() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -188,7 +188,7 @@ async fn test_connect_manual_start() {
 #[test_log::test(tokio::test)]
 async fn test_connect_automatic_start() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -216,7 +216,7 @@ async fn test_connect_automatic_start() {
 #[test_log::test(tokio::test)]
 async fn test_connect_manual_stop() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] }),
@@ -267,7 +267,7 @@ async fn test_connect_manual_stop() {
 #[test_log::test(tokio::test)]
 async fn test_connect_retry_timer_expires() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] }),
@@ -308,7 +308,7 @@ async fn test_connect_retry_timer_expires() {
 async fn test_connect_delay_open_timer_expires() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .wait(Duration::from_secs(1))
@@ -358,7 +358,7 @@ async fn test_connect_delay_open_timer_expires() {
 #[test_log::test(tokio::test)]
 async fn test_connect_tcp_connection_confirmed() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
     passive_io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
@@ -414,7 +414,7 @@ async fn test_connect_tcp_connection_confirmed() {
 #[test_log::test(tokio::test)]
 async fn test_connect_tcp_connection_confirmed_with_open_delay() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
@@ -459,7 +459,7 @@ async fn test_connect_tcp_connection_confirmed_with_open_delay() {
 #[test_log::test(tokio::test)]
 async fn test_connect_tcp_connection_fails() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_connect = MockFailedActiveConnect {
         peer_addr: PEER_ADDR,
         connect_delay: Duration::from_secs(0),
@@ -499,7 +499,7 @@ async fn test_connect_tcp_connection_fails_with_open_delay_timer() {
 async fn test_connect_bgp_open_with_delay() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -559,7 +559,7 @@ async fn test_connect_bgp_open_with_delay() {
 #[test_log::test(tokio::test)]
 async fn test_connect_tcp_cr_acked() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
         MY_AS as u16,
@@ -594,7 +594,7 @@ async fn test_connect_tcp_cr_acked() {
 #[test_log::test(tokio::test)]
 async fn test_connect_bgp_header_err() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     let bad_header = [0xee; 16];
     io_builder
@@ -641,7 +641,7 @@ async fn test_connect_bgp_header_err() {
 #[test_log::test(tokio::test)]
 async fn test_connect_bgp_open_err_unsupported_version() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     let bgp_version = 0x03;
     io_builder
@@ -689,7 +689,7 @@ async fn test_connect_bgp_open_err_unsupported_version() {
 #[test_log::test(tokio::test)]
 async fn test_connect_bgp_open_err_unacceptable_hold_time() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     let hold_time = 1;
     let peer_open = BgpOpenMessage::new(
@@ -748,7 +748,7 @@ async fn test_connect_notif_version_err() {
 #[test_log::test(tokio::test)]
 async fn test_connect_notif_version_err_with_open_delay() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.read(BgpMessage::Notification(
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
@@ -784,7 +784,7 @@ async fn test_connect_notif_version_err_with_open_delay() {
 #[test_log::test(tokio::test)]
 async fn test_connect_automatic_stop() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] }),
@@ -827,7 +827,7 @@ async fn test_connect_hold_timer_expires() {
 #[test_log::test(tokio::test)]
 async fn test_connect_notif_msg() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     let notif =
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
@@ -862,7 +862,7 @@ async fn test_connect_notif_msg() {
 #[test_log::test(tokio::test)]
 async fn test_connect_keepalive_msg() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.read(BgpMessage::KeepAlive);
 
@@ -895,7 +895,7 @@ async fn test_connect_keepalive_msg() {
 #[test_log::test(tokio::test)]
 async fn test_connect_update_msg() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
     io_builder.read(BgpMessage::Update(update.clone()));
@@ -932,7 +932,7 @@ async fn test_connect_update_msg() {
 #[test_log::test(tokio::test)]
 async fn test_connect_update_err_msg() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     let update = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -974,7 +974,7 @@ async fn test_connect_update_err_msg() {
 #[test_log::test(tokio::test)]
 async fn test_connect_route_refresh_msg() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     let route_refresh = BgpRouteRefreshMessage::new(
         AddressType::Ipv4Unicast,
@@ -1011,7 +1011,7 @@ async fn test_connect_route_refresh_msg() {
 #[test_log::test(tokio::test)]
 async fn test_active_manual_start() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -1043,7 +1043,7 @@ async fn test_active_manual_start() {
 #[test_log::test(tokio::test)]
 async fn test_active_automatic_start() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -1075,7 +1075,7 @@ async fn test_active_automatic_start() {
 #[test_log::test(tokio::test)]
 async fn test_active_connect_retry_timer_expires() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let io_builder = BgpIoMockBuilder::new();
 
     let active_connect = MockActiveConnect {
@@ -1116,7 +1116,7 @@ async fn test_active_connect_retry_timer_expires() {
 async fn test_active_delay_open_timer_expires() {
     let open_delay = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
     passive_io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
@@ -1172,7 +1172,7 @@ async fn test_active_delay_open_timer_expires() {
 #[test_log::test(tokio::test)]
 async fn test_active_tcp_connection_confirmed() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
     passive_io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
@@ -1222,7 +1222,7 @@ async fn test_active_tcp_connection_confirmed() {
 #[test_log::test(tokio::test)]
 async fn test_active_tcp_connection_confirmed_with_open_delay() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
 
@@ -1262,7 +1262,7 @@ async fn test_active_tcp_connection_confirmed_with_open_delay() {
 #[test_log::test(tokio::test)]
 async fn test_active_tcp_connection_fails() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_io_builder = BgpIoMockBuilder::new();
     let passive_io = tokio_test::io::Builder::new()
         .read_error(io::Error::from(io::ErrorKind::ConnectionAborted))
@@ -1313,7 +1313,7 @@ async fn test_active_tcp_connection_fails() -> Result<(), FsmStateError<SocketAd
 async fn test_active_bgp_open_with_open_delay() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -1391,7 +1391,7 @@ async fn test_active_bgp_open_with_open_delay() {
 async fn test_active_bgp_header_err() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
     let bad_header = [0xee; 16];
@@ -1452,7 +1452,7 @@ async fn test_active_bgp_header_err() {
 async fn test_active_bgp_open_err() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
 
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -1521,7 +1521,7 @@ async fn test_active_notif_version_err() {
 async fn test_active_notif_version_err_with_open_delay() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
 
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -1570,7 +1570,7 @@ async fn test_active_notif_version_err_with_open_delay() {
 async fn test_active_automatic_stop() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
 
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -1619,7 +1619,7 @@ async fn test_active_automatic_stop() {
 async fn test_active_notif_msg() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
 
     let active_io_builder = BgpIoMockBuilder::new();
     let notif =
@@ -1668,7 +1668,7 @@ async fn test_active_notif_msg() {
 async fn test_active_keepalive_msg() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
 
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -1714,7 +1714,7 @@ async fn test_active_keepalive_msg() {
 async fn test_active_update_msg() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
 
     let active_io_builder = BgpIoMockBuilder::new();
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
@@ -1763,7 +1763,7 @@ async fn test_active_update_msg() {
 async fn test_active_update_err_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
 
     let active_io_builder = BgpIoMockBuilder::new();
     let update = [
@@ -1818,7 +1818,7 @@ async fn test_active_update_err_msg() -> Result<(), FsmStateError<SocketAddr>> {
 async fn test_active_route_refresh_msg() {
     let delay_open_duration = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
 
     let active_io_builder = BgpIoMockBuilder::new();
     let route_refresh = BgpRouteRefreshMessage::new(
@@ -1867,7 +1867,7 @@ async fn test_active_route_refresh_msg() {
 #[test_log::test(tokio::test)]
 async fn test_open_sent_manual_stop() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -1915,7 +1915,7 @@ async fn test_open_sent_manual_stop() {
 #[test_log::test(tokio::test)]
 async fn test_open_sent_automatic_stop() {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -1964,7 +1964,7 @@ async fn test_open_sent_automatic_stop() {
 async fn test_open_sent_hold_timer_expires() {
     let hold_time = 1;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -2010,7 +2010,7 @@ async fn test_open_sent_hold_timer_expires() {
 #[test_log::test(tokio::test)]
 async fn test_open_sent_tcp_connection_confirmed() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
     let mut active_io_builder = BgpIoMockBuilder::new();
@@ -2073,7 +2073,7 @@ async fn test_open_sent_tcp_cr_acked() {
 #[test_log::test(tokio::test)]
 async fn test_open_sent_tcp_connections_fails() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let active_io_builder = BgpIoMockBuilder::new();
 
     let msg = BgpMessage::Open(BgpOpenMessage::new(
@@ -2130,7 +2130,7 @@ async fn test_open_sent_tcp_connections_fails() -> Result<(), FsmStateError<Sock
 #[test_log::test(tokio::test)]
 async fn test_open_sent_bgp_open() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -2186,7 +2186,7 @@ async fn test_open_sent_bgp_open() -> Result<(), FsmStateError<SocketAddr>> {
 #[test_log::test(tokio::test)]
 async fn test_open_sent_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let bad_header = [0xee; 16];
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -2249,7 +2249,7 @@ async fn test_open_sent_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>
 #[test_log::test(tokio::test)]
 async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let bgp_version = 0x03;
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -2311,7 +2311,7 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
 #[test_log::test(tokio::test)]
 async fn test_open_sent_collision_dump_main_connection() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) + 1);
     let properties = PeerProperties::new(
         MY_AS,
@@ -2412,7 +2412,7 @@ async fn test_open_sent_collision_dump_main_connection() -> Result<(), FsmStateE
 async fn test_open_sent_collision_dump_tracked_connection() -> Result<(), FsmStateError<SocketAddr>>
 {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
     let properties = PeerProperties::new(
         MY_AS,
@@ -2512,7 +2512,7 @@ async fn test_open_sent_collision_dump_tracked_connection() -> Result<(), FsmSta
 #[test_log::test(tokio::test)]
 async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -2564,7 +2564,7 @@ async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAd
 #[test_log::test(tokio::test)]
 async fn test_open_sent_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let notif =
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
     let mut io_builder = BgpIoMockBuilder::new();
@@ -2619,7 +2619,7 @@ async fn test_open_sent_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
 #[test_log::test(tokio::test)]
 async fn test_open_sent_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -2672,7 +2672,7 @@ async fn test_open_sent_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>
 #[test_log::test(tokio::test)]
 async fn test_open_sent_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -2726,7 +2726,7 @@ async fn test_open_sent_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
 #[test_log::test(tokio::test)]
 async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let update = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0x00, 0x1b, 0x02, 0x00, 0x04, 0x19, 0xac, 0x10, 0x01, 0x00, 0x00,
@@ -2786,7 +2786,7 @@ async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
 #[test_log::test(tokio::test)]
 async fn test_open_sent_route_refresh_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let route_refresh = BgpRouteRefreshMessage::new(
         AddressType::Ipv4Unicast,
         RouteRefreshSubcode::BeginningOfRouteRefresh,
@@ -2843,7 +2843,7 @@ async fn test_open_sent_route_refresh_msg() -> Result<(), FsmStateError<SocketAd
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_starts() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -2909,7 +2909,7 @@ async fn test_open_confirm_starts() -> Result<(), FsmStateError<SocketAddr>> {
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_manual_stop() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -2974,7 +2974,7 @@ async fn test_open_confirm_manual_stop() -> Result<(), FsmStateError<SocketAddr>
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_automatic_stop() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -3040,7 +3040,7 @@ async fn test_open_confirm_automatic_stop() -> Result<(), FsmStateError<SocketAd
 async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -3118,7 +3118,7 @@ async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<Sock
 async fn test_open_confirm_keep_alive_timer_expires() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -3177,7 +3177,7 @@ async fn test_open_confirm_keep_alive_timer_expires() -> Result<(), FsmStateErro
 async fn test_open_confirm_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let notif =
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
     let peer_open = BgpOpenMessage::new(
@@ -3241,7 +3241,7 @@ async fn test_open_confirm_notif_msg() -> Result<(), FsmStateError<SocketAddr>> 
 async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -3307,7 +3307,7 @@ async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<Socke
 async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmStateError<SocketAddr>>
 {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) + 1);
     let properties = PeerProperties::new(
         MY_AS,
@@ -3414,7 +3414,7 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
 async fn test_open_confirm_collision_dump_tracked_connection(
 ) -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
     let properties = PeerProperties::new(
         MY_AS,
@@ -3521,7 +3521,7 @@ async fn test_open_confirm_collision_dump_tracked_connection(
 async fn test_open_confirm_open_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let notif = BgpNotificationMessage::FiniteStateMachineError(
         FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState { value: vec![] },
     );
@@ -3587,7 +3587,7 @@ async fn test_open_confirm_open_msg() -> Result<(), FsmStateError<SocketAddr>> {
 async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let bgp_version = 0x03;
     let notif =
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
@@ -3663,7 +3663,7 @@ async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr
 async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let bad_header = [0xee; 16];
     let notif =
         BgpNotificationMessage::MessageHeaderError(MessageHeaderError::ConnectionNotSynchronized {
@@ -3736,7 +3736,7 @@ async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAd
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -3794,7 +3794,7 @@ async fn test_open_confirm_keep_alive_msg() -> Result<(), FsmStateError<SocketAd
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -3862,7 +3862,7 @@ async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>>
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -3936,7 +3936,7 @@ async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>>
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -4007,7 +4007,7 @@ async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<Socke
 #[test_log::test(tokio::test)]
 async fn test_established_starts() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -4078,7 +4078,7 @@ async fn test_established_starts() -> Result<(), FsmStateError<SocketAddr>> {
 #[test_log::test(tokio::test)]
 async fn test_established_manual_stop() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -4148,7 +4148,7 @@ async fn test_established_manual_stop() -> Result<(), FsmStateError<SocketAddr>>
 #[test_log::test(tokio::test)]
 async fn test_established_automatic_stop() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -4219,7 +4219,7 @@ async fn test_established_automatic_stop() -> Result<(), FsmStateError<SocketAdd
 async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -4300,7 +4300,7 @@ async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<Socke
 async fn test_established_keep_alive_timer_expires() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -4369,7 +4369,7 @@ async fn test_established_keep_alive_timer_expires() -> Result<(), FsmStateError
 async fn test_established_collision_dump_main_connection() -> Result<(), FsmStateError<SocketAddr>>
 {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) + 1);
     let properties = PeerProperties::new(
         MY_AS,
@@ -4482,7 +4482,7 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
 async fn test_established_collision_dump_tracked_connection(
 ) -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
     let properties = PeerProperties::new(
         MY_AS,
@@ -4594,7 +4594,7 @@ async fn test_established_collision_dump_tracked_connection(
 async fn test_established_reject_connection_tracking_disabled(
 ) -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
     let properties = PeerProperties::new(
         MY_AS,
@@ -4681,7 +4681,7 @@ async fn test_established_reject_connection_tracking_disabled(
 async fn test_established_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -4749,7 +4749,7 @@ async fn test_established_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
 async fn test_established_notif_version_error() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, hold_time, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         hold_time,
@@ -4818,7 +4818,7 @@ async fn test_established_notif_version_error() -> Result<(), FsmStateError<Sock
 #[test_log::test(tokio::test)]
 async fn test_established_tcp_connection_fails() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let my_open = BgpMessage::Open(BgpOpenMessage::new(
         MY_AS as u16,
         HOLD_TIME,
@@ -4899,7 +4899,7 @@ async fn test_established_tcp_connection_fails() -> Result<(), FsmStateError<Soc
 #[test_log::test(tokio::test)]
 async fn test_established_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,
@@ -4960,7 +4960,7 @@ async fn test_established_keep_alive_msg() -> Result<(), FsmStateError<SocketAdd
 #[test_log::test(tokio::test)]
 async fn test_established_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let policy =
-        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, HashSet::new(), HashSet::new());
     let peer_open = BgpOpenMessage::new(
         PEER_AS as u16,
         HOLD_TIME,

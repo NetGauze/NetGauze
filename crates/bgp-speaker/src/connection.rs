@@ -1555,7 +1555,7 @@ pub mod test {
             MY_AS,
             MY_BGP_ID,
             HOLD_TIME,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let open_delay_duration = Duration::from_secs(1);
@@ -1590,7 +1590,7 @@ pub mod test {
             MY_AS,
             MY_BGP_ID,
             HOLD_TIME,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let open_delay_duration = Duration::from_secs(1);
@@ -1651,7 +1651,7 @@ pub mod test {
             MY_AS,
             MY_BGP_ID,
             HOLD_TIME,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let open_delay_duration = Duration::from_secs(1);
@@ -1689,7 +1689,7 @@ pub mod test {
             MY_AS,
             MY_BGP_ID,
             HOLD_TIME,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let io = BgpIoMockBuilder::new()
@@ -1718,7 +1718,7 @@ pub mod test {
             MY_AS,
             MY_BGP_ID,
             HOLD_TIME,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let hold_time_seconds = 1;
@@ -1767,7 +1767,7 @@ pub mod test {
             MY_AS,
             MY_BGP_ID,
             our_hold_time,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let open = BgpOpenMessage::new(
@@ -1822,7 +1822,7 @@ pub mod test {
             MY_AS,
             MY_BGP_ID,
             HOLD_TIME,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let hold_time_seconds = 1;
@@ -1862,7 +1862,7 @@ pub mod test {
             MY_AS,
             MY_BGP_ID,
             hold_time_seconds as u16,
-            HashMap::new(),
+            HashSet::new(),
             HashSet::new(),
         );
         let open = BgpOpenMessage::new(
