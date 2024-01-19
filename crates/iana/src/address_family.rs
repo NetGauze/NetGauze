@@ -56,7 +56,7 @@ use strum_macros::{Display, FromRepr};
 /// assert_eq!(undefined, Err(UndefinedAddressFamily(65000)));
 /// ```
 #[repr(u16)]
-#[derive(FromRepr, Display, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(FromRepr, Display, Hash, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum AddressFamily {
     IPv4 = 1,

@@ -16,10 +16,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
-};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 
 use netgauze_bgp_speaker::peer::{
     EchoCapabilitiesPolicy, Peer, PeerAdminEvents, PeerConfig, PeerProperties,
@@ -416,7 +413,7 @@ fuzz_target!(|data: (
         IpAddr::V6(v6) => SocketAddr::V6(SocketAddrV6::new(v6, 179, 0, 0)),
     };
     let policy =
-        EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashMap::new(), HashSet::new());
+        EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashSet::new(), HashSet::new());
 
     tokio_test::block_on(async {
         let mut io_builder = IoBuilder::new();
