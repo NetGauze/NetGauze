@@ -12,7 +12,7 @@ fn main() {
     // Netflow V9 template packet
     let netflow_template = NetFlowV9Packet::new(
         45646,
-        Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 00).unwrap(),
+        Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 0).unwrap(),
         3812,
         0,
         vec![Set::Template(vec![TemplateRecord::new(
@@ -49,7 +49,7 @@ fn main() {
     // Netflow v9 data packet
     let netflow_data = NetFlowV9Packet::new(
         45647,
-        Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 01).unwrap(),
+        Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 1).unwrap(),
         3812,
         0,
         vec![Set::Data {

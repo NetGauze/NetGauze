@@ -9,6 +9,8 @@ homepage = "https://github.com/NetGauze/NetGauze"
 description = """
 Simple PCAP reader
 """
+keywords = ["pcap", "protocol"]
+categories = ["network-programming", "parsing"]
 
 [dependencies]
 pcap-parser = { version = "0.14", features = ["data"] }

@@ -54,7 +54,7 @@ fn generate_xref_link(xref: &Xref) -> Option<String> {
     }
 }
 
-/// Generate InformationElementDataType
+/// Generate `InformationElementDataType`
 /// Currently we manually write this provide option for user defined types
 #[allow(dead_code)]
 pub(crate) fn generate_ie_data_type(data_types: &[SimpleRegistry]) -> String {
@@ -131,8 +131,9 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
                 ie.name,
                 ie.data_type_semantics
                     .as_ref()
-                    .map(|x| format!("Some(super::InformationElementSemantics::{x})"))
-                    .unwrap_or_else(|| "None".to_string())
+                    .map_or("None".to_string(), |x| format!(
+                        "Some(super::InformationElementSemantics::{x})"
+                    ))
             )
             .as_str(),
         );
@@ -161,10 +162,9 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
             format!(
                 "            Self::{} => {},\n",
                 ie.name,
-                ie.units
-                    .as_ref()
-                    .map(|x| format!("Some(super::InformationElementUnits::{x})"))
-                    .unwrap_or_else(|| "None".to_string())
+                ie.units.as_ref().map_or("None".to_string(), |x| format!(
+                    "Some(super::InformationElementUnits::{x})"
+                ))
             )
             .as_str(),
         );
@@ -179,27 +179,24 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
             format!(
                 "            Self::{} => {},\n",
                 ie.name,
-                ie.range
-                    .as_ref()
-                    .map(|x| {
-                        let mut parts = vec![];
-                        for part in x.split('-') {
-                            parts.push(part)
-                        }
-                        let start = parts.first().expect("Couldn't parse units range");
-                        let end = parts.get(1).unwrap().trim();
-                        let end = if end.starts_with("0x") {
-                            u64::from_str_radix(end.trim_start_matches("0x"), 16).unwrap()
-                        } else {
-                            end.parse::<u64>().unwrap()
-                        };
-                        format!(
-                            "Some(std::ops::Range{{start: {}, end: {}}})",
-                            start,
-                            end + 1
-                        )
-                    })
-                    .unwrap_or_else(|| "None".to_string())
+                ie.range.as_ref().map_or("None".to_string(), |x| {
+                    let mut parts = vec![];
+                    for part in x.split('-') {
+                        parts.push(part);
+                    }
+                    let start = parts.first().expect("Couldn't parse units range");
+                    let end = parts.get(1).unwrap().trim();
+                    let end = if end.starts_with("0x") {
+                        u64::from_str_radix(end.trim_start_matches("0x"), 16).unwrap()
+                    } else {
+                        end.parse::<u64>().unwrap()
+                    };
+                    format!(
+                        "Some(std::ops::Range{{start: {}, end: {}}})",
+                        start,
+                        end + 1
+                    )
+                })
             )
             .as_str(),
         );
@@ -283,7 +280,7 @@ pub(crate) fn generate_ie_status() -> String {
     ret
 }
 
-/// Use at the beginning of ie_generated for defining custom types
+/// Use at the beginning of `ie_generated` for defining custom types
 pub(crate) fn generate_common_types() -> String {
     "pub type MacAddress = [u8; 6];\n\n".to_string()
 }
@@ -349,8 +346,9 @@ fn generate_ie_template_trait_for_main(
                 ie.name,
                 ie.data_type_semantics
                     .as_ref()
-                    .map(|x| format!("Some(InformationElementSemantics::{x})"))
-                    .unwrap_or_else(|| "None".to_string())
+                    .map_or("None".to_string(), |x| format!(
+                        "Some(InformationElementSemantics::{x})"
+                    ))
             )
             .as_str(),
         );
@@ -387,10 +385,9 @@ fn generate_ie_template_trait_for_main(
             format!(
                 "            Self::{} => {},\n",
                 ie.name,
-                ie.units
-                    .as_ref()
-                    .map(|x| format!("Some(super::InformationElementUnits::{x})"))
-                    .unwrap_or_else(|| "None".to_string())
+                ie.units.as_ref().map_or("None".to_string(), |x| format!(
+                    "Some(super::InformationElementUnits::{x})"
+                ))
             )
             .as_str(),
         );
@@ -409,27 +406,24 @@ fn generate_ie_template_trait_for_main(
             format!(
                 "            Self::{} => {},\n",
                 ie.name,
-                ie.range
-                    .as_ref()
-                    .map(|x| {
-                        let mut parts = vec![];
-                        for part in x.split('-') {
-                            parts.push(part)
-                        }
-                        let start = parts.first().expect("Couldn't parse units range");
-                        let end = parts.get(1).unwrap().trim();
-                        let end = if end.starts_with("0x") {
-                            u64::from_str_radix(end.trim_start_matches("0x"), 16).unwrap()
-                        } else {
-                            end.parse::<u64>().unwrap()
-                        };
-                        format!(
-                            "Some(std::ops::Range{{start: {}, end: {}}})",
-                            start,
-                            end + 1
-                        )
-                    })
-                    .unwrap_or_else(|| "None".to_string())
+                ie.range.as_ref().map_or("None".to_string(), |x| {
+                    let mut parts = vec![];
+                    for part in x.split('-') {
+                        parts.push(part);
+                    }
+                    let start = parts.first().expect("Couldn't parse units range");
+                    let end = parts.get(1).unwrap().trim();
+                    let end = if end.starts_with("0x") {
+                        u64::from_str_radix(end.trim_start_matches("0x"), 16).unwrap()
+                    } else {
+                        end.parse::<u64>().unwrap()
+                    };
+                    format!(
+                        "Some(std::ops::Range{{start: {}, end: {}}})",
+                        start,
+                        end + 1
+                    )
+                })
             )
             .as_str(),
         );
@@ -1245,15 +1239,13 @@ fn get_rust_type(data_type: &str) -> String {
         "boolean" => "bool",
         "macAddress" => "super::MacAddress",
         "string" => "String",
-        "dateTimeSeconds" => "chrono::DateTime<chrono::Utc>",
-        "dateTimeMilliseconds" => "chrono::DateTime<chrono::Utc>",
-        "dateTimeMicroseconds" => "chrono::DateTime<chrono::Utc>",
-        "dateTimeNanoseconds" => "chrono::DateTime<chrono::Utc>",
+        "dateTimeSeconds"
+        | "dateTimeMilliseconds"
+        | "dateTimeMicroseconds"
+        | "dateTimeNanoseconds" => "chrono::DateTime<chrono::Utc>",
         "ipv4Address" => "std::net::Ipv4Addr",
         "ipv6Address" => "std::net::Ipv6Addr",
-        "basicList" => "Vec<u8>",
-        "subTemplateList" => "Vec<u8>",
-        "subTemplateMultiList" => "Vec<u8>",
+        "basicList" | "subTemplateList" | "subTemplateMultiList" => "Vec<u8>",
         other => todo!("Implement rust data type conversion for {}", other),
     };
     rust_type.to_string()

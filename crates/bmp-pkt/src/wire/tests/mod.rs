@@ -224,7 +224,7 @@ fn test_peer_header() -> Result<(), PeerHeaderWritingError> {
         Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
         200,
         Ipv4Addr::new(172, 16, 0, 20),
-        Some(Utc.with_ymd_and_hms(2023, 01, 01, 01, 00, 00).unwrap()),
+        Some(Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0).unwrap()),
     );
 
     let good_ipv6 = PeerHeader::new(
