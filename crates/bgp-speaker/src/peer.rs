@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     error::Error,
     fmt::{Debug, Display},
     marker::PhantomData,
@@ -35,8 +35,8 @@ use tokio::{
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
 use netgauze_bgp_pkt::{
-    capabilities::BgpCapability,
-    iana::AS_TRANS,
+    capabilities::{BgpCapability, FourOctetAsCapability},
+    iana::{BgpCapabilityCode, AS_TRANS},
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
@@ -99,9 +99,9 @@ pub struct EchoCapabilitiesPolicy<A, I, D> {
     my_bgp_id: Ipv4Addr,
     remote_as: Option<u32>,
     hold_timer_duration: u16,
-    capabilities: HashSet<BgpCapability>,
-    reject_capabilities: HashSet<BgpCapability>,
-    peer_capabilities: HashSet<BgpCapability>,
+    capabilities: Vec<BgpCapability>,
+    reject_capabilities: Vec<BgpCapability>,
+    peer_capabilities: Vec<BgpCapability>,
     _address_marker: PhantomData<A>,
     _inner_marker: PhantomData<I>,
     _codec_marker: PhantomData<D>,
@@ -112,8 +112,8 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
         my_asn: u32,
         my_bgp_id: Ipv4Addr,
         hold_timer_duration: u16,
-        capabilities: HashSet<BgpCapability>,
-        reject_capabilities: HashSet<BgpCapability>,
+        capabilities: Vec<BgpCapability>,
+        reject_capabilities: Vec<BgpCapability>,
     ) -> Self {
         Self {
             my_asn,
@@ -122,7 +122,7 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
             hold_timer_duration,
             capabilities,
             reject_capabilities,
-            peer_capabilities: HashSet::new(),
+            peer_capabilities: Vec::new(),
             _address_marker: PhantomData,
             _inner_marker: PhantomData,
             _codec_marker: PhantomData,
@@ -141,28 +141,39 @@ impl<
     > PeerPolicy<A, I, D> for EchoCapabilitiesPolicy<A, I, D>
 {
     async fn open_message(&mut self) -> BgpOpenMessage {
-        let mut capabilities: HashSet<BgpCapability> = self.capabilities.iter().cloned().collect();
+        // ASN in BGP header is always 2-octets,
+        // 4-octets are encoded in as a BGP Capability
+        let (my_asn, asn4_cap) = if self.my_asn > u16::MAX as u32 {
+            (
+                AS_TRANS,
+                Some(BgpCapability::FourOctetAs(FourOctetAsCapability::new(
+                    self.my_asn,
+                ))),
+            )
+        } else {
+            (self.my_asn as u16, None)
+        };
+
+        let mut capabilities: Vec<BgpCapability> = self.capabilities.clone();
+        // Make sure ASN4 capability is inserted only once
+        if let Some(asn4_cap) = asn4_cap {
+            if !capabilities.contains(&asn4_cap) {
+                capabilities.insert(0, asn4_cap);
+            }
+        }
         for cap in &self.peer_capabilities {
             // Check that the capability has not been added before and not in the reject
             // list
             if !self.capabilities.contains(cap) && !self.reject_capabilities.contains(cap) {
-                capabilities.insert(cap.clone());
+                capabilities.push(cap.clone());
             }
         }
-        // ASN in BGP header is always 2-octets,
-        // 4-octets are encoded in as a BGP Capability
-        let my_asn = if self.my_asn > u16::MAX as u32 {
-            AS_TRANS
-        } else {
-            self.my_asn as u16
-        };
+
         BgpOpenMessage::new(
             my_asn,
             self.hold_timer_duration,
             self.my_bgp_id,
-            vec![BgpOpenMessageParameter::Capabilities(
-                capabilities.iter().cloned().collect::<Vec<BgpCapability>>(),
-            )],
+            vec![BgpOpenMessageParameter::Capabilities(capabilities)],
         )
     }
 
@@ -175,7 +186,12 @@ impl<
             ConnectionEvent::BGPOpen(open) | ConnectionEvent::BGPOpenWithDelayOpenTimer(open) => {
                 let asn = open.my_asn4();
                 self.remote_as.replace(asn);
-                self.peer_capabilities = open.capabilities().values().cloned().cloned().collect();
+                self.peer_capabilities = open
+                    .capabilities()
+                    .into_iter()
+                    .filter(|cap| cap.code() != Ok(BgpCapabilityCode::FourOctetAs))
+                    .cloned()
+                    .collect();
             }
             _ => {}
         }
