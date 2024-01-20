@@ -20,4 +20,5 @@ serde = { workspace = true, features = ["derive"] }
 arbitrary = { workspace = true, optional = true }
 
 [features]
+default = []
 fuzz = ["arbitrary"]

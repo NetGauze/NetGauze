@@ -39,8 +39,8 @@ strum_macros = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
 
-
 [features]
+default = []
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
