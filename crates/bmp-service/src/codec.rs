@@ -17,14 +17,17 @@
 
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
-use netgauze_bgp_pkt::{capabilities::BgpCapability, iana::BgpCapabilityCode, BgpMessage};
+use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
 use netgauze_bmp_pkt::{
     iana::BmpVersion,
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
     BmpMessage, BmpMessageValue, PeerKey,
 };
 
-use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
+use netgauze_bgp_pkt::{
+    capabilities::{AddPathCapability, MultipleLabel},
+    wire::deserializer::BgpParsingContext,
+};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 use nom::Needed;
 use serde::{Deserialize, Serialize};
@@ -55,6 +58,34 @@ pub struct BmpCodec {
     ctx: HashMap<PeerKey, BgpParsingContext>,
 }
 
+#[inline]
+fn get_caps(
+    capabilities: Vec<&BgpCapability>,
+) -> (Vec<AddPathCapability>, Vec<Vec<MultipleLabel>>) {
+    let add_path_caps = capabilities
+        .iter()
+        .flat_map(|cap| {
+            if let BgpCapability::AddPath(add_path) = cap {
+                Some(add_path)
+            } else {
+                None
+            }
+        })
+        .cloned()
+        .collect::<Vec<AddPathCapability>>();
+    let multiple_labels_caps = capabilities
+        .iter()
+        .flat_map(|cap| {
+            if let BgpCapability::MultipleLabels(value) = cap {
+                Some(value)
+            } else {
+                None
+            }
+        })
+        .cloned()
+        .collect::<Vec<Vec<MultipleLabel>>>();
+    (add_path_caps, multiple_labels_caps)
+}
 impl BmpCodec {
     fn update_add_path(&mut self, msg: &BmpMessage) {
         match msg {
@@ -66,9 +97,8 @@ impl BmpCodec {
                 BmpMessageValue::PeerUpNotification(peer_up) => {
                     if let BgpMessage::Open(open) = peer_up.sent_message() {
                         let capabilities = open.capabilities();
-                        if let Some(BgpCapability::AddPath(add_path)) =
-                            capabilities.get(&BgpCapabilityCode::AddPathCapability)
-                        {
+                        let (add_path_caps, multiple_labels_caps) = get_caps(capabilities);
+                        for add_path in add_path_caps {
                             let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
                             let bgp_ctx = self.ctx.entry(peer_key).or_default();
                             for add_path_family in add_path.address_families() {
@@ -78,9 +108,7 @@ impl BmpCodec {
                                 );
                             }
                         }
-                        if let Some(BgpCapability::MultipleLabels(labels)) =
-                            capabilities.get(&BgpCapabilityCode::MultipleLabelsCapability)
-                        {
+                        for labels in multiple_labels_caps {
                             let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
                             let bgp_ctx = self.ctx.entry(peer_key).or_default();
                             for label in labels {
@@ -92,9 +120,8 @@ impl BmpCodec {
                     }
                     if let BgpMessage::Open(open) = peer_up.received_message() {
                         let capabilities = open.capabilities();
-                        if let Some(BgpCapability::AddPath(add_path)) =
-                            capabilities.get(&BgpCapabilityCode::AddPathCapability)
-                        {
+                        let (add_path_caps, multiple_labels_caps) = get_caps(capabilities);
+                        for add_path in add_path_caps {
                             let peer_key = PeerKey::new(
                                 peer_up.peer_header().address(),
                                 peer_up.peer_header().peer_type(),
@@ -110,9 +137,7 @@ impl BmpCodec {
                                 );
                             }
                         }
-                        if let Some(BgpCapability::MultipleLabels(multiple_labels)) =
-                            capabilities.get(&BgpCapabilityCode::MultipleLabelsCapability)
-                        {
+                        for multiple_labels in multiple_labels_caps {
                             let peer_key = PeerKey::new(
                                 peer_up.peer_header().address(),
                                 peer_up.peer_header().peer_type(),

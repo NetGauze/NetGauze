@@ -17,8 +17,8 @@
 
 #[cfg(feature = "fuzz")]
 use crate::arbitrary_ipv4;
-use crate::{capabilities::BgpCapability, iana::BgpCapabilityCode, Deserialize, Serialize};
-use std::{collections::HashMap, net::Ipv4Addr};
+use crate::{capabilities::BgpCapability, Deserialize, Serialize};
+use std::net::Ipv4Addr;
 
 pub const BGP_VERSION: u8 = 4;
 
@@ -91,33 +91,29 @@ impl BgpOpenMessage {
 
     /// Read the ASN4 value
     pub fn my_asn4(&self) -> u32 {
-        self.params
-            .iter()
-            .flat_map(|x| match x {
-                BgpOpenMessageParameter::Capabilities(capabilities_vec) => capabilities_vec,
-            })
-            .find(|cap| cap.code() == Ok(BgpCapabilityCode::FourOctetAs))
-            .map(|cap| {
+        self.capabilities()
+            .into_iter()
+            .filter_map(|cap| {
                 if let BgpCapability::FourOctetAs(asn4) = cap {
-                    asn4.asn4()
+                    Some(asn4.asn4())
                 } else {
-                    self.my_as as u32
+                    None
                 }
             })
+            .collect::<Vec<u32>>()
+            .pop()
             .unwrap_or(self.my_as as u32)
     }
 
     /// Shortcut to get a list of all the capabilities from all the parameters
-    pub fn capabilities(&self) -> HashMap<BgpCapabilityCode, &BgpCapability> {
+    pub fn capabilities(&self) -> Vec<&BgpCapability> {
         return self
             .params
             .iter()
             .flat_map(|x| match x {
                 BgpOpenMessageParameter::Capabilities(capabilities_vec) => capabilities_vec,
             })
-            .filter(|x| x.code().is_ok())
-            .map(|x| (x.code().unwrap(), x))
-            .collect::<HashMap<BgpCapabilityCode, &BgpCapability>>();
+            .collect();
     }
 }
 
