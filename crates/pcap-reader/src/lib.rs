@@ -51,7 +51,7 @@ impl<'a> Iterator for PcapIter<'a> {
                 Ok((offset, block)) => {
                     match block {
                         PcapBlockOwned::Legacy(legacy_packet) => {
-                            let packet_data = pcap_parser::data::get_packetdata(
+                            let packet_data = data::get_packetdata(
                                 legacy_packet.data,
                                 Linktype::ETHERNET,
                                 legacy_packet.caplen as usize,
@@ -72,7 +72,7 @@ impl<'a> Iterator for PcapIter<'a> {
                         }
                         PcapBlockOwned::NG(Block::EnhancedPacket(packet)) => {
                             let link_type = self.link_types[packet.if_id as usize];
-                            let packet_data = pcap_parser::data::get_packetdata(
+                            let packet_data = data::get_packetdata(
                                 packet.data,
                                 link_type,
                                 packet.caplen as usize,

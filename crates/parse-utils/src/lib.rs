@@ -27,7 +27,7 @@ pub type Span<'a> = BinarySpan<&'a [u8]>;
 /// Generic trait for Readable Protocol Data Unit that doesn't need any external
 /// input while parsing the packet.
 pub trait ReadablePdu<'a, Error: Debug> {
-    fn from_wire(buf: Span<'a>) -> nom::IResult<Span<'a>, Self, Error>
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, Error>
     where
         Self: Sized;
 }
@@ -35,7 +35,7 @@ pub trait ReadablePdu<'a, Error: Debug> {
 /// Generic trait Readable Protocol Data Unit that does need a single external
 /// input
 pub trait ReadablePduWithOneInput<'a, T, ErrorType> {
-    fn from_wire(buf: Span<'a>, input: T) -> nom::IResult<Span<'a>, Self, ErrorType>
+    fn from_wire(buf: Span<'a>, input: T) -> IResult<Span<'a>, Self, ErrorType>
     where
         Self: Sized;
 }
@@ -43,7 +43,7 @@ pub trait ReadablePduWithOneInput<'a, T, ErrorType> {
 /// Generic trait for Readable Protocol Data Unit that does need two external
 /// inputs
 pub trait ReadablePduWithTwoInputs<'a, T, U, ErrorType> {
-    fn from_wire(buf: Span<'a>, input1: T, input2: U) -> nom::IResult<Span<'a>, Self, ErrorType>
+    fn from_wire(buf: Span<'a>, input1: T, input2: U) -> IResult<Span<'a>, Self, ErrorType>
     where
         Self: Sized;
 }
@@ -56,7 +56,7 @@ pub trait ReadablePduWithThreeInputs<'a, I1, I2, I3, ErrorType> {
         input1: I1,
         input2: I2,
         input3: I3,
-    ) -> nom::IResult<Span<'a>, Self, ErrorType>
+    ) -> IResult<Span<'a>, Self, ErrorType>
     where
         Self: Sized;
 }

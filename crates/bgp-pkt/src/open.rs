@@ -15,8 +15,6 @@
 
 //! Representations for BGP Open message
 
-#[cfg(feature = "fuzz")]
-use crate::arbitrary_ipv4;
 use crate::{capabilities::BgpCapability, Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
@@ -48,7 +46,7 @@ pub struct BgpOpenMessage {
     version: u8,
     my_as: u16,
     hold_time: u16,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
     bgp_id: Ipv4Addr,
     params: Vec<BgpOpenMessageParameter>, // TODO (AH): rfc5492
 }

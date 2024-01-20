@@ -208,7 +208,7 @@ impl Default for BgpParsingContext {
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4PrefixParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -259,7 +259,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4PrefixParsingErro
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv6PrefixParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -340,7 +340,7 @@ impl<'a> ReadablePdu<'a, LocatedIpAddrParsingError<'a>> for IpAddr {
 /// BGP Message Parsing errors
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpMessageParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

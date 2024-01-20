@@ -346,10 +346,8 @@ impl LocatedError {
 #[proc_macro_derive(LocatedError, attributes(from_nom, from_external, from_located))]
 pub fn located_error(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse_macro_input!(input as syn::DeriveInput);
-    match LocatedError::from(&ast) {
-        Ok(tokens) => tokens,
-        Err(err) => proc_macro::TokenStream::from(err.to_compile_error()),
-    }
+    LocatedError::from(&ast)
+        .unwrap_or_else(|err| proc_macro::TokenStream::from(err.to_compile_error()))
 }
 
 #[derive(Debug)]
@@ -427,8 +425,6 @@ impl WritingError {
 #[proc_macro_derive(WritingError, attributes(from_std_io_error, from))]
 pub fn writing_error(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse_macro_input!(input as syn::DeriveInput);
-    match WritingError::from(&ast) {
-        Ok(tokens) => tokens,
-        Err(err) => proc_macro::TokenStream::from(err.to_compile_error()),
-    }
+    WritingError::from(&ast)
+        .unwrap_or_else(|err| proc_macro::TokenStream::from(err.to_compile_error()))
 }

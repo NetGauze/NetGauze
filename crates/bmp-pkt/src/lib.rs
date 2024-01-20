@@ -137,11 +137,11 @@ impl BmpMessageValue {
 pub struct PeerHeader {
     peer_type: BmpPeerType,
     rd: Option<RouteDistinguisher>,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ip)))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ip)))]
     address: Option<IpAddr>,
     peer_as: u32,
     bgp_id: Ipv4Addr,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_datetime)))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_datetime)))]
     timestamp: Option<DateTime<Utc>>,
 }
 
@@ -449,7 +449,7 @@ impl TerminationInformation {
 
 /// Runtime errors when constructing a [`RouteMonitoringMessage`]
 /// Peer Up BGP messages should only carry
-/// [`netgauze_bgp_pkt::BgpMessage::Update`], anything else is an error
+/// [`BgpMessage::Update`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMonitoringMessageError {
@@ -585,7 +585,7 @@ impl RouteMirroringValue {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerUpNotificationMessage {
     peer_header: PeerHeader,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ip)))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ip)))]
     local_address: Option<IpAddr>,
     local_port: Option<u16>,
     remote_port: Option<u16>,
@@ -596,7 +596,7 @@ pub struct PeerUpNotificationMessage {
 
 /// Runtime errors when constructing a [`PeerUpNotificationMessage`]
 /// Peer Up BGP messages should only carry
-/// [`netgauze_bgp_pkt::BgpMessage::Open`], anything else is an error
+/// [`BgpMessage::Open`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PeerUpNotificationMessageError {
@@ -668,7 +668,7 @@ impl PeerUpNotificationMessage {
 
 /// Runtime errors when constructing a [`PeerDownNotificationMessage`]
 /// Peer Up BGP messages should only carry
-/// [`netgauze_bgp_pkt::BgpMessage::Notification`], anything else is an error
+/// [`BgpMessage::Notification`], anything else is an error
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PeerDownNotificationMessageError {
@@ -1025,7 +1025,7 @@ fn arbitrary_ipv4(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Ipv4
 #[derive(Debug, Hash, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerKey {
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ip)))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ip)))]
     peer_address: Option<IpAddr>,
     peer_type: BmpPeerType,
     rd: Option<RouteDistinguisher>,

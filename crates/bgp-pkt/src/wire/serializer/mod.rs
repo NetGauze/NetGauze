@@ -58,10 +58,10 @@ pub enum BgpMessageWritingError {
 
     StdIOError(#[from_std_io_error] String),
 
-    /// Error encountered during parsing a [c`rate::open::BgpOpenMessage`]
+    /// Error encountered during parsing a [crate::open::BgpOpenMessage]
     OpenError(#[from] BgpOpenMessageWritingError),
 
-    /// Error encountered during parsing a [`crate::update::BgpUpdateMessage`]
+    /// Error encountered during parsing a [crate::update::BgpUpdateMessage]
     UpdateError(#[from] BgpUpdateMessageWritingError),
 
     NotificationError(#[from] BgpNotificationMessageWritingError),

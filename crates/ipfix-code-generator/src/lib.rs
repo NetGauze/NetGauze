@@ -179,7 +179,7 @@ fn get_string_source(source: &RegistrySource) -> Result<String, GetStringSourceE
             let resp = client.get(url).send()?;
             resp.text()?
         }
-        RegistrySource::File(path) => std::fs::read_to_string(path)?,
+        RegistrySource::File(path) => fs::read_to_string(path)?,
     };
     Ok(str)
 }

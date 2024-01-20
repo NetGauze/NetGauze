@@ -98,7 +98,7 @@ impl BmpServer {
                         ret = Self::handle_connection(svc.clone(), addr_info, framed) =>{
                             tracing::info!("worker closed {:?} and service ret: {:?}", addr_info, ret);
                         },
-                    };
+                    }
                     tracing::info!("worker_ended");
                 });
             }
