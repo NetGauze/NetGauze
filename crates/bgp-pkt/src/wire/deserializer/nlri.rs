@@ -423,7 +423,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4UnicastParsingErr
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum Ipv4UnicastAddressParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

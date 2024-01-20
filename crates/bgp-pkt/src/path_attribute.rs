@@ -16,8 +16,6 @@
 //! Contains the extensible definitions for various [`PathAttribute`] that can
 //! be used in [`crate::update::BgpUpdateMessage`].
 
-#[cfg(feature = "fuzz")]
-use crate::{arbitrary_ip, arbitrary_ipv4, arbitrary_ipv6};
 use crate::{
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     nlri::*,
@@ -929,17 +927,17 @@ impl ClusterId {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MpReach {
     Ipv4Unicast {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
         next_hop: Ipv4Addr,
         nlri: Vec<Ipv4UnicastAddress>,
     },
     Ipv4Multicast {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
         next_hop: Ipv4Addr,
         nlri: Vec<Ipv4MulticastAddress>,
     },
     Ipv4NlriMplsLabels {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<Ipv4NlriMplsLabelsAddress>,
     },
@@ -949,19 +947,19 @@ pub enum MpReach {
     },
     Ipv6Unicast {
         next_hop_global: Ipv6Addr,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ipv6)))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv6UnicastAddress>,
     },
     Ipv6Multicast {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6))]
         next_hop_global: Ipv6Addr,
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ipv6)))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
         next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv6MulticastAddress>,
     },
     Ipv6NlriMplsLabels {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<Ipv6NlriMplsLabelsAddress>,
     },
@@ -970,12 +968,12 @@ pub enum MpReach {
         nlri: Vec<Ipv6MplsVpnUnicastAddress>,
     },
     L2Evpn {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<L2EvpnAddress>,
     },
     RouteTargetMembership {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<RouteTargetMembershipAddress>,
     },

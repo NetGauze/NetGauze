@@ -31,7 +31,7 @@ use crate::{community::*, iana::*, wire::deserializer::nlri::MacAddressParsingEr
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum CommunityParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

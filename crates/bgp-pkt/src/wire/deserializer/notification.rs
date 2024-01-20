@@ -38,7 +38,7 @@ use serde::{Deserialize, Serialize};
 /// BGP Notification Message Parsing errors
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpNotificationMessageParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -93,7 +93,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpNotificationMessageParsingError<'a>> for BgpN
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum MessageHeaderErrorParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -139,7 +139,7 @@ impl<'a> ReadablePdu<'a, LocatedMessageHeaderErrorParsingError<'a>> for MessageH
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum OpenMessageErrorParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -209,7 +209,7 @@ impl<'a> ReadablePdu<'a, LocatedOpenMessageErrorParsingError<'a>> for OpenMessag
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum UpdateMessageErrorParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -297,7 +297,7 @@ impl<'a> ReadablePdu<'a, LocatedUpdateMessageErrorParsingError<'a>> for UpdateMe
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum HoldTimerExpiredErrorParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -321,7 +321,7 @@ impl<'a> ReadablePdu<'a, LocatedHoldTimerExpiredErrorParsingError<'a>> for HoldT
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FiniteStateMachineErrorParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -369,7 +369,7 @@ impl<'a> ReadablePdu<'a, LocatedFiniteStateMachineErrorParsingError<'a>>
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum CeaseErrorParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
@@ -448,7 +448,7 @@ impl<'a> ReadablePdu<'a, LocatedCeaseErrorParsingError<'a>> for CeaseError {
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum RouteRefreshErrorParsingError {
-    /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
+    /// Errors triggered by the nom parser, see [ErrorKind] for
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),

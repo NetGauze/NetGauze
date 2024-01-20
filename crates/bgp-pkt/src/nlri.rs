@@ -17,8 +17,6 @@
 //! (`NLRI`)
 
 use crate::iana::{L2EvpnRouteTypeCode, RouteDistinguisherTypeCode};
-#[cfg(feature = "fuzz")]
-use crate::{arbitrary_ip, arbitrary_ipv4, arbitrary_ipv4net, arbitrary_ipv6, arbitrary_ipv6net};
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_iana::address_family::AddressType;
 use serde::{Deserialize, Serialize};
@@ -66,7 +64,7 @@ pub enum RouteDistinguisher {
     ///     - Administrator subfield: Ipv4 address
     ///     - Assigned Number subfield: 2 bytes
     Ipv4Administrator {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
         ip: Ipv4Addr,
         number: u16,
     },
@@ -96,7 +94,7 @@ impl RouteDistinguisher {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LabeledIpv4NextHop {
     rd: RouteDistinguisher,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
     next_hop: Ipv4Addr,
 }
 
@@ -118,7 +116,7 @@ impl LabeledIpv4NextHop {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LabeledIpv6NextHop {
     rd: RouteDistinguisher,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6))]
     next_hop: Ipv6Addr,
 }
 
@@ -147,14 +145,16 @@ pub enum LabeledNextHop {
 /// networks
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct Ipv4Unicast(#[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4net))] Ipv4Net);
+pub struct Ipv4Unicast(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] Ipv4Net,
+);
 
 /// Raised when the network is not a unicast range
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 
 pub struct InvalidIpv4UnicastNetwork(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4net))] pub Ipv4Net,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] pub Ipv4Net,
 );
 
 impl Ipv4Unicast {
@@ -283,13 +283,13 @@ impl NlriAddressType for Ipv4MplsVpnUnicastAddress {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Ipv4Multicast(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4net))] Ipv4Net,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] Ipv4Net,
 );
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct InvalidIpv4MulticastNetwork(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4net))] pub Ipv4Net,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] pub Ipv4Net,
 );
 
 impl Ipv4Multicast {
@@ -353,12 +353,14 @@ impl NlriAddressType for Ipv4MulticastAddress {
 /// networks
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct Ipv6Unicast(#[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6net))] Ipv6Net);
+pub struct Ipv6Unicast(
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] Ipv6Net,
+);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct InvalidIpv6UnicastNetwork(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6net))] pub Ipv6Net,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] pub Ipv6Net,
 );
 
 impl Ipv6Unicast {
@@ -475,13 +477,13 @@ impl NlriAddressType for Ipv6MplsVpnUnicastAddress {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Ipv6Multicast(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6net))] Ipv6Net,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] Ipv6Net,
 );
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct InvalidIpv6MulticastNetwork(
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6net))] pub Ipv6Net,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] pub Ipv6Net,
 );
 
 impl Ipv6Multicast {
@@ -693,7 +695,7 @@ pub struct MacIpAdvertisement {
     segment_id: EthernetSegmentIdentifier,
     tag: EthernetTag,
     mac: MacAddress,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(arbitrary_ip)))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ip)))]
     ip: Option<IpAddr>,
     mpls_label1: MplsLabel,
     mpls_label2: Option<MplsLabel>,
@@ -769,7 +771,7 @@ impl MacIpAdvertisement {
 pub struct InclusiveMulticastEthernetTagRoute {
     rd: RouteDistinguisher,
     tag: EthernetTag,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
     ip: IpAddr,
 }
 
@@ -811,7 +813,7 @@ impl InclusiveMulticastEthernetTagRoute {
 pub struct EthernetSegmentRoute {
     rd: RouteDistinguisher,
     segment_id: EthernetSegmentIdentifier,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
     ip: IpAddr,
 }
 
@@ -870,9 +872,9 @@ pub struct L2EvpnIpv4PrefixRoute {
     rd: RouteDistinguisher,
     segment_id: EthernetSegmentIdentifier,
     tag: EthernetTag,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4net))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))]
     prefix: Ipv4Net,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
     gateway: Ipv4Addr,
     label: MplsLabel,
 }
@@ -944,9 +946,9 @@ pub struct L2EvpnIpv6PrefixRoute {
     rd: RouteDistinguisher,
     segment_id: EthernetSegmentIdentifier,
     tag: EthernetTag,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6net))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))]
     prefix: Ipv6Net,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6))]
     gateway: Ipv6Addr,
     label: MplsLabel,
 }
@@ -1097,7 +1099,7 @@ impl NlriAddressType for RouteTargetMembershipAddress {
 pub struct Ipv4NlriMplsLabelsAddress {
     path_id: Option<u32>,
     labels: Vec<MplsLabel>,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4net))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))]
     prefix: Ipv4Net,
 }
 
@@ -1173,7 +1175,7 @@ impl NlriAddressType for Ipv4NlriMplsLabelsAddress {
 pub struct Ipv6NlriMplsLabelsAddress {
     path_id: Option<u32>,
     labels: Vec<MplsLabel>,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6net))]
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))]
     prefix: Ipv6Net,
 }
 
