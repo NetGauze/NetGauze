@@ -35,7 +35,7 @@ use netgauze_bgp_speaker::{
 };
 use std::{
     cmp,
-    collections::{HashSet, VecDeque},
+    collections::VecDeque,
     fmt,
     future::Future,
     io,
@@ -412,8 +412,7 @@ fuzz_target!(|data: (
         IpAddr::V4(v4) => SocketAddr::V4(SocketAddrV4::new(v4, 179)),
         IpAddr::V6(v6) => SocketAddr::V6(SocketAddrV6::new(v6, 179, 0, 0)),
     };
-    let policy =
-        EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashSet::new(), HashSet::new());
+    let policy = EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, vec![], vec![]);
 
     tokio_test::block_on(async {
         let mut io_builder = IoBuilder::new();

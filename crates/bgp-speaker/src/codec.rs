@@ -19,7 +19,7 @@ use nom::Needed;
 use tokio_util::codec::{Decoder, Encoder};
 
 use netgauze_bgp_pkt::{
-    iana::BgpCapabilityCode,
+    capabilities::BgpCapability,
     wire::{
         deserializer::{BgpMessageParsingError, BgpParsingContext, BgpParsingIgnoredErrors},
         serializer::BgpMessageWritingError,
@@ -92,8 +92,8 @@ impl Decoder for BgpCodec {
                         if let BgpMessage::Open(ref open) = msg {
                             let asn4 = open
                                 .capabilities()
-                                .get(&BgpCapabilityCode::FourOctetAs)
-                                .is_some();
+                                .into_iter()
+                                .any(|cap| matches!(cap, BgpCapability::FourOctetAs(_)));
                             log::debug!("Sending ASN4 received to: {asn4}");
                             self.asn4_received = Some(asn4);
                         }
@@ -137,8 +137,8 @@ impl Encoder<BgpMessage> for BgpCodec {
         if let BgpMessage::Open(ref open) = msg {
             let asn4 = open
                 .capabilities()
-                .get(&BgpCapabilityCode::FourOctetAs)
-                .is_some();
+                .into_iter()
+                .any(|cap| matches!(cap, BgpCapability::FourOctetAs(_)));
             log::debug!("Sending ASN4 sent to: {asn4}");
             self.asn4_sent = Some(asn4);
         }
