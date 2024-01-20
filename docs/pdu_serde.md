@@ -103,8 +103,8 @@ impl BPdu {
 
 * NetGauze uses [nom](https://github.com/geal/nom) as the primary parser.
 * In order to deserialize PDUs efficiently, NetGauze provides a fork
-  of [nom_locate](https://github.com/fflorent/nom_locate). See [netgauze-locate](../netgauze-locate/README.md).
-* [netgauze-parse-utils](../netgauze-parse-utils) provides the essential traits to handle PDUs parsing. And
+  of [nom_locate](https://github.com/fflorent/nom_locate). See [netgauze-locate](../crates/locate/README.md).
+* [netgauze-parse-utils](../crates/parse-utils) provides the essential traits to handle PDUs parsing. And
   optionally, testing helpers for unit testing.
 * In case if there is any deserialization error, the first error must be reported effectively, that includes
     * Exactly location in the byte stream of where the parsing error occurred
