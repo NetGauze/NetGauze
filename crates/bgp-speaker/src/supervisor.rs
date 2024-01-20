@@ -26,7 +26,7 @@ use netgauze_bgp_pkt::{
     BgpMessage,
 };
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::{Debug, Display},
     hash::Hash,
     net::Ipv4Addr,
@@ -151,8 +151,8 @@ impl<
             self.my_asn,
             self.my_bgp_id,
             peer_config.hold_timer_duration_large_value,
-            HashSet::new(),
-            HashSet::new(),
+            Vec::new(),
+            Vec::new(),
         );
         let (rx, peer_handle) = self.create_peer(
             peer_key,
@@ -194,14 +194,14 @@ mod tests {
             peer_properties,
             PeerConfig::default(),
             TcpActiveConnect,
-            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashSet::new(), HashSet::new()),
+            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, Vec::new(), Vec::new()),
         )?;
         let second_create = supervisor.create_peer(
             peer_addr.ip(),
             peer_properties,
             PeerConfig::default(),
             TcpActiveConnect,
-            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashSet::new(), HashSet::new()),
+            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, Vec::new(), Vec::new()),
         );
         let removed_peer = supervisor.remove_peer(&peer_addr.ip());
         let non_existing_peer = supervisor.remove_peer(&peer_addr.ip());
@@ -237,7 +237,7 @@ mod tests {
             peer_properties,
             PeerConfig::default(),
             TcpActiveConnect,
-            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, HashSet::new(), HashSet::new()),
+            EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, Vec::new(), Vec::new()),
         );
 
         let removed_peer = supervisor.remove_peer(&peer_addr.ip());

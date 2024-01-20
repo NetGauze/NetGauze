@@ -15,14 +15,12 @@
 
 use clap::Parser;
 use std::{
-    collections::{HashSet},
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    vec,
 };
 use tokio::net::TcpStream;
 
-use netgauze_bgp_pkt::{
-    capabilities::{BgpCapability, FourOctetAsCapability},
-};
+use netgauze_bgp_pkt::capabilities::{BgpCapability, FourOctetAsCapability};
 
 use netgauze_bgp_speaker::{
     connection::TcpActiveConnect,
@@ -46,10 +44,9 @@ fn create_peer(
     peer_addr: SocketAddr,
     supervisor: &mut PeersSupervisor<IpAddr, SocketAddr, TcpStream>,
 ) -> PeerHandle<SocketAddr, TcpStream> {
-    let mut caps = HashSet::new();
-    caps.insert(
-        BgpCapability::FourOctetAs(FourOctetAsCapability::new(my_asn)),
-    );
+    let caps = vec![BgpCapability::FourOctetAs(FourOctetAsCapability::new(
+        my_asn,
+    ))];
     let config = PeerConfigBuilder::new()
         .open_delay_timer_duration(1)
         .build();
@@ -58,7 +55,7 @@ fn create_peer(
         my_bgp_id,
         config.hold_timer_duration_large_value().as_secs() as u16,
         caps,
-        HashSet::new(),
+        vec![],
     );
 
     let properties = PeerProperties::new(
