@@ -35,7 +35,7 @@ use crate::codec::BgpCodecDecoderError;
 pub type BgpMsgReceiver = mpsc::Receiver<BgpMessage>;
 pub type BgpMsgSender = mpsc::Sender<BgpMessage>;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum UpdateTreatment {
     /// Treat update normally, errors were discovered
     Normal,
@@ -101,7 +101,7 @@ impl Ord for UpdateTreatment {
     }
 }
 
-#[derive(Debug, PartialEq, strum_macros::Display)]
+#[derive(Debug, PartialEq, strum_macros::Display, serde::Serialize, serde::Deserialize)]
 pub enum BgpEvent<A> {
     /// **Event 1:** Local system administrator manually starts the peer
     /// connection.
@@ -321,7 +321,7 @@ pub enum BgpEvent<A> {
 /// Subset of BGP Events defined [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271) that
 /// are related to the events occurring after connection is successfully made in
 /// [crate::fsm::FsmState::Connect] or [crate::fsm::FsmState::Active] states.
-#[derive(Debug, Clone, PartialEq, strum_macros::Display)]
+#[derive(Debug, Clone, PartialEq, strum_macros::Display, serde::Serialize, serde::Deserialize)]
 pub enum ConnectionEvent<A> {
     /// ***Event 10***: HoldTimer_Expires an event generated when the HoldTimer
     /// expires.
