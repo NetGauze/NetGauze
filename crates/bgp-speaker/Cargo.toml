@@ -14,12 +14,12 @@ keywords = ["bgp", "protocol"]
 categories = ["network-programming"]
 
 [dependencies]
-netgauze-bgp-pkt = { version = "0.2.0", path = "../bgp-pkt", features = ["serde"] }
+netgauze-bgp-pkt = { version = "0.2.0", path = "../bgp-pkt" }
 netgauze-iana = { version = "0.2.0", path = "../iana" }
 netgauze-locate = { version = "0.2.0", path = "../locate" }
 netgauze-parse-utils = { version = "0.2.0", path = "../parse-utils" }
 byteorder = { workspace = true }
-chrono = { workspace = true, default-features = false, features = ["std", "serde", "clock"] }
+chrono = { workspace = true, default-features = false, features = ["std", "clock"] }
 
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true, features = ["codec"] }
@@ -35,12 +35,13 @@ ipnet = { workspace = true }
 rand = { workspace = true }
 async-trait = { workspace = true }
 strum_macros = { workspace = true }
+serde = { workspace = true, features = ["derive"], optional = true }
 
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
 
 [features]
-default = []
+default = ["serde"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
