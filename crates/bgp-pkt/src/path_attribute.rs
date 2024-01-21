@@ -176,7 +176,7 @@ pub enum PathAttributeValue {
     MpReach(MpReach),
     MpUnreach(MpUnreach),
     OnlyToCustomer(OnlyToCustomer),
-    /// Accumulated IGP metric attribuyte
+    /// Accumulated IGP metric attribute
     Aigp(Aigp),
     UnknownAttribute(UnknownAttribute),
 }
