@@ -108,7 +108,7 @@ pub struct EchoCapabilitiesPolicy<A, I, D> {
 }
 
 impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
-    pub fn new(
+    pub const fn new(
         my_asn: u32,
         send_asn4_cap_by_default: bool,
         my_bgp_id: Ipv4Addr,
