@@ -14,7 +14,6 @@
 // limitations under the License.
 
 use std::{
-    collections::HashMap,
     error::Error,
     fmt::{Debug, Display},
     marker::PhantomData,
@@ -96,6 +95,7 @@ pub trait PeerPolicy<
 #[derive(Debug, Clone)]
 pub struct EchoCapabilitiesPolicy<A, I, D> {
     my_asn: u32,
+    send_asn4_cap_by_default: bool,
     my_bgp_id: Ipv4Addr,
     remote_as: Option<u32>,
     hold_timer_duration: u16,
@@ -110,6 +110,7 @@ pub struct EchoCapabilitiesPolicy<A, I, D> {
 impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
     pub fn new(
         my_asn: u32,
+        send_asn4_cap_by_default: bool,
         my_bgp_id: Ipv4Addr,
         hold_timer_duration: u16,
         capabilities: Vec<BgpCapability>,
@@ -117,6 +118,7 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
     ) -> Self {
         Self {
             my_asn,
+            send_asn4_cap_by_default,
             my_bgp_id,
             remote_as: None,
             hold_timer_duration,
@@ -127,6 +129,14 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
             _inner_marker: PhantomData,
             _codec_marker: PhantomData,
         }
+    }
+
+    pub const fn is_send_asn4_cap_by_default(&self) -> bool {
+        self.send_asn4_cap_by_default
+    }
+
+    pub fn send_asn4_cap_by_default(&mut self, value: bool) {
+        self.send_asn4_cap_by_default = value;
     }
 }
 
@@ -146,21 +156,23 @@ impl<
         let (my_asn, asn4_cap) = if self.my_asn > u16::MAX as u32 {
             (
                 AS_TRANS,
-                Some(BgpCapability::FourOctetAs(FourOctetAsCapability::new(
-                    self.my_asn,
-                ))),
+                BgpCapability::FourOctetAs(FourOctetAsCapability::new(self.my_asn)),
             )
         } else {
-            (self.my_asn as u16, None)
+            (
+                self.my_asn as u16,
+                BgpCapability::FourOctetAs(FourOctetAsCapability::new(self.my_asn)),
+            )
         };
 
         let mut capabilities: Vec<BgpCapability> = self.capabilities.clone();
         // Make sure ASN4 capability is inserted only once
-        if let Some(asn4_cap) = asn4_cap {
-            if !capabilities.contains(&asn4_cap) {
-                capabilities.insert(0, asn4_cap);
-            }
+        if (self.send_asn4_cap_by_default || my_asn == AS_TRANS)
+            && !capabilities.contains(&asn4_cap)
+        {
+            capabilities.insert(0, asn4_cap);
         }
+
         for cap in &self.peer_capabilities {
             // Check that the capability has not been added before and not in the reject
             // list
@@ -628,7 +640,6 @@ impl<
         let connection = Connection::new(
             &self.properties,
             peer_addr,
-            HashMap::new(),
             connection_type,
             (&self.config).into(),
             framed,

@@ -20,8 +20,6 @@ use std::{
 };
 use tokio::net::TcpStream;
 
-use netgauze_bgp_pkt::capabilities::{BgpCapability, FourOctetAsCapability};
-
 use netgauze_bgp_speaker::{
     connection::TcpActiveConnect,
     listener::BgpListener,
@@ -44,17 +42,15 @@ fn create_peer(
     peer_addr: SocketAddr,
     supervisor: &mut PeersSupervisor<IpAddr, SocketAddr, TcpStream>,
 ) -> PeerHandle<SocketAddr, TcpStream> {
-    let caps = vec![BgpCapability::FourOctetAs(FourOctetAsCapability::new(
-        my_asn,
-    ))];
     let config = PeerConfigBuilder::new()
         .open_delay_timer_duration(1)
         .build();
     let policy = EchoCapabilitiesPolicy::new(
         my_asn,
+        true,
         my_bgp_id,
         config.hold_timer_duration_large_value().as_secs() as u16,
-        caps,
+        vec![],
         vec![],
     );
 
