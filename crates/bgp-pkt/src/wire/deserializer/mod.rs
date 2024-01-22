@@ -377,21 +377,77 @@ pub enum BgpMessageParsingError {
     ),
 }
 
+/// Smaller error variant of BgpMessageParsingError for small stack allocations
+/// in parse_bgp_message_length_and_type
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum BgpMessageOpenAndLengthParsingError {
+    /// Errors triggered by the nom parser, see [ErrorKind] for
+    /// additional information.
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+
+    /// Couldn't recognize the type octet in the BGPMessage, see
+    /// [UndefinedBgpMessageType]
+    UndefinedBgpMessageType(#[from_external] UndefinedBgpMessageType),
+
+    /// BGP Message length is not in the defined \[min, max\] range for the
+    /// given message type
+    BadMessageLength(u16),
+}
+
+#[inline]
+fn into_located_bgp_message_parsing_error(
+    value: nom::Err<LocatedBgpMessageOpenAndLengthParsingError<'_>>,
+) -> nom::Err<LocatedBgpMessageParsingError<'_>> {
+    #[inline]
+    fn convert(
+        inner_error: LocatedBgpMessageOpenAndLengthParsingError<'_>,
+    ) -> LocatedBgpMessageParsingError<'_> {
+        LocatedBgpMessageParsingError::new(
+            inner_error.span,
+            match inner_error.error {
+                BgpMessageOpenAndLengthParsingError::NomError(val) => {
+                    BgpMessageParsingError::NomError(val)
+                }
+                BgpMessageOpenAndLengthParsingError::UndefinedBgpMessageType(val) => {
+                    BgpMessageParsingError::UndefinedBgpMessageType(val)
+                }
+                BgpMessageOpenAndLengthParsingError::BadMessageLength(val) => {
+                    BgpMessageParsingError::BadMessageLength(val)
+                }
+            },
+        )
+    }
+
+    match value {
+        nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+        nom::Err::Error(value) => nom::Err::Error(convert(value)),
+        nom::Err::Failure(value) => nom::Err::Failure(convert(value)),
+    }
+}
+
 /// Parse [`BgpMessage`] length and type, then check that the length of a BGP
 /// message is valid according to it's type. Takes into consideration both rules at [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
 /// and [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654).
+#[inline]
 fn parse_bgp_message_length_and_type(
     buf: Span<'_>,
-) -> IResult<Span<'_>, (u16, BgpMessageType, Span<'_>), LocatedBgpMessageParsingError<'_>> {
+) -> IResult<
+    Span<'_>,
+    (u16, BgpMessageType, Span<'_>),
+    LocatedBgpMessageOpenAndLengthParsingError<'_>,
+> {
     let pre_len_buf = buf;
     let (buf, length) = be_u16(buf)?;
 
     // Fail early if the message length is not valid
     if length < BGP_MIN_MESSAGE_LENGTH {
-        return Err(nom::Err::Error(LocatedBgpMessageParsingError::new(
-            pre_len_buf,
-            BgpMessageParsingError::BadMessageLength(length),
-        )));
+        return Err(nom::Err::Error(
+            LocatedBgpMessageOpenAndLengthParsingError::new(
+                pre_len_buf,
+                BgpMessageOpenAndLengthParsingError::BadMessageLength(length),
+            ),
+        ));
     }
 
     // Only read the subset that is defined by the length
@@ -404,10 +460,12 @@ fn parse_bgp_message_length_and_type(
     let (reminder_buf, buf) = match reminder_result {
         Ok((reminder_buf, buf)) => (reminder_buf, buf),
         Err(_) => {
-            return Err(nom::Err::Error(LocatedBgpMessageParsingError::new(
-                pre_len_buf,
-                BgpMessageParsingError::BadMessageLength(length),
-            )));
+            return Err(nom::Err::Error(
+                LocatedBgpMessageOpenAndLengthParsingError::new(
+                    pre_len_buf,
+                    BgpMessageOpenAndLengthParsingError::BadMessageLength(length),
+                ),
+            ));
         }
     };
     let (buf, message_type) = nom::combinator::map_res(be_u8, BgpMessageType::try_from)(buf)?;
@@ -415,10 +473,12 @@ fn parse_bgp_message_length_and_type(
     match message_type {
         BgpMessageType::Open | BgpMessageType::KeepAlive => {
             if !(BGP_MIN_MESSAGE_LENGTH..=BGP_MAX_MESSAGE_LENGTH).contains(&length) {
-                return Err(nom::Err::Error(LocatedBgpMessageParsingError::new(
-                    pre_len_buf,
-                    BgpMessageParsingError::BadMessageLength(length),
-                )));
+                return Err(nom::Err::Error(
+                    LocatedBgpMessageOpenAndLengthParsingError::new(
+                        pre_len_buf,
+                        BgpMessageOpenAndLengthParsingError::BadMessageLength(length),
+                    ),
+                ));
             }
         }
         BgpMessageType::Update | BgpMessageType::Notification | BgpMessageType::RouteRefresh => {}
@@ -443,7 +503,10 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpMessagePa
 
         // Parse both length and type together, since we need to do input validation on
         // the length based on the type of the message
-        let (buf, (_, message_type, reminder_buf)) = parse_bgp_message_length_and_type(buf)?;
+        let (buf, (_, message_type, reminder_buf)) = match parse_bgp_message_length_and_type(buf) {
+            Ok(value) => value,
+            Err(err) => return Err(into_located_bgp_message_parsing_error(err)),
+        };
         let (buf, msg) = match message_type {
             BgpMessageType::Open => {
                 let (buf, open) = parse_into_located_one_input(buf, ctx)?;
