@@ -20,7 +20,6 @@ use futures_util::{FutureExt, SinkExt};
 use async_trait::async_trait;
 use pin_project::pin_project;
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display},
     future::Future,
     io,
@@ -37,12 +36,12 @@ use tokio_util::codec::{Decoder, Encoder, Framed};
 
 use netgauze_bgp_pkt::{
     capabilities::BgpCapability,
-    iana::{BgpCapabilityCode, PathAttributeType},
+    iana::PathAttributeType,
     notification::{
         BgpNotificationMessage, FiniteStateMachineError, HoldTimerExpiredError, OpenMessageError,
         UpdateMessageError,
     },
-    open::{BgpOpenMessage, BgpOpenMessageParameter},
+    open::BgpOpenMessage,
     path_attribute::{InvalidPathAttribute, PathAttributeValue},
     update::BgpUpdateMessage,
     wire::{
@@ -301,8 +300,9 @@ pub struct Connection<
     my_bgp_id: Ipv4Addr,
     #[pin]
     peer_bgp_id: Option<Ipv4Addr>,
-    capabilities: HashMap<BgpCapabilityCode, BgpCapability>,
-    peer_capabilities: Option<HashMap<BgpCapabilityCode, BgpCapability>>,
+    #[pin]
+    sent_capabilities: Option<Vec<BgpCapability>>,
+    received_capabilities: Option<Vec<BgpCapability>>,
     peer_hold_time: Option<u16>,
     remote_bgp_id: Option<Ipv4Addr>,
     #[pin]
@@ -329,7 +329,6 @@ impl<
     pub fn new(
         peer_properties: &PeerProperties<A>,
         peer_addr: A,
-        capabilities: HashMap<BgpCapabilityCode, BgpCapability>,
         connection_type: ConnectionType,
         config: ConnectionConfig,
         inner: Framed<I, D>,
@@ -356,8 +355,8 @@ impl<
             peer_asn,
             my_bgp_id,
             peer_bgp_id,
-            capabilities,
-            peer_capabilities: None,
+            sent_capabilities: None,
+            received_capabilities: None,
             peer_hold_time: None,
             remote_bgp_id: None,
             inner,
@@ -414,19 +413,18 @@ impl<
         self.connection_type
     }
 
-    fn read_open_msg(&mut self, open: &BgpOpenMessage) {
-        let caps = open
-            .params()
-            .iter()
-            .flat_map(|x| match x {
-                BgpOpenMessageParameter::Capabilities(capabilities_vec) => capabilities_vec,
-            })
-            .flat_map(|cap| cap.code().map(|code| (code, cap.clone())))
-            .collect::<HashMap<BgpCapabilityCode, BgpCapability>>();
+    pub const fn sent_capabilities(&self) -> Option<&Vec<BgpCapability>> {
+        self.sent_capabilities.as_ref()
+    }
+    pub const fn received_capabilities(&self) -> Option<&Vec<BgpCapability>> {
+        self.received_capabilities.as_ref()
+    }
 
+    fn read_open_msg(&mut self, open: &BgpOpenMessage) {
         self.peer_asn = Some(open.my_asn4());
         self.peer_bgp_id = Some(open.bgp_id());
-        self.peer_capabilities = Some(caps);
+        self.received_capabilities =
+            Some(open.capabilities().iter().map(|x| (*x).clone()).collect());
         self.peer_hold_time = Some(open.hold_time());
     }
 
@@ -1431,8 +1429,10 @@ impl<
         this.stats.messages_sent += 1;
         this.stats.last_sent = Some(Utc::now());
         match &message {
-            BgpMessage::Open(_) => {
+            BgpMessage::Open(open) => {
                 this.stats.open_sent += 1;
+                this.sent_capabilities
+                    .replace(open.capabilities().iter().map(|x| (*x).clone()).collect());
             }
             BgpMessage::Update(_) => {
                 match *this.keepalive_timer.as_mut() {
@@ -1504,7 +1504,6 @@ pub mod test {
         BgpMessage,
     };
     use std::{
-        collections::HashMap,
         io,
         net::{IpAddr, Ipv4Addr, SocketAddr},
         time::Duration,
@@ -1535,7 +1534,6 @@ pub mod test {
         let mut connection = Connection::new(
             &PEER_PROPERTIES,
             PEER_ADDR,
-            HashMap::new(),
             ConnectionType::Active,
             config,
             framed,
@@ -1552,7 +1550,7 @@ pub mod test {
     #[tokio::test]
     async fn test_connected_delay_open_timer_expires() -> io::Result<()> {
         let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
+            EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
         let open_delay_duration = Duration::from_secs(1);
         let io = BgpIoMockBuilder::new()
             .wait(open_delay_duration)
@@ -1582,7 +1580,7 @@ pub mod test {
     #[tokio::test]
     async fn test_connected_open_with_delay_open_timer() -> io::Result<()> {
         let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
+            EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
         let open_delay_duration = Duration::from_secs(1);
         let io = BgpIoMockBuilder::new()
             .read(BgpMessage::Open(BgpOpenMessage::new(
@@ -1635,10 +1633,10 @@ pub mod test {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_connected_bgp_header_err() -> io::Result<()> {
         let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
+            EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
         let open_delay_duration = Duration::from_secs(1);
         let io = BgpIoMockBuilder::new()
             .read_u8(&[
@@ -1668,10 +1666,10 @@ pub mod test {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_connected_open_sent() -> io::Result<()> {
         let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
+            EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
         let io = BgpIoMockBuilder::new()
             .write(BgpMessage::Open(BgpOpenMessage::new(
                 MY_AS as u16,
@@ -1695,7 +1693,7 @@ pub mod test {
     #[tokio::test]
     async fn test_open_sent_hold_timer_expires() -> io::Result<()> {
         let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
+            EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
         let hold_time_seconds = 1;
         let io = BgpIoMockBuilder::new()
             .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -1738,8 +1736,14 @@ pub mod test {
     async fn test_open_sent_bgp_open() -> io::Result<()> {
         let peer_hold_time = 120;
         let our_hold_time = 240;
-        let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, our_hold_time, Vec::new(), Vec::new());
+        let mut policy = EchoCapabilitiesPolicy::new(
+            MY_AS,
+            false,
+            MY_BGP_ID,
+            our_hold_time,
+            Vec::new(),
+            Vec::new(),
+        );
         let open = BgpOpenMessage::new(
             MY_AS as u16,
             peer_hold_time,
@@ -1789,7 +1793,7 @@ pub mod test {
     #[tokio::test]
     async fn test_open_sent_tcp_connection_fails() -> io::Result<()> {
         let mut policy =
-            EchoCapabilitiesPolicy::new(MY_AS, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
+            EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
         let hold_time_seconds = 1;
         let io = BgpIoMockBuilder::new()
             .write(BgpMessage::Open(BgpOpenMessage::new(
@@ -1825,6 +1829,7 @@ pub mod test {
         let hold_time_seconds = 3;
         let mut policy = EchoCapabilitiesPolicy::new(
             MY_AS,
+            false,
             MY_BGP_ID,
             hold_time_seconds as u16,
             Vec::new(),
