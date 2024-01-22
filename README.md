@@ -1,7 +1,7 @@
 # NetGauze (under-development)
 
 [<img alt="github" src="https://img.shields.io/badge/github-netgauze/netgauze-8da0cb??style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/NetGauze/NetGauze)
-[<img alt="build status" src="https://img.shields.io/github/actions/workflow/status/NetGauze/NetGauze/ci.yml?branch=main&style=for-the-badge" height="20">](https://github.com/NetGauze/NetGauze/actions?query=branch%3Amaster)
+[<img alt="build status" src="https://img.shields.io/github/actions/workflow/status/NetGauze/NetGauze/ci.yml?branch=main&style=for-the-badge" height="20">](https://github.com/NetGauze/NetGauze/actions?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/NetGauze/NetGauze/graph/badge.svg?token=QYU92L6YZJ)](https://codecov.io/gh/NetGauze/NetGauze)
 
 A collection of network related libraries that includes protocol parsers and daemons.
