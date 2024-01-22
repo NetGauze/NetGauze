@@ -181,12 +181,15 @@ impl<
             }
         }
 
-        BgpOpenMessage::new(
-            my_asn,
-            self.hold_timer_duration,
-            self.my_bgp_id,
-            vec![BgpOpenMessageParameter::Capabilities(capabilities)],
-        )
+        let params = if capabilities.is_empty() {
+            vec![]
+        } else {
+            // TODO check for param size and spread capabilities across multiple params or
+            // use extended params RFC 9072
+            vec![BgpOpenMessageParameter::Capabilities(capabilities)]
+        };
+
+        BgpOpenMessage::new(my_asn, self.hold_timer_duration, self.my_bgp_id, params)
     }
 
     async fn pre_handle_connection_event_hook(

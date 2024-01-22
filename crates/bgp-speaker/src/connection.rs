@@ -1515,7 +1515,7 @@ pub mod test {
         connection::ConnectionConfig, events::ConnectionEvent, fsm::FsmStateError,
         peer::PeerProperties, test::BgpIoMockBuilder,
     };
-    use netgauze_bgp_pkt::open::{BgpOpenMessage, BgpOpenMessageParameter::Capabilities};
+    use netgauze_bgp_pkt::open::BgpOpenMessage;
 
     const MY_AS: u32 = 100;
     const HOLD_TIME: u16 = 180;
@@ -1558,7 +1558,7 @@ pub mod test {
                 MY_AS as u16,
                 HOLD_TIME,
                 MY_BGP_ID,
-                vec![Capabilities(vec![])],
+                vec![],
             )))
             .build();
         let config = ConnectionConfigBuilder::new()
@@ -1587,13 +1587,13 @@ pub mod test {
                 MY_AS as u16,
                 HOLD_TIME,
                 MY_BGP_ID,
-                vec![Capabilities(vec![])],
+                vec![],
             )))
             .write(BgpMessage::Open(BgpOpenMessage::new(
                 MY_AS as u16,
                 HOLD_TIME,
                 MY_BGP_ID,
-                vec![Capabilities(vec![])],
+                vec![],
             )))
             .write(BgpMessage::KeepAlive)
             .build();
@@ -1675,7 +1675,7 @@ pub mod test {
                 MY_AS as u16,
                 HOLD_TIME,
                 MY_BGP_ID,
-                vec![Capabilities(vec![])],
+                vec![],
             )))
             .build();
 
@@ -1700,7 +1700,7 @@ pub mod test {
                 MY_AS as u16,
                 HOLD_TIME,
                 MY_BGP_ID,
-                vec![Capabilities(vec![])],
+                vec![],
             )))
             .wait(Duration::from_secs(hold_time_seconds * 2))
             .write(BgpMessage::Notification(
@@ -1744,18 +1744,13 @@ pub mod test {
             Vec::new(),
             Vec::new(),
         );
-        let open = BgpOpenMessage::new(
-            MY_AS as u16,
-            peer_hold_time,
-            MY_BGP_ID,
-            vec![Capabilities(vec![])],
-        );
+        let open = BgpOpenMessage::new(MY_AS as u16, peer_hold_time, MY_BGP_ID, vec![]);
         let io = BgpIoMockBuilder::new()
             .write(BgpMessage::Open(BgpOpenMessage::new(
                 MY_AS as u16,
                 our_hold_time,
                 MY_BGP_ID,
-                vec![Capabilities(vec![])],
+                vec![],
             )))
             .read(BgpMessage::Open(open.clone()))
             .write(BgpMessage::KeepAlive)
@@ -1800,7 +1795,7 @@ pub mod test {
                 MY_AS as u16,
                 HOLD_TIME,
                 MY_BGP_ID,
-                vec![Capabilities(vec![])],
+                vec![],
             )))
             .build();
 
@@ -1835,18 +1830,13 @@ pub mod test {
             Vec::new(),
             Vec::new(),
         );
-        let open = BgpOpenMessage::new(
-            MY_AS as u16,
-            hold_time_seconds as u16,
-            MY_BGP_ID,
-            vec![Capabilities(vec![])],
-        );
+        let open = BgpOpenMessage::new(MY_AS as u16, hold_time_seconds as u16, MY_BGP_ID, vec![]);
         let io = BgpIoMockBuilder::new()
             .write(BgpMessage::Open(BgpOpenMessage::new(
                 MY_AS as u16,
                 hold_time_seconds as u16,
                 MY_BGP_ID,
-                vec![Capabilities(vec![])],
+                vec![],
             )))
             .read(BgpMessage::Open(open.clone()))
             .write(BgpMessage::KeepAlive)

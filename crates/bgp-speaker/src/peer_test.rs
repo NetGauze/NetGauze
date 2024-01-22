@@ -77,7 +77,7 @@ async fn test_idle_manual_start_with_passive_tcp() {
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     )));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -130,7 +130,7 @@ async fn test_idle_automatic_start_with_passive() {
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     )));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -302,7 +302,7 @@ async fn test_connect_delay_open_timer_expires() {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -349,7 +349,7 @@ async fn test_connect_tcp_connection_confirmed() {
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     )));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -478,12 +478,7 @@ async fn test_connect_tcp_connection_fails_with_open_delay_timer() {
 #[test_log::test(tokio::test)]
 async fn test_connect_bgp_open_with_delay() {
     let delay_open_duration = 1;
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
 
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -493,7 +488,7 @@ async fn test_connect_bgp_open_with_delay() {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .write(BgpMessage::KeepAlive);
     let active_connect = MockActiveConnect {
@@ -541,7 +536,7 @@ async fn test_connect_tcp_cr_acked() {
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     )));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -662,12 +657,7 @@ async fn test_connect_bgp_open_err_unsupported_version() {
 async fn test_connect_bgp_open_err_unacceptable_hold_time() {
     let mut io_builder = BgpIoMockBuilder::new();
     let hold_time = 1;
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
 
     io_builder
         .read(BgpMessage::Open(peer_open.clone()))
@@ -1071,7 +1061,7 @@ async fn test_active_delay_open_timer_expires() {
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     )));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -1125,7 +1115,7 @@ async fn test_active_tcp_connection_confirmed() {
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     )));
 
     let active_connect = MockActiveConnect {
@@ -1254,12 +1244,7 @@ async fn test_active_tcp_connection_fails() -> Result<(), FsmStateError<SocketAd
 #[test_log::test(tokio::test)]
 async fn test_active_bgp_open_with_open_delay() {
     let delay_open_duration = 1;
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
 
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -1270,7 +1255,7 @@ async fn test_active_bgp_open_with_open_delay() {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .write(BgpMessage::KeepAlive);
 
@@ -1788,7 +1773,7 @@ async fn test_open_sent_manual_stop() {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
@@ -1834,7 +1819,7 @@ async fn test_open_sent_automatic_stop() {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown {
@@ -1883,7 +1868,7 @@ async fn test_open_sent_hold_timer_expires() {
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
@@ -1928,7 +1913,7 @@ async fn test_open_sent_tcp_connection_confirmed() -> Result<(), FsmStateError<S
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     )));
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
@@ -1940,7 +1925,7 @@ async fn test_open_sent_tcp_connection_confirmed() -> Result<(), FsmStateError<S
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     )));
 
     let mut peer = Peer::new(
@@ -1988,7 +1973,7 @@ async fn test_open_sent_tcp_connections_fails() -> Result<(), FsmStateError<Sock
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     ));
     let buf = vec![];
     let mut cursor = Cursor::new(buf);
@@ -2037,19 +2022,14 @@ async fn test_open_sent_tcp_connections_fails() -> Result<(), FsmStateError<Sock
 
 #[test_log::test(tokio::test)]
 async fn test_open_sent_bgp_open() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive);
@@ -2098,7 +2078,7 @@ async fn test_open_sent_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read_u8(&bad_header) // Malformed header
         .read_u8(&[0x00, 0x13, 0x04]) // Keep alive message body
@@ -2159,7 +2139,7 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read_u8(&[0xff; 16]) // BGP Standard header
         .read_u8(&[0x00, 0x14]) // Length
@@ -2224,12 +2204,7 @@ async fn test_open_sent_collision_dump_main_connection() -> Result<(), FsmStateE
     );
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        peer_bgp_id,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
 
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -2237,7 +2212,7 @@ async fn test_open_sent_collision_dump_main_connection() -> Result<(), FsmStateE
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .write(BgpMessage::Notification(
             BgpNotificationMessage::CeaseError(CeaseError::ConnectionCollisionResolution {
@@ -2257,7 +2232,7 @@ async fn test_open_sent_collision_dump_main_connection() -> Result<(), FsmStateE
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -2323,12 +2298,7 @@ async fn test_open_sent_collision_dump_tracked_connection() -> Result<(), FsmSta
     );
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        peer_bgp_id,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
 
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -2336,7 +2306,7 @@ async fn test_open_sent_collision_dump_tracked_connection() -> Result<(), FsmSta
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .wait(Duration::from_millis(10))
         .read(BgpMessage::Open(peer_open.clone()))
@@ -2354,7 +2324,7 @@ async fn test_open_sent_collision_dump_tracked_connection() -> Result<(), FsmSta
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -2415,7 +2385,7 @@ async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAd
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Notification(
             BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
@@ -2467,7 +2437,7 @@ async fn test_open_sent_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Notification(notif.clone()))
         .write(BgpMessage::Notification(
@@ -2518,7 +2488,7 @@ async fn test_open_sent_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
@@ -2570,7 +2540,7 @@ async fn test_open_sent_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Update(update.clone()))
         .write(BgpMessage::Notification(
@@ -2625,7 +2595,7 @@ async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read_u8(&update)
         .write(BgpMessage::Notification(
@@ -2683,7 +2653,7 @@ async fn test_open_sent_route_refresh_msg() -> Result<(), FsmStateError<SocketAd
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::RouteRefresh(route_refresh.clone()))
         .write(BgpMessage::Notification(
@@ -2728,19 +2698,14 @@ async fn test_open_sent_route_refresh_msg() -> Result<(), FsmStateError<SocketAd
 
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_starts() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -2792,19 +2757,14 @@ async fn test_open_confirm_starts() -> Result<(), FsmStateError<SocketAddr>> {
 
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_manual_stop() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -2855,19 +2815,14 @@ async fn test_open_confirm_manual_stop() -> Result<(), FsmStateError<SocketAddr>
 
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_automatic_stop() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -2921,19 +2876,14 @@ async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<Sock
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -2999,19 +2949,14 @@ async fn test_open_confirm_keep_alive_timer_expires() -> Result<(), FsmStateErro
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3060,19 +3005,14 @@ async fn test_open_confirm_notif_msg() -> Result<(), FsmStateError<SocketAddr>> 
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
     let notif =
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3122,19 +3062,14 @@ async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<Socke
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3198,12 +3133,7 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
     );
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        peer_bgp_id,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
 
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -3211,7 +3141,7 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3233,7 +3163,7 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3303,12 +3233,7 @@ async fn test_open_confirm_collision_dump_tracked_connection(
     );
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        peer_bgp_id,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
 
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -3316,7 +3241,7 @@ async fn test_open_confirm_collision_dump_tracked_connection(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3335,7 +3260,7 @@ async fn test_open_confirm_collision_dump_tracked_connection(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3401,19 +3326,14 @@ async fn test_open_confirm_open_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let notif = BgpNotificationMessage::FiniteStateMachineError(
         FiniteStateMachineError::ReceiveUnexpectedMessageInOpenConfirmState { value: vec![] },
     );
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3469,19 +3389,14 @@ async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
             value: vec![0x00, 0x04],
         });
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3545,19 +3460,14 @@ async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAd
         BgpNotificationMessage::MessageHeaderError(MessageHeaderError::ConnectionNotSynchronized {
             value: Vec::from(&bad_header),
         });
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3611,19 +3521,14 @@ async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAd
 
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3667,12 +3572,7 @@ async fn test_open_confirm_keep_alive_msg() -> Result<(), FsmStateError<SocketAd
 
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -3680,7 +3580,7 @@ async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>>
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3733,12 +3633,7 @@ async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>>
 
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let update = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0x00, 0x1b, 0x02, 0x00, 0x04, 0x19, 0xac, 0x10, 0x01, 0x00, 0x00,
@@ -3749,7 +3644,7 @@ async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>>
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3805,12 +3700,7 @@ async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>>
 
 #[test_log::test(tokio::test)]
 async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let route_refresh = BgpRouteRefreshMessage::new(
         AddressType::Ipv4Unicast,
         RouteRefreshSubcode::BeginningOfRouteRefresh,
@@ -3821,7 +3711,7 @@ async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<Socke
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3874,19 +3764,14 @@ async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<Socke
 
 #[test_log::test(tokio::test)]
 async fn test_established_starts() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -3943,19 +3828,14 @@ async fn test_established_starts() -> Result<(), FsmStateError<SocketAddr>> {
 
 #[test_log::test(tokio::test)]
 async fn test_established_manual_stop() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4011,19 +3891,14 @@ async fn test_established_manual_stop() -> Result<(), FsmStateError<SocketAddr>>
 
 #[test_log::test(tokio::test)]
 async fn test_established_automatic_stop() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4082,19 +3957,14 @@ async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<Socke
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4163,19 +4033,14 @@ async fn test_established_keep_alive_timer_expires() -> Result<(), FsmStateError
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4242,12 +4107,7 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
     );
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        peer_bgp_id,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
 
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -4255,7 +4115,7 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4278,7 +4138,7 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4353,12 +4213,7 @@ async fn test_established_collision_dump_tracked_connection(
     );
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        peer_bgp_id,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
 
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -4366,7 +4221,7 @@ async fn test_established_collision_dump_tracked_connection(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4386,7 +4241,7 @@ async fn test_established_collision_dump_tracked_connection(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4463,12 +4318,7 @@ async fn test_established_reject_connection_tracking_disabled(
     );
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        peer_bgp_id,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
 
     let mut active_io_builder = BgpIoMockBuilder::new();
     active_io_builder
@@ -4476,7 +4326,7 @@ async fn test_established_reject_connection_tracking_disabled(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4538,12 +4388,7 @@ async fn test_established_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let notif =
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
     let mut io_builder = BgpIoMockBuilder::new();
@@ -4552,7 +4397,7 @@ async fn test_established_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4606,12 +4451,7 @@ async fn test_established_notif_version_error() -> Result<(), FsmStateError<Sock
     let hold_time = 3;
     let policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, hold_time, Vec::new(), Vec::new());
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        hold_time,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, hold_time, PEER_BGP_ID, vec![]);
     let notif =
         BgpNotificationMessage::OpenMessageError(OpenMessageError::UnsupportedVersionNumber {
             value: vec![0x00, 0x04],
@@ -4622,7 +4462,7 @@ async fn test_established_notif_version_error() -> Result<(), FsmStateError<Sock
             MY_AS as u16,
             hold_time,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4677,7 +4517,7 @@ async fn test_established_tcp_connection_fails() -> Result<(), FsmStateError<Soc
         MY_AS as u16,
         HOLD_TIME,
         MY_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     ));
     let buf = vec![];
     let mut cursor = Cursor::new(buf);
@@ -4688,7 +4528,7 @@ async fn test_established_tcp_connection_fails() -> Result<(), FsmStateError<Soc
         PEER_AS as u16,
         HOLD_TIME,
         PEER_BGP_ID,
-        vec![Capabilities(vec![])],
+        vec![],
     ));
     let buf = vec![];
     let mut cursor = Cursor::new(buf);
@@ -4752,19 +4592,14 @@ async fn test_established_tcp_connection_fails() -> Result<(), FsmStateError<Soc
 
 #[test_log::test(tokio::test)]
 async fn test_established_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
         .write(BgpMessage::Open(BgpOpenMessage::new(
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
@@ -4811,12 +4646,7 @@ async fn test_established_keep_alive_msg() -> Result<(), FsmStateError<SocketAdd
 
 #[test_log::test(tokio::test)]
 async fn test_established_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
-    let peer_open = BgpOpenMessage::new(
-        PEER_AS as u16,
-        HOLD_TIME,
-        PEER_BGP_ID,
-        vec![Capabilities(vec![])],
-    );
+    let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -4824,7 +4654,7 @@ async fn test_established_update_msg() -> Result<(), FsmStateError<SocketAddr>> 
             MY_AS as u16,
             HOLD_TIME,
             MY_BGP_ID,
-            vec![Capabilities(vec![])],
+            vec![],
         )))
         .read(BgpMessage::Open(peer_open.clone()))
         .write(BgpMessage::KeepAlive)
