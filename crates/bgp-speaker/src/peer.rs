@@ -1538,6 +1538,52 @@ impl<
         Ok(())
     }
 
+    fn handle_bgp_event(
+        bgp_event: PeerResult<A>,
+        peer_key: K,
+        fsm_state: FsmState,
+        rec_tx: mpsc::UnboundedSender<PeerStateResult<A>>,
+    ) -> Result<(), ()> {
+        log::debug!(
+            "[{}][{}] BGP Event {}",
+            peer_key,
+            fsm_state,
+            match &bgp_event {
+                Ok(event) => format!("{event}"),
+                Err(err) => format!("{err}"),
+            }
+        );
+        match bgp_event {
+            Ok(event) => {
+                if let Err(err) = rec_tx.send(Ok((fsm_state, event))) {
+                    log::error!(
+                        "[{}][{}] Couldn't send BGP event message, terminating the connection: {err:?}",
+                        peer_key,
+                        fsm_state,
+                    );
+                    return Err(());
+                }
+                Ok(())
+            }
+            Err(err) => {
+                log::error!(
+                    "[{}][{}] Terminating Peer due to error in handling BgpEvent: {err}",
+                    peer_key,
+                    fsm_state,
+                );
+                if let Err(err) = rec_tx.send(Err(err)) {
+                    log::error!(
+                        "[{}][{}] Couldn't report error in handling BgpEvent: {err:?}",
+                        peer_key,
+                        fsm_state,
+                    );
+                    return Err(());
+                }
+                Err(())
+            }
+        }
+    }
+
     fn start_peer<
         D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
             + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
@@ -1568,25 +1614,11 @@ impl<
                         }
                     }
                     bgp_event = peer.run() => {
-                        log::debug!(
-                            "[{:?}][{:?}] BGP Event {}",
-                            peer.fsm_state(),
-                            peer.peer_state(),
-                            match &bgp_event {
-                                Ok(event) => format!("{event}"),
-                                Err(err) => format!("{err}"),
-                            }
-                        );
-                        match bgp_event {
-                            Ok(event) => {
-                                rec_tx.send(Ok((peer.fsm_state(), event))).unwrap();
-                            }
-                            Err(err) => {
-                                log::error!("Terminating Peer due to error in handling BgpEvent: {err}");
-                                rec_tx.send(Err(err))?;
-                                break;
-                            }
+                        if Self::handle_bgp_event(bgp_event, peer_key,peer.fsm_state(), rec_tx.clone()).is_err() {
+                            // Errors should be logged in [Self::handle_bgp_event]
+                            break;
                         }
+
                     }
                 }
             }
