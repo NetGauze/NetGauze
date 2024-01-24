@@ -23,7 +23,8 @@ use tokio::net::TcpStream;
 use netgauze_bgp_speaker::{
     connection::TcpActiveConnect,
     listener::BgpListener,
-    peer::{EchoCapabilitiesPolicy, PeerConfigBuilder, PeerHandle, PeerProperties},
+    peer::{EchoCapabilitiesPolicy, PeerConfigBuilder, PeerProperties},
+    peer_controller::PeerHandle,
     supervisor::PeersSupervisor,
 };
 

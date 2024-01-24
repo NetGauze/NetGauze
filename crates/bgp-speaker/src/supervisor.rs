@@ -16,10 +16,8 @@
 use crate::{
     codec::{BgpCodecDecoderError, BgpCodecInitializer},
     connection::ActiveConnect,
-    peer::{
-        EchoCapabilitiesPolicy, Peer, PeerConfig, PeerConfigBuilder, PeerController, PeerHandle,
-        PeerPolicy, PeerProperties, PeerStateResult,
-    },
+    peer::*,
+    peer_controller::*,
 };
 use netgauze_bgp_pkt::{
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},

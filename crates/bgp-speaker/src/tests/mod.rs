@@ -25,6 +25,7 @@ use netgauze_parse_utils::WritablePdu;
 
 mod connection;
 mod peer;
+mod peer_controller;
 mod supervisor;
 
 pub(crate) const MY_AS: u32 = 100;
