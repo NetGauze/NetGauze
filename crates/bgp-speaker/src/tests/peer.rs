@@ -1,7 +1,7 @@
 use std::{
     io,
     io::Cursor,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{Ipv4Addr, SocketAddr},
     time::Duration,
 };
 
@@ -24,29 +24,7 @@ use netgauze_bgp_pkt::{
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::WritablePdu;
 
-use crate::{codec::BgpCodec, events::*, fsm::*, peer::*, test::*};
-
-const MY_AS: u32 = 100;
-const PEER_AS: u32 = 200;
-const HOLD_TIME: u16 = 180;
-const MY_BGP_ID: Ipv4Addr = Ipv4Addr::new(192, 168, 0, 1);
-
-const PEER_BGP_ID: Ipv4Addr = Ipv4Addr::new(192, 168, 0, 2);
-const PEER_KEY: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 0, 2));
-const PEER_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 0, 2)), 179);
-
-const PROPERTIES: PeerProperties<SocketAddr> = PeerProperties::new(
-    MY_AS,
-    PEER_AS,
-    MY_BGP_ID,
-    PEER_BGP_ID,
-    PEER_ADDR,
-    false,
-    false,
-);
-
-const POLICY: EchoCapabilitiesPolicy<SocketAddr, tokio_test::io::Mock, BgpCodec> =
-    EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
+use crate::{events::*, fsm::*, peer::*, tests::*};
 
 #[test_log::test(tokio::test)]
 async fn test_idle_manual_start() {
