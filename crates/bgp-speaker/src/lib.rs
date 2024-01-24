@@ -26,6 +26,7 @@ pub mod events;
 pub mod fsm;
 pub mod listener;
 pub mod peer;
+pub mod peer_controller;
 pub mod supervisor;
 
 #[cfg(test)]

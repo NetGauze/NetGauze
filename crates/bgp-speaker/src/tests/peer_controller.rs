@@ -17,6 +17,7 @@ use crate::{
     events::BgpEvent,
     fsm::FsmState,
     peer::*,
+    peer_controller::PeerController,
     tests::{
         BgpIoMockBuilder, MockActiveConnect, HOLD_TIME, MY_AS, MY_BGP_ID, PEER_ADDR, PEER_KEY,
         POLICY, PROPERTIES,

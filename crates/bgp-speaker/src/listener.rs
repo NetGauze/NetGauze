@@ -31,7 +31,7 @@ use tokio::{
 };
 use tokio_stream::StreamExt;
 
-use crate::{fsm::FsmState, peer::PeerHandle, supervisor::PeersSupervisor};
+use crate::{fsm::FsmState, peer_controller::PeerHandle, supervisor::PeersSupervisor};
 
 /// A modified version of Tokio's TcpListenerStream wrapper that returns the
 /// peer socket along the incoming stream
