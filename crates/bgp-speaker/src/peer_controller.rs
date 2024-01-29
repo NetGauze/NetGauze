@@ -21,6 +21,7 @@ use crate::{
     peer::*,
 };
 use netgauze_bgp_pkt::{
+    capabilities::BgpCapability,
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
     BgpMessage,
 };
@@ -122,6 +123,34 @@ impl<
                         log::error!("Error sending tracked connection stats: {err:?}");
                     }
                 }
+                PeerEvent::ConnectionSentCapabilities(tx) => {
+                    let caps = peer.main_connection_send_capabilities();
+                    eprintln!("Got main_connection_send_capabilities: {caps:?}");
+                    if let Err(err) = tx.send(caps) {
+                        log::error!("Error sending main connection sent capabilities: {err:?}");
+                    }
+                    eprintln!("Sent main_connection_send_capabilities");
+                }
+                PeerEvent::ConnectionReceivedCapabilities(tx) => {
+                    let caps = peer.main_connection_received_capabilities();
+                    if let Err(err) = tx.send(caps) {
+                        log::error!("Error sending main connection received capabilities: {err:?}");
+                    }
+                }
+                PeerEvent::TrackedConnectionSentCapabilities(tx) => {
+                    let caps = peer.tracked_connection_send_capabilities();
+                    if let Err(err) = tx.send(caps) {
+                        log::error!("Error sending tracked sent tracked capabilities: {err:?}");
+                    }
+                }
+                PeerEvent::TrackedConnectionReceivedCapabilities(tx) => {
+                    let caps = peer.tracked_connection_received_capabilities();
+                    if let Err(err) = tx.send(caps) {
+                        log::error!(
+                            "Error sending tracked connection received capabilities: {err:?}"
+                        );
+                    }
+                }
             }
         }
         Ok(())
@@ -203,11 +232,11 @@ impl<
                         }
                     }
                     bgp_event = peer.run() => {
-                        if Self::handle_bgp_event(bgp_event, peer_key,peer.fsm_state(), rec_tx.clone()).is_err() {
+                        let ret = Self::handle_bgp_event(bgp_event, peer_key,peer.fsm_state(), rec_tx.clone());
+                        if ret.is_err() {
                             // Errors should be logged in [Self::handle_bgp_event]
                             break;
                         }
-
                     }
                 }
             }
@@ -221,10 +250,7 @@ impl<
     }
 
     pub fn get_new_handle(&self) -> PeerHandle<A, I> {
-        PeerHandle::new(
-            self.peer_events_tx.clone(),
-            self.properties.peer_addr(),
-        )
+        PeerHandle::new(self.peer_events_tx.clone(), self.properties.peer_addr())
     }
 }
 
@@ -301,6 +327,42 @@ impl<A: Display + Debug + 'static, I: AsyncWrite + AsyncRead + 'static> PeerHand
         let (tx, rx) = oneshot::channel();
         self.peer_events_tx
             .send(PeerEvent::GetTrackedConnectionStats(tx))?;
+        Ok(rx.await?)
+    }
+
+    pub async fn connection_sent_capabilities(
+        &mut self,
+    ) -> Result<Option<Vec<BgpCapability>>, Box<dyn Error>> {
+        let (tx, rx) = oneshot::channel();
+        self.peer_events_tx
+            .send(PeerEvent::ConnectionSentCapabilities(tx))?;
+        Ok(rx.await?)
+    }
+
+    pub async fn connection_received_capabilities(
+        &mut self,
+    ) -> Result<Option<Vec<BgpCapability>>, Box<dyn Error>> {
+        let (tx, rx) = oneshot::channel();
+        self.peer_events_tx
+            .send(PeerEvent::ConnectionReceivedCapabilities(tx))?;
+        Ok(rx.await?)
+    }
+
+    pub async fn tracked_connection_sent_capabilities(
+        &mut self,
+    ) -> Result<Option<Vec<BgpCapability>>, Box<dyn Error>> {
+        let (tx, rx) = oneshot::channel();
+        self.peer_events_tx
+            .send(PeerEvent::TrackedConnectionSentCapabilities(tx))?;
+        Ok(rx.await?)
+    }
+
+    pub async fn tracked_connection_received_capabilities(
+        &mut self,
+    ) -> Result<Option<Vec<BgpCapability>>, Box<dyn Error>> {
+        let (tx, rx) = oneshot::channel();
+        self.peer_events_tx
+            .send(PeerEvent::TrackedConnectionReceivedCapabilities(tx))?;
         Ok(rx.await?)
     }
 }

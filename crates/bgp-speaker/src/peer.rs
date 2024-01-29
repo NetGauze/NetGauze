@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use std::{
-    fmt::{Debug, Display},
+    fmt::{Debug, Display, Formatter},
     marker::PhantomData,
     net::Ipv4Addr,
     ops::Add,
@@ -242,6 +242,17 @@ pub enum PeerAdminEvents<A, I: AsyncWrite + AsyncRead> {
     TcpConnectionConfirmed((A, I)),
 }
 
+impl<A: Display, I: AsyncWrite + AsyncRead> Display for PeerAdminEvents<A, I> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PeerAdminEvents::ManualStart => write!(f, "ManualStart"),
+            PeerAdminEvents::ManualStop => write!(f, "ManualStop"),
+            PeerAdminEvents::AutomaticStart => write!(f, "AutomaticStart"),
+            PeerAdminEvents::AutomaticStop => write!(f, "AutomaticStop"),
+            PeerAdminEvents::TcpConnectionConfirmed(_) => write!(f, "TcpConnectionConfirmed"),
+        }
+    }
+}
 #[derive(Debug)]
 pub enum PeerEvent<A, I: AsyncWrite + AsyncRead> {
     Admin(PeerAdminEvents<A, I>),
@@ -249,8 +260,33 @@ pub enum PeerEvent<A, I: AsyncWrite + AsyncRead> {
     GetPeerStats(oneshot::Sender<PeerStats>),
     GetConnectionStats(oneshot::Sender<Option<ConnectionStats>>),
     GetTrackedConnectionStats(oneshot::Sender<Option<ConnectionStats>>),
+    ConnectionSentCapabilities(oneshot::Sender<Option<Vec<BgpCapability>>>),
+    ConnectionReceivedCapabilities(oneshot::Sender<Option<Vec<BgpCapability>>>),
+    TrackedConnectionSentCapabilities(oneshot::Sender<Option<Vec<BgpCapability>>>),
+    TrackedConnectionReceivedCapabilities(oneshot::Sender<Option<Vec<BgpCapability>>>),
 }
 
+impl<A: Display, I: AsyncWrite + AsyncRead> Display for PeerEvent<A, I> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PeerEvent::Admin(admin) => write!(f, "Admin({admin})"),
+            PeerEvent::BgpMessage(msg) => write!(f, "BgpMessage({msg:?})"),
+            PeerEvent::GetPeerStats(_) => write!(f, "GetPeerStats"),
+            PeerEvent::GetConnectionStats(_) => write!(f, "GetConnectionStats"),
+            PeerEvent::GetTrackedConnectionStats(_) => write!(f, "GetTrackedConnectionStats"),
+            PeerEvent::ConnectionSentCapabilities(_) => write!(f, "ConnectionSentCapabilities"),
+            PeerEvent::ConnectionReceivedCapabilities(_) => {
+                write!(f, "ConnectionReceivedCapabilities")
+            }
+            PeerEvent::TrackedConnectionSentCapabilities(_) => {
+                write!(f, "TrackedConnectionSentCapabilities")
+            }
+            PeerEvent::TrackedConnectionReceivedCapabilities(_) => {
+                write!(f, "TrackedConnectionReceivedCapabilities")
+            }
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, Eq, PartialEq, strum_macros::Display)]
 pub enum PeerState {
     AdminUp,
@@ -519,7 +555,7 @@ pub struct Peer<
 
 impl<
         K: Display + Copy,
-        A: Display + Debug + Clone,
+        A: Display + Copy + Debug + Clone,
         I: AsyncWrite + AsyncRead + Unpin,
         D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
             + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
@@ -676,11 +712,11 @@ impl<
         log::info!("[{}][{}] Passive connected", self.peer_key, self.fsm_state);
         self.connect_retry_timer.take();
         let mut connection =
-            self.create_connection(peer_addr.clone(), tcp_stream, ConnectionType::Passive)?;
+            self.create_connection(peer_addr, tcp_stream, ConnectionType::Passive)?;
         let event = connection
             .handle_event(
                 &mut self.policy,
-                ConnectionEvent::TcpConnectionConfirmed(peer_addr.clone()),
+                ConnectionEvent::TcpConnectionConfirmed(peer_addr),
             )
             .await?
             .into();
@@ -722,6 +758,30 @@ impl<
 
     pub fn tracked_connection_stats(&self) -> Option<ConnectionStats> {
         self.tracked_connection.as_ref().map(|c| *c.stats())
+    }
+
+    pub fn main_connection_send_capabilities(&self) -> Option<Vec<BgpCapability>> {
+        self.connection
+            .as_ref()
+            .and_then(|c| c.sent_capabilities().cloned())
+    }
+
+    pub fn main_connection_received_capabilities(&self) -> Option<Vec<BgpCapability>> {
+        self.connection
+            .as_ref()
+            .and_then(|c| c.received_capabilities().cloned())
+    }
+
+    pub fn tracked_connection_send_capabilities(&self) -> Option<Vec<BgpCapability>> {
+        self.tracked_connection
+            .as_ref()
+            .and_then(|c| c.sent_capabilities().cloned())
+    }
+
+    pub fn tracked_connection_received_capabilities(&self) -> Option<Vec<BgpCapability>> {
+        self.tracked_connection
+            .as_ref()
+            .and_then(|c| c.received_capabilities().cloned())
     }
 
     async fn shutdown(&mut self) {
@@ -777,7 +837,7 @@ impl<
         match connect_result {
             Ok(stream) => {
                 let mut connection = self.create_connection(
-                    self.properties.peer_addr.clone(),
+                    self.properties.peer_addr,
                     stream,
                     ConnectionType::Active,
                 )?;
@@ -785,9 +845,7 @@ impl<
                 let event = connection
                     .handle_event(
                         &mut self.policy,
-                        ConnectionEvent::TcpConnectionRequestAcked(
-                            self.properties.peer_addr.clone(),
-                        ),
+                        ConnectionEvent::TcpConnectionRequestAcked(self.properties.peer_addr),
                     )
                     .await?
                     .into();
@@ -854,6 +912,12 @@ impl<
                         && tracked_created < main_created)
                 {
                     self.connection.replace(connection);
+                    log::info!(
+                        "[{}][{}] BGP Collision detection dropping tracked connection: {}",
+                        self.peer_key,
+                        self.fsm_state,
+                        tracked.peer_addr()
+                    );
                     let _ = tracked
                         .send(BgpMessage::Notification(
                             BgpNotificationMessage::CeaseError(
@@ -864,6 +928,9 @@ impl<
                 } else {
                     self.stats.connect_retry_counter += 1;
                     let new_state = Self::fsm_state_from_tracked(self.fsm_state, open, &tracked)?;
+                    log::info!(
+                        "[{}][{}] BGP Collision replacing main connection with tracked connection: {}",
+                        self.peer_key, self.fsm_state, tracked.peer_addr());
                     self.fsm_transition(new_state);
                     self.connection.replace(tracked);
                     let _ = connection
@@ -1418,7 +1485,7 @@ impl<
         tokio::select! {
             connect_result = Self::connect(
                 self.properties.peer_bgp_id,
-                self.properties.peer_addr.clone(),
+                self.properties.peer_addr,
                 &mut self.active_connect,
                 self.fsm_state,
                 // Arbitrary one second timeout if connect retry duration is very small
