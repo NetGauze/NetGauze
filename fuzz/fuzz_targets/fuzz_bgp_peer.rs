@@ -426,15 +426,8 @@ fuzz_target!(|data: (
             io_builder,
         };
 
-        let properties = PeerProperties::new(
-            my_asn,
-            peer_asn,
-            my_bgp_id,
-            peer_bgp_id,
-            peer_addr,
-            allow_dynamic_as,
-            true,
-        );
+        let properties =
+            PeerProperties::new(my_asn, peer_asn, my_bgp_id, peer_addr, allow_dynamic_as);
 
         let mut peer = Peer::new(peer_addr.ip(), properties, config, policy, active_connect);
         peer.add_admin_event(PeerAdminEvents::ManualStart);

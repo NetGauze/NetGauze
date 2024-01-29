@@ -478,10 +478,8 @@ pub struct PeerProperties<A> {
     my_asn: u32,
     peer_asn: u32,
     my_bgp_id: Ipv4Addr,
-    peer_bgp_id: Ipv4Addr,
     peer_addr: A,
     allow_dynamic_as: bool,
-    allow_dynamic_bgp_id: bool,
 }
 
 impl<A: Clone> PeerProperties<A> {
@@ -489,19 +487,15 @@ impl<A: Clone> PeerProperties<A> {
         my_asn: u32,
         peer_asn: u32,
         my_bgp_id: Ipv4Addr,
-        peer_bgp_id: Ipv4Addr,
         peer_addr: A,
         allow_dynamic_as: bool,
-        allow_dynamic_bgp_id: bool,
     ) -> Self {
         Self {
             my_asn,
             peer_asn,
             my_bgp_id,
-            peer_bgp_id,
             peer_addr,
             allow_dynamic_as,
-            allow_dynamic_bgp_id,
         }
     }
 
@@ -514,17 +508,11 @@ impl<A: Clone> PeerProperties<A> {
     pub const fn my_bgp_id(&self) -> Ipv4Addr {
         self.my_bgp_id
     }
-    pub const fn peer_bgp_id(&self) -> Ipv4Addr {
-        self.peer_bgp_id
-    }
     pub fn peer_addr(&self) -> A {
         self.peer_addr.clone()
     }
     pub const fn allow_dynamic_as(&self) -> bool {
         self.allow_dynamic_as
-    }
-    pub const fn allow_dynamic_bgp_id(&self) -> bool {
-        self.allow_dynamic_bgp_id
     }
 }
 
@@ -1360,7 +1348,7 @@ impl<
         Ok(event.into())
     }
     async fn connect(
-        peer: Ipv4Addr,
+        peer_key: K,
         peer_addr: A,
         active_connect: &mut C,
         fsm_state: FsmState,
@@ -1369,17 +1357,19 @@ impl<
     ) -> Result<I, ConnectError> {
         match (fsm_state, &allowed_to_active_connect) {
             (FsmState::Connect, true) => {
-                log::info!("[{peer}][{fsm_state}] Connecting to peer: {peer_addr}");
+                log::info!("[{peer_key}][{fsm_state}] Connecting to peer: {peer_addr}");
                 *allowed_to_active_connect = false;
                 match tokio::time::timeout(connect_timeout, active_connect.connect(peer_addr)).await
                 {
                     Ok(Ok(stream)) => Ok(stream),
                     Ok(Err(err)) => {
-                        log::info!("[{peer}][{fsm_state}] Couldn't establish connection: {err:?}");
+                        log::info!(
+                            "[{peer_key}][{fsm_state}] Couldn't establish connection: {err:?}"
+                        );
                         Err(ConnectError::TcpConnectionFails)
                     }
                     Err(_) => {
-                        log::info!("[{peer}][{fsm_state}] Timeout establishing connection");
+                        log::info!("[{peer_key}][{fsm_state}] Timeout establishing connection");
                         Err(ConnectError::TcpConnectionFails)
                     }
                 }
@@ -1484,7 +1474,7 @@ impl<
         }
         tokio::select! {
             connect_result = Self::connect(
-                self.properties.peer_bgp_id,
+                self.peer_key,
                 self.properties.peer_addr,
                 &mut self.active_connect,
                 self.fsm_state,

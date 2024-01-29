@@ -2171,15 +2171,7 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
 #[test_log::test(tokio::test)]
 async fn test_open_sent_collision_dump_main_connection() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) + 1);
-    let properties = PeerProperties::new(
-        MY_AS,
-        PEER_AS,
-        MY_BGP_ID,
-        peer_bgp_id,
-        PEER_ADDR,
-        false,
-        false,
-    );
+    let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
@@ -2265,15 +2257,7 @@ async fn test_open_sent_collision_dump_main_connection() -> Result<(), FsmStateE
 async fn test_open_sent_collision_dump_tracked_connection() -> Result<(), FsmStateError<SocketAddr>>
 {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
-    let properties = PeerProperties::new(
-        MY_AS,
-        PEER_AS,
-        MY_BGP_ID,
-        peer_bgp_id,
-        PEER_ADDR,
-        false,
-        false,
-    );
+    let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
@@ -3100,15 +3084,7 @@ async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<Socke
 async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmStateError<SocketAddr>>
 {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) + 1);
-    let properties = PeerProperties::new(
-        MY_AS,
-        PEER_AS,
-        MY_BGP_ID,
-        peer_bgp_id,
-        PEER_ADDR,
-        false,
-        false,
-    );
+    let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
@@ -3200,15 +3176,7 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
 async fn test_open_confirm_collision_dump_tracked_connection(
 ) -> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
-    let properties = PeerProperties::new(
-        MY_AS,
-        PEER_AS,
-        MY_BGP_ID,
-        peer_bgp_id,
-        PEER_ADDR,
-        false,
-        false,
-    );
+    let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
@@ -4074,15 +4042,7 @@ async fn test_established_keep_alive_timer_expires() -> Result<(), FsmStateError
 async fn test_established_collision_dump_main_connection() -> Result<(), FsmStateError<SocketAddr>>
 {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) + 1);
-    let properties = PeerProperties::new(
-        MY_AS,
-        PEER_AS,
-        MY_BGP_ID,
-        peer_bgp_id,
-        PEER_ADDR,
-        false,
-        false,
-    );
+    let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
@@ -4180,15 +4140,7 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
 async fn test_established_collision_dump_tracked_connection(
 ) -> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
-    let properties = PeerProperties::new(
-        MY_AS,
-        PEER_AS,
-        MY_BGP_ID,
-        peer_bgp_id,
-        PEER_ADDR,
-        false,
-        false,
-    );
+    let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);
@@ -4285,15 +4237,7 @@ async fn test_established_collision_dump_tracked_connection(
 async fn test_established_reject_connection_tracking_disabled(
 ) -> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
-    let properties = PeerProperties::new(
-        MY_AS,
-        PEER_AS,
-        MY_BGP_ID,
-        peer_bgp_id,
-        PEER_ADDR,
-        false,
-        false,
-    );
+    let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, peer_bgp_id, vec![]);

@@ -38,15 +38,8 @@ pub(crate) const PEER_KEY: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 0, 2));
 pub(crate) const PEER_ADDR: SocketAddr =
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 0, 2)), 179);
 
-pub(crate) const PROPERTIES: PeerProperties<SocketAddr> = PeerProperties::new(
-    MY_AS,
-    PEER_AS,
-    MY_BGP_ID,
-    PEER_BGP_ID,
-    PEER_ADDR,
-    false,
-    false,
-);
+pub(crate) const PROPERTIES: PeerProperties<SocketAddr> =
+    PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
 
 pub(crate) const POLICY: EchoCapabilitiesPolicy<SocketAddr, tokio_test::io::Mock, BgpCodec> =
     EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
