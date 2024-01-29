@@ -131,15 +131,8 @@ impl<
         active_connect: C,
     ) -> Result<(UnboundedReceiver<PeerStateResult<A>>, PeerHandle<A, I>), PeersSupervisorError>
     {
-        let peer_properties = PeerProperties::new(
-            self.my_asn,
-            self.my_asn,
-            self.my_bgp_id,
-            self.my_bgp_id, // Just assume a default bgp id
-            peer_addr,
-            true,
-            true,
-        );
+        let peer_properties =
+            PeerProperties::new(self.my_asn, self.my_asn, self.my_bgp_id, peer_addr, true);
         let peer_config = PeerConfigBuilder::new()
             // set open_delay_Timer to max, to allow the peer to communicate it's open message first
             .open_delay_timer_duration(u16::MAX)

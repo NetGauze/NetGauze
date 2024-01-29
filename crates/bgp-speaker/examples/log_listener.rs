@@ -39,7 +39,6 @@ fn create_peer(
     my_asn: u32,
     peer_asn: u32,
     my_bgp_id: Ipv4Addr,
-    peer_bgp_id: Ipv4Addr,
     peer_addr: SocketAddr,
     supervisor: &mut PeersSupervisor<IpAddr, SocketAddr, TcpStream>,
 ) -> PeerHandle<SocketAddr, TcpStream> {
@@ -55,15 +54,7 @@ fn create_peer(
         vec![],
     );
 
-    let properties = PeerProperties::new(
-        my_asn,
-        peer_asn,
-        my_bgp_id,
-        peer_bgp_id,
-        peer_addr,
-        true,
-        true,
-    );
+    let properties = PeerProperties::new(my_asn, peer_asn, my_bgp_id, peer_addr, true);
 
     let (mut received_rx, peer_handle) = supervisor
         .create_peer(peer_addr.ip(), properties, config, TcpActiveConnect, policy)
@@ -101,16 +92,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
 
     // Example registering peer manually
     let peer_asn = 100;
-    let peer_bgp_id = Ipv4Addr::new(172, 16, 0, 10);
     let peer_addr: SocketAddr = "192.168.56.10:179".parse().unwrap();
-    let peer_handle = create_peer(
-        my_asn,
-        peer_asn,
-        my_bgp_id,
-        peer_bgp_id,
-        peer_addr,
-        &mut supervisor,
-    );
+    let peer_handle = create_peer(my_asn, peer_asn, my_bgp_id, peer_addr, &mut supervisor);
     listener.reg_peer(peer_addr.ip(), peer_handle.clone());
 
     listener.run(&mut supervisor).await?;

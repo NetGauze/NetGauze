@@ -340,11 +340,6 @@ impl<
             Some(peer_properties.peer_asn())
         };
         let my_bgp_id = peer_properties.my_bgp_id();
-        let peer_bgp_id = if peer_properties.allow_dynamic_bgp_id() {
-            None
-        } else {
-            Some(peer_properties.peer_bgp_id())
-        };
 
         Self {
             peer_addr,
@@ -354,7 +349,7 @@ impl<
             my_asn,
             peer_asn,
             my_bgp_id,
-            peer_bgp_id,
+            peer_bgp_id: None,
             sent_capabilities: None,
             received_capabilities: None,
             peer_hold_time: None,
@@ -1203,33 +1198,31 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
 fn handle_open_message<A>(
     open: BgpOpenMessage,
     peer_asn: Option<u32>,
-    peer_bgp_id: Option<Ipv4Addr>,
     delay_timer_running: bool,
-) -> Option<ConnectionEvent<A>> {
+) -> (Ipv4Addr, ConnectionEvent<A>) {
     // Check Peer ASN number
     if let Some(peer_asn) = peer_asn {
         if peer_asn != open.my_asn4() {
-            return Some(ConnectionEvent::BGPOpenMsgErr(
-                OpenMessageError::BadPeerAs {
+            return (
+                open.bgp_id(),
+                ConnectionEvent::BGPOpenMsgErr(OpenMessageError::BadPeerAs {
                     value: peer_asn.to_be_bytes().to_vec(),
-                },
-            ));
+                }),
+            );
         }
     }
-    // Check Peer BGP ID
-    if let Some(peer_bgp_id) = peer_bgp_id {
-        if peer_bgp_id != open.bgp_id() {
-            return Some(ConnectionEvent::BGPOpenMsgErr(
-                OpenMessageError::BadBgpIdentifier {
-                    value: open.bgp_id().octets().to_vec(),
-                },
-            ));
-        }
-    }
+    // TODO: check BGP ID according to RFC4271: If the BGP Identifier field of the
+    // OPEN message is syntactically incorrect, then the Error Subcode MUST be set
+    // to Bad BGP Identifier. Syntactic correctness means that the BGP Identifier
+    // field represents a valid unicast IP host address.
+
     if delay_timer_running {
-        Some(ConnectionEvent::BGPOpenWithDelayOpenTimer(open))
+        (
+            open.bgp_id(),
+            ConnectionEvent::BGPOpenWithDelayOpenTimer(open),
+        )
     } else {
-        Some(ConnectionEvent::BGPOpen(open))
+        (open.bgp_id(), ConnectionEvent::BGPOpen(open))
     }
 }
 
@@ -1369,7 +1362,9 @@ where
                                             );
                                         }
                                     }
-                                    handle_open_message(open, *this.peer_asn, *this.peer_bgp_id, this.open_delay_timer.is_some())
+                                    let (peer_bgp_id, event) = handle_open_message(open, *this.peer_asn, this.open_delay_timer.is_some());
+                                    this.peer_bgp_id.replace(peer_bgp_id);
+                                    Some(event)
                                 }
                                 BgpMessage::Update(update) => {
                                     this.stats.update_received += 1;
