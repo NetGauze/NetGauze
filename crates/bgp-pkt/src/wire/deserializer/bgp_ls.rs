@@ -1,18 +1,21 @@
+use std::collections::HashMap;
 use std::io::BufWriter;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::BitAnd;
 use std::string::FromUtf8Error;
-use ipnet::{IpNet, Ipv4Net};
+use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 use nom::error::{ErrorKind, FromExternalError};
 use nom::IResult;
 use nom::number::complete::{be_f32, be_u128, be_u16, be_u32, be_u64, be_u8};
 use serde::{Deserialize, Serialize};
-use netgauze_parse_utils::{parse_into_located, parse_into_located_one_input, parse_till_empty_into_located, parse_till_empty_into_with_one_input_located, ReadablePdu, ReadablePduWithOneInput, Span, WritablePdu, WritablePduWithOneInput};
+use netgauze_parse_utils::{parse_into_located, parse_into_located_one_input, parse_till_empty_into_located, parse_till_empty_into_with_one_input_located, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs, Span, WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::LocatedError;
-use crate::bgp_ls::{BgpLsAttribute, BgpLsAttributeTlv, IpReachabilityInformationData, BgpLsNlriValue, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptorTlv, BgpLsPrefixDescriptorTlv, IgpFlags, LinkProtectionType, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, NodeFlagsBits, OspfRouteType, UnknownOspfRouteType, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsVpnNlri};
+use crate::bgp_ls::{BgpLsAttribute, BgpLsAttributeTlv, IpReachabilityInformationData, BgpLsNlriValue, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptorTlv, BgpLsPrefixDescriptorTlv, IgpFlags, LinkProtectionType, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, NodeFlagsBits, OspfRouteType, UnknownOspfRouteType, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsVpnNlri, SharedRiskLinkGroupValue};
 use netgauze_parse_utils::ErrorKindSerdeDeref;
 use crate::iana;
 use crate::iana::{BgpLsNodeDescriptorTlvType, BgpLsNlriType, BgpLsProtocolId, UnknownBgpLsAttributeTlvType, UnknownBgpLsNodeDescriptorTlvType, UnknownBgpLsProtocolId, UnknownNodeDescriptorSubTlvType, BgpLsPrefixDescriptorTlvType, UnknownPrefixDescriptorTlvType, BgpLsLinkDescriptorTlvType, UnknownLinkDescriptorTlvType, UnknownBgpLsNlriType};
+use crate::nlri::{LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher};
+use crate::path_attribute::MpReach;
 use crate::wire::deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
 use crate::wire::deserializer::nlri::RouteDistinguisherParsingError;
 use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
@@ -159,7 +162,10 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
             iana::BgpLsAttributeTlv::IgpMetric => {
                 BgpLsAttributeTlv::IgpMetric(data.to_vec())
             }
-            iana::BgpLsAttributeTlv::SharedRiskLinkGroup => unimplemented!(),
+            iana::BgpLsAttributeTlv::SharedRiskLinkGroup => {
+                let (_, values) = parse_till_empty_into_located(data)?;
+                BgpLsAttributeTlv::SharedRiskLinkGroup(values)
+            },
             iana::BgpLsAttributeTlv::OpaqueLinkAttribute => {
                 BgpLsAttributeTlv::OpaqueLinkAttribute(data.to_vec())
             }
@@ -227,17 +233,16 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for u64 {
     }
 }
 
+impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for SharedRiskLinkGroupValue {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> where Self: Sized {
+        let (span, value) = be_u32(buf)?;
+        Ok((span, SharedRiskLinkGroupValue(value)))
+    }
+}
 impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for MultiTopologyIdData {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> where Self: Sized {
         let (span, value) = parse_till_empty_into_located(buf)?;
         Ok((span, MultiTopologyIdData(value)))
-    }
-}
-
-impl From<u16> for MultiTopologyId {
-    fn from(value: u16) -> Self {
-        // ignore 4 first reserved bits
-        Self(value.bitand(!(0b1111u16 << 12)))
     }
 }
 
@@ -292,7 +297,6 @@ pub enum BgpLsNlriParsingError {
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlri {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> where Self: Sized {
-
         let (buf, nlri_type) = nom::combinator::map_res(be_u16, BgpLsNlriType::try_from)(buf)?;
         let (buf, nlri_len) = be_u16(buf)?;
         let (buf, data) = nom::bytes::complete::take(nlri_len)(buf)?;
@@ -305,7 +309,6 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlri {
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsVpnNlri {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> where Self: Sized {
-
         let (buf, nlri_type) = nom::combinator::map_res(be_u16, BgpLsNlriType::try_from)(buf)?;
         let (buf, nlri_len) = be_u16(buf)?;
         let (buf, data) = nom::bytes::complete::take(nlri_len)(buf)?;
@@ -315,7 +318,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsVpnNlri {
 
         Ok((buf, BgpLsVpnNlri {
             rd,
-            nlri
+            nlri,
         }))
     }
 }
@@ -611,19 +614,21 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
 
 #[test]
 pub fn test_bgp_ls_nlri_parse() {
-    let value = BgpLsNlriValue::Link(BgpLsNlriLink {
-        protocol_id: BgpLsProtocolId::IsIsLevel1,
-        identifier: 69,
-        local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
-            BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
-        ]),
-        remote_node_descriptors: BgpLsNodeDescriptorTlv::Remote(vec![
-            BgpLsNodeDescriptorSubTlv::OspfAreaId(21)
-        ]),
-        link_descriptor_tlvs: vec![
-            BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(Ipv4Addr::new(1, 2, 3, 4))
-        ],
-    });
+    let value = BgpLsNlri(
+        BgpLsNlriValue::Link(BgpLsNlriLink {
+            protocol_id: BgpLsProtocolId::IsIsLevel1,
+            identifier: 69,
+            local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+                BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
+            ]),
+            remote_node_descriptors: BgpLsNodeDescriptorTlv::Remote(vec![
+                BgpLsNodeDescriptorSubTlv::OspfAreaId(21)
+            ]),
+            link_descriptor_tlvs: vec![
+                BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(Ipv4Addr::new(1, 2, 3, 4))
+            ],
+        })
+    );
 
     let mut buf = Vec::<u8>::new();
     let mut writer = BufWriter::new(&mut buf);
@@ -631,29 +636,31 @@ pub fn test_bgp_ls_nlri_parse() {
     drop(writer);
 
     let span = Span::new(&buf);
-    let result = BgpLsNlriValue::from_wire(span, BgpLsNlriType::Link).expect("I CAN READ");
+    let result = BgpLsNlri::from_wire(span).expect("I CAN READ");
 
     assert_eq!(result.1, value)
 }
 
 #[test]
 pub fn test_bgp_ls_nlri_ipv4_parse() {
-    let value = BgpLsNlriValue::Ipv4Prefix(BgpLsNlriIpPrefix {
-        protocol_id: BgpLsProtocolId::IsIsLevel1,
-        identifier: 69,
-        local_node_descriptors:
-        BgpLsNodeDescriptorTlv::Local(vec![
-            BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
-        ]),
-        prefix_descriptor_tlvs: vec![
-            BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(IpNet::V4(Ipv4Net::new(Ipv4Addr::new(1, 2, 3, 4), 32).unwrap()))),
-            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
-                MultiTopologyId(69),
-                MultiTopologyId(21),
-            ])),
-            BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2)
-        ],
-    });
+    let value = BgpLsNlri(
+        BgpLsNlriValue::Ipv4Prefix(BgpLsNlriIpPrefix {
+            protocol_id: BgpLsProtocolId::IsIsLevel1,
+            identifier: 69,
+            local_node_descriptors:
+            BgpLsNodeDescriptorTlv::Local(vec![
+                BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
+            ]),
+            prefix_descriptor_tlvs: vec![
+                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(IpNet::V4(Ipv4Net::new(Ipv4Addr::new(1, 2, 3, 4), 32).unwrap()))),
+                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                    MultiTopologyId(69),
+                    MultiTopologyId(21),
+                ])),
+                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+            ],
+        })
+    );
 
     let mut buf = Vec::<u8>::new();
     let mut writer = BufWriter::new(&mut buf);
@@ -661,29 +668,31 @@ pub fn test_bgp_ls_nlri_ipv4_parse() {
     drop(writer);
 
     let span = Span::new(&buf);
-    let result = BgpLsNlriValue::from_wire(span, BgpLsNlriType::Ipv4TopologyPrefix).expect("I CAN READ");
+    let result = BgpLsNlri::from_wire(span).expect("I CAN READ");
 
     assert_eq!(result.1, value)
 }
 
 #[test]
 pub fn test_bgp_ls_nlri_ipv6_parse() {
-    let value = BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
-        protocol_id: BgpLsProtocolId::IsIsLevel1,
-        identifier: 69,
-        local_node_descriptors:
-        BgpLsNodeDescriptorTlv::Local(vec![
-            BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
-        ]),
-        prefix_descriptor_tlvs: vec![
-            BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(IpNet::V4(Ipv4Net::new(Ipv4Addr::new(1, 2, 3, 4), 32).unwrap()))),
-            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
-                MultiTopologyId(69),
-                MultiTopologyId(21),
-            ])),
-            BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2)
-        ],
-    });
+    let value = BgpLsNlri(
+        BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
+            protocol_id: BgpLsProtocolId::IsIsLevel1,
+            identifier: 69,
+            local_node_descriptors:
+            BgpLsNodeDescriptorTlv::Local(vec![
+                BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
+            ]),
+            prefix_descriptor_tlvs: vec![
+                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(IpNet::V6(Ipv6Net::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8), 128).unwrap()))),
+                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                    MultiTopologyId(69),
+                    MultiTopologyId(21),
+                ])),
+                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+            ],
+        })
+    );
 
     let mut buf = Vec::<u8>::new();
     let mut writer = BufWriter::new(&mut buf);
@@ -691,7 +700,101 @@ pub fn test_bgp_ls_nlri_ipv6_parse() {
     drop(writer);
 
     let span = Span::new(&buf);
-    let result = BgpLsNlriValue::from_wire(span, BgpLsNlriType::Ipv6TopologyPrefix).expect("I CAN READ");
+    let result = BgpLsNlri::from_wire(span).expect("I CAN READ");
+
+    assert_eq!(result.1, value)
+}
+
+#[test]
+pub fn test_bgp_ls_mp_reach() {
+    let ls_nlri = BgpLsNlri(
+        BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
+            protocol_id: BgpLsProtocolId::IsIsLevel1,
+            identifier: 69,
+            local_node_descriptors:
+            BgpLsNodeDescriptorTlv::Local(vec![
+                BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
+            ]),
+            prefix_descriptor_tlvs: vec![
+                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(IpNet::V6(Ipv6Net::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8), 128).unwrap()))),
+                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                    MultiTopologyId(69),
+                    MultiTopologyId(21),
+                ])),
+                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+            ],
+        })
+    );
+
+    let value = MpReach::BgpLs {
+        next_hop: IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)),
+        nlri: vec![
+            ls_nlri.clone(),
+            ls_nlri.clone(),
+            ls_nlri,
+        ],
+    };
+
+    let mut buf = Vec::<u8>::new();
+    let mut writer = BufWriter::new(&mut buf);
+    value.write(&mut writer, false).expect("I CAN WRITE");
+    drop(writer);
+    println!("written {:?} {:#?}", buf, buf.len());
+
+    let span = Span::new(&buf);
+    let result = MpReach::from_wire(span, false, &HashMap::new(), &HashMap::new()).expect("I CAN READ");
+
+    assert_eq!(result.1, value)
+}
+
+#[test]
+pub fn test_bgp_ls_vpn_mp_reach() {
+    let ls_nlri = BgpLsVpnNlri {
+        rd: RouteDistinguisher::As4Administrator {
+            asn4: 1010,
+            number: 2020,
+        },
+        nlri: BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
+            protocol_id: BgpLsProtocolId::IsIsLevel1,
+            identifier: 69,
+            local_node_descriptors:
+            BgpLsNodeDescriptorTlv::Local(vec![
+                BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
+            ]),
+            prefix_descriptor_tlvs: vec![
+                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(IpNet::V6(Ipv6Net::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8), 128).unwrap()))),
+                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                    MultiTopologyId(69),
+                    MultiTopologyId(21),
+                ])),
+                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+            ],
+        })
+    };
+
+    let value = MpReach::BgpLsVpn {
+        next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
+            RouteDistinguisher::As2Administrator {
+                asn2: 0,
+                number: 0
+            },
+            Ipv4Addr::new(1, 2, 3, 4))
+        ),
+        nlri: vec![
+            ls_nlri.clone(),
+            ls_nlri.clone(),
+            ls_nlri
+        ],
+    };
+
+    let mut buf = Vec::<u8>::new();
+    let mut writer = BufWriter::new(&mut buf);
+    value.write(&mut writer, false).expect("I CAN WRITE");
+    drop(writer);
+    println!("written {:?}", buf);
+
+    let span = Span::new(&buf);
+    let result = MpReach::from_wire(span, false, &HashMap::new(), &HashMap::new()).expect("I CAN READ");
 
     assert_eq!(result.1, value)
 }

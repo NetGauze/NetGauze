@@ -1,4 +1,5 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::ops::BitAnd;
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
@@ -495,7 +496,7 @@ pub enum BgpLsNodeDescriptorSubTlv {
     AutonomousSystem(u32),
     BgpLsIdentifier(u32),
     OspfAreaId(u32),
-    IgpRouterId(Vec<u8>), // TODO add types for all possible cases (https://datatracker.ietf.org/doc/html/rfc7752)
+    IgpRouterId(Vec<u8>),
 }
 
 impl BgpLsNodeDescriptorSubTlv {
@@ -570,13 +571,20 @@ impl MultiTopologyId {
     }
 }
 
+impl From<u16> for MultiTopologyId {
+    fn from(value: u16) -> Self {
+        // ignore 4 first reserved bits
+        Self(value.bitand(!(0b1111u16 << 12)))
+    }
+}
+
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct IsIsMtId(u16);
 
 /// TODO unimplemented: we don't care about what they it's just a u32 (https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.5)
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct SharedRiskLinkGroupValue(u32);
+pub struct SharedRiskLinkGroupValue(pub u32);
 
 impl SharedRiskLinkGroupValue {
     pub fn value(&self) -> u32 {

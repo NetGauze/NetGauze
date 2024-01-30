@@ -853,11 +853,6 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
                 next_hop_len + 1 + nlri_len
             }
-            Self::Unknown {
-                afi: _,
-                safi: _,
-                value,
-            } => value.len(),
             Self::BgpLs { nlri, next_hop } => {
                 let next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN as usize
@@ -867,7 +862,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
 
                 let ls_nlri_len: usize = nlri.iter().map(&BgpLsNlri::len).sum();
 
-                next_hop_len + ls_nlri_len
+                next_hop_len + 1 /* next-hop prefix length */
+                    + ls_nlri_len
             }
             Self::BgpLsVpn { nlri, next_hop } => {
                 let next_hop_len = next_hop.len();
@@ -876,6 +872,11 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
 
                 next_hop_len + ls_nlri_len
             }
+            Self::Unknown {
+                afi: _,
+                safi: _,
+                value,
+            } => value.len(),
         };
         Self::BASE_LENGTH + usize::from(extended_length) + payload_len
     }
@@ -1158,8 +1159,12 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 writer.write_u8(AddressType::BgpLsVpn.subsequent_address_family().into())?;
 
                 // The RD of the next-hop is set to all zeros (https://www.rfc-editor.org/rfc/rfc7752#section-3.4)
+                writer.write_u8((next_hop.len() - 1) as u8 /* len field */)?;
                 writer.write(&[0u8; 8])?;
-                next_hop.next_hop().write(writer)?;
+                match next_hop.next_hop() {
+                    IpAddr::V4(ip) => writer.write(&ip.octets())?,
+                    IpAddr::V6(ip) => writer.write(&ip.octets())?,
+                };
 
                 writer.write_u8(0)?;
 

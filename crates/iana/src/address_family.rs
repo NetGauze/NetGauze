@@ -548,6 +548,7 @@ impl AddressType {
             (AddressFamily::L2vpn, SubsequentAddressFamily::BgpEvpn) => Ok(Self::L2VpnBgpEvpn),
 
             (AddressFamily::BgpLs, SubsequentAddressFamily::BgpLs) => Ok(Self::BgpLs),
+            (AddressFamily::BgpLs, SubsequentAddressFamily::BgpLsVpn) => Ok(Self::BgpLsVpn),
             (AddressFamily::IPv4, SubsequentAddressFamily::RouteTargetConstrains) => {
                 Ok(Self::RouteTargetConstrains)
             }

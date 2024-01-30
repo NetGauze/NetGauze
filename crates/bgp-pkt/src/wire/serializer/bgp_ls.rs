@@ -49,8 +49,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNlri {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
         let nlri = self.nlri();
-        writer.write_u16::<NetworkEndian>(nlri.get_type() as u16)?;
-        writer.write_u16::<NetworkEndian>(nlri.len() as u16)?;
+        write_tlv_header(writer, nlri.get_type() as u16, self.len() as u16)?;
 
         nlri.write(writer)?;
 
@@ -66,8 +65,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsVpnNlri {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError> where Self: Sized {
-        writer.write_u16::<NetworkEndian>(self.nlri.get_type() as u16)?;
-        writer.write_u16::<NetworkEndian>(self.nlri.len() as u16)?;
+        write_tlv_header(writer, self.nlri.get_type() as u16, self.len() as u16)?;
 
         self.rd.write(writer)?;
 

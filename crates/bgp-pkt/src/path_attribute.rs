@@ -988,56 +988,11 @@ pub enum MpReach {
         next_hop: IpAddr,
         nlri: Vec<RouteTargetMembershipAddress>,
     },
-
-    ///
-    ///    The format of the Link-State NLRI is shown in the following figures.
-    ///
-    ///       0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |            NLRI Type          |     Total NLRI Length         |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |                                                               |
-    ///      //                  Link-State NLRI (variable)                 //
-    ///      |                                                               |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///
-    ///            Figure 5: Link-State AFI 16388 / SAFI 71 NLRI Format
-    ///
-    ///    The Total NLRI Length field contains the cumulative length, in
-    ///    octets, of the rest of the NLRI, not including the NLRI Type field or
-    ///    itself
-    /// 
     BgpLs {
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: IpAddr,
         nlri: Vec<BgpLsNlri>
     },
-
-    ///
-    ///    The format of the Link-State VPN NLRI is shown in the following figures.
-    ///
-    ///       0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |            NLRI Type          |     Total NLRI Length         |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |                                                               |
-    ///      +                       Route Distinguisher                     +
-    ///      |                                                               |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |                                                               |
-    ///      //                  Link-State NLRI (variable)                 //
-    ///      |                                                               |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///
-    ///            Figure 5: Link-State AFI 16388 / SAFI 71 NLRI Format
-    ///
-    ///    The Total NLRI Length field contains the cumulative length, in
-    ///    octets, of the rest of the NLRI, not including the NLRI Type field or
-    ///    itself. For VPN applications, it also includes the length of the
-    ///    Route Distinguisher.
-    ///
     BgpLsVpn {
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: LabeledNextHop,
