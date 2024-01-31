@@ -1161,7 +1161,7 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
 
                 // The RD of the next-hop is set to all zeros (https://www.rfc-editor.org/rfc/rfc7752#section-3.4)
                 writer.write_u8((next_hop.len() - 1) as u8 /* len field */)?;
-                writer.write(&[0u8; 8])?;
+                writer.write_all(&[0u8; 8])?;
                 match next_hop.next_hop() {
                     IpAddr::V4(ip) => writer.write(&ip.octets())?,
                     IpAddr::V6(ip) => writer.write(&ip.octets())?,
@@ -1375,27 +1375,15 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
                 }
             }
             Self::BgpLs { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    BgpLs.address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    BgpLs.subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(BgpLs.address_family().into())?;
+                writer.write_u8(BgpLs.subsequent_address_family().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::BgpLsVpn { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    BgpLsVpn.address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    BgpLsVpn.subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(BgpLsVpn.address_family().into())?;
+                writer.write_u8(BgpLsVpn.subsequent_address_family().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }

@@ -1396,6 +1396,7 @@ impl TryFrom<u16> for BgpLsNlriType {
 /// BGP-LS Protocol IDs [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#protocol-ids)
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpLsProtocolId {
     IsIsLevel1 = 1,
     IsIsLevel2 = 2,
@@ -1433,7 +1434,7 @@ impl TryFrom<u8> for BgpLsProtocolId {
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BgpLsNodeDescriptorTlvType {
     LocalNodeDescriptor = 256,
-    RemoteNodeDescriptor = 257
+    RemoteNodeDescriptor = 257,
 }
 
 #[repr(C)]
@@ -1464,7 +1465,7 @@ pub enum BgpLsNodeDescriptorSubTlv {
     AutonomousSystem = 512,
     BgpLsIdentifier = 513,
     OspfAreaId = 514,
-    IgpRouterId = 515
+    IgpRouterId = 515,
 }
 
 #[repr(C)]
@@ -1564,7 +1565,6 @@ pub enum BgpLsDescriptorTlvType {
     IPv6NeighborAddress = 262,
 }
 
-
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct UnknownDescriptorTlvType(pub u16);
@@ -1585,7 +1585,6 @@ impl TryFrom<u16> for BgpLsDescriptorTlvType {
         }
     }
 }
-
 
 /// Aggregate of [BgpLsLinkAttribute] [BgpLsNodeAttribute] [BgpLsPrefixAttribute]
 #[repr(u16)]

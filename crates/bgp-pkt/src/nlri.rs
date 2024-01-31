@@ -159,14 +159,14 @@ impl LabeledNextHop {
     pub fn next_hop(&self) -> IpAddr {
         match self {
             LabeledNextHop::Ipv4(nh) => IpAddr::V4(nh.next_hop()),
-            LabeledNextHop::Ipv6(nh) => IpAddr::V6(nh.next_hop())
+            LabeledNextHop::Ipv6(nh) => IpAddr::V6(nh.next_hop()),
         }
     }
 
     pub fn rd(&self) -> RouteDistinguisher {
         match self {
             LabeledNextHop::Ipv4(nh) => nh.rd(),
-            LabeledNextHop::Ipv6(nh) => nh.rd()
+            LabeledNextHop::Ipv6(nh) => nh.rd(),
         }
     }
 }

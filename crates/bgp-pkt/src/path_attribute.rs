@@ -16,6 +16,9 @@
 //! Contains the extensible definitions for various [`PathAttribute`] that can
 //! be used in [`crate::update::BgpUpdateMessage`].
 
+#[cfg(feature = "fuzz")]
+use crate::arbitrary_ip;
+use crate::bgp_ls::{BgpLsAttribute, BgpLsNlri, BgpLsVpnNlri};
 use crate::{
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     nlri::*,
@@ -24,7 +27,6 @@ use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
-use crate::bgp_ls::{BgpLsAttribute, BgpLsNlri, BgpLsVpnNlri};
 
 /// General properties to check the validity of a given path attribute value
 pub trait PathAttributeValueProperties {
@@ -991,12 +993,11 @@ pub enum MpReach {
     BgpLs {
         #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: IpAddr,
-        nlri: Vec<BgpLsNlri>
+        nlri: Vec<BgpLsNlri>,
     },
     BgpLsVpn {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ip))]
         next_hop: LabeledNextHop,
-        nlri: Vec<BgpLsVpnNlri>
+        nlri: Vec<BgpLsVpnNlri>,
     },
     Unknown {
         afi: AddressFamily,
@@ -1068,10 +1069,10 @@ pub enum MpUnreach {
         nlri: Vec<RouteTargetMembershipAddress>,
     },
     BgpLs {
-        nlri: Vec<BgpLsNlri>
+        nlri: Vec<BgpLsNlri>,
     },
     BgpLsVpn {
-        nlri: Vec<BgpLsVpnNlri>
+        nlri: Vec<BgpLsVpnNlri>,
     },
     Unknown {
         afi: AddressFamily,

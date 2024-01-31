@@ -52,7 +52,11 @@ use netgauze_parse_utils::{
 use nom::error::ErrorKind;
 use std::fs::File;
 use std::io::{Cursor, Write};
-use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    str::FromStr,
+};
 
 use crate::{
     iana::*,

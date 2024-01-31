@@ -16,6 +16,7 @@
 
 //! Deserializer for BGP Path Attributes
 
+use crate::wire::deserializer::bgp_ls::LocatedBgpLsAttributeParsingError;
 use crate::wire::deserializer::bgp_ls::{BgpLsAttributeParsingError, BgpLsNlriParsingError};
 use crate::{
     iana::{
@@ -41,7 +42,6 @@ use netgauze_parse_utils::{
     ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs, ReadablePduWithTwoInputs,
     Span,
 };
-use crate::wire::deserializer::bgp_ls::LocatedBgpLsAttributeParsingError;
 use netgauze_serde_macros::LocatedError;
 use nom::{
     error::ErrorKind,
@@ -111,7 +111,7 @@ pub trait IntoLocatedPathAttributeParsingError<'a> {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttributeParsingError<'a>>
-for PathAttribute
+    for PathAttribute
 {
     fn from_wire(
         buf: Span<'a>,
@@ -421,7 +421,7 @@ pub enum MultiExitDiscriminatorParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedMultiExitDiscriminatorParsingError<'a>>
-for MultiExitDiscriminator
+    for MultiExitDiscriminator
 {
     fn from_wire(
         buf: Span<'a>,
@@ -459,7 +459,7 @@ pub enum LocalPreferenceParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedLocalPreferenceParsingError<'a>>
-for LocalPreference
+    for LocalPreference
 {
     fn from_wire(
         buf: Span<'a>,
@@ -495,7 +495,7 @@ pub enum AtomicAggregateParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedAtomicAggregateParsingError<'a>>
-for AtomicAggregate
+    for AtomicAggregate
 {
     fn from_wire(
         buf: Span<'a>,
@@ -529,7 +529,7 @@ pub enum AggregatorParsingError {
 }
 
 impl<'a> ReadablePduWithTwoInputs<'a, bool, bool, LocatedAggregatorParsingError<'a>>
-for Aggregator
+    for Aggregator
 {
     fn from_wire(
         buf: Span<'a>,
@@ -651,13 +651,13 @@ pub enum MpReachParsingError {
 }
 
 impl<'a>
-ReadablePduWithThreeInputs<
-    'a,
-    bool,
-    &HashMap<AddressType, u8>,
-    &HashMap<AddressType, bool>,
-    LocatedMpReachParsingError<'a>,
-> for MpReach
+    ReadablePduWithThreeInputs<
+        'a,
+        bool,
+        &HashMap<AddressType, u8>,
+        &HashMap<AddressType, bool>,
+        LocatedMpReachParsingError<'a>,
+    > for MpReach
 {
     fn from_wire(
         buf: Span<'a>,
@@ -1018,20 +1018,17 @@ pub enum MpUnreachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")]
         RouteTargetMembershipAddressParsingError,
     ),
-    BgpLsError(
-        #[from_located(module = "crate::wire::deserializer::bgp_ls")]
-        BgpLsNlriParsingError,
-    ),
+    BgpLsError(#[from_located(module = "crate::wire::deserializer::bgp_ls")] BgpLsNlriParsingError),
 }
 
 impl<'a>
-ReadablePduWithThreeInputs<
-    'a,
-    bool,
-    &HashMap<AddressType, u8>,
-    &HashMap<AddressType, bool>,
-    LocatedMpUnreachParsingError<'a>,
-> for MpUnreach
+    ReadablePduWithThreeInputs<
+        'a,
+        bool,
+        &HashMap<AddressType, u8>,
+        &HashMap<AddressType, bool>,
+        LocatedMpUnreachParsingError<'a>,
+    > for MpUnreach
 {
     fn from_wire(
         buf: Span<'a>,
@@ -1177,7 +1174,7 @@ pub enum UnknownAttributeParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'a>>
-for UnknownAttribute
+    for UnknownAttribute
 {
     fn from_wire(
         buf: Span<'a>,
@@ -1235,7 +1232,7 @@ pub enum ExtendedCommunitiesParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedExtendedCommunitiesParsingError<'a>>
-for ExtendedCommunities
+    for ExtendedCommunities
 {
     fn from_wire(
         buf: Span<'a>,
@@ -1262,7 +1259,7 @@ pub enum ExtendedCommunitiesIpv6ParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedExtendedCommunitiesIpv6ParsingError<'a>>
-for ExtendedCommunitiesIpv6
+    for ExtendedCommunitiesIpv6
 {
     fn from_wire(
         buf: Span<'a>,
@@ -1288,7 +1285,7 @@ pub enum LargeCommunitiesParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedLargeCommunitiesParsingError<'a>>
-for LargeCommunities
+    for LargeCommunities
 {
     fn from_wire(
         buf: Span<'a>,
@@ -1404,7 +1401,7 @@ pub enum OnlyToCustomerParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedOnlyToCustomerParsingError<'a>>
-for OnlyToCustomer
+    for OnlyToCustomer
 {
     fn from_wire(
         buf: Span<'a>,

@@ -15,6 +15,7 @@
 
 //! Serializer library for BGP's wire protocol
 
+mod bgp_ls;
 pub mod capabilities;
 pub mod community;
 pub mod nlri;
@@ -23,7 +24,6 @@ pub mod open;
 pub mod path_attribute;
 pub mod route_refresh;
 pub mod update;
-mod bgp_ls;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
 use std::net::IpAddr;

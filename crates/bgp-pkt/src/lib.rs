@@ -21,6 +21,7 @@ use crate::{
 };
 use ::serde::{Deserialize, Serialize};
 
+pub mod bgp_ls;
 pub mod capabilities;
 pub mod community;
 pub mod iana;
@@ -32,7 +33,6 @@ pub mod route_refresh;
 pub mod update;
 #[cfg(feature = "serde")]
 pub mod wire;
-pub mod bgp_ls;
 
 /// BGP message wire format as defined by [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271#section-4.1)
 /// Here we don't keep the length and type in memory. The type is inferred by
@@ -132,6 +132,18 @@ pub(crate) fn arbitrary_ip(
     let ipv4 = arbitrary_ipv4(u)?;
     let ipv6 = arbitrary_ipv6(u)?;
     let choices = [std::net::IpAddr::V4(ipv4), std::net::IpAddr::V6(ipv6)];
+    let addr = u.choose(&choices)?;
+    Ok(*addr)
+}
+
+// Custom function to generate arbitrary IPv4 and IPv6 network addresses
+#[cfg(feature = "fuzz")]
+pub(crate) fn arbitrary_ipnet(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<ipnet::IpNet> {
+    let ipv4 = arbitrary_ipv4net(u)?;
+    let ipv6 = arbitrary_ipv6net(u)?;
+    let choices = [ipnet::IpNet::V4(ipv4), ipnet::IpNet::V6(ipv6)];
     let addr = u.choose(&choices)?;
     Ok(*addr)
 }
