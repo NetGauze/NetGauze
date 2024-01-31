@@ -34,7 +34,7 @@ use tokio_util::codec::{Decoder, Encoder, Framed};
 use netgauze_bgp_pkt::{
     capabilities::{BgpCapability, FourOctetAsCapability},
     iana::{BgpCapabilityCode, AS_TRANS},
-    notification::{BgpNotificationMessage, CeaseError},
+    notification::{BgpNotificationMessage, CeaseError, OpenMessageError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
     BgpMessage,
@@ -305,6 +305,25 @@ impl<A> From<ConnectError> for BgpEvent<A> {
             ConnectError::TcpConnectionFails => BgpEvent::TcpConnectionFails,
         }
     }
+}
+
+/// Internally used return type to signal the results of the BGP collision
+/// process
+#[derive(Debug, Clone, PartialEq)]
+enum CollisionCheckRet {
+    DropMain,
+    DropTracked,
+    /// Drop tracked connection and send a notif message with BGP Peer ID.
+    InvalidTrackedBgpId(Ipv4Addr),
+}
+
+/// Internally used return type when polling main and tracked connection for
+/// next ConnectionEvent to handle.
+#[derive(Debug, Clone, PartialEq)]
+enum ConnectionNextEvent<A> {
+    DropMain,
+    DropTracked,
+    Event(ConnectionEvent<A>),
 }
 
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq)]
@@ -848,7 +867,7 @@ impl<
     }
 
     async fn get_connection_event(
-        connection: Option<&mut Connection<A, I, D>>,
+        connection: &mut Option<&mut Connection<A, I, D>>,
     ) -> ConnectionEvent<A> {
         match connection {
             None => std::future::pending().await,
@@ -861,18 +880,17 @@ impl<
 
     fn fsm_state_from_tracked(
         fsm_state: FsmState,
-        open: BgpOpenMessage,
         tracked: &Connection<A, I, D>,
     ) -> Result<FsmState, FsmStateError<A>> {
         match tracked.state() {
             ConnectionState::Connected => Err(FsmStateError::InvalidConnectionStateTransition(
-                BgpEvent::BGPOpen(open),
+                BgpEvent::OpenCollisionDump,
                 fsm_state,
                 ConnectionState::Connected,
                 ConnectionState::Connected,
             )),
             ConnectionState::Terminate => Err(FsmStateError::InvalidConnectionStateTransition(
-                BgpEvent::BGPOpen(open),
+                BgpEvent::OpenCollisionDump,
                 fsm_state,
                 ConnectionState::Terminate,
                 ConnectionState::Terminate,
@@ -881,70 +899,6 @@ impl<
             ConnectionState::OpenConfirm => Ok(FsmState::OpenConfirm),
             ConnectionState::Established => Ok(FsmState::Established),
         }
-    }
-
-    async fn handle_tracked_connection_event(
-        &mut self,
-        value: Result<BgpOpenMessage, ()>,
-    ) -> Result<BgpEvent<A>, FsmStateError<A>> {
-        match (
-            value,
-            self.connection.take(),
-            self.tracked_connection.take(),
-        ) {
-            (Ok(open), Some(mut connection), Some(mut tracked)) => {
-                let main_created = connection.stats().created();
-                let tracked_created = tracked.stats().created();
-                if open.bgp_id() < self.properties.my_bgp_id
-                    || (open.bgp_id() == self.properties.my_bgp_id
-                        && tracked_created < main_created)
-                {
-                    self.connection.replace(connection);
-                    log::info!(
-                        "[{}][{}] BGP Collision detection dropping tracked connection: {}",
-                        self.peer_key,
-                        self.fsm_state,
-                        tracked.peer_addr()
-                    );
-                    let _ = tracked
-                        .send(BgpMessage::Notification(
-                            BgpNotificationMessage::CeaseError(
-                                CeaseError::ConnectionCollisionResolution { value: vec![] },
-                            ),
-                        ))
-                        .await;
-                } else {
-                    self.stats.connect_retry_counter += 1;
-                    let new_state = Self::fsm_state_from_tracked(self.fsm_state, open, &tracked)?;
-                    log::info!(
-                        "[{}][{}] BGP Collision replacing main connection with tracked connection: {}",
-                        self.peer_key, self.fsm_state, tracked.peer_addr());
-                    self.fsm_transition(new_state);
-                    self.connection.replace(tracked);
-                    let _ = connection
-                        .send(BgpMessage::Notification(
-                            BgpNotificationMessage::CeaseError(
-                                CeaseError::ConnectionCollisionResolution { value: vec![] },
-                            ),
-                        ))
-                        .await;
-                }
-            }
-            (Ok(open), None, Some(tracked)) => {
-                self.stats.connect_retry_counter += 1;
-                let new_state = Self::fsm_state_from_tracked(self.fsm_state, open, &tracked)?;
-                self.fsm_transition(new_state);
-                self.connection.replace(tracked);
-            }
-            (_, Some(connection), _) => {
-                self.connection.replace(connection);
-            }
-            (_, None, Some(tracked)) => {
-                self.connection.replace(tracked);
-            }
-            (_, None, None) => {}
-        }
-        Ok(BgpEvent::OpenCollisionDump)
     }
 
     async fn handle_connection_event(
@@ -1384,9 +1338,11 @@ impl<
     async fn get_tracked_connection_event(
         fsm_state: FsmState,
         policy: &mut P,
-        connection: Option<&mut Connection<A, I, D>>,
+        connection: &mut Option<&mut Connection<A, I, D>>,
     ) -> Result<BgpOpenMessage, ()> {
-        if fsm_state == FsmState::Connect {
+        if fsm_state == FsmState::Connect
+            || connection.as_ref().map(|x| x.state()) == Some(ConnectionState::OpenConfirm)
+        {
             return std::future::pending().await;
         }
         match connection {
@@ -1416,6 +1372,166 @@ impl<
 
     pub fn add_admin_event(&mut self, event: PeerAdminEvents<A, I>) {
         self.waiting_admin_events.push(event);
+    }
+
+    fn check_connection_collision(
+        my_bgp_id: Ipv4Addr,
+        connection: &mut Option<&mut Connection<A, I, D>>,
+        tracked_connection: &mut Option<&mut Connection<A, I, D>>,
+    ) -> Option<CollisionCheckRet> {
+        let main_info = if let Some((Some(id), time)) = connection
+            .as_ref()
+            .map(|x| (x.peer_bgp_id(), x.stats().created()))
+        {
+            Some((id, time))
+        } else {
+            None
+        };
+
+        let tracked_info = if let Some((Some(id), time)) = tracked_connection
+            .as_ref()
+            .map(|x| (x.peer_bgp_id(), x.stats().created()))
+        {
+            Some((id, time))
+        } else {
+            None
+        };
+        if let (
+            Some((main_peer_bgp_id, main_created)),
+            Some((tracked_peer_bgp_id, tracked_created)),
+        ) = (main_info, tracked_info)
+        {
+            // This is not part of the BGP Spec, currently it's not defined if the BGP
+            // Peer ID signaled in main and tracked connections are different.
+            // We take the one in the main connection as the reference one and close the
+            // tracked connection.
+            if tracked_peer_bgp_id != main_peer_bgp_id {
+                return Some(CollisionCheckRet::InvalidTrackedBgpId(tracked_peer_bgp_id));
+            }
+            let peer_bgp_id = main_peer_bgp_id;
+            if my_bgp_id < peer_bgp_id
+                || (my_bgp_id == peer_bgp_id && tracked_created < main_created)
+            {
+                Some(CollisionCheckRet::DropMain)
+            } else {
+                Some(CollisionCheckRet::DropTracked)
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Poll the main and tracked connections to get the next
+    /// [ConnectionNextEvent] event to be handled by the BGP FSM.
+    async fn next_connection_event(
+        my_bgp_id: Ipv4Addr,
+        fsm_state: FsmState,
+        policy: &mut P,
+        mut connection: Option<&mut Connection<A, I, D>>,
+        mut tracked_connection: Option<&mut Connection<A, I, D>>,
+    ) -> ConnectionNextEvent<A> {
+        // Looping to till one event is produced. Note this is because we ignore tracked
+        // connection events and we wait for either main connection event or a
+        // collision detection event.
+        loop {
+            let event = tokio::select! {
+                event = Self::get_connection_event(&mut connection) => {
+                    let check = Self::check_connection_collision(
+                        my_bgp_id,
+                        &mut connection,
+                        &mut tracked_connection);
+                    match check {
+                        Some(CollisionCheckRet::DropMain) => Some(ConnectionNextEvent::DropMain),
+                        Some(CollisionCheckRet::DropTracked) => Some(ConnectionNextEvent::DropTracked),
+                        Some(CollisionCheckRet::InvalidTrackedBgpId(peer_id)) => {
+                            if let Some(tracked) = tracked_connection.take() {
+                                let _ = tracked.send(
+                                    BgpMessage::Notification(
+                                        BgpNotificationMessage::OpenMessageError(
+                                            OpenMessageError::BadBgpIdentifier {
+                                                value: peer_id.octets().to_vec()}))).await;
+                            }
+                            None
+                        },
+                        None => {
+                             Some(ConnectionNextEvent::Event(event))
+                        }
+                    }
+                }
+                _ = Self::get_tracked_connection_event(fsm_state, policy, &mut tracked_connection) => {
+                    let check = Self::check_connection_collision(
+                        my_bgp_id,
+                        &mut connection,
+                        &mut tracked_connection);
+                    match check {
+                        Some(CollisionCheckRet::DropMain) => Some(ConnectionNextEvent::DropMain),
+                        Some(CollisionCheckRet::DropTracked) => Some(ConnectionNextEvent::DropTracked),
+                        Some(CollisionCheckRet::InvalidTrackedBgpId(peer_id)) => {
+                            if let Some(tracked) = tracked_connection.take() {
+                                let _ = tracked.send(
+                                    BgpMessage::Notification(
+                                        BgpNotificationMessage::OpenMessageError(
+                                            OpenMessageError::BadBgpIdentifier {
+                                                value: peer_id.octets().to_vec()}))).await;
+                            }
+                            None
+                        },
+                        None => {
+                             None
+                        }
+                    }
+                }
+            };
+            if let Some(event) = event {
+                return event;
+            }
+        }
+    }
+
+    async fn handle_connect_event(&mut self, event: ConnectionNextEvent<A>) -> PeerResult<A> {
+        match event {
+            ConnectionNextEvent::DropMain => {
+                if let Some(tracked) = self.tracked_connection.take() {
+                    self.stats.connect_retry_counter += 1;
+                    let new_state = Self::fsm_state_from_tracked(self.fsm_state, &tracked)?;
+                    log::info!(
+                        "[{}][{}] BGP Collision replacing main connection with tracked connection: {}",
+                        self.peer_key, self.fsm_state, tracked.peer_addr());
+                    self.fsm_transition(new_state);
+                    if let Some(mut connection) = self.connection.take() {
+                        let _ = connection
+                            .send(BgpMessage::Notification(
+                                BgpNotificationMessage::CeaseError(
+                                    CeaseError::ConnectionCollisionResolution { value: vec![] },
+                                ),
+                            ))
+                            .await;
+                    }
+                    self.connection.replace(tracked);
+                }
+
+                Ok(BgpEvent::OpenCollisionDump)
+            }
+            ConnectionNextEvent::DropTracked => {
+                if let Some(mut tracked) = self.tracked_connection.take() {
+                    log::info!(
+                        "[{}][{}] BGP Collision detection dropping tracked connection: {}",
+                        self.peer_key,
+                        self.fsm_state,
+                        tracked.peer_addr()
+                    );
+                    let _ = tracked
+                        .send(BgpMessage::Notification(
+                            BgpNotificationMessage::CeaseError(
+                                CeaseError::ConnectionCollisionResolution { value: vec![] },
+                            ),
+                        ))
+                        .await;
+                }
+                Ok(BgpEvent::OpenCollisionDump)
+            }
+            ConnectionNextEvent::Event(event) => self.handle_connection_event(event).await,
+        }
     }
 
     pub async fn run(&mut self) -> PeerResult<A> {
@@ -1484,7 +1600,15 @@ impl<
             => {
                 self.handle_active_connection(connect_result).await
             }
-            _ = async {match self.connect_retry_timer.as_mut() {Some(interval) => {interval.tick().await;}, None => std::future::pending().await}} => {
+            _ = async {
+                    match self.connect_retry_timer.as_mut() {
+                        Some(interval) => {
+                            interval.tick().await;
+                        },
+                        None => std::future::pending().await,
+                    }
+                }
+            => {
                 if self.fsm_state == FsmState::Active {
                     self.fsm_transition(FsmState::Connect);
                 }
@@ -1492,11 +1616,14 @@ impl<
                 self.connection.take();
                 Ok(BgpEvent::ConnectRetryTimerExpires)
             }
-            event = Self::get_connection_event(self.connection.as_mut()) => {
-                self.handle_connection_event(event).await
-            }
-            event = Self::get_tracked_connection_event(self.fsm_state, &mut self.policy, self.tracked_connection.as_mut()) => {
-                self.handle_tracked_connection_event(event).await
+            value = Self::next_connection_event(
+                self.properties.my_bgp_id,
+                self.fsm_state,
+                &mut self.policy,
+                self.connection.as_mut(),
+                self.tracked_connection.as_mut())
+            => {
+               self.handle_connect_event(value).await
             }
         }
     }
