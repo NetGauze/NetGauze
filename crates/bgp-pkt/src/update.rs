@@ -141,12 +141,12 @@ impl BgpUpdateMessage {
                     }
                     MpUnreach::Ipv6MplsVpnUnicast { nlri } => {
                         if nlri.is_empty() {
-                            return Some(AddressType::Ipv6MplsLabeledVpn);
+                            current = Some(AddressType::Ipv6MplsLabeledVpn);
                         }
                     }
                     MpUnreach::L2Evpn { nlri } => {
                         if nlri.is_empty() {
-                            return Some(AddressType::L2VpnBgpEvpn);
+                            current = Some(AddressType::L2VpnBgpEvpn);
                         }
                     }
                     MpUnreach::RouteTargetMembership { nlri } => {
