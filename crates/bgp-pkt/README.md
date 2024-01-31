@@ -145,6 +145,22 @@ pub fn main() {
 | [RFC 4659](https://datatracker.ietf.org/doc/html/RFC4659)                                                              | 2 = IPv4             | 128 = MPLS Labeled Unicast        |                                         |
 | [RFC 7432](https://datatracker.ietf.org/doc/html/RFC7432) and [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136) | 25 = L2 VPN          | 70 = BGP EVPNs                    | Route types from 1 till 5 are supported |
 
+### Supported Notification Sub-Codes
+
+| Capability                         | RFCs                                                      | Notes |
+|------------------------------------|-----------------------------------------------------------|-------|
+| Reserved                           |                                                           |       |
+| Maximum Number of Prefixes Reached | [RFC 4486](https://datatracker.ietf.org/doc/html/rfc4486) |       |
+| Administrative Shutdown            | [RFC 4486](https://datatracker.ietf.org/doc/html/rfc4486) |       |
+| Peer De-configured                 | [RFC 4486](https://datatracker.ietf.org/doc/html/rfc4486) |       |
+| Administrative Reset               | [RFC 4486](https://datatracker.ietf.org/doc/html/rfc4486) |       |
+| Connection Rejected                | [RFC 4486](https://datatracker.ietf.org/doc/html/rfc4486) |       |
+| Other Configuration Change         | [RFC 4486](https://datatracker.ietf.org/doc/html/rfc4486) |       |
+| Connection Collision Resolution    | [RFC 4486](https://datatracker.ietf.org/doc/html/rfc4486) |       |
+| Out of Resources                   | [RFC 4486](https://datatracker.ietf.org/doc/html/rfc4486) |       |
+| Hard Reset                         | [RFC 8538](https://datatracker.ietf.org/doc/html/rfc8538) |       |
+| BFD Down                           | [RFC 9384](https://datatracker.ietf.org/doc/html/rfc9384) |       |
+
 # Development documentation
 
 * Running Packet Serde benchmarks*

@@ -12,6 +12,7 @@ This project is still in an early stage.
 1. BGP
     1. Packet representation and wire format
        serialization/deserialization: [`netgauze-bgp-pkt`](crates/bgp-pkt/README.md)
+    2. BGP Speaker (including connection management and FSM): [`netgauze-bgp-speaker`](crates/bgp-speaker/README.md)
 2. BMP
     1. Packet representation and wire format
        serialization/deserialization: [`netgauze-bmp-pkt`](crates/bmp-pkt/README.md)
@@ -25,17 +26,26 @@ This project is still in an early stage.
 
 *Running Packet Serde Fuzzer*
 
-- Fuzzing BGP
-  ```cargo fuzz run fuzz-bgp-pkt```
+- Fuzzing BGP Peer
+  ```cargo +nightly fuzz run fuzz-bgp-peer```
 
-- Fuzzing BMP
-  ```cargo fuzz run fuzz-bmp-pkt```
+- Fuzzing BGP pkt serde
+  ```
+  cargo +nightly fuzz run fuzz-bgp-pkt
+  cargo +nightly fuzz run fuzz-bgp-pkt-serialize
+  ```
+
+- Fuzzing BMP pkt serde
+  ```
+  cargo +nightly fuzz run fuzz-bmp-pkt
+  cargo +nightly fuzz run fuzz-bmp-pkt-serialize
+  ```
 
 - Fuzzing IPFIX
-  ```cargo fuzz run fuzz-ipfix-pkt```
+  ```cargo +nightly fuzz run fuzz-ipfix-pkt```
 
 - Fuzzing Netflow V9
-  ```cargo fuzz run fuzz-netflow-v9-pkt```
+  ```cargo +nightly fuzz run fuzz-netflow-v9-pkt```
 
 ## License
 
