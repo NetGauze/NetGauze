@@ -397,66 +397,77 @@ impl ActiveConnect<SocketAddr, Mock, BgpCodec> for MockActiveConnect {
     }
 }
 
-fuzz_target!(|data: (
-    &[u8],
-    u32,
-    u32,
-    bool,
-    Ipv4Addr,
-    Ipv4Addr,
-    IpAddr,
-    PeerConfig
-)| {
-    let (buf, my_asn, peer_asn, allow_dynamic_as, my_bgp_id, peer_bgp_id, peer, config) = data;
-    let peer_addr = match peer {
-        IpAddr::V4(v4) => SocketAddr::V4(SocketAddrV4::new(v4, 179)),
-        IpAddr::V6(v6) => SocketAddr::V6(SocketAddrV6::new(v6, 179, 0, 0)),
-    };
-    let policy = EchoCapabilitiesPolicy::new(my_asn, my_bgp_id, 100, vec![], vec![]);
-
-    tokio_test::block_on(async {
-        let mut io_builder = IoBuilder::new();
-        // Divide buffer into smaller read chunks
-        for chunk in buf.chunks(1024) {
-            io_builder.read(chunk);
-        }
-
-        let active_connect = MockActiveConnect {
-            peer_addr,
-            io_builder,
+fuzz_target!(
+    |data: (&[u8], u32, u32, bool, bool, Ipv4Addr, IpAddr, PeerConfig)| {
+        let (
+            buf,
+            my_asn,
+            peer_asn,
+            send_asn4_cap_by_default,
+            allow_dynamic_as,
+            my_bgp_id,
+            peer,
+            config,
+        ) = data;
+        let peer_addr = match peer {
+            IpAddr::V4(v4) => SocketAddr::V4(SocketAddrV4::new(v4, 179)),
+            IpAddr::V6(v6) => SocketAddr::V6(SocketAddrV6::new(v6, 179, 0, 0)),
         };
+        let policy = EchoCapabilitiesPolicy::new(
+            my_asn,
+            send_asn4_cap_by_default,
+            my_bgp_id,
+            100,
+            vec![],
+            vec![],
+        );
 
-        let properties =
-            PeerProperties::new(my_asn, peer_asn, my_bgp_id, peer_addr, allow_dynamic_as);
+        tokio_test::block_on(async {
+            let mut io_builder = IoBuilder::new();
+            // Divide buffer into smaller read chunks
+            for chunk in buf.chunks(1024) {
+                io_builder.read(chunk);
+            }
 
-        let mut peer = Peer::new(peer_addr.ip(), properties, config, policy, active_connect);
-        peer.add_admin_event(PeerAdminEvents::ManualStart);
-        loop {
-            let ret = tokio::time::timeout(Duration::from_millis(100), peer.run()).await;
-            match ret {
-                Ok(Ok(event)) => {
-                    if event == BgpEvent::TcpConnectionFails {
+            let active_connect = MockActiveConnect {
+                peer_addr,
+                io_builder,
+            };
+
+            let properties =
+                PeerProperties::new(my_asn, peer_asn, my_bgp_id, peer_addr, allow_dynamic_as);
+
+            let mut peer = Peer::new(peer_addr.ip(), properties, config, policy, active_connect);
+            peer.add_admin_event(PeerAdminEvents::ManualStart);
+            loop {
+                let ret = tokio::time::timeout(Duration::from_millis(100), peer.run()).await;
+                match ret {
+                    Ok(Ok(event)) => {
+                        if event == BgpEvent::TcpConnectionFails {
+                            return;
+                        }
+                        if peer.fsm_state() == FsmState::Idle
+                            || peer.fsm_state() == FsmState::Active
+                        {
+                            // Peer with terminated or reached an active state in which it waits for
+                            // TCP connection
+                            return;
+                        }
+                    }
+                    Ok(Err(err)) => {
+                        panic!("State: {}, Err: {err:?}", peer.fsm_state());
+                    }
+                    Err(_) => {
+                        assert_eq!(
+                            peer.fsm_state(),
+                            FsmState::Active,
+                            "State: {}, Timeout",
+                            peer.fsm_state()
+                        );
                         return;
                     }
-                    if peer.fsm_state() == FsmState::Idle || peer.fsm_state() == FsmState::Active {
-                        // Peer with terminated or reached an active state in which it waits for TCP
-                        // connection
-                        return;
-                    }
-                }
-                Ok(Err(err)) => {
-                    panic!("State: {}, Err: {err:?}", peer.fsm_state());
-                }
-                Err(_) => {
-                    assert_eq!(
-                        peer.fsm_state(),
-                        FsmState::Active,
-                        "State: {}, Timeout",
-                        peer.fsm_state()
-                    );
-                    return;
                 }
             }
-        }
-    });
-});
+        });
+    }
+);
