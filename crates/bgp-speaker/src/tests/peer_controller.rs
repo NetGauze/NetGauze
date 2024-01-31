@@ -236,3 +236,161 @@ async fn test_get_exchanged_capabilities(
 
     Ok(())
 }
+
+#[test_log::test(tokio::test)]
+async fn test_get_exchanged_capabilities_tracked_connection(
+) -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
+    let my_asn = 66_000;
+    let extended_msg_cap = BgpCapability::ExtendedMessage;
+    let route_refresh_cap = BgpCapability::RouteRefresh;
+    let enhanced_route_refresh_cap = BgpCapability::EnhancedRouteRefresh;
+    let ipv4_unicast_cap = BgpCapability::MultiProtocolExtensions(
+        MultiProtocolExtensionsCapability::new(AddressType::Ipv4Unicast),
+    );
+    let ipv4_multicast_cap = BgpCapability::MultiProtocolExtensions(
+        MultiProtocolExtensionsCapability::new(AddressType::Ipv4Multicast),
+    );
+    let ipv6_unicast_cap = BgpCapability::MultiProtocolExtensions(
+        MultiProtocolExtensionsCapability::new(AddressType::Ipv6Unicast),
+    );
+    let ipv6_multicast_cap = BgpCapability::MultiProtocolExtensions(
+        MultiProtocolExtensionsCapability::new(AddressType::Ipv6Multicast),
+    );
+
+    let pushed_caps = vec![
+        route_refresh_cap.clone(),
+        extended_msg_cap.clone(),
+        ipv6_unicast_cap.clone(),
+    ];
+    let rejected_caps = vec![
+        enhanced_route_refresh_cap.clone(),
+        ipv6_multicast_cap.clone(),
+    ];
+    let my_caps = vec![
+        BgpCapability::FourOctetAs(FourOctetAsCapability::new(my_asn)),
+        route_refresh_cap.clone(),
+        extended_msg_cap,
+        ipv6_unicast_cap,
+    ];
+
+    let peer_caps = vec![
+        BgpCapability::FourOctetAs(FourOctetAsCapability::new(PEER_AS)),
+        route_refresh_cap.clone(),
+        enhanced_route_refresh_cap,
+        ipv4_unicast_cap,
+        ipv4_multicast_cap,
+    ];
+    let peer_open = BgpOpenMessage::new(
+        PEER_AS as u16,
+        HOLD_TIME,
+        PEER_BGP_ID,
+        vec![BgpOpenMessageParameter::Capabilities(peer_caps.clone())],
+    );
+
+    let policy = EchoCapabilitiesPolicy::new(
+        my_asn,
+        false,
+        MY_BGP_ID,
+        HOLD_TIME,
+        pushed_caps.clone(),
+        rejected_caps.clone(),
+    );
+    let mut passive_addr = PEER_ADDR;
+    passive_addr.set_port(5000);
+    let mut active_io_builder = BgpIoMockBuilder::new();
+    active_io_builder
+        .write(BgpMessage::Open(BgpOpenMessage::new(
+            AS_TRANS,
+            HOLD_TIME,
+            MY_BGP_ID,
+            vec![BgpOpenMessageParameter::Capabilities(my_caps.clone())],
+        )))
+        .wait(Duration::from_millis(100))
+        .read(BgpMessage::Open(peer_open.clone()))
+        .write(BgpMessage::Notification(
+            BgpNotificationMessage::CeaseError(CeaseError::ConnectionCollisionResolution {
+                value: vec![],
+            }),
+        ));
+    let active_connect = MockActiveConnect {
+        peer_addr: PEER_ADDR,
+        io_builder: active_io_builder,
+        connect_delay: Duration::from_secs(0),
+    };
+    let mut passive_io_builder = BgpIoMockBuilder::new();
+    passive_io_builder
+        .write(BgpMessage::Open(BgpOpenMessage::new(
+            AS_TRANS,
+            HOLD_TIME,
+            MY_BGP_ID,
+            vec![BgpOpenMessageParameter::Capabilities(my_caps.clone())],
+        )))
+        .read(BgpMessage::Open(peer_open.clone()))
+        .write(BgpMessage::KeepAlive)
+        .wait(Duration::from_millis(100))
+        .read(BgpMessage::KeepAlive);
+    let config = PeerConfigBuilder::new().build();
+    let (tx, mut rx) = mpsc::unbounded_channel();
+
+    let peer_controller =
+        PeerController::new(PEER_KEY, PROPERTIES, config, tx, policy, active_connect);
+
+    let mut handle = peer_controller.get_new_handle();
+    handle.start()?;
+
+    let sent_caps = handle.tracked_connection_sent_capabilities().await.unwrap();
+    let recv_caps = handle
+        .tracked_connection_received_capabilities()
+        .await
+        .unwrap();
+    assert_eq!(sent_caps, None);
+    assert_eq!(recv_caps, None);
+
+    assert_eq!(
+        rx.recv().await,
+        Some(Ok((FsmState::Connect, BgpEvent::ManualStart)))
+    );
+    assert_eq!(
+        rx.recv().await,
+        Some(Ok((
+            FsmState::OpenSent,
+            BgpEvent::TcpConnectionRequestAcked(PEER_ADDR)
+        )))
+    );
+
+    let sent_caps = handle.tracked_connection_sent_capabilities().await.unwrap();
+    let recv_caps = handle
+        .tracked_connection_received_capabilities()
+        .await
+        .unwrap();
+    assert_eq!(sent_caps, None);
+    assert_eq!(recv_caps, None);
+
+    handle.accept_connection(passive_addr, passive_io_builder.build())?;
+    assert_eq!(
+        rx.recv().await,
+        Some(Ok((
+            FsmState::OpenSent,
+            BgpEvent::TcpConnectionConfirmed(passive_addr)
+        )))
+    );
+
+    let sent_caps = handle.tracked_connection_sent_capabilities().await.unwrap();
+    let recv_caps = handle
+        .tracked_connection_received_capabilities()
+        .await
+        .unwrap();
+    assert_eq!(sent_caps, Some(my_caps.clone()));
+    assert_eq!(recv_caps, Some(peer_caps.clone()));
+
+    assert_eq!(
+        rx.recv().await,
+        Some(Ok((FsmState::OpenConfirm, BgpEvent::OpenCollisionDump)))
+    );
+
+    assert_eq!(
+        rx.recv().await,
+        Some(Ok((FsmState::Established, BgpEvent::KeepAliveMsg)))
+    );
+    Ok(())
+}
