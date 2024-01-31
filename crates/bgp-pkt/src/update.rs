@@ -154,6 +154,16 @@ impl BgpUpdateMessage {
                             current = Some(AddressType::RouteTargetConstrains);
                         }
                     }
+                    MpUnreach::BgpLs { nlri } => {
+                        if nlri.is_empty() {
+                            current = Some(AddressType::BgpLs)
+                        }
+                    }
+                    MpUnreach::BgpLsVpn { nlri } => {
+                        if nlri.is_empty() {
+                            current = Some(AddressType::BgpLsVpn)
+                        }
+                    }
                     MpUnreach::Unknown { .. } => {
                         // For unknown address families we assume it's not EoR, as they might have
                         // different semantics defined.

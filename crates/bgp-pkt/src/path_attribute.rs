@@ -1067,6 +1067,12 @@ pub enum MpUnreach {
     RouteTargetMembership {
         nlri: Vec<RouteTargetMembershipAddress>,
     },
+    BgpLs {
+        nlri: Vec<BgpLsNlri>
+    },
+    BgpLsVpn {
+        nlri: Vec<BgpLsVpnNlri>
+    },
     Unknown {
         afi: AddressFamily,
         safi: SubsequentAddressFamily,

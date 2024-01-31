@@ -15,7 +15,7 @@ use netgauze_parse_utils::ErrorKindSerdeDeref;
 use crate::iana;
 use crate::iana::{BgpLsNodeDescriptorTlvType, BgpLsNlriType, BgpLsProtocolId, UnknownBgpLsAttributeTlvType, UnknownBgpLsNodeDescriptorTlvType, UnknownBgpLsProtocolId, UnknownNodeDescriptorSubTlvType, BgpLsPrefixDescriptorTlvType, UnknownPrefixDescriptorTlvType, BgpLsLinkDescriptorTlvType, UnknownLinkDescriptorTlvType, UnknownBgpLsNlriType};
 use crate::nlri::{LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher};
-use crate::path_attribute::MpReach;
+use crate::path_attribute::{MpReach, MpUnreach};
 use crate::wire::deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
 use crate::wire::deserializer::nlri::RouteDistinguisherParsingError;
 use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
@@ -795,6 +795,51 @@ pub fn test_bgp_ls_vpn_mp_reach() {
 
     let span = Span::new(&buf);
     let result = MpReach::from_wire(span, false, &HashMap::new(), &HashMap::new()).expect("I CAN READ");
+
+    assert_eq!(result.1, value)
+}
+
+#[test]
+pub fn test_bgp_ls_vpn_mp_unreach() {
+    let ls_nlri = BgpLsVpnNlri {
+        rd: RouteDistinguisher::As4Administrator {
+            asn4: 1010,
+            number: 2020,
+        },
+        nlri: BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
+            protocol_id: BgpLsProtocolId::IsIsLevel1,
+            identifier: 69,
+            local_node_descriptors:
+            BgpLsNodeDescriptorTlv::Local(vec![
+                BgpLsNodeDescriptorSubTlv::OspfAreaId(18)
+            ]),
+            prefix_descriptor_tlvs: vec![
+                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(IpNet::V6(Ipv6Net::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8), 128).unwrap()))),
+                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                    MultiTopologyId(69),
+                    MultiTopologyId(21),
+                ])),
+                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+            ],
+        })
+    };
+
+    let value = MpUnreach::BgpLsVpn {
+        nlri: vec![
+            ls_nlri.clone(),
+            ls_nlri.clone(),
+            ls_nlri
+        ],
+    };
+
+    let mut buf = Vec::<u8>::new();
+    let mut writer = BufWriter::new(&mut buf);
+    value.write(&mut writer, false).expect("I CAN WRITE");
+    drop(writer);
+    println!("written {:?}", buf);
+
+    let span = Span::new(&buf);
+    let result = MpUnreach::from_wire(span, false, &HashMap::new(), &HashMap::new()).expect("I CAN READ");
 
     assert_eq!(result.1, value)
 }

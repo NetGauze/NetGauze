@@ -28,6 +28,7 @@ use crate::{
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_iana::address_family::AddressType;
+use netgauze_iana::address_family::AddressType::{BgpLs, BgpLsVpn};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::net::IpAddr;
@@ -1195,6 +1196,7 @@ pub enum MpUnreachWritingError {
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
+    BgpLsError(#[from] BgpLsWritingError),
 }
 
 impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
@@ -1214,6 +1216,8 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
             Self::Ipv6MplsVpnUnicast { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::L2Evpn { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::RouteTargetMembership { nlri } => nlri.iter().map(|x| x.len()).sum(),
+            Self::BgpLs { nlri } => nlri.iter().map(|x| x.len()).sum(),
+            Self::BgpLsVpn { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::Unknown {
                 afi: _,
                 safi: _,
@@ -1364,6 +1368,32 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
                 writer.write_u8(
                     RouteTargetMembershipAddress::address_type()
                         .subsequent_address_family()
+                        .into(),
+                )?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::BgpLs { nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    BgpLs.address_family()
+                        .into(),
+                )?;
+                writer.write_u8(
+                    BgpLs.subsequent_address_family()
+                        .into(),
+                )?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::BgpLsVpn { nlri } => {
+                writer.write_u16::<NetworkEndian>(
+                    BgpLsVpn.address_family()
+                        .into(),
+                )?;
+                writer.write_u8(
+                    BgpLsVpn.subsequent_address_family()
                         .into(),
                 )?;
                 for nlri in nlri {

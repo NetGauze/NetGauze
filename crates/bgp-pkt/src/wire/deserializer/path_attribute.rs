@@ -1018,6 +1018,10 @@ pub enum MpUnreachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")]
         RouteTargetMembershipAddressParsingError,
     ),
+    BgpLsError(
+        #[from_located(module = "crate::wire::deserializer::bgp_ls")]
+        BgpLsNlriParsingError,
+    ),
 }
 
 impl<'a>
@@ -1141,6 +1145,16 @@ ReadablePduWithThreeInputs<
                     .map_or(false, |x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::L2Evpn { nlri }))
+            }
+            Ok(AddressType::BgpLs) => {
+                // TODO do addpath ?
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpUnreach::BgpLs { nlri }))
+            }
+            Ok(AddressType::BgpLsVpn) => {
+                // TODO do addpath ?
+                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                Ok((buf, MpUnreach::BgpLsVpn { nlri }))
             }
             Ok(_) | Err(_) => Ok((
                 buf,
