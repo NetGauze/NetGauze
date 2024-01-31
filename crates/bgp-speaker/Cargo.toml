@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-bgp-speaker"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
@@ -14,10 +14,10 @@ keywords = ["bgp", "protocol"]
 categories = ["network-programming"]
 
 [dependencies]
-netgauze-bgp-pkt = { version = "0.2.0", path = "../bgp-pkt" }
-netgauze-iana = { version = "0.2.0", path = "../iana" }
-netgauze-locate = { version = "0.2.0", path = "../locate" }
-netgauze-parse-utils = { version = "0.2.0", path = "../parse-utils" }
+netgauze-bgp-pkt = { version = "0.3.0", path = "../bgp-pkt" }
+netgauze-iana = { version = "0.3.0", path = "../iana" }
+netgauze-locate = { version = "0.3.0", path = "../locate" }
+netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils" }
 byteorder = { workspace = true }
 chrono = { workspace = true, default-features = false, features = ["std", "clock"] }
 
