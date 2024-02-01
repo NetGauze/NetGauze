@@ -13,17 +13,18 @@ use strum_macros::{Display, FromRepr};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// The BGP Link-State Attribute. see [RFC7752 Section 3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3)
 pub struct BgpLsAttribute {
     pub tlvs: Vec<BgpLsAttributeTlv>,
 }
 
 impl PathAttributeValueProperties for BgpLsAttribute {
-    /// see [RFC7752 Section 3.3]https://www.rfc-editor.org/rfc/rfc7752#section-3.3
+    /// see [RFC7752 Section 3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3)
     fn can_be_optional() -> Option<bool> {
         Some(true)
     }
 
-    /// see [RFC7752 Section 3.3]https://www.rfc-editor.org/rfc/rfc7752#section-3.3
+    /// see [RFC7752 Section 3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3)
     fn can_be_transitive() -> Option<bool> {
         Some(false)
     }
@@ -37,42 +38,57 @@ impl PathAttributeValueProperties for BgpLsAttribute {
 #[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpLsAttributeTlv {
+    /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
     LocalNodeIpv4RouterId(Ipv4Addr),
+
+    /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
     LocalNodeIpv6RouterId(Ipv6Addr),
-    /// must be global
+
+    /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
-    RemoteNodeIpv4RouterId(Ipv4Addr),
-    /// must be global
+    RemoteNodeIpv4RouterId(
+        /// must be global
+        Ipv4Addr,
+    ),
+
+    /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
-    RemoteNodeIpv6RouterId(Ipv6Addr),
+    RemoteNodeIpv6RouterId(
+        /// must be global
+        Ipv6Addr,
+    ),
+
+    /// see [RFC5305 Section 3.1](https://www.rfc-editor.org/rfc/rfc5305#section-3.1)
     RemoteNodeAdministrativeGroupColor(u32),
+
+    /// see [RFC5305 Section 3.4](https://www.rfc-editor.org/rfc/rfc5305#section-3.4)
     MaximumLinkBandwidth(f32),
+
+    /// see [RFC5305 Section 3.5](https://www.rfc-editor.org/rfc/rfc5305#section-3.5)
     MaximumReservableLinkBandwidth(f32),
+
+    /// see [RFC5305 Section 3.6](https://www.rfc-editor.org/rfc/rfc5305#section-3.6)
     UnreservedBandwidth([f32; 8]),
+
+    /// see [RFC5305 Section 3.7](https://www.rfc-editor.org/rfc/rfc5305#section-3.7)
     TeDefaultMetric(u32),
 
-    ///        0                   1
-    ///        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
-    ///       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///       |Protection Cap |    Reserved   |
-    ///       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///       0x01  Extra Traffic
+    /// ```text
+    ///  0                   1
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |Protection Cap |    Reserved   |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     ///
-    ///       0x02  Unprotected
-    ///
-    ///       0x04  Shared
-    ///
-    ///       0x08  Dedicated 1:1
-    ///
-    ///       0x10  Dedicated 1+1
-    ///
-    ///       0x20  Enhanced
-    ///
-    ///       0x40  Reserved
-    ///
-    ///       0x80  Reserved
+    /// 0x01  Extra Traffic
+    /// 0x02  Unprotected
+    /// 0x04  Shared
+    /// 0x08  Dedicated 1:1
+    /// 0x10  Dedicated 1+1
+    /// ```
+    /// see [RFC5307 Section 1.2](https://www.rfc-editor.org/rfc/rfc5307#section-1.2)
     LinkProtectionType {
         extra_traffic: bool,
         unprotected: bool,
@@ -81,87 +97,102 @@ pub enum BgpLsAttributeTlv {
         dedicated1p1: bool,
         enhanced: bool,
     },
-    ///       0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |L|R|  Reserved |
-    ///      +-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |L|R|  Reserved |
+    /// +-+-+-+-+-+-+-+-+
     ///
-    ///    +------------+------------------------------------------+-----------+
-    ///    |    Bit     | Description                              | Reference |
-    ///    +------------+------------------------------------------+-----------+
-    ///    |    'L'     | Label Distribution Protocol (LDP)        | [RFC5036] |
-    ///    |    'R'     | Extension to RSVP for LSP Tunnels        | [RFC3209] |
-    ///    |            | (RSVP-TE)                                |           |
-    ///    | 'Reserved' | Reserved for future use                  |           |
-    ///    +------------+------------------------------------------+-----------+
-    MplsProtocolMask {
-        ldp: bool,
-        rsvp_te: bool,
-    },
+    /// +------------+------------------------------------------+-----------+
+    /// |    Bit     | Description                              | Reference |
+    /// +------------+------------------------------------------+-----------+
+    /// |    'L'     | Label Distribution Protocol (LDP)        | [RFC5036] |
+    /// |    'R'     | Extension to RSVP for LSP Tunnels        | [RFC3209] |
+    /// |            | (RSVP-TE)                                |           |
+    /// | 'Reserved' | Reserved for future use                  |           |
+    /// +------------+------------------------------------------+-----------+
+    /// ```
+    /// see [RFC7752 Section 3.3.2.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.2)
+    MplsProtocolMask { ldp: bool, rsvp_te: bool },
 
-    ///      0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      //      IGP Link Metric (variable length)      //
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //      IGP Link Metric (variable length)      //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.2.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.4)
     IgpMetric(Vec<u8>),
 
-    ///      0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |                  Shared Risk Link Group Value                 |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      //                         ............                        //
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |                  Shared Risk Link Group Value                 |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                  Shared Risk Link Group Value                 |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                         ............                        //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                  Shared Risk Link Group Value                 |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.2.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.5)
     SharedRiskLinkGroup(Vec<SharedRiskLinkGroupValue>),
 
-    ///      0                   1                   2                   3
-    ///      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///     |              Type             |             Length            |
-    ///     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///     //                Opaque link attributes (variable)            //
-    ///     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                Opaque link attributes (variable)            //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.2.6](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.6)
     OpaqueLinkAttribute(Vec<u8>),
 
-    ///      0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      //                     Link Name (variable)                    //
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                     Link Name (variable)                    //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.2.7](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.7)
     LinkName(String),
 
     /* Prefix Attribute TLV */
-    ///       0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |D|N|L|P| Resvd.|
-    ///      +-+-+-+-+-+-+-+-+
-    ///
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |D|N|L|P| Resvd.|
+    /// +-+-+-+-+-+-+-+-+
+    /// ```
     ///    The Value field contains bits defined according to the table below:
-    ///
-    ///            +----------+---------------------------+-----------+
-    ///            |   Bit    | Description               | Reference |
-    ///            +----------+---------------------------+-----------+
-    ///            |   'D'    | IS-IS Up/Down Bit         | [RFC5305] |
-    ///            |   'N'    | OSPF "no unicast" Bit     | [RFC5340] |
-    ///            |   'L'    | OSPF "local address" Bit  | [RFC5340] |
-    ///            |   'P'    | OSPF "propagate NSSA" Bit | [RFC5340] |
-    ///            | Reserved | Reserved for future use.  |           |
-    ///            +----------+---------------------------+-----------+
+    /// ```text
+    /// +----------+---------------------------+-----------+
+    /// |   Bit    | Description               | Reference |
+    /// +----------+---------------------------+-----------+
+    /// |   'D'    | IS-IS Up/Down Bit         | [RFC5305] |
+    /// |   'N'    | OSPF "no unicast" Bit     | [RFC5340] |
+    /// |   'L'    | OSPF "local address" Bit  | [RFC5340] |
+    /// |   'P'    | OSPF "propagate NSSA" Bit | [RFC5340] |
+    /// | Reserved | Reserved for future use.  |           |
+    /// +----------+---------------------------+-----------+
+    /// ```
+    /// see [RFC7752 Section 3.3.3.1](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.1)
     IgpFlags {
         isis_up_down: bool,
         ospf_no_unicast: bool,
@@ -169,64 +200,121 @@ pub enum BgpLsAttributeTlv {
         ospf_propagate_nssa: bool,
     },
 
-    ///      0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      //                    Route Tags (one or more)                 //
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                    Route Tags (one or more)                 //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     ///
-    ///    Length is a multiple of 4.
+    /// Length is a multiple of 4.
+    /// ```
+    /// see [RFC7752 Section 3.3.3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.2)
     IgpRouteTag(Vec<u32>),
 
-    ///       0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      //                Extended Route Tag (one or more)             //
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                Extended Route Tag (one or more)             //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     ///
-    ///    Length is a multiple of 8.
+    /// Length is a multiple of 8.
+    /// ```
+    /// see [RFC7752 Section 3.3.3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.3)
     IgpExtendedRouteTag(Vec<u64>),
 
-    ///       0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |                            Metric                             |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                            Metric                             |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     ///
-    ///    Length is 4.
+    /// Length is 4.
+    /// ```
+    /// see [RFC7752 Section 3.3.3.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.4)
     PrefixMetric(u32),
 
-    ///       0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      //                Forwarding Address (variable)                //
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                Forwarding Address (variable)                //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     ///
-    ///    Length is 4 for an IPv4 forwarding address, and 16 for an IPv6
-    ///    forwarding address.
+    /// Length is 4 for an IPv4 forwarding address, and 16 for an IPv6
+    /// forwarding address.
+    /// ```
+    /// see [RFC7752 Section 3.3.3.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.5)
     OspfForwardingAddress(
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))] IpAddr,
     ),
 
-    ///       0                   1                   2                   3
-    ///       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      |              Type             |             Length            |
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///      //              Opaque Prefix Attributes  (variable)           //
-    ///      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //              Opaque Prefix Attributes  (variable)           //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.3.6](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.6)
     OpaquePrefixAttribute(Vec<u8>),
 
     /* Node Attribute TLV */
+    /// ```text
+    /// The format of the MT-ID TLV is shown in the following figure.
+    ///
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |          Length=2*n           |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |R R R R|  Multi-Topology ID 1  |             ....             //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //             ....             |R R R R|  Multi-Topology ID n  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    /// where Type is 263, Length is 2*n, and n is the number of MT-IDs
+    /// carried in the TLV.
+    /// ```
+    /// see [RFC7752 Section 3.2.1.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1.5)
     MultiTopologyIdentifier(MultiTopologyIdData),
+
+    ///  ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |O|T|E|B|R|V| Rsvd|
+    /// +-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// The bits are defined as follows:
+    /// ```text
+    /// +-----------------+-------------------------+------------+
+    /// |       Bit       | Description             | Reference  |
+    /// +-----------------+-------------------------+------------+
+    /// |       'O'       | Overload Bit            | [ISO10589] |
+    /// |       'T'       | Attached Bit            | [ISO10589] |
+    /// |       'E'       | External Bit            | [RFC2328]  |
+    /// |       'B'       | ABR Bit                 | [RFC2328]  |
+    /// |       'R'       | Router Bit              | [RFC5340]  |
+    /// |       'V'       | V6 Bit                  | [RFC5340]  |
+    /// | Reserved (Rsvd) | Reserved for future use |            |
+    /// +-----------------+-------------------------+------------+
+    /// ```
+    /// see [RFC7752 Section 3.2.3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
     NodeFlagBits {
         overload: bool,
         attached: bool,
@@ -235,8 +323,41 @@ pub enum BgpLsAttributeTlv {
         router: bool,
         v6: bool,
     },
+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //               Opaque node attributes (variable)             //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.1.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.5)
     OpaqueNodeAttribute(Vec<u8>),
+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                     Node Name (variable)                    //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.2.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.4)
     NodeNameTlv(String),
+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                 Area Identifier (variable)                  //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.1.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.2)
     IsIsArea(Vec<u8>),
 }
 
@@ -309,6 +430,18 @@ impl BgpLsAttributeTlv {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |            NLRI Type          |     Total NLRI Length         |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                                                               |
+/// //                  Link-State NLRI (variable)                 //
+/// |                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 pub struct BgpLsNlri(pub BgpLsNlriValue);
 
 impl BgpLsNlri {
@@ -319,6 +452,22 @@ impl BgpLsNlri {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |            NLRI Type          |     Total NLRI Length         |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                                                               |
+/// +                       Route Distinguisher                     +
+/// |                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                                                               |
+/// //                  Link-State NLRI (variable)                 //
+/// |                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 pub struct BgpLsVpnNlri {
     pub rd: RouteDistinguisher,
     pub nlri: BgpLsNlriValue,
@@ -326,10 +475,84 @@ pub struct BgpLsVpnNlri {
 
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+/// +------+---------------------------+
+/// | Type | NLRI Type                 |
+/// +------+---------------------------+
+/// |  1   | Node NLRI                 |
+/// |  2   | Link NLRI                 |
+/// |  3   | IPv4 Topology Prefix NLRI |
+/// |  4   | IPv6 Topology Prefix NLRI |
+/// +------+---------------------------+
+/// ```
+/// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 pub enum BgpLsNlriValue {
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+
+    /// |  Protocol-ID  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                           Identifier                          |
+    /// |                            (64 bits)                          |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                Local Node Descriptors (variable)            //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
     Node(BgpLsNlriNode),
+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+
+    /// |  Protocol-ID  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                           Identifier                          |
+    /// |                            (64 bits)                          |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //               Local Node Descriptors (variable)             //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //               Remote Node Descriptors (variable)            //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                  Link Descriptors (variable)                //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
     Link(BgpLsNlriLink),
+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+
+    /// |  Protocol-ID  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                           Identifier                          |
+    /// |                            (64 bits)                          |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //              Local Node Descriptors (variable)              //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                Prefix Descriptors (variable)                //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
     Ipv4Prefix(BgpLsNlriIpPrefix),
+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+
+    /// |  Protocol-ID  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                           Identifier                          |
+    /// |                            (64 bits)                          |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //              Local Node Descriptors (variable)              //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //                Prefix Descriptors (variable)                //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
     Ipv6Prefix(BgpLsNlriIpPrefix),
 }
 
@@ -346,6 +569,21 @@ impl BgpLsNlriValue {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+
+/// |  Protocol-ID  |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                           Identifier                          |
+/// |                            (64 bits)                          |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// //              Local Node Descriptors (variable)              //
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// //                Prefix Descriptors (variable)                //
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 pub struct BgpLsNlriIpPrefix {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
@@ -389,13 +627,39 @@ impl TryFrom<u8> for OspfRouteType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+/// ```text
+/// +------------+------------------------------------------+-----------+
+/// |    Bit     | Description                              | Reference |
+/// +------------+------------------------------------------+-----------+
+/// |    'L'     | Label Distribution Protocol (LDP)        | [RFC5036](https://rfc-editor.org/rfc/rfc5036) |
+/// |    'R'     | Extension to RSVP for LSP Tunnels        | [RFC3209](https://rfc-editor.org/rfc/rfc3209) |
+/// |            | (RSVP-TE)                                |           |
+/// | 'Reserved' | Reserved for future use                  |           |
+/// +------------+------------------------------------------+-----------+
+/// ```
+/// see [RFC7752 Section 3.3.2.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.2)
 pub enum MplsProtocolMask {
-    LabelDistributionProtocol = 0b10000000,
-    ExtensionToRsvpForLspTunnels = 0b01000000,
+    LabelDistributionProtocol = 0b_1000_0000,
+    ExtensionToRsvpForLspTunnels = 0b_0100_0000,
 }
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+/// ```text
+///  0                   1
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |Protection Cap |    Reserved   |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// Protection Cap:
+/// 0x01  Extra Traffic
+/// 0x02  Unprotected
+/// 0x04  Shared
+/// 0x08  Dedicated 1:1
+/// 0x10  Dedicated 1+1
+/// ```
+///
+/// see [RFC5307 Section 1.2](https://www.rfc-editor.org/rfc/rfc5307#section-1.2)
 pub enum LinkProtectionType {
     ExtraTraffic = 0x01,
     Unprotected = 0x02,
@@ -407,15 +671,41 @@ pub enum LinkProtectionType {
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+/// ```text
+/// +----------+---------------------------+-----------+
+/// |   Bit    | Description               | Reference |
+/// +----------+---------------------------+-----------+
+/// |   'D'    | IS-IS Up/Down Bit         | [RFC5305] |
+/// |   'N'    | OSPF "no unicast" Bit     | [RFC5340] |
+/// |   'L'    | OSPF "local address" Bit  | [RFC5340] |
+/// |   'P'    | OSPF "propagate NSSA" Bit | [RFC5340] |
+/// | Reserved | Reserved for future use.  |           |
+/// +----------+---------------------------+-----------+
+/// ```
+/// see [RFC7752 Section 3.3.3.1](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.1)
 pub enum IgpFlags {
-    IsIsUp = 0b10000000,
-    OspfNoUnicast = 0b01000000,
-    OspfLocalAddress = 0b00100000,
-    OspfPropagateNssa = 0b00010000,
+    IsIsUp = 0b_1000_0000,
+    OspfNoUnicast = 0b_0100_0000,
+    OspfLocalAddress = 0b_0010_0000,
+    OspfPropagateNssa = 0b_0001_0000,
 }
 
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+/// ```text
+/// +-----------------+-------------------------+------------+
+/// |       Bit       | Description             | Reference  |
+/// +-----------------+-------------------------+------------+
+/// |       'O'       | Overload Bit            | [ISO10589](https://www.rfc-editor.org/rfc/rfc7752#ref-ISO10589) |
+/// |       'T'       | Attached Bit            | [ISO10589](https://www.rfc-editor.org/rfc/rfc7752#ref-ISO10589) |
+/// |       'E'       | External Bit            | [RFC2328](https://www.rfc-editor.org/rfc/rfc2328)  |
+/// |       'B'       | ABR Bit                 | [RFC2328](https://www.rfc-editor.org/rfc/rfc2328)  |
+/// |       'R'       | Router Bit              | [RFC5340](https://www.rfc-editor.org/rfc/rfc5340)  |
+/// |       'V'       | V6 Bit                  | [RFC5340](https://www.rfc-editor.org/rfc/rfc5340)  |
+/// | Reserved (Rsvd) | Reserved for future use |            |
+/// +-----------------+-------------------------+------------+
+/// ```
+/// see [RFC7752 Section 3.2.3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
 pub enum NodeFlagsBits {
     Overload = 0b_1000_0000,
     Attached = 0b_0100_0000,
@@ -427,6 +717,16 @@ pub enum NodeFlagsBits {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |              Type             |             Length            |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// | Prefix Length | IP Prefix (variable)                         //
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// see [RFC7752 Section 3.3.2.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
 pub struct IpReachabilityInformationData(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipnet))] pub IpNet,
 );
@@ -436,9 +736,11 @@ impl IpReachabilityInformationData {
     /// as described in [RFC7752 Section-3.2.3.2](https://datatracker.ietf.org/doc/html/rfc7752#section-3.2.3.2)
     pub fn most_significant_bytes(prefix_len: u8) -> usize {
         /*
-         1-8    -> 1
-         9-16   -> 2
-         17-24 -> 3
+         pfx            pfx
+         length (bits)  length (bytes)
+         1-8        ->  1
+         9-16       ->  2
+         17-24      ->  3
          ...
         */
         if prefix_len == 0 {
@@ -456,8 +758,51 @@ impl IpReachabilityInformationData {
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpLsPrefixDescriptorTlv {
+    /// The format of the MT-ID TLV is shown in the following figure.
+    ///
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |          Length=2*n           |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |R R R R|  Multi-Topology ID 1  |             ....             //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// //             ....             |R R R R|  Multi-Topology ID n  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    /// where Type is 263, Length is 2*n, and n is the number of MT-IDs
+    /// carried in the TLV.
+    /// ```
+    /// see [RFC7752 Section 3.2.1.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1.5)
     MultiTopologyIdentifier(MultiTopologyIdData),
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |  Route Type   |
+    /// +-+-+-+-+-+-+-+-+
+    /// Route Type:
+    /// Intra-Area (0x1)
+    /// Inter-Area (0x2)
+    /// External 1 (0x3)
+    /// External 2 (0x4)
+    /// NSSA 1 (0x5)
+    /// NSSA 2 (0x6)
+    /// ```
     OspfRouteType(OspfRouteType),
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |              Type             |             Length            |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// | Prefix Length | IP Prefix (variable)                         //
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 3.3.2.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
     IpReachabilityInformation(IpReachabilityInformationData),
 }
 
@@ -479,6 +824,19 @@ impl BgpLsPrefixDescriptorTlv {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+
+/// |  Protocol-ID  |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                           Identifier                          |
+/// |                            (64 bits)                          |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// //                Local Node Descriptors (variable)            //
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 pub struct BgpLsNlriNode {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
@@ -487,6 +845,17 @@ pub struct BgpLsNlriNode {
 
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |              Type             |             Length            |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                                                               |
+/// //              Node Descriptor Sub-TLVs (variable)            //
+/// |                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
 pub enum BgpLsNodeDescriptorTlv {
     Local(Vec<BgpLsNodeDescriptorSubTlv>),
     Remote(Vec<BgpLsNodeDescriptorSubTlv>),
@@ -515,11 +884,23 @@ impl BgpLsNodeDescriptorTlv {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// see [RFC7752 Section 3.2.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.2)
 pub enum BgpLsLinkDescriptorTlv {
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                  Link Local Identifier                        |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                  Link Remote Identifier                       |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    /// see [RFC7752 Section 1.1](https://www.rfc-editor.org/rfc/rfc5307#section-1.1)
     LinkLocalRemoteIdentifiers {
         link_local_identifier: u32,
         link_remote_identifier: u32,
     },
+
     IPv4InterfaceAddress(Ipv4Addr),
     IPv4NeighborAddress(Ipv4Addr),
 
@@ -558,6 +939,17 @@ impl BgpLsLinkDescriptorTlv {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+/// +--------------------+-------------------+----------+
+/// | Sub-TLV Code Point | Description       |   Length |
+/// +--------------------+-------------------+----------+
+/// |        512         | Autonomous System |        4 |
+/// |        513         | BGP-LS Identifier |        4 |
+/// |        514         | OSPF Area-ID      |        4 |
+/// |        515         | IGP Router-ID     | Variable |
+/// +--------------------+-------------------+----------+
+/// ```
+/// see [RFC7752 Section 3.2.1](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1)
 pub enum BgpLsNodeDescriptorSubTlv {
     AutonomousSystem(u32),
     BgpLsIdentifier(u32),
@@ -584,6 +976,23 @@ impl BgpLsNodeDescriptorSubTlv {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+///  ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+
+/// |  Protocol-ID  |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                           Identifier                          |
+/// |                            (64 bits)                          |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// //               Local Node Descriptors (variable)             //
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// //               Remote Node Descriptors (variable)            //
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// //                  Link Descriptors (variable)                //
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+/// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 pub struct BgpLsNlriLink {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
@@ -594,6 +1003,23 @@ pub struct BgpLsNlriLink {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+/// The format of the MT-ID TLV is shown in the following figure.
+///
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |              Type             |          Length=2*n           |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |R R R R|  Multi-Topology ID 1  |             ....             //
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// //             ....             |R R R R|  Multi-Topology ID n  |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///
+/// where Type is 263, Length is 2*n, and n is the number of MT-IDs
+/// carried in the TLV.
+/// ```
+/// see [RFC7752 Section 3.2.1.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1.5)
 pub struct MultiTopologyIdData(pub Vec<MultiTopologyId>);
 
 impl From<Vec<MultiTopologyId>> for MultiTopologyIdData {
@@ -610,6 +1036,28 @@ impl MultiTopologyIdData {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// Multi-Topology ID for IS-IS [RFC5120 Section 7.2](https://www.rfc-editor.org/rfc/rfc5120#section-7.2)
+/// MT ID is a 12-bit field containing the non-zero MT ID of the
+/// topology being announced.  The TLV MUST be ignored if the ID is
+/// zero.  This is to ensure the consistent view of the standard
+/// unicast topology.
+///
+/// Multi-Topology ID for OSPF [RFC4915 Section 3.7](https://www.rfc-editor.org/rfc/rfc4915#section-3.7)
+///  Since AS-External-LSAs use the high-order bit in the MT-ID field
+/// (E-bit) for the external metric-type, only MT-IDs in the 0 to 127
+/// range are valid.  The following MT-ID values are reserved:
+///
+/// ```text
+///  0      - Reserved for advertising the metric associated
+///           with the default topology (see Section 4.2)
+///  1      - Reserved for advertising the metric associated
+///           with the default multicast topology
+///  2      - Reserved for IPv4 in-band management purposes
+/// 3-31    - Reserved for assignments by IANA
+/// 32-127  - Reserved for development, experimental and
+///           proprietary features [RFC3692]
+/// 128-255 - Invalid and SHOULD be ignored
+/// ```
 pub struct MultiTopologyId(pub u16);
 
 impl MultiTopologyId {
@@ -652,10 +1100,6 @@ impl From<u16> for MultiTopologyId {
         Self(value.bitand(!(0b1111u16 << 12)))
     }
 }
-
-#[repr(transparent)]
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct IsIsMtId(u16);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]

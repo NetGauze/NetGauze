@@ -31,7 +31,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::BitAnd;
 use std::string::FromUtf8Error;
 
-/// BGP Capability Parsing errors
+/// BGP Link-State Attribute Parsing Errors
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpLsAttributeParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
@@ -299,7 +299,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for MultiTopolog
     }
 }
 
-/// BGP Capability Parsing errors
+/// BGP Link-State NLRI Parsing Errors
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpLsNlriParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for

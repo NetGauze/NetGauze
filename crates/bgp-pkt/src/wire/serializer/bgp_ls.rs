@@ -25,9 +25,11 @@ use std::net::IpAddr;
 ///
 /// `tlv_type` : tlv code point
 ///
-/// `tlv_length` : tlv length on the wire (as reported by the writer <=> including type and length fields)
+/// `tlv_length` : total tlv length on the wire
+/// (as reported by the writer <=> including type and length fields)
 ///
-/// Written length field will be `tlv_length - 4`
+/// Written length field will be `tlv_length - 4` since "Length" must not
+/// include the length of the "Type" and "Length" field
 fn write_tlv_header<T: Write>(
     writer: &mut T,
     tlv_type: u16,
