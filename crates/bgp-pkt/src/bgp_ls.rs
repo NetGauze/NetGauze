@@ -2,13 +2,13 @@ use crate::bgp_ls::BgpLsMtIdError::{IsIsMtIdInvalidValue, OspfMtIdInvalidValue};
 use crate::iana;
 use crate::iana::BgpLsNodeDescriptorTlvType::{LocalNodeDescriptor, RemoteNodeDescriptor};
 use crate::iana::{BgpLsNodeDescriptorTlvType, BgpLsProtocolId};
-use crate::nlri::RouteDistinguisher;
+use crate::nlri::{MplsLabel, RouteDistinguisher};
 use crate::path_attribute::PathAttributeValueProperties;
 use ipnet::IpNet;
 use netgauze_parse_utils::WritablePdu;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::ops::BitAnd;
+use std::ops::{BitAnd, BitOr};
 use strum_macros::{Display, FromRepr};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -359,6 +359,150 @@ pub enum BgpLsAttributeTlv {
     /// ```
     /// see [RFC7752 Section 3.3.1.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.2)
     IsIsArea(Vec<u8>),
+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |               Type            |              Length           |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// | Flags         |     Weight    |             Reserved          |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                   SID/Label/Index (variable)                  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    ///
+    /// see [RFC9086](https://datatracker.ietf.org/doc/html/rfc9086#section-5)
+    ///
+    PeerNodeSid(BgpLsPeerSid),
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |               Type            |              Length           |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// | Flags         |     Weight    |             Reserved          |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                   SID/Label/Index (variable)                  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    ///
+    /// see [RFC9086](https://datatracker.ietf.org/doc/html/rfc9086#section-5)
+    PeerAdjSid(BgpLsPeerSid),
+
+    /// ```text
+    ///  0                   1                   2                   3
+    ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |               Type            |              Length           |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// | Flags         |     Weight    |             Reserved          |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// |                   SID/Label/Index (variable)                  |
+    /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    /// ```
+    ///
+    /// see [RFC9086](https://datatracker.ietf.org/doc/html/rfc9086#section-5)
+    PeerSetSid(BgpLsPeerSid),
+}
+
+#[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |               Type            |              Length           |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// | Flags         |     Weight    |             Reserved          |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                   SID/Label/Index (variable)                  |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+///
+/// see [RFC9086](https://datatracker.ietf.org/doc/html/rfc9086#section-5)
+pub enum BgpLsPeerSid {
+    LabelValue {
+        flags: u8,
+        weight: u8,
+        label: MplsLabel,
+    },
+    IndexValue {
+        flags: u8,
+        weight: u8,
+        index: u32,
+    },
+}
+
+// TODO this goes to IANA ?
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsSidAttributeFlags {
+    ValueFlag = 0b_1000_0000,
+    LocalFlag = 0b_0100_0000,
+    BackupFlag = 0b_0010_0000,
+    PersistentFlag = 0b_0001_0000,
+}
+
+impl BgpLsPeerSid {
+    pub fn new_label_value(flags: u8, weight: u8, label: MplsLabel) -> Self {
+        Self::LabelValue {
+            // force the value flag to set
+            flags: flags.bitor(BgpLsSidAttributeFlags::ValueFlag as u8),
+            weight,
+            label,
+        }
+    }
+    pub fn new_index_value(flags: u8, weight: u8, index: u32) -> Self {
+        Self::IndexValue {
+            // force the value flag to unset
+            flags: flags.bitand(!(BgpLsSidAttributeFlags::ValueFlag as u8)),
+            weight,
+            index,
+        }
+    }
+
+    pub fn flags(&self) -> u8 {
+        match self {
+            BgpLsPeerSid::LabelValue { flags, .. } => *flags,
+            BgpLsPeerSid::IndexValue { flags, .. } => *flags,
+        }
+    }
+    pub fn weight(&self) -> u8 {
+        match self {
+            BgpLsPeerSid::LabelValue { weight, .. } => *weight,
+            BgpLsPeerSid::IndexValue { weight, .. } => *weight,
+        }
+    }
+
+    pub fn v_flag(&self) -> bool {
+        Self::flags_have_v_flag(self.flags())
+    }
+    pub fn flags_have_v_flag(flags: u8) -> bool {
+        let flag = BgpLsSidAttributeFlags::ValueFlag as u8;
+        (flags & flag) == flag
+    }
+    pub fn l_flag(&self) -> bool {
+        Self::flags_have_l_flag(self.flags())
+    }
+    pub fn flags_have_l_flag(flags: u8) -> bool {
+        let flag = BgpLsSidAttributeFlags::LocalFlag as u8;
+        (flags & flag) == flag
+    }
+    pub fn b_flag(&self) -> bool {
+        Self::flags_have_b_flag(self.flags())
+    }
+    pub fn flags_have_b_flag(flags: u8) -> bool {
+        let flag = BgpLsSidAttributeFlags::BackupFlag as u8;
+        (flags & flag) == flag
+    }
+    pub fn p_flag(&self) -> bool {
+        Self::flags_have_p_flag(self.flags())
+    }
+    pub fn flags_have_p_flag(flags: u8) -> bool {
+        let flag = BgpLsSidAttributeFlags::PersistentFlag as u8;
+        (flags & flag) == flag
+    }
 }
 
 impl BgpLsAttributeTlv {
@@ -424,6 +568,9 @@ impl BgpLsAttributeTlv {
             }
             BgpLsAttributeTlv::NodeNameTlv(..) => iana::BgpLsAttributeTlv::NodeNameTlv,
             BgpLsAttributeTlv::IsIsArea(..) => iana::BgpLsAttributeTlv::IsIsArea,
+            BgpLsAttributeTlv::PeerNodeSid(..) => iana::BgpLsAttributeTlv::PeerNodeSid,
+            BgpLsAttributeTlv::PeerAdjSid(..) => iana::BgpLsAttributeTlv::PeerAdjSid,
+            BgpLsAttributeTlv::PeerSetSid(..) => iana::BgpLsAttributeTlv::PeerSetSid,
         }
     }
 }
@@ -947,6 +1094,8 @@ impl BgpLsLinkDescriptorTlv {
 /// |        513         | BGP-LS Identifier |        4 |
 /// |        514         | OSPF Area-ID      |        4 |
 /// |        515         | IGP Router-ID     | Variable |
+/// |        516         | BGP Router-ID     |        4 |
+/// |        517         | Member-AS Number  |        4 |
 /// +--------------------+-------------------+----------+
 /// ```
 /// see [RFC7752 Section 3.2.1](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1)
@@ -955,6 +1104,8 @@ pub enum BgpLsNodeDescriptorSubTlv {
     BgpLsIdentifier(u32),
     OspfAreaId(u32),
     IgpRouterId(Vec<u8>),
+    BgpRouterIdentifier(u32),
+    MemberAsNumber(u32),
 }
 
 impl BgpLsNodeDescriptorSubTlv {
@@ -969,6 +1120,12 @@ impl BgpLsNodeDescriptorSubTlv {
             BgpLsNodeDescriptorSubTlv::OspfAreaId(_) => iana::BgpLsNodeDescriptorSubTlv::OspfAreaId,
             BgpLsNodeDescriptorSubTlv::IgpRouterId(_) => {
                 iana::BgpLsNodeDescriptorSubTlv::IgpRouterId
+            }
+            BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(_) => {
+                iana::BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier
+            }
+            BgpLsNodeDescriptorSubTlv::MemberAsNumber(_) => {
+                iana::BgpLsNodeDescriptorSubTlv::MemberAsNumber
             }
         }
     }

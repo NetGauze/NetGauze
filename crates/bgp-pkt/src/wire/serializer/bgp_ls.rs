@@ -1,11 +1,11 @@
 use crate::bgp_ls::{
     BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
     BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-    BgpLsNodeDescriptorTlv, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
+    BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
     IpReachabilityInformationData, LinkProtectionType, MplsProtocolMask, MultiTopologyId,
     MultiTopologyIdData, NodeFlagsBits,
 };
-use crate::wire::serializer::nlri::RouteDistinguisherWritingError;
+use crate::wire::serializer::nlri::{MplsLabelWritingError, RouteDistinguisherWritingError};
 use crate::wire::serializer::path_attribute::write_length;
 use crate::wire::serializer::IpAddrWritingError;
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -50,6 +50,7 @@ pub enum BgpLsWritingError {
     NodeNameTlvStringTooLong,
     IpAddrWritingError(#[from] IpAddrWritingError),
     RouteDistinguisherWritingError(#[from] RouteDistinguisherWritingError),
+    MplsLabelWritingError(#[from] MplsLabelWritingError),
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsNlri {
@@ -268,6 +269,9 @@ impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
                 BgpLsAttributeTlv::OpaqueNodeAttribute(bytes) => bytes.len(),
                 BgpLsAttributeTlv::NodeNameTlv(ascii) => ascii.len(),
                 BgpLsAttributeTlv::IsIsArea(area) => area.len(),
+                BgpLsAttributeTlv::PeerNodeSid(value) => value.len(),
+                BgpLsAttributeTlv::PeerAdjSid(value) => value.len(),
+                BgpLsAttributeTlv::PeerSetSid(value) => value.len(),
             }
     }
 
@@ -443,6 +447,9 @@ impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
                 }
             }
             BgpLsAttributeTlv::IsIsArea(area) => writer.write_all(area)?,
+            BgpLsAttributeTlv::PeerNodeSid(value) => value.write(writer)?,
+            BgpLsAttributeTlv::PeerAdjSid(value) => value.write(writer)?,
+            BgpLsAttributeTlv::PeerSetSid(value) => value.write(writer)?,
         }
 
         Ok(())
@@ -547,6 +554,8 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
                 BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(_) => 4,
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(_) => 4,
                 BgpLsNodeDescriptorSubTlv::IgpRouterId(inner) => inner.len(),
+                BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(_) => 4,
+                BgpLsNodeDescriptorSubTlv::MemberAsNumber(_) => 4,
             }
     }
 
@@ -566,6 +575,12 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
                 writer.write_u32::<NetworkEndian>(*data)?
             }
             BgpLsNodeDescriptorSubTlv::IgpRouterId(data) => writer.write_all(data)?,
+            BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(data) => {
+                writer.write_u32::<NetworkEndian>(*data)?
+            }
+            BgpLsNodeDescriptorSubTlv::MemberAsNumber(data) => {
+                writer.write_u32::<NetworkEndian>(*data)?
+            }
         };
 
         Ok(())
@@ -635,6 +650,36 @@ impl WritablePdu<BgpLsWritingError> for MultiTopologyId {
         Self: Sized,
     {
         writer.write_u16::<NetworkEndian>(self.value())?;
+
+        Ok(())
+    }
+}
+
+impl WritablePdu<BgpLsWritingError> for BgpLsPeerSid {
+    const BASE_LENGTH: usize = 4; /* flags u8 + weight u8 + reserved u16 */
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                BgpLsPeerSid::LabelValue { .. } => 3,
+                BgpLsPeerSid::IndexValue { .. } => 4,
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError>
+    where
+        Self: Sized,
+    {
+        /* tlv header is already written in BgpLsAttributeTlv */
+
+        writer.write_u8(self.flags())?;
+        writer.write_u8(self.weight())?;
+        writer.write_u16::<NetworkEndian>(0)?;
+
+        match self {
+            BgpLsPeerSid::LabelValue { label, .. } => label.write(writer)?,
+            BgpLsPeerSid::IndexValue { index, .. } => writer.write_u32::<NetworkEndian>(*index)?,
+        }
 
         Ok(())
     }

@@ -1466,6 +1466,8 @@ pub enum BgpLsNodeDescriptorSubTlv {
     BgpLsIdentifier = 513,
     OspfAreaId = 514,
     IgpRouterId = 515,
+    BgpRouterIdentifier = 516,
+    MemberAsNumber = 517,
 }
 
 #[repr(C)]
@@ -1616,6 +1618,9 @@ pub enum BgpLsAttributeTlv {
     PrefixMetric = 1155,
     OspfForwardingAddress = 1156,
     OpaquePrefixAttribute = 1157,
+    PeerNodeSid = 1101,
+    PeerAdjSid = 1102,
+    PeerSetSid = 1103,
 }
 
 #[repr(C)]

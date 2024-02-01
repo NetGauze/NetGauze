@@ -1,7 +1,7 @@
 use crate::bgp_ls::{
     BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
     BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-    BgpLsNodeDescriptorTlv, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
+    BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
     IpReachabilityInformationData, LinkProtectionType, MplsProtocolMask, MultiTopologyId,
     MultiTopologyIdData, NodeFlagsBits, OspfRouteType, SharedRiskLinkGroupValue,
     UnknownOspfRouteType,
@@ -13,7 +13,7 @@ use crate::iana::{
     UnknownBgpLsNodeDescriptorTlvType, UnknownBgpLsProtocolId, UnknownLinkDescriptorTlvType,
     UnknownNodeDescriptorSubTlvType, UnknownPrefixDescriptorTlvType,
 };
-use crate::wire::deserializer::nlri::RouteDistinguisherParsingError;
+use crate::wire::deserializer::nlri::{MplsLabelParsingError, RouteDistinguisherParsingError};
 use crate::wire::deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
 use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
 use ipnet::IpNet;
@@ -32,7 +32,7 @@ use std::ops::BitAnd;
 use std::string::FromUtf8Error;
 
 /// BGP Link-State Attribute Parsing Errors
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BgpLsAttributeParsingError {
     /// Errors triggered by the nom parser, see [nom::error::ErrorKind] for
     /// additional information.
@@ -43,6 +43,10 @@ pub enum BgpLsAttributeParsingError {
     Utf8Error(String),
     WrongIpAddrLength(usize),
     BadUnreservedBandwidthLength(usize),
+    MplsLabelParsingError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] MplsLabelParsingError,
+    ),
+    BadSidValue(u8),
 }
 
 impl<'a> FromExternalError<Span<'a>, FromUtf8Error> for LocatedBgpLsAttributeParsingError<'a> {
@@ -88,7 +92,11 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
 
         let tlv = match tlv_type {
             iana::BgpLsAttributeTlv::MultiTopologyIdentifier => {
-                let (_, mtid) = parse_into_located(data)?;
+                let (_, mtid) = parse_into_located::<
+                    LocatedBgpLsAttributeParsingError<'_>,
+                    LocatedBgpLsAttributeParsingError<'_>,
+                    MultiTopologyIdData,
+                >(data)?;
                 BgpLsAttributeTlv::MultiTopologyIdentifier(mtid)
             }
             iana::BgpLsAttributeTlv::NodeFlagBits => {
@@ -244,6 +252,18 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
             iana::BgpLsAttributeTlv::OpaquePrefixAttribute => {
                 BgpLsAttributeTlv::OpaquePrefixAttribute(data.to_vec())
             }
+            iana::BgpLsAttributeTlv::PeerNodeSid => {
+                let (_, value) = parse_into_located_one_input(data, tlv_length)?;
+                BgpLsAttributeTlv::PeerNodeSid(value)
+            }
+            iana::BgpLsAttributeTlv::PeerAdjSid => {
+                let (_, value) = parse_into_located_one_input(data, tlv_length)?;
+                BgpLsAttributeTlv::PeerAdjSid(value)
+            }
+            iana::BgpLsAttributeTlv::PeerSetSid => {
+                let (_, value) = parse_into_located_one_input(data, tlv_length)?;
+                BgpLsAttributeTlv::PeerSetSid(value)
+            }
         };
 
         Ok((remainder, tlv))
@@ -283,7 +303,11 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for MultiTopolog
     where
         Self: Sized,
     {
-        let (span, value) = parse_till_empty_into_located(buf)?;
+        let (span, value) = parse_till_empty_into_located::<
+            LocatedBgpLsAttributeParsingError<'_>,
+            LocatedBgpLsAttributeParsingError<'_>,
+            MultiTopologyId,
+        >(buf)?;
         Ok((span, MultiTopologyIdData(value)))
     }
 }
@@ -569,6 +593,14 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescript
             iana::BgpLsNodeDescriptorSubTlv::IgpRouterId => {
                 BgpLsNodeDescriptorSubTlv::IgpRouterId(data.to_vec())
             }
+            iana::BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier => {
+                let (_, value) = be_u32(data)?;
+                BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(value)
+            }
+            iana::BgpLsNodeDescriptorSubTlv::MemberAsNumber => {
+                let (_, value) = be_u32(data)?;
+                BgpLsNodeDescriptorSubTlv::MemberAsNumber(value)
+            }
         };
 
         Ok((span, result))
@@ -718,11 +750,57 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
     }
 }
 
+impl<'a> ReadablePduWithOneInput<'a, u16, LocatedBgpLsAttributeParsingError<'a>> for BgpLsPeerSid {
+    fn from_wire(
+        buf: Span<'a>,
+        length: u16,
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
+    where
+        Self: Sized,
+    {
+        let (span, flags) = be_u8(buf)?;
+        let (span, weight) = be_u8(span)?;
+        let (span, _reserved) = be_u16(span)?;
+
+        return if length == 7 && Self::flags_have_v_flag(flags) {
+            let (span, label) = parse_into_located(span)?;
+
+            // TODO check if max 20 rightmost bits are set
+
+            Ok((
+                span,
+                BgpLsPeerSid::LabelValue {
+                    flags,
+                    weight,
+                    label,
+                },
+            ))
+        } else if length == 8 && !Self::flags_have_v_flag(flags) {
+            let (span, index) = be_u32(span)?;
+
+            Ok((
+                span,
+                BgpLsPeerSid::IndexValue {
+                    flags,
+                    weight,
+                    index,
+                },
+            ))
+        } else {
+            Err(nom::Err::Error(LocatedBgpLsAttributeParsingError::new(
+                buf,
+                BgpLsAttributeParsingError::BadSidValue(flags),
+            )))
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bgp_ls::BgpLsSidAttributeFlags;
     use crate::iana::BgpLsProtocolId;
-    use crate::nlri::{LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher};
+    use crate::nlri::{LabeledIpv4NextHop, LabeledNextHop, MplsLabel, RouteDistinguisher};
     use crate::path_attribute::{MpReach, MpUnreach};
     use ipnet::{Ipv4Net, Ipv6Net};
     use netgauze_parse_utils::{ReadablePduWithThreeInputs, WritablePdu, WritablePduWithOneInput};
@@ -963,6 +1041,40 @@ mod tests {
         let span = Span::new(&buf);
         let result = MpUnreach::from_wire(span, false, &HashMap::new(), &HashMap::new())
             .expect("I CAN READ");
+
+        assert_eq!(result.1, value)
+    }
+
+    #[test]
+    pub fn test_bgp_ls_sid() {
+        let value = BgpLsAttribute {
+            tlvs: vec![
+                BgpLsAttributeTlv::PeerNodeSid(BgpLsPeerSid::new_index_value(
+                    BgpLsSidAttributeFlags::BackupFlag as u8,
+                    69,
+                    32,
+                )),
+                BgpLsAttributeTlv::PeerAdjSid(BgpLsPeerSid::new_index_value(
+                    BgpLsSidAttributeFlags::BackupFlag as u8,
+                    169,
+                    64,
+                )),
+                BgpLsAttributeTlv::PeerSetSid(BgpLsPeerSid::new_label_value(
+                    BgpLsSidAttributeFlags::BackupFlag as u8,
+                    69,
+                    MplsLabel::new([1, 2, 3]),
+                )),
+            ],
+        };
+
+        let mut buf = Vec::<u8>::new();
+        let mut writer = BufWriter::new(&mut buf);
+        value.write(&mut writer, false).expect("I CAN WRITE");
+        drop(writer);
+        println!("written {:?}", buf);
+
+        let span = Span::new(&buf);
+        let result = BgpLsAttribute::from_wire(span, false).expect("I CAN READ");
 
         assert_eq!(result.1, value)
     }
