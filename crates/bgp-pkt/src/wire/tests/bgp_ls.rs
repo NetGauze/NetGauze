@@ -1,24 +1,45 @@
-use crate::bgp_ls::{
-    BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
-    BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-    BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri,
-    IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
-};
-use crate::iana::{BgpLsProtocolId, BgpLsSidAttributeFlags};
-use crate::path_attribute::{MpReach, MpUnreach, PathAttribute, PathAttributeValue};
-use netgauze_parse_utils::test_helpers::{test_parsed_completely_with_one_input, test_write};
-use std::collections::HashMap;
-use std::io::BufWriter;
+// Copyright (C) 2023-present The NetGauze Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-use crate::nlri::MplsLabel;
-use crate::wire::deserializer::BgpParsingContext;
-use crate::wire::serializer::path_attribute::PathAttributeWritingError;
+use crate::{
+    bgp_ls::{
+        BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
+        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
+        BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri,
+        IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
+    },
+    iana::{BgpLsProtocolId, BgpLsSidAttributeFlags},
+    path_attribute::{MpReach, MpUnreach, PathAttribute, PathAttributeValue},
+};
+use netgauze_parse_utils::test_helpers::{test_parsed_completely_with_one_input, test_write};
+use std::{collections::HashMap, io::BufWriter};
+
+use crate::{
+    nlri::MplsLabel,
+    wire::{
+        deserializer::BgpParsingContext, serializer::path_attribute::PathAttributeWritingError,
+    },
+};
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
     ReadablePduWithOneInput, ReadablePduWithThreeInputs, Span, WritablePduWithOneInput,
 };
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::str::FromStr;
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    str::FromStr,
+};
 
 use crate::nlri::{LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};

@@ -18,17 +18,20 @@
 use crate::bgp_ls::{BgpLsNlri, BgpLsVpnNlri};
 use crate::wire::serializer::bgp_ls::BgpLsWritingError;
 use crate::{
+    bgp_ls::{BgpLsNlri, BgpLsVpnNlri},
     iana::{AigpAttributeType, PathAttributeType},
     nlri::*,
     path_attribute::*,
     wire::{
-        serializer::{community::*, nlri::*, IpAddrWritingError},
+        serializer::{bgp_ls::BgpLsWritingError, community::*, nlri::*, IpAddrWritingError},
         ACCUMULATED_IGP_METRIC,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_iana::address_family::AddressType;
-use netgauze_iana::address_family::AddressType::{BgpLs, BgpLsVpn};
+use netgauze_iana::address_family::{
+    AddressType,
+    AddressType::{BgpLs, BgpLsVpn},
+};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::net::IpAddr;

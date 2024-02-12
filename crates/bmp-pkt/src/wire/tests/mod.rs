@@ -16,18 +16,18 @@
 #[cfg(not(feature = "fuzz"))]
 use chrono::TimeZone;
 use ipnet::Ipv4Net;
-use netgauze_bgp_pkt::nlri::{
-    EthernetSegmentIdentifier, EthernetTag, L2EvpnAddress, L2EvpnIpPrefixRoute,
-    L2EvpnIpv4PrefixRoute, L2EvpnRoute, MplsLabel,
-};
-use netgauze_bgp_pkt::path_attribute::MpReach;
 use netgauze_bgp_pkt::{
     capabilities::{
         BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
         FourOctetAsCapability, MultiProtocolExtensionsCapability,
     },
     community::{Community, ExtendedCommunity, TransitiveTwoOctetExtendedCommunity},
+    iana::BgpMessageType,
     iana::UndefinedBgpMessageType,
+    nlri::{
+        EthernetSegmentIdentifier, EthernetTag, L2EvpnAddress, L2EvpnIpPrefixRoute,
+        L2EvpnIpv4PrefixRoute, L2EvpnRoute,
+    },
     nlri::{Ipv4NlriMplsLabelsAddress, Ipv4Unicast, Ipv4UnicastAddress, MplsLabel},
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
@@ -50,10 +50,10 @@ use netgauze_parse_utils::{
     Span, WritablePdu,
 };
 use nom::error::ErrorKind;
-use std::fs::File;
-use std::io::{Cursor, Write};
 use std::{
     collections::HashMap,
+    fs::File,
+    io::{Cursor, Write},
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };

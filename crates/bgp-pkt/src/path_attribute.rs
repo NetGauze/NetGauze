@@ -18,8 +18,8 @@
 
 #[cfg(feature = "fuzz")]
 use crate::arbitrary_ip;
-use crate::bgp_ls::{BgpLsAttribute, BgpLsNlri, BgpLsVpnNlri};
 use crate::{
+    bgp_ls::{BgpLsAttribute, BgpLsNlri, BgpLsVpnNlri},
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     nlri::*,
 };

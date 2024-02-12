@@ -1,34 +1,59 @@
-use crate::bgp_ls::{
-    BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
-    BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-    BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
-    IpReachabilityInformationData, LinkProtectionType, MplsProtocolMask, MultiTopologyId,
-    MultiTopologyIdData, OspfRouteType, SharedRiskLinkGroupValue, UnknownOspfRouteType,
+// Copyright (C) 2023-present The NetGauze Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::{
+    bgp_ls::{
+        BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
+        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
+        BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
+        IpReachabilityInformationData, LinkProtectionType, MplsProtocolMask, MultiTopologyId,
+        MultiTopologyIdData, OspfRouteType, SharedRiskLinkGroupValue, UnknownOspfRouteType,
+    },
+    iana,
+    iana::{
+        BgpLsLinkDescriptorTlvType, BgpLsNlriType, BgpLsNodeDescriptorTlvType, BgpLsNodeFlagsBits,
+        BgpLsPrefixDescriptorTlvType, UnknownBgpLsAttributeTlvType, UnknownBgpLsNlriType,
+        UnknownBgpLsNodeDescriptorTlvType, UnknownBgpLsProtocolId, UnknownLinkDescriptorTlvType,
+        UnknownNodeDescriptorSubTlvType, UnknownPrefixDescriptorTlvType,
+    },
+    wire::{
+        deserializer::{
+            nlri::{MplsLabelParsingError, RouteDistinguisherParsingError},
+            Ipv4PrefixParsingError, Ipv6PrefixParsingError,
+        },
+        serializer::nlri::{IPV4_LEN, IPV6_LEN},
+    },
 };
-use crate::iana;
-use crate::iana::{
-    BgpLsLinkDescriptorTlvType, BgpLsNlriType, BgpLsNodeDescriptorTlvType, BgpLsNodeFlagsBits,
-    BgpLsPrefixDescriptorTlvType, UnknownBgpLsAttributeTlvType, UnknownBgpLsNlriType,
-    UnknownBgpLsNodeDescriptorTlvType, UnknownBgpLsProtocolId, UnknownLinkDescriptorTlvType,
-    UnknownNodeDescriptorSubTlvType, UnknownPrefixDescriptorTlvType,
-};
-use crate::wire::deserializer::nlri::{MplsLabelParsingError, RouteDistinguisherParsingError};
-use crate::wire::deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
-use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
 use ipnet::IpNet;
-use netgauze_parse_utils::ErrorKindSerdeDeref;
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
-    parse_till_empty_into_with_one_input_located, ReadablePdu, ReadablePduWithOneInput, Span,
+    parse_till_empty_into_with_one_input_located, ErrorKindSerdeDeref, ReadablePdu,
+    ReadablePduWithOneInput, Span,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::error::{ErrorKind, FromExternalError};
-use nom::number::complete::{be_f32, be_u128, be_u16, be_u32, be_u64, be_u8};
-use nom::IResult;
+use nom::{
+    error::{ErrorKind, FromExternalError},
+    number::complete::{be_f32, be_u128, be_u16, be_u32, be_u64, be_u8},
+    IResult,
+};
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::ops::BitAnd;
-use std::string::FromUtf8Error;
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    ops::BitAnd,
+    string::FromUtf8Error,
+};
 
 /// BGP Link-State Attribute Parsing Errors
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]

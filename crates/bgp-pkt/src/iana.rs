@@ -1587,7 +1587,8 @@ impl TryFrom<u16> for BgpLsDescriptorTlvType {
     }
 }
 
-/// Aggregate of [BgpLsLinkAttribute] [BgpLsNodeAttribute] [BgpLsPrefixAttribute]
+/// Aggregate of [BgpLsLinkAttribute] [BgpLsNodeAttribute]
+/// [BgpLsPrefixAttribute]
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BgpLsAttributeTlv {
@@ -1693,25 +1694,24 @@ pub enum BgpLsPrefixAttribute {
 ///       |V|L|B|P| Rsvd  |
 ///       +-+-+-+-+-+-+-+-+
 /// ```
-/// -  V-Flag: Value Flag.  If set, then the SID carries a label
-///    value.  By default, the flag is SET.
+/// - V-Flag: Value Flag.  If set, then the SID carries a label value.  By
+///   default, the flag is SET.
 ///
-/// -  L-Flag: Local Flag.  If set, then the value/index carried by
-///    the SID has local significance.  By default, the flag is SET.
+/// - L-Flag: Local Flag.  If set, then the value/index carried by the SID has
+///   local significance.  By default, the flag is SET.
 ///
-/// -  B-Flag: Backup Flag.  If set, the SID refers to a path that is
-///    eligible for protection using fast reroute (FRR).  The
-///    computation of the backup forwarding path and its association
-///    with the BGP Peering SID forwarding entry is implementation
-///    specific.  Section 3.6 of [RFC9087] discusses some of the
-///    possible ways of identifying backup paths for BGP Peering SIDs.
+/// - B-Flag: Backup Flag.  If set, the SID refers to a path that is eligible
+///   for protection using fast reroute (FRR).  The computation of the backup
+///   forwarding path and its association with the BGP Peering SID forwarding
+///   entry is implementation specific.  Section 3.6 of [RFC9087] discusses some
+///   of the possible ways of identifying backup paths for BGP Peering SIDs.
 ///
-/// -  P-Flag: Persistent Flag: If set, the SID is persistently
-///    allocated, i.e., the SID value remains consistent across router
-///    restart and session/interface flap.
+/// - P-Flag: Persistent Flag: If set, the SID is persistently allocated, i.e.,
+///   the SID value remains consistent across router restart and
+///   session/interface flap.
 ///
-/// -  Rsvd bits: Reserved for future use and MUST be zero when
-///    originated and ignored when received.
+/// - Rsvd bits: Reserved for future use and MUST be zero when originated and
+///   ignored when received.
 pub enum BgpLsSidAttributeFlags {
     ValueFlag = 0b_1000_0000,
     LocalFlag = 0b_0100_0000,

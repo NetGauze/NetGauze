@@ -16,8 +16,6 @@
 
 //! Deserializer for BGP Path Attributes
 
-use crate::wire::deserializer::bgp_ls::LocatedBgpLsAttributeParsingError;
-use crate::wire::deserializer::bgp_ls::{BgpLsAttributeParsingError, BgpLsNlriParsingError};
 use crate::{
     iana::{
         AigpAttributeType, PathAttributeType, UndefinedAigpAttributeType,
@@ -26,7 +24,15 @@ use crate::{
     nlri::LabeledNextHop,
     path_attribute::*,
     wire::{
-        deserializer::{community::*, nlri::*, BgpParsingContext, IpAddrParsingError},
+        deserializer::{
+            bgp_ls::{
+                BgpLsAttributeParsingError, BgpLsNlriParsingError,
+                LocatedBgpLsAttributeParsingError,
+            },
+            community::*,
+            nlri::*,
+            BgpParsingContext, IpAddrParsingError,
+        },
         serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN},
         ACCUMULATED_IGP_METRIC,
     },
