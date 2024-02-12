@@ -1366,9 +1366,8 @@ pub enum BgpLsNlriType {
     Ipv4TopologyPrefix = 3,
     /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
     Ipv6TopologyPrefix = 4,
-    // TODO link
     TePolicy = 5,
-    // TODO link
+    /// [RFC9514](https://datatracker.ietf.org/doc/rfc9514/)
     Srv6Sid = 6,
 }
 
@@ -1684,6 +1683,65 @@ pub enum BgpLsPrefixAttribute {
     PrefixMetric = 1155,
     OspfForwardingAddress = 1156,
     OpaquePrefixAttribute = 1157,
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+/// ```text
+///        0 1 2 3 4 5 6 7
+///       +-+-+-+-+-+-+-+-+
+///       |V|L|B|P| Rsvd  |
+///       +-+-+-+-+-+-+-+-+
+/// ```
+/// -  V-Flag: Value Flag.  If set, then the SID carries a label
+///    value.  By default, the flag is SET.
+///
+/// -  L-Flag: Local Flag.  If set, then the value/index carried by
+///    the SID has local significance.  By default, the flag is SET.
+///
+/// -  B-Flag: Backup Flag.  If set, the SID refers to a path that is
+///    eligible for protection using fast reroute (FRR).  The
+///    computation of the backup forwarding path and its association
+///    with the BGP Peering SID forwarding entry is implementation
+///    specific.  Section 3.6 of [RFC9087] discusses some of the
+///    possible ways of identifying backup paths for BGP Peering SIDs.
+///
+/// -  P-Flag: Persistent Flag: If set, the SID is persistently
+///    allocated, i.e., the SID value remains consistent across router
+///    restart and session/interface flap.
+///
+/// -  Rsvd bits: Reserved for future use and MUST be zero when
+///    originated and ignored when received.
+pub enum BgpLsSidAttributeFlags {
+    ValueFlag = 0b_1000_0000,
+    LocalFlag = 0b_0100_0000,
+    BackupFlag = 0b_0010_0000,
+    PersistentFlag = 0b_0001_0000,
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+/// ```text
+/// +-----------------+-------------------------+------------+
+/// |       Bit       | Description             | Reference  |
+/// +-----------------+-------------------------+------------+
+/// |       'O'       | Overload Bit            | [ISO10589](https://www.rfc-editor.org/rfc/rfc7752#ref-ISO10589) |
+/// |       'T'       | Attached Bit            | [ISO10589](https://www.rfc-editor.org/rfc/rfc7752#ref-ISO10589) |
+/// |       'E'       | External Bit            | [RFC2328](https://www.rfc-editor.org/rfc/rfc2328)  |
+/// |       'B'       | ABR Bit                 | [RFC2328](https://www.rfc-editor.org/rfc/rfc2328)  |
+/// |       'R'       | Router Bit              | [RFC5340](https://www.rfc-editor.org/rfc/rfc5340)  |
+/// |       'V'       | V6 Bit                  | [RFC5340](https://www.rfc-editor.org/rfc/rfc5340)  |
+/// | Reserved (Rsvd) | Reserved for future use |            |
+/// +-----------------+-------------------------+------------+
+/// ```
+/// see [RFC7752 Section 3.2.3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
+pub enum BgpLsNodeFlagsBits {
+    Overload = 0b_1000_0000,
+    Attached = 0b_0100_0000,
+    External = 0b_0010_0000,
+    Abr = 0b_0001_0000,
+    Router = 0b_0000_1000,
+    V6 = 0b_0000_0100,
 }
 
 #[cfg(test)]

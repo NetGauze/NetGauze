@@ -853,15 +853,17 @@ impl<'a>
             Ok(AddressType::BgpLs) => {
                 let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, AddressType::BgpLs)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                // TODO does this need add-path ?
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map.get(&AddressType::BgpLs).map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::BgpLs { next_hop, nlri }))
             }
             Ok(AddressType::BgpLsVpn) => {
                 let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, AddressType::BgpLsVpn)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                // TODO does this need add-path ?
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::BgpLsVpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::BgpLsVpn { next_hop, nlri }))
             }
             Ok(_) | Err(_) => Ok((
@@ -1144,13 +1146,15 @@ impl<'a>
                 Ok((buf, MpUnreach::L2Evpn { nlri }))
             }
             Ok(AddressType::BgpLs) => {
-                // TODO do addpath ?
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map.get(&AddressType::BgpLs).map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::BgpLs { nlri }))
             }
             Ok(AddressType::BgpLsVpn) => {
-                // TODO do addpath ?
-                let (_, nlri) = parse_till_empty_into_located(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::BgpLsVpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::BgpLsVpn { nlri }))
             }
             Ok(_) | Err(_) => Ok((

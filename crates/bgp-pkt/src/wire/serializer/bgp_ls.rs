@@ -3,8 +3,9 @@ use crate::bgp_ls::{
     BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
     BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
     IpReachabilityInformationData, LinkProtectionType, MplsProtocolMask, MultiTopologyId,
-    MultiTopologyIdData, NodeFlagsBits,
+    MultiTopologyIdData,
 };
+use crate::iana::BgpLsNodeFlagsBits;
 use crate::wire::serializer::nlri::{MplsLabelWritingError, RouteDistinguisherWritingError};
 use crate::wire::serializer::path_attribute::write_length;
 use crate::wire::serializer::IpAddrWritingError;
@@ -57,15 +58,21 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNlri {
     const BASE_LENGTH: usize = 4; /* nlri type u16 + total nlri length u16 */
 
     fn len(&self) -> usize {
-        Self::BASE_LENGTH + self.nlri().len()
+        Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.nlri().len()
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError>
     where
         Self: Sized,
     {
+        if let Some(path_id) = self.path_id() {
+            writer.write_u32::<NetworkEndian>(*path_id)?;
+        }
         let nlri = self.nlri();
-        write_tlv_header(writer, nlri.get_type() as u16, self.len() as u16)?;
+
+        // do not count add_path length since it is before the tlv
+        let tlv_len = self.len() as u16 - self.path_id.map_or(0, |_| 4);
+        write_tlv_header(writer, nlri.get_type() as u16, tlv_len)?;
 
         nlri.write(writer)?;
 
@@ -77,18 +84,23 @@ impl WritablePdu<BgpLsWritingError> for BgpLsVpnNlri {
     const BASE_LENGTH: usize = 12; /* nlri type u16 + total nlri length u16 + rd 8 bytes */
 
     fn len(&self) -> usize {
-        Self::BASE_LENGTH + self.nlri.len()
+        Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.value.len()
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsWritingError>
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.nlri.get_type() as u16, self.len() as u16)?;
+        if let Some(path_id) = self.path_id() {
+            writer.write_u32::<NetworkEndian>(*path_id)?;
+        }
+
+        // do not count add_path length since it is before the tlv
+        let tlv_len = self.len() as u16 - self.path_id.map_or(0, |_| 4);
+        write_tlv_header(writer, self.value.get_type() as u16, tlv_len)?;
 
         self.rd.write(writer)?;
-
-        self.nlri.write(writer)?;
+        self.value.write(writer)?;
 
         Ok(())
     }
@@ -413,27 +425,27 @@ impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
             } => {
                 let mut flags: u8 = 0x00u8;
                 if *overload {
-                    flags |= NodeFlagsBits::Overload as u8;
+                    flags |= BgpLsNodeFlagsBits::Overload as u8;
                 }
 
                 if *attached {
-                    flags |= NodeFlagsBits::Attached as u8;
+                    flags |= BgpLsNodeFlagsBits::Attached as u8;
                 }
 
                 if *external {
-                    flags |= NodeFlagsBits::External as u8;
+                    flags |= BgpLsNodeFlagsBits::External as u8;
                 }
 
                 if *abr {
-                    flags |= NodeFlagsBits::Abr as u8;
+                    flags |= BgpLsNodeFlagsBits::Abr as u8;
                 }
 
                 if *router {
-                    flags |= NodeFlagsBits::Router as u8;
+                    flags |= BgpLsNodeFlagsBits::Router as u8;
                 }
 
                 if *v6 {
-                    flags |= NodeFlagsBits::V6 as u8;
+                    flags |= BgpLsNodeFlagsBits::V6 as u8;
                 }
 
                 writer.write_u8(flags)?;

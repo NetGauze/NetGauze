@@ -1,7 +1,7 @@
 use crate::bgp_ls::BgpLsMtIdError::{IsIsMtIdInvalidValue, OspfMtIdInvalidValue};
 use crate::iana;
 use crate::iana::BgpLsNodeDescriptorTlvType::{LocalNodeDescriptor, RemoteNodeDescriptor};
-use crate::iana::{BgpLsNodeDescriptorTlvType, BgpLsProtocolId};
+use crate::iana::{BgpLsNodeDescriptorTlvType, BgpLsProtocolId, BgpLsSidAttributeFlags};
 use crate::nlri::{MplsLabel, RouteDistinguisher};
 use crate::path_attribute::PathAttributeValueProperties;
 use ipnet::IpNet;
@@ -434,16 +434,6 @@ pub enum BgpLsPeerSid {
     },
 }
 
-// TODO this goes to IANA ?
-#[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BgpLsSidAttributeFlags {
-    ValueFlag = 0b_1000_0000,
-    LocalFlag = 0b_0100_0000,
-    BackupFlag = 0b_0010_0000,
-    PersistentFlag = 0b_0001_0000,
-}
-
 impl BgpLsPeerSid {
     pub fn new_label_value(flags: u8, weight: u8, label: MplsLabel) -> Self {
         Self::LabelValue {
@@ -589,11 +579,17 @@ impl BgpLsAttributeTlv {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
-pub struct BgpLsNlri(pub BgpLsNlriValue);
+pub struct BgpLsNlri {
+    pub path_id: Option<u32>,
+    pub value: BgpLsNlriValue,
+}
 
 impl BgpLsNlri {
     pub fn nlri(&self) -> &BgpLsNlriValue {
-        &self.0
+        &self.value
+    }
+    pub fn path_id(&self) -> &Option<u32> {
+        &self.path_id
     }
 }
 
@@ -616,8 +612,21 @@ impl BgpLsNlri {
 /// ```
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 pub struct BgpLsVpnNlri {
+    pub path_id: Option<u32>,
     pub rd: RouteDistinguisher,
-    pub nlri: BgpLsNlriValue,
+    pub value: BgpLsNlriValue,
+}
+
+impl BgpLsVpnNlri {
+    pub fn nlri(&self) -> &BgpLsNlriValue {
+        &self.value
+    }
+    pub fn rd(&self) -> &RouteDistinguisher {
+        &self.rd
+    }
+    pub fn path_id(&self) -> &Option<u32> {
+        &self.path_id
+    }
 }
 
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -738,7 +747,6 @@ pub struct BgpLsNlriIpPrefix {
     pub prefix_descriptor_tlvs: Vec<BgpLsPrefixDescriptorTlv>,
 }
 
-// TODO does this go into IANA?
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -835,31 +843,6 @@ pub enum IgpFlags {
     OspfNoUnicast = 0b_0100_0000,
     OspfLocalAddress = 0b_0010_0000,
     OspfPropagateNssa = 0b_0001_0000,
-}
-
-#[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-/// ```text
-/// +-----------------+-------------------------+------------+
-/// |       Bit       | Description             | Reference  |
-/// +-----------------+-------------------------+------------+
-/// |       'O'       | Overload Bit            | [ISO10589](https://www.rfc-editor.org/rfc/rfc7752#ref-ISO10589) |
-/// |       'T'       | Attached Bit            | [ISO10589](https://www.rfc-editor.org/rfc/rfc7752#ref-ISO10589) |
-/// |       'E'       | External Bit            | [RFC2328](https://www.rfc-editor.org/rfc/rfc2328)  |
-/// |       'B'       | ABR Bit                 | [RFC2328](https://www.rfc-editor.org/rfc/rfc2328)  |
-/// |       'R'       | Router Bit              | [RFC5340](https://www.rfc-editor.org/rfc/rfc5340)  |
-/// |       'V'       | V6 Bit                  | [RFC5340](https://www.rfc-editor.org/rfc/rfc5340)  |
-/// | Reserved (Rsvd) | Reserved for future use |            |
-/// +-----------------+-------------------------+------------+
-/// ```
-/// see [RFC7752 Section 3.2.3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
-pub enum NodeFlagsBits {
-    Overload = 0b_1000_0000,
-    Attached = 0b_0100_0000,
-    External = 0b_0010_0000,
-    Abr = 0b_0001_0000,
-    Router = 0b_0000_1000,
-    V6 = 0b_0000_0100,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
