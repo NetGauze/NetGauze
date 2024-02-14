@@ -1686,8 +1686,6 @@ pub enum BgpLsPrefixAttribute {
     OpaquePrefixAttribute = 1157,
 }
 
-#[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// ```text
 ///        0 1 2 3 4 5 6 7
 ///       +-+-+-+-+-+-+-+-+
@@ -1712,6 +1710,8 @@ pub enum BgpLsPrefixAttribute {
 ///
 /// - Rsvd bits: Reserved for future use and MUST be zero when originated and
 ///   ignored when received.
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BgpLsSidAttributeFlags {
     ValueFlag = 0b_1000_0000,
     LocalFlag = 0b_0100_0000,
@@ -1719,8 +1719,6 @@ pub enum BgpLsSidAttributeFlags {
     PersistentFlag = 0b_0001_0000,
 }
 
-#[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// ```text
 /// +-----------------+-------------------------+------------+
 /// |       Bit       | Description             | Reference  |
@@ -1735,6 +1733,8 @@ pub enum BgpLsSidAttributeFlags {
 /// +-----------------+-------------------------+------------+
 /// ```
 /// see [RFC7752 Section 3.2.3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BgpLsNodeFlagsBits {
     Overload = 0b_1000_0000,
     Attached = 0b_0100_0000,

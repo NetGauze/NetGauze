@@ -15,7 +15,7 @@
 
 //! Deserializer library for BGP's wire protocol
 
-mod bgp_ls;
+pub mod bgp_ls;
 pub mod capabilities;
 pub mod community;
 pub mod nlri;

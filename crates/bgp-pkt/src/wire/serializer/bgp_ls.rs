@@ -54,7 +54,7 @@ fn write_tlv_header<T: Write>(
     tlv_type: u16,
     tlv_length: u16,
 ) -> Result<(), BgpLsWritingError> {
-    /* do not account for the tlv type u16 and tlv length u16 */
+    // do not account for the tlv type u16 and tlv length u16
     let effective_length = tlv_length - 4;
 
     writer.write_u16::<NetworkEndian>(tlv_type)?;
@@ -73,7 +73,7 @@ pub enum BgpLsWritingError {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsNlri {
-    const BASE_LENGTH: usize = 4; /* nlri type u16 + total nlri length u16 */
+    const BASE_LENGTH: usize = 4; // nlri type u16 + total nlri length u16
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.nlri().len()
@@ -99,7 +99,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNlri {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsVpnNlri {
-    const BASE_LENGTH: usize = 12; /* nlri type u16 + total nlri length u16 + rd 8 bytes */
+    const BASE_LENGTH: usize = 12; // nlri type u16 + total nlri length u16 + rd 8 bytes
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.value.len()
@@ -150,7 +150,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNlriValue {
 }
 
 impl WritablePduWithOneInput<bool, BgpLsWritingError> for BgpLsAttribute {
-    const BASE_LENGTH: usize = 1; /* 1 byte for attribute length */
+    const BASE_LENGTH: usize = 1; // 1 byte for attribute length
 
     fn len(&self, extended_length: bool) -> usize {
         let len = Self::BASE_LENGTH;
@@ -177,7 +177,7 @@ impl WritablePduWithOneInput<bool, BgpLsWritingError> for BgpLsAttribute {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsNlriIpPrefix {
-    const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
+    const BASE_LENGTH: usize = 1 + 8; // protocol_id + identifier;
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
@@ -207,7 +207,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNlriIpPrefix {
 }
 
 impl WritablePdu<BgpLsWritingError> for IpReachabilityInformationData {
-    const BASE_LENGTH: usize = 1; /* Prefix Length (1 byte) */
+    const BASE_LENGTH: usize = 1; // Prefix Length (1 byte)
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH + Self::most_significant_bytes(self.address().prefix_len())
@@ -237,14 +237,14 @@ impl WritablePdu<BgpLsWritingError> for IpReachabilityInformationData {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsPrefixDescriptorTlv {
-    const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
+    const BASE_LENGTH: usize = 4; // tlv type u16 + tlv length u16
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
             + match self {
                 BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(data) => data.len(),
                 BgpLsPrefixDescriptorTlv::OspfRouteType(_) => {
-                    1 /* OSPF Route Type */
+                    1 // OSPF Route Type
                 }
                 BgpLsPrefixDescriptorTlv::IpReachabilityInformation(ip_reachability) => {
                     ip_reachability.len()
@@ -268,7 +268,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsPrefixDescriptorTlv {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
-    const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
+    const BASE_LENGTH: usize = 4; // tlv type u16 + tlv length u16
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
@@ -487,7 +487,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsNlriNode {
-    const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
+    const BASE_LENGTH: usize = 1 + 8; // protocol_id + identifier
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH + self.local_node_descriptors.len()
@@ -507,7 +507,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNlriNode {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorTlv {
-    const BASE_LENGTH: usize = 4; /* tlv type 16bits + tlv length 16bits */
+    const BASE_LENGTH: usize = 4; // tlv type 16bits + tlv length 16bits
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH + self.subtlvs_len()
@@ -527,7 +527,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorTlv {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsLinkDescriptorTlv {
-    const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
+    const BASE_LENGTH: usize = 4; // tlv type u16 + tlv length u16
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
@@ -575,7 +575,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsLinkDescriptorTlv {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
-    const BASE_LENGTH: usize = 4; /* tlv type u16 + tlv length u16 */
+    const BASE_LENGTH: usize = 4; // tlv type u16 + tlv length u16
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
@@ -618,7 +618,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsNlriLink {
-    const BASE_LENGTH: usize = 1 /* protocol_id */ + 8 /* identifier */;
+    const BASE_LENGTH: usize = 1 + 8; // protocol_id + identifier
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
@@ -686,7 +686,7 @@ impl WritablePdu<BgpLsWritingError> for MultiTopologyId {
 }
 
 impl WritablePdu<BgpLsWritingError> for BgpLsPeerSid {
-    const BASE_LENGTH: usize = 4; /* flags u8 + weight u8 + reserved u16 */
+    const BASE_LENGTH: usize = 4; // flags u8 + weight u8 + reserved u16
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
@@ -700,7 +700,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsPeerSid {
     where
         Self: Sized,
     {
-        /* tlv header is already written in BgpLsAttributeTlv */
+        // tlv header is already written in BgpLsAttributeTlv
 
         writer.write_u8(self.flags())?;
         writer.write_u8(self.weight())?;

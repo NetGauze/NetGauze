@@ -23,8 +23,11 @@ use crate::{
     iana::{BgpLsProtocolId, BgpLsSidAttributeFlags},
     path_attribute::{MpReach, MpUnreach, PathAttribute, PathAttributeValue},
 };
-use netgauze_parse_utils::test_helpers::{test_parsed_completely_with_one_input, test_write};
-use std::{collections::HashMap, io::BufWriter};
+use netgauze_parse_utils::test_helpers::{
+    test_parsed_completely_with_one_input, test_parsed_completely_with_three_inputs, test_write,
+    test_write_with_one_input,
+};
+use std::collections::HashMap;
 
 use crate::{
     nlri::MplsLabel,
@@ -33,17 +36,19 @@ use crate::{
     },
 };
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{
-    ReadablePduWithOneInput, ReadablePduWithThreeInputs, Span, WritablePduWithOneInput,
-};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };
 
-use crate::nlri::{LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher};
+use crate::{
+    nlri::{LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher},
+    wire::serializer::{
+        bgp_ls::BgpLsWritingError,
+        path_attribute::{MpReachWritingError, MpUnreachWritingError},
+    },
+};
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
-use netgauze_parse_utils::WritablePdu;
 
 #[test]
 fn test_wire() -> Result<(), PathAttributeWritingError> {
@@ -114,25 +119,28 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
 }
 
 #[test]
-pub fn test_bgp_ls_attr_parse() {
-    let value = BgpLsAttribute {
+pub fn test_bgp_ls_attr_parse() -> Result<(), BgpLsWritingError> {
+    let good_wire = [
+        17, 4, 74, 0, 13, 77, 121, 32, 83, 117, 112, 101, 114, 32, 76, 105, 110, 107,
+    ];
+
+    let good = BgpLsAttribute {
         tlvs: vec![BgpLsAttributeTlv::LinkName("My Super Link".to_string())],
     };
 
-    let mut buf = Vec::<u8>::new();
-    let mut writer = BufWriter::new(&mut buf);
-    value.write(&mut writer, false).expect("I CAN WRITE");
-    drop(writer);
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write_with_one_input(&good, false, &good_wire)?;
 
-    let span = Span::new(&buf);
-    let result = BgpLsAttribute::from_wire(span, false).expect("I CAN READ");
-
-    assert_eq!(result.1, value)
+    Ok(())
 }
 
 #[test]
-pub fn test_bgp_ls_nlri_parse() {
-    let value = BgpLsNlri {
+pub fn test_bgp_ls_nlri_parse() -> Result<(), BgpLsWritingError> {
+    let good_wire = [
+        0, 2, 0, 41, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 1, 0, 8,
+        2, 2, 0, 4, 0, 0, 0, 21, 1, 3, 0, 4, 1, 2, 3, 4,
+    ];
+    let good = BgpLsNlri {
         path_id: None,
         value: BgpLsNlriValue::Link(BgpLsNlriLink {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
@@ -149,20 +157,20 @@ pub fn test_bgp_ls_nlri_parse() {
         }),
     };
 
-    let mut buf = Vec::<u8>::new();
-    let mut writer = BufWriter::new(&mut buf);
-    value.write(&mut writer).expect("I CAN WRITE");
-    drop(writer);
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
 
-    let span = Span::new(&buf);
-    let result = BgpLsNlri::from_wire(span, false).expect("I CAN READ");
-
-    assert_eq!(result.1, value)
+    Ok(())
 }
 
 #[test]
-pub fn test_bgp_ls_nlri_ipv4_parse() {
-    let value = BgpLsNlri {
+pub fn test_bgp_ls_nlri_ipv4_parse() -> Result<(), BgpLsWritingError> {
+    let good_wire = [
+        0, 3, 0, 43, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 5,
+        32, 1, 2, 3, 4, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4,
+    ];
+
+    let good = BgpLsNlri {
         path_id: None,
         value: BgpLsNlriValue::Ipv4Prefix(BgpLsNlriIpPrefix {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
@@ -183,20 +191,21 @@ pub fn test_bgp_ls_nlri_ipv4_parse() {
         }),
     };
 
-    let mut buf = Vec::<u8>::new();
-    let mut writer = BufWriter::new(&mut buf);
-    value.write(&mut writer).expect("I CAN WRITE");
-    drop(writer);
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
 
-    let span = Span::new(&buf);
-    let result = BgpLsNlri::from_wire(span, false).expect("I CAN READ");
-
-    assert_eq!(result.1, value)
+    Ok(())
 }
 
 #[test]
-pub fn test_bgp_ls_nlri_ipv6_parse() {
-    let value = BgpLsNlri {
+pub fn test_bgp_ls_nlri_ipv6_parse() -> Result<(), BgpLsWritingError> {
+    let good_wire = [
+        0, 4, 0, 55, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17,
+        128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1,
+        4,
+    ];
+
+    let good = BgpLsNlri {
         path_id: None,
         value: BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
@@ -217,19 +226,24 @@ pub fn test_bgp_ls_nlri_ipv6_parse() {
         }),
     };
 
-    let mut buf = Vec::<u8>::new();
-    let mut writer = BufWriter::new(&mut buf);
-    value.write(&mut writer).expect("I CAN WRITE");
-    drop(writer);
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write(&good, &good_wire)?;
 
-    let span = Span::new(&buf);
-    let result = BgpLsNlri::from_wire(span, false).expect("I CAN READ");
-
-    assert_eq!(result.1, value)
+    Ok(())
 }
 
 #[test]
-pub fn test_bgp_ls_mp_reach() {
+pub fn test_bgp_ls_mp_reach() -> Result<(), MpReachWritingError> {
+    let good_wire = [
+        186, 64, 4, 71, 4, 1, 2, 3, 4, 0, 0, 4, 0, 55, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2,
+        2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17, 128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 1,
+        7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4, 0, 4, 0, 55, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8,
+        2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17, 128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8,
+        1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4, 0, 4, 0, 55, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0,
+        8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17, 128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0,
+        8, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4,
+    ];
+
     let ls_nlri = BgpLsNlri {
         path_id: None,
         value: BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
@@ -251,26 +265,36 @@ pub fn test_bgp_ls_mp_reach() {
         }),
     };
 
-    let value = MpReach::BgpLs {
+    let good = MpReach::BgpLs {
         next_hop: IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)),
         nlri: vec![ls_nlri.clone(), ls_nlri.clone(), ls_nlri],
     };
 
-    let mut buf = Vec::<u8>::new();
-    let mut writer = BufWriter::new(&mut buf);
-    value.write(&mut writer, false).expect("I CAN WRITE");
-    drop(writer);
-    println!("written {:?} {:#?}", buf, buf.len());
+    test_parsed_completely_with_three_inputs(
+        &good_wire,
+        false,
+        &HashMap::new(),
+        &HashMap::new(),
+        &good,
+    );
+    test_write_with_one_input(&good, false, &good_wire)?;
 
-    let span = Span::new(&buf);
-    let result =
-        MpReach::from_wire(span, false, &HashMap::new(), &HashMap::new()).expect("I CAN READ");
-
-    assert_eq!(result.1, value)
+    Ok(())
 }
 
 #[test]
-pub fn test_bgp_ls_vpn_mp_reach() {
+pub fn test_bgp_ls_vpn_mp_reach() -> Result<(), MpReachWritingError> {
+    let good_wire = [
+        218, 64, 4, 72, 12, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 0, 0, 4, 0, 63, 0, 2, 0, 0, 3, 242,
+        7, 228, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17, 128,
+        0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4, 0,
+        4, 0, 63, 0, 2, 0, 0, 3, 242, 7, 228, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4,
+        0, 0, 0, 18, 1, 9, 0, 17, 128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 1, 7, 0, 4,
+        0, 69, 0, 21, 1, 8, 0, 1, 4, 0, 4, 0, 63, 0, 2, 0, 0, 3, 242, 7, 228, 1, 0, 0, 0, 0, 0, 0,
+        0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17, 128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5,
+        0, 6, 0, 7, 0, 8, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4,
+    ];
+
     let ls_nlri = BgpLsVpnNlri {
         path_id: None,
         rd: RouteDistinguisher::As4Administrator {
@@ -296,7 +320,7 @@ pub fn test_bgp_ls_vpn_mp_reach() {
         }),
     };
 
-    let value = MpReach::BgpLsVpn {
+    let good = MpReach::BgpLsVpn {
         next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
             RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
             Ipv4Addr::new(1, 2, 3, 4),
@@ -304,21 +328,31 @@ pub fn test_bgp_ls_vpn_mp_reach() {
         nlri: vec![ls_nlri.clone(), ls_nlri.clone(), ls_nlri],
     };
 
-    let mut buf = Vec::<u8>::new();
-    let mut writer = BufWriter::new(&mut buf);
-    value.write(&mut writer, false).expect("I CAN WRITE");
-    drop(writer);
-    println!("written {:?}", buf);
+    test_parsed_completely_with_three_inputs(
+        &good_wire,
+        false,
+        &HashMap::new(),
+        &HashMap::new(),
+        &good,
+    );
+    test_write_with_one_input(&good, false, &good_wire)?;
 
-    let span = Span::new(&buf);
-    let result =
-        MpReach::from_wire(span, false, &HashMap::new(), &HashMap::new()).expect("I CAN READ");
-
-    assert_eq!(result.1, value)
+    Ok(())
 }
 
 #[test]
-pub fn test_bgp_ls_vpn_mp_unreach() {
+pub fn test_bgp_ls_vpn_mp_unreach() -> Result<(), MpUnreachWritingError> {
+    let good_wire = [
+        216, 64, 4, 72, 0, 0, 0, 18, 0, 4, 0, 63, 0, 2, 0, 0, 3, 242, 7, 228, 1, 0, 0, 0, 0, 0, 0,
+        0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17, 128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5,
+        0, 6, 0, 7, 0, 8, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4, 0, 0, 0, 18, 0, 4, 0, 63, 0, 2,
+        0, 0, 3, 242, 7, 228, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1,
+        9, 0, 17, 128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 1, 7, 0, 4, 0, 69, 0, 21, 1,
+        8, 0, 1, 4, 0, 0, 0, 18, 0, 4, 0, 63, 0, 2, 0, 0, 3, 242, 7, 228, 1, 0, 0, 0, 0, 0, 0, 0,
+        69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17, 128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0,
+        6, 0, 7, 0, 8, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4,
+    ];
+
     let ls_nlri = BgpLsVpnNlri {
         path_id: Some(18),
         rd: RouteDistinguisher::As4Administrator {
@@ -344,28 +378,33 @@ pub fn test_bgp_ls_vpn_mp_unreach() {
         }),
     };
 
-    let value = MpUnreach::BgpLsVpn {
+    let good = MpUnreach::BgpLsVpn {
         nlri: vec![ls_nlri.clone(), ls_nlri.clone(), ls_nlri],
     };
 
-    let mut buf = Vec::<u8>::new();
-    let mut writer = BufWriter::new(&mut buf);
-    value.write(&mut writer, false).expect("I CAN WRITE");
-    drop(writer);
-    println!("written {:?}", buf);
-
-    let span = Span::new(&buf);
     let mut add_path_map = HashMap::new();
     add_path_map.insert(AddressType::BgpLsVpn, true);
-    let result =
-        MpUnreach::from_wire(span, false, &HashMap::new(), &add_path_map).expect("I CAN READ");
 
-    assert_eq!(result.1, value)
+    test_parsed_completely_with_three_inputs(
+        &good_wire,
+        false,
+        &HashMap::new(),
+        &add_path_map,
+        &good,
+    );
+    test_write_with_one_input(&good, false, &good_wire)?;
+
+    Ok(())
 }
 
 #[test]
-pub fn test_bgp_ls_sid() {
-    let value = BgpLsAttribute {
+pub fn test_bgp_ls_sid() -> Result<(), BgpLsWritingError> {
+    let good_wire = [
+        35, 4, 77, 0, 8, 32, 69, 0, 0, 0, 0, 0, 32, 4, 78, 0, 8, 32, 169, 0, 0, 0, 0, 0, 64, 4, 79,
+        0, 7, 160, 69, 0, 0, 1, 2, 3,
+    ];
+
+    let good = BgpLsAttribute {
         tlvs: vec![
             BgpLsAttributeTlv::PeerNodeSid(BgpLsPeerSid::new_index_value(
                 BgpLsSidAttributeFlags::BackupFlag as u8,
@@ -384,15 +423,8 @@ pub fn test_bgp_ls_sid() {
             )),
         ],
     };
+    test_parsed_completely_with_one_input(&good_wire, false, &good);
+    test_write_with_one_input(&good, false, &good_wire)?;
 
-    let mut buf = Vec::<u8>::new();
-    let mut writer = BufWriter::new(&mut buf);
-    value.write(&mut writer, false).expect("I CAN WRITE");
-    drop(writer);
-    println!("written {:?}", buf);
-
-    let span = Span::new(&buf);
-    let result = BgpLsAttribute::from_wire(span, false).expect("I CAN READ");
-
-    assert_eq!(result.1, value)
+    Ok(())
 }

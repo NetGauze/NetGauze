@@ -33,9 +33,9 @@ use std::{
 };
 use strum_macros::{Display, FromRepr};
 
+/// The BGP Link-State Attribute. see [RFC7752 Section 3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-/// The BGP Link-State Attribute. see [RFC7752 Section 3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3)
 pub struct BgpLsAttribute {
     pub tlvs: Vec<BgpLsAttributeTlv>,
 }
@@ -427,8 +427,6 @@ pub enum BgpLsAttributeTlv {
     PeerSetSid(BgpLsPeerSid),
 }
 
-#[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -442,6 +440,8 @@ pub enum BgpLsAttributeTlv {
 /// ```
 ///
 /// see [RFC9086](https://datatracker.ietf.org/doc/html/rfc9086#section-5)
+#[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpLsPeerSid {
     LabelValue {
         flags: u8,
@@ -586,8 +586,6 @@ impl BgpLsAttributeTlv {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -600,6 +598,8 @@ impl BgpLsAttributeTlv {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpLsNlri {
     pub path_id: Option<u32>,
     pub value: BgpLsNlriValue,
@@ -614,8 +614,6 @@ impl BgpLsNlri {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -632,6 +630,8 @@ impl BgpLsNlri {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpLsVpnNlri {
     pub path_id: Option<u32>,
     pub rd: RouteDistinguisher,
@@ -650,8 +650,6 @@ impl BgpLsVpnNlri {
     }
 }
 
-#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 /// +------+---------------------------+
 /// | Type | NLRI Type                 |
@@ -663,6 +661,8 @@ impl BgpLsVpnNlri {
 /// +------+---------------------------+
 /// ```
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
+#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpLsNlriValue {
     /// ```text
     ///  0                   1                   2                   3
@@ -744,8 +744,6 @@ impl BgpLsNlriValue {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -761,6 +759,8 @@ impl BgpLsNlriValue {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpLsNlriIpPrefix {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
@@ -801,8 +801,6 @@ impl TryFrom<u8> for OspfRouteType {
     }
 }
 
-#[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// ```text
 /// +------------+------------------------------------------+-----------+
 /// |    Bit     | Description                              | Reference |
@@ -814,13 +812,13 @@ impl TryFrom<u8> for OspfRouteType {
 /// +------------+------------------------------------------+-----------+
 /// ```
 /// see [RFC7752 Section 3.3.2.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.2.2)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum MplsProtocolMask {
     LabelDistributionProtocol = 0b_1000_0000,
     ExtensionToRsvpForLspTunnels = 0b_0100_0000,
 }
 
-#[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// ```text
 ///  0                   1
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
@@ -836,6 +834,8 @@ pub enum MplsProtocolMask {
 /// ```
 ///
 /// see [RFC5307 Section 1.2](https://www.rfc-editor.org/rfc/rfc5307#section-1.2)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum LinkProtectionType {
     ExtraTraffic = 0x01,
     Unprotected = 0x02,
@@ -845,8 +845,6 @@ pub enum LinkProtectionType {
     Enhanced = 0x20,
 }
 
-#[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 /// ```text
 /// +----------+---------------------------+-----------+
 /// |   Bit    | Description               | Reference |
@@ -859,6 +857,8 @@ pub enum LinkProtectionType {
 /// +----------+---------------------------+-----------+
 /// ```
 /// see [RFC7752 Section 3.3.3.1](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.3.1)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum IgpFlags {
     IsIsUp = 0b_1000_0000,
     OspfNoUnicast = 0b_0100_0000,
@@ -866,8 +866,6 @@ pub enum IgpFlags {
     OspfPropagateNssa = 0b_0001_0000,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -878,6 +876,8 @@ pub enum IgpFlags {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 /// see [RFC7752 Section 3.3.2.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct IpReachabilityInformationData(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipnet))] pub IpNet,
 );
@@ -973,8 +973,6 @@ impl BgpLsPrefixDescriptorTlv {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -988,14 +986,14 @@ impl BgpLsPrefixDescriptorTlv {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpLsNlriNode {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
     pub local_node_descriptors: BgpLsNodeDescriptorTlv,
 }
 
-#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -1007,6 +1005,8 @@ pub struct BgpLsNlriNode {
 /// |                                                               |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
+#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpLsNodeDescriptorTlv {
     Local(Vec<BgpLsNodeDescriptorSubTlv>),
     Remote(Vec<BgpLsNodeDescriptorSubTlv>),
@@ -1033,9 +1033,9 @@ impl BgpLsNodeDescriptorTlv {
     }
 }
 
+/// see [RFC7752 Section 3.2.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-/// see [RFC7752 Section 3.2.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.2)
 pub enum BgpLsLinkDescriptorTlv {
     /// ```text
     ///  0                   1                   2                   3
@@ -1088,8 +1088,6 @@ impl BgpLsLinkDescriptorTlv {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 /// +--------------------+-------------------+----------+
 /// | Sub-TLV Code Point | Description       |   Length |
@@ -1103,6 +1101,8 @@ impl BgpLsLinkDescriptorTlv {
 /// +--------------------+-------------------+----------+
 /// ```
 /// see [RFC7752 Section 3.2.1](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpLsNodeDescriptorSubTlv {
     AutonomousSystem(u32),
     BgpLsIdentifier(u32),
@@ -1135,8 +1135,6 @@ impl BgpLsNodeDescriptorSubTlv {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 ///  ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -1154,6 +1152,8 @@ impl BgpLsNodeDescriptorSubTlv {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpLsNlriLink {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
@@ -1162,8 +1162,6 @@ pub struct BgpLsNlriLink {
     pub link_descriptor_tlvs: Vec<BgpLsLinkDescriptorTlv>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// ```text
 /// The format of the MT-ID TLV is shown in the following figure.
 ///
@@ -1181,6 +1179,8 @@ pub struct BgpLsNlriLink {
 /// carried in the TLV.
 /// ```
 /// see [RFC7752 Section 3.2.1.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1.5)
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MultiTopologyIdData(pub Vec<MultiTopologyId>);
 
 impl From<Vec<MultiTopologyId>> for MultiTopologyIdData {
@@ -1195,8 +1195,6 @@ impl MultiTopologyIdData {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 /// Multi-Topology ID for IS-IS [RFC5120 Section 7.2](https://www.rfc-editor.org/rfc/rfc5120#section-7.2)
 /// MT ID is a 12-bit field containing the non-zero MT ID of the
 /// topology being announced.  The TLV MUST be ignored if the ID is
@@ -1219,6 +1217,8 @@ impl MultiTopologyIdData {
 ///           proprietary features [RFC3692]
 /// 128-255 - Invalid and SHOULD be ignored
 /// ```
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MultiTopologyId(pub u16);
 
 impl MultiTopologyId {
@@ -1227,7 +1227,7 @@ impl MultiTopologyId {
     }
 }
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Eq, PartialEq, Serialize, Deserialize)]
 pub enum BgpLsMtIdError {
     OspfMtIdInvalidValue(MultiTopologyId),
     IsIsMtIdInvalidValue(MultiTopologyId),
