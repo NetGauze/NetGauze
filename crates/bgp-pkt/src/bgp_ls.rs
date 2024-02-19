@@ -17,9 +17,10 @@ use crate::{
     bgp_ls::BgpLsMtIdError::{IsIsMtIdInvalidValue, OspfMtIdInvalidValue},
     iana,
     iana::{
+        BgpLsAttributeTlvType, BgpLsLinkDescriptorTlvType, BgpLsNodeDescriptorSubTlvType,
         BgpLsNodeDescriptorTlvType,
         BgpLsNodeDescriptorTlvType::{LocalNodeDescriptor, RemoteNodeDescriptor},
-        BgpLsProtocolId, BgpLsSidAttributeFlags,
+        BgpLsPrefixDescriptorTlvType, BgpLsProtocolId, BgpLsSidAttributeFlags,
     },
     nlri::{MplsLabel, RouteDistinguisher},
     path_attribute::PathAttributeValueProperties,
@@ -522,76 +523,79 @@ impl BgpLsPeerSid {
 impl BgpLsAttributeTlv {
     pub const NODE_NAME_TLV_MAX_LEN: u8 = 255;
 
-    pub fn code(&self) -> u16 {
+    pub const fn code(&self) -> Result<BgpLsAttributeTlvType, u16> {
         match self {
             BgpLsAttributeTlv::LocalNodeIpv4RouterId(_) => {
-                iana::BgpLsAttributeTlvType::LocalNodeIpv4RouterId as u16
+                Ok(BgpLsAttributeTlvType::LocalNodeIpv4RouterId)
             }
             BgpLsAttributeTlv::LocalNodeIpv6RouterId(_) => {
-                iana::BgpLsAttributeTlvType::LocalNodeIpv6RouterId as u16
+                Ok(BgpLsAttributeTlvType::LocalNodeIpv6RouterId)
             }
             BgpLsAttributeTlv::RemoteNodeIpv4RouterId(_) => {
-                iana::BgpLsAttributeTlvType::RemoteNodeIpv4RouterId as u16
+                Ok(BgpLsAttributeTlvType::RemoteNodeIpv4RouterId)
             }
             BgpLsAttributeTlv::RemoteNodeIpv6RouterId(_) => {
-                iana::BgpLsAttributeTlvType::RemoteNodeIpv6RouterId as u16
+                Ok(BgpLsAttributeTlvType::RemoteNodeIpv6RouterId)
             }
             BgpLsAttributeTlv::RemoteNodeAdministrativeGroupColor(_) => {
-                iana::BgpLsAttributeTlvType::RemoteNodeAdministrativeGroupColor as u16
+                Ok(BgpLsAttributeTlvType::RemoteNodeAdministrativeGroupColor)
             }
             BgpLsAttributeTlv::MaximumLinkBandwidth(_) => {
-                iana::BgpLsAttributeTlvType::MaximumLinkBandwidth as u16
+                Ok(BgpLsAttributeTlvType::MaximumLinkBandwidth)
             }
             BgpLsAttributeTlv::MaximumReservableLinkBandwidth(_) => {
-                iana::BgpLsAttributeTlvType::MaximumReservableLinkBandwidth as u16
+                Ok(BgpLsAttributeTlvType::MaximumReservableLinkBandwidth)
             }
             BgpLsAttributeTlv::UnreservedBandwidth(_) => {
-                iana::BgpLsAttributeTlvType::UnreservedBandwidth as u16
+                Ok(BgpLsAttributeTlvType::UnreservedBandwidth)
             }
-            BgpLsAttributeTlv::TeDefaultMetric(_) => {
-                iana::BgpLsAttributeTlvType::TeDefaultMetric as u16
-            }
+            BgpLsAttributeTlv::TeDefaultMetric(_) => Ok(BgpLsAttributeTlvType::TeDefaultMetric),
             BgpLsAttributeTlv::LinkProtectionType { .. } => {
-                iana::BgpLsAttributeTlvType::LinkProtectionType as u16
+                Ok(BgpLsAttributeTlvType::LinkProtectionType)
             }
             BgpLsAttributeTlv::MplsProtocolMask { .. } => {
-                iana::BgpLsAttributeTlvType::MplsProtocolMask as u16
+                Ok(BgpLsAttributeTlvType::MplsProtocolMask)
             }
-            BgpLsAttributeTlv::IgpMetric(..) => iana::BgpLsAttributeTlvType::IgpMetric as u16,
+            BgpLsAttributeTlv::IgpMetric(..) => Ok(BgpLsAttributeTlvType::IgpMetric),
             BgpLsAttributeTlv::SharedRiskLinkGroup(..) => {
-                iana::BgpLsAttributeTlvType::SharedRiskLinkGroup as u16
+                Ok(BgpLsAttributeTlvType::SharedRiskLinkGroup)
             }
             BgpLsAttributeTlv::OpaqueLinkAttribute(..) => {
-                iana::BgpLsAttributeTlvType::OpaqueLinkAttribute as u16
+                Ok(BgpLsAttributeTlvType::OpaqueLinkAttribute)
             }
-            BgpLsAttributeTlv::LinkName(..) => iana::BgpLsAttributeTlvType::LinkName as u16,
-            BgpLsAttributeTlv::IgpFlags { .. } => iana::BgpLsAttributeTlvType::IgpFlags as u16,
-            BgpLsAttributeTlv::IgpRouteTag(_) => iana::BgpLsAttributeTlvType::IgpRouteTag as u16,
+            BgpLsAttributeTlv::LinkName(..) => Ok(BgpLsAttributeTlvType::LinkName),
+            BgpLsAttributeTlv::IgpFlags { .. } => Ok(BgpLsAttributeTlvType::IgpFlags),
+            BgpLsAttributeTlv::IgpRouteTag(_) => Ok(BgpLsAttributeTlvType::IgpRouteTag),
             BgpLsAttributeTlv::IgpExtendedRouteTag(_) => {
-                iana::BgpLsAttributeTlvType::IgpExtendedRouteTag as u16
+                Ok(BgpLsAttributeTlvType::IgpExtendedRouteTag)
             }
-            BgpLsAttributeTlv::PrefixMetric(_) => iana::BgpLsAttributeTlvType::PrefixMetric as u16,
+            BgpLsAttributeTlv::PrefixMetric(_) => Ok(BgpLsAttributeTlvType::PrefixMetric),
             BgpLsAttributeTlv::OspfForwardingAddress(_) => {
-                iana::BgpLsAttributeTlvType::OspfForwardingAddress as u16
+                Ok(BgpLsAttributeTlvType::OspfForwardingAddress)
             }
             BgpLsAttributeTlv::OpaquePrefixAttribute(_) => {
-                iana::BgpLsAttributeTlvType::OpaquePrefixAttribute as u16
+                Ok(BgpLsAttributeTlvType::OpaquePrefixAttribute)
             }
             BgpLsAttributeTlv::MultiTopologyIdentifier(..) => {
-                iana::BgpLsAttributeTlvType::MultiTopologyIdentifier as u16
+                Ok(BgpLsAttributeTlvType::MultiTopologyIdentifier)
             }
-            BgpLsAttributeTlv::NodeFlagBits { .. } => {
-                iana::BgpLsAttributeTlvType::NodeFlagBits as u16
-            }
+            BgpLsAttributeTlv::NodeFlagBits { .. } => Ok(BgpLsAttributeTlvType::NodeFlagBits),
             BgpLsAttributeTlv::OpaqueNodeAttribute(..) => {
-                iana::BgpLsAttributeTlvType::OpaqueNodeAttribute as u16
+                Ok(BgpLsAttributeTlvType::OpaqueNodeAttribute)
             }
-            BgpLsAttributeTlv::NodeNameTlv(..) => iana::BgpLsAttributeTlvType::NodeNameTlv as u16,
-            BgpLsAttributeTlv::IsIsArea(..) => iana::BgpLsAttributeTlvType::IsIsArea as u16,
-            BgpLsAttributeTlv::PeerNodeSid(..) => iana::BgpLsAttributeTlvType::PeerNodeSid as u16,
-            BgpLsAttributeTlv::PeerAdjSid(..) => iana::BgpLsAttributeTlvType::PeerAdjSid as u16,
-            BgpLsAttributeTlv::PeerSetSid(..) => iana::BgpLsAttributeTlvType::PeerSetSid as u16,
-            BgpLsAttributeTlv::Unknown { code, .. } => *code,
+            BgpLsAttributeTlv::NodeNameTlv(..) => Ok(BgpLsAttributeTlvType::NodeNameTlv),
+            BgpLsAttributeTlv::IsIsArea(..) => Ok(BgpLsAttributeTlvType::IsIsArea),
+            BgpLsAttributeTlv::PeerNodeSid(..) => Ok(BgpLsAttributeTlvType::PeerNodeSid),
+            BgpLsAttributeTlv::PeerAdjSid(..) => Ok(BgpLsAttributeTlvType::PeerAdjSid),
+            BgpLsAttributeTlv::PeerSetSid(..) => Ok(BgpLsAttributeTlvType::PeerSetSid),
+            BgpLsAttributeTlv::Unknown { code, .. } => Err(*code),
+        }
+    }
+
+    pub const fn raw_code(&self) -> u16 {
+        match self.code() {
+            Ok(value) => value as u16,
+            Err(value) => value,
         }
     }
 }
@@ -972,18 +976,25 @@ pub enum BgpLsPrefixDescriptorTlv {
 }
 
 impl BgpLsPrefixDescriptorTlv {
-    pub fn code(&self) -> u16 {
+    pub const fn code(&self) -> Result<BgpLsPrefixDescriptorTlvType, u16> {
         match self {
             BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(..) => {
-                iana::BgpLsPrefixDescriptorTlvType::MultiTopologyIdentifier as u16
+                Ok(BgpLsPrefixDescriptorTlvType::MultiTopologyIdentifier)
             }
             BgpLsPrefixDescriptorTlv::OspfRouteType(_) => {
-                iana::BgpLsPrefixDescriptorTlvType::OspfRouteType as u16
+                Ok(BgpLsPrefixDescriptorTlvType::OspfRouteType)
             }
             BgpLsPrefixDescriptorTlv::IpReachabilityInformation(_) => {
-                iana::BgpLsPrefixDescriptorTlvType::IpReachabilityInformation as u16
+                Ok(BgpLsPrefixDescriptorTlvType::IpReachabilityInformation)
             }
-            BgpLsPrefixDescriptorTlv::Unknown { code, .. } => *code,
+            BgpLsPrefixDescriptorTlv::Unknown { code, .. } => Err(*code),
+        }
+    }
+
+    pub const fn raw_code(&self) -> u16 {
+        match self.code() {
+            Ok(value) => value as u16,
+            Err(value) => value,
         }
     }
 }
@@ -1083,27 +1094,34 @@ pub enum BgpLsLinkDescriptorTlv {
 }
 
 impl BgpLsLinkDescriptorTlv {
-    pub fn code(&self) -> u16 {
+    pub const fn code(&self) -> Result<BgpLsLinkDescriptorTlvType, u16> {
         match self {
             BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers { .. } => {
-                iana::BgpLsLinkDescriptorTlvType::LinkLocalRemoteIdentifiers as u16
+                Ok(BgpLsLinkDescriptorTlvType::LinkLocalRemoteIdentifiers)
             }
             BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(..) => {
-                iana::BgpLsLinkDescriptorTlvType::IPv4InterfaceAddress as u16
+                Ok(BgpLsLinkDescriptorTlvType::IPv4InterfaceAddress)
             }
             BgpLsLinkDescriptorTlv::IPv4NeighborAddress(..) => {
-                iana::BgpLsLinkDescriptorTlvType::IPv4NeighborAddress as u16
+                Ok(BgpLsLinkDescriptorTlvType::IPv4NeighborAddress)
             }
             BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(..) => {
-                iana::BgpLsLinkDescriptorTlvType::IPv6InterfaceAddress as u16
+                Ok(BgpLsLinkDescriptorTlvType::IPv6InterfaceAddress)
             }
             BgpLsLinkDescriptorTlv::IPv6NeighborAddress(..) => {
-                iana::BgpLsLinkDescriptorTlvType::IPv6NeighborAddress as u16
+                Ok(BgpLsLinkDescriptorTlvType::IPv6NeighborAddress)
             }
             BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(..) => {
-                iana::BgpLsLinkDescriptorTlvType::MultiTopologyIdentifier as u16
+                Ok(BgpLsLinkDescriptorTlvType::MultiTopologyIdentifier)
             }
-            BgpLsLinkDescriptorTlv::Unknown { code, .. } => *code,
+            BgpLsLinkDescriptorTlv::Unknown { code, .. } => Err(*code),
+        }
+    }
+
+    pub const fn raw_code(&self) -> u16 {
+        match self.code() {
+            Ok(value) => value as u16,
+            Err(value) => value,
         }
     }
 }
@@ -1134,27 +1152,34 @@ pub enum BgpLsNodeDescriptorSubTlv {
 }
 
 impl BgpLsNodeDescriptorSubTlv {
-    pub fn code(&self) -> u16 {
+    pub const fn code(&self) -> Result<BgpLsNodeDescriptorSubTlvType, u16> {
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(_) => {
-                iana::BgpLsNodeDescriptorSubTlvType::AutonomousSystem as u16
+                Ok(BgpLsNodeDescriptorSubTlvType::AutonomousSystem)
             }
             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(_) => {
-                iana::BgpLsNodeDescriptorSubTlvType::BgpLsIdentifier as u16
+                Ok(BgpLsNodeDescriptorSubTlvType::BgpLsIdentifier)
             }
             BgpLsNodeDescriptorSubTlv::OspfAreaId(_) => {
-                iana::BgpLsNodeDescriptorSubTlvType::OspfAreaId as u16
+                Ok(BgpLsNodeDescriptorSubTlvType::OspfAreaId)
             }
             BgpLsNodeDescriptorSubTlv::IgpRouterId(_) => {
-                iana::BgpLsNodeDescriptorSubTlvType::IgpRouterId as u16
+                Ok(BgpLsNodeDescriptorSubTlvType::IgpRouterId)
             }
             BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(_) => {
-                iana::BgpLsNodeDescriptorSubTlvType::BgpRouterIdentifier as u16
+                Ok(BgpLsNodeDescriptorSubTlvType::BgpRouterIdentifier)
             }
             BgpLsNodeDescriptorSubTlv::MemberAsNumber(_) => {
-                iana::BgpLsNodeDescriptorSubTlvType::MemberAsNumber as u16
+                Ok(BgpLsNodeDescriptorSubTlvType::MemberAsNumber)
             }
-            BgpLsNodeDescriptorSubTlv::Unknown { code, .. } => *code,
+            BgpLsNodeDescriptorSubTlv::Unknown { code, .. } => Err(*code),
+        }
+    }
+
+    pub const fn raw_code(&self) -> u16 {
+        match self.code() {
+            Ok(value) => value as u16,
+            Err(value) => value,
         }
     }
 }

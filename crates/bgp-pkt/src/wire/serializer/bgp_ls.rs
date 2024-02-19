@@ -12,7 +12,6 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 use crate::{
     bgp_ls::{
         BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
@@ -257,7 +256,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsPrefixDescriptorTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.code(), self.len() as u16)?;
+        write_tlv_header(writer, self.raw_code(), self.len() as u16)?;
         match self {
             BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(data) => data.write(writer)?,
             BgpLsPrefixDescriptorTlv::OspfRouteType(data) => writer.write_u8(*data as u8)?,
@@ -312,7 +311,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.code(), self.len() as u16)?;
+        write_tlv_header(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
             BgpLsAttributeTlv::LocalNodeIpv4RouterId(ipv4) => writer.write_all(&ipv4.octets())?,
@@ -550,7 +549,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsLinkDescriptorTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.code(), self.len() as u16)?;
+        write_tlv_header(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
             BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers {
@@ -600,7 +599,8 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.code(), self.len() as u16)?;
+        write_tlv_header(writer, self.raw_code(), self.len() as u16)?;
+
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(data) => {
                 writer.write_u32::<NetworkEndian>(*data)?
