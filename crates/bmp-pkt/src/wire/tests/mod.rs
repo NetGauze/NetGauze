@@ -22,8 +22,7 @@ use netgauze_bgp_pkt::{
         FourOctetAsCapability, MultiProtocolExtensionsCapability,
     },
     community::{Community, ExtendedCommunity, TransitiveTwoOctetExtendedCommunity},
-    iana::BgpMessageType,
-    iana::UndefinedBgpMessageType,
+    iana::{BgpMessageType, UndefinedBgpMessageType},
     nlri::{
         EthernetSegmentIdentifier, EthernetTag, L2EvpnAddress, L2EvpnIpPrefixRoute,
         L2EvpnIpv4PrefixRoute, L2EvpnRoute,
@@ -47,13 +46,11 @@ use netgauze_parse_utils::{
         test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
         test_parsed_completely_with_one_input, test_write,
     },
-    Span, WritablePdu,
+    Span,
 };
 use nom::error::ErrorKind;
 use std::{
     collections::HashMap,
-    fs::File,
-    io::{Cursor, Write},
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     str::FromStr,
 };

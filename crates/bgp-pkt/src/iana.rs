@@ -1410,7 +1410,7 @@ pub enum BgpLsProtocolId {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnknownBgpLsProtocolId(pub u8);
+pub struct BgpLsProtocolIdError(pub BgpLsIanaValueError<u8>);
 
 impl From<BgpLsProtocolId> for u8 {
     fn from(value: BgpLsProtocolId) -> Self {
@@ -1419,16 +1419,21 @@ impl From<BgpLsProtocolId> for u8 {
 }
 
 impl TryFrom<u8> for BgpLsProtocolId {
-    type Error = UnknownBgpLsProtocolId;
+    type Error = BgpLsProtocolIdError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UnknownBgpLsProtocolId(value)),
+            None => {
+                if value == 0 {
+                    Err(BgpLsProtocolIdError(BgpLsIanaValueError::Reserved(value)))
+                } else {
+                    Err(BgpLsProtocolIdError(BgpLsIanaValueError::Unknown(value)))
+                }
+            }
         }
     }
 }
-
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum BgpLsNodeDescriptorTlvType {
@@ -1438,7 +1443,7 @@ pub enum BgpLsNodeDescriptorTlvType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnknownBgpLsNodeDescriptorTlvType(pub u16);
+pub struct BgpLsNodeDescriptorTlvTypeError(pub BgpLsIanaValueError<u16>);
 
 impl From<BgpLsNodeDescriptorTlvType> for u16 {
     fn from(value: BgpLsNodeDescriptorTlvType) -> Self {
@@ -1447,12 +1452,22 @@ impl From<BgpLsNodeDescriptorTlvType> for u16 {
 }
 
 impl TryFrom<u16> for BgpLsNodeDescriptorTlvType {
-    type Error = UnknownBgpLsNodeDescriptorTlvType;
+    type Error = BgpLsNodeDescriptorTlvTypeError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UnknownBgpLsNodeDescriptorTlvType(value)),
+            None => {
+                if value <= 255 {
+                    Err(BgpLsNodeDescriptorTlvTypeError(
+                        BgpLsIanaValueError::Reserved(value),
+                    ))
+                } else {
+                    Err(BgpLsNodeDescriptorTlvTypeError(
+                        BgpLsIanaValueError::Unknown(value),
+                    ))
+                }
+            }
         }
     }
 }
@@ -1460,7 +1475,7 @@ impl TryFrom<u16> for BgpLsNodeDescriptorTlvType {
 /// BGP-LS Node Descriptor Sub-TLVs [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#node-descriptor-link-descriptor-prefix-descriptor-attribute-tlv)
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BgpLsNodeDescriptorSubTlv {
+pub enum BgpLsNodeDescriptorSubTlvType {
     AutonomousSystem = 512,
     BgpLsIdentifier = 513,
     OspfAreaId = 514,
@@ -1471,21 +1486,31 @@ pub enum BgpLsNodeDescriptorSubTlv {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnknownNodeDescriptorSubTlvType(pub u16);
+pub struct NodeDescriptorSubTlvTypeError(pub BgpLsIanaValueError<u16>);
 
-impl From<BgpLsNodeDescriptorSubTlv> for u16 {
-    fn from(value: BgpLsNodeDescriptorSubTlv) -> Self {
+impl From<BgpLsNodeDescriptorSubTlvType> for u16 {
+    fn from(value: BgpLsNodeDescriptorSubTlvType) -> Self {
         value as u16
     }
 }
 
-impl TryFrom<u16> for BgpLsNodeDescriptorSubTlv {
-    type Error = UnknownNodeDescriptorSubTlvType;
+impl TryFrom<u16> for BgpLsNodeDescriptorSubTlvType {
+    type Error = NodeDescriptorSubTlvTypeError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UnknownNodeDescriptorSubTlvType(value)),
+            None => {
+                if value <= 255 {
+                    Err(NodeDescriptorSubTlvTypeError(
+                        BgpLsIanaValueError::Reserved(value),
+                    ))
+                } else {
+                    Err(NodeDescriptorSubTlvTypeError(BgpLsIanaValueError::Unknown(
+                        value,
+                    )))
+                }
+            }
         }
     }
 }
@@ -1500,7 +1525,7 @@ pub enum BgpLsPrefixDescriptorTlvType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnknownPrefixDescriptorTlvType(pub u16);
+pub struct PrefixDescriptorTlvTypeError(pub BgpLsIanaValueError<u16>);
 
 impl From<BgpLsPrefixDescriptorTlvType> for u16 {
     fn from(value: BgpLsPrefixDescriptorTlvType) -> Self {
@@ -1509,12 +1534,22 @@ impl From<BgpLsPrefixDescriptorTlvType> for u16 {
 }
 
 impl TryFrom<u16> for BgpLsPrefixDescriptorTlvType {
-    type Error = UnknownPrefixDescriptorTlvType;
+    type Error = PrefixDescriptorTlvTypeError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UnknownPrefixDescriptorTlvType(value)),
+            None => {
+                if value <= 255 {
+                    Err(PrefixDescriptorTlvTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
+                } else {
+                    Err(PrefixDescriptorTlvTypeError(BgpLsIanaValueError::Unknown(
+                        value,
+                    )))
+                }
+            }
         }
     }
 }
@@ -1532,7 +1567,7 @@ pub enum BgpLsLinkDescriptorTlvType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnknownLinkDescriptorTlvType(pub u16);
+pub struct LinkDescriptorTlvTypeError(pub BgpLsIanaValueError<u16>);
 
 impl From<BgpLsLinkDescriptorTlvType> for u16 {
     fn from(value: BgpLsLinkDescriptorTlvType) -> Self {
@@ -1541,12 +1576,22 @@ impl From<BgpLsLinkDescriptorTlvType> for u16 {
 }
 
 impl TryFrom<u16> for BgpLsLinkDescriptorTlvType {
-    type Error = UnknownLinkDescriptorTlvType;
+    type Error = LinkDescriptorTlvTypeError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UnknownLinkDescriptorTlvType(value)),
+            None => {
+                if value <= 255 {
+                    Err(LinkDescriptorTlvTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
+                } else {
+                    Err(LinkDescriptorTlvTypeError(BgpLsIanaValueError::Unknown(
+                        value,
+                    )))
+                }
+            }
         }
     }
 }
@@ -1568,7 +1613,7 @@ pub enum BgpLsDescriptorTlvType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnknownDescriptorTlvType(pub u16);
+pub struct DescriptorTlvTypeError(pub BgpLsIanaValueError<u16>);
 
 impl From<BgpLsDescriptorTlvType> for u16 {
     fn from(value: BgpLsDescriptorTlvType) -> Self {
@@ -1577,21 +1622,26 @@ impl From<BgpLsDescriptorTlvType> for u16 {
 }
 
 impl TryFrom<u16> for BgpLsDescriptorTlvType {
-    type Error = UnknownDescriptorTlvType;
+    type Error = DescriptorTlvTypeError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UnknownDescriptorTlvType(value)),
+            None => {
+                if value <= 255 {
+                    Err(DescriptorTlvTypeError(BgpLsIanaValueError::Reserved(value)))
+                } else {
+                    Err(DescriptorTlvTypeError(BgpLsIanaValueError::Unknown(value)))
+                }
+            }
         }
     }
 }
-
 /// Aggregate of [BgpLsLinkAttribute] [BgpLsNodeAttribute]
 /// [BgpLsPrefixAttribute]
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum BgpLsAttributeTlv {
+pub enum BgpLsAttributeTlvType {
     MultiTopologyIdentifier = 263,
     NodeFlagBits = 1024,
     OpaqueNodeAttribute = 1025,
@@ -1624,22 +1674,42 @@ pub enum BgpLsAttributeTlv {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct UnknownBgpLsAttributeTlvType(pub u16);
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize, Display)]
+pub enum BgpLsIanaValueError<T> {
+    /// Reserved Values
+    Reserved(T),
 
-impl From<BgpLsAttributeTlv> for u16 {
-    fn from(afi: BgpLsAttributeTlv) -> Self {
+    /// Unassigned or Private Use values
+    Unknown(T),
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct BgpLsAttributeTlvTypeError(pub BgpLsIanaValueError<u16>);
+
+impl From<BgpLsAttributeTlvType> for u16 {
+    fn from(afi: BgpLsAttributeTlvType) -> Self {
         afi as u16
     }
 }
 
-impl TryFrom<u16> for BgpLsAttributeTlv {
-    type Error = UnknownBgpLsAttributeTlvType;
+impl TryFrom<u16> for BgpLsAttributeTlvType {
+    type Error = BgpLsAttributeTlvTypeError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match Self::from_repr(value) {
             Some(val) => Ok(val),
-            None => Err(UnknownBgpLsAttributeTlvType(value)),
+            None => {
+                if value <= 255 {
+                    Err(BgpLsAttributeTlvTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
+                } else {
+                    Err(BgpLsAttributeTlvTypeError(BgpLsIanaValueError::Unknown(
+                        value,
+                    )))
+                }
+            }
         }
     }
 }
@@ -1723,12 +1793,12 @@ pub enum BgpLsSidAttributeFlags {
 /// +-----------------+-------------------------+------------+
 /// |       Bit       | Description             | Reference  |
 /// +-----------------+-------------------------+------------+
-/// |       'O'       | Overload Bit            | [ISO10589](https://www.rfc-editor.org/rfc/rfc7752#ref-ISO10589) |
-/// |       'T'       | Attached Bit            | [ISO10589](https://www.rfc-editor.org/rfc/rfc7752#ref-ISO10589) |
-/// |       'E'       | External Bit            | [RFC2328](https://www.rfc-editor.org/rfc/rfc2328)  |
-/// |       'B'       | ABR Bit                 | [RFC2328](https://www.rfc-editor.org/rfc/rfc2328)  |
-/// |       'R'       | Router Bit              | [RFC5340](https://www.rfc-editor.org/rfc/rfc5340)  |
-/// |       'V'       | V6 Bit                  | [RFC5340](https://www.rfc-editor.org/rfc/rfc5340)  |
+/// |       'O'       | Overload Bit            | [ISO10589] |
+/// |       'T'       | Attached Bit            | [ISO10589] |
+/// |       'E'       | External Bit            | [RFC2328]  |
+/// |       'B'       | ABR Bit                 | [RFC2328]  |
+/// |       'R'       | Router Bit              | [RFC5340]  |
+/// |       'V'       | V6 Bit                  | [RFC5340]  |
 /// | Reserved (Rsvd) | Reserved for future use |            |
 /// +-----------------+-------------------------+------------+
 /// ```

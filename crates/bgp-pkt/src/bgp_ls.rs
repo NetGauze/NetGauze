@@ -425,6 +425,9 @@ pub enum BgpLsAttributeTlv {
     ///
     /// see [RFC9086](https://datatracker.ietf.org/doc/html/rfc9086#section-5)
     PeerSetSid(BgpLsPeerSid),
+
+    /// Unrecognized types MUST be preserved and propagated. [RFC7752 Section 3.1](https://datatracker.ietf.org/doc/html/rfc7752#section-3.1)
+    Unknown { code: u16, value: Vec<u8> },
 }
 
 /// ```text
@@ -519,69 +522,76 @@ impl BgpLsPeerSid {
 impl BgpLsAttributeTlv {
     pub const NODE_NAME_TLV_MAX_LEN: u8 = 255;
 
-    pub fn get_type(&self) -> iana::BgpLsAttributeTlv {
+    pub fn code(&self) -> u16 {
         match self {
             BgpLsAttributeTlv::LocalNodeIpv4RouterId(_) => {
-                iana::BgpLsAttributeTlv::LocalNodeIpv4RouterId
+                iana::BgpLsAttributeTlvType::LocalNodeIpv4RouterId as u16
             }
             BgpLsAttributeTlv::LocalNodeIpv6RouterId(_) => {
-                iana::BgpLsAttributeTlv::LocalNodeIpv6RouterId
+                iana::BgpLsAttributeTlvType::LocalNodeIpv6RouterId as u16
             }
             BgpLsAttributeTlv::RemoteNodeIpv4RouterId(_) => {
-                iana::BgpLsAttributeTlv::RemoteNodeIpv4RouterId
+                iana::BgpLsAttributeTlvType::RemoteNodeIpv4RouterId as u16
             }
             BgpLsAttributeTlv::RemoteNodeIpv6RouterId(_) => {
-                iana::BgpLsAttributeTlv::RemoteNodeIpv6RouterId
+                iana::BgpLsAttributeTlvType::RemoteNodeIpv6RouterId as u16
             }
             BgpLsAttributeTlv::RemoteNodeAdministrativeGroupColor(_) => {
-                iana::BgpLsAttributeTlv::RemoteNodeAdministrativeGroupColor
+                iana::BgpLsAttributeTlvType::RemoteNodeAdministrativeGroupColor as u16
             }
             BgpLsAttributeTlv::MaximumLinkBandwidth(_) => {
-                iana::BgpLsAttributeTlv::MaximumLinkBandwidth
+                iana::BgpLsAttributeTlvType::MaximumLinkBandwidth as u16
             }
             BgpLsAttributeTlv::MaximumReservableLinkBandwidth(_) => {
-                iana::BgpLsAttributeTlv::MaximumReservableLinkBandwidth
+                iana::BgpLsAttributeTlvType::MaximumReservableLinkBandwidth as u16
             }
             BgpLsAttributeTlv::UnreservedBandwidth(_) => {
-                iana::BgpLsAttributeTlv::UnreservedBandwidth
+                iana::BgpLsAttributeTlvType::UnreservedBandwidth as u16
             }
-            BgpLsAttributeTlv::TeDefaultMetric(_) => iana::BgpLsAttributeTlv::TeDefaultMetric,
+            BgpLsAttributeTlv::TeDefaultMetric(_) => {
+                iana::BgpLsAttributeTlvType::TeDefaultMetric as u16
+            }
             BgpLsAttributeTlv::LinkProtectionType { .. } => {
-                iana::BgpLsAttributeTlv::LinkProtectionType
+                iana::BgpLsAttributeTlvType::LinkProtectionType as u16
             }
-            BgpLsAttributeTlv::MplsProtocolMask { .. } => iana::BgpLsAttributeTlv::MplsProtocolMask,
-            BgpLsAttributeTlv::IgpMetric(..) => iana::BgpLsAttributeTlv::IgpMetric,
+            BgpLsAttributeTlv::MplsProtocolMask { .. } => {
+                iana::BgpLsAttributeTlvType::MplsProtocolMask as u16
+            }
+            BgpLsAttributeTlv::IgpMetric(..) => iana::BgpLsAttributeTlvType::IgpMetric as u16,
             BgpLsAttributeTlv::SharedRiskLinkGroup(..) => {
-                iana::BgpLsAttributeTlv::SharedRiskLinkGroup
+                iana::BgpLsAttributeTlvType::SharedRiskLinkGroup as u16
             }
             BgpLsAttributeTlv::OpaqueLinkAttribute(..) => {
-                iana::BgpLsAttributeTlv::OpaqueLinkAttribute
+                iana::BgpLsAttributeTlvType::OpaqueLinkAttribute as u16
             }
-            BgpLsAttributeTlv::LinkName(..) => iana::BgpLsAttributeTlv::LinkName,
-            BgpLsAttributeTlv::IgpFlags { .. } => iana::BgpLsAttributeTlv::IgpFlags,
-            BgpLsAttributeTlv::IgpRouteTag(_) => iana::BgpLsAttributeTlv::IgpRouteTag,
+            BgpLsAttributeTlv::LinkName(..) => iana::BgpLsAttributeTlvType::LinkName as u16,
+            BgpLsAttributeTlv::IgpFlags { .. } => iana::BgpLsAttributeTlvType::IgpFlags as u16,
+            BgpLsAttributeTlv::IgpRouteTag(_) => iana::BgpLsAttributeTlvType::IgpRouteTag as u16,
             BgpLsAttributeTlv::IgpExtendedRouteTag(_) => {
-                iana::BgpLsAttributeTlv::IgpExtendedRouteTag
+                iana::BgpLsAttributeTlvType::IgpExtendedRouteTag as u16
             }
-            BgpLsAttributeTlv::PrefixMetric(_) => iana::BgpLsAttributeTlv::PrefixMetric,
+            BgpLsAttributeTlv::PrefixMetric(_) => iana::BgpLsAttributeTlvType::PrefixMetric as u16,
             BgpLsAttributeTlv::OspfForwardingAddress(_) => {
-                iana::BgpLsAttributeTlv::OspfForwardingAddress
+                iana::BgpLsAttributeTlvType::OspfForwardingAddress as u16
             }
             BgpLsAttributeTlv::OpaquePrefixAttribute(_) => {
-                iana::BgpLsAttributeTlv::OpaquePrefixAttribute
+                iana::BgpLsAttributeTlvType::OpaquePrefixAttribute as u16
             }
             BgpLsAttributeTlv::MultiTopologyIdentifier(..) => {
-                iana::BgpLsAttributeTlv::MultiTopologyIdentifier
+                iana::BgpLsAttributeTlvType::MultiTopologyIdentifier as u16
             }
-            BgpLsAttributeTlv::NodeFlagBits { .. } => iana::BgpLsAttributeTlv::NodeFlagBits,
+            BgpLsAttributeTlv::NodeFlagBits { .. } => {
+                iana::BgpLsAttributeTlvType::NodeFlagBits as u16
+            }
             BgpLsAttributeTlv::OpaqueNodeAttribute(..) => {
-                iana::BgpLsAttributeTlv::OpaqueNodeAttribute
+                iana::BgpLsAttributeTlvType::OpaqueNodeAttribute as u16
             }
-            BgpLsAttributeTlv::NodeNameTlv(..) => iana::BgpLsAttributeTlv::NodeNameTlv,
-            BgpLsAttributeTlv::IsIsArea(..) => iana::BgpLsAttributeTlv::IsIsArea,
-            BgpLsAttributeTlv::PeerNodeSid(..) => iana::BgpLsAttributeTlv::PeerNodeSid,
-            BgpLsAttributeTlv::PeerAdjSid(..) => iana::BgpLsAttributeTlv::PeerAdjSid,
-            BgpLsAttributeTlv::PeerSetSid(..) => iana::BgpLsAttributeTlv::PeerSetSid,
+            BgpLsAttributeTlv::NodeNameTlv(..) => iana::BgpLsAttributeTlvType::NodeNameTlv as u16,
+            BgpLsAttributeTlv::IsIsArea(..) => iana::BgpLsAttributeTlvType::IsIsArea as u16,
+            BgpLsAttributeTlv::PeerNodeSid(..) => iana::BgpLsAttributeTlvType::PeerNodeSid as u16,
+            BgpLsAttributeTlv::PeerAdjSid(..) => iana::BgpLsAttributeTlvType::PeerAdjSid as u16,
+            BgpLsAttributeTlv::PeerSetSid(..) => iana::BgpLsAttributeTlvType::PeerSetSid as u16,
+            BgpLsAttributeTlv::Unknown { code, .. } => *code,
         }
     }
 }
@@ -609,8 +619,8 @@ impl BgpLsNlri {
     pub fn nlri(&self) -> &BgpLsNlriValue {
         &self.value
     }
-    pub fn path_id(&self) -> &Option<u32> {
-        &self.path_id
+    pub fn path_id(&self) -> Option<u32> {
+        self.path_id
     }
 }
 
@@ -642,11 +652,11 @@ impl BgpLsVpnNlri {
     pub fn nlri(&self) -> &BgpLsNlriValue {
         &self.value
     }
-    pub fn rd(&self) -> &RouteDistinguisher {
-        &self.rd
+    pub const fn rd(&self) -> RouteDistinguisher {
+        self.rd
     }
-    pub fn path_id(&self) -> &Option<u32> {
-        &self.path_id
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
     }
 }
 
@@ -805,8 +815,8 @@ impl TryFrom<u8> for OspfRouteType {
 /// +------------+------------------------------------------+-----------+
 /// |    Bit     | Description                              | Reference |
 /// +------------+------------------------------------------+-----------+
-/// |    'L'     | Label Distribution Protocol (LDP)        | [RFC5036](https://rfc-editor.org/rfc/rfc5036) |
-/// |    'R'     | Extension to RSVP for LSP Tunnels        | [RFC3209](https://rfc-editor.org/rfc/rfc3209) |
+/// |    'L'     | Label Distribution Protocol (LDP)        | [RFC5036] |
+/// |    'R'     | Extension to RSVP for LSP Tunnels        | [RFC3209] |
 /// |            | (RSVP-TE)                                |           |
 /// | 'Reserved' | Reserved for future use                  |           |
 /// +------------+------------------------------------------+-----------+
@@ -955,20 +965,25 @@ pub enum BgpLsPrefixDescriptorTlv {
     /// ```
     /// see [RFC7752 Section 3.3.2.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
     IpReachabilityInformation(IpReachabilityInformationData),
+    Unknown {
+        code: u16,
+        value: Vec<u8>,
+    },
 }
 
 impl BgpLsPrefixDescriptorTlv {
-    pub fn get_type(&self) -> iana::BgpLsPrefixDescriptorTlvType {
+    pub fn code(&self) -> u16 {
         match self {
             BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(..) => {
-                iana::BgpLsPrefixDescriptorTlvType::MultiTopologyIdentifier
+                iana::BgpLsPrefixDescriptorTlvType::MultiTopologyIdentifier as u16
             }
             BgpLsPrefixDescriptorTlv::OspfRouteType(_) => {
-                iana::BgpLsPrefixDescriptorTlvType::OspfRouteType
+                iana::BgpLsPrefixDescriptorTlvType::OspfRouteType as u16
             }
             BgpLsPrefixDescriptorTlv::IpReachabilityInformation(_) => {
-                iana::BgpLsPrefixDescriptorTlvType::IpReachabilityInformation
+                iana::BgpLsPrefixDescriptorTlvType::IpReachabilityInformation as u16
             }
+            BgpLsPrefixDescriptorTlv::Unknown { code, .. } => *code,
         }
     }
 }
@@ -1061,29 +1076,34 @@ pub enum BgpLsLinkDescriptorTlv {
     /// MUST NOT be local-link
     IPv6NeighborAddress(Ipv6Addr),
     MultiTopologyIdentifier(MultiTopologyIdData),
+    Unknown {
+        code: u16,
+        value: Vec<u8>,
+    },
 }
 
 impl BgpLsLinkDescriptorTlv {
-    pub fn get_type(&self) -> iana::BgpLsLinkDescriptorTlvType {
+    pub fn code(&self) -> u16 {
         match self {
             BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers { .. } => {
-                iana::BgpLsLinkDescriptorTlvType::LinkLocalRemoteIdentifiers
+                iana::BgpLsLinkDescriptorTlvType::LinkLocalRemoteIdentifiers as u16
             }
             BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(..) => {
-                iana::BgpLsLinkDescriptorTlvType::IPv4InterfaceAddress
+                iana::BgpLsLinkDescriptorTlvType::IPv4InterfaceAddress as u16
             }
             BgpLsLinkDescriptorTlv::IPv4NeighborAddress(..) => {
-                iana::BgpLsLinkDescriptorTlvType::IPv4NeighborAddress
+                iana::BgpLsLinkDescriptorTlvType::IPv4NeighborAddress as u16
             }
             BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(..) => {
-                iana::BgpLsLinkDescriptorTlvType::IPv6InterfaceAddress
+                iana::BgpLsLinkDescriptorTlvType::IPv6InterfaceAddress as u16
             }
             BgpLsLinkDescriptorTlv::IPv6NeighborAddress(..) => {
-                iana::BgpLsLinkDescriptorTlvType::IPv6NeighborAddress
+                iana::BgpLsLinkDescriptorTlvType::IPv6NeighborAddress as u16
             }
             BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(..) => {
-                iana::BgpLsLinkDescriptorTlvType::MultiTopologyIdentifier
+                iana::BgpLsLinkDescriptorTlvType::MultiTopologyIdentifier as u16
             }
+            BgpLsLinkDescriptorTlv::Unknown { code, .. } => *code,
         }
     }
 }
@@ -1110,27 +1130,31 @@ pub enum BgpLsNodeDescriptorSubTlv {
     IgpRouterId(Vec<u8>),
     BgpRouterIdentifier(u32),
     MemberAsNumber(u32),
+    Unknown { code: u16, value: Vec<u8> },
 }
 
 impl BgpLsNodeDescriptorSubTlv {
-    pub fn get_type(&self) -> iana::BgpLsNodeDescriptorSubTlv {
+    pub fn code(&self) -> u16 {
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(_) => {
-                iana::BgpLsNodeDescriptorSubTlv::AutonomousSystem
+                iana::BgpLsNodeDescriptorSubTlvType::AutonomousSystem as u16
             }
             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(_) => {
-                iana::BgpLsNodeDescriptorSubTlv::BgpLsIdentifier
+                iana::BgpLsNodeDescriptorSubTlvType::BgpLsIdentifier as u16
             }
-            BgpLsNodeDescriptorSubTlv::OspfAreaId(_) => iana::BgpLsNodeDescriptorSubTlv::OspfAreaId,
+            BgpLsNodeDescriptorSubTlv::OspfAreaId(_) => {
+                iana::BgpLsNodeDescriptorSubTlvType::OspfAreaId as u16
+            }
             BgpLsNodeDescriptorSubTlv::IgpRouterId(_) => {
-                iana::BgpLsNodeDescriptorSubTlv::IgpRouterId
+                iana::BgpLsNodeDescriptorSubTlvType::IgpRouterId as u16
             }
             BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(_) => {
-                iana::BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier
+                iana::BgpLsNodeDescriptorSubTlvType::BgpRouterIdentifier as u16
             }
             BgpLsNodeDescriptorSubTlv::MemberAsNumber(_) => {
-                iana::BgpLsNodeDescriptorSubTlv::MemberAsNumber
+                iana::BgpLsNodeDescriptorSubTlvType::MemberAsNumber as u16
             }
+            BgpLsNodeDescriptorSubTlv::Unknown { code, .. } => *code,
         }
     }
 }

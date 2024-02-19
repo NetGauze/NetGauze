@@ -84,7 +84,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNlri {
         Self: Sized,
     {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(*path_id)?;
+            writer.write_u32::<NetworkEndian>(path_id)?;
         }
         let nlri = self.nlri();
 
@@ -110,7 +110,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsVpnNlri {
         Self: Sized,
     {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(*path_id)?;
+            writer.write_u32::<NetworkEndian>(path_id)?;
         }
 
         // do not count add_path length since it is before the tlv
@@ -249,6 +249,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsPrefixDescriptorTlv {
                 BgpLsPrefixDescriptorTlv::IpReachabilityInformation(ip_reachability) => {
                     ip_reachability.len()
                 }
+                BgpLsPrefixDescriptorTlv::Unknown { value, .. } => value.len(),
             }
     }
 
@@ -256,11 +257,12 @@ impl WritablePdu<BgpLsWritingError> for BgpLsPrefixDescriptorTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+        write_tlv_header(writer, self.code(), self.len() as u16)?;
         match self {
             BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(data) => data.write(writer)?,
             BgpLsPrefixDescriptorTlv::OspfRouteType(data) => writer.write_u8(*data as u8)?,
             BgpLsPrefixDescriptorTlv::IpReachabilityInformation(data) => data.write(writer)?,
+            BgpLsPrefixDescriptorTlv::Unknown { value, .. } => writer.write_all(value)?,
         }
 
         Ok(())
@@ -302,6 +304,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
                 BgpLsAttributeTlv::PeerNodeSid(value) => value.len(),
                 BgpLsAttributeTlv::PeerAdjSid(value) => value.len(),
                 BgpLsAttributeTlv::PeerSetSid(value) => value.len(),
+                BgpLsAttributeTlv::Unknown { value, .. } => value.len(),
             }
     }
 
@@ -309,7 +312,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+        write_tlv_header(writer, self.code(), self.len() as u16)?;
 
         match self {
             BgpLsAttributeTlv::LocalNodeIpv4RouterId(ipv4) => writer.write_all(&ipv4.octets())?,
@@ -480,6 +483,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsAttributeTlv {
             BgpLsAttributeTlv::PeerNodeSid(value) => value.write(writer)?,
             BgpLsAttributeTlv::PeerAdjSid(value) => value.write(writer)?,
             BgpLsAttributeTlv::PeerSetSid(value) => value.write(writer)?,
+            BgpLsAttributeTlv::Unknown { value, .. } => writer.write_all(value)?,
         }
 
         Ok(())
@@ -538,6 +542,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsLinkDescriptorTlv {
                 BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(..) => 16,
                 BgpLsLinkDescriptorTlv::IPv6NeighborAddress(..) => 16,
                 BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(data) => data.len(),
+                BgpLsLinkDescriptorTlv::Unknown { value, .. } => value.len(),
             }
     }
 
@@ -545,7 +550,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsLinkDescriptorTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+        write_tlv_header(writer, self.code(), self.len() as u16)?;
 
         match self {
             BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers {
@@ -568,6 +573,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsLinkDescriptorTlv {
                 writer.write_all(&ipv6.octets())?
             }
             BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(data) => data.write(writer)?,
+            BgpLsLinkDescriptorTlv::Unknown { value, .. } => writer.write_all(value)?,
         };
 
         Ok(())
@@ -586,6 +592,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
                 BgpLsNodeDescriptorSubTlv::IgpRouterId(inner) => inner.len(),
                 BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(_) => 4,
                 BgpLsNodeDescriptorSubTlv::MemberAsNumber(_) => 4,
+                BgpLsNodeDescriptorSubTlv::Unknown { value, .. } => value.len(),
             }
     }
 
@@ -593,7 +600,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+        write_tlv_header(writer, self.code(), self.len() as u16)?;
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(data) => {
                 writer.write_u32::<NetworkEndian>(*data)?
@@ -611,6 +618,7 @@ impl WritablePdu<BgpLsWritingError> for BgpLsNodeDescriptorSubTlv {
             BgpLsNodeDescriptorSubTlv::MemberAsNumber(data) => {
                 writer.write_u32::<NetworkEndian>(*data)?
             }
+            BgpLsNodeDescriptorSubTlv::Unknown { value, .. } => writer.write_all(value)?,
         };
 
         Ok(())
