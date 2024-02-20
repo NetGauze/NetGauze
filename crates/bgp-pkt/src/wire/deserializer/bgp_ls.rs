@@ -14,13 +14,6 @@
 // limitations under the License.
 
 use crate::{
-    bgp_ls::{
-        BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
-        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-        BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
-        IpReachabilityInformationData, LinkProtectionType, MplsProtocolMask, MultiTopologyId,
-        MultiTopologyIdData, OspfRouteType, SharedRiskLinkGroupValue, UnknownOspfRouteType,
-    },
     iana,
     iana::{
         BgpLsAttributeTlvType, BgpLsAttributeTlvTypeError, BgpLsIanaValueError,
@@ -29,6 +22,14 @@ use crate::{
         BgpLsPrefixDescriptorTlvType, BgpLsProtocolIdError, LinkDescriptorTlvTypeError,
         NodeDescriptorSubTlvTypeError, PrefixDescriptorTlvTypeError, UnknownBgpLsNlriType,
     },
+    nlri::{
+        BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
+        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptorTlv,
+        BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags, IpReachabilityInformationData,
+        LinkProtectionType, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
+        SharedRiskLinkGroupValue, UnknownOspfRouteType,
+    },
+    path_attribute::{BgpLsAttribute, BgpLsAttributeTlv, BgpLsPeerSid},
     wire::{
         deserializer::{
             nlri::{MplsLabelParsingError, RouteDistinguisherParsingError},

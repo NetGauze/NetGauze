@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::{
-    bgp_ls::{
-        BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
-        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-        BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags,
-        IpReachabilityInformationData, LinkProtectionType, MplsProtocolMask, MultiTopologyId,
-        MultiTopologyIdData,
-    },
     iana::BgpLsNodeFlagsBits,
+    nlri::{
+        BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
+        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptorTlv,
+        BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags, IpReachabilityInformationData,
+        LinkProtectionType, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData,
+    },
+    path_attribute::{BgpLsAttribute, BgpLsAttributeTlv, BgpLsPeerSid},
     wire::serializer::{
         nlri::{MplsLabelWritingError, RouteDistinguisherWritingError},
         path_attribute::write_length,

@@ -18,9 +18,8 @@
 use crate::bgp_ls::{BgpLsNlri, BgpLsVpnNlri};
 use crate::wire::serializer::bgp_ls::BgpLsWritingError;
 use crate::{
-    bgp_ls::{BgpLsNlri, BgpLsVpnNlri},
     iana::{AigpAttributeType, PathAttributeType},
-    nlri::*,
+    nlri::{BgpLsNlri, BgpLsVpnNlri, *},
     path_attribute::*,
     wire::{
         serializer::{bgp_ls::BgpLsWritingError, community::*, nlri::*, IpAddrWritingError},

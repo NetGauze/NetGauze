@@ -19,9 +19,9 @@
 #[cfg(feature = "fuzz")]
 use crate::arbitrary_ip;
 use crate::{
-    bgp_ls::{BgpLsAttribute, BgpLsNlri, BgpLsVpnNlri},
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
     nlri::*,
+    path_attribute::BgpLsAttribute,
 };
 use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 use serde::{Deserialize, Serialize};

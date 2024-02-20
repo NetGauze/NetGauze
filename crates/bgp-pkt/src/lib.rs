@@ -21,7 +21,6 @@ use crate::{
 };
 use ::serde::{Deserialize, Serialize};
 
-pub mod bgp_ls;
 pub mod capabilities;
 pub mod community;
 pub mod iana;

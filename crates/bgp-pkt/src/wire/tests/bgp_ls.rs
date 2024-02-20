@@ -14,14 +14,17 @@
 // limitations under the License.
 
 use crate::{
-    bgp_ls::{
-        BgpLsAttribute, BgpLsAttributeTlv, BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix,
-        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-        BgpLsNodeDescriptorTlv, BgpLsPeerSid, BgpLsPrefixDescriptorTlv, BgpLsVpnNlri,
-        IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
-    },
     iana::{BgpLsProtocolId, BgpLsSidAttributeFlags},
-    path_attribute::{MpReach, MpUnreach, PathAttribute, PathAttributeValue},
+    nlri::{
+        BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
+        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptorTlv,
+        BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IpReachabilityInformationData, MultiTopologyId,
+        MultiTopologyIdData, OspfRouteType,
+    },
+    path_attribute::{
+        BgpLsAttribute, BgpLsAttributeTlv, BgpLsPeerSid, MpReach, MpUnreach, PathAttribute,
+        PathAttributeValue,
+    },
 };
 use netgauze_parse_utils::test_helpers::{
     test_parsed_completely_with_one_input, test_parsed_completely_with_three_inputs, test_write,
