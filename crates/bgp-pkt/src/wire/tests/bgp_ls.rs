@@ -16,13 +16,13 @@
 use crate::{
     iana::{BgpLsProtocolId, BgpLsSidAttributeFlags},
     nlri::{
-        BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
-        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptorTlv,
-        BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IpReachabilityInformationData, MultiTopologyId,
+        BgpLsLinkDescriptor, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
+        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptor,
+        BgpLsPrefixDescriptor, BgpLsVpnNlri, IpReachabilityInformationData, MultiTopologyId,
         MultiTopologyIdData, OspfRouteType,
     },
     path_attribute::{
-        BgpLsAttribute, BgpLsAttributeTlv, BgpLsPeerSid, MpReach, MpUnreach, PathAttribute,
+        BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, MpReach, MpUnreach, PathAttribute,
         PathAttributeValue,
     },
 };
@@ -79,7 +79,7 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
                     value: BgpLsNlriValue::Node(BgpLsNlriNode {
                         protocol_id: BgpLsProtocolId::IsIsLevel1,
                         identifier: 0,
-                        local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+                        local_node_descriptors: BgpLsNodeDescriptor::Local(vec![
                             BgpLsNodeDescriptorSubTlv::AutonomousSystem(65536),
                             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(0),
                             BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![0, 0, 0, 0, 0, 9, 1]),
@@ -91,7 +91,7 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
                     value: BgpLsNlriValue::Node(BgpLsNlriNode {
                         protocol_id: BgpLsProtocolId::IsIsLevel1,
                         identifier: 0,
-                        local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+                        local_node_descriptors: BgpLsNodeDescriptor::Local(vec![
                             BgpLsNodeDescriptorSubTlv::AutonomousSystem(65536),
                             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(0),
                             BgpLsNodeDescriptorSubTlv::IgpRouterId(vec![0, 0, 0, 0, 0, 1, 3]),
@@ -128,7 +128,7 @@ pub fn test_bgp_ls_attr_parse() -> Result<(), BgpLsWritingError> {
     ];
 
     let good = BgpLsAttribute {
-        tlvs: vec![BgpLsAttributeTlv::LinkName("My Super Link".to_string())],
+        attributes: vec![BgpLsAttributeValue::LinkName("My Super Link".to_string())],
     };
 
     test_parsed_completely_with_one_input(&good_wire, false, &good);
@@ -148,13 +148,13 @@ pub fn test_bgp_ls_nlri_parse() -> Result<(), BgpLsWritingError> {
         value: BgpLsNlriValue::Link(BgpLsNlriLink {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
             identifier: 69,
-            local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+            local_node_descriptors: BgpLsNodeDescriptor::Local(vec![
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(18),
             ]),
-            remote_node_descriptors: BgpLsNodeDescriptorTlv::Remote(vec![
+            remote_node_descriptors: BgpLsNodeDescriptor::Remote(vec![
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(21),
             ]),
-            link_descriptor_tlvs: vec![BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(
+            link_descriptors: vec![BgpLsLinkDescriptor::IPv4InterfaceAddress(
                 Ipv4Addr::new(1, 2, 3, 4),
             )],
         }),
@@ -178,18 +178,18 @@ pub fn test_bgp_ls_nlri_ipv4_parse() -> Result<(), BgpLsWritingError> {
         value: BgpLsNlriValue::Ipv4Prefix(BgpLsNlriIpPrefix {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
             identifier: 69,
-            local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+            local_node_descriptors: BgpLsNodeDescriptor::Local(vec![
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(18),
             ]),
-            prefix_descriptor_tlvs: vec![
-                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(
+            prefix_descriptors: vec![
+                BgpLsPrefixDescriptor::IpReachabilityInformation(IpReachabilityInformationData(
                     IpNet::V4(Ipv4Net::new(Ipv4Addr::new(1, 2, 3, 4), 32).unwrap()),
                 )),
-                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                BgpLsPrefixDescriptor::MultiTopologyIdentifier(MultiTopologyIdData(vec![
                     MultiTopologyId(69),
                     MultiTopologyId(21),
                 ])),
-                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+                BgpLsPrefixDescriptor::OspfRouteType(OspfRouteType::External2),
             ],
         }),
     };
@@ -213,18 +213,18 @@ pub fn test_bgp_ls_nlri_ipv6_parse() -> Result<(), BgpLsWritingError> {
         value: BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
             identifier: 69,
-            local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+            local_node_descriptors: BgpLsNodeDescriptor::Local(vec![
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(18),
             ]),
-            prefix_descriptor_tlvs: vec![
-                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(
+            prefix_descriptors: vec![
+                BgpLsPrefixDescriptor::IpReachabilityInformation(IpReachabilityInformationData(
                     IpNet::V6(Ipv6Net::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8), 128).unwrap()),
                 )),
-                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                BgpLsPrefixDescriptor::MultiTopologyIdentifier(MultiTopologyIdData(vec![
                     MultiTopologyId(69),
                     MultiTopologyId(21),
                 ])),
-                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+                BgpLsPrefixDescriptor::OspfRouteType(OspfRouteType::External2),
             ],
         }),
     };
@@ -252,18 +252,18 @@ pub fn test_bgp_ls_mp_reach() -> Result<(), MpReachWritingError> {
         value: BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
             identifier: 69,
-            local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+            local_node_descriptors: BgpLsNodeDescriptor::Local(vec![
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(18),
             ]),
-            prefix_descriptor_tlvs: vec![
-                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(
+            prefix_descriptors: vec![
+                BgpLsPrefixDescriptor::IpReachabilityInformation(IpReachabilityInformationData(
                     IpNet::V6(Ipv6Net::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8), 128).unwrap()),
                 )),
-                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                BgpLsPrefixDescriptor::MultiTopologyIdentifier(MultiTopologyIdData(vec![
                     MultiTopologyId(69),
                     MultiTopologyId(21),
                 ])),
-                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+                BgpLsPrefixDescriptor::OspfRouteType(OspfRouteType::External2),
             ],
         }),
     };
@@ -307,18 +307,18 @@ pub fn test_bgp_ls_vpn_mp_reach() -> Result<(), MpReachWritingError> {
         value: BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
             identifier: 69,
-            local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+            local_node_descriptors: BgpLsNodeDescriptor::Local(vec![
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(18),
             ]),
-            prefix_descriptor_tlvs: vec![
-                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(
+            prefix_descriptors: vec![
+                BgpLsPrefixDescriptor::IpReachabilityInformation(IpReachabilityInformationData(
                     IpNet::V6(Ipv6Net::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8), 128).unwrap()),
                 )),
-                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                BgpLsPrefixDescriptor::MultiTopologyIdentifier(MultiTopologyIdData(vec![
                     MultiTopologyId(69),
                     MultiTopologyId(21),
                 ])),
-                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+                BgpLsPrefixDescriptor::OspfRouteType(OspfRouteType::External2),
             ],
         }),
     };
@@ -365,18 +365,18 @@ pub fn test_bgp_ls_vpn_mp_unreach() -> Result<(), MpUnreachWritingError> {
         value: BgpLsNlriValue::Ipv6Prefix(BgpLsNlriIpPrefix {
             protocol_id: BgpLsProtocolId::IsIsLevel1,
             identifier: 69,
-            local_node_descriptors: BgpLsNodeDescriptorTlv::Local(vec![
+            local_node_descriptors: BgpLsNodeDescriptor::Local(vec![
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(18),
             ]),
-            prefix_descriptor_tlvs: vec![
-                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(IpReachabilityInformationData(
+            prefix_descriptors: vec![
+                BgpLsPrefixDescriptor::IpReachabilityInformation(IpReachabilityInformationData(
                     IpNet::V6(Ipv6Net::new(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8), 128).unwrap()),
                 )),
-                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(MultiTopologyIdData(vec![
+                BgpLsPrefixDescriptor::MultiTopologyIdentifier(MultiTopologyIdData(vec![
                     MultiTopologyId(69),
                     MultiTopologyId(21),
                 ])),
-                BgpLsPrefixDescriptorTlv::OspfRouteType(OspfRouteType::External2),
+                BgpLsPrefixDescriptor::OspfRouteType(OspfRouteType::External2),
             ],
         }),
     };
@@ -408,18 +408,18 @@ pub fn test_bgp_ls_sid() -> Result<(), BgpLsWritingError> {
     ];
 
     let good = BgpLsAttribute {
-        tlvs: vec![
-            BgpLsAttributeTlv::PeerNodeSid(BgpLsPeerSid::new_index_value(
+        attributes: vec![
+            BgpLsAttributeValue::PeerNodeSid(BgpLsPeerSid::new_index_value(
                 BgpLsSidAttributeFlags::BackupFlag as u8,
                 69,
                 32,
             )),
-            BgpLsAttributeTlv::PeerAdjSid(BgpLsPeerSid::new_index_value(
+            BgpLsAttributeValue::PeerAdjSid(BgpLsPeerSid::new_index_value(
                 BgpLsSidAttributeFlags::BackupFlag as u8,
                 169,
                 64,
             )),
-            BgpLsAttributeTlv::PeerSetSid(BgpLsPeerSid::new_label_value(
+            BgpLsAttributeValue::PeerSetSid(BgpLsPeerSid::new_label_value(
                 BgpLsSidAttributeFlags::BackupFlag as u8,
                 69,
                 MplsLabel::new([1, 2, 3]),

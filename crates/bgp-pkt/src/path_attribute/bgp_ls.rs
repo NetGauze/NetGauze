@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    iana::{BgpLsAttributeTlvType, BgpLsSidAttributeFlags},
+    iana::{BgpLsAttributeType, BgpLsSidAttributeFlags},
     nlri::{MplsLabel, MultiTopologyIdData, SharedRiskLinkGroupValue},
     path_attribute::PathAttributeValueProperties,
 };
@@ -23,13 +23,13 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     ops::{BitAnd, BitOr},
 };
-use strum_macros::Display;
+use strum_macros::{Display, FromRepr};
 
 /// The BGP Link-State Attribute. see [RFC7752 Section 3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BgpLsAttribute {
-    pub tlvs: Vec<BgpLsAttributeTlv>,
+    pub attributes: Vec<BgpLsAttributeValue>,
 }
 
 impl PathAttributeValueProperties for BgpLsAttribute {
@@ -51,7 +51,7 @@ impl PathAttributeValueProperties for BgpLsAttribute {
 
 #[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BgpLsAttributeTlv {
+pub enum BgpLsAttributeValue {
     /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
     LocalNodeIpv4RouterId(Ipv4Addr),
@@ -423,6 +423,32 @@ pub enum BgpLsAttributeTlv {
 }
 
 /// ```text
+///  0                   1
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |Protection Cap |    Reserved   |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// Protection Cap:
+/// 0x01  Extra Traffic
+/// 0x02  Unprotected
+/// 0x04  Shared
+/// 0x08  Dedicated 1:1
+/// 0x10  Dedicated 1+1
+/// ```
+///
+/// see [RFC5307 Section 1.2](https://www.rfc-editor.org/rfc/rfc5307#section-1.2)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum LinkProtectionType {
+    ExtraTraffic = 0x01,
+    Unprotected = 0x02,
+    Shared = 0x04,
+    Dedicated1c1 = 0x08,
+    Dedicated1p1 = 0x10,
+    Enhanced = 0x20,
+}
+
+/// ```text
 ///  0                   1                   2                   3
 ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -512,75 +538,75 @@ impl BgpLsPeerSid {
     }
 }
 
-impl BgpLsAttributeTlv {
+impl BgpLsAttributeValue {
     pub const NODE_NAME_TLV_MAX_LEN: u8 = 255;
 
-    pub const fn code(&self) -> Result<BgpLsAttributeTlvType, u16> {
+    pub const fn code(&self) -> Result<BgpLsAttributeType, u16> {
         match self {
-            BgpLsAttributeTlv::LocalNodeIpv4RouterId(_) => {
-                Ok(BgpLsAttributeTlvType::LocalNodeIpv4RouterId)
+            BgpLsAttributeValue::LocalNodeIpv4RouterId(_) => {
+                Ok(BgpLsAttributeType::LocalNodeIpv4RouterId)
             }
-            BgpLsAttributeTlv::LocalNodeIpv6RouterId(_) => {
-                Ok(BgpLsAttributeTlvType::LocalNodeIpv6RouterId)
+            BgpLsAttributeValue::LocalNodeIpv6RouterId(_) => {
+                Ok(BgpLsAttributeType::LocalNodeIpv6RouterId)
             }
-            BgpLsAttributeTlv::RemoteNodeIpv4RouterId(_) => {
-                Ok(BgpLsAttributeTlvType::RemoteNodeIpv4RouterId)
+            BgpLsAttributeValue::RemoteNodeIpv4RouterId(_) => {
+                Ok(BgpLsAttributeType::RemoteNodeIpv4RouterId)
             }
-            BgpLsAttributeTlv::RemoteNodeIpv6RouterId(_) => {
-                Ok(BgpLsAttributeTlvType::RemoteNodeIpv6RouterId)
+            BgpLsAttributeValue::RemoteNodeIpv6RouterId(_) => {
+                Ok(BgpLsAttributeType::RemoteNodeIpv6RouterId)
             }
-            BgpLsAttributeTlv::RemoteNodeAdministrativeGroupColor(_) => {
-                Ok(BgpLsAttributeTlvType::RemoteNodeAdministrativeGroupColor)
+            BgpLsAttributeValue::RemoteNodeAdministrativeGroupColor(_) => {
+                Ok(BgpLsAttributeType::RemoteNodeAdministrativeGroupColor)
             }
-            BgpLsAttributeTlv::MaximumLinkBandwidth(_) => {
-                Ok(BgpLsAttributeTlvType::MaximumLinkBandwidth)
+            BgpLsAttributeValue::MaximumLinkBandwidth(_) => {
+                Ok(BgpLsAttributeType::MaximumLinkBandwidth)
             }
-            BgpLsAttributeTlv::MaximumReservableLinkBandwidth(_) => {
-                Ok(BgpLsAttributeTlvType::MaximumReservableLinkBandwidth)
+            BgpLsAttributeValue::MaximumReservableLinkBandwidth(_) => {
+                Ok(BgpLsAttributeType::MaximumReservableLinkBandwidth)
             }
-            BgpLsAttributeTlv::UnreservedBandwidth(_) => {
-                Ok(BgpLsAttributeTlvType::UnreservedBandwidth)
+            BgpLsAttributeValue::UnreservedBandwidth(_) => {
+                Ok(BgpLsAttributeType::UnreservedBandwidth)
             }
-            BgpLsAttributeTlv::TeDefaultMetric(_) => Ok(BgpLsAttributeTlvType::TeDefaultMetric),
-            BgpLsAttributeTlv::LinkProtectionType { .. } => {
-                Ok(BgpLsAttributeTlvType::LinkProtectionType)
+            BgpLsAttributeValue::TeDefaultMetric(_) => Ok(BgpLsAttributeType::TeDefaultMetric),
+            BgpLsAttributeValue::LinkProtectionType { .. } => {
+                Ok(BgpLsAttributeType::LinkProtectionType)
             }
-            BgpLsAttributeTlv::MplsProtocolMask { .. } => {
-                Ok(BgpLsAttributeTlvType::MplsProtocolMask)
+            BgpLsAttributeValue::MplsProtocolMask { .. } => {
+                Ok(BgpLsAttributeType::MplsProtocolMask)
             }
-            BgpLsAttributeTlv::IgpMetric(..) => Ok(BgpLsAttributeTlvType::IgpMetric),
-            BgpLsAttributeTlv::SharedRiskLinkGroup(..) => {
-                Ok(BgpLsAttributeTlvType::SharedRiskLinkGroup)
+            BgpLsAttributeValue::IgpMetric(..) => Ok(BgpLsAttributeType::IgpMetric),
+            BgpLsAttributeValue::SharedRiskLinkGroup(..) => {
+                Ok(BgpLsAttributeType::SharedRiskLinkGroup)
             }
-            BgpLsAttributeTlv::OpaqueLinkAttribute(..) => {
-                Ok(BgpLsAttributeTlvType::OpaqueLinkAttribute)
+            BgpLsAttributeValue::OpaqueLinkAttribute(..) => {
+                Ok(BgpLsAttributeType::OpaqueLinkAttribute)
             }
-            BgpLsAttributeTlv::LinkName(..) => Ok(BgpLsAttributeTlvType::LinkName),
-            BgpLsAttributeTlv::IgpFlags { .. } => Ok(BgpLsAttributeTlvType::IgpFlags),
-            BgpLsAttributeTlv::IgpRouteTag(_) => Ok(BgpLsAttributeTlvType::IgpRouteTag),
-            BgpLsAttributeTlv::IgpExtendedRouteTag(_) => {
-                Ok(BgpLsAttributeTlvType::IgpExtendedRouteTag)
+            BgpLsAttributeValue::LinkName(..) => Ok(BgpLsAttributeType::LinkName),
+            BgpLsAttributeValue::IgpFlags { .. } => Ok(BgpLsAttributeType::IgpFlags),
+            BgpLsAttributeValue::IgpRouteTag(_) => Ok(BgpLsAttributeType::IgpRouteTag),
+            BgpLsAttributeValue::IgpExtendedRouteTag(_) => {
+                Ok(BgpLsAttributeType::IgpExtendedRouteTag)
             }
-            BgpLsAttributeTlv::PrefixMetric(_) => Ok(BgpLsAttributeTlvType::PrefixMetric),
-            BgpLsAttributeTlv::OspfForwardingAddress(_) => {
-                Ok(BgpLsAttributeTlvType::OspfForwardingAddress)
+            BgpLsAttributeValue::PrefixMetric(_) => Ok(BgpLsAttributeType::PrefixMetric),
+            BgpLsAttributeValue::OspfForwardingAddress(_) => {
+                Ok(BgpLsAttributeType::OspfForwardingAddress)
             }
-            BgpLsAttributeTlv::OpaquePrefixAttribute(_) => {
-                Ok(BgpLsAttributeTlvType::OpaquePrefixAttribute)
+            BgpLsAttributeValue::OpaquePrefixAttribute(_) => {
+                Ok(BgpLsAttributeType::OpaquePrefixAttribute)
             }
-            BgpLsAttributeTlv::MultiTopologyIdentifier(..) => {
-                Ok(BgpLsAttributeTlvType::MultiTopologyIdentifier)
+            BgpLsAttributeValue::MultiTopologyIdentifier(..) => {
+                Ok(BgpLsAttributeType::MultiTopologyIdentifier)
             }
-            BgpLsAttributeTlv::NodeFlagBits { .. } => Ok(BgpLsAttributeTlvType::NodeFlagBits),
-            BgpLsAttributeTlv::OpaqueNodeAttribute(..) => {
-                Ok(BgpLsAttributeTlvType::OpaqueNodeAttribute)
+            BgpLsAttributeValue::NodeFlagBits { .. } => Ok(BgpLsAttributeType::NodeFlagBits),
+            BgpLsAttributeValue::OpaqueNodeAttribute(..) => {
+                Ok(BgpLsAttributeType::OpaqueNodeAttribute)
             }
-            BgpLsAttributeTlv::NodeNameTlv(..) => Ok(BgpLsAttributeTlvType::NodeNameTlv),
-            BgpLsAttributeTlv::IsIsArea(..) => Ok(BgpLsAttributeTlvType::IsIsArea),
-            BgpLsAttributeTlv::PeerNodeSid(..) => Ok(BgpLsAttributeTlvType::PeerNodeSid),
-            BgpLsAttributeTlv::PeerAdjSid(..) => Ok(BgpLsAttributeTlvType::PeerAdjSid),
-            BgpLsAttributeTlv::PeerSetSid(..) => Ok(BgpLsAttributeTlvType::PeerSetSid),
-            BgpLsAttributeTlv::Unknown { code, .. } => Err(*code),
+            BgpLsAttributeValue::NodeNameTlv(..) => Ok(BgpLsAttributeType::NodeNameTlv),
+            BgpLsAttributeValue::IsIsArea(..) => Ok(BgpLsAttributeType::IsIsArea),
+            BgpLsAttributeValue::PeerNodeSid(..) => Ok(BgpLsAttributeType::PeerNodeSid),
+            BgpLsAttributeValue::PeerAdjSid(..) => Ok(BgpLsAttributeType::PeerAdjSid),
+            BgpLsAttributeValue::PeerSetSid(..) => Ok(BgpLsAttributeType::PeerSetSid),
+            BgpLsAttributeValue::Unknown { code, .. } => Err(*code),
         }
     }
 

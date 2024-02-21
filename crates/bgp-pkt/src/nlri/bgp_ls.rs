@@ -16,9 +16,9 @@
 use crate::{
     iana,
     iana::{
-        BgpLsLinkDescriptorTlvType, BgpLsNodeDescriptorSubTlvType, BgpLsNodeDescriptorTlvType,
-        BgpLsNodeDescriptorTlvType::{LocalNodeDescriptor, RemoteNodeDescriptor},
-        BgpLsPrefixDescriptorTlvType, BgpLsProtocolId,
+        BgpLsLinkDescriptorType, BgpLsNodeDescriptorSubType, BgpLsNodeDescriptorType,
+        BgpLsNodeDescriptorType::{LocalNodeDescriptor, RemoteNodeDescriptor},
+        BgpLsPrefixDescriptorType, BgpLsProtocolId,
     },
     nlri::RouteDistinguisher,
 };
@@ -209,8 +209,8 @@ impl BgpLsNlriValue {
 pub struct BgpLsNlriIpPrefix {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptors: BgpLsNodeDescriptorTlv,
-    pub prefix_descriptor_tlvs: Vec<BgpLsPrefixDescriptorTlv>,
+    pub local_node_descriptors: BgpLsNodeDescriptor,
+    pub prefix_descriptors: Vec<BgpLsPrefixDescriptor>,
 }
 
 #[repr(u8)]
@@ -262,32 +262,6 @@ impl TryFrom<u8> for OspfRouteType {
 pub enum MplsProtocolMask {
     LabelDistributionProtocol = 0b_1000_0000,
     ExtensionToRsvpForLspTunnels = 0b_0100_0000,
-}
-
-/// ```text
-///  0                   1
-///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
-/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-/// |Protection Cap |    Reserved   |
-/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-/// Protection Cap:
-/// 0x01  Extra Traffic
-/// 0x02  Unprotected
-/// 0x04  Shared
-/// 0x08  Dedicated 1:1
-/// 0x10  Dedicated 1+1
-/// ```
-///
-/// see [RFC5307 Section 1.2](https://www.rfc-editor.org/rfc/rfc5307#section-1.2)
-#[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum LinkProtectionType {
-    ExtraTraffic = 0x01,
-    Unprotected = 0x02,
-    Shared = 0x04,
-    Dedicated1c1 = 0x08,
-    Dedicated1p1 = 0x10,
-    Enhanced = 0x20,
 }
 
 /// ```text
@@ -353,7 +327,7 @@ impl IpReachabilityInformationData {
 
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BgpLsPrefixDescriptorTlv {
+pub enum BgpLsPrefixDescriptor {
     /// The format of the MT-ID TLV is shown in the following figure.
     ///
     /// ```text
@@ -406,19 +380,19 @@ pub enum BgpLsPrefixDescriptorTlv {
     },
 }
 
-impl BgpLsPrefixDescriptorTlv {
-    pub const fn code(&self) -> Result<BgpLsPrefixDescriptorTlvType, u16> {
+impl BgpLsPrefixDescriptor {
+    pub const fn code(&self) -> Result<BgpLsPrefixDescriptorType, u16> {
         match self {
-            BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(..) => {
-                Ok(BgpLsPrefixDescriptorTlvType::MultiTopologyIdentifier)
+            BgpLsPrefixDescriptor::MultiTopologyIdentifier(..) => {
+                Ok(BgpLsPrefixDescriptorType::MultiTopologyIdentifier)
             }
-            BgpLsPrefixDescriptorTlv::OspfRouteType(_) => {
-                Ok(BgpLsPrefixDescriptorTlvType::OspfRouteType)
+            BgpLsPrefixDescriptor::OspfRouteType(_) => {
+                Ok(BgpLsPrefixDescriptorType::OspfRouteType)
             }
-            BgpLsPrefixDescriptorTlv::IpReachabilityInformation(_) => {
-                Ok(BgpLsPrefixDescriptorTlvType::IpReachabilityInformation)
+            BgpLsPrefixDescriptor::IpReachabilityInformation(_) => {
+                Ok(BgpLsPrefixDescriptorType::IpReachabilityInformation)
             }
-            BgpLsPrefixDescriptorTlv::Unknown { code, .. } => Err(*code),
+            BgpLsPrefixDescriptor::Unknown { code, .. } => Err(*code),
         }
     }
 
@@ -448,7 +422,7 @@ impl BgpLsPrefixDescriptorTlv {
 pub struct BgpLsNlriNode {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptors: BgpLsNodeDescriptorTlv,
+    pub local_node_descriptors: BgpLsNodeDescriptor,
 }
 
 /// ```text
@@ -464,22 +438,22 @@ pub struct BgpLsNlriNode {
 /// ```
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BgpLsNodeDescriptorTlv {
+pub enum BgpLsNodeDescriptor {
     Local(Vec<BgpLsNodeDescriptorSubTlv>),
     Remote(Vec<BgpLsNodeDescriptorSubTlv>),
 }
 
-impl BgpLsNodeDescriptorTlv {
-    pub fn get_type(&self) -> BgpLsNodeDescriptorTlvType {
+impl BgpLsNodeDescriptor {
+    pub fn get_type(&self) -> BgpLsNodeDescriptorType {
         match self {
-            BgpLsNodeDescriptorTlv::Local(_) => LocalNodeDescriptor,
-            BgpLsNodeDescriptorTlv::Remote(_) => RemoteNodeDescriptor,
+            BgpLsNodeDescriptor::Local(_) => LocalNodeDescriptor,
+            BgpLsNodeDescriptor::Remote(_) => RemoteNodeDescriptor,
         }
     }
 
     pub fn subtlvs(&self) -> &[BgpLsNodeDescriptorSubTlv] {
         match self {
-            BgpLsNodeDescriptorTlv::Local(subtlvs) | BgpLsNodeDescriptorTlv::Remote(subtlvs) => {
+            BgpLsNodeDescriptor::Local(subtlvs) | BgpLsNodeDescriptor::Remote(subtlvs) => {
                 subtlvs
             }
         }
@@ -493,7 +467,7 @@ impl BgpLsNodeDescriptorTlv {
 /// see [RFC7752 Section 3.2.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BgpLsLinkDescriptorTlv {
+pub enum BgpLsLinkDescriptor {
     /// ```text
     ///  0                   1                   2                   3
     ///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -524,28 +498,28 @@ pub enum BgpLsLinkDescriptorTlv {
     },
 }
 
-impl BgpLsLinkDescriptorTlv {
-    pub const fn code(&self) -> Result<BgpLsLinkDescriptorTlvType, u16> {
+impl BgpLsLinkDescriptor {
+    pub const fn code(&self) -> Result<BgpLsLinkDescriptorType, u16> {
         match self {
-            BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers { .. } => {
-                Ok(BgpLsLinkDescriptorTlvType::LinkLocalRemoteIdentifiers)
+            BgpLsLinkDescriptor::LinkLocalRemoteIdentifiers { .. } => {
+                Ok(BgpLsLinkDescriptorType::LinkLocalRemoteIdentifiers)
             }
-            BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(..) => {
-                Ok(BgpLsLinkDescriptorTlvType::IPv4InterfaceAddress)
+            BgpLsLinkDescriptor::IPv4InterfaceAddress(..) => {
+                Ok(BgpLsLinkDescriptorType::IPv4InterfaceAddress)
             }
-            BgpLsLinkDescriptorTlv::IPv4NeighborAddress(..) => {
-                Ok(BgpLsLinkDescriptorTlvType::IPv4NeighborAddress)
+            BgpLsLinkDescriptor::IPv4NeighborAddress(..) => {
+                Ok(BgpLsLinkDescriptorType::IPv4NeighborAddress)
             }
-            BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(..) => {
-                Ok(BgpLsLinkDescriptorTlvType::IPv6InterfaceAddress)
+            BgpLsLinkDescriptor::IPv6InterfaceAddress(..) => {
+                Ok(BgpLsLinkDescriptorType::IPv6InterfaceAddress)
             }
-            BgpLsLinkDescriptorTlv::IPv6NeighborAddress(..) => {
-                Ok(BgpLsLinkDescriptorTlvType::IPv6NeighborAddress)
+            BgpLsLinkDescriptor::IPv6NeighborAddress(..) => {
+                Ok(BgpLsLinkDescriptorType::IPv6NeighborAddress)
             }
-            BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(..) => {
-                Ok(BgpLsLinkDescriptorTlvType::MultiTopologyIdentifier)
+            BgpLsLinkDescriptor::MultiTopologyIdentifier(..) => {
+                Ok(BgpLsLinkDescriptorType::MultiTopologyIdentifier)
             }
-            BgpLsLinkDescriptorTlv::Unknown { code, .. } => Err(*code),
+            BgpLsLinkDescriptor::Unknown { code, .. } => Err(*code),
         }
     }
 
@@ -583,25 +557,25 @@ pub enum BgpLsNodeDescriptorSubTlv {
 }
 
 impl BgpLsNodeDescriptorSubTlv {
-    pub const fn code(&self) -> Result<BgpLsNodeDescriptorSubTlvType, u16> {
+    pub const fn code(&self) -> Result<BgpLsNodeDescriptorSubType, u16> {
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(_) => {
-                Ok(BgpLsNodeDescriptorSubTlvType::AutonomousSystem)
+                Ok(BgpLsNodeDescriptorSubType::AutonomousSystem)
             }
             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(_) => {
-                Ok(BgpLsNodeDescriptorSubTlvType::BgpLsIdentifier)
+                Ok(BgpLsNodeDescriptorSubType::BgpLsIdentifier)
             }
             BgpLsNodeDescriptorSubTlv::OspfAreaId(_) => {
-                Ok(BgpLsNodeDescriptorSubTlvType::OspfAreaId)
+                Ok(BgpLsNodeDescriptorSubType::OspfAreaId)
             }
             BgpLsNodeDescriptorSubTlv::IgpRouterId(_) => {
-                Ok(BgpLsNodeDescriptorSubTlvType::IgpRouterId)
+                Ok(BgpLsNodeDescriptorSubType::IgpRouterId)
             }
             BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(_) => {
-                Ok(BgpLsNodeDescriptorSubTlvType::BgpRouterIdentifier)
+                Ok(BgpLsNodeDescriptorSubType::BgpRouterIdentifier)
             }
             BgpLsNodeDescriptorSubTlv::MemberAsNumber(_) => {
-                Ok(BgpLsNodeDescriptorSubTlvType::MemberAsNumber)
+                Ok(BgpLsNodeDescriptorSubType::MemberAsNumber)
             }
             BgpLsNodeDescriptorSubTlv::Unknown { code, .. } => Err(*code),
         }
@@ -637,9 +611,9 @@ impl BgpLsNodeDescriptorSubTlv {
 pub struct BgpLsNlriLink {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptors: BgpLsNodeDescriptorTlv,
-    pub remote_node_descriptors: BgpLsNodeDescriptorTlv,
-    pub link_descriptor_tlvs: Vec<BgpLsLinkDescriptorTlv>,
+    pub local_node_descriptors: BgpLsNodeDescriptor,
+    pub remote_node_descriptors: BgpLsNodeDescriptor,
+    pub link_descriptors: Vec<BgpLsLinkDescriptor>,
 }
 
 /// ```text

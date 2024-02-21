@@ -16,20 +16,20 @@
 use crate::{
     iana,
     iana::{
-        BgpLsAttributeTlvType, BgpLsAttributeTlvTypeError, BgpLsIanaValueError,
-        BgpLsLinkDescriptorTlvType, BgpLsNlriType, BgpLsNodeDescriptorSubTlvType,
-        BgpLsNodeDescriptorTlvType, BgpLsNodeDescriptorTlvTypeError, BgpLsNodeFlagsBits,
-        BgpLsPrefixDescriptorTlvType, BgpLsProtocolIdError, LinkDescriptorTlvTypeError,
-        NodeDescriptorSubTlvTypeError, PrefixDescriptorTlvTypeError, UnknownBgpLsNlriType,
+        BgpLsAttributeType, BgpLsAttributeTypeError, BgpLsIanaValueError,
+        BgpLsLinkDescriptorType, BgpLsNlriType, BgpLsNodeDescriptorSubType,
+        BgpLsNodeDescriptorType, BgpLsNodeDescriptorTypeError, BgpLsNodeFlagsBits,
+        BgpLsPrefixDescriptorType, BgpLsProtocolIdError, LinkDescriptorTypeError,
+        NodeDescriptorSubTypeError, PrefixDescriptorTypeError, UnknownBgpLsNlriType,
     },
     nlri::{
-        BgpLsLinkDescriptorTlv, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
-        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptorTlv,
-        BgpLsPrefixDescriptorTlv, BgpLsVpnNlri, IgpFlags, IpReachabilityInformationData,
-        LinkProtectionType, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
+        BgpLsLinkDescriptor, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
+        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptor,
+        BgpLsPrefixDescriptor, BgpLsVpnNlri, IgpFlags, IpReachabilityInformationData,
+        MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
         SharedRiskLinkGroupValue, UnknownOspfRouteType,
     },
-    path_attribute::{BgpLsAttribute, BgpLsAttributeTlv, BgpLsPeerSid},
+    path_attribute::{BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid},
     wire::{
         deserializer::{
             nlri::{MplsLabelParsingError, RouteDistinguisherParsingError},
@@ -56,6 +56,7 @@ use std::{
     ops::BitAnd,
     string::FromUtf8Error,
 };
+use crate::path_attribute::LinkProtectionType;
 
 /// BGP Link-State Attribute Parsing Errors
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -65,7 +66,7 @@ pub enum BgpLsAttributeParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     MultiTopologyIdLengthError(usize),
-    UnknownTlvType(#[from_external] BgpLsAttributeTlvTypeError),
+    UnknownTlvType(#[from_external] BgpLsAttributeTypeError),
     Utf8Error(String),
     WrongIpAddrLength(usize),
     BadUnreservedBandwidthLength(usize),
@@ -100,25 +101,25 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpLsAttributeParsingError<'a>
             nom::multi::length_data(be_u8)(buf)?
         };
 
-        let (span, tlvs) = parse_till_empty_into_located(ls_buf)?;
+        let (span, attributes) = parse_till_empty_into_located(ls_buf)?;
 
-        Ok((span, BgpLsAttribute { tlvs }))
+        Ok((span, BgpLsAttribute { attributes }))
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttributeTlv {
+impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttributeValue {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
     where
         Self: Sized,
     {
         let (tlv_type, tlv_length, data, remainder) = read_tlv_header(buf)?;
 
-        let tlv_type = match BgpLsAttributeTlvType::try_from(tlv_type) {
+        let tlv_type = match BgpLsAttributeType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(BgpLsAttributeTlvTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
-                    BgpLsAttributeTlv::Unknown {
+                    BgpLsAttributeValue::Unknown {
                         code: value,
                         value: data.to_vec(),
                     },
@@ -133,17 +134,17 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
         };
 
         let tlv = match tlv_type {
-            BgpLsAttributeTlvType::MultiTopologyIdentifier => {
+            BgpLsAttributeType::MultiTopologyIdentifier => {
                 let (_, mtid) = parse_into_located::<
                     LocatedBgpLsAttributeParsingError<'_>,
                     LocatedBgpLsAttributeParsingError<'_>,
                     MultiTopologyIdData,
                 >(data)?;
-                BgpLsAttributeTlv::MultiTopologyIdentifier(mtid)
+                BgpLsAttributeValue::MultiTopologyIdentifier(mtid)
             }
-            BgpLsAttributeTlvType::NodeFlagBits => {
+            BgpLsAttributeType::NodeFlagBits => {
                 let (_, flags) = be_u8(data)?;
-                BgpLsAttributeTlv::NodeFlagBits {
+                BgpLsAttributeValue::NodeFlagBits {
                     overload: flags.bitand(BgpLsNodeFlagsBits::Overload as u8)
                         == BgpLsNodeFlagsBits::Overload as u8,
                     attached: flags.bitand(BgpLsNodeFlagsBits::Attached as u8)
@@ -157,46 +158,46 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                     v6: flags.bitand(BgpLsNodeFlagsBits::V6 as u8) == BgpLsNodeFlagsBits::V6 as u8,
                 }
             }
-            BgpLsAttributeTlvType::OpaqueNodeAttribute => {
-                BgpLsAttributeTlv::OpaqueNodeAttribute(data.to_vec())
+            BgpLsAttributeType::OpaqueNodeAttribute => {
+                BgpLsAttributeValue::OpaqueNodeAttribute(data.to_vec())
             }
-            BgpLsAttributeTlvType::NodeNameTlv => {
+            BgpLsAttributeType::NodeNameTlv => {
                 let (_, str) = nom::combinator::map_res(
                     nom::bytes::complete::take(tlv_length),
                     |x: Span<'_>| String::from_utf8(x.to_vec()),
                 )(data)?;
-                BgpLsAttributeTlv::NodeNameTlv(str)
+                BgpLsAttributeValue::NodeNameTlv(str)
             }
-            BgpLsAttributeTlvType::IsIsArea => BgpLsAttributeTlv::IsIsArea(data.to_vec()),
-            BgpLsAttributeTlvType::LocalNodeIpv4RouterId => {
+            BgpLsAttributeType::IsIsArea => BgpLsAttributeValue::IsIsArea(data.to_vec()),
+            BgpLsAttributeType::LocalNodeIpv4RouterId => {
                 let (_, address) = be_u32(data)?;
-                BgpLsAttributeTlv::LocalNodeIpv4RouterId(Ipv4Addr::from(address))
+                BgpLsAttributeValue::LocalNodeIpv4RouterId(Ipv4Addr::from(address))
             }
-            BgpLsAttributeTlvType::LocalNodeIpv6RouterId => {
+            BgpLsAttributeType::LocalNodeIpv6RouterId => {
                 let (_, address) = be_u128(data)?;
-                BgpLsAttributeTlv::LocalNodeIpv6RouterId(Ipv6Addr::from(address))
+                BgpLsAttributeValue::LocalNodeIpv6RouterId(Ipv6Addr::from(address))
             }
-            BgpLsAttributeTlvType::RemoteNodeIpv4RouterId => {
+            BgpLsAttributeType::RemoteNodeIpv4RouterId => {
                 let (_, address) = be_u32(data)?;
-                BgpLsAttributeTlv::RemoteNodeIpv4RouterId(Ipv4Addr::from(address))
+                BgpLsAttributeValue::RemoteNodeIpv4RouterId(Ipv4Addr::from(address))
             }
-            BgpLsAttributeTlvType::RemoteNodeIpv6RouterId => {
+            BgpLsAttributeType::RemoteNodeIpv6RouterId => {
                 let (_, address) = be_u128(data)?;
-                BgpLsAttributeTlv::RemoteNodeIpv6RouterId(Ipv6Addr::from(address))
+                BgpLsAttributeValue::RemoteNodeIpv6RouterId(Ipv6Addr::from(address))
             }
-            BgpLsAttributeTlvType::RemoteNodeAdministrativeGroupColor => {
+            BgpLsAttributeType::RemoteNodeAdministrativeGroupColor => {
                 let (_, color) = be_u32(data)?;
-                BgpLsAttributeTlv::RemoteNodeAdministrativeGroupColor(color)
+                BgpLsAttributeValue::RemoteNodeAdministrativeGroupColor(color)
             }
-            BgpLsAttributeTlvType::MaximumLinkBandwidth => {
+            BgpLsAttributeType::MaximumLinkBandwidth => {
                 let (_, bandwidth) = be_f32(data)?;
-                BgpLsAttributeTlv::MaximumLinkBandwidth(bandwidth)
+                BgpLsAttributeValue::MaximumLinkBandwidth(bandwidth)
             }
-            BgpLsAttributeTlvType::MaximumReservableLinkBandwidth => {
+            BgpLsAttributeType::MaximumReservableLinkBandwidth => {
                 let (_, bandwidth) = be_f32(data)?;
-                BgpLsAttributeTlv::MaximumReservableLinkBandwidth(bandwidth)
+                BgpLsAttributeValue::MaximumReservableLinkBandwidth(bandwidth)
             }
-            BgpLsAttributeTlvType::UnreservedBandwidth => {
+            BgpLsAttributeType::UnreservedBandwidth => {
                 let (_, vec) = nom::multi::count(be_f32, 8)(data)?;
                 let len = vec.len();
                 let value: [f32; 8] = vec.try_into().map_err(|_| {
@@ -205,15 +206,15 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                         BgpLsAttributeParsingError::BadUnreservedBandwidthLength(len),
                     ))
                 })?;
-                BgpLsAttributeTlv::UnreservedBandwidth(value)
+                BgpLsAttributeValue::UnreservedBandwidth(value)
             }
-            BgpLsAttributeTlvType::TeDefaultMetric => {
+            BgpLsAttributeType::TeDefaultMetric => {
                 let (_, metric) = be_u32(data)?;
-                BgpLsAttributeTlv::TeDefaultMetric(metric)
+                BgpLsAttributeValue::TeDefaultMetric(metric)
             }
-            BgpLsAttributeTlvType::LinkProtectionType => {
+            BgpLsAttributeType::LinkProtectionType => {
                 let (_, flags) = be_u16(data)?;
-                BgpLsAttributeTlv::LinkProtectionType {
+                BgpLsAttributeValue::LinkProtectionType {
                     extra_traffic: flags.bitand(LinkProtectionType::ExtraTraffic as u16)
                         == LinkProtectionType::ExtraTraffic as u16,
                     unprotected: flags.bitand(LinkProtectionType::Unprotected as u16)
@@ -228,33 +229,33 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                         == LinkProtectionType::Enhanced as u16,
                 }
             }
-            BgpLsAttributeTlvType::MplsProtocolMask => {
+            BgpLsAttributeType::MplsProtocolMask => {
                 let (_, flags) = be_u8(data)?;
-                BgpLsAttributeTlv::MplsProtocolMask {
+                BgpLsAttributeValue::MplsProtocolMask {
                     ldp: flags.bitand(MplsProtocolMask::LabelDistributionProtocol as u8)
                         == MplsProtocolMask::LabelDistributionProtocol as u8,
                     rsvp_te: flags.bitand(MplsProtocolMask::ExtensionToRsvpForLspTunnels as u8)
                         == MplsProtocolMask::ExtensionToRsvpForLspTunnels as u8,
                 }
             }
-            BgpLsAttributeTlvType::IgpMetric => BgpLsAttributeTlv::IgpMetric(data.to_vec()),
-            BgpLsAttributeTlvType::SharedRiskLinkGroup => {
+            BgpLsAttributeType::IgpMetric => BgpLsAttributeValue::IgpMetric(data.to_vec()),
+            BgpLsAttributeType::SharedRiskLinkGroup => {
                 let (_, values) = parse_till_empty_into_located(data)?;
-                BgpLsAttributeTlv::SharedRiskLinkGroup(values)
+                BgpLsAttributeValue::SharedRiskLinkGroup(values)
             }
-            BgpLsAttributeTlvType::OpaqueLinkAttribute => {
-                BgpLsAttributeTlv::OpaqueLinkAttribute(data.to_vec())
+            BgpLsAttributeType::OpaqueLinkAttribute => {
+                BgpLsAttributeValue::OpaqueLinkAttribute(data.to_vec())
             }
-            BgpLsAttributeTlvType::LinkName => {
+            BgpLsAttributeType::LinkName => {
                 let (_, str) = nom::combinator::map_res(
                     nom::bytes::complete::take(tlv_length),
                     |x: Span<'_>| String::from_utf8(x.to_vec()),
                 )(data)?;
-                BgpLsAttributeTlv::LinkName(str)
+                BgpLsAttributeValue::LinkName(str)
             }
-            BgpLsAttributeTlvType::IgpFlags => {
+            BgpLsAttributeType::IgpFlags => {
                 let (_, flags) = be_u8(data)?;
-                BgpLsAttributeTlv::IgpFlags {
+                BgpLsAttributeValue::IgpFlags {
                     isis_up_down: flags.bitand(IgpFlags::IsIsUp as u8) == IgpFlags::IsIsUp as u8,
                     ospf_no_unicast: flags.bitand(IgpFlags::OspfNoUnicast as u8)
                         == IgpFlags::OspfNoUnicast as u8,
@@ -264,19 +265,19 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                         == IgpFlags::OspfPropagateNssa as u8,
                 }
             }
-            BgpLsAttributeTlvType::IgpRouteTag => {
+            BgpLsAttributeType::IgpRouteTag => {
                 let (_, vec) = parse_till_empty_into_located(data)?;
-                BgpLsAttributeTlv::IgpRouteTag(vec)
+                BgpLsAttributeValue::IgpRouteTag(vec)
             }
-            BgpLsAttributeTlvType::IgpExtendedRouteTag => {
+            BgpLsAttributeType::IgpExtendedRouteTag => {
                 let (_, vec) = parse_till_empty_into_located(data)?;
-                BgpLsAttributeTlv::IgpExtendedRouteTag(vec)
+                BgpLsAttributeValue::IgpExtendedRouteTag(vec)
             }
-            BgpLsAttributeTlvType::PrefixMetric => {
+            BgpLsAttributeType::PrefixMetric => {
                 let (_, metric) = be_u32(data)?;
-                BgpLsAttributeTlv::PrefixMetric(metric)
+                BgpLsAttributeValue::PrefixMetric(metric)
             }
-            BgpLsAttributeTlvType::OspfForwardingAddress => {
+            BgpLsAttributeType::OspfForwardingAddress => {
                 let address = if tlv_length == IPV4_LEN as u16 {
                     let (_, ip) = be_u32(data)?;
                     IpAddr::V4(Ipv4Addr::from(ip))
@@ -290,22 +291,22 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                     )));
                 };
 
-                BgpLsAttributeTlv::OspfForwardingAddress(address)
+                BgpLsAttributeValue::OspfForwardingAddress(address)
             }
-            BgpLsAttributeTlvType::OpaquePrefixAttribute => {
-                BgpLsAttributeTlv::OpaquePrefixAttribute(data.to_vec())
+            BgpLsAttributeType::OpaquePrefixAttribute => {
+                BgpLsAttributeValue::OpaquePrefixAttribute(data.to_vec())
             }
-            BgpLsAttributeTlvType::PeerNodeSid => {
+            BgpLsAttributeType::PeerNodeSid => {
                 let (_, value) = parse_into_located_one_input(data, tlv_length)?;
-                BgpLsAttributeTlv::PeerNodeSid(value)
+                BgpLsAttributeValue::PeerNodeSid(value)
             }
-            BgpLsAttributeTlvType::PeerAdjSid => {
+            BgpLsAttributeType::PeerAdjSid => {
                 let (_, value) = parse_into_located_one_input(data, tlv_length)?;
-                BgpLsAttributeTlv::PeerAdjSid(value)
+                BgpLsAttributeValue::PeerAdjSid(value)
             }
-            BgpLsAttributeTlvType::PeerSetSid => {
+            BgpLsAttributeType::PeerSetSid => {
                 let (_, value) = parse_into_located_one_input(data, tlv_length)?;
-                BgpLsAttributeTlv::PeerSetSid(value)
+                BgpLsAttributeValue::PeerSetSid(value)
             }
         };
 
@@ -378,12 +379,12 @@ pub enum BgpLsNlriParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")] RouteDistinguisherParsingError,
     ),
     UnknownProtocolId(#[from_external] BgpLsProtocolIdError),
-    UnknownDescriptorTlvType(#[from_external] BgpLsNodeDescriptorTlvTypeError),
-    UnknownNodeDescriptorSubTlvType(#[from_external] NodeDescriptorSubTlvTypeError),
-    UnknownPrefixDescriptorTlvType(#[from_external] PrefixDescriptorTlvTypeError),
+    UnknownDescriptorTlvType(#[from_external] BgpLsNodeDescriptorTypeError),
+    UnknownNodeDescriptorSubTlvType(#[from_external] NodeDescriptorSubTypeError),
+    UnknownPrefixDescriptorTlvType(#[from_external] PrefixDescriptorTypeError),
     UnknownOspfRouteType(#[from_external] UnknownOspfRouteType),
-    BadNodeDescriptorTlvType(BgpLsNodeDescriptorTlvType),
-    UnknownLinkDescriptorTlvType(#[from_external] LinkDescriptorTlvTypeError),
+    BadNodeDescriptorTlvType(BgpLsNodeDescriptorType),
+    UnknownLinkDescriptorTlvType(#[from_external] LinkDescriptorTypeError),
     BadTlvTypeInNlri(BgpLsNlriType),
     Ipv4PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError),
     Ipv6PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv6PrefixParsingError),
@@ -494,27 +495,27 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriLink {
 
         let (span, local_node_descriptors) = parse_into_located(span)?;
 
-        if !matches!(local_node_descriptors, BgpLsNodeDescriptorTlv::Local(_)) {
+        if !matches!(local_node_descriptors, BgpLsNodeDescriptor::Local(_)) {
             return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
                 span,
                 BgpLsNlriParsingError::BadNodeDescriptorTlvType(
-                    BgpLsNodeDescriptorTlvType::RemoteNodeDescriptor,
+                    BgpLsNodeDescriptorType::RemoteNodeDescriptor,
                 ),
             )));
         }
 
         let (span, remote_node_descriptors) = parse_into_located(span)?;
 
-        if !matches!(remote_node_descriptors, BgpLsNodeDescriptorTlv::Remote(_)) {
+        if !matches!(remote_node_descriptors, BgpLsNodeDescriptor::Remote(_)) {
             return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
                 span,
                 BgpLsNlriParsingError::BadNodeDescriptorTlvType(
-                    BgpLsNodeDescriptorTlvType::RemoteNodeDescriptor,
+                    BgpLsNodeDescriptorType::RemoteNodeDescriptor,
                 ),
             )));
         }
 
-        let (span, link_descriptor_tlvs) = parse_till_empty_into_located(span)?;
+        let (span, link_descriptors) = parse_till_empty_into_located(span)?;
 
         Ok((
             span,
@@ -523,25 +524,25 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriLink {
                 identifier,
                 local_node_descriptors,
                 remote_node_descriptors,
-                link_descriptor_tlvs,
+                link_descriptors,
             },
         ))
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLinkDescriptorTlv {
+impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLinkDescriptor {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
     where
         Self: Sized,
     {
         let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
 
-        let tlv_type = match BgpLsLinkDescriptorTlvType::try_from(tlv_type) {
+        let tlv_type = match BgpLsLinkDescriptorType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(LinkDescriptorTlvTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(LinkDescriptorTypeError(BgpLsIanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
-                    BgpLsLinkDescriptorTlv::Unknown {
+                    BgpLsLinkDescriptor::Unknown {
                         code: value,
                         value: data.to_vec(),
                     },
@@ -556,39 +557,39 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLinkDescript
         };
 
         let tlv = match tlv_type {
-            BgpLsLinkDescriptorTlvType::LinkLocalRemoteIdentifiers => {
+            BgpLsLinkDescriptorType::LinkLocalRemoteIdentifiers => {
                 let (remainder, link_local_identifier) = be_u32(data)?;
                 let (_remainder, link_remote_identifier) = be_u32(remainder)?;
-                BgpLsLinkDescriptorTlv::LinkLocalRemoteIdentifiers {
+                BgpLsLinkDescriptor::LinkLocalRemoteIdentifiers {
                     link_local_identifier,
                     link_remote_identifier,
                 }
             }
-            BgpLsLinkDescriptorTlvType::IPv4InterfaceAddress => {
+            BgpLsLinkDescriptorType::IPv4InterfaceAddress => {
                 let (_remainder, ipv4) = be_u32(data)?;
-                BgpLsLinkDescriptorTlv::IPv4InterfaceAddress(Ipv4Addr::from(ipv4))
+                BgpLsLinkDescriptor::IPv4InterfaceAddress(Ipv4Addr::from(ipv4))
             }
-            BgpLsLinkDescriptorTlvType::IPv4NeighborAddress => {
+            BgpLsLinkDescriptorType::IPv4NeighborAddress => {
                 let (_remainder, ipv4) = be_u32(data)?;
-                BgpLsLinkDescriptorTlv::IPv4NeighborAddress(Ipv4Addr::from(ipv4))
+                BgpLsLinkDescriptor::IPv4NeighborAddress(Ipv4Addr::from(ipv4))
             }
-            BgpLsLinkDescriptorTlvType::IPv6InterfaceAddress => {
+            BgpLsLinkDescriptorType::IPv6InterfaceAddress => {
                 let (_remainder, ipv6) = be_u128(data)?;
                 // TODO CHECK NOT LOCAL-LINK
-                BgpLsLinkDescriptorTlv::IPv6InterfaceAddress(Ipv6Addr::from(ipv6))
+                BgpLsLinkDescriptor::IPv6InterfaceAddress(Ipv6Addr::from(ipv6))
             }
-            BgpLsLinkDescriptorTlvType::IPv6NeighborAddress => {
+            BgpLsLinkDescriptorType::IPv6NeighborAddress => {
                 let (_remainder, ipv6) = be_u128(data)?;
                 // TODO CHECK NOT LOCAL-LINK
-                BgpLsLinkDescriptorTlv::IPv6NeighborAddress(Ipv6Addr::from(ipv6))
+                BgpLsLinkDescriptor::IPv6NeighborAddress(Ipv6Addr::from(ipv6))
             }
-            BgpLsLinkDescriptorTlvType::MultiTopologyIdentifier => {
+            BgpLsLinkDescriptorType::MultiTopologyIdentifier => {
                 let (_remainder, mtid) = parse_into_located::<
                     LocatedBgpLsNlriParsingError<'a>,
                     LocatedBgpLsNlriParsingError<'a>,
                     MultiTopologyIdData,
                 >(data)?;
-                BgpLsLinkDescriptorTlv::MultiTopologyIdentifier(mtid)
+                BgpLsLinkDescriptor::MultiTopologyIdentifier(mtid)
             }
         };
 
@@ -607,11 +608,11 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriNode {
 
         let (span, local_node_descriptors) = parse_into_located(span)?;
 
-        if !matches!(local_node_descriptors, BgpLsNodeDescriptorTlv::Local(_)) {
+        if !matches!(local_node_descriptors, BgpLsNodeDescriptor::Local(_)) {
             return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
                 span,
                 BgpLsNlriParsingError::BadNodeDescriptorTlvType(
-                    BgpLsNodeDescriptorTlvType::RemoteNodeDescriptor,
+                    BgpLsNodeDescriptorType::RemoteNodeDescriptor,
                 ),
             )));
         }
@@ -627,24 +628,24 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriNode {
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescriptorTlv {
+impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescriptor {
     fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
     where
         Self: Sized,
     {
         let (span, tlv_type) =
-            nom::combinator::map_res(be_u16, iana::BgpLsNodeDescriptorTlvType::try_from)(span)?;
+            nom::combinator::map_res(be_u16, iana::BgpLsNodeDescriptorType::try_from)(span)?;
         let (span, tlv_length) = be_u16(span)?;
         let (span, data) = nom::bytes::complete::take(tlv_length)(span)?;
 
         let (_, subtlvs) = parse_till_empty_into_located(data)?;
 
         let descriptor = match tlv_type {
-            BgpLsNodeDescriptorTlvType::LocalNodeDescriptor => {
-                BgpLsNodeDescriptorTlv::Local(subtlvs)
+            BgpLsNodeDescriptorType::LocalNodeDescriptor => {
+                BgpLsNodeDescriptor::Local(subtlvs)
             }
-            BgpLsNodeDescriptorTlvType::RemoteNodeDescriptor => {
-                BgpLsNodeDescriptorTlv::Remote(subtlvs)
+            BgpLsNodeDescriptorType::RemoteNodeDescriptor => {
+                BgpLsNodeDescriptor::Remote(subtlvs)
             }
         };
 
@@ -671,9 +672,9 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescript
     {
         let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
 
-        let tlv_type = match BgpLsNodeDescriptorSubTlvType::try_from(tlv_type) {
+        let tlv_type = match BgpLsNodeDescriptorSubType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(NodeDescriptorSubTlvTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(NodeDescriptorSubTypeError(BgpLsIanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
                     BgpLsNodeDescriptorSubTlv::Unknown {
@@ -691,26 +692,26 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescript
         };
 
         let result = match tlv_type {
-            BgpLsNodeDescriptorSubTlvType::AutonomousSystem => {
+            BgpLsNodeDescriptorSubType::AutonomousSystem => {
                 let (_, value) = be_u32(data)?;
                 BgpLsNodeDescriptorSubTlv::AutonomousSystem(value)
             }
-            BgpLsNodeDescriptorSubTlvType::BgpLsIdentifier => {
+            BgpLsNodeDescriptorSubType::BgpLsIdentifier => {
                 let (_, value) = be_u32(data)?;
                 BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(value)
             }
-            BgpLsNodeDescriptorSubTlvType::OspfAreaId => {
+            BgpLsNodeDescriptorSubType::OspfAreaId => {
                 let (_, value) = be_u32(data)?;
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(value)
             }
-            BgpLsNodeDescriptorSubTlvType::IgpRouterId => {
+            BgpLsNodeDescriptorSubType::IgpRouterId => {
                 BgpLsNodeDescriptorSubTlv::IgpRouterId(data.to_vec())
             }
-            BgpLsNodeDescriptorSubTlvType::BgpRouterIdentifier => {
+            BgpLsNodeDescriptorSubType::BgpRouterIdentifier => {
                 let (_, value) = be_u32(data)?;
                 BgpLsNodeDescriptorSubTlv::BgpRouterIdentifier(value)
             }
-            BgpLsNodeDescriptorSubTlvType::MemberAsNumber => {
+            BgpLsNodeDescriptorSubType::MemberAsNumber => {
                 let (_, value) = be_u32(data)?;
                 BgpLsNodeDescriptorSubTlv::MemberAsNumber(value)
             }
@@ -736,16 +737,16 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
 
         let (span, local_node_descriptors) = parse_into_located(span)?;
 
-        if !matches!(local_node_descriptors, BgpLsNodeDescriptorTlv::Local(_)) {
+        if !matches!(local_node_descriptors, BgpLsNodeDescriptor::Local(_)) {
             return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
                 span,
                 BgpLsNlriParsingError::BadNodeDescriptorTlvType(
-                    BgpLsNodeDescriptorTlvType::RemoteNodeDescriptor,
+                    BgpLsNodeDescriptorType::RemoteNodeDescriptor,
                 ),
             )));
         }
 
-        let (span, prefix_descriptor_tlvs) =
+        let (span, prefix_descriptors) =
             parse_till_empty_into_with_one_input_located(span, nlri_type)?;
 
         Ok((
@@ -754,14 +755,14 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
                 protocol_id,
                 identifier,
                 local_node_descriptors,
-                prefix_descriptor_tlvs,
+                prefix_descriptors,
             },
         ))
     }
 }
 
 impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError<'a>>
-    for BgpLsPrefixDescriptorTlv
+    for BgpLsPrefixDescriptor
 {
     fn from_wire(
         buf: Span<'a>,
@@ -772,12 +773,12 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
     {
         let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
 
-        let tlv_type = match BgpLsPrefixDescriptorTlvType::try_from(tlv_type) {
+        let tlv_type = match BgpLsPrefixDescriptorType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(PrefixDescriptorTlvTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(PrefixDescriptorTypeError(BgpLsIanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
-                    BgpLsPrefixDescriptorTlv::Unknown {
+                    BgpLsPrefixDescriptor::Unknown {
                         code: value,
                         value: data.to_vec(),
                     },
@@ -792,21 +793,21 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
         };
 
         let tlv = match tlv_type {
-            BgpLsPrefixDescriptorTlvType::MultiTopologyIdentifier => {
+            BgpLsPrefixDescriptorType::MultiTopologyIdentifier => {
                 let (_, mtid) = parse_into_located::<
                     LocatedBgpLsNlriParsingError<'a>,
                     LocatedBgpLsNlriParsingError<'a>,
                     MultiTopologyIdData,
                 >(data)?;
-                BgpLsPrefixDescriptorTlv::MultiTopologyIdentifier(mtid)
+                BgpLsPrefixDescriptor::MultiTopologyIdentifier(mtid)
             }
-            BgpLsPrefixDescriptorTlvType::OspfRouteType => {
+            BgpLsPrefixDescriptorType::OspfRouteType => {
                 let (_, ospf_route_type) = parse_into_located(data)?;
-                BgpLsPrefixDescriptorTlv::OspfRouteType(ospf_route_type)
+                BgpLsPrefixDescriptor::OspfRouteType(ospf_route_type)
             }
-            BgpLsPrefixDescriptorTlvType::IpReachabilityInformation => {
+            BgpLsPrefixDescriptorType::IpReachabilityInformation => {
                 let (_, ip_reachability_info) = parse_into_located_one_input(data, nlri_type)?;
-                BgpLsPrefixDescriptorTlv::IpReachabilityInformation(ip_reachability_info)
+                BgpLsPrefixDescriptor::IpReachabilityInformation(ip_reachability_info)
             }
         };
 
