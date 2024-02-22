@@ -22,7 +22,9 @@ use crate::{
     nlri::{BgpLsNlri, BgpLsVpnNlri, *},
     path_attribute::*,
     wire::{
-        serializer::{bgp_ls::BgpLsWritingError, community::*, nlri::*, IpAddrWritingError},
+        serializer::{
+            community::*, nlri::*, path_attribute::BgpLsAttributeWritingError, IpAddrWritingError,
+        },
         ACCUMULATED_IGP_METRIC,
     },
 };
@@ -53,7 +55,7 @@ pub enum PathAttributeWritingError {
     ClusterListError(#[from] ClusterListWritingError),
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
-    BgpLsError(#[from] BgpLsWritingError),
+    BgpLsAttributeError(#[from] BgpLsAttributeWritingError),
     OnlyToCustomerError(#[from] OnlyToCustomerWritingError),
     AigpError(#[from] AigpWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
@@ -743,7 +745,7 @@ pub enum MpReachWritingError {
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
-    BgpLsNlriWritingError(#[from] BgpLsWritingError),
+    BgpLsNlriWritingError(#[from] BgpLsNlriWritingError),
     RouteDistinguisherWritingError(#[from] RouteDistinguisherWritingError),
 }
 
@@ -1198,7 +1200,7 @@ pub enum MpUnreachWritingError {
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
-    BgpLsError(#[from] BgpLsWritingError),
+    BgpLsError(#[from] BgpLsNlriWritingError),
 }
 
 impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {

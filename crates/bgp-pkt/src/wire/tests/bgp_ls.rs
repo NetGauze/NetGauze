@@ -17,9 +17,9 @@ use crate::{
     iana::{BgpLsProtocolId, BgpLsSidAttributeFlags},
     nlri::{
         BgpLsLinkDescriptor, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
-        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptor,
-        BgpLsPrefixDescriptor, BgpLsVpnNlri, IpReachabilityInformationData, MultiTopologyId,
-        MultiTopologyIdData, OspfRouteType,
+        BgpLsNlriValue, BgpLsNodeDescriptor, BgpLsNodeDescriptorSubTlv, BgpLsPrefixDescriptor,
+        BgpLsVpnNlri, IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData,
+        OspfRouteType,
     },
     path_attribute::{
         BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, MpReach, MpUnreach, PathAttribute,
@@ -47,8 +47,8 @@ use std::{
 use crate::{
     nlri::{LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher},
     wire::serializer::{
-        bgp_ls::BgpLsWritingError,
-        path_attribute::{MpReachWritingError, MpUnreachWritingError},
+        nlri::BgpLsNlriWritingError,
+        path_attribute::{BgpLsAttributeWritingError, MpReachWritingError, MpUnreachWritingError},
     },
 };
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
@@ -122,7 +122,7 @@ fn test_wire() -> Result<(), PathAttributeWritingError> {
 }
 
 #[test]
-pub fn test_bgp_ls_attr_parse() -> Result<(), BgpLsWritingError> {
+pub fn test_bgp_ls_attr_parse() -> Result<(), BgpLsAttributeWritingError> {
     let good_wire = [
         17, 4, 74, 0, 13, 77, 121, 32, 83, 117, 112, 101, 114, 32, 76, 105, 110, 107,
     ];
@@ -138,7 +138,7 @@ pub fn test_bgp_ls_attr_parse() -> Result<(), BgpLsWritingError> {
 }
 
 #[test]
-pub fn test_bgp_ls_nlri_parse() -> Result<(), BgpLsWritingError> {
+pub fn test_bgp_ls_nlri_parse() -> Result<(), BgpLsNlriWritingError> {
     let good_wire = [
         0, 2, 0, 41, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 1, 0, 8,
         2, 2, 0, 4, 0, 0, 0, 21, 1, 3, 0, 4, 1, 2, 3, 4,
@@ -154,9 +154,9 @@ pub fn test_bgp_ls_nlri_parse() -> Result<(), BgpLsWritingError> {
             remote_node_descriptors: BgpLsNodeDescriptor::Remote(vec![
                 BgpLsNodeDescriptorSubTlv::OspfAreaId(21),
             ]),
-            link_descriptors: vec![BgpLsLinkDescriptor::IPv4InterfaceAddress(
-                Ipv4Addr::new(1, 2, 3, 4),
-            )],
+            link_descriptors: vec![BgpLsLinkDescriptor::IPv4InterfaceAddress(Ipv4Addr::new(
+                1, 2, 3, 4,
+            ))],
         }),
     };
 
@@ -167,7 +167,7 @@ pub fn test_bgp_ls_nlri_parse() -> Result<(), BgpLsWritingError> {
 }
 
 #[test]
-pub fn test_bgp_ls_nlri_ipv4_parse() -> Result<(), BgpLsWritingError> {
+pub fn test_bgp_ls_nlri_ipv4_parse() -> Result<(), BgpLsNlriWritingError> {
     let good_wire = [
         0, 3, 0, 43, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 5,
         32, 1, 2, 3, 4, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1, 4,
@@ -201,7 +201,7 @@ pub fn test_bgp_ls_nlri_ipv4_parse() -> Result<(), BgpLsWritingError> {
 }
 
 #[test]
-pub fn test_bgp_ls_nlri_ipv6_parse() -> Result<(), BgpLsWritingError> {
+pub fn test_bgp_ls_nlri_ipv6_parse() -> Result<(), BgpLsNlriWritingError> {
     let good_wire = [
         0, 4, 0, 55, 1, 0, 0, 0, 0, 0, 0, 0, 69, 1, 0, 0, 8, 2, 2, 0, 4, 0, 0, 0, 18, 1, 9, 0, 17,
         128, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 1, 7, 0, 4, 0, 69, 0, 21, 1, 8, 0, 1,
@@ -401,7 +401,7 @@ pub fn test_bgp_ls_vpn_mp_unreach() -> Result<(), MpUnreachWritingError> {
 }
 
 #[test]
-pub fn test_bgp_ls_sid() -> Result<(), BgpLsWritingError> {
+pub fn test_bgp_ls_sid() -> Result<(), BgpLsAttributeWritingError> {
     let good_wire = [
         35, 4, 77, 0, 8, 32, 69, 0, 0, 0, 0, 0, 32, 4, 78, 0, 8, 32, 169, 0, 0, 0, 0, 0, 64, 4, 79,
         0, 7, 160, 69, 0, 0, 1, 2, 3,

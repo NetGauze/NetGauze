@@ -25,13 +25,8 @@ use crate::{
     path_attribute::*,
     wire::{
         deserializer::{
-            bgp_ls::{
-                BgpLsAttributeParsingError, BgpLsNlriParsingError,
-                LocatedBgpLsAttributeParsingError,
-            },
-            community::*,
-            nlri::*,
-            BgpParsingContext, IpAddrParsingError,
+            community::*, nlri::*, path_attribute::BgpLsAttributeParsingError, BgpParsingContext,
+            IpAddrParsingError,
         },
         serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN},
         ACCUMULATED_IGP_METRIC,
@@ -107,7 +102,10 @@ pub enum PathAttributeParsingError {
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     OnlyToCustomerError(#[from_located(module = "self")] OnlyToCustomerParsingError),
     AigpError(#[from_located(module = "self")] AigpParsingError),
-    BgpLsError(#[from_located(module = "self")] BgpLsAttributeParsingError),
+    BgpLsError(
+        #[from_located(module = "crate::wire::deserializer::path_attribute")]
+        BgpLsAttributeParsingError,
+    ),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
     InvalidPathAttribute(InvalidPathAttribute, PathAttributeValue),
 }
@@ -652,7 +650,7 @@ pub enum MpReachParsingError {
         RouteTargetMembershipAddressParsingError,
     ),
     BgpLsNlriParsingError(
-        #[from_located(module = "crate::wire::deserializer::bgp_ls")] BgpLsNlriParsingError,
+        #[from_located(module = "crate::wire::deserializer::nlri")] BgpLsNlriParsingError,
     ),
 }
 
@@ -1026,7 +1024,7 @@ pub enum MpUnreachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")]
         RouteTargetMembershipAddressParsingError,
     ),
-    BgpLsError(#[from_located(module = "crate::wire::deserializer::bgp_ls")] BgpLsNlriParsingError),
+    BgpLsError(#[from_located(module = "crate::wire::deserializer::nlri")] BgpLsNlriParsingError),
 }
 
 impl<'a>

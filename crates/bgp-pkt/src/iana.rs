@@ -1459,13 +1459,13 @@ impl TryFrom<u16> for BgpLsNodeDescriptorType {
             Some(val) => Ok(val),
             None => {
                 if value <= 255 {
-                    Err(BgpLsNodeDescriptorTypeError(
-                        BgpLsIanaValueError::Reserved(value),
-                    ))
+                    Err(BgpLsNodeDescriptorTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
                 } else {
-                    Err(BgpLsNodeDescriptorTypeError(
-                        BgpLsIanaValueError::Unknown(value),
-                    ))
+                    Err(BgpLsNodeDescriptorTypeError(BgpLsIanaValueError::Unknown(
+                        value,
+                    )))
                 }
             }
         }
@@ -1502,9 +1502,9 @@ impl TryFrom<u16> for BgpLsNodeDescriptorSubType {
             Some(val) => Ok(val),
             None => {
                 if value <= 255 {
-                    Err(NodeDescriptorSubTypeError(
-                        BgpLsIanaValueError::Reserved(value),
-                    ))
+                    Err(NodeDescriptorSubTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
                 } else {
                     Err(NodeDescriptorSubTypeError(BgpLsIanaValueError::Unknown(
                         value,
@@ -1587,9 +1587,7 @@ impl TryFrom<u16> for BgpLsLinkDescriptorType {
                         value,
                     )))
                 } else {
-                    Err(LinkDescriptorTypeError(BgpLsIanaValueError::Unknown(
-                        value,
-                    )))
+                    Err(LinkDescriptorTypeError(BgpLsIanaValueError::Unknown(value)))
                 }
             }
         }
@@ -1705,9 +1703,7 @@ impl TryFrom<u16> for BgpLsAttributeType {
                         value,
                     )))
                 } else {
-                    Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Unknown(
-                        value,
-                    )))
+                    Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Unknown(value)))
                 }
             }
         }

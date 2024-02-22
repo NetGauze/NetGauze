@@ -15,7 +15,6 @@
 
 //! Deserializer library for BGP's wire protocol
 
-pub mod bgp_ls;
 pub mod capabilities;
 pub mod community;
 pub mod nlri;
@@ -576,4 +575,16 @@ impl From<BgpMessageParsingError> for BgpNotificationMessage {
             }
         }
     }
+}
+
+pub fn read_tlv_header<'a, E, T>(buf: Span<'a>) -> Result<(u16, u16, Span<'a>, Span<'a>), E>
+where
+    E: From<nom::Err<T>>,
+    T: nom::error::ParseError<netgauze_locate::BinarySpan<&'a [u8]>>,
+{
+    let (span, tlv_type) = be_u16(buf)?;
+    let (span, tlv_length) = be_u16(span)?;
+    let (remainder, data) = nom::bytes::complete::take(tlv_length)(span)?;
+
+    Ok((tlv_type, tlv_length, data, remainder))
 }

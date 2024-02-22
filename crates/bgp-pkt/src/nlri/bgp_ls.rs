@@ -386,9 +386,7 @@ impl BgpLsPrefixDescriptor {
             BgpLsPrefixDescriptor::MultiTopologyIdentifier(..) => {
                 Ok(BgpLsPrefixDescriptorType::MultiTopologyIdentifier)
             }
-            BgpLsPrefixDescriptor::OspfRouteType(_) => {
-                Ok(BgpLsPrefixDescriptorType::OspfRouteType)
-            }
+            BgpLsPrefixDescriptor::OspfRouteType(_) => Ok(BgpLsPrefixDescriptorType::OspfRouteType),
             BgpLsPrefixDescriptor::IpReachabilityInformation(_) => {
                 Ok(BgpLsPrefixDescriptorType::IpReachabilityInformation)
             }
@@ -453,9 +451,7 @@ impl BgpLsNodeDescriptor {
 
     pub fn subtlvs(&self) -> &[BgpLsNodeDescriptorSubTlv] {
         match self {
-            BgpLsNodeDescriptor::Local(subtlvs) | BgpLsNodeDescriptor::Remote(subtlvs) => {
-                subtlvs
-            }
+            BgpLsNodeDescriptor::Local(subtlvs) | BgpLsNodeDescriptor::Remote(subtlvs) => subtlvs,
         }
     }
 
@@ -565,9 +561,7 @@ impl BgpLsNodeDescriptorSubTlv {
             BgpLsNodeDescriptorSubTlv::BgpLsIdentifier(_) => {
                 Ok(BgpLsNodeDescriptorSubType::BgpLsIdentifier)
             }
-            BgpLsNodeDescriptorSubTlv::OspfAreaId(_) => {
-                Ok(BgpLsNodeDescriptorSubType::OspfAreaId)
-            }
+            BgpLsNodeDescriptorSubTlv::OspfAreaId(_) => Ok(BgpLsNodeDescriptorSubType::OspfAreaId),
             BgpLsNodeDescriptorSubTlv::IgpRouterId(_) => {
                 Ok(BgpLsNodeDescriptorSubType::IgpRouterId)
             }
