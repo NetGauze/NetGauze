@@ -20,19 +20,12 @@ use crate::{
 
 use crate::{
     nlri::*,
-    path_attribute::{MpReach, MpUnreach},
-    wire::{
-        deserializer::{
-            nlri::{
-                Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
-                Ipv6UnicastParsingError,
-            },
-            path_attribute::{
-                LocatedMpReachParsingError, MpReachParsingError, MpUnreachParsingError,
-            },
-            Ipv4PrefixParsingError,
+    wire::deserializer::{
+        nlri::{
+            Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
+            Ipv6UnicastParsingError,
         },
-        serializer::path_attribute::MpReachWritingError,
+        Ipv4PrefixParsingError,
     },
 };
 use ipnet::{Ipv4Net, Ipv6Net};

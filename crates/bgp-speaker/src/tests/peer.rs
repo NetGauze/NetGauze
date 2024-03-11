@@ -1,28 +1,14 @@
-use std::{
-    io,
-    io::Cursor,
-    net::{Ipv4Addr, SocketAddr},
-    time::Duration,
-};
-
-use netgauze_bgp_pkt::{
-    iana::RouteRefreshSubcode,
-    notification::{
-        HoldTimerExpiredError, MessageHeaderError, OpenMessageError, UpdateMessageError,
-    },
-    BgpMessage,
-};
+use netgauze_bgp_pkt::iana::RouteRefreshSubcode;
 
 use netgauze_bgp_pkt::{
     capabilities::{BgpCapability, FourOctetAsCapability, MultiProtocolExtensionsCapability},
     iana::AS_TRANS,
-    notification::{FiniteStateMachineError, *},
+    notification::*,
     open::{BgpOpenMessage, BgpOpenMessageParameter::Capabilities},
     route_refresh::BgpRouteRefreshMessage,
     update::BgpUpdateMessage,
 };
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::WritablePdu;
 
 use crate::{events::*, fsm::*, peer::*, tests::*};
 

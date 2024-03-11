@@ -33,7 +33,7 @@ use crate::{
         },
         serializer::netflow::*,
     },
-    DataSetId, FieldSpecifier, *,
+    *,
 };
 
 #[test]

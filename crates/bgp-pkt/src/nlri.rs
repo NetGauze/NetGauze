@@ -1218,11 +1218,7 @@ impl NlriAddressType for Ipv6NlriMplsLabelsAddress {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netgauze_iana::address_family::AddressType;
-    use std::{
-        net::{Ipv4Addr, Ipv6Addr},
-        str::FromStr,
-    };
+    use std::str::FromStr;
 
     #[test]
     fn test_ipv4_unicast() {

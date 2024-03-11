@@ -22,7 +22,7 @@ use netgauze_bgp_pkt::wire::serializer::{
 };
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
-use std::{io::Write, net::IpAddr};
+use std::io::Write;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageWritingError {

@@ -17,7 +17,7 @@ use crate::{nlri::*, wire::serializer::round_len};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
-use std::{convert::Into, io::Write, net::IpAddr};
+use std::{io::Write, net::IpAddr};
 
 /// Length for Route Distinguisher
 pub(crate) const RD_LEN: u8 = 8;

@@ -13,17 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    codec::BgpCodec,
-    connection::{Connection, ConnectionConfigBuilder, ConnectionState, ConnectionType},
-    peer::EchoCapabilitiesPolicy,
-};
+use crate::connection::{Connection, ConnectionConfigBuilder, ConnectionState, ConnectionType};
 use futures::StreamExt;
-use netgauze_bgp_pkt::{
-    notification::{BgpNotificationMessage, HoldTimerExpiredError, MessageHeaderError},
-    BgpMessage,
+use netgauze_bgp_pkt::notification::{
+    BgpNotificationMessage, HoldTimerExpiredError, MessageHeaderError,
 };
-use std::{io, net::SocketAddr, time::Duration};
 use tokio_test::io::Mock;
 use tokio_util::codec::Framed;
 

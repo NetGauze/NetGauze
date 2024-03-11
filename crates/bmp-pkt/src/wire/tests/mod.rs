@@ -13,14 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{TimeZone, Utc};
 use ipnet::Ipv4Net;
 use netgauze_bgp_pkt::{
     capabilities::{
         BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
         FourOctetAsCapability, MultiProtocolExtensionsCapability,
     },
-    iana::{BgpMessageType, UndefinedBgpMessageType},
+    iana::UndefinedBgpMessageType,
     nlri::{Ipv4Unicast, Ipv4UnicastAddress},
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
@@ -32,9 +31,8 @@ use netgauze_bgp_pkt::{
     wire::deserializer::{
         nlri::RouteDistinguisherParsingError, BgpMessageParsingError, BgpParsingContext,
     },
-    BgpMessage,
 };
-use netgauze_iana::address_family::{AddressFamily, AddressType};
+use netgauze_iana::address_family::AddressFamily;
 use netgauze_parse_utils::{
     test_helpers::{
         test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
@@ -43,11 +41,7 @@ use netgauze_parse_utils::{
     Span,
 };
 use nom::error::ErrorKind;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
 
 use crate::{
     iana::*,

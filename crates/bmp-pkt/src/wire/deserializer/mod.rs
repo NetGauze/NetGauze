@@ -15,19 +15,11 @@
 
 //! Deserializer library for BMP's wire protocol
 
-use chrono::{LocalResult, TimeZone, Utc};
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    string::FromUtf8Error,
-};
+use chrono::LocalResult;
+use std::{collections::HashMap, net::Ipv6Addr, string::FromUtf8Error};
 
-use netgauze_bgp_pkt::{
-    iana::BgpMessageType,
-    wire::deserializer::{
-        nlri::RouteDistinguisherParsingError, BgpMessageParsingError, BgpParsingContext,
-    },
-    BgpMessage,
+use netgauze_bgp_pkt::wire::deserializer::{
+    nlri::RouteDistinguisherParsingError, BgpMessageParsingError, BgpParsingContext,
 };
 use netgauze_iana::address_family::{
     AddressFamily, InvalidAddressType, SubsequentAddressFamily, UndefinedAddressFamily,
