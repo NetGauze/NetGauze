@@ -767,7 +767,7 @@ impl<
         self.tracked_connection.as_ref().map(|c| *c.stats())
     }
 
-    pub fn main_connection_send_capabilities(&self) -> Option<Vec<BgpCapability>> {
+    pub fn main_connection_sent_capabilities(&self) -> Option<Vec<BgpCapability>> {
         self.connection
             .as_ref()
             .and_then(|c| c.sent_capabilities().cloned())
@@ -779,7 +779,7 @@ impl<
             .and_then(|c| c.received_capabilities().cloned())
     }
 
-    pub fn tracked_connection_send_capabilities(&self) -> Option<Vec<BgpCapability>> {
+    pub fn tracked_connection_sent_capabilities(&self) -> Option<Vec<BgpCapability>> {
         self.tracked_connection
             .as_ref()
             .and_then(|c| c.sent_capabilities().cloned())
