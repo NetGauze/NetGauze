@@ -135,10 +135,10 @@ impl BgpParsingContext {
             false,
             HashMap::new(),
             HashMap::new(),
-            false,
-            false,
-            false,
-            false,
+            true,
+            true,
+            true,
+            true,
         )
     }
 
@@ -194,15 +194,7 @@ impl BgpParsingContext {
 
 impl Default for BgpParsingContext {
     fn default() -> Self {
-        Self::new(
-            true,
-            HashMap::new(),
-            HashMap::new(),
-            false,
-            false,
-            false,
-            false,
-        )
+        Self::new(true, HashMap::new(), HashMap::new(), true, true, true, true)
     }
 }
 
