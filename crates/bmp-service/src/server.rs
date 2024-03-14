@@ -172,6 +172,7 @@ mod tests {
     use std::{
         convert::Infallible,
         net::{IpAddr, Ipv4Addr},
+        time::Duration,
     };
 
     use futures_util::SinkExt;
@@ -203,7 +204,7 @@ mod tests {
         client.send(msg.clone()).await.unwrap();
         handle.shutdown();
         // yield to let the server handle the shutdown signal
-        tokio::task::yield_now().await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
         // No clients should be able to connect
         assert!(client.send(msg).await.is_err());
         assert!(server.is_finished());
