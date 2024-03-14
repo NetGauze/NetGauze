@@ -1013,7 +1013,11 @@ impl<'a>
         };
         let input = buf;
         let (buf, mut prefix_len) = be_u8(buf)?;
-        let prefix_bytes = prefix_len / 8;
+        let prefix_bytes = if prefix_len > u8::MAX - 7 {
+            u8::MAX
+        } else {
+            (prefix_len + 7) / 8
+        };
         let (buf, nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
         let (nlri_buf, label_stack) =
             parse_mpls_label_stack(nlri_buf, is_unreach, multiple_labels_limit).map_err(|err| {
@@ -1058,7 +1062,11 @@ impl<'a>
         };
         let input = buf;
         let (buf, mut prefix_len) = be_u8(buf)?;
-        let prefix_bytes = prefix_len / 8;
+        let prefix_bytes = if prefix_len > u8::MAX - 7 {
+            u8::MAX
+        } else {
+            (prefix_len + 7) / 8
+        };
         let (buf, nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
         let (nlri_buf, label_stack) =
             parse_mpls_label_stack(nlri_buf, is_unreach, multiple_labels_limit).map_err(|err| {

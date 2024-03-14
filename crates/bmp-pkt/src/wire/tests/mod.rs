@@ -19,12 +19,14 @@ use netgauze_bgp_pkt::{
         BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
         FourOctetAsCapability, MultiProtocolExtensionsCapability,
     },
+    community::{Community, ExtendedCommunity, TransitiveTwoOctetExtendedCommunity},
     iana::UndefinedBgpMessageType,
-    nlri::{Ipv4Unicast, Ipv4UnicastAddress},
+    nlri::{Ipv4NlriMplsLabelsAddress, Ipv4Unicast, Ipv4UnicastAddress, MplsLabel},
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
     path_attribute::{
-        As4PathSegment, AsPath, AsPathSegmentType, NextHop, Origin, PathAttribute,
+        As4PathSegment, AsPath, AsPathSegmentType, Communities, ExtendedCommunities,
+        LocalPreference, MpReach, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
         PathAttributeValue,
     },
     update::BgpUpdateMessage,
@@ -1516,6 +1518,140 @@ fn test_bmp_stats() -> Result<(), BmpMessageWritingError> {
                 ),
             ],
         ),
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0xa9, 0x00, 0x03, 0x80, 0x00, 0x00, 0xfb, 0xf3, 0x00, 0x00, 0x00,
+        0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x00, 0x02, 0x3d, 0x64, 0x28, 0xc4, 0x47, 0x00,
+        0x03, 0x8a, 0xe5, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0x00, 0x79, 0x02, 0x00, 0x00, 0x00, 0x62, 0x40, 0x01, 0x01, 0x00,
+        0x40, 0x02, 0x0e, 0x02, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x03, 0x00, 0x00,
+        0xfd, 0xe8, 0x80, 0x04, 0x04, 0x00, 0x00, 0x3b, 0x60, 0x40, 0x05, 0x04, 0x00, 0x00, 0x3f,
+        0x48, 0xc0, 0x08, 0x14, 0xfb, 0xf0, 0x01, 0x2b, 0xfb, 0xf0, 0x03, 0xe9, 0xfb, 0xf0, 0x04,
+        0x09, 0xfb, 0xf1, 0x00, 0x01, 0xfb, 0xf3, 0x00, 0x14, 0xc0, 0x10, 0x10, 0x00, 0x02, 0xfb,
+        0xf1, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x03, 0xfb, 0xf1, 0x00, 0x00, 0x00, 0x2a, 0x90, 0x0e,
+        0x00, 0x11, 0x00, 0x01, 0x04, 0x04, 0xc6, 0x33, 0x64, 0x47, 0x00, 0x37, 0x10, 0x03, 0x31,
+        0xcb, 0x00, 0x71, 0xfe,
+    ];
+
+    let good = BmpMessage::V3(BmpMessageValue::RouteMonitoring(
+        RouteMonitoringMessage::build(
+            PeerHeader::new(
+                BmpPeerType::LocRibInstancePeer { filtered: true },
+                Some(RouteDistinguisher::As2Administrator {
+                    asn2: 64499,
+                    number: 11,
+                }),
+                None,
+                65537,
+                Ipv4Addr::new(192, 0, 2, 61),
+                Some(Utc.timestamp_opt(1680393287, 232165000).unwrap()),
+            ),
+            BgpMessage::Update(BgpUpdateMessage::new(
+                vec![],
+                vec![
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::Origin(Origin::IGP),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                            As4PathSegment::new(
+                                AsPathSegmentType::AsSequence,
+                                vec![65536, 65539, 65000],
+                            ),
+                        ])),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        true,
+                        false,
+                        false,
+                        false,
+                        PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(
+                            15200,
+                        )),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::LocalPreference(LocalPreference::new(16200)),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        true,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::Communities(Communities::new(vec![
+                            Community::new(4226810155),
+                            Community::new(4226810857),
+                            Community::new(4226810889),
+                            Community::new(4226875393),
+                            Community::new(4227006484),
+                        ])),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        true,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::ExtendedCommunities(ExtendedCommunities::new(vec![
+                            ExtendedCommunity::TransitiveTwoOctet(
+                                TransitiveTwoOctetExtendedCommunity::RouteTarget {
+                                    global_admin: 64497,
+                                    local_admin: 11,
+                                },
+                            ),
+                            ExtendedCommunity::TransitiveTwoOctet(
+                                TransitiveTwoOctetExtendedCommunity::RouteOrigin {
+                                    global_admin: 64497,
+                                    local_admin: 42,
+                                },
+                            ),
+                        ])),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        true,
+                        false,
+                        false,
+                        true,
+                        PathAttributeValue::MpReach(MpReach::Ipv4NlriMplsLabels {
+                            next_hop: IpAddr::V4(Ipv4Addr::new(198, 51, 100, 71)),
+                            nlri: vec![Ipv4NlriMplsLabelsAddress::new(
+                                None,
+                                vec![MplsLabel::new([16, 3, 49])],
+                                Ipv4Net::from_str("203.0.113.254/31").unwrap(),
+                            )],
+                        }),
+                    )
+                    .unwrap(),
+                ],
+                vec![],
+            )),
+        )
+        .unwrap(),
     ));
 
     test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
