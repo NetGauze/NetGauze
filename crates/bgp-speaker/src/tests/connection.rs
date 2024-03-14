@@ -391,7 +391,18 @@ async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
     // Receive and handle third KeepAliveTimerExpires
     let event =
         tokio::time::timeout(Duration::from_secs(hold_time_seconds), connection.next()).await;
-    assert_eq!(event, Ok(Some(ConnectionEvent::HoldTimerExpires)));
+    // There's no guarantees KeepAlive or HoldTimersExpires will be fired first
+    assert!(
+        event == Ok(Some(ConnectionEvent::HoldTimerExpires))
+            || event == Ok(Some(ConnectionEvent::KeepAliveTimerExpires))
+    );
+    if event == Ok(Some(ConnectionEvent::KeepAliveTimerExpires)) {
+        // If KeepAlive is first check HoldTimersExpires is fired after
+        let event =
+            tokio::time::timeout(Duration::from_secs(hold_time_seconds), connection.next()).await;
+        assert_eq!(event, Ok(Some(ConnectionEvent::HoldTimerExpires)));
+    }
+
     let event = event.unwrap().unwrap();
     let event = connection.handle_event(&mut policy, event).await;
     assert_eq!(event, Ok(ConnectionEvent::HoldTimerExpires));
