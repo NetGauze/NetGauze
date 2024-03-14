@@ -124,7 +124,7 @@ impl<
                     }
                 }
                 PeerEvent::ConnectionSentCapabilities(tx) => {
-                    let caps = peer.main_connection_send_capabilities();
+                    let caps = peer.main_connection_sent_capabilities();
                     eprintln!("Got main_connection_send_capabilities: {caps:?}");
                     if let Err(err) = tx.send(caps) {
                         log::error!("Error sending main connection sent capabilities: {err:?}");
@@ -138,7 +138,7 @@ impl<
                     }
                 }
                 PeerEvent::TrackedConnectionSentCapabilities(tx) => {
-                    let caps = peer.tracked_connection_send_capabilities();
+                    let caps = peer.tracked_connection_sent_capabilities();
                     if let Err(err) = tx.send(caps) {
                         log::error!("Error sending tracked sent tracked capabilities: {err:?}");
                     }
