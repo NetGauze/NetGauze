@@ -16,6 +16,7 @@
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use nom::Needed;
+use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
 use netgauze_bgp_pkt::{
@@ -44,7 +45,15 @@ impl BgpCodec {
         Self {
             asn4_sent: Some(asn4),
             asn4_received: Some(asn4),
-            ctx: BgpParsingContext::default(),
+            ctx: BgpParsingContext::new(
+                true,
+                HashMap::new(),
+                HashMap::new(),
+                false,
+                false,
+                false,
+                false,
+            ),
         }
     }
 }
