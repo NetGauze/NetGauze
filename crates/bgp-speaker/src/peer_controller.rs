@@ -125,11 +125,9 @@ impl<
                 }
                 PeerEvent::ConnectionSentCapabilities(tx) => {
                     let caps = peer.main_connection_sent_capabilities();
-                    eprintln!("Got main_connection_send_capabilities: {caps:?}");
                     if let Err(err) = tx.send(caps) {
                         log::error!("Error sending main connection sent capabilities: {err:?}");
                     }
-                    eprintln!("Sent main_connection_send_capabilities");
                 }
                 PeerEvent::ConnectionReceivedCapabilities(tx) => {
                     let caps = peer.main_connection_received_capabilities();
