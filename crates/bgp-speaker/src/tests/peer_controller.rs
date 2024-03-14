@@ -183,8 +183,10 @@ async fn test_get_exchanged_capabilities(
         )))
         .wait(Duration::from_millis(10))
         .read(BgpMessage::Open(peer_open.clone()))
+        .wait(Duration::from_secs(1))
         .write(BgpMessage::KeepAlive)
-        .wait(Duration::from_secs(1));
+        .wait(Duration::from_millis(100))
+        .write(BgpMessage::KeepAlive);
     let active_connect = MockActiveConnect {
         peer_addr: PEER_ADDR,
         io_builder: active_io_builder,
