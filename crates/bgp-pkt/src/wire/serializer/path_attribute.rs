@@ -849,12 +849,12 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
             }
             Self::Ipv4NlriMplsLabels { next_hop, nlri } => {
                 writer.write_u16::<NetworkEndian>(
-                    Ipv4MplsVpnUnicastAddress::address_type()
+                    Ipv4NlriMplsLabelsAddress::address_type()
                         .address_family()
                         .into(),
                 )?;
                 writer.write_u8(
-                    Ipv4MplsVpnUnicastAddress::address_type()
+                    Ipv4NlriMplsLabelsAddress::address_type()
                         .subsequent_address_family()
                         .into(),
                 )?;
