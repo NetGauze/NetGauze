@@ -847,7 +847,7 @@ impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAd
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4NlriMplsLabelsAddressWritingError> {
         let len = (self.len() - 1) * 8;
-        writer.write_u8(len as u8)?;
+        writer.write_u8((len - 1) as u8)?;
         for label in self.labels() {
             label.write(writer)?;
         }

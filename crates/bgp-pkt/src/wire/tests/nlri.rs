@@ -384,3 +384,16 @@ fn test_route_target_membership_address() -> Result<(), RouteTargetMembershipAdd
     test_write(&good_short, &good_short_wire)?;
     Ok(())
 }
+
+#[test]
+fn test_ipv4_nlri_mpls_labels_address() -> Result<(), Ipv4NlriMplsLabelsAddressWritingError> {
+    let good_wire = [0x37, 0x10, 0x03, 0x31, 0xcb, 0x00, 0x71, 0xfe];
+    let good = Ipv4NlriMplsLabelsAddress::new(
+        None,
+        vec![MplsLabel::new([16, 3, 49])],
+        Ipv4Net::from_str("203.0.113.254/31").unwrap(),
+    );
+    test_parsed_completely_with_three_inputs(&good_wire, false, false, 1, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
