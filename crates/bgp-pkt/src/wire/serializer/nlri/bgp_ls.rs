@@ -14,17 +14,19 @@
 // limitations under the License.
 
 use crate::{
+    iana::BgpLsNodeDescriptorType,
     nlri::{
-        BgpLsLinkDescriptor, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
-        BgpLsNlriValue, BgpLsNodeDescriptor, BgpLsNodeDescriptorSubTlv, BgpLsPrefixDescriptor,
-        BgpLsVpnNlri, IpReachabilityInformationData,
+        BgpLsLinkDescriptor, BgpLsLocalNodeDescriptors, BgpLsNlri, BgpLsNlriIpPrefix,
+        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
+        BgpLsNodeDescriptors, BgpLsPrefixDescriptor, BgpLsRemoteNodeDescriptors, BgpLsVpnNlri,
+        IpReachabilityInformationData,
     },
     wire::serializer::{
         nlri::nlri::RouteDistinguisherWritingError, write_tlv_header, MultiTopologyIdWritingError,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_parse_utils::WritablePdu;
+use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::{io::Write, net::IpAddr};
 
@@ -225,18 +227,56 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriNode {
     }
 }
 
-impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptor {
-    const BASE_LENGTH: usize = 4; // tlv type 16bits + tlv length 16bits
+impl WritablePdu<BgpLsNlriWritingError> for BgpLsLocalNodeDescriptors {
+    const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
-        Self::BASE_LENGTH + self.subtlvs_len()
+        self.0.len(BgpLsNodeDescriptorType::LocalNodeDescriptor)
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.get_type() as u16, self.len() as u16)?;
+        self.0
+            .write(writer, BgpLsNodeDescriptorType::LocalNodeDescriptor)
+    }
+}
+
+impl WritablePdu<BgpLsNlriWritingError> for BgpLsRemoteNodeDescriptors {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        self.0.len(BgpLsNodeDescriptorType::RemoteNodeDescriptor)
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
+    where
+        Self: Sized,
+    {
+        self.0
+            .write(writer, BgpLsNodeDescriptorType::RemoteNodeDescriptor)
+    }
+}
+
+impl WritablePduWithOneInput<BgpLsNodeDescriptorType, BgpLsNlriWritingError>
+    for BgpLsNodeDescriptors
+{
+    const BASE_LENGTH: usize = 4; // tlv type 16bits + tlv length 16bits
+
+    fn len(&self, _input: BgpLsNodeDescriptorType) -> usize {
+        Self::BASE_LENGTH + self.subtlvs_len()
+    }
+
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+        input: BgpLsNodeDescriptorType,
+    ) -> Result<(), BgpLsNlriWritingError>
+    where
+        Self: Sized,
+    {
+        write_tlv_header(writer, input as u16, self.len(input) as u16)?;
         for tlv in self.subtlvs() {
             tlv.write(writer)?;
         }

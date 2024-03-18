@@ -209,7 +209,7 @@ impl BgpLsNlriValue {
 pub struct BgpLsNlriIpPrefix {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptors: BgpLsNodeDescriptor,
+    pub local_node_descriptors: BgpLsLocalNodeDescriptors,
     pub prefix_descriptors: Vec<BgpLsPrefixDescriptor>,
 }
 
@@ -420,7 +420,7 @@ impl BgpLsPrefixDescriptor {
 pub struct BgpLsNlriNode {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptors: BgpLsNodeDescriptor,
+    pub local_node_descriptors: BgpLsLocalNodeDescriptors,
 }
 
 /// ```text
@@ -434,25 +434,42 @@ pub struct BgpLsNlriNode {
 /// |                                                               |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BgpLsNodeDescriptor {
-    Local(Vec<BgpLsNodeDescriptorSubTlv>),
-    Remote(Vec<BgpLsNodeDescriptorSubTlv>),
-}
+pub struct BgpLsNodeDescriptors(pub Vec<BgpLsNodeDescriptorSubTlv>);
 
-impl BgpLsNodeDescriptor {
-    pub fn get_type(&self) -> BgpLsNodeDescriptorType {
-        match self {
-            BgpLsNodeDescriptor::Local(_) => LocalNodeDescriptor,
-            BgpLsNodeDescriptor::Remote(_) => RemoteNodeDescriptor,
-        }
-    }
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |              Type             |             Length            |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                                                               |
+/// //              Node Descriptor Sub-TLVs (variable)            //
+/// |                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct BgpLsLocalNodeDescriptors(pub BgpLsNodeDescriptors);
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |              Type             |             Length            |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |                                                               |
+/// //              Node Descriptor Sub-TLVs (variable)            //
+/// |                                                               |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct BgpLsRemoteNodeDescriptors(pub BgpLsNodeDescriptors);
 
+impl BgpLsNodeDescriptors {
     pub fn subtlvs(&self) -> &[BgpLsNodeDescriptorSubTlv] {
-        match self {
-            BgpLsNodeDescriptor::Local(subtlvs) | BgpLsNodeDescriptor::Remote(subtlvs) => subtlvs,
-        }
+        &self.0
     }
 
     pub fn subtlvs_len(&self) -> usize {
@@ -605,8 +622,8 @@ impl BgpLsNodeDescriptorSubTlv {
 pub struct BgpLsNlriLink {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
-    pub local_node_descriptors: BgpLsNodeDescriptor,
-    pub remote_node_descriptors: BgpLsNodeDescriptor,
+    pub local_node_descriptors: BgpLsLocalNodeDescriptors,
+    pub remote_node_descriptors: BgpLsRemoteNodeDescriptors,
     pub link_descriptors: Vec<BgpLsLinkDescriptor>,
 }
 

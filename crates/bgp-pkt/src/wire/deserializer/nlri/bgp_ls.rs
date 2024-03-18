@@ -22,10 +22,11 @@ use crate::{
         PrefixDescriptorTypeError, UnknownBgpLsNlriType,
     },
     nlri::{
-        BgpLsLinkDescriptor, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
-        BgpLsNlriValue, BgpLsNodeDescriptor, BgpLsNodeDescriptorSubTlv, BgpLsPrefixDescriptor,
-        BgpLsVpnNlri, IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData,
-        OspfRouteType, UnknownOspfRouteType,
+        BgpLsLinkDescriptor, BgpLsLocalNodeDescriptors, BgpLsNlri, BgpLsNlriIpPrefix,
+        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
+        BgpLsNodeDescriptors, BgpLsPrefixDescriptor, BgpLsRemoteNodeDescriptors, BgpLsVpnNlri,
+        IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
+        UnknownOspfRouteType,
     },
     wire::deserializer::{
         nlri::RouteDistinguisherParsingError, read_tlv_header, Ipv4PrefixParsingError,
@@ -172,29 +173,8 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriLink {
         let (span, protocol_id) =
             nom::combinator::map_res(be_u8, iana::BgpLsProtocolId::try_from)(span)?;
         let (span, identifier) = be_u64(span)?;
-
         let (span, local_node_descriptors) = parse_into_located(span)?;
-
-        if !matches!(local_node_descriptors, BgpLsNodeDescriptor::Local(_)) {
-            return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
-                span,
-                BgpLsNlriParsingError::BadNodeDescriptorTlvType(
-                    BgpLsNodeDescriptorType::RemoteNodeDescriptor,
-                ),
-            )));
-        }
-
         let (span, remote_node_descriptors) = parse_into_located(span)?;
-
-        if !matches!(remote_node_descriptors, BgpLsNodeDescriptor::Remote(_)) {
-            return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
-                span,
-                BgpLsNlriParsingError::BadNodeDescriptorTlvType(
-                    BgpLsNodeDescriptorType::RemoteNodeDescriptor,
-                ),
-            )));
-        }
-
         let (span, link_descriptors) = parse_till_empty_into_located(span)?;
 
         Ok((
@@ -285,17 +265,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriNode {
         let (span, protocol_id) =
             nom::combinator::map_res(be_u8, iana::BgpLsProtocolId::try_from)(span)?;
         let (span, identifier) = be_u64(span)?;
-
         let (span, local_node_descriptors) = parse_into_located(span)?;
-
-        if !matches!(local_node_descriptors, BgpLsNodeDescriptor::Local(_)) {
-            return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
-                span,
-                BgpLsNlriParsingError::BadNodeDescriptorTlvType(
-                    BgpLsNodeDescriptorType::RemoteNodeDescriptor,
-                ),
-            )));
-        }
 
         Ok((
             span,
@@ -308,24 +278,56 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriNode {
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescriptor {
-    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLocalNodeDescriptors {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
+    where
+        Self: Sized,
+    {
+        let (span, value) =
+            parse_into_located_one_input(buf, BgpLsNodeDescriptorType::LocalNodeDescriptor)?;
+
+        Ok((span, BgpLsLocalNodeDescriptors(value)))
+    }
+}
+
+impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsRemoteNodeDescriptors {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
+    where
+        Self: Sized,
+    {
+        let (span, value) =
+            parse_into_located_one_input(buf, BgpLsNodeDescriptorType::RemoteNodeDescriptor)?;
+
+        Ok((span, BgpLsRemoteNodeDescriptors(value)))
+    }
+}
+
+impl<'a> ReadablePduWithOneInput<'a, BgpLsNodeDescriptorType, LocatedBgpLsNlriParsingError<'a>>
+    for BgpLsNodeDescriptors
+{
+    fn from_wire(
+        span: Span<'a>,
+        input: BgpLsNodeDescriptorType,
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
     where
         Self: Sized,
     {
         let (span, tlv_type) =
             nom::combinator::map_res(be_u16, iana::BgpLsNodeDescriptorType::try_from)(span)?;
+
+        if tlv_type != input {
+            return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
+                span,
+                BgpLsNlriParsingError::BadNodeDescriptorTlvType(tlv_type),
+            )));
+        }
+
         let (span, tlv_length) = be_u16(span)?;
         let (span, data) = nom::bytes::complete::take(tlv_length)(span)?;
 
         let (_, subtlvs) = parse_till_empty_into_located(data)?;
 
-        let descriptor = match tlv_type {
-            BgpLsNodeDescriptorType::LocalNodeDescriptor => BgpLsNodeDescriptor::Local(subtlvs),
-            BgpLsNodeDescriptorType::RemoteNodeDescriptor => BgpLsNodeDescriptor::Remote(subtlvs),
-        };
-
-        Ok((span, descriptor))
+        Ok((span, BgpLsNodeDescriptors(subtlvs)))
     }
 }
 
@@ -398,18 +400,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
         let (span, protocol_id) =
             nom::combinator::map_res(be_u8, iana::BgpLsProtocolId::try_from)(span)?;
         let (span, identifier) = be_u64(span)?;
-
         let (span, local_node_descriptors) = parse_into_located(span)?;
-
-        if !matches!(local_node_descriptors, BgpLsNodeDescriptor::Local(_)) {
-            return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
-                span,
-                BgpLsNlriParsingError::BadNodeDescriptorTlvType(
-                    BgpLsNodeDescriptorType::RemoteNodeDescriptor,
-                ),
-            )));
-        }
-
         let (span, prefix_descriptors) =
             parse_till_empty_into_with_one_input_located(span, nlri_type)?;
 
