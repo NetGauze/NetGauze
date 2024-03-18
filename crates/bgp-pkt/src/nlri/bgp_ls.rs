@@ -13,12 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::iana::BgpLsNlriType;
 use crate::{
-    iana,
     iana::{
-        BgpLsLinkDescriptorType, BgpLsNodeDescriptorSubType, BgpLsNodeDescriptorType,
-        BgpLsNodeDescriptorType::{LocalNodeDescriptor, RemoteNodeDescriptor},
-        BgpLsPrefixDescriptorType, BgpLsProtocolId,
+        BgpLsLinkDescriptorType, BgpLsNodeDescriptorSubType, BgpLsPrefixDescriptorType,
+        BgpLsProtocolId,
     },
     nlri::RouteDistinguisher,
 };
@@ -176,15 +175,28 @@ pub enum BgpLsNlriValue {
     /// ```
     /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
     Ipv6Prefix(BgpLsNlriIpPrefix),
+
+    Unknown {
+        code: u16,
+        value: Vec<u8>,
+    },
 }
 
 impl BgpLsNlriValue {
-    pub fn get_type(&self) -> iana::BgpLsNlriType {
+    pub fn code(&self) -> Result<BgpLsNlriType, u16> {
         match self {
-            BgpLsNlriValue::Node(_) => iana::BgpLsNlriType::Node,
-            BgpLsNlriValue::Link(_) => iana::BgpLsNlriType::Link,
-            BgpLsNlriValue::Ipv4Prefix(_) => iana::BgpLsNlriType::Ipv4TopologyPrefix,
-            BgpLsNlriValue::Ipv6Prefix(_) => iana::BgpLsNlriType::Ipv6TopologyPrefix,
+            BgpLsNlriValue::Node(_) => Ok(BgpLsNlriType::Node),
+            BgpLsNlriValue::Link(_) => Ok(BgpLsNlriType::Link),
+            BgpLsNlriValue::Ipv4Prefix(_) => Ok(BgpLsNlriType::Ipv4TopologyPrefix),
+            BgpLsNlriValue::Ipv6Prefix(_) => Ok(BgpLsNlriType::Ipv6TopologyPrefix),
+            BgpLsNlriValue::Unknown { code, .. } => Err(*code),
+        }
+    }
+
+    pub fn raw_code(&self) -> u16 {
+        match self.code() {
+            Ok(type_) => type_ as u16,
+            Err(code) => code,
         }
     }
 }

@@ -55,7 +55,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlri {
 
         // do not count add_path length since it is before the tlv
         let tlv_len = self.len() as u16 - self.path_id.map_or(0, |_| 4);
-        write_tlv_header(writer, nlri.get_type() as u16, tlv_len)?;
+        write_tlv_header(writer, nlri.raw_code(), tlv_len)?;
 
         nlri.write(writer)?;
 
@@ -80,7 +80,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsVpnNlri {
 
         // do not count add_path length since it is before the tlv
         let tlv_len = self.len() as u16 - self.path_id.map_or(0, |_| 4);
-        write_tlv_header(writer, self.value.get_type() as u16, tlv_len)?;
+        write_tlv_header(writer, self.value.raw_code(), tlv_len)?;
 
         self.rd.write(writer)?;
         self.value.write(writer)?;
@@ -98,6 +98,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriValue {
             BgpLsNlriValue::Link(data) => data.len(),
             BgpLsNlriValue::Ipv4Prefix(data) => data.len(),
             BgpLsNlriValue::Ipv6Prefix(data) => data.len(),
+            BgpLsNlriValue::Unknown { value, .. } => value.len(),
         }
     }
 
@@ -110,6 +111,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriValue {
             BgpLsNlriValue::Link(data) => data.write(writer),
             BgpLsNlriValue::Ipv4Prefix(data) => data.write(writer),
             BgpLsNlriValue::Ipv6Prefix(data) => data.write(writer),
+            BgpLsNlriValue::Unknown { value, .. } => Ok(writer.write_all(value)?),
         }
     }
 }
