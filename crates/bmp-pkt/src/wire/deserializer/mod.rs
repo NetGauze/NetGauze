@@ -16,6 +16,9 @@
 //! Deserializer library for BMP's wire protocol
 
 use chrono::LocalResult;
+#[cfg(not(feature = "fuzz"))]
+use chrono::TimeZone;
+
 use std::{collections::HashMap, net::Ipv6Addr, string::FromUtf8Error};
 
 use netgauze_bgp_pkt::wire::deserializer::{

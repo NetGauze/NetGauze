@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(not(feature = "fuzz"))]
+use chrono::TimeZone;
 use ipnet::Ipv4Net;
 use netgauze_bgp_pkt::{
     capabilities::{
