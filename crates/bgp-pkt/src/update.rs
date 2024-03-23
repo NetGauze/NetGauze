@@ -254,6 +254,7 @@ mod tests {
                     next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
                         RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
                         "fc00::1".parse().unwrap(),
+                        None,
                     )),
                     nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
                         RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },

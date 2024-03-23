@@ -25,6 +25,7 @@ pub(crate) const IPV4_LEN: u8 = 4;
 pub(crate) const IPV4_LEN_BITS: u8 = 32;
 pub(crate) const LABELED_IPV4_LEN: u8 = RD_LEN + IPV4_LEN;
 pub(crate) const IPV6_LEN: u8 = 16;
+pub(crate) const IPV6_WITH_LINK_LOCAL_LEN: u8 = 32;
 pub(crate) const IPV6_LEN_BITS: u8 = 128;
 pub(crate) const LABELED_IPV6_LEN: u8 = RD_LEN + IPV6_LEN;
 pub(crate) const MPLS_LABEL_LEN_BITS: u8 = 24;
@@ -846,8 +847,8 @@ impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAd
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4NlriMplsLabelsAddressWritingError> {
-        let len = (self.len() - 1) * 8;
-        writer.write_u8((len - 1) as u8)?;
+        let len = self.labels().len() as u8 * MPLS_LABEL_LEN_BITS + self.prefix().prefix_len();
+        writer.write_u8(len)?;
         for label in self.labels() {
             label.write(writer)?;
         }

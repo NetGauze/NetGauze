@@ -927,18 +927,24 @@ impl ClusterId {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MpReach {
     Ipv4Unicast {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
-        next_hop: Ipv4Addr,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
+        next_hop: IpAddr,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
+        next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv4UnicastAddress>,
     },
     Ipv4Multicast {
-        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
-        next_hop: Ipv4Addr,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
+        next_hop: IpAddr,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
+        next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv4MulticastAddress>,
     },
     Ipv4NlriMplsLabels {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
+        next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv4NlriMplsLabelsAddress>,
     },
     Ipv4MplsVpnUnicast {

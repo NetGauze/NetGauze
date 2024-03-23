@@ -303,6 +303,7 @@ pub enum IpAddrParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidIpAddressType(u8),
+    InvalidIpAddressLength(u8),
 }
 
 impl<'a> ReadablePdu<'a, LocatedIpAddrParsingError<'a>> for IpAddr {

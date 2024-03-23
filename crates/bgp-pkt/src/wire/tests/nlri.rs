@@ -141,6 +141,7 @@ fn test_labeled_ipv6_next_hop() -> Result<(), LabeledNextHopWritingError> {
     let good = LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
         RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
         Ipv6Addr::from_str("fc00::1").unwrap(),
+        None,
     ));
     test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;

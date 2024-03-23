@@ -19,8 +19,8 @@ use crate::{
     wire::{
         deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError},
         serializer::nlri::{
-            IPV4_LEN_BITS, IPV6_LEN_BITS, LABELED_IPV4_LEN, LABELED_IPV6_LEN, MAC_ADDRESS_LEN_BITS,
-            MPLS_LABEL_LEN_BITS, RD_LEN,
+            IPV4_LEN_BITS, IPV6_LEN, IPV6_LEN_BITS, LABELED_IPV4_LEN, LABELED_IPV6_LEN,
+            MAC_ADDRESS_LEN_BITS, MPLS_LABEL_LEN_BITS, RD_LEN,
         },
     },
 };
@@ -140,9 +140,15 @@ impl<'a> ReadablePdu<'a, LocatedLabeledIpv6NextHopParsingError<'a>> for LabeledI
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedLabeledIpv6NextHopParsingError<'a>> {
         let (buf, rd) = parse_into_located(buf)?;
-        let (buf, ip) = be_u128(buf)?;
-        let ip = Ipv6Addr::from(ip);
-        Ok((buf, LabeledIpv6NextHop::new(rd, ip)))
+        let (buf, (next_hop, local)) = if buf.len() == IPV6_LEN.into() {
+            let (buf, ip) = be_u128(buf)?;
+            (buf, (Ipv6Addr::from(ip), None))
+        } else {
+            let (buf, ip) = be_u128(buf)?;
+            let (buf, local) = be_u128(buf)?;
+            (buf, (Ipv6Addr::from(ip), Some(Ipv6Addr::from(local))))
+        };
+        Ok((buf, LabeledIpv6NextHop::new(rd, next_hop, local)))
     }
 }
 
@@ -158,17 +164,18 @@ pub enum LabeledNextHopParsingError {
 impl<'a> ReadablePdu<'a, LocatedLabeledNextHopParsingError<'a>> for LabeledNextHop {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedLabeledNextHopParsingError<'a>> {
         let input = buf;
-        let (buf, len) = be_u8(buf)?;
-        if len == LABELED_IPV4_LEN {
-            let (buf, labeled_ipv4) = parse_into_located(buf)?;
+        let (buf, prefix_len) = be_u8(buf)?;
+        let (buf, address_buf) = nom::bytes::complete::take(prefix_len)(buf)?;
+        if prefix_len == LABELED_IPV4_LEN {
+            let (_, labeled_ipv4) = parse_into_located(address_buf)?;
             Ok((buf, LabeledNextHop::Ipv4(labeled_ipv4)))
-        } else if len == LABELED_IPV6_LEN {
-            let (buf, labeled_ipv6) = parse_into_located(buf)?;
+        } else if prefix_len == LABELED_IPV6_LEN {
+            let (_, labeled_ipv6) = parse_into_located(address_buf)?;
             Ok((buf, LabeledNextHop::Ipv6(labeled_ipv6)))
         } else {
             Err(nom::Err::Error(LocatedLabeledNextHopParsingError::new(
                 input,
-                LabeledNextHopParsingError::InvalidLength(len),
+                LabeledNextHopParsingError::InvalidLength(prefix_len),
             )))
         }
     }

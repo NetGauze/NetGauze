@@ -1639,6 +1639,7 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
                         true,
                         PathAttributeValue::MpReach(MpReach::Ipv4NlriMplsLabels {
                             next_hop: IpAddr::V4(Ipv4Addr::new(198, 51, 100, 71)),
+                            next_hop_local: None,
                             nlri: vec![Ipv4NlriMplsLabelsAddress::new(
                                 None,
                                 vec![MplsLabel::new([16, 3, 49])],

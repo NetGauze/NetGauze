@@ -118,11 +118,21 @@ pub struct LabeledIpv6NextHop {
     rd: RouteDistinguisher,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6))]
     next_hop: Ipv6Addr,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
+    next_hop_local: Option<Ipv6Addr>,
 }
 
 impl LabeledIpv6NextHop {
-    pub const fn new(rd: RouteDistinguisher, next_hop: Ipv6Addr) -> Self {
-        Self { rd, next_hop }
+    pub const fn new(
+        rd: RouteDistinguisher,
+        next_hop: Ipv6Addr,
+        next_hop_local: Option<Ipv6Addr>,
+    ) -> Self {
+        Self {
+            rd,
+            next_hop,
+            next_hop_local,
+        }
     }
 
     pub const fn rd(&self) -> RouteDistinguisher {
@@ -131,6 +141,10 @@ impl LabeledIpv6NextHop {
 
     pub const fn next_hop(&self) -> Ipv6Addr {
         self.next_hop
+    }
+
+    pub const fn next_hop_local(&self) -> Option<Ipv6Addr> {
+        self.next_hop_local
     }
 }
 

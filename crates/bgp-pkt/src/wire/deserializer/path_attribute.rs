@@ -25,6 +25,7 @@ use crate::{
     path_attribute::*,
     wire::{
         deserializer::{community::*, nlri::*, BgpParsingContext, IpAddrParsingError},
+        serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN},
         ACCUMULATED_IGP_METRIC,
     },
 };
@@ -663,30 +664,42 @@ impl<'a>
             nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(mp_buf)?;
         match AddressType::from_afi_safi(afi, safi) {
             Ok(AddressType::Ipv4Unicast) => {
-                let (mp_buf, _next_hop_len) = be_u8(mp_buf)?;
-                let (mp_buf, next_hop) = be_u32(mp_buf)?;
-                let next_hop = Ipv4Addr::from(next_hop);
+                let (mp_buf, (next_hop, next_hop_local)) =
+                    parse_ip4_or_ipv6_next_hop(mp_buf, AddressType::Ipv4Unicast)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4Unicast)
                     .map_or(false, |x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpReach::Ipv4Unicast { next_hop, nlri }))
+                Ok((
+                    buf,
+                    MpReach::Ipv4Unicast {
+                        next_hop,
+                        next_hop_local,
+                        nlri,
+                    },
+                ))
             }
             Ok(AddressType::Ipv4Multicast) => {
-                let (mp_buf, _next_hop_len) = be_u8(mp_buf)?;
-                let (mp_buf, next_hop) = be_u32(mp_buf)?;
-                let next_hop = Ipv4Addr::from(next_hop);
+                let (mp_buf, (next_hop, next_hop_local)) =
+                    parse_ip4_or_ipv6_next_hop(mp_buf, AddressType::Ipv4Unicast)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4Multicast)
                     .map_or(false, |x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
-                Ok((buf, MpReach::Ipv4Multicast { next_hop, nlri }))
+                Ok((
+                    buf,
+                    MpReach::Ipv4Multicast {
+                        next_hop,
+                        next_hop_local,
+                        nlri,
+                    },
+                ))
             }
             Ok(AddressType::Ipv4NlriMplsLabels) => {
-                let (mp_buf, next_hop) =
-                    parse_ip_next_hop(mp_buf, AddressType::Ipv4NlriMplsLabels)?;
+                let (mp_buf, (next_hop, next_hop_local)) =
+                    parse_ip4_or_ipv6_next_hop(mp_buf, AddressType::Ipv4NlriMplsLabels)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::Ipv4NlriMplsLabels)
@@ -699,7 +712,14 @@ impl<'a>
                         .get(&AddressType::Ipv4NlriMplsLabels)
                         .unwrap_or(&1),
                 )?;
-                Ok((buf, MpReach::Ipv4NlriMplsLabels { next_hop, nlri }))
+                Ok((
+                    buf,
+                    MpReach::Ipv4NlriMplsLabels {
+                        next_hop,
+                        next_hop_local,
+                        nlri,
+                    },
+                ))
             }
             Ok(AddressType::Ipv4MplsLabeledVpn) => {
                 let (mp_buf, next_hop) =
@@ -859,6 +879,43 @@ fn parse_ip_next_hop(
         }
     };
     Ok((mp_buf, next_hop))
+}
+
+#[inline]
+fn parse_ip4_or_ipv6_next_hop(
+    mp_buf: Span<'_>,
+    address_type: AddressType,
+) -> IResult<Span<'_>, (IpAddr, Option<Ipv6Addr>), LocatedMpReachParsingError<'_>> {
+    let begin_buf = mp_buf;
+    let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
+    match next_hop_len {
+        IPV4_LEN => {
+            let (mp_buf, next_hop) = be_u32(mp_buf)?;
+            let next_hop = Ipv4Addr::from(next_hop);
+            Ok((mp_buf, (IpAddr::V4(next_hop), None)))
+        }
+        IPV6_LEN => {
+            let (mp_buf, next_hop) = be_u128(mp_buf)?;
+            let next_hop = Ipv6Addr::from(next_hop);
+            Ok((mp_buf, (IpAddr::V6(next_hop), None)))
+        }
+        IPV6_WITH_LINK_LOCAL_LEN => {
+            let (mp_buf, next_hop) = be_u128(mp_buf)?;
+            let (mp_buf, next_hop_local) = be_u128(mp_buf)?;
+            let next_hop = Ipv6Addr::from(next_hop);
+            let next_hop_local = Ipv6Addr::from(next_hop_local);
+            Ok((mp_buf, (IpAddr::V6(next_hop), Some(next_hop_local))))
+        }
+        _ => {
+            return Err(nom::Err::Error(LocatedMpReachParsingError::new(
+                begin_buf,
+                MpReachParsingError::IpAddrError(
+                    address_type,
+                    IpAddrParsingError::InvalidIpAddressLength(next_hop_len),
+                ),
+            )));
+        }
+    }
 }
 
 #[inline]
