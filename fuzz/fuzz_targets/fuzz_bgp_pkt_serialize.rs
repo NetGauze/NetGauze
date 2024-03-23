@@ -23,5 +23,5 @@ use std::io::Cursor;
 fuzz_target!(|data: BgpMessage| {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
-    data.write(&mut cursor).unwrap();
+    let _ = data.write(&mut cursor);
 });
