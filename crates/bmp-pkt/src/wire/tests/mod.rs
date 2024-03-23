@@ -1642,11 +1642,12 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
                         PathAttributeValue::MpReach(MpReach::Ipv4NlriMplsLabels {
                             next_hop: IpAddr::V4(Ipv4Addr::new(198, 51, 100, 71)),
                             next_hop_local: None,
-                            nlri: vec![Ipv4NlriMplsLabelsAddress::new(
+                            nlri: vec![Ipv4NlriMplsLabelsAddress::from(
                                 None,
                                 vec![MplsLabel::new([16, 3, 49])],
                                 Ipv4Net::from_str("203.0.113.254/31").unwrap(),
-                            )],
+                            )
+                            .unwrap()],
                         }),
                     )
                     .unwrap(),

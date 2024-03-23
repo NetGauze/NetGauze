@@ -1000,6 +1000,8 @@ pub enum Ipv4NlriMplsLabelsAddressParsingError {
     NomError(#[from_nom] ErrorKind),
     MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
     Ipv4PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv4PrefixParsingError),
+    InvalidIpv4NlriMplsLabelsAddress(InvalidIpv4NlriMplsLabelsAddress),
+    InvalidPrefixLength(u8),
 }
 
 impl<'a>
@@ -1034,12 +1036,25 @@ impl<'a>
                     nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
                 }
             })?;
+        if prefix_len < MPLS_LABEL_LEN_BITS * label_stack.len() as u8 {
+            return Err(nom::Err::Error(
+                LocatedIpv4NlriMplsLabelsAddressParsingError::new(
+                    input,
+                    Ipv4NlriMplsLabelsAddressParsingError::InvalidPrefixLength(prefix_len),
+                ),
+            ));
+        }
         prefix_len -= MPLS_LABEL_LEN_BITS * label_stack.len() as u8;
         let (_buf, prefix) = parse_into_located_two_inputs(nlri_buf, prefix_len, input)?;
-        Ok((
-            buf,
-            Ipv4NlriMplsLabelsAddress::new(path_id, label_stack, prefix),
-        ))
+        match Ipv4NlriMplsLabelsAddress::from(path_id, label_stack, prefix) {
+            Ok(address) => Ok((buf, address)),
+            Err(err) => Err(nom::Err::Error(
+                LocatedIpv4NlriMplsLabelsAddressParsingError::new(
+                    input,
+                    Ipv4NlriMplsLabelsAddressParsingError::InvalidIpv4NlriMplsLabelsAddress(err),
+                ),
+            )),
+        }
     }
 }
 
@@ -1049,6 +1064,8 @@ pub enum Ipv6NlriMplsLabelsAddressParsingError {
     NomError(#[from_nom] ErrorKind),
     MplsLabelError(#[from_located(module = "self")] MplsLabelParsingError),
     Ipv6PrefixError(#[from_located(module = "crate::wire::deserializer")] Ipv6PrefixParsingError),
+    InvalidIpv6NlriMplsLabelsAddress(InvalidIpv6NlriMplsLabelsAddress),
+    InvalidPrefixLength(u8),
 }
 
 impl<'a>
@@ -1083,12 +1100,25 @@ impl<'a>
                     nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
                 }
             })?;
+        if prefix_len < MPLS_LABEL_LEN_BITS * label_stack.len() as u8 {
+            return Err(nom::Err::Error(
+                LocatedIpv6NlriMplsLabelsAddressParsingError::new(
+                    input,
+                    Ipv6NlriMplsLabelsAddressParsingError::InvalidPrefixLength(prefix_len),
+                ),
+            ));
+        }
         prefix_len -= MPLS_LABEL_LEN_BITS * label_stack.len() as u8;
         let (_buf, prefix) = parse_into_located_two_inputs(nlri_buf, prefix_len, input)?;
-        Ok((
-            buf,
-            Ipv6NlriMplsLabelsAddress::new(path_id, label_stack, prefix),
-        ))
+        match Ipv6NlriMplsLabelsAddress::from(path_id, label_stack, prefix) {
+            Ok(address) => Ok((buf, address)),
+            Err(err) => Err(nom::Err::Error(
+                LocatedIpv6NlriMplsLabelsAddressParsingError::new(
+                    input,
+                    Ipv6NlriMplsLabelsAddressParsingError::InvalidIpv6NlriMplsLabelsAddress(err),
+                ),
+            )),
+        }
     }
 }
 

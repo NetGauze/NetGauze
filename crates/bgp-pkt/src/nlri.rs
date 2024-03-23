@@ -1077,6 +1077,14 @@ impl NlriAddressType for RouteTargetMembershipAddress {
     }
 }
 
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum InvalidIpv4NlriMplsLabelsAddress {
+    /// Total length should not exceed 255, each MPLS Label is 24 bit and
+    /// account for up to 32 bit IPv4 prefix length
+    InvalidLabelsLength(usize),
+}
+
 /// Binding IPv4 addresses to one or more MPLS labels
 ///
 /// [RFC8277](https://datatracker.ietf.org/doc/html/rfc8277) defines two wire format based on
@@ -1118,20 +1126,31 @@ pub struct Ipv4NlriMplsLabelsAddress {
 }
 
 impl Ipv4NlriMplsLabelsAddress {
-    pub const fn new(path_id: Option<u32>, labels: Vec<MplsLabel>, prefix: Ipv4Net) -> Self {
-        Self {
-            path_id,
-            labels,
-            prefix,
+    pub fn from(
+        path_id: Option<u32>,
+        labels: Vec<MplsLabel>,
+        prefix: Ipv4Net,
+    ) -> Result<Self, InvalidIpv4NlriMplsLabelsAddress> {
+        // Total length should not exceed 255, each MPLS Label is 24 bit and account for
+        // 32 bit IP prefix length
+        if labels.len() * 24 + prefix.prefix_len() as usize > u8::MAX as usize {
+            Err(InvalidIpv4NlriMplsLabelsAddress::InvalidLabelsLength(
+                labels.len(),
+            ))
+        } else {
+            Ok(Self {
+                path_id,
+                labels,
+                prefix,
+            })
         }
     }
 
-    pub const fn new_no_path_id(labels: Vec<MplsLabel>, prefix: Ipv4Net) -> Self {
-        Self {
-            path_id: None,
-            labels,
-            prefix,
-        }
+    pub fn new_no_path_id(
+        labels: Vec<MplsLabel>,
+        prefix: Ipv4Net,
+    ) -> Result<Self, InvalidIpv4NlriMplsLabelsAddress> {
+        Self::from(None, labels, prefix)
     }
 
     pub const fn path_id(&self) -> Option<u32> {
@@ -1151,6 +1170,14 @@ impl NlriAddressType for Ipv4NlriMplsLabelsAddress {
     fn address_type() -> AddressType {
         AddressType::Ipv4NlriMplsLabels
     }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum InvalidIpv6NlriMplsLabelsAddress {
+    /// Total length should not exceed 255, each MPLS Label is 24 bit and
+    /// account for up to 128 bit IPv6 prefix length
+    InvalidLabelsLength(usize),
 }
 
 /// Binding IPv6 addresses to one or more MPLS labels
@@ -1194,20 +1221,31 @@ pub struct Ipv6NlriMplsLabelsAddress {
 }
 
 impl Ipv6NlriMplsLabelsAddress {
-    pub const fn new(path_id: Option<u32>, labels: Vec<MplsLabel>, prefix: Ipv6Net) -> Self {
-        Self {
-            path_id,
-            labels,
-            prefix,
+    pub fn from(
+        path_id: Option<u32>,
+        labels: Vec<MplsLabel>,
+        prefix: Ipv6Net,
+    ) -> Result<Self, InvalidIpv6NlriMplsLabelsAddress> {
+        // Total length should not exceed 255, each MPLS Label is 24 bit and account for
+        // 32 bit IP prefix length
+        if labels.len() * 24 + prefix.prefix_len() as usize > u8::MAX as usize {
+            Err(InvalidIpv6NlriMplsLabelsAddress::InvalidLabelsLength(
+                labels.len(),
+            ))
+        } else {
+            Ok(Self {
+                path_id,
+                labels,
+                prefix,
+            })
         }
     }
 
-    pub const fn new_no_path_id(labels: Vec<MplsLabel>, prefix: Ipv6Net) -> Self {
-        Self {
-            path_id: None,
-            labels,
-            prefix,
-        }
+    pub fn new_no_path_id(
+        labels: Vec<MplsLabel>,
+        prefix: Ipv6Net,
+    ) -> Result<Self, InvalidIpv6NlriMplsLabelsAddress> {
+        Self::from(None, labels, prefix)
     }
 
     pub const fn path_id(&self) -> Option<u32> {

@@ -1404,21 +1404,23 @@ fn test_mp_reach_nlri_ipv4_mpls_labels_ipv6_next_hop() -> Result<(), MpReachWrit
     let good_no_link_local = MpReach::Ipv4NlriMplsLabels {
         next_hop: IpAddr::V6(Ipv6Addr::new(0x2001, 0x0db8, 0x91, 0, 0, 0, 0, 0x1)),
         next_hop_local: None,
-        nlri: vec![Ipv4NlriMplsLabelsAddress::new(
+        nlri: vec![Ipv4NlriMplsLabelsAddress::from(
             None,
             vec![MplsLabel::new([1, 3, 0])],
             Ipv4Net::from_str("192.0.2.13/32").unwrap(),
-        )],
+        )
+        .unwrap()],
     };
 
     let good_link_local = MpReach::Ipv4NlriMplsLabels {
         next_hop: IpAddr::V6(Ipv6Addr::new(0x2001, 0x0db8, 0x91, 0, 0, 0, 0, 0x1)),
         next_hop_local: Some(Ipv6Addr::from_str("FE80::AB8").unwrap()),
-        nlri: vec![Ipv4NlriMplsLabelsAddress::new(
+        nlri: vec![Ipv4NlriMplsLabelsAddress::from(
             None,
             vec![MplsLabel::new([1, 3, 0])],
             Ipv4Net::from_str("192.0.2.13/32").unwrap(),
-        )],
+        )
+        .unwrap()],
     };
 
     test_parsed_completely_with_three_inputs(
@@ -2065,7 +2067,8 @@ fn test_mp_reach_nlri_mpls_labels_ipv6() -> Result<(), PathAttributeWritingError
             nlri: vec![Ipv6NlriMplsLabelsAddress::new_no_path_id(
                 vec![MplsLabel::new([0x05, 0xdc, 0x31])],
                 Ipv6Net::from_str("fc00::3/128").unwrap(),
-            )],
+            )
+            .unwrap()],
         }),
     )
     .unwrap();
@@ -2522,11 +2525,12 @@ fn test_ipv4_nlri_mpls_labels_address() -> Result<(), PathAttributeWritingError>
         PathAttributeValue::MpReach(MpReach::Ipv4NlriMplsLabels {
             next_hop: IpAddr::V4(Ipv4Addr::new(198, 51, 100, 71)),
             next_hop_local: None,
-            nlri: vec![Ipv4NlriMplsLabelsAddress::new(
+            nlri: vec![Ipv4NlriMplsLabelsAddress::from(
                 None,
                 vec![MplsLabel::new([16, 3, 49])],
                 Ipv4Net::from_str("203.0.113.254/31").unwrap(),
-            )],
+            )
+            .unwrap()],
         }),
     )
     .unwrap();

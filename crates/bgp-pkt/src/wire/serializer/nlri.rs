@@ -834,6 +834,8 @@ impl WritablePdu<RouteTargetMembershipWritingError> for RouteTargetMembership {
 pub enum Ipv4NlriMplsLabelsAddressWritingError {
     StdIOError(#[from_std_io_error] String),
     MplsLabelError(#[from] MplsLabelWritingError),
+    /// prefix length is exceeding 255 limit
+    InvalidPrefixLength(usize),
 }
 
 impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAddress {
@@ -847,8 +849,14 @@ impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAd
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv4NlriMplsLabelsAddressWritingError> {
-        let len = self.labels().len() as u8 * MPLS_LABEL_LEN_BITS + self.prefix().prefix_len();
-        writer.write_u8(len)?;
+        let len = self.labels().len() * MPLS_LABEL_LEN_BITS as usize
+            + self.prefix().prefix_len() as usize;
+        if len > u8::MAX as usize {
+            return Err(Ipv4NlriMplsLabelsAddressWritingError::InvalidPrefixLength(
+                len,
+            ));
+        }
+        writer.write_u8(len as u8)?;
         for label in self.labels() {
             label.write(writer)?;
         }
@@ -862,6 +870,8 @@ impl WritablePdu<Ipv4NlriMplsLabelsAddressWritingError> for Ipv4NlriMplsLabelsAd
 pub enum Ipv6NlriMplsLabelsAddressWritingError {
     StdIOError(#[from_std_io_error] String),
     MplsLabelError(#[from] MplsLabelWritingError),
+    /// prefix length is exceeding 255 limit
+    InvalidPrefixLength(usize),
 }
 
 impl WritablePdu<Ipv6NlriMplsLabelsAddressWritingError> for Ipv6NlriMplsLabelsAddress {
@@ -875,7 +885,13 @@ impl WritablePdu<Ipv6NlriMplsLabelsAddressWritingError> for Ipv6NlriMplsLabelsAd
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6NlriMplsLabelsAddressWritingError> {
-        let len = (self.len() - 1) * 8;
+        let len = self.labels().len() * MPLS_LABEL_LEN_BITS as usize
+            + self.prefix().prefix_len() as usize;
+        if len > u8::MAX as usize {
+            return Err(Ipv6NlriMplsLabelsAddressWritingError::InvalidPrefixLength(
+                len,
+            ));
+        }
         writer.write_u8(len as u8)?;
         for label in self.labels() {
             label.write(writer)?;
