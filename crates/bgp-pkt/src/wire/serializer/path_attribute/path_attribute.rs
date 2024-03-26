@@ -15,8 +15,6 @@
 
 //! Serializer for BGP Path Attributes
 
-use crate::bgp_ls::{BgpLsNlri, BgpLsVpnNlri};
-use crate::wire::serializer::bgp_ls::BgpLsWritingError;
 use crate::{
     iana::{AigpAttributeType, PathAttributeType},
     nlri::*,
