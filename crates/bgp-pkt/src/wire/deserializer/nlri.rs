@@ -203,19 +203,29 @@ impl<'a>
     ) -> IResult<Span<'a>, Self, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>> {
         let input = buf;
         let (buf, prefix_len) = be_u8(buf)?;
-        let (buf, label_stack) = parse_mpls_label_stack(buf, is_unreach, multiple_labels_limit)
-            .map_err(|err| match err {
-                nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-                nom::Err::Error(error) => nom::Err::Error(error.into()),
-                nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
-            })?;
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+        let prefix_bytes = if prefix_len > u8::MAX - 7 {
+            u8::MAX
         } else {
-            (buf, None)
+            (prefix_len + 7) / 8
         };
-        let (buf, rd) = parse_into_located(buf)?;
+        // consuming only the bytes specified by the prefix length field, since MPLS
+        // stack is read until the last bit is set.
+        let (buf, prefix_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
+        let (prefix_buf, label_stack) =
+            parse_mpls_label_stack(prefix_buf, is_unreach, multiple_labels_limit).map_err(
+                |err| match err {
+                    nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+                    nom::Err::Error(error) => nom::Err::Error(error.into()),
+                    nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
+                },
+            )?;
+        let (prefix_buf, path_id) = if add_path {
+            let (prefix_buf, path_id) = be_u32(prefix_buf)?;
+            (prefix_buf, Some(path_id))
+        } else {
+            (prefix_buf, None)
+        };
+        let (prefix_buf, rd) = parse_into_located(prefix_buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
         let reminder_prefix_len = match prefix_len.checked_sub(read_prefix) {
@@ -229,7 +239,17 @@ impl<'a>
             }
             Some(val) => val,
         };
-        let (buf, network) = parse_into_located_two_inputs(buf, reminder_prefix_len, input)?;
+        let (reminder, network) =
+            parse_into_located_two_inputs(prefix_buf, reminder_prefix_len, input)?;
+        // Check all the bytes specified by the prefix length are consumed
+        if !reminder.is_empty() {
+            return Err(nom::Err::Error(
+                LocatedIpv4MplsVpnUnicastAddressParsingError::new(
+                    input,
+                    Ipv4MplsVpnUnicastAddressParsingError::InvalidPrefixLength(prefix_len),
+                ),
+            ));
+        }
         Ok((
             buf,
             Ipv4MplsVpnUnicastAddress::new(path_id, rd, label_stack, network),
@@ -259,19 +279,29 @@ impl<'a>
     ) -> IResult<Span<'a>, Self, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>> {
         let input = buf;
         let (buf, prefix_len) = be_u8(buf)?;
-        let (buf, label_stack) = parse_mpls_label_stack(buf, is_unreach, multiple_labels_limit)
-            .map_err(|err| match err {
-                nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
-                nom::Err::Error(error) => nom::Err::Error(error.into()),
-                nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
-            })?;
-        let (buf, path_id) = if add_path {
-            let (buf, path_id) = be_u32(buf)?;
-            (buf, Some(path_id))
+        let prefix_bytes = if prefix_len > u8::MAX - 7 {
+            u8::MAX
         } else {
-            (buf, None)
+            (prefix_len + 7) / 8
         };
-        let (buf, rd) = parse_into_located(buf)?;
+        // consuming only the bytes specified by the prefix length field, since MPLS
+        // stack is read until the last bit is set.
+        let (buf, prefix_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
+        let (prefix_buf, label_stack) =
+            parse_mpls_label_stack(prefix_buf, is_unreach, multiple_labels_limit).map_err(
+                |err| match err {
+                    nom::Err::Incomplete(needed) => nom::Err::Incomplete(needed),
+                    nom::Err::Error(error) => nom::Err::Error(error.into()),
+                    nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
+                },
+            )?;
+        let (prefix_buf, path_id) = if add_path {
+            let (prefix_buf, path_id) = be_u32(prefix_buf)?;
+            (prefix_buf, Some(path_id))
+        } else {
+            (prefix_buf, None)
+        };
+        let (prefix_buf, rd) = parse_into_located(prefix_buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
         let reminder_prefix_len = match prefix_len.checked_sub(read_prefix) {
@@ -285,7 +315,17 @@ impl<'a>
             }
             Some(val) => val,
         };
-        let (buf, network) = parse_into_located_two_inputs(buf, reminder_prefix_len, input)?;
+        let (reminder, network) =
+            parse_into_located_two_inputs(prefix_buf, reminder_prefix_len, input)?;
+        // Check all the bytes specified by the prefix length are consumed
+        if !reminder.is_empty() {
+            return Err(nom::Err::Error(
+                LocatedIpv6MplsVpnUnicastAddressParsingError::new(
+                    input,
+                    Ipv6MplsVpnUnicastAddressParsingError::InvalidPrefixLength(prefix_len),
+                ),
+            ));
+        }
         Ok((
             buf,
             Ipv6MplsVpnUnicastAddress::new(path_id, rd, label_stack, network),
