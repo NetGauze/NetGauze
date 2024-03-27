@@ -1635,7 +1635,7 @@ impl TryFrom<u16> for BgpLsDescriptorTlvType {
         }
     }
 }
-/// Aggregate of [BgpLsLinkAttribute] [BgpLsNodeAttribute]
+/// Aggregate of [BgpLsLinkAttributeType] [BgpLsNodeAttributeType]
 /// [BgpLsPrefixAttributeType]
 #[repr(u16)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
@@ -1767,7 +1767,7 @@ pub enum BgpLsPrefixAttributeType {
 /// - B-Flag: Backup Flag.  If set, the SID refers to a path that is eligible
 ///   for protection using fast reroute (FRR).  The computation of the backup
 ///   forwarding path and its association with the BGP Peering SID forwarding
-///   entry is implementation specific.  Section 3.6 of [RFC9087] discusses some
+///   entry is implementation specific.  Section 3.6 of RFC9087 discusses some
 ///   of the possible ways of identifying backup paths for BGP Peering SIDs.
 ///
 /// - P-Flag: Persistent Flag: If set, the SID is persistently allocated, i.e.,

@@ -22,11 +22,7 @@ use netgauze_bgp_pkt::{
         FourOctetAsCapability, MultiProtocolExtensionsCapability,
     },
     community::{Community, ExtendedCommunity, TransitiveTwoOctetExtendedCommunity},
-    iana::{BgpMessageType, UndefinedBgpMessageType},
-    nlri::{
-        EthernetSegmentIdentifier, EthernetTag, L2EvpnAddress, L2EvpnIpPrefixRoute,
-        L2EvpnIpv4PrefixRoute, L2EvpnRoute,
-    },
+    iana::UndefinedBgpMessageType,
     nlri::{Ipv4NlriMplsLabelsAddress, Ipv4Unicast, Ipv4UnicastAddress, MplsLabel},
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
@@ -49,11 +45,7 @@ use netgauze_parse_utils::{
     Span,
 };
 use nom::error::ErrorKind;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
 
 use crate::{
     iana::*,
