@@ -18,9 +18,11 @@
 //! Example
 //! ```no_run
 //! use futures_util::StreamExt;
-//! use netgauze_bmp_pkt::BmpMessage;
-//! use netgauze_bmp_service::{
+//! use netgauze_bmp_pkt::{
 //!     codec::{BmpCodec, BmpCodecDecoderError},
+//!     BmpMessage,
+//! };
+//! use netgauze_bmp_service::{
 //!     server::BmpServerResponse,
 //!     transport::{TaggedFramedReadStream, TaggedFramedReadStreamResult},
 //!     AddrInfo,
@@ -143,11 +145,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{codec::BmpCodec, BmpCodecDecoderError};
     use chrono::{TimeZone, Utc};
     use futures::StreamExt;
     use netgauze_bmp_pkt::{
-        iana::UndefinedBmpVersion, wire::deserializer::BmpMessageParsingError, *,
+        codec::{BmpCodec, BmpCodecDecoderError},
+        iana::UndefinedBmpVersion,
+        wire::deserializer::BmpMessageParsingError,
+        *,
     };
     use std::net::{IpAddr, Ipv4Addr};
     use tokio_test::io::Builder;

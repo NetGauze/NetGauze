@@ -15,13 +15,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::codec::BmpCodecDecoderError;
+use netgauze_bmp_pkt::codec::BmpCodecDecoderError;
 use std::{
     fmt::{Display, Formatter},
     net::SocketAddr,
 };
 
-pub mod codec;
 pub mod handle;
 pub mod server;
 pub mod transport;

@@ -20,9 +20,9 @@ use tokio_util::codec::Framed;
 use tower::ServiceExt;
 use tower_service::Service;
 
-use netgauze_bmp_pkt::BmpMessage;
+use netgauze_bmp_pkt::{codec::BmpCodec, BmpMessage};
 
-use crate::{codec::BmpCodec, handle::BmpServerHandle, AddrInfo, BmpCodecDecoderError, TaggedData};
+use crate::{handle::BmpServerHandle, AddrInfo, BmpCodecDecoderError, TaggedData};
 
 /// Tagged BMP Protocol request
 pub type BmpRequest =

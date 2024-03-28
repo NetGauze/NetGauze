@@ -33,6 +33,8 @@ use crate::iana::{
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "codec")]
+pub mod codec;
 pub mod iana;
 #[cfg(feature = "serde")]
 pub mod wire;

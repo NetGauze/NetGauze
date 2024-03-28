@@ -17,7 +17,7 @@ pcap-parser = { version = "0.15", features = ["data"] }
 pdu = "1.4"
 
 [dev-dependencies]
-netgauze-bmp-service = { version = "0.3.0", path = "../bmp-service" }
+netgauze-bmp-pkt= { version = "0.3.0", path = "../bmp-pkt", features = ["codec"] }
 serde_json = { workspace = true }
 bytes = { workspace = true }
 tokio-util = { workspace = true, features = ["codec"] }

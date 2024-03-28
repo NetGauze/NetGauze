@@ -15,7 +15,7 @@ categories = ["network-programming", "parsing"]
 
 [dependencies]
 netgauze-iana = { version = "0.3.0", path = "../iana" }
-netgauze-bmp-pkt = { version = "0.3.0", path = "../bmp-pkt", features = ["serde"] }
+netgauze-bmp-pkt = { version = "0.3.0", path = "../bmp-pkt", features = ["serde", "codec"] }
 netgauze-bgp-pkt = { version = "0.3.0", path = "../bgp-pkt", features = ["serde"] }
 netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils" }
 

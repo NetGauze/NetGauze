@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use pcap_parser::PcapNGReader;
 use tokio_util::codec::Decoder;
 
-use netgauze_bmp_service::codec::BmpCodec;
+use netgauze_bmp_pkt::codec::BmpCodec;
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 
 fn main() {

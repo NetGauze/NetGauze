@@ -15,14 +15,14 @@
 
 //! Codecs to decode and encode BMP Protocol messages from byte streams
 
-use byteorder::{ByteOrder, NetworkEndian};
-use bytes::{Buf, BufMut, BytesMut};
-use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
-use netgauze_bmp_pkt::{
+use crate::{
     iana::BmpVersion,
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
     BmpMessage, BmpMessageValue, PeerKey,
 };
+use byteorder::{ByteOrder, NetworkEndian};
+use bytes::{Buf, BufMut, BytesMut};
+use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
 
 use netgauze_bgp_pkt::{
     capabilities::{AddPathCapability, MultipleLabel},
@@ -35,7 +35,7 @@ use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
 /// Min length for a valid BMP Message: 1-octet version + 4-octet length
-pub(crate) const BMP_MESSAGE_MIN_LENGTH: usize = 5;
+pub const BMP_MESSAGE_MIN_LENGTH: usize = 5;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum BmpCodecDecoderError {
@@ -232,7 +232,7 @@ impl Decoder for BmpCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netgauze_bmp_pkt::*;
+    use crate::*;
 
     #[test]
     fn test_codec() -> Result<(), BmpMessageWritingError> {
