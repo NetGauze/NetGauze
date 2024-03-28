@@ -13,13 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    codec::{BgpCodecDecoderError, BgpCodecInitializer},
-    connection::ActiveConnect,
-    peer::*,
-    peer_controller::*,
-};
+use crate::{connection::ActiveConnect, peer::*, peer_controller::*};
 use netgauze_bgp_pkt::{
+    codec::{BgpCodecDecoderError, BgpCodecInitializer},
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
     BgpMessage,
 };

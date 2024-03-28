@@ -19,8 +19,8 @@ use std::net::{IpAddr, Ipv4Addr};
 use async_trait::async_trait;
 use std::{io, io::Cursor, net::SocketAddr, time::Duration};
 
-use crate::{codec::BgpCodec, connection::ActiveConnect};
-use netgauze_bgp_pkt::BgpMessage;
+use crate::connection::ActiveConnect;
+use netgauze_bgp_pkt::{codec::BgpCodec, BgpMessage};
 use netgauze_parse_utils::WritablePdu;
 
 mod connection;

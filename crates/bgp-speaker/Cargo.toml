@@ -14,7 +14,7 @@ keywords = ["bgp", "protocol"]
 categories = ["network-programming"]
 
 [dependencies]
-netgauze-bgp-pkt = { version = "0.3.0", path = "../bgp-pkt" }
+netgauze-bgp-pkt = { version = "0.3.0", path = "../bgp-pkt", features = ["codec"] }
 netgauze-iana = { version = "0.3.0", path = "../iana" }
 netgauze-locate = { version = "0.3.0", path = "../locate" }
 netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils" }

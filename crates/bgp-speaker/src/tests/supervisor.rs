@@ -14,12 +14,12 @@
 // limitations under the License.
 
 use crate::{
-    codec::BgpCodec,
     connection::TcpActiveConnect,
     peer::{EchoCapabilitiesPolicy, PeerConfig},
     supervisor::{PeersSupervisor, PeersSupervisorError},
     tests::{HOLD_TIME, MY_AS, MY_BGP_ID, PEER_ADDR, PROPERTIES},
 };
+use netgauze_bgp_pkt::codec::BgpCodec;
 use std::net::SocketAddr;
 
 const TCP_STREAM_POLICY: EchoCapabilitiesPolicy<SocketAddr, tokio::net::TcpStream, BgpCodec> =

@@ -33,6 +33,9 @@ pub mod update;
 #[cfg(feature = "serde")]
 pub mod wire;
 
+#[cfg(feature = "codec")]
+pub mod codec;
+
 /// BGP message wire format as defined by [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271#section-4.1)
 /// Here we don't keep the length and type in memory. The type is inferred by
 /// the enum value, while the length is computed a serialization time.

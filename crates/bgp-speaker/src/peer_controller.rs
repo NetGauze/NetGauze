@@ -14,7 +14,6 @@
 // limitations under the License.
 
 use crate::{
-    codec::{BgpCodecDecoderError, BgpCodecInitializer},
     connection::{ActiveConnect, ConnectionStats},
     events::BgpEvent,
     fsm::{FsmState, FsmStateError},
@@ -22,6 +21,7 @@ use crate::{
 };
 use netgauze_bgp_pkt::{
     capabilities::BgpCapability,
+    codec::{BgpCodecDecoderError, BgpCodecInitializer},
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
     BgpMessage,
 };

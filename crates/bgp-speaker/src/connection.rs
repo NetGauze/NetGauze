@@ -36,6 +36,7 @@ use tokio_util::codec::{Decoder, Encoder, Framed};
 
 use netgauze_bgp_pkt::{
     capabilities::BgpCapability,
+    codec::{BgpCodec, BgpCodecDecoderError},
     iana::PathAttributeType,
     notification::{
         BgpNotificationMessage, FiniteStateMachineError, HoldTimerExpiredError, OpenMessageError,
@@ -58,7 +59,6 @@ use netgauze_bgp_pkt::{
 use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 
 use crate::{
-    codec::{BgpCodec, BgpCodecDecoderError},
     events::{ConnectionEvent, UpdateTreatment},
     fsm::FsmStateError,
     peer::{PeerConfig, PeerPolicy, PeerProperties},

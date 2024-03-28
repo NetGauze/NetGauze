@@ -27,10 +27,14 @@ byteorder = { workspace = true, optional = true }
 criterion = { workspace = true, optional = true } # Dev dep for bench
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
+log = { workspace = true, optional = true }
+tokio-util = { workspace = true, features = ["codec"], optional = true }
+bytes = { workspace = true, optional = true }
 
 [features]
 default = ["serde"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
+codec = ["log", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 

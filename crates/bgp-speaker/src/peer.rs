@@ -33,6 +33,7 @@ use tokio_util::codec::{Decoder, Encoder, Framed};
 
 use netgauze_bgp_pkt::{
     capabilities::{BgpCapability, FourOctetAsCapability},
+    codec::{BgpCodecDecoderError, BgpCodecInitializer},
     iana::{BgpCapabilityCode, AS_TRANS},
     notification::{BgpNotificationMessage, CeaseError, OpenMessageError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
@@ -41,7 +42,6 @@ use netgauze_bgp_pkt::{
 };
 
 use crate::{
-    codec::{BgpCodecDecoderError, BgpCodecInitializer},
     connection::{ActiveConnect, Connection, ConnectionState, ConnectionStats, ConnectionType},
     events::{BgpEvent, ConnectionEvent},
     fsm::{FsmState, FsmStateError},

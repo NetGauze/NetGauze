@@ -30,7 +30,7 @@ use netgauze_bgp_pkt::{
     BgpMessage,
 };
 
-use crate::codec::BgpCodecDecoderError;
+use netgauze_bgp_pkt::codec::BgpCodecDecoderError;
 
 pub type BgpMsgReceiver = mpsc::Receiver<BgpMessage>;
 pub type BgpMsgSender = mpsc::Sender<BgpMessage>;

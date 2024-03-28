@@ -16,11 +16,10 @@
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 
-use crate::codec::BgpCodec;
+use netgauze_bgp_pkt::codec::BgpCodec;
 
 pub type BgpFramed = Framed<TcpStream, BgpCodec>;
 
-pub mod codec;
 pub mod connection;
 pub mod events;
 pub mod fsm;

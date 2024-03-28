@@ -19,7 +19,7 @@ use nom::Needed;
 use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
-use netgauze_bgp_pkt::{
+use crate::{
     capabilities::BgpCapability,
     wire::{
         deserializer::{BgpMessageParsingError, BgpParsingContext, BgpParsingIgnoredErrors},
