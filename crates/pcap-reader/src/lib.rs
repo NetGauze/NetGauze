@@ -88,7 +88,7 @@ impl<'a> Iterator for PcapIter<'a> {
                         }
                     };
                 }
-                Err(PcapError::Incomplete) => {
+                Err(PcapError::Incomplete(_)) => {
                     self.reader.refill().unwrap();
                 }
                 Err(PcapError::Eof) => return None,
@@ -98,6 +98,8 @@ impl<'a> Iterator for PcapIter<'a> {
                     todo!()
                 }
                 Err(PcapError::OwnedNomError(_, _)) => todo!(),
+                Err(PcapError::BufferTooSmall) => todo!(),
+                Err(PcapError::UnexpectedEof) => todo!(),
             }
         }
     }

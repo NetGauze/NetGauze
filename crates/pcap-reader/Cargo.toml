@@ -13,7 +13,7 @@ keywords = ["pcap", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-pcap-parser = { version = "0.14", features = ["data"] }
+pcap-parser = { version = "0.15", features = ["data"] }
 pdu = "1.4"
 
 [dev-dependencies]
