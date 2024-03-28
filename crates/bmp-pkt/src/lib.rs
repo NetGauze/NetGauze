@@ -48,7 +48,7 @@ pub mod wire;
 /// |   Msg. Type   |
 /// +---------------+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpMessage {
     V3(BmpMessageValue),
@@ -72,7 +72,7 @@ impl BmpMessage {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpMessageValue {
     RouteMonitoring(RouteMonitoringMessage),
@@ -463,7 +463,7 @@ pub enum RouteMonitoringMessageError {
 //
 /// Following the common BMP header and per-peer header is a BGP Update
 /// PDU.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
@@ -497,7 +497,7 @@ impl RouteMonitoringMessage {
 
 /// Route Mirroring messages are used for verbatim duplication of messages as
 /// received.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct RouteMirroringMessage {
     peer_header: PeerHeader,
@@ -521,14 +521,14 @@ impl RouteMirroringMessage {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MirroredBgpMessage {
     Parsed(BgpMessage),
     Raw(Vec<u8>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMirroringValue {
     /// A BGP PDU.  This PDU may or may not be an Update message.
@@ -581,7 +581,7 @@ impl RouteMirroringValue {
 /// ~                                                               ~
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerUpNotificationMessage {
     peer_header: PeerHeader,
@@ -688,7 +688,7 @@ pub enum PeerDownNotificationMessageError {
 /// ~                                                               ~
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerDownNotificationMessage {
     peer_header: PeerHeader,
@@ -744,7 +744,7 @@ impl PeerDownNotificationMessage {
 
 /// Reason indicates why the session was closed and
 /// [`PeerDownNotificationMessage`] is sent.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum PeerDownNotificationReason {
     /// The local system closed the session.  Following the

@@ -65,6 +65,7 @@ use crate::{
     BgpMessage, BgpNotificationMessage, BgpOpenMessage, BgpRouteRefreshMessage,
 };
 
+mod bgp_ls;
 mod capabilities;
 mod community;
 mod keepalive;

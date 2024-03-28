@@ -24,7 +24,10 @@ use crate::{
     nlri::LabeledNextHop,
     path_attribute::*,
     wire::{
-        deserializer::{community::*, nlri::*, BgpParsingContext, IpAddrParsingError},
+        deserializer::{
+            community::*, nlri::*, path_attribute::BgpLsAttributeParsingError, BgpParsingContext,
+            IpAddrParsingError,
+        },
         serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN},
         ACCUMULATED_IGP_METRIC,
     },
@@ -99,6 +102,10 @@ pub enum PathAttributeParsingError {
     MpUnreachErrorError(#[from_located(module = "self")] MpUnreachParsingError),
     OnlyToCustomerError(#[from_located(module = "self")] OnlyToCustomerParsingError),
     AigpError(#[from_located(module = "self")] AigpParsingError),
+    BgpLsError(
+        #[from_located(module = "crate::wire::deserializer::path_attribute")]
+        BgpLsAttributeParsingError,
+    ),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
     InvalidPathAttribute(InvalidPathAttribute, PathAttributeValue),
 }
@@ -225,6 +232,11 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttribut
                 let value = PathAttributeValue::Aigp(value);
                 (buf, value)
             }
+            Ok(PathAttributeType::BgpLsAttribute) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::BgpLs(value);
+                (buf, value)
+            }
             Ok(_code) => {
                 let (buf, value) = parse_into_located_one_input(buf_before_code, extended_length)?;
                 let value = PathAttributeValue::UnknownAttribute(value);
@@ -243,7 +255,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttribut
                 return Err(nom::Err::Error(LocatedPathAttributeParsingError::new(
                     buf,
                     PathAttributeParsingError::InvalidPathAttribute(err, value),
-                )))
+                )));
             }
         };
         Ok((buf, attr))
@@ -637,6 +649,9 @@ pub enum MpReachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")]
         RouteTargetMembershipAddressParsingError,
     ),
+    BgpLsNlriParsingError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] BgpLsNlriParsingError,
+    ),
 }
 
 impl<'a>
@@ -839,6 +854,22 @@ impl<'a>
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::RouteTargetMembership { next_hop, nlri }))
             }
+            Ok(AddressType::BgpLs) => {
+                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, AddressType::BgpLs)?;
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let add_path = add_path_map.get(&AddressType::BgpLs).map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpReach::BgpLs { next_hop, nlri }))
+            }
+            Ok(AddressType::BgpLsVpn) => {
+                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, AddressType::BgpLsVpn)?;
+                let (mp_buf, _) = be_u8(mp_buf)?;
+                let add_path = add_path_map
+                    .get(&AddressType::BgpLsVpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpReach::BgpLsVpn { next_hop, nlri }))
+            }
             Ok(_) | Err(_) => Ok((
                 buf,
                 MpReach::Unknown {
@@ -993,6 +1024,7 @@ pub enum MpUnreachParsingError {
         #[from_located(module = "crate::wire::deserializer::nlri")]
         RouteTargetMembershipAddressParsingError,
     ),
+    BgpLsError(#[from_located(module = "crate::wire::deserializer::nlri")] BgpLsNlriParsingError),
 }
 
 impl<'a>
@@ -1116,6 +1148,18 @@ impl<'a>
                     .map_or(false, |x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::L2Evpn { nlri }))
+            }
+            Ok(AddressType::BgpLs) => {
+                let add_path = add_path_map.get(&AddressType::BgpLs).map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpUnreach::BgpLs { nlri }))
+            }
+            Ok(AddressType::BgpLsVpn) => {
+                let add_path = add_path_map
+                    .get(&AddressType::BgpLsVpn)
+                    .map_or(false, |x| *x);
+                let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
+                Ok((buf, MpUnreach::BgpLsVpn { nlri }))
             }
             Ok(_) | Err(_) => Ok((
                 buf,

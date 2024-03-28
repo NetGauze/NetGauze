@@ -25,12 +25,13 @@ pub mod route_refresh;
 pub mod update;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
-use std::net::IpAddr;
+use std::{io::Write, net::IpAddr};
 
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 use crate::{
+    nlri::{MultiTopologyId, MultiTopologyIdData},
     wire::{
         deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
         serializer::{
@@ -146,6 +147,77 @@ impl WritablePdu<IpAddrWritingError> for IpAddr {
                 writer.write_all(&value.octets())?;
             }
         }
+        Ok(())
+    }
+}
+
+#[inline]
+/// Write a TLV header.
+///
+/// 0                   1                   2                   3
+/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |              Type             |             Length            |
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///
+/// `tlv_type` : tlv code point
+///
+/// `tlv_length` : total tlv length on the wire
+/// (as reported by the writer <=> including type and length fields)
+///
+/// Written length field will be `tlv_length - 4` since "Length" must not
+/// include the length of the "Type" and "Length" field
+fn write_tlv_header<T: Write>(
+    writer: &mut T,
+    tlv_type: u16,
+    tlv_length: u16,
+) -> Result<(), std::io::Error> {
+    // do not account for the tlv type u16 and tlv length u16
+    let effective_length = tlv_length - 4;
+
+    writer.write_u16::<NetworkEndian>(tlv_type)?;
+    writer.write_u16::<NetworkEndian>(effective_length)?;
+
+    Ok(())
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum MultiTopologyIdWritingError {
+    StdIoError(#[from_std_io_error] String),
+}
+
+impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyIdData {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        2 * self.id_count()
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError>
+    where
+        Self: Sized,
+    {
+        for id in &self.0 {
+            id.write(writer)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyId {
+    const BASE_LENGTH: usize = 2;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError>
+    where
+        Self: Sized,
+    {
+        writer.write_u16::<NetworkEndian>(self.value())?;
+
         Ok(())
     }
 }

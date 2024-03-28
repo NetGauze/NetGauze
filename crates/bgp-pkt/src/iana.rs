@@ -1354,6 +1354,462 @@ impl TryFrom<u8> for AigpAttributeType {
 /// Reserved by RFC6793 for AS4 that are non-mappable to AS2
 pub const AS_TRANS: u16 = 23456;
 
+/// BGP-LS NLRI Types [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#nlri-types)
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNlriType {
+    /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
+    Node = 1,
+    /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
+    Link = 2,
+    /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
+    Ipv4TopologyPrefix = 3,
+    /// [RFC7752](https://datatracker.ietf.org/doc/html/rfc7752)
+    Ipv6TopologyPrefix = 4,
+    TePolicy = 5,
+    /// [RFC9514](https://datatracker.ietf.org/doc/rfc9514/)
+    Srv6Sid = 6,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct UnknownBgpLsNlriType(pub u16);
+
+impl From<BgpLsNlriType> for u16 {
+    fn from(value: BgpLsNlriType) -> Self {
+        value as u16
+    }
+}
+
+impl TryFrom<u16> for BgpLsNlriType {
+    type Error = UnknownBgpLsNlriType;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => Err(UnknownBgpLsNlriType(value)),
+        }
+    }
+}
+
+/// BGP-LS Protocol IDs [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#protocol-ids)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum BgpLsProtocolId {
+    IsIsLevel1 = 1,
+    IsIsLevel2 = 2,
+    OspfV2 = 3,
+    Direct = 4,
+    StaticConfiguration = 5,
+    OspfV3 = 6,
+    Bgp = 7,
+    RsvpTe = 8,
+    SegmentRouting = 9,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct BgpLsProtocolIdError(pub BgpLsIanaValueError<u8>);
+
+impl From<BgpLsProtocolId> for u8 {
+    fn from(value: BgpLsProtocolId) -> Self {
+        value as u8
+    }
+}
+
+impl TryFrom<u8> for BgpLsProtocolId {
+    type Error = BgpLsProtocolIdError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => {
+                if value == 0 {
+                    Err(BgpLsProtocolIdError(BgpLsIanaValueError::Reserved(value)))
+                } else {
+                    Err(BgpLsProtocolIdError(BgpLsIanaValueError::Unknown(value)))
+                }
+            }
+        }
+    }
+}
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNodeDescriptorType {
+    LocalNodeDescriptor = 256,
+    RemoteNodeDescriptor = 257,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct BgpLsNodeDescriptorTypeError(pub BgpLsIanaValueError<u16>);
+
+impl From<BgpLsNodeDescriptorType> for u16 {
+    fn from(value: BgpLsNodeDescriptorType) -> Self {
+        value as u16
+    }
+}
+
+impl TryFrom<u16> for BgpLsNodeDescriptorType {
+    type Error = BgpLsNodeDescriptorTypeError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => {
+                if value <= 255 {
+                    Err(BgpLsNodeDescriptorTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
+                } else {
+                    Err(BgpLsNodeDescriptorTypeError(BgpLsIanaValueError::Unknown(
+                        value,
+                    )))
+                }
+            }
+        }
+    }
+}
+
+/// BGP-LS Node Descriptor Sub-TLVs [IANA](https://www.iana.org/assignments/bgp-ls-parameters/bgp-ls-parameters.xhtml#node-descriptor-link-descriptor-prefix-descriptor-attribute-tlv)
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNodeDescriptorSubType {
+    AutonomousSystem = 512,
+    BgpLsIdentifier = 513,
+    OspfAreaId = 514,
+    IgpRouterId = 515,
+    BgpRouterIdentifier = 516,
+    MemberAsNumber = 517,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct NodeDescriptorSubTypeError(pub BgpLsIanaValueError<u16>);
+
+impl From<BgpLsNodeDescriptorSubType> for u16 {
+    fn from(value: BgpLsNodeDescriptorSubType) -> Self {
+        value as u16
+    }
+}
+
+impl TryFrom<u16> for BgpLsNodeDescriptorSubType {
+    type Error = NodeDescriptorSubTypeError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => {
+                if value <= 255 {
+                    Err(NodeDescriptorSubTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
+                } else {
+                    Err(NodeDescriptorSubTypeError(BgpLsIanaValueError::Unknown(
+                        value,
+                    )))
+                }
+            }
+        }
+    }
+}
+
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsPrefixDescriptorType {
+    MultiTopologyIdentifier = 263,
+    OspfRouteType = 264,
+    IpReachabilityInformation = 265,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct PrefixDescriptorTypeError(pub BgpLsIanaValueError<u16>);
+
+impl From<BgpLsPrefixDescriptorType> for u16 {
+    fn from(value: BgpLsPrefixDescriptorType) -> Self {
+        value as u16
+    }
+}
+
+impl TryFrom<u16> for BgpLsPrefixDescriptorType {
+    type Error = PrefixDescriptorTypeError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => {
+                if value <= 255 {
+                    Err(PrefixDescriptorTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
+                } else {
+                    Err(PrefixDescriptorTypeError(BgpLsIanaValueError::Unknown(
+                        value,
+                    )))
+                }
+            }
+        }
+    }
+}
+
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsLinkDescriptorType {
+    LinkLocalRemoteIdentifiers = 258,
+    IPv4InterfaceAddress = 259,
+    IPv4NeighborAddress = 260,
+    IPv6InterfaceAddress = 261,
+    IPv6NeighborAddress = 262,
+    MultiTopologyIdentifier = 263,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct LinkDescriptorTypeError(pub BgpLsIanaValueError<u16>);
+
+impl From<BgpLsLinkDescriptorType> for u16 {
+    fn from(value: BgpLsLinkDescriptorType) -> Self {
+        value as u16
+    }
+}
+
+impl TryFrom<u16> for BgpLsLinkDescriptorType {
+    type Error = LinkDescriptorTypeError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => {
+                if value <= 255 {
+                    Err(LinkDescriptorTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
+                } else {
+                    Err(LinkDescriptorTypeError(BgpLsIanaValueError::Unknown(value)))
+                }
+            }
+        }
+    }
+}
+
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsDescriptorTlvType {
+    LocalNodeDescriptor = 256,
+    RemoteNodeDescriptor = 257,
+    MultiTopologyIdentifier = 263,
+    OspfRouteType = 264,
+    IpReachabilityInformation = 265,
+    LinkLocalRemoteIdentifiers = 258,
+    IPv4InterfaceAddress = 259,
+    IPv4NeighborAddress = 260,
+    IPv6InterfaceAddress = 261,
+    IPv6NeighborAddress = 262,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct DescriptorTlvTypeError(pub BgpLsIanaValueError<u16>);
+
+impl From<BgpLsDescriptorTlvType> for u16 {
+    fn from(value: BgpLsDescriptorTlvType) -> Self {
+        value as u16
+    }
+}
+
+impl TryFrom<u16> for BgpLsDescriptorTlvType {
+    type Error = DescriptorTlvTypeError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => {
+                if value <= 255 {
+                    Err(DescriptorTlvTypeError(BgpLsIanaValueError::Reserved(value)))
+                } else {
+                    Err(DescriptorTlvTypeError(BgpLsIanaValueError::Unknown(value)))
+                }
+            }
+        }
+    }
+}
+/// Aggregate of [BgpLsLinkAttributeType] [BgpLsNodeAttributeType]
+/// [BgpLsPrefixAttributeType]
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsAttributeType {
+    MultiTopologyIdentifier = 263,
+    NodeFlagBits = 1024,
+    OpaqueNodeAttribute = 1025,
+    NodeNameTlv = 1026,
+    IsIsArea = 1027,
+    LocalNodeIpv4RouterId = 1028,
+    LocalNodeIpv6RouterId = 1029,
+    RemoteNodeIpv4RouterId = 1030,
+    RemoteNodeIpv6RouterId = 1031,
+    RemoteNodeAdministrativeGroupColor = 1088,
+    MaximumLinkBandwidth = 1089,
+    MaximumReservableLinkBandwidth = 1090,
+    UnreservedBandwidth = 1091,
+    TeDefaultMetric = 1092,
+    LinkProtectionType = 1093,
+    MplsProtocolMask = 1094,
+    IgpMetric = 1095,
+    SharedRiskLinkGroup = 1096,
+    OpaqueLinkAttribute = 1097,
+    LinkName = 1098,
+    IgpFlags = 1152,
+    IgpRouteTag = 1153,
+    IgpExtendedRouteTag = 1154,
+    PrefixMetric = 1155,
+    OspfForwardingAddress = 1156,
+    OpaquePrefixAttribute = 1157,
+    PeerNodeSid = 1101,
+    PeerAdjSid = 1102,
+    PeerSetSid = 1103,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize, Display)]
+pub enum BgpLsIanaValueError<T> {
+    /// Reserved Values
+    Reserved(T),
+
+    /// Unassigned or Private Use values
+    Unknown(T),
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct BgpLsAttributeTypeError(pub BgpLsIanaValueError<u16>);
+
+impl From<BgpLsAttributeType> for u16 {
+    fn from(afi: BgpLsAttributeType) -> Self {
+        afi as u16
+    }
+}
+
+impl TryFrom<u16> for BgpLsAttributeType {
+    type Error = BgpLsAttributeTypeError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(val) => Ok(val),
+            None => {
+                if value <= 255 {
+                    Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Reserved(
+                        value,
+                    )))
+                } else {
+                    Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Unknown(value)))
+                }
+            }
+        }
+    }
+}
+
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNodeAttributeType {
+    MultiTopologyIdentifier = 263,
+    NodeFlagBits = 1024,
+    OpaqueNodeAttribute = 1025,
+    NodeNameTlv = 1026,
+    IsIsArea = 1027,
+    LocalNodeIpv4RouterId = 1028,
+    LocalNodeIpv6RouterId = 1029,
+}
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsLinkAttributeType {
+    LocalNodeIpv4RouterId = 1028,
+    LocalNodeIpv6RouterId = 1029,
+    RemoteNodeIpv4RouterId = 1030,
+    RemoteNodeIpv6RouterId = 1031,
+    RemoteNodeAdministrativeGroupColor = 1088,
+    MaximumLinkBandwidth = 1089,
+    MaximumReservableLinkBandwidth = 1090,
+    UnreservedBandwidth = 1091,
+    TeDefaultMetric = 1092,
+    LinkProtectionType = 1093,
+    MplsProtocolMask = 1094,
+    IgpMetric = 1095,
+    SharedRiskLinkGroup = 1096,
+    OpaqueLinkAttribute = 1097,
+    LinkName = 1098,
+}
+
+#[repr(u16)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsPrefixAttributeType {
+    IgpFlags = 1152,
+    IgpRouteTag = 1153,
+    IgpExtendedRouteTag = 1154,
+    PrefixMetric = 1155,
+    OspfForwardingAddress = 1156,
+    OpaquePrefixAttribute = 1157,
+}
+
+/// ```text
+///        0 1 2 3 4 5 6 7
+///       +-+-+-+-+-+-+-+-+
+///       |V|L|B|P| Rsvd  |
+///       +-+-+-+-+-+-+-+-+
+/// ```
+/// - V-Flag: Value Flag.  If set, then the SID carries a label value.  By
+///   default, the flag is SET.
+///
+/// - L-Flag: Local Flag.  If set, then the value/index carried by the SID has
+///   local significance.  By default, the flag is SET.
+///
+/// - B-Flag: Backup Flag.  If set, the SID refers to a path that is eligible
+///   for protection using fast reroute (FRR).  The computation of the backup
+///   forwarding path and its association with the BGP Peering SID forwarding
+///   entry is implementation specific.  Section 3.6 of RFC9087 discusses some
+///   of the possible ways of identifying backup paths for BGP Peering SIDs.
+///
+/// - P-Flag: Persistent Flag: If set, the SID is persistently allocated, i.e.,
+///   the SID value remains consistent across router restart and
+///   session/interface flap.
+///
+/// - Rsvd bits: Reserved for future use and MUST be zero when originated and
+///   ignored when received.
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsSidAttributeFlags {
+    ValueFlag = 0b_1000_0000,
+    LocalFlag = 0b_0100_0000,
+    BackupFlag = 0b_0010_0000,
+    PersistentFlag = 0b_0001_0000,
+}
+
+/// ```text
+/// +-----------------+-------------------------+------------+
+/// |       Bit       | Description             | Reference  |
+/// +-----------------+-------------------------+------------+
+/// |       'O'       | Overload Bit            | [ISO10589] |
+/// |       'T'       | Attached Bit            | [ISO10589] |
+/// |       'E'       | External Bit            | [RFC2328]  |
+/// |       'B'       | ABR Bit                 | [RFC2328]  |
+/// |       'R'       | Router Bit              | [RFC5340]  |
+/// |       'V'       | V6 Bit                  | [RFC5340]  |
+/// | Reserved (Rsvd) | Reserved for future use |            |
+/// +-----------------+-------------------------+------------+
+/// ```
+/// see [RFC7752 Section 3.2.3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpLsNodeFlagsBits {
+    Overload = 0b_1000_0000,
+    Attached = 0b_0100_0000,
+    External = 0b_0010_0000,
+    Abr = 0b_0001_0000,
+    Router = 0b_0000_1000,
+    V6 = 0b_0000_0100,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1049,6 +1049,15 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
                             treatment = tmp
                         }
                     }
+                    MpReachParsingError::BgpLsNlriParsingError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::RouteTargetConstrains.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
                 }
             }
             PathAttributeParsingError::MpUnreachErrorError(err) => {
@@ -1157,6 +1166,15 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
                             treatment = tmp
                         }
                     }
+                    MpUnreachParsingError::BgpLsError(_) => {
+                        let tmp = UpdateTreatment::ResetAddressFamily(
+                            AddressFamily::IPv4.into(),
+                            SubsequentAddressFamily::RouteTargetConstrains.into(),
+                        );
+                        if treatment < tmp {
+                            treatment = tmp
+                        }
+                    }
                 }
             }
             PathAttributeParsingError::OnlyToCustomerError(_) => {
@@ -1188,6 +1206,11 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
                     InvalidPathAttribute::InvalidPartialFlagValue(_) => {
                         // Keep treatment as is
                     }
+                }
+            }
+            PathAttributeParsingError::BgpLsError(_) => {
+                if treatment < UpdateTreatment::AttributeDiscard {
+                    treatment = UpdateTreatment::AttributeDiscard
                 }
             }
         }

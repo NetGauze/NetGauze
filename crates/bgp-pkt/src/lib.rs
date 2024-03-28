@@ -52,7 +52,7 @@ pub mod wire;
 /// |          Length               |      Type     |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpMessage {
     Open(BgpOpenMessage),
@@ -131,6 +131,18 @@ pub(crate) fn arbitrary_ip(
     let ipv4 = arbitrary_ipv4(u)?;
     let ipv6 = arbitrary_ipv6(u)?;
     let choices = [std::net::IpAddr::V4(ipv4), std::net::IpAddr::V6(ipv6)];
+    let addr = u.choose(&choices)?;
+    Ok(*addr)
+}
+
+// Custom function to generate arbitrary IPv4 and IPv6 network addresses
+#[cfg(feature = "fuzz")]
+pub(crate) fn arbitrary_ipnet(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<ipnet::IpNet> {
+    let ipv4 = arbitrary_ipv4net(u)?;
+    let ipv6 = arbitrary_ipv6net(u)?;
+    let choices = [ipnet::IpNet::V4(ipv4), ipnet::IpNet::V6(ipv6)];
     let addr = u.choose(&choices)?;
     Ok(*addr)
 }

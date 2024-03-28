@@ -20,11 +20,17 @@ use crate::{
     nlri::*,
     path_attribute::*,
     wire::{
-        serializer::{community::*, nlri::*, IpAddrWritingError},
+        serializer::{
+            community::*, nlri::*, path_attribute::BgpLsAttributeWritingError, IpAddrWritingError,
+        },
         ACCUMULATED_IGP_METRIC,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
+use netgauze_iana::address_family::{
+    AddressType,
+    AddressType::{BgpLs, BgpLsVpn},
+};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::net::IpAddr;
@@ -47,6 +53,7 @@ pub enum PathAttributeWritingError {
     ClusterListError(#[from] ClusterListWritingError),
     MpReachError(#[from] MpReachWritingError),
     MpUnreachError(#[from] MpUnreachWritingError),
+    BgpLsAttributeError(#[from] BgpLsAttributeWritingError),
     OnlyToCustomerError(#[from] OnlyToCustomerWritingError),
     AigpError(#[from] AigpWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
@@ -73,6 +80,7 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::ClusterList(value) => value.len(self.extended_length()),
             PathAttributeValue::MpReach(value) => value.len(self.extended_length()),
             PathAttributeValue::MpUnreach(value) => value.len(self.extended_length()),
+            PathAttributeValue::BgpLs(value) => value.len(self.extended_length()),
             PathAttributeValue::OnlyToCustomer(value) => value.len(self.extended_length()),
             PathAttributeValue::Aigp(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
@@ -158,6 +166,10 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             }
             PathAttributeValue::MpUnreach(value) => {
                 writer.write_u8(PathAttributeType::MpUnreachNlri.into())?;
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::BgpLs(value) => {
+                writer.write_u8(PathAttributeType::BgpLsAttribute.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::OnlyToCustomer(value) => {
@@ -731,6 +743,8 @@ pub enum MpReachWritingError {
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     LabeledNextHopError(#[from] LabeledNextHopWritingError),
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
+    BgpLsNlriWritingError(#[from] BgpLsNlriWritingError),
+    RouteDistinguisherWritingError(#[from] RouteDistinguisherWritingError),
 }
 
 impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
@@ -841,6 +855,25 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 };
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
                 next_hop_len + 1 + nlri_len
+            }
+            Self::BgpLs { nlri, next_hop } => {
+                let next_hop_len = if next_hop.is_ipv4() {
+                    IPV4_LEN as usize
+                } else {
+                    IPV6_LEN as usize
+                };
+
+                let ls_nlri_len: usize = nlri.iter().map(&BgpLsNlri::len).sum();
+
+                next_hop_len + 1 /* next-hop prefix length */
+                    + ls_nlri_len
+            }
+            Self::BgpLsVpn { nlri, next_hop } => {
+                let next_hop_len = next_hop.len();
+
+                let ls_nlri_len: usize = nlri.iter().map(&BgpLsVpnNlri::len).sum();
+
+                next_hop_len + ls_nlri_len
             }
             Self::Unknown {
                 afi: _,
@@ -1113,6 +1146,35 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     nlri.write(writer)?
                 }
             }
+            Self::BgpLs { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(AddressType::BgpLs.address_family().into())?;
+                writer.write_u8(AddressType::BgpLs.subsequent_address_family().into())?;
+                next_hop.write(writer)?;
+
+                writer.write_u8(0)?;
+
+                for nlri in nlri {
+                    nlri.write(writer)?;
+                }
+            }
+            Self::BgpLsVpn { next_hop, nlri } => {
+                writer.write_u16::<NetworkEndian>(AddressType::BgpLs.address_family().into())?;
+                writer.write_u8(AddressType::BgpLsVpn.subsequent_address_family().into())?;
+
+                // The RD of the next-hop is set to all zeros (https://www.rfc-editor.org/rfc/rfc7752#section-3.4)
+                writer.write_u8((next_hop.len() - 1) as u8 /* len field */)?;
+                writer.write_all(&[0u8; 8])?;
+                match next_hop.next_hop() {
+                    IpAddr::V4(ip) => writer.write(&ip.octets())?,
+                    IpAddr::V6(ip) => writer.write(&ip.octets())?,
+                };
+
+                writer.write_u8(0)?;
+
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
             Self::Unknown { afi, safi, value } => {
                 writer.write_u16::<NetworkEndian>(*afi as u16)?;
                 writer.write_u8(*safi as u8)?;
@@ -1136,6 +1198,7 @@ pub enum MpUnreachWritingError {
     Ipv6MplsVpnUnicastAddressError(#[from] Ipv6MplsVpnUnicastAddressWritingError),
     L2EvpnAddressError(#[from] L2EvpnAddressWritingError),
     RouteTargetMembershipAddressError(#[from] RouteTargetMembershipAddressWritingError),
+    BgpLsError(#[from] BgpLsNlriWritingError),
 }
 
 impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
@@ -1155,6 +1218,8 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
             Self::Ipv6MplsVpnUnicast { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::L2Evpn { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::RouteTargetMembership { nlri } => nlri.iter().map(|x| x.len()).sum(),
+            Self::BgpLs { nlri } => nlri.iter().map(|x| x.len()).sum(),
+            Self::BgpLsVpn { nlri } => nlri.iter().map(|x| x.len()).sum(),
             Self::Unknown {
                 afi: _,
                 safi: _,
@@ -1311,6 +1376,20 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
                     nlri.write(writer)?
                 }
             }
+            Self::BgpLs { nlri } => {
+                writer.write_u16::<NetworkEndian>(BgpLs.address_family().into())?;
+                writer.write_u8(BgpLs.subsequent_address_family().into())?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
+            Self::BgpLsVpn { nlri } => {
+                writer.write_u16::<NetworkEndian>(BgpLsVpn.address_family().into())?;
+                writer.write_u8(BgpLsVpn.subsequent_address_family().into())?;
+                for nlri in nlri {
+                    nlri.write(writer)?
+                }
+            }
             Self::Unknown { afi, safi, nlri } => {
                 writer.write_u16::<NetworkEndian>(*afi as u16)?;
                 writer.write_u8(*safi as u8)?;
@@ -1386,8 +1465,9 @@ impl WritablePduWithOneInput<bool, AigpWritingError> for Aigp {
     }
 }
 
+// TODO restore original visibility
 #[inline]
-fn write_length<T: Sized + WritablePduWithOneInput<bool, E>, E, W: std::io::Write>(
+pub(crate) fn write_length<T: Sized + WritablePduWithOneInput<bool, E>, E, W: std::io::Write>(
     attribute: &T,
     extended_length: bool,
     writer: &mut W,

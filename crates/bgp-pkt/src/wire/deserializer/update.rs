@@ -288,6 +288,10 @@ fn handle_path_error<'a>(
             let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
             buf
         }
+        PathAttributeParsingError::BgpLsError(_) => {
+            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
+            buf
+        }
     };
     Ok((buf, ()))
 }
@@ -377,6 +381,10 @@ impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
                     }
                     PathAttributeParsingError::InvalidPathAttribute(_, _) => {
                         UpdateMessageError::AttributeFlagsError { value: vec![] }
+                    }
+                    PathAttributeParsingError::BgpLsError(_) => {
+                        // TODO what to do here ?
+                        UpdateMessageError::Unspecific { value: vec![] }
                     }
                 }
             }

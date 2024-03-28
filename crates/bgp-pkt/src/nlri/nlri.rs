@@ -155,6 +155,22 @@ pub enum LabeledNextHop {
     Ipv6(LabeledIpv6NextHop),
 }
 
+impl LabeledNextHop {
+    pub fn next_hop(&self) -> IpAddr {
+        match self {
+            LabeledNextHop::Ipv4(nh) => IpAddr::V4(nh.next_hop()),
+            LabeledNextHop::Ipv6(nh) => IpAddr::V6(nh.next_hop()),
+        }
+    }
+
+    pub fn rd(&self) -> RouteDistinguisher {
+        match self {
+            LabeledNextHop::Ipv4(nh) => nh.rd(),
+            LabeledNextHop::Ipv6(nh) => nh.rd(),
+        }
+    }
+}
+
 /// A more restricted version of [`Ipv4Net`] that allows only unicast
 /// networks
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
