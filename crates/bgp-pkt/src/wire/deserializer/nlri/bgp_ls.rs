@@ -157,8 +157,17 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
                     BgpLsNlriIpPrefix::from_wire(buf, BgpLsNlriType::Ipv6TopologyPrefix)?;
                 (span, BgpLsNlriValue::Ipv6Prefix(nlri_value))
             }
-            BgpLsNlriType::TePolicy => unimplemented!(),
-            BgpLsNlriType::Srv6Sid => unimplemented!(),
+            BgpLsNlriType::TePolicy | BgpLsNlriType::Srv6Sid => {
+                let (buf, value): (Span<'_>, Span<'_>) =
+                    nom::bytes::complete::take(buf.len())(buf)?;
+                (
+                    buf,
+                    BgpLsNlriValue::Unknown {
+                        code: nlri_type.into(),
+                        value: value.to_vec(),
+                    },
+                )
+            }
         };
 
         Ok(result)
