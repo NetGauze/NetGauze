@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use tokio_util::codec::{Decoder, Encoder};
 use tracing::instrument;
 
-use netgauze_flow_pkt::{
+use crate::{
     ipfix, netflow,
     wire::{
         deserializer::{

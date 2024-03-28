@@ -26,10 +26,15 @@ chrono = { workspace = true, default-features = false, features = ["std", "serde
 nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
 criterion = { workspace = true, optional = true } # Dev dep for bench
+tracing = { workspace = true, optional = true }
+tokio-util = { workspace = true, features = ["codec"], optional = true }
+bytes = { workspace = true, optional = true }
+
 
 [features]
 default = ["serde"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
+codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
 
 

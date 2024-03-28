@@ -14,7 +14,7 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-flow-pkt = { version = "0.3.0", path = "../flow-pkt" }
+netgauze-flow-pkt = { version = "0.3.0", path = "../flow-pkt", features = ["codec"] }
 netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils" }
 nom = { workspace = true }
 byteorder = { workspace = true }

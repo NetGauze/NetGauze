@@ -9,7 +9,7 @@ use tokio_util::{
     udp::UdpFramed,
 };
 
-use netgauze_flow_service::codec::FlowInfoCodec;
+use netgauze_flow_pkt::codec::FlowInfoCodec;
 
 fn init_tracing() {
     // Very simple setup at the moment to validate the instrumentation in the code
