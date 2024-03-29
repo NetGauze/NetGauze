@@ -98,9 +98,11 @@ impl BmpCodec {
                     if let BgpMessage::Open(open) = peer_up.sent_message() {
                         let capabilities = open.capabilities();
                         let (add_path_caps, multiple_labels_caps) = get_caps(capabilities);
+                        let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
+                        let bgp_ctx = self.ctx.entry(peer_key).or_default();
+                        bgp_ctx.add_path_mut().clear();
+                        bgp_ctx.multiple_labels_mut().clear();
                         for add_path in add_path_caps {
-                            let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
-                            let bgp_ctx = self.ctx.entry(peer_key).or_default();
                             for add_path_family in add_path.address_families() {
                                 bgp_ctx.add_path_mut().insert(
                                     add_path_family.address_type(),
@@ -109,8 +111,6 @@ impl BmpCodec {
                             }
                         }
                         for labels in multiple_labels_caps {
-                            let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
-                            let bgp_ctx = self.ctx.entry(peer_key).or_default();
                             for label in labels {
                                 bgp_ctx
                                     .multiple_labels_mut()
@@ -121,15 +121,17 @@ impl BmpCodec {
                     if let BgpMessage::Open(open) = peer_up.received_message() {
                         let capabilities = open.capabilities();
                         let (add_path_caps, multiple_labels_caps) = get_caps(capabilities);
+                        let peer_key = PeerKey::new(
+                            peer_up.peer_header().address(),
+                            peer_up.peer_header().peer_type(),
+                            peer_up.peer_header().rd(),
+                            peer_up.peer_header().peer_as(),
+                            open.bgp_id(),
+                        );
+                        let bgp_ctx = self.ctx.entry(peer_key).or_default();
+                        bgp_ctx.add_path_mut().clear();
+                        bgp_ctx.multiple_labels_mut().clear();
                         for add_path in add_path_caps {
-                            let peer_key = PeerKey::new(
-                                peer_up.peer_header().address(),
-                                peer_up.peer_header().peer_type(),
-                                peer_up.peer_header().rd(),
-                                peer_up.peer_header().peer_as(),
-                                open.bgp_id(),
-                            );
-                            let bgp_ctx = self.ctx.entry(peer_key).or_default();
                             for add_path_family in add_path.address_families() {
                                 bgp_ctx.add_path_mut().insert(
                                     add_path_family.address_type(),
@@ -138,14 +140,6 @@ impl BmpCodec {
                             }
                         }
                         for multiple_labels in multiple_labels_caps {
-                            let peer_key = PeerKey::new(
-                                peer_up.peer_header().address(),
-                                peer_up.peer_header().peer_type(),
-                                peer_up.peer_header().rd(),
-                                peer_up.peer_header().peer_as(),
-                                open.bgp_id(),
-                            );
-                            let bgp_ctx = self.ctx.entry(peer_key).or_default();
                             for label in multiple_labels {
                                 bgp_ctx
                                     .multiple_labels_mut()
