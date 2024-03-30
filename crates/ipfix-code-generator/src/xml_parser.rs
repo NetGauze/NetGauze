@@ -185,7 +185,9 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
 
         let Some(data_type) =
             get_string_child(child, (IANA_NAMESPACE, "dataType").into()).map(|data_type| {
-                if name.as_str() == "samplerId" {
+                if name.as_str() == "samplerId"
+                    || name.as_str().eq_ignore_ascii_case("forwardingStatus")
+                {
                     "unsigned32".to_string()
                 } else {
                     data_type
