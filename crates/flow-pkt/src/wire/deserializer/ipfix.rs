@@ -165,23 +165,22 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                     )));
                 };
                 let (scope_field_specs, field_specs) = template.as_ref();
-                let record_length = scope_field_specs
-                    .iter()
-                    .map(|x| x.length() as usize)
-                    .sum::<usize>()
-                    + field_specs
-                        .iter()
-                        .map(|x| x.length() as usize)
-                        .sum::<usize>();
-                let count = buf.len() / record_length;
-                let mut records = Vec::with_capacity(count);
-                while buf.len() >= record_length {
-                    let (t, record) = parse_into_located_one_input(buf, Rc::clone(template))?;
+                let mut total_record_count = scope_field_specs.len() + field_specs.len();
+                let mut records = Vec::new();
+                while total_record_count > 0 {
+                    let (t, record): (Span<'_>, DataRecord) =
+                        parse_into_located_one_input(buf, Rc::clone(template))?;
                     buf = t;
+                    total_record_count -= record.scope_fields().len() + record.fields().len();
                     records.push(record);
                 }
                 // buf could be a non zero value for padding
-                check_padding_value(buf)?;
+                if buf.len() > 0 {
+                    while nom::combinator::peek(be_u8)(buf)?.1 == 0 {
+                        let (t, _) = be_u8(buf)?;
+                        buf = t;
+                    }
+                }
                 // We can safely unwrap DataSetId here since we already checked the range
                 Set::Data {
                     id: DataSetId::new(id).unwrap(),

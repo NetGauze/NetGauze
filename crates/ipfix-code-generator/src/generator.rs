@@ -953,18 +953,40 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     ret.push_str(string_error.as_str());
     ret.push_str(header.as_str());
 
-    ret.push_str("        let (buf, value) =\n");
-    ret.push_str("            nom::combinator::map_res(nom::bytes::complete::take(length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
-    ret.push_str("                let nul_range_end = str_buf\n");
-    ret.push_str("                    .iter()\n");
-    ret.push_str("                    .position(|&c| c == b'\\0')\n");
-    ret.push_str("                    .unwrap_or(str_buf.len());\n");
-    ret.push_str(
-        "                let result = ::std::str::from_utf8(&str_buf[..nul_range_end]);\n",
-    );
+    ret.push_str(format!("        eprintln!(\"{ie_name} Len {{length}}\");\n").as_str());
+    ret.push_str("        if length == u16::MAX {\n");
+    ret.push_str("            let (buf, short_length) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("            let (buf, variable_length) = if short_length == u8::MAX {\n");
+    ret.push_str("                let mut variable_length: u32= 0;\n");
+    ret.push_str("                let (buf, part1) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("                let (buf, part2) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("                let (buf, part3) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("                variable_length = (variable_length << 8) + part1  as u32;\n");
+    ret.push_str("                variable_length = (variable_length << 8) + part2  as u32;\n");
+    ret.push_str("                variable_length = (variable_length << 8) + part3  as u32;\n");
+    ret.push_str("                (buf, variable_length)\n");
+    ret.push_str("            } else {\n");
+    ret.push_str("                (buf, short_length as u32)\n");
+    ret.push_str("            };\n");
+    ret.push_str("            let (buf, value) = nom::combinator::map_res(nom::bytes::complete::take(variable_length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
+    ret.push_str("                let result = ::std::str::from_utf8(&str_buf);\n");
     ret.push_str("                result.map(|x| x.to_string())\n");
     ret.push_str("            })(buf)?;\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    ret.push_str(format!("            Ok((buf,  {ie_name}(value.to_string())))\n").as_str());
+    ret.push_str("        } else {\n");
+    ret.push_str("            let (buf, value) =\n");
+    ret.push_str("                nom::combinator::map_res(nom::bytes::complete::take(length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
+    ret.push_str("                    let nul_range_end = str_buf\n");
+    ret.push_str("                        .iter()\n");
+    ret.push_str("                        .position(|&c| c == b'\0')\n");
+    ret.push_str("                        .unwrap_or(str_buf.len());\n");
+    ret.push_str(
+        "                    let result = ::std::str::from_utf8(&str_buf[..nul_range_end]);\n",
+    );
+    ret.push_str("                    result.map(|x| x.to_string())\n");
+    ret.push_str("                })(buf)?;\n");
+    ret.push_str(format!("            Ok((buf,  {ie_name}(value)))\n").as_str());
+    ret.push_str("        }\n");
     ret.push_str("    }\n");
     ret.push_str("}\n");
     ret
@@ -1505,25 +1527,48 @@ fn generate_string_serializer(ie_name: &str) -> String {
         )
         .as_str(),
     );
-    ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
-    ret.push_str("     fn len(&self, length: Option<u16>) -> usize {\n");
-    ret.push_str("         match length {\n");
-    ret.push_str("             None => self.0.len(),\n");
-    ret.push_str("             Some(len) => len as usize,\n");
-    ret.push_str("         }\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str("         writer.write_all(self.0.as_bytes())?;\n");
-    ret.push_str("         match length {\n");
-    ret.push_str("             None => {},\n");
-    ret.push_str("             Some(len) => {\n");
-    ret.push_str("                  for _ in self.0.as_bytes().len()..(len as usize) {\n");
-    ret.push_str("                      writer.write_u8(0)?\n");
-    ret.push_str("                  }\n");
-    ret.push_str("             }\n");
-    ret.push_str("         }\n");
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
+    ret.push_str("    const BASE_LENGTH: usize = 0;\n");
+    ret.push('\n');
+    ret.push_str("    fn len(&self, length: Option<u16>) -> usize {\n");
+    ret.push_str("        match length {\n");
+    ret.push_str("            None => self.0.len(),\n");
+    ret.push_str("            Some(len) => if len == u16::MAX {\n");
+    ret.push_str("                if self.0.len() < u8::MAX as usize {\n");
+    ret.push_str("                    // One octet for the length field\n");
+    ret.push_str("                    self.0.len() + 1\n");
+    ret.push_str("                } else {\n");
+    ret.push_str("                    // 4 octets for the length field, first is 255 and other three carries the len\n");
+    ret.push_str("                    self.0.len() + 4\n");
+    ret.push_str("                }\n");
+    ret.push_str("            } else {\n");
+    ret.push_str("                len as usize\n");
+    ret.push_str("            },\n");
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push('\n');
+    ret.push_str(format!("    fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
+    ret.push_str("        match length {\n");
+    ret.push_str("            Some(u16::MAX) | None => {\n");
+    ret.push_str("                let bytes = self.0.as_bytes();\n");
+    ret.push_str("                if bytes.len() < u8::MAX as usize {\n");
+    ret.push_str("                    writer.write_u8(bytes.len() as u8)?;\n");
+    ret.push_str("                } else {\n");
+    ret.push_str("                    writer.write_u8(u8::MAX)?;\n");
+    ret.push_str("                    writer.write_all(&bytes.len().to_be_bytes()[1..])?;\n");
+    ret.push_str("                }\n");
+    ret.push_str("                writer.write_all(self.0.as_bytes())?;\n");
+    ret.push_str("            }\n");
+    ret.push_str("            Some(len) => {\n");
+    ret.push_str("                eprintln!(\"LEN: {len}\");\n");
+    ret.push_str("                writer.write_all(self.0.as_bytes())?;\n");
+    ret.push_str("                // fill the rest with zeros\n");
+    ret.push_str("                for _ in self.0.as_bytes().len()..(len as usize) {\n");
+    ret.push_str("                    writer.write_u8(0)?\n");
+    ret.push_str("                }\n");
+    ret.push_str("            }\n");
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
 }

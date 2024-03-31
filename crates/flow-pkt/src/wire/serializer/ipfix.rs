@@ -139,26 +139,54 @@ impl WritablePduWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingErro
     const BASE_LENGTH: usize = 0;
 
     fn len(&self, decoding_template: Option<Rc<DecodingTemplate>>) -> usize {
-        let (scope_lens, field_lens) = match decoding_template {
-            None => (None, None),
+        let (scope_fields_len, fields_len) = match decoding_template {
+            None => {
+                let scope_fields = self
+                    .scope_fields()
+                    .iter()
+                    .map(|x| x.len(None))
+                    .sum::<usize>();
+                let data_fields = self.fields().iter().map(|x| x.len(None)).sum::<usize>();
+                (scope_fields, data_fields)
+            }
             Some(template) => {
                 let (scope_fields_spec, fields_spec) = template.as_ref();
-                let scope_lens = scope_fields_spec.iter().map(|x| x.length()).sum::<u16>();
-                let fields_lens = fields_spec.iter().map(|x| x.length()).sum::<u16>();
-                (Some(scope_lens), Some(fields_lens))
+                let scope_lens = self
+                    .scope_fields()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, record)| {
+                        {
+                            scope_fields_spec.get(index).map(|x| {
+                                if x.length() == u16::MAX {
+                                    record.len(Some(x.length()))
+                                } else {
+                                    x.length() as usize
+                                }
+                            })
+                        }
+                        .unwrap_or(record.len(None))
+                    })
+                    .sum::<usize>();
+                let fields_lens = self
+                    .fields()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, record)| {
+                        {
+                            fields_spec.get(index).map(|x| {
+                                if x.length() == u16::MAX {
+                                    record.len(Some(x.length()))
+                                } else {
+                                    x.length() as usize
+                                }
+                            })
+                        }
+                        .unwrap_or(record.len(None))
+                    })
+                    .sum::<usize>();
+                (scope_lens, fields_lens)
             }
-        };
-        let scope_fields_len = match scope_lens {
-            Some(len) => len as usize,
-            None => self
-                .scope_fields()
-                .iter()
-                .map(|x| x.len(None))
-                .sum::<usize>(),
-        };
-        let fields_len = match field_lens {
-            Some(len) => len as usize,
-            None => self.fields().iter().map(|x| x.len(None)).sum::<usize>(),
         };
         Self::BASE_LENGTH + scope_fields_len + fields_len
     }
@@ -168,29 +196,22 @@ impl WritablePduWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingErro
         writer: &mut T,
         decoding_template: Option<Rc<DecodingTemplate>>,
     ) -> Result<(), DataRecordWritingError> {
-        let written = match decoding_template {
-            None => None,
-            Some(template) => {
-                let (scope_fields_spec, fields_spec) = template.as_ref();
-                for (index, record) in self.scope_fields().iter().enumerate() {
-                    let field_length = scope_fields_spec.get(index).map(|x| x.length());
-                    record.write(writer, field_length)?;
-                }
-                for (index, record) in self.fields().iter().enumerate() {
-                    let field_length = fields_spec.get(index).map(|x| x.length());
-                    record.write(writer, field_length)?;
-                }
-                Some(())
-            }
-        };
-        match written {
-            Some(_) => {}
+        match decoding_template {
             None => {
                 for record in self.scope_fields() {
                     record.write(writer, None)?;
                 }
                 for record in self.fields() {
                     record.write(writer, None)?;
+                }
+            }
+            Some(template) => {
+                let (scope_fields_spec, fields_spec) = template.as_ref();
+                for (index, record) in self.scope_fields().iter().enumerate() {
+                    record.write(writer, scope_fields_spec.get(index).map(|x| x.length))?;
+                }
+                for (index, record) in self.fields().iter().enumerate() {
+                    record.write(writer, fields_spec.get(index).map(|x| x.length))?;
                 }
             }
         };
