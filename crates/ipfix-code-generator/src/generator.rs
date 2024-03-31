@@ -953,7 +953,6 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     ret.push_str(string_error.as_str());
     ret.push_str(header.as_str());
 
-    ret.push_str(format!("        eprintln!(\"{ie_name} Len {{length}}\");\n").as_str());
     ret.push_str("        if length == u16::MAX {\n");
     ret.push_str("            let (buf, short_length) = nom::number::complete::be_u8(buf)?;\n");
     ret.push_str("            let (buf, variable_length) = if short_length == u8::MAX {\n");
@@ -1559,7 +1558,6 @@ fn generate_string_serializer(ie_name: &str) -> String {
     ret.push_str("                writer.write_all(self.0.as_bytes())?;\n");
     ret.push_str("            }\n");
     ret.push_str("            Some(len) => {\n");
-    ret.push_str("                eprintln!(\"LEN: {len}\");\n");
     ret.push_str("                writer.write_all(self.0.as_bytes())?;\n");
     ret.push_str("                // fill the rest with zeros\n");
     ret.push_str("                for _ in self.0.as_bytes().len()..(len as usize) {\n");
