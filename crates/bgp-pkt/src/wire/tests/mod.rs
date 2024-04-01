@@ -73,6 +73,8 @@ mod nlri;
 mod notification;
 mod open;
 mod path_attribute;
+#[cfg(feature = "codec")]
+mod pcap_tests;
 mod route_refresh;
 mod update;
 

@@ -53,6 +53,9 @@ use crate::{
     *,
 };
 
+#[cfg(feature = "codec")]
+mod pcap_tests;
+
 #[test]
 fn test_peer_type() -> Result<(), PeerHeaderWritingError> {
     let good_global_instance_ipv4_wire = [0x00, 0x00];

@@ -39,8 +39,12 @@ bench = ["criterion"]
 
 
 [dev-dependencies]
+netgauze-pcap-reader = { version = "0.3.0", path = "../pcap-reader" }
 netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils", features = ["test-helpers"] }
 serde_json = { workspace = true }
+rstest = { workspace = true }
+pcap-parser = { workspace = true, features = ["data"] }
+
 
 
 [build-dependencies]
