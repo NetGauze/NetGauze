@@ -16,6 +16,9 @@
 mod ipfix;
 mod netflow;
 
+#[cfg(feature = "codec")]
+pub mod pcap_tests;
+
 use chrono::{TimeZone, Timelike, Utc};
 use netgauze_parse_utils::{test_helpers::*, Span};
 use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};

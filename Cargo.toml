@@ -13,7 +13,7 @@ members = [
     "crates/locate",
     "crates/parse-utils",
     "crates/serde-macros",
-    "fuzz"
+    "fuzz",
 ]
 resolver = "2"
 
@@ -51,3 +51,5 @@ roxmltree = "0.19"
 arbitrary = { version = "1", features = ["derive"] }
 arbitrary_ext = { version = "0.3" }
 async-trait = "0.1"
+rstest = "0.18"
+pcap-parser = { version = "0.15", features = ["data"] }
