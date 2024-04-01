@@ -15,7 +15,7 @@ fn main() {
     let reader = Box::new(reader);
     let mut iter = PcapIter::new(reader);
     let mut peers = HashMap::new();
-    while let Some((src_ip, src_port, dst_ip, dst_port, protocol, value)) = iter.next() {
+    for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
         if protocol != TransportProtocol::TCP {
             continue;
         }
