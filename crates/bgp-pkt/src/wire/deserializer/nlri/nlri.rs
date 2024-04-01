@@ -140,7 +140,7 @@ impl<'a> ReadablePdu<'a, LocatedLabeledIpv6NextHopParsingError<'a>> for LabeledI
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedLabeledIpv6NextHopParsingError<'a>> {
         let (buf, rd) = parse_into_located(buf)?;
-        let (buf, (next_hop, local)) = if buf.len() == IPV6_LEN.into() {
+        let (buf, (next_hop, local)) = if buf.len() == IPV6_LEN as usize {
             let (buf, ip) = be_u128(buf)?;
             (buf, (Ipv6Addr::from(ip), None))
         } else {
