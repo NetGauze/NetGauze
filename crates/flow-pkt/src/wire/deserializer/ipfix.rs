@@ -175,12 +175,11 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                     records.push(record);
                 }
                 // buf could be a non zero value for padding
-                if buf.len() > 0 {
-                    while nom::combinator::peek(be_u8)(buf)?.1 == 0 {
-                        let (t, _) = be_u8(buf)?;
-                        buf = t;
-                    }
+                while buf.len() > 0 && nom::combinator::peek(be_u8)(buf)?.1 == 0 {
+                    let (t, _) = be_u8(buf)?;
+                    buf = t;
                 }
+
                 // We can safely unwrap DataSetId here since we already checked the range
                 Set::Data {
                     id: DataSetId::new(id).unwrap(),
