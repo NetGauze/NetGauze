@@ -13,7 +13,7 @@ fn main() {
     let file = File::open(path).unwrap();
     let reader = PcapNGReader::new(165536, file).unwrap();
     let reader = Box::new(reader);
-    let mut iter = PcapIter::new(reader);
+    let iter = PcapIter::new(reader);
     let mut peers = HashMap::new();
     for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
         if protocol != TransportProtocol::TCP {
