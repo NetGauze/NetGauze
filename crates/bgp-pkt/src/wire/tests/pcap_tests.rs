@@ -87,23 +87,28 @@ fn test_bgp_pcap(overwrite: bool, pcap_path: PathBuf) {
             .entry(key)
             .or_insert((BgpCodec::new(true), BytesMut::new()));
         buf.extend_from_slice(value.as_slice());
-        if let Some((msg, _err)) = codec.decode(buf).expect("Couldn't parse BGP message.") {
-            let serialized =
-                serde_json::to_string(&msg).expect("Couldn't serialize BGP message to json");
-            if let Some(file) = json_file.as_mut() {
-                file.write_all(serialized.as_bytes())
-                    .expect("Couldn't write json message");
-                file.write_all(b"\n").expect("Couldn't write json message");
+        let serialized = match codec.decode(buf) {
+            Ok(Some((msg, _err))) => {
+                serde_json::to_string(&msg).expect("Couldn't serialize BGP message to json")
             }
-            if let Some(lines) = lines.as_mut() {
-                let err_msg = format!(
-                    "PCAP PDU is not found in expected output file.\
+            Ok(None) => String::new(),
+            Err(err) => {
+                serde_json::to_string(&err).expect("Couldn't serialize BGP error message to json")
+            }
+        };
+        if let Some(file) = json_file.as_mut() {
+            file.write_all(serialized.as_bytes())
+                .expect("Couldn't write json message");
+            file.write_all(b"\n").expect("Couldn't write json message");
+        }
+        if let Some(lines) = lines.as_mut() {
+            let err_msg = format!(
+                "PCAP PDU is not found in expected output file.\
                 \nPCAP PDU {serialized}.\
                 \nExpected output file: {json_path:?}",
-                );
-                let expected = lines.next().expect(&err_msg).expect("Error reading");
-                assert_eq!(expected, serialized);
-            }
+            );
+            let expected = lines.next().expect(&err_msg).expect("Error reading");
+            assert_eq!(expected, serialized);
         }
     }
 }
