@@ -16,6 +16,7 @@
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use nom::Needed;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -64,7 +65,7 @@ impl<Peer> BgpCodecInitializer<Peer> for BgpCodec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub enum BgpCodecDecoderError {
     IoError(String),
     Incomplete(Option<usize>),
