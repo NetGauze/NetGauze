@@ -13,11 +13,11 @@ keywords = ["pcap", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-pcap-parser = { version = "0.15", features = ["data"] }
+pcap-parser = { workspace = true, features = ["data"] }
 pdu = "1.4"
 
 [dev-dependencies]
-netgauze-bmp-pkt= { version = "0.3.0", path = "../bmp-pkt", features = ["codec"] }
+netgauze-bmp-pkt = { version = "0.3.0", path = "../bmp-pkt", features = ["codec"] }
 serde_json = { workspace = true }
 bytes = { workspace = true }
 tokio-util = { workspace = true, features = ["codec"] }
