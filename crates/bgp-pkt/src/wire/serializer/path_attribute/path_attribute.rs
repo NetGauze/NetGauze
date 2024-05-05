@@ -27,10 +27,6 @@ use crate::{
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_iana::address_family::{
-    AddressType,
-    AddressType::{BgpLs, BgpLsVpn},
-};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::net::IpAddr;
@@ -896,14 +892,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv4UnicastAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    Ipv4UnicastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 let next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN
                 } else {
@@ -936,14 +926,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv4MulticastAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    Ipv4MulticastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 let mut next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN
                 } else {
@@ -974,16 +958,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv4NlriMplsLabelsAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    Ipv4NlriMplsLabelsAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 let next_hop_len = if next_hop.is_ipv4() {
                     IPV4_LEN
                 } else {
@@ -1012,16 +988,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 }
             }
             Self::Ipv4MplsVpnUnicast { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv4MplsVpnUnicastAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    Ipv4MplsVpnUnicastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
@@ -1033,14 +1001,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv6UnicastAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    Ipv6UnicastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 if let Some(local) = next_hop_local {
                     writer.write_u8(32)?;
                     writer.write_all(&next_hop_global.octets())?;
@@ -1059,14 +1021,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 next_hop_local,
                 nlri,
             } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv6MulticastAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    Ipv6MulticastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 if let Some(local) = next_hop_local {
                     writer.write_u8(32)?;
                     writer.write_all(&next_hop_global.octets())?;
@@ -1081,16 +1037,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 }
             }
             Self::Ipv6NlriMplsLabels { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv6NlriMplsLabelsAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    Ipv6NlriMplsLabelsAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
@@ -1098,16 +1046,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 }
             }
             Self::Ipv6MplsVpnUnicast { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv6MplsVpnUnicastAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    Ipv6MplsVpnUnicastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
@@ -1115,14 +1055,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 }
             }
             Self::L2Evpn { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    L2EvpnAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    L2EvpnAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
@@ -1130,16 +1064,8 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 }
             }
             Self::RouteTargetMembership { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    RouteTargetMembershipAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    RouteTargetMembershipAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 next_hop.write(writer)?;
                 writer.write_u8(0)?;
                 for nlri in nlri {
@@ -1147,20 +1073,17 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 }
             }
             Self::BgpLs { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(AddressType::BgpLs.address_family().into())?;
-                writer.write_u8(AddressType::BgpLs.subsequent_address_family().into())?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 next_hop.write(writer)?;
-
                 writer.write_u8(0)?;
-
                 for nlri in nlri {
                     nlri.write(writer)?;
                 }
             }
             Self::BgpLsVpn { next_hop, nlri } => {
-                writer.write_u16::<NetworkEndian>(AddressType::BgpLs.address_family().into())?;
-                writer.write_u8(AddressType::BgpLsVpn.subsequent_address_family().into())?;
-
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 // The RD of the next-hop is set to all zeros (https://www.rfc-editor.org/rfc/rfc7752#section-3.4)
                 writer.write_u8((next_hop.len() - 1) as u8 /* len field */)?;
                 writer.write_all(&[0u8; 8])?;
@@ -1175,9 +1098,9 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     nlri.write(writer)?
                 }
             }
-            Self::Unknown { afi, safi, value } => {
-                writer.write_u16::<NetworkEndian>(*afi as u16)?;
-                writer.write_u8(*safi as u8)?;
+            Self::Unknown { value, .. } => {
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 writer.write_all(value)?;
             }
         }
@@ -1237,162 +1160,96 @@ impl WritablePduWithOneInput<bool, MpUnreachWritingError> for MpUnreach {
         write_length(self, extended_length, writer)?;
         match self {
             Self::Ipv4Unicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv4UnicastAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    Ipv4UnicastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv4Multicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv4MulticastAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    Ipv4MulticastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv4NlriMplsLabels { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv4NlriMplsLabelsAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    Ipv4NlriMplsLabelsAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv4MplsVpnUnicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv4MplsVpnUnicastAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    Ipv4MplsVpnUnicastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6Unicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv6UnicastAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    Ipv6UnicastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6Multicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv6MulticastAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    Ipv6MulticastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6NlriMplsLabels { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv6NlriMplsLabelsAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    Ipv6NlriMplsLabelsAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::Ipv6MplsVpnUnicast { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    Ipv6MplsVpnUnicastAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    Ipv6MplsVpnUnicastAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::L2Evpn { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    L2EvpnAddress::address_type().address_family().into(),
-                )?;
-                writer.write_u8(
-                    L2EvpnAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::RouteTargetMembership { nlri } => {
-                writer.write_u16::<NetworkEndian>(
-                    RouteTargetMembershipAddress::address_type()
-                        .address_family()
-                        .into(),
-                )?;
-                writer.write_u8(
-                    RouteTargetMembershipAddress::address_type()
-                        .subsequent_address_family()
-                        .into(),
-                )?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::BgpLs { nlri } => {
-                writer.write_u16::<NetworkEndian>(BgpLs.address_family().into())?;
-                writer.write_u8(BgpLs.subsequent_address_family().into())?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
             Self::BgpLsVpn { nlri } => {
-                writer.write_u16::<NetworkEndian>(BgpLsVpn.address_family().into())?;
-                writer.write_u8(BgpLsVpn.subsequent_address_family().into())?;
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 for nlri in nlri {
                     nlri.write(writer)?
                 }
             }
-            Self::Unknown { afi, safi, nlri } => {
-                writer.write_u16::<NetworkEndian>(*afi as u16)?;
-                writer.write_u8(*safi as u8)?;
+            Self::Unknown {
+                afi: _afi,
+                safi: _safi,
+                nlri,
+            } => {
+                writer.write_u16::<NetworkEndian>(self.afi().into())?;
+                writer.write_u8(self.safi().into())?;
                 writer.write_all(nlri)?;
             }
         }
