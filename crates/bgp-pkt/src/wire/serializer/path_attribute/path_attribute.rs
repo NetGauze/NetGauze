@@ -16,7 +16,7 @@
 //! Serializer for BGP Path Attributes
 
 use crate::{
-    iana::{AigpAttributeType, PathAttributeType},
+    iana::AigpAttributeType,
     nlri::*,
     path_attribute::*,
     wire::{
@@ -99,81 +99,65 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             attributes |= 0b00010000;
         }
         writer.write_u8(attributes)?;
+        if let Ok(path_attribute_type) = self.path_attribute_type() {
+            writer.write_u8(path_attribute_type.into())?;
+        }
         match self.value() {
             PathAttributeValue::Origin(value) => {
-                writer.write_u8(PathAttributeType::Origin.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::AsPath(value) => {
-                writer.write_u8(PathAttributeType::AsPath.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::As4Path(value) => {
-                writer.write_u8(PathAttributeType::As4Path.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::NextHop(value) => {
-                writer.write_u8(PathAttributeType::NextHop.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MultiExitDiscriminator(value) => {
-                writer.write_u8(PathAttributeType::MultiExitDiscriminator.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::LocalPreference(value) => {
-                writer.write_u8(PathAttributeType::LocalPreference.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::AtomicAggregate(value) => {
-                writer.write_u8(PathAttributeType::AtomicAggregate.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::Aggregator(value) => {
-                writer.write_u8(PathAttributeType::Aggregator.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::Communities(value) => {
-                writer.write_u8(PathAttributeType::Communities.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::ExtendedCommunities(value) => {
-                writer.write_u8(PathAttributeType::ExtendedCommunities.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::ExtendedCommunitiesIpv6(value) => {
-                writer.write_u8(PathAttributeType::ExtendedCommunitiesIpv6.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::LargeCommunities(value) => {
-                writer.write_u8(PathAttributeType::LargeCommunities.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::Originator(value) => {
-                writer.write_u8(PathAttributeType::OriginatorId.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::ClusterList(value) => {
-                writer.write_u8(PathAttributeType::ClusterList.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MpReach(value) => {
-                writer.write_u8(PathAttributeType::MpReachNlri.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::MpUnreach(value) => {
-                writer.write_u8(PathAttributeType::MpUnreachNlri.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::BgpLs(value) => {
-                writer.write_u8(PathAttributeType::BgpLsAttribute.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::OnlyToCustomer(value) => {
-                writer.write_u8(PathAttributeType::OnlyToCustomer.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::Aigp(value) => {
-                writer.write_u8(PathAttributeType::AccumulatedIgp.into())?;
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::UnknownAttribute(value) => {

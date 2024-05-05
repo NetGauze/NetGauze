@@ -20,6 +20,7 @@
 use crate::arbitrary_ip;
 use crate::{
     community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
+    iana::PathAttributeType,
     nlri::*,
     path_attribute::BgpLsAttribute,
 };
@@ -152,10 +153,14 @@ impl PathAttribute {
         self.transitive
     }
 
-    ///// Extended Length bit defines whether the Attribute Length is one octet
-    ///// (if set to `false`) or two octets (if set to `true`).
+    /// Extended Length bit defines whether the Attribute Length is one octet
+    /// (if set to `false`) or two octets (if set to `true`).
     pub const fn extended_length(&self) -> bool {
         self.extended_length
+    }
+
+    pub const fn path_attribute_type(&self) -> Result<PathAttributeType, u8> {
+        self.value.path_attribute_type()
     }
 }
 
@@ -258,6 +263,37 @@ impl PathAttributeValue {
             Self::OnlyToCustomer(_) => OnlyToCustomer::can_be_partial(),
             Self::Aigp(_) => Aigp::can_be_partial(),
             Self::UnknownAttribute(_) => UnknownAttribute::can_be_partial(),
+        }
+    }
+
+    pub const fn path_attribute_type(&self) -> Result<PathAttributeType, u8> {
+        match self {
+            PathAttributeValue::Origin(_) => Ok(PathAttributeType::Origin),
+            PathAttributeValue::AsPath(_) => Ok(PathAttributeType::AsPath),
+            PathAttributeValue::As4Path(_) => Ok(PathAttributeType::As4Path),
+            PathAttributeValue::NextHop(_) => Ok(PathAttributeType::NextHop),
+            PathAttributeValue::MultiExitDiscriminator(_) => {
+                Ok(PathAttributeType::MultiExitDiscriminator)
+            }
+            PathAttributeValue::LocalPreference(_) => Ok(PathAttributeType::LocalPreference),
+            PathAttributeValue::AtomicAggregate(_) => Ok(PathAttributeType::AtomicAggregate),
+            PathAttributeValue::Aggregator(_) => Ok(PathAttributeType::Aggregator),
+            PathAttributeValue::Communities(_) => Ok(PathAttributeType::Communities),
+            PathAttributeValue::ExtendedCommunities(_) => {
+                Ok(PathAttributeType::ExtendedCommunities)
+            }
+            PathAttributeValue::ExtendedCommunitiesIpv6(_) => {
+                Ok(PathAttributeType::ExtendedCommunitiesIpv6)
+            }
+            PathAttributeValue::LargeCommunities(_) => Ok(PathAttributeType::LargeCommunities),
+            PathAttributeValue::Originator(_) => Ok(PathAttributeType::OriginatorId),
+            PathAttributeValue::ClusterList(_) => Ok(PathAttributeType::ClusterList),
+            PathAttributeValue::MpReach(_) => Ok(PathAttributeType::MpReachNlri),
+            PathAttributeValue::MpUnreach(_) => Ok(PathAttributeType::MpUnreachNlri),
+            PathAttributeValue::BgpLs(_) => Ok(PathAttributeType::BgpLsAttribute),
+            PathAttributeValue::OnlyToCustomer(_) => Ok(PathAttributeType::OnlyToCustomer),
+            PathAttributeValue::Aigp(_) => Ok(PathAttributeType::AccumulatedIgp),
+            PathAttributeValue::UnknownAttribute(UnknownAttribute { code, .. }) => Err(*code),
         }
     }
 }
