@@ -974,6 +974,8 @@ pub enum MpReach {
     Ipv6NlriMplsLabels {
         #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ip))]
         next_hop: IpAddr,
+        #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ipv6)))]
+        next_hop_local: Option<Ipv6Addr>,
         nlri: Vec<Ipv6NlriMplsLabelsAddress>,
     },
     Ipv6MplsVpnUnicast {
@@ -1408,5 +1410,383 @@ mod tests {
         assert!(!MpReach::can_be_transitive().unwrap_or(false));
         assert!(OnlyToCustomer::can_be_optional().unwrap_or(false));
         assert!(OnlyToCustomer::can_be_transitive().unwrap_or(false));
+    }
+
+    #[test]
+    fn test_mp_reach_address() {
+        let ipv4_unicast = MpReach::Ipv4Unicast {
+            next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            next_hop_local: None,
+            nlri: vec![],
+        };
+        let ipv4_multicast = MpReach::Ipv4Multicast {
+            next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            next_hop_local: None,
+            nlri: vec![],
+        };
+        let ipv4_nlri_mpls_labels = MpReach::Ipv4NlriMplsLabels {
+            next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            next_hop_local: None,
+            nlri: vec![],
+        };
+        let ipv4_mpls_vpn_unicast = MpReach::Ipv4MplsVpnUnicast {
+            next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
+                RouteDistinguisher::As2Administrator {
+                    asn2: 13,
+                    number: 34,
+                },
+                Ipv4Addr::new(192, 168, 1, 1),
+            )),
+            nlri: vec![],
+        };
+
+        let ipv6_unicast = MpReach::Ipv6Unicast {
+            next_hop_global: Ipv6Addr::LOCALHOST,
+            next_hop_local: None,
+            nlri: vec![],
+        };
+        let ipv6_multicast = MpReach::Ipv6Multicast {
+            next_hop_global: Ipv6Addr::LOCALHOST,
+            next_hop_local: None,
+            nlri: vec![],
+        };
+        let ipv6_nlri_mpls_labels = MpReach::Ipv6NlriMplsLabels {
+            next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            next_hop_local: None,
+            nlri: vec![],
+        };
+        let ipv6_mpls_vpn_unicast = MpReach::Ipv6MplsVpnUnicast {
+            next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
+                RouteDistinguisher::As2Administrator {
+                    asn2: 13,
+                    number: 34,
+                },
+                Ipv4Addr::new(192, 168, 1, 1),
+            )),
+            nlri: vec![],
+        };
+
+        let l2_evpn = MpReach::L2Evpn {
+            next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            nlri: vec![],
+        };
+        let rt = MpReach::RouteTargetMembership {
+            next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            nlri: vec![],
+        };
+        let bgp_ls = MpReach::BgpLs {
+            next_hop: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            nlri: vec![],
+        };
+        let bgp_ls_vpn = MpReach::BgpLsVpn {
+            next_hop: LabeledNextHop::Ipv4(LabeledIpv4NextHop::new(
+                RouteDistinguisher::As2Administrator {
+                    asn2: 13,
+                    number: 34,
+                },
+                Ipv4Addr::new(192, 168, 1, 1),
+            )),
+            nlri: vec![],
+        };
+        let unknown = MpReach::Unknown {
+            afi: AddressFamily::AppleTalk,
+            safi: SubsequentAddressFamily::Unicast,
+            value: vec![],
+        };
+
+        assert_eq!(ipv4_unicast.address_type(), Ok(AddressType::Ipv4Unicast));
+        assert_eq!(
+            ipv4_unicast.afi(),
+            AddressType::Ipv4Unicast.address_family()
+        );
+        assert_eq!(
+            ipv4_unicast.safi(),
+            AddressType::Ipv4Unicast.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv4_multicast.address_type(),
+            Ok(AddressType::Ipv4Multicast)
+        );
+        assert_eq!(
+            ipv4_multicast.afi(),
+            AddressType::Ipv4Multicast.address_family()
+        );
+        assert_eq!(
+            ipv4_multicast.safi(),
+            AddressType::Ipv4Multicast.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv4_nlri_mpls_labels.address_type(),
+            Ok(AddressType::Ipv4NlriMplsLabels)
+        );
+        assert_eq!(
+            ipv4_nlri_mpls_labels.afi(),
+            AddressType::Ipv4NlriMplsLabels.address_family()
+        );
+        assert_eq!(
+            ipv4_nlri_mpls_labels.safi(),
+            AddressType::Ipv4NlriMplsLabels.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv4_mpls_vpn_unicast.address_type(),
+            Ok(AddressType::Ipv4MplsLabeledVpn)
+        );
+        assert_eq!(
+            ipv4_mpls_vpn_unicast.afi(),
+            AddressType::Ipv4MplsLabeledVpn.address_family()
+        );
+        assert_eq!(
+            ipv4_mpls_vpn_unicast.safi(),
+            AddressType::Ipv4MplsLabeledVpn.subsequent_address_family()
+        );
+
+        assert_eq!(ipv6_unicast.address_type(), Ok(AddressType::Ipv6Unicast));
+        assert_eq!(
+            ipv6_unicast.afi(),
+            AddressType::Ipv6Unicast.address_family()
+        );
+        assert_eq!(
+            ipv6_unicast.safi(),
+            AddressType::Ipv6Unicast.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv6_multicast.address_type(),
+            Ok(AddressType::Ipv6Multicast)
+        );
+        assert_eq!(
+            ipv6_multicast.afi(),
+            AddressType::Ipv6Multicast.address_family()
+        );
+        assert_eq!(
+            ipv6_multicast.safi(),
+            AddressType::Ipv6Multicast.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv6_nlri_mpls_labels.address_type(),
+            Ok(AddressType::Ipv6NlriMplsLabels)
+        );
+        assert_eq!(
+            ipv6_nlri_mpls_labels.afi(),
+            AddressType::Ipv6NlriMplsLabels.address_family()
+        );
+        assert_eq!(
+            ipv6_nlri_mpls_labels.safi(),
+            AddressType::Ipv6NlriMplsLabels.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv6_mpls_vpn_unicast.address_type(),
+            Ok(AddressType::Ipv6MplsLabeledVpn)
+        );
+        assert_eq!(
+            ipv6_mpls_vpn_unicast.afi(),
+            AddressType::Ipv6MplsLabeledVpn.address_family()
+        );
+        assert_eq!(
+            ipv6_mpls_vpn_unicast.safi(),
+            AddressType::Ipv6MplsLabeledVpn.subsequent_address_family()
+        );
+
+        assert_eq!(l2_evpn.address_type(), Ok(AddressType::L2VpnBgpEvpn));
+        assert_eq!(l2_evpn.afi(), AddressType::L2VpnBgpEvpn.address_family());
+        assert_eq!(
+            l2_evpn.safi(),
+            AddressType::L2VpnBgpEvpn.subsequent_address_family()
+        );
+
+        assert_eq!(rt.address_type(), Ok(AddressType::RouteTargetConstrains));
+        assert_eq!(
+            rt.afi(),
+            AddressType::RouteTargetConstrains.address_family()
+        );
+        assert_eq!(
+            rt.safi(),
+            AddressType::RouteTargetConstrains.subsequent_address_family()
+        );
+
+        assert_eq!(bgp_ls.address_type(), Ok(AddressType::BgpLs));
+        assert_eq!(bgp_ls.afi(), AddressType::BgpLs.address_family());
+        assert_eq!(
+            bgp_ls.safi(),
+            AddressType::BgpLs.subsequent_address_family()
+        );
+
+        assert_eq!(bgp_ls_vpn.address_type(), Ok(AddressType::BgpLsVpn));
+        assert_eq!(bgp_ls_vpn.afi(), AddressType::BgpLsVpn.address_family());
+        assert_eq!(
+            bgp_ls_vpn.safi(),
+            AddressType::BgpLsVpn.subsequent_address_family()
+        );
+
+        assert_eq!(
+            unknown.address_type(),
+            Err((AddressFamily::AppleTalk, SubsequentAddressFamily::Unicast))
+        );
+        assert_eq!(unknown.afi(), AddressFamily::AppleTalk);
+        assert_eq!(unknown.safi(), SubsequentAddressFamily::Unicast);
+    }
+
+    #[test]
+    fn test_mp_unreach_address() {
+        let ipv4_unicast = MpUnreach::Ipv4Unicast { nlri: vec![] };
+        let ipv4_multicast = MpUnreach::Ipv4Multicast { nlri: vec![] };
+        let ipv4_nlri_mpls_labels = MpUnreach::Ipv4NlriMplsLabels { nlri: vec![] };
+        let ipv4_mpls_vpn_unicast = MpUnreach::Ipv4MplsVpnUnicast { nlri: vec![] };
+
+        let ipv6_unicast = MpUnreach::Ipv6Unicast { nlri: vec![] };
+        let ipv6_multicast = MpUnreach::Ipv6Multicast { nlri: vec![] };
+        let ipv6_nlri_mpls_labels = MpUnreach::Ipv6NlriMplsLabels { nlri: vec![] };
+        let ipv6_mpls_vpn_unicast = MpUnreach::Ipv6MplsVpnUnicast { nlri: vec![] };
+
+        let l2_evpn = MpUnreach::L2Evpn { nlri: vec![] };
+        let rt = MpUnreach::RouteTargetMembership { nlri: vec![] };
+        let bgp_ls = MpUnreach::BgpLs { nlri: vec![] };
+        let bgp_ls_vpn = MpUnreach::BgpLsVpn { nlri: vec![] };
+        let unknown = MpUnreach::Unknown {
+            afi: AddressFamily::AppleTalk,
+            safi: SubsequentAddressFamily::Unicast,
+            nlri: vec![],
+        };
+
+        assert_eq!(ipv4_unicast.address_type(), Ok(AddressType::Ipv4Unicast));
+        assert_eq!(
+            ipv4_unicast.afi(),
+            AddressType::Ipv4Unicast.address_family()
+        );
+        assert_eq!(
+            ipv4_unicast.safi(),
+            AddressType::Ipv4Unicast.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv4_multicast.address_type(),
+            Ok(AddressType::Ipv4Multicast)
+        );
+        assert_eq!(
+            ipv4_multicast.afi(),
+            AddressType::Ipv4Multicast.address_family()
+        );
+        assert_eq!(
+            ipv4_multicast.safi(),
+            AddressType::Ipv4Multicast.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv4_nlri_mpls_labels.address_type(),
+            Ok(AddressType::Ipv4NlriMplsLabels)
+        );
+        assert_eq!(
+            ipv4_nlri_mpls_labels.afi(),
+            AddressType::Ipv4NlriMplsLabels.address_family()
+        );
+        assert_eq!(
+            ipv4_nlri_mpls_labels.safi(),
+            AddressType::Ipv4NlriMplsLabels.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv4_mpls_vpn_unicast.address_type(),
+            Ok(AddressType::Ipv4MplsLabeledVpn)
+        );
+        assert_eq!(
+            ipv4_mpls_vpn_unicast.afi(),
+            AddressType::Ipv4MplsLabeledVpn.address_family()
+        );
+        assert_eq!(
+            ipv4_mpls_vpn_unicast.safi(),
+            AddressType::Ipv4MplsLabeledVpn.subsequent_address_family()
+        );
+
+        assert_eq!(ipv6_unicast.address_type(), Ok(AddressType::Ipv6Unicast));
+        assert_eq!(
+            ipv6_unicast.afi(),
+            AddressType::Ipv6Unicast.address_family()
+        );
+        assert_eq!(
+            ipv6_unicast.safi(),
+            AddressType::Ipv6Unicast.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv6_multicast.address_type(),
+            Ok(AddressType::Ipv6Multicast)
+        );
+        assert_eq!(
+            ipv6_multicast.afi(),
+            AddressType::Ipv6Multicast.address_family()
+        );
+        assert_eq!(
+            ipv6_multicast.safi(),
+            AddressType::Ipv6Multicast.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv6_nlri_mpls_labels.address_type(),
+            Ok(AddressType::Ipv6NlriMplsLabels)
+        );
+        assert_eq!(
+            ipv6_nlri_mpls_labels.afi(),
+            AddressType::Ipv6NlriMplsLabels.address_family()
+        );
+        assert_eq!(
+            ipv6_nlri_mpls_labels.safi(),
+            AddressType::Ipv6NlriMplsLabels.subsequent_address_family()
+        );
+
+        assert_eq!(
+            ipv6_mpls_vpn_unicast.address_type(),
+            Ok(AddressType::Ipv6MplsLabeledVpn)
+        );
+        assert_eq!(
+            ipv6_mpls_vpn_unicast.afi(),
+            AddressType::Ipv6MplsLabeledVpn.address_family()
+        );
+        assert_eq!(
+            ipv6_mpls_vpn_unicast.safi(),
+            AddressType::Ipv6MplsLabeledVpn.subsequent_address_family()
+        );
+
+        assert_eq!(l2_evpn.address_type(), Ok(AddressType::L2VpnBgpEvpn));
+        assert_eq!(l2_evpn.afi(), AddressType::L2VpnBgpEvpn.address_family());
+        assert_eq!(
+            l2_evpn.safi(),
+            AddressType::L2VpnBgpEvpn.subsequent_address_family()
+        );
+
+        assert_eq!(rt.address_type(), Ok(AddressType::RouteTargetConstrains));
+        assert_eq!(
+            rt.afi(),
+            AddressType::RouteTargetConstrains.address_family()
+        );
+        assert_eq!(
+            rt.safi(),
+            AddressType::RouteTargetConstrains.subsequent_address_family()
+        );
+
+        assert_eq!(bgp_ls.address_type(), Ok(AddressType::BgpLs));
+        assert_eq!(bgp_ls.afi(), AddressType::BgpLs.address_family());
+        assert_eq!(
+            bgp_ls.safi(),
+            AddressType::BgpLs.subsequent_address_family()
+        );
+
+        assert_eq!(bgp_ls_vpn.address_type(), Ok(AddressType::BgpLsVpn));
+        assert_eq!(bgp_ls_vpn.afi(), AddressType::BgpLsVpn.address_family());
+        assert_eq!(
+            bgp_ls_vpn.safi(),
+            AddressType::BgpLsVpn.subsequent_address_family()
+        );
+
+        assert_eq!(
+            unknown.address_type(),
+            Err((AddressFamily::AppleTalk, SubsequentAddressFamily::Unicast))
+        );
+        assert_eq!(unknown.afi(), AddressFamily::AppleTalk);
+        assert_eq!(unknown.safi(), SubsequentAddressFamily::Unicast);
     }
 }
