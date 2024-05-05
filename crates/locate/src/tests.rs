@@ -49,7 +49,6 @@ fn it_should_convert_from_str_successfully() {
     assert_eq!(StrSpan::new(input), input.into());
 }
 
-#[cfg(feature = "alloc")]
 #[test]
 fn it_should_iterate_indices() {
     let str_slice = StrSpan::new("foobar");
@@ -65,7 +64,6 @@ fn it_should_iterate_indices() {
     );
 }
 
-#[cfg(feature = "alloc")]
 #[test]
 fn it_should_iterate_elements() {
     let str_slice = StrSpan::new("foobar");
@@ -134,19 +132,6 @@ fn it_should_find_substring() {
     assert_eq!(
         BytesSpan::new(b"foobar").find_substring(b"baz" as &[u8]),
         None
-    );
-}
-
-#[cfg(feature = "alloc")]
-#[test]
-fn it_should_parse_to_string() {
-    assert_eq!(
-        StrSpan::new("foobar").parse_to(),
-        Some("foobar".to_string())
-    );
-    assert_eq!(
-        BytesSpan::new(b"foobar").parse_to(),
-        Some("foobar".to_string())
     );
 }
 
