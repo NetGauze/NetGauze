@@ -23,7 +23,7 @@ use crate::{
     nlri::*,
     path_attribute::BgpLsAttribute,
 };
-use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
+use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use strum_macros::{Display, FromRepr};
@@ -1006,6 +1006,82 @@ pub enum MpReach {
     },
 }
 
+impl MpReach {
+    /// [AddressType] of the MP Reach message.
+    /// Error with the individual AFI/SAIF values for [MpReach::Unknown] is
+    /// returned.
+    pub const fn address_type(
+        &self,
+    ) -> Result<AddressType, (AddressFamily, SubsequentAddressFamily)> {
+        match self {
+            MpReach::Ipv4Unicast { .. } => Ok(AddressType::Ipv4Unicast),
+            MpReach::Ipv4Multicast { .. } => Ok(AddressType::Ipv4Multicast),
+            MpReach::Ipv4NlriMplsLabels { .. } => Ok(AddressType::Ipv4NlriMplsLabels),
+            MpReach::Ipv4MplsVpnUnicast { .. } => Ok(AddressType::Ipv4MplsLabeledVpn),
+            MpReach::Ipv6Unicast { .. } => Ok(AddressType::Ipv6Unicast),
+            MpReach::Ipv6Multicast { .. } => Ok(AddressType::Ipv6Multicast),
+            MpReach::Ipv6NlriMplsLabels { .. } => Ok(AddressType::Ipv6NlriMplsLabels),
+            MpReach::Ipv6MplsVpnUnicast { .. } => Ok(AddressType::Ipv6MplsLabeledVpn),
+            MpReach::L2Evpn { .. } => Ok(AddressType::L2VpnBgpEvpn),
+            MpReach::RouteTargetMembership { .. } => Ok(AddressType::RouteTargetConstrains),
+            MpReach::BgpLs { .. } => Ok(AddressType::BgpLs),
+            MpReach::BgpLsVpn { .. } => Ok(AddressType::BgpLsVpn),
+            MpReach::Unknown { afi, safi, .. } => Err((*afi, *safi)),
+        }
+    }
+
+    /// [AddressFamily] for the MP Reach Message
+    pub const fn afi(&self) -> AddressFamily {
+        match self {
+            MpReach::Ipv4Unicast { .. } => AddressType::Ipv4Unicast.address_family(),
+            MpReach::Ipv4Multicast { .. } => AddressType::Ipv4Multicast.address_family(),
+            MpReach::Ipv4NlriMplsLabels { .. } => AddressType::Ipv4NlriMplsLabels.address_family(),
+            MpReach::Ipv4MplsVpnUnicast { .. } => AddressType::Ipv4MplsLabeledVpn.address_family(),
+            MpReach::Ipv6Unicast { .. } => AddressType::Ipv6Unicast.address_family(),
+            MpReach::Ipv6Multicast { .. } => AddressType::Ipv6Multicast.address_family(),
+            MpReach::Ipv6NlriMplsLabels { .. } => AddressType::Ipv6NlriMplsLabels.address_family(),
+            MpReach::Ipv6MplsVpnUnicast { .. } => AddressType::Ipv6MplsLabeledVpn.address_family(),
+            MpReach::L2Evpn { .. } => AddressType::L2VpnBgpEvpn.address_family(),
+            MpReach::RouteTargetMembership { .. } => {
+                AddressType::RouteTargetConstrains.address_family()
+            }
+            MpReach::BgpLs { .. } => AddressType::BgpLs.address_family(),
+            MpReach::BgpLsVpn { .. } => AddressType::BgpLsVpn.address_family(),
+            MpReach::Unknown { afi, .. } => *afi,
+        }
+    }
+
+    /// [SubsequentAddressFamily] for the MP Reach Message
+    pub const fn safi(&self) -> SubsequentAddressFamily {
+        match self {
+            MpReach::Ipv4Unicast { .. } => AddressType::Ipv4Unicast.subsequent_address_family(),
+            MpReach::Ipv4Multicast { .. } => AddressType::Ipv4Multicast.subsequent_address_family(),
+            MpReach::Ipv4NlriMplsLabels { .. } => {
+                AddressType::Ipv4NlriMplsLabels.subsequent_address_family()
+            }
+            MpReach::Ipv4MplsVpnUnicast { .. } => {
+                AddressType::Ipv4MplsLabeledVpn.subsequent_address_family()
+            }
+            MpReach::Ipv6Unicast { .. } => AddressType::Ipv6Unicast.subsequent_address_family(),
+            MpReach::Ipv6Multicast { .. } => AddressType::Ipv6Multicast.subsequent_address_family(),
+            MpReach::Ipv6NlriMplsLabels { .. } => {
+                AddressType::Ipv6NlriMplsLabels.subsequent_address_family()
+            }
+            MpReach::Ipv6MplsVpnUnicast { .. } => {
+                AddressType::Ipv6MplsLabeledVpn.subsequent_address_family()
+            }
+            MpReach::L2Evpn { .. } => AddressType::L2VpnBgpEvpn.subsequent_address_family(),
+            MpReach::RouteTargetMembership { .. } => {
+                AddressType::RouteTargetConstrains.subsequent_address_family()
+            }
+            MpReach::BgpLs { .. } => AddressType::BgpLs.subsequent_address_family(),
+            MpReach::BgpLsVpn { .. } => AddressType::BgpLsVpn.subsequent_address_family(),
+            MpReach::Unknown {
+                afi: _afi, safi, ..
+            } => *safi,
+        }
+    }
+}
 impl PathAttributeValueProperties for MpReach {
     fn can_be_optional() -> Option<bool> {
         Some(true)
@@ -1079,6 +1155,95 @@ pub enum MpUnreach {
         safi: SubsequentAddressFamily,
         nlri: Vec<u8>,
     },
+}
+
+impl MpUnreach {
+    /// [AddressType] of the MP Unreach message.
+    /// Error with the individual AFI/SAIF values for [MpUnreach::Unknown] is
+    /// returned.
+    pub const fn address_type(
+        &self,
+    ) -> Result<AddressType, (AddressFamily, SubsequentAddressFamily)> {
+        match self {
+            MpUnreach::Ipv4Unicast { .. } => Ok(AddressType::Ipv4Unicast),
+            MpUnreach::Ipv4Multicast { .. } => Ok(AddressType::Ipv4Multicast),
+            MpUnreach::Ipv4NlriMplsLabels { .. } => Ok(AddressType::Ipv4NlriMplsLabels),
+            MpUnreach::Ipv4MplsVpnUnicast { .. } => Ok(AddressType::Ipv4MplsLabeledVpn),
+            MpUnreach::Ipv6Unicast { .. } => Ok(AddressType::Ipv6Unicast),
+            MpUnreach::Ipv6Multicast { .. } => Ok(AddressType::Ipv6Multicast),
+            MpUnreach::Ipv6NlriMplsLabels { .. } => Ok(AddressType::Ipv6NlriMplsLabels),
+            MpUnreach::Ipv6MplsVpnUnicast { .. } => Ok(AddressType::Ipv6MplsLabeledVpn),
+            MpUnreach::L2Evpn { .. } => Ok(AddressType::L2VpnBgpEvpn),
+            MpUnreach::RouteTargetMembership { .. } => Ok(AddressType::RouteTargetConstrains),
+            MpUnreach::BgpLs { .. } => Ok(AddressType::BgpLs),
+            MpUnreach::BgpLsVpn { .. } => Ok(AddressType::BgpLsVpn),
+            MpUnreach::Unknown { afi, safi, .. } => Err((*afi, *safi)),
+        }
+    }
+
+    /// [AddressFamily] for the MP Unreach Message
+    pub const fn afi(&self) -> AddressFamily {
+        match self {
+            MpUnreach::Ipv4Unicast { .. } => AddressType::Ipv4Unicast.address_family(),
+            MpUnreach::Ipv4Multicast { .. } => AddressType::Ipv4Multicast.address_family(),
+            MpUnreach::Ipv4NlriMplsLabels { .. } => {
+                AddressType::Ipv4NlriMplsLabels.address_family()
+            }
+            MpUnreach::Ipv4MplsVpnUnicast { .. } => {
+                AddressType::Ipv4MplsLabeledVpn.address_family()
+            }
+            MpUnreach::Ipv6Unicast { .. } => AddressType::Ipv6Unicast.address_family(),
+            MpUnreach::Ipv6Multicast { .. } => AddressType::Ipv6Multicast.address_family(),
+            MpUnreach::Ipv6NlriMplsLabels { .. } => {
+                AddressType::Ipv6NlriMplsLabels.address_family()
+            }
+            MpUnreach::Ipv6MplsVpnUnicast { .. } => {
+                AddressType::Ipv6MplsLabeledVpn.address_family()
+            }
+            MpUnreach::L2Evpn { .. } => AddressType::L2VpnBgpEvpn.address_family(),
+            MpUnreach::RouteTargetMembership { .. } => {
+                AddressType::RouteTargetConstrains.address_family()
+            }
+            MpUnreach::BgpLs { .. } => AddressType::BgpLs.address_family(),
+            MpUnreach::BgpLsVpn { .. } => AddressType::BgpLsVpn.address_family(),
+            MpUnreach::Unknown { afi, .. } => *afi,
+        }
+    }
+
+    /// [SubsequentAddressFamily] for the MP Unreach Message
+    pub const fn safi(&self) -> SubsequentAddressFamily {
+        match self {
+            MpUnreach::Ipv4Unicast { .. } => AddressType::Ipv4Unicast.subsequent_address_family(),
+            MpUnreach::Ipv4Multicast { .. } => {
+                AddressType::Ipv4Multicast.subsequent_address_family()
+            }
+            MpUnreach::Ipv4NlriMplsLabels { .. } => {
+                AddressType::Ipv4NlriMplsLabels.subsequent_address_family()
+            }
+            MpUnreach::Ipv4MplsVpnUnicast { .. } => {
+                AddressType::Ipv4MplsLabeledVpn.subsequent_address_family()
+            }
+            MpUnreach::Ipv6Unicast { .. } => AddressType::Ipv6Unicast.subsequent_address_family(),
+            MpUnreach::Ipv6Multicast { .. } => {
+                AddressType::Ipv6Multicast.subsequent_address_family()
+            }
+            MpUnreach::Ipv6NlriMplsLabels { .. } => {
+                AddressType::Ipv6NlriMplsLabels.subsequent_address_family()
+            }
+            MpUnreach::Ipv6MplsVpnUnicast { .. } => {
+                AddressType::Ipv6MplsLabeledVpn.subsequent_address_family()
+            }
+            MpUnreach::L2Evpn { .. } => AddressType::L2VpnBgpEvpn.subsequent_address_family(),
+            MpUnreach::RouteTargetMembership { .. } => {
+                AddressType::RouteTargetConstrains.subsequent_address_family()
+            }
+            MpUnreach::BgpLs { .. } => AddressType::BgpLs.subsequent_address_family(),
+            MpUnreach::BgpLsVpn { .. } => AddressType::BgpLsVpn.subsequent_address_family(),
+            MpUnreach::Unknown {
+                afi: _afi, safi, ..
+            } => *safi,
+        }
+    }
 }
 
 impl PathAttributeValueProperties for MpUnreach {
