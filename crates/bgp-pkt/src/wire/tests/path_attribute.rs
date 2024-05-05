@@ -1280,6 +1280,23 @@ fn test_mp_reach_nlri_ipv6() -> Result<(), MpReachWritingError> {
         )),
     );
 
+    assert_eq!(good.address_type(), Ok(AddressType::Ipv6Unicast));
+    assert_eq!(good.afi(), AddressType::Ipv6Unicast.address_family());
+    assert_eq!(
+        good.safi(),
+        AddressType::Ipv6Unicast.subsequent_address_family()
+    );
+
+    assert_eq!(
+        unknown_address_type.address_type(),
+        Err((AddressFamily::AppleTalk, SubsequentAddressFamily::Unicast))
+    );
+    assert_eq!(unknown_address_type.afi(), AddressFamily::AppleTalk);
+    assert_eq!(
+        unknown_address_type.safi(),
+        SubsequentAddressFamily::Unicast
+    );
+
     test_parsed_completely_with_three_inputs(
         &good_wire,
         false,
@@ -1848,23 +1865,34 @@ fn test_mp_reach_labeled_vpn_ipv4() -> Result<(), PathAttributeWritingError> {
         0xc0, 0xa8, 0x01,
     ];
 
+    let mp_reach = MpReach::Ipv4MplsVpnUnicast {
+        next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
+            RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
+            Ipv6Addr::from_str("fc00::1").unwrap(),
+            None,
+        )),
+        nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
+            RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
+            vec![MplsLabel::new([0, 65, 1])],
+            Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
+        )],
+    };
+    assert_eq!(mp_reach.address_type(), Ok(AddressType::Ipv4MplsLabeledVpn));
+    assert_eq!(
+        mp_reach.afi(),
+        AddressType::Ipv4MplsLabeledVpn.address_family()
+    );
+    assert_eq!(
+        mp_reach.safi(),
+        AddressType::Ipv4MplsLabeledVpn.subsequent_address_family()
+    );
+
     let good = PathAttribute::from(
         true,
         false,
         false,
         true,
-        PathAttributeValue::MpReach(MpReach::Ipv4MplsVpnUnicast {
-            next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
-                RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
-                Ipv6Addr::from_str("fc00::1").unwrap(),
-                None,
-            )),
-            nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
-                RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
-                vec![MplsLabel::new([0, 65, 1])],
-                Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
-            )],
-        }),
+        PathAttributeValue::MpReach(mp_reach),
     )
     .unwrap();
 
@@ -1884,23 +1912,34 @@ fn test_mp_reach_multi_labels_vp_ipv4() -> Result<(), PathAttributeWritingError>
         0, 0, 0, 0, 1, 0, 136, 0, 65, 0, 0, 65, 1, 0, 0, 0, 1, 0, 0, 0, 1, 192, 168, 1,
     ];
 
+    let mp_reach = MpReach::Ipv4MplsVpnUnicast {
+        next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
+            RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
+            Ipv6Addr::from_str("fc00::1").unwrap(),
+            None,
+        )),
+        nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
+            RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
+            vec![MplsLabel::new([0, 65, 0]), MplsLabel::new([0, 65, 1])],
+            Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
+        )],
+    };
+    assert_eq!(mp_reach.address_type(), Ok(AddressType::Ipv4MplsLabeledVpn));
+    assert_eq!(
+        mp_reach.afi(),
+        AddressType::Ipv4MplsLabeledVpn.address_family()
+    );
+    assert_eq!(
+        mp_reach.safi(),
+        AddressType::Ipv4MplsLabeledVpn.subsequent_address_family()
+    );
+
     let good = PathAttribute::from(
         true,
         false,
         false,
         true,
-        PathAttributeValue::MpReach(MpReach::Ipv4MplsVpnUnicast {
-            next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
-                RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
-                Ipv6Addr::from_str("fc00::1").unwrap(),
-                None,
-            )),
-            nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
-                RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
-                vec![MplsLabel::new([0, 65, 0]), MplsLabel::new([0, 65, 1])],
-                Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
-            )],
-        }),
+        PathAttributeValue::MpReach(mp_reach),
     )
     .unwrap();
 
@@ -2006,37 +2045,48 @@ fn test_mp_reach_labeled_vpn_ipv6() -> Result<(), PathAttributeWritingError> {
         0xca, 0xfe, 0x00, 0x02, 0x00, 0x03,
     ];
 
+    let mp_reach = MpReach::Ipv6MplsVpnUnicast {
+        next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
+            RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
+            Ipv6Addr::from_str("fdea:3e00:400::1").unwrap(),
+            None,
+        )),
+        nlri: vec![
+            Ipv6MplsVpnUnicastAddress::new_no_path_id(
+                RouteDistinguisher::Ipv4Administrator {
+                    ip: Ipv4Addr::new(10, 215, 182, 48),
+                    number: 3,
+                },
+                vec![MplsLabel::new([0xe0, 0x08, 0x01])],
+                Ipv6Unicast::from_net(Ipv6Net::from_str("fd00:2::4/126").unwrap()).unwrap(),
+            ),
+            Ipv6MplsVpnUnicastAddress::new_no_path_id(
+                RouteDistinguisher::Ipv4Administrator {
+                    ip: Ipv4Addr::new(10, 215, 182, 48),
+                    number: 3,
+                },
+                vec![MplsLabel::new([0xe0, 0x08, 0x01])],
+                Ipv6Unicast::from_net(Ipv6Net::from_str("fd01:cafe:2:3::/64").unwrap()).unwrap(),
+            ),
+        ],
+    };
+
+    assert_eq!(mp_reach.address_type(), Ok(AddressType::Ipv6MplsLabeledVpn));
+    assert_eq!(
+        mp_reach.afi(),
+        AddressType::Ipv6MplsLabeledVpn.address_family()
+    );
+    assert_eq!(
+        mp_reach.safi(),
+        AddressType::Ipv6MplsLabeledVpn.subsequent_address_family()
+    );
+
     let good = PathAttribute::from(
         true,
         false,
         false,
         true,
-        PathAttributeValue::MpReach(MpReach::Ipv6MplsVpnUnicast {
-            next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
-                RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
-                Ipv6Addr::from_str("fdea:3e00:400::1").unwrap(),
-                None,
-            )),
-            nlri: vec![
-                Ipv6MplsVpnUnicastAddress::new_no_path_id(
-                    RouteDistinguisher::Ipv4Administrator {
-                        ip: Ipv4Addr::new(10, 215, 182, 48),
-                        number: 3,
-                    },
-                    vec![MplsLabel::new([0xe0, 0x08, 0x01])],
-                    Ipv6Unicast::from_net(Ipv6Net::from_str("fd00:2::4/126").unwrap()).unwrap(),
-                ),
-                Ipv6MplsVpnUnicastAddress::new_no_path_id(
-                    RouteDistinguisher::Ipv4Administrator {
-                        ip: Ipv4Addr::new(10, 215, 182, 48),
-                        number: 3,
-                    },
-                    vec![MplsLabel::new([0xe0, 0x08, 0x01])],
-                    Ipv6Unicast::from_net(Ipv6Net::from_str("fd01:cafe:2:3::/64").unwrap())
-                        .unwrap(),
-                ),
-            ],
-        }),
+        PathAttributeValue::MpReach(mp_reach),
     )
     .unwrap();
 
@@ -2386,72 +2436,87 @@ fn test_path_attr_route_target_membership() -> Result<(), PathAttributeWritingEr
         0x00, 0xff, 0xcc, 0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc5, 0x60, 0x00, 0x00, 0xff,
         0xcc, 0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc4,
     ];
+
+    let mp_reach = MpReach::RouteTargetMembership {
+        next_hop: IpAddr::V6(Ipv6Addr::from_str("fd00:3f00:302::1").unwrap()),
+        nlri: vec![
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xb2],
+                )),
+            ),
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xa3],
+                )),
+            ),
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x00, 0x02],
+                )),
+            ),
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x00, 0x01],
+                )),
+            ),
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xd9],
+                )),
+            ),
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xd8],
+                )),
+            ),
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc5],
+                )),
+            ),
+            RouteTargetMembershipAddress::new(
+                None,
+                Some(RouteTargetMembership::new(
+                    65484,
+                    vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc4],
+                )),
+            ),
+        ],
+    };
+    assert_eq!(
+        mp_reach.address_type(),
+        Ok(AddressType::RouteTargetConstrains)
+    );
+    assert_eq!(
+        mp_reach.afi(),
+        AddressType::RouteTargetConstrains.address_family()
+    );
+    assert_eq!(
+        mp_reach.safi(),
+        AddressType::RouteTargetConstrains.subsequent_address_family()
+    );
+
     let good = PathAttribute::from(
         true,
         false,
         false,
         true,
-        PathAttributeValue::MpReach(MpReach::RouteTargetMembership {
-            next_hop: IpAddr::V6(Ipv6Addr::from_str("fd00:3f00:302::1").unwrap()),
-            nlri: vec![
-                RouteTargetMembershipAddress::new(
-                    None,
-                    Some(RouteTargetMembership::new(
-                        65484,
-                        vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xb2],
-                    )),
-                ),
-                RouteTargetMembershipAddress::new(
-                    None,
-                    Some(RouteTargetMembership::new(
-                        65484,
-                        vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x0f, 0xa3],
-                    )),
-                ),
-                RouteTargetMembershipAddress::new(
-                    None,
-                    Some(RouteTargetMembership::new(
-                        65484,
-                        vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x00, 0x02],
-                    )),
-                ),
-                RouteTargetMembershipAddress::new(
-                    None,
-                    Some(RouteTargetMembership::new(
-                        65484,
-                        vec![0x00, 0x02, 0xff, 0xcc, 0x00, 0x00, 0x00, 0x01],
-                    )),
-                ),
-                RouteTargetMembershipAddress::new(
-                    None,
-                    Some(RouteTargetMembership::new(
-                        65484,
-                        vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xd9],
-                    )),
-                ),
-                RouteTargetMembershipAddress::new(
-                    None,
-                    Some(RouteTargetMembership::new(
-                        65484,
-                        vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xd8],
-                    )),
-                ),
-                RouteTargetMembershipAddress::new(
-                    None,
-                    Some(RouteTargetMembership::new(
-                        65484,
-                        vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc5],
-                    )),
-                ),
-                RouteTargetMembershipAddress::new(
-                    None,
-                    Some(RouteTargetMembership::new(
-                        65484,
-                        vec![0x00, 0x02, 0x00, 0x64, 0x00, 0x00, 0x04, 0xc4],
-                    )),
-                ),
-            ],
-        }),
+        PathAttributeValue::MpReach(mp_reach),
     )
     .unwrap();
 
