@@ -124,10 +124,34 @@ fn test_ipv4_multicast() -> Result<(), Ipv4MulticastWritingError> {
 
 #[test]
 fn test_route_distinguisher() -> Result<(), RouteDistinguisherWritingError> {
-    let good_wire = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-    let good = RouteDistinguisher::As2Administrator { asn2: 0, number: 0 };
-    test_parsed_completely(&good_wire, &good);
-    test_write(&good, &good_wire)?;
+    let good_asn2_wire = [0x00, 0x00, 0xee, 0xee, 0xff, 0xff, 0xff, 0xff];
+    let good_ipv4_wire = [0x00, 0x01, 0xee, 0xee, 0xee, 0xee, 0xff, 0xff];
+    let good_asn4_wire = [0x00, 0x02, 0xee, 0xee, 0xee, 0xee, 0xff, 0xff];
+    let good_leaf_wire = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+    let good_asn2 = RouteDistinguisher::As2Administrator {
+        asn2: 0xeeee,
+        number: 0xffffffff,
+    };
+    let good_ipv4 = RouteDistinguisher::Ipv4Administrator {
+        ip: Ipv4Addr::from(0xeeeeeeee),
+        number: 0xffff,
+    };
+    let good_asn4 = RouteDistinguisher::As4Administrator {
+        asn4: 0xeeeeeeee,
+        number: 0xffff,
+    };
+    let good_leaf = RouteDistinguisher::LeafAdRoutes;
+    test_parsed_completely(&good_asn2_wire, &good_asn2);
+    test_parsed_completely(&good_ipv4_wire, &good_ipv4);
+    test_parsed_completely(&good_asn4_wire, &good_asn4);
+    test_parsed_completely(&good_leaf_wire, &good_leaf);
+
+    test_write(&good_leaf, &good_leaf_wire)?;
+
+    test_write(&good_asn2, &good_asn2_wire)?;
+    test_write(&good_asn4, &good_asn4_wire)?;
+    test_write(&good_ipv4, &good_ipv4_wire)?;
+    test_write(&good_leaf, &good_leaf_wire)?;
     Ok(())
 }
 

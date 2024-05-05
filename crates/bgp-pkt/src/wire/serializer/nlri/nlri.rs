@@ -44,25 +44,7 @@ impl WritablePdu<RouteDistinguisherWritingError> for RouteDistinguisher {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteDistinguisherWritingError> {
-        writer.write_u16::<NetworkEndian>(self.get_type().into())?;
-        match self {
-            RouteDistinguisher::As2Administrator { asn2, number } => {
-                writer.write_u16::<NetworkEndian>(*asn2)?;
-                writer.write_u32::<NetworkEndian>(*number)?;
-            }
-            RouteDistinguisher::Ipv4Administrator { ip, number } => {
-                writer.write_all(&ip.octets())?;
-                writer.write_u16::<NetworkEndian>(*number)?;
-            }
-            RouteDistinguisher::As4Administrator { asn4, number } => {
-                writer.write_u32::<NetworkEndian>(*asn4)?;
-                writer.write_u16::<NetworkEndian>(*number)?;
-            }
-            RouteDistinguisher::LeafAdRoutes => {
-                writer.write_u16::<NetworkEndian>(u16::MAX)?;
-                writer.write_u32::<NetworkEndian>(u32::MAX)?;
-            }
-        }
+        writer.write_u64::<NetworkEndian>(<RouteDistinguisher as Into<u64>>::into(*self))?;
         Ok(())
     }
 }
