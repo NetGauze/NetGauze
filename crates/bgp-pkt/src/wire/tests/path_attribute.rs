@@ -2114,6 +2114,7 @@ fn test_mp_reach_nlri_mpls_labels_ipv6() -> Result<(), PathAttributeWritingError
         true,
         PathAttributeValue::MpReach(MpReach::Ipv6NlriMplsLabels {
             next_hop: IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap()),
+            next_hop_local: None,
             nlri: vec![Ipv6NlriMplsLabelsAddress::new_no_path_id(
                 vec![MplsLabel::new([0x05, 0xdc, 0x31])],
                 Ipv6Net::from_str("fc00::3/128").unwrap(),

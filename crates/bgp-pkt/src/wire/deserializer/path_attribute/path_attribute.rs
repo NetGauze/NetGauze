@@ -802,8 +802,8 @@ impl<'a>
                 ))
             }
             Ok(AddressType::Ipv6NlriMplsLabels) => {
-                let (mp_buf, next_hop) =
-                    parse_ip_next_hop(mp_buf, AddressType::Ipv6NlriMplsLabels)?;
+                let (mp_buf, (next_hop, next_hop_local)) =
+                    parse_ip4_or_ipv6_next_hop(mp_buf, AddressType::Ipv4NlriMplsLabels)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
                 let add_path = add_path_map
                     .get(&AddressType::Ipv6NlriMplsLabels)
@@ -816,7 +816,14 @@ impl<'a>
                         .get(&AddressType::Ipv6NlriMplsLabels)
                         .unwrap_or(&1),
                 )?;
-                Ok((buf, MpReach::Ipv6NlriMplsLabels { next_hop, nlri }))
+                Ok((
+                    buf,
+                    MpReach::Ipv6NlriMplsLabels {
+                        next_hop,
+                        next_hop_local,
+                        nlri,
+                    },
+                ))
             }
             Ok(AddressType::Ipv6MplsLabeledVpn) => {
                 let (mp_buf, next_hop) =

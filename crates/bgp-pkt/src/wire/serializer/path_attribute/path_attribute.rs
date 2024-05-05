@@ -826,9 +826,23 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
                 IPV6_LEN as usize + 1 + local_len + nlri_len
             }
-            Self::Ipv6NlriMplsLabels { next_hop: _, nlri } => {
+            Self::Ipv6NlriMplsLabels {
+                next_hop,
+                next_hop_local,
+                nlri,
+            } => {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
-                IPV6_LEN as usize + 1 + nlri_len
+                let next_hop_len = if next_hop.is_ipv4() {
+                    IPV4_LEN as usize
+                } else {
+                    IPV6_LEN as usize
+                };
+                let local_len = if next_hop_local.is_some() {
+                    IPV6_LEN as usize
+                } else {
+                    0
+                };
+                1 + next_hop_len + local_len + nlri_len
             }
             Self::Ipv6MplsVpnUnicast { next_hop, nlri } => {
                 let nlri_len: usize = nlri.iter().map(|x| x.len()).sum();
@@ -1036,10 +1050,35 @@ impl WritablePduWithOneInput<bool, MpReachWritingError> for MpReach {
                     nlri.write(writer)?
                 }
             }
-            Self::Ipv6NlriMplsLabels { next_hop, nlri } => {
+            Self::Ipv6NlriMplsLabels {
+                next_hop,
+                next_hop_local,
+                nlri,
+            } => {
                 writer.write_u16::<NetworkEndian>(self.afi().into())?;
                 writer.write_u8(self.safi().into())?;
-                next_hop.write(writer)?;
+                let next_hop_len = if next_hop.is_ipv4() {
+                    IPV4_LEN
+                } else {
+                    IPV6_LEN
+                };
+                let local_len = if next_hop_local.is_some() {
+                    IPV6_LEN
+                } else {
+                    0
+                };
+                writer.write_u8(next_hop_len + local_len)?;
+                match next_hop {
+                    IpAddr::V4(addr) => {
+                        writer.write_all(&addr.octets())?;
+                    }
+                    IpAddr::V6(addr) => {
+                        writer.write_all(&addr.octets())?;
+                    }
+                }
+                if let Some(addr) = next_hop_local {
+                    writer.write_all(&addr.octets())?;
+                }
                 writer.write_u8(0)?;
                 for nlri in nlri {
                     nlri.write(writer)?
