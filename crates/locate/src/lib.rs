@@ -127,6 +127,16 @@ impl<T> core::ops::Deref for BinarySpan<T> {
     }
 }
 
+impl<T, U> AsRef<U> for BinarySpan<&T>
+where
+    T: ?Sized + AsRef<U>,
+    U: ?Sized,
+{
+    fn as_ref(&self) -> &U {
+        self.fragment.as_ref()
+    }
+}
+
 impl<T: AsBytes> AsBytes for BinarySpan<T> {
     #[inline]
     fn as_bytes(&self) -> &[u8] {
@@ -160,4 +170,11 @@ impl<T: AsBytes> From<T> for BinarySpan<T> {
     fn from(i: T) -> Self {
         Self::new_extra(i)
     }
+}
+
+#[test]
+fn it_should_implement_as_ref_for_the_underlying_type() {
+    fn function_accepting_u8_slice<B: AsRef<[u8]>>(_data: B) {}
+    let bytes_data = BinarySpan::new(b"some binary data");
+    function_accepting_u8_slice(bytes_data);
 }
