@@ -87,7 +87,10 @@ fn get_caps(
     (add_path_caps, multiple_labels_caps)
 }
 impl BmpCodec {
-    fn update_add_path(&mut self, msg: &BmpMessage) {
+    /// Update the parsing context based on information presented in the payload
+    /// of BMP message. It updates BGP parsing flags such as: Add Path and
+    /// Multi label MPLS capabilities
+    pub fn update_parsing_ctx(&mut self, msg: &BmpMessage) {
         match msg {
             BmpMessage::V3(value) => match value {
                 BmpMessageValue::PeerDownNotification(peer_down) => {
@@ -189,7 +192,7 @@ impl Decoder for BmpCodec {
                 self.in_message = false;
                 let msg = match BmpMessage::from_wire(Span::new(buf), &mut self.ctx) {
                     Ok((span, msg)) => {
-                        self.update_add_path(&msg);
+                        self.update_parsing_ctx(&msg);
                         buf.advance(span.location_offset());
                         msg
                     }
