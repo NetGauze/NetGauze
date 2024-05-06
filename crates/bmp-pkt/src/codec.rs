@@ -97,6 +97,10 @@ impl BmpCodec {
                     let peer_key = PeerKey::from_peer_header(peer_down.peer_header());
                     self.ctx.remove(&peer_key);
                 }
+                BmpMessageValue::Termination(termination) => {
+                    let peer_key = PeerKey::from_peer_header(termination.peer_header());
+                    self.ctx.remove(&peer_key);
+                }
                 BmpMessageValue::PeerUpNotification(peer_up) => {
                     if let BgpMessage::Open(open) = peer_up.sent_message() {
                         let capabilities = open.capabilities();
@@ -230,6 +234,16 @@ impl Decoder for BmpCodec {
 mod tests {
     use super::*;
     use crate::*;
+    use chrono::TimeZone;
+    use netgauze_bgp_pkt::{
+        capabilities::{
+            ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
+            MultiProtocolExtensionsCapability,
+        },
+        open::{BgpOpenMessage, BgpOpenMessageParameter},
+    };
+    use netgauze_iana::address_family::AddressFamily;
+    use std::{net::Ipv6Addr, str::FromStr};
 
     #[test]
     fn test_codec() -> Result<(), BmpMessageWritingError> {
@@ -252,6 +266,139 @@ mod tests {
         assert!(decode_empty.is_ok());
         assert_eq!(decode_empty.unwrap(), None);
         assert!(decode_error.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_peer_key_add_remove() -> Result<(), BmpMessageWritingError> {
+        let peer_header = PeerHeader::new(
+            BmpPeerType::GlobalInstancePeer {
+                ipv6: true,
+                post_policy: false,
+                asn2: false,
+                adj_rib_out: false,
+            },
+            None,
+            Some(IpAddr::V6(Ipv6Addr::from_str("fc00::1").unwrap())),
+            64512,
+            Ipv4Addr::new(10, 0, 0, 1),
+            Some(Utc.timestamp_opt(1664821826, 645593000).unwrap()),
+        );
+
+        let peer_up = BmpMessage::V3(BmpMessageValue::PeerUpNotification(
+            PeerUpNotificationMessage::build(
+                peer_header.clone(),
+                Some(IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap())),
+                Some(179),
+                Some(29834),
+                BgpMessage::Open(BgpOpenMessage::new(
+                    64512,
+                    180,
+                    Ipv4Addr::new(10, 0, 0, 3),
+                    vec![
+                        BgpOpenMessageParameter::Capabilities(vec![
+                            BgpCapability::MultiProtocolExtensions(
+                                MultiProtocolExtensionsCapability::new(
+                                    AddressType::Ipv4MplsLabeledVpn,
+                                ),
+                            ),
+                        ]),
+                        BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                            FourOctetAsCapability::new(64512),
+                        )]),
+                        BgpOpenMessageParameter::Capabilities(vec![
+                            BgpCapability::ExtendedNextHopEncoding(
+                                ExtendedNextHopEncodingCapability::new(vec![
+                                    ExtendedNextHopEncoding::new(
+                                        AddressType::Ipv4Unicast,
+                                        AddressFamily::IPv6,
+                                    ),
+                                    ExtendedNextHopEncoding::new(
+                                        AddressType::Ipv4Multicast,
+                                        AddressFamily::IPv6,
+                                    ),
+                                    ExtendedNextHopEncoding::new(
+                                        AddressType::Ipv4MplsLabeledVpn,
+                                        AddressFamily::IPv6,
+                                    ),
+                                ]),
+                            ),
+                        ]),
+                    ],
+                )),
+                BgpMessage::Open(BgpOpenMessage::new(
+                    64512,
+                    180,
+                    Ipv4Addr::new(10, 0, 0, 1),
+                    vec![
+                        BgpOpenMessageParameter::Capabilities(vec![
+                            BgpCapability::MultiProtocolExtensions(
+                                MultiProtocolExtensionsCapability::new(
+                                    AddressType::Ipv4MplsLabeledVpn,
+                                ),
+                            ),
+                        ]),
+                        BgpOpenMessageParameter::Capabilities(vec![BgpCapability::FourOctetAs(
+                            FourOctetAsCapability::new(64512),
+                        )]),
+                        BgpOpenMessageParameter::Capabilities(vec![
+                            BgpCapability::ExtendedNextHopEncoding(
+                                ExtendedNextHopEncodingCapability::new(vec![
+                                    ExtendedNextHopEncoding::new(
+                                        AddressType::Ipv4Unicast,
+                                        AddressFamily::IPv6,
+                                    ),
+                                    ExtendedNextHopEncoding::new(
+                                        AddressType::Ipv4Multicast,
+                                        AddressFamily::IPv6,
+                                    ),
+                                    ExtendedNextHopEncoding::new(
+                                        AddressType::Ipv4MplsLabeledVpn,
+                                        AddressFamily::IPv6,
+                                    ),
+                                ]),
+                            ),
+                        ]),
+                    ],
+                )),
+                vec![],
+            )
+            .unwrap(),
+        ));
+
+        let peer_down = BmpMessage::V3(BmpMessageValue::PeerDownNotification(
+            PeerDownNotificationMessage::build(
+                peer_header.clone(),
+                PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
+            )
+            .unwrap(),
+        ));
+
+        let terminate = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(
+            peer_header.clone(),
+            vec![TerminationInformation::String("test".to_string())],
+        )));
+
+        let mut codec = BmpCodec::default();
+        let peer_key = PeerKey::from_peer_header(&peer_header);
+        // Check initially empty
+        assert!(!codec.ctx.contains_key(&peer_key));
+
+        // Check peer registered correctly
+        codec.update_parsing_ctx(&peer_up);
+        assert!(codec.ctx.contains_key(&peer_key));
+
+        // Check peer removed after a Peer Down Message
+        codec.update_parsing_ctx(&peer_down);
+        assert!(!codec.ctx.contains_key(&peer_key));
+
+        // Register again
+        codec.update_parsing_ctx(&peer_up);
+        assert!(codec.ctx.contains_key(&peer_key));
+
+        // Check peer removed after a terminate message
+        codec.update_parsing_ctx(&terminate);
+        assert!(!codec.ctx.contains_key(&peer_key));
         Ok(())
     }
 }
