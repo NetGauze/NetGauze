@@ -47,7 +47,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 nom = { version = "7.1", default-features = false, features = ["alloc"] }
 reqwest = { version = "0.12", features = ["blocking"] }
-roxmltree = "0.19"
+roxmltree = "0.20"
 arbitrary = { version = "1", features = ["derive"] }
 arbitrary_ext = { version = "0.3" }
 async-trait = "0.1"
