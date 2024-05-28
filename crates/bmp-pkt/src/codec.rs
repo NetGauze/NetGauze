@@ -24,14 +24,11 @@ use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
 
-use netgauze_bgp_pkt::{
-    capabilities::{AddPathCapability, MultipleLabel},
-    wire::deserializer::BgpParsingContext,
-};
+use crate::wire::deserializer::BmpParsingContext;
+use netgauze_bgp_pkt::capabilities::{AddPathCapability, MultipleLabel};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 use nom::Needed;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
 /// Min length for a valid BMP Message: 1-octet version + 4-octet length
@@ -55,7 +52,7 @@ impl From<std::io::Error> for BmpCodecDecoderError {
 pub struct BmpCodec {
     /// Helper to track in the decoder if we are inside a BMP message or not
     in_message: bool,
-    ctx: HashMap<PeerKey, BgpParsingContext>,
+    ctx: BmpParsingContext,
 }
 
 #[inline]
@@ -86,27 +83,34 @@ fn get_caps(
         .collect::<Vec<Vec<MultipleLabel>>>();
     (add_path_caps, multiple_labels_caps)
 }
+
 impl BmpCodec {
+    pub fn update_parsing_ctx(&mut self, msg: &BmpMessage) {
+        self.ctx.update(msg)
+    }
+}
+
+impl BmpParsingContext {
     /// Update the parsing context based on information presented in the payload
     /// of BMP message. It updates BGP parsing flags such as: Add Path and
     /// Multi label MPLS capabilities
-    pub fn update_parsing_ctx(&mut self, msg: &BmpMessage) {
+    pub fn update(&mut self, msg: &BmpMessage) {
         match msg {
             BmpMessage::V3(value) => match value {
                 BmpMessageValue::PeerDownNotification(peer_down) => {
                     let peer_key = PeerKey::from_peer_header(peer_down.peer_header());
-                    self.ctx.remove(&peer_key);
+                    self.remove(&peer_key);
                 }
                 BmpMessageValue::Termination(termination) => {
                     let peer_key = PeerKey::from_peer_header(termination.peer_header());
-                    self.ctx.remove(&peer_key);
+                    self.remove(&peer_key);
                 }
                 BmpMessageValue::PeerUpNotification(peer_up) => {
                     if let BgpMessage::Open(open) = peer_up.sent_message() {
                         let capabilities = open.capabilities();
                         let (add_path_caps, multiple_labels_caps) = get_caps(capabilities);
                         let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
-                        let bgp_ctx = self.ctx.entry(peer_key).or_default();
+                        let bgp_ctx = self.entry(peer_key).or_default();
                         bgp_ctx.add_path_mut().clear();
                         bgp_ctx.multiple_labels_mut().clear();
                         for add_path in add_path_caps {
@@ -135,7 +139,7 @@ impl BmpCodec {
                             peer_up.peer_header().peer_as(),
                             open.bgp_id(),
                         );
-                        let bgp_ctx = self.ctx.entry(peer_key).or_default();
+                        let bgp_ctx = self.entry(peer_key).or_default();
                         bgp_ctx.add_path_mut().clear();
                         bgp_ctx.multiple_labels_mut().clear();
                         for add_path in add_path_caps {
@@ -234,7 +238,6 @@ impl Decoder for BmpCodec {
 mod tests {
     use super::*;
     use crate::*;
-    use chrono::TimeZone;
     use netgauze_bgp_pkt::{
         capabilities::{
             ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
