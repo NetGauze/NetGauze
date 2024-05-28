@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use libfuzzer_sys::fuzz_target;
 
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
-use netgauze_bmp_pkt::{BmpMessage, PeerKey};
+use netgauze_bmp_pkt::{wire::deserializer::BmpParsingContext, BmpMessage, PeerKey};
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
@@ -43,7 +43,7 @@ fuzz_target!(|data: (
     >,
 )| {
     let (mut buf, ctx_params) = data;
-    let mut ctx = ctx_params
+    let ctx = ctx_params
         .iter()
         .map(
             |(
@@ -73,6 +73,7 @@ fuzz_target!(|data: (
             },
         )
         .collect();
+    let mut ctx = BmpParsingContext::new(ctx);
     while let Ok((retbuf, _msg)) = BmpMessage::from_wire(Span::new(buf), &mut ctx) {
         buf = retbuf.fragment();
     }

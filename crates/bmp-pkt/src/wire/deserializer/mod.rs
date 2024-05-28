@@ -19,7 +19,7 @@ use chrono::LocalResult;
 #[cfg(not(feature = "fuzz"))]
 use chrono::TimeZone;
 
-use std::{collections::HashMap, net::Ipv6Addr, string::FromUtf8Error};
+use std::{collections::HashMap, net::Ipv6Addr, ops::DerefMut, string::FromUtf8Error};
 
 use netgauze_bgp_pkt::wire::deserializer::{
     nlri::RouteDistinguisherParsingError, BgpMessageParsingError, BgpParsingContext,
@@ -51,16 +51,35 @@ pub enum BmpMessageParsingError {
     BmpMessageValueError(#[from_located(module = "self")] BmpMessageValueParsingError),
 }
 
-impl<'a>
-    ReadablePduWithOneInput<
-        'a,
-        &mut HashMap<PeerKey, BgpParsingContext>,
-        LocatedBmpMessageParsingError<'a>,
-    > for BmpMessage
+#[derive(Debug, Default)]
+pub struct BmpParsingContext(HashMap<PeerKey, BgpParsingContext>);
+
+impl BmpParsingContext {
+    pub fn new(map: HashMap<PeerKey, BgpParsingContext>) -> Self {
+        Self(map)
+    }
+}
+
+impl Deref for BmpParsingContext {
+    type Target = HashMap<PeerKey, BgpParsingContext>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for BmpParsingContext {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageParsingError<'a>>
+    for BmpMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
+        ctx: &mut BmpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedBmpMessageParsingError<'a>> {
         let (buf, version) = nom::combinator::map_res(be_u8, BmpVersion::try_from)(buf)?;
         let input = buf;
@@ -113,16 +132,12 @@ pub enum BmpMessageValueParsingError {
     ),
 }
 
-impl<'a>
-    ReadablePduWithOneInput<
-        'a,
-        &mut HashMap<PeerKey, BgpParsingContext>,
-        LocatedBmpMessageValueParsingError<'a>,
-    > for BmpMessageValue
+impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageValueParsingError<'a>>
+    for BmpMessageValue
 {
     fn from_wire(
         buf: Span<'a>,
-        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
+        ctx: &mut BmpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedBmpMessageValueParsingError<'a>> {
         let (buf, msg_type) = nom::combinator::map_res(be_u8, BmpMessageType::try_from)(buf)?;
         let (buf, msg) = match msg_type {
@@ -280,13 +295,13 @@ pub enum RouteMonitoringMessageParsingError {
 impl<'a>
     ReadablePduWithOneInput<
         'a,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedRouteMonitoringMessageParsingError<'a>,
     > for RouteMonitoringMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
+        ctx: &mut BmpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedRouteMonitoringMessageParsingError<'a>> {
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);
@@ -456,13 +471,13 @@ const fn check_is_ipv6(peer_type: &BmpPeerType) -> Result<bool, BmpPeerTypeCode>
 impl<'a>
     ReadablePduWithOneInput<
         'a,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedPeerUpNotificationMessageParsingError<'a>,
     > for PeerUpNotificationMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
+        ctx: &mut BmpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedPeerUpNotificationMessageParsingError<'a>> {
         let input = buf;
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
@@ -541,13 +556,13 @@ pub enum PeerDownNotificationMessageParsingError {
 impl<'a>
     ReadablePduWithOneInput<
         'a,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedPeerDownNotificationMessageParsingError<'a>,
     > for PeerDownNotificationMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
+        ctx: &mut BmpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationMessageParsingError<'a>> {
         let input = buf;
         let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
@@ -670,13 +685,13 @@ pub enum RouteMirroringMessageParsingError {
 impl<'a>
     ReadablePduWithOneInput<
         'a,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedRouteMirroringMessageParsingError<'a>,
     > for RouteMirroringMessage
 {
     fn from_wire(
         buf: Span<'a>,
-        ctx: &mut HashMap<PeerKey, BgpParsingContext>,
+        ctx: &mut BmpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedRouteMirroringMessageParsingError<'a>> {
         let (mut buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
         let peer_key = PeerKey::from_peer_header(&peer_header);

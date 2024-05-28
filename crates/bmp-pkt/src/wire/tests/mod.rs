@@ -45,7 +45,7 @@ use netgauze_parse_utils::{
     Span,
 };
 use nom::error::ErrorKind;
-use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
+use std::{net::Ipv6Addr, str::FromStr};
 
 use crate::{
     iana::*,
@@ -438,12 +438,16 @@ fn test_bmp_value_initiation_message() -> Result<(), BmpMessageValueWritingError
             ),
         ),
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_parse_error_with_one_input::<
         BmpMessageValue,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
-    >(&bad_information_wire, &mut HashMap::new(), &bad_information);
+    >(
+        &bad_information_wire,
+        &mut Default::default(),
+        &bad_information,
+    );
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -546,22 +550,26 @@ fn test_route_monitoring_message() -> Result<(), RouteMonitoringMessageWritingEr
         ),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_parse_error_with_one_input::<
         RouteMonitoringMessage,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedRouteMonitoringMessageParsingError<'_>,
-    >(&bad_peer_header_wire, &mut HashMap::new(), &bad_peer_header);
+    >(
+        &bad_peer_header_wire,
+        &mut Default::default(),
+        &bad_peer_header,
+    );
     test_parse_error_with_one_input::<
         RouteMonitoringMessage,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedRouteMonitoringMessageParsingError<'_>,
-    >(&bad_bgp_wire, &mut HashMap::new(), &bad_bgp);
+    >(&bad_bgp_wire, &mut Default::default(), &bad_bgp);
     test_parse_error_with_one_input::<
         RouteMonitoringMessage,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedRouteMonitoringMessageParsingError<'_>,
-    >(&bad_bgp_type_wire, &mut HashMap::new(), &bad_bgp_type);
+    >(&bad_bgp_type_wire, &mut Default::default(), &bad_bgp_type);
 
     test_write(&good, &good_wire)?;
 
@@ -647,12 +655,12 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
             )),
         ),
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_parse_error_with_one_input::<
         BmpMessageValue,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
-    >(&bad_wire, &mut HashMap::new(), &bad);
+    >(&bad_wire, &mut Default::default(), &bad);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -783,12 +791,12 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
             ),
         ),
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_parse_error_with_one_input::<
         BmpMessageValue,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
-    >(&bad_wire, &mut HashMap::new(), &bad);
+    >(&bad_wire, &mut Default::default(), &bad);
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -853,7 +861,7 @@ fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError>
         .unwrap(),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1084,23 +1092,35 @@ fn test_peer_down_notification() -> Result<(), PeerDownNotificationMessageWritin
             ),
         ),
     );
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
 
     test_parse_error_with_one_input::<
         PeerDownNotificationMessage,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedPeerDownNotificationMessageParsingError<'_>,
-    >(&bad_information_wire, &mut HashMap::new(), &bad_information);
+    >(
+        &bad_information_wire,
+        &mut Default::default(),
+        &bad_information,
+    );
     test_parse_error_with_one_input::<
         PeerDownNotificationMessage,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedPeerDownNotificationMessageParsingError<'_>,
-    >(&bad_peer_header_wire, &mut HashMap::new(), &bad_peer_header);
+    >(
+        &bad_peer_header_wire,
+        &mut Default::default(),
+        &bad_peer_header,
+    );
     test_parse_error_with_one_input::<
         PeerDownNotificationMessage,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedPeerDownNotificationMessageParsingError<'_>,
-    >(&bad_peer_reason_wire, &mut HashMap::new(), &bad_peer_reason);
+    >(
+        &bad_peer_reason_wire,
+        &mut Default::default(),
+        &bad_peer_reason,
+    );
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -1141,13 +1161,13 @@ fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
         BmpMessageValueParsingError::NomError(ErrorKind::Eof),
     );
 
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
 
     test_parse_error_with_one_input::<
         BmpMessageValue,
-        &mut HashMap<PeerKey, BgpParsingContext>,
+        &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
-    >(&bad_eof_wire, &mut HashMap::new(), &bad_eof);
+    >(&bad_eof_wire, &mut Default::default(), &bad_eof);
 
     test_write(&good, &good_wire)?;
 
@@ -1242,7 +1262,7 @@ fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
             BgpMessage::KeepAlive,
         ))],
     )));
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -1337,7 +1357,7 @@ fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
         ),
         vec![TerminationInformation::String("test".to_string())],
     )));
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
 
     test_write(&good, &good_wire)?;
     Ok(())
@@ -1383,7 +1403,7 @@ fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
             ],
         ),
     ));
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
 
     Ok(())
@@ -1525,7 +1545,7 @@ fn test_bmp_stats() -> Result<(), BmpMessageWritingError> {
         ),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -1661,7 +1681,7 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
         .unwrap(),
     ));
 
-    test_parsed_completely_with_one_input(&good_wire, &mut HashMap::new(), &good);
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
