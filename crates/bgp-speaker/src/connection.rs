@@ -1227,6 +1227,11 @@ fn update_treatment(errors: &BgpParsingIgnoredErrors) -> UpdateTreatment {
                     treatment = UpdateTreatment::AttributeDiscard
                 }
             }
+            PathAttributeParsingError::SegmentIdentifierParsingError(_) => {
+                if treatment < UpdateTreatment::AttributeDiscard {
+                    treatment = UpdateTreatment::AttributeDiscard
+                }
+            }
         }
     }
     treatment
