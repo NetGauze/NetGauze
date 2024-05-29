@@ -1410,7 +1410,7 @@ pub enum BgpLsProtocolId {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct BgpLsProtocolIdError(pub BgpLsIanaValueError<u8>);
+pub struct BgpLsProtocolIdError(pub IanaValueError<u8>);
 
 impl From<BgpLsProtocolId> for u8 {
     fn from(value: BgpLsProtocolId) -> Self {
@@ -1426,9 +1426,9 @@ impl TryFrom<u8> for BgpLsProtocolId {
             Some(val) => Ok(val),
             None => {
                 if value == 0 {
-                    Err(BgpLsProtocolIdError(BgpLsIanaValueError::Reserved(value)))
+                    Err(BgpLsProtocolIdError(IanaValueError::Reserved(value)))
                 } else {
-                    Err(BgpLsProtocolIdError(BgpLsIanaValueError::Unknown(value)))
+                    Err(BgpLsProtocolIdError(IanaValueError::Unknown(value)))
                 }
             }
         }
@@ -1443,7 +1443,7 @@ pub enum BgpLsNodeDescriptorType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct BgpLsNodeDescriptorTypeError(pub BgpLsIanaValueError<u16>);
+pub struct BgpLsNodeDescriptorTypeError(pub IanaValueError<u16>);
 
 impl From<BgpLsNodeDescriptorType> for u16 {
     fn from(value: BgpLsNodeDescriptorType) -> Self {
@@ -1459,13 +1459,11 @@ impl TryFrom<u16> for BgpLsNodeDescriptorType {
             Some(val) => Ok(val),
             None => {
                 if value <= 255 {
-                    Err(BgpLsNodeDescriptorTypeError(BgpLsIanaValueError::Reserved(
+                    Err(BgpLsNodeDescriptorTypeError(IanaValueError::Reserved(
                         value,
                     )))
                 } else {
-                    Err(BgpLsNodeDescriptorTypeError(BgpLsIanaValueError::Unknown(
-                        value,
-                    )))
+                    Err(BgpLsNodeDescriptorTypeError(IanaValueError::Unknown(value)))
                 }
             }
         }
@@ -1486,7 +1484,7 @@ pub enum BgpLsNodeDescriptorSubType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct NodeDescriptorSubTypeError(pub BgpLsIanaValueError<u16>);
+pub struct NodeDescriptorSubTypeError(pub IanaValueError<u16>);
 
 impl From<BgpLsNodeDescriptorSubType> for u16 {
     fn from(value: BgpLsNodeDescriptorSubType) -> Self {
@@ -1502,13 +1500,9 @@ impl TryFrom<u16> for BgpLsNodeDescriptorSubType {
             Some(val) => Ok(val),
             None => {
                 if value <= 255 {
-                    Err(NodeDescriptorSubTypeError(BgpLsIanaValueError::Reserved(
-                        value,
-                    )))
+                    Err(NodeDescriptorSubTypeError(IanaValueError::Reserved(value)))
                 } else {
-                    Err(NodeDescriptorSubTypeError(BgpLsIanaValueError::Unknown(
-                        value,
-                    )))
+                    Err(NodeDescriptorSubTypeError(IanaValueError::Unknown(value)))
                 }
             }
         }
@@ -1525,7 +1519,7 @@ pub enum BgpLsPrefixDescriptorType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct PrefixDescriptorTypeError(pub BgpLsIanaValueError<u16>);
+pub struct PrefixDescriptorTypeError(pub IanaValueError<u16>);
 
 impl From<BgpLsPrefixDescriptorType> for u16 {
     fn from(value: BgpLsPrefixDescriptorType) -> Self {
@@ -1541,13 +1535,9 @@ impl TryFrom<u16> for BgpLsPrefixDescriptorType {
             Some(val) => Ok(val),
             None => {
                 if value <= 255 {
-                    Err(PrefixDescriptorTypeError(BgpLsIanaValueError::Reserved(
-                        value,
-                    )))
+                    Err(PrefixDescriptorTypeError(IanaValueError::Reserved(value)))
                 } else {
-                    Err(PrefixDescriptorTypeError(BgpLsIanaValueError::Unknown(
-                        value,
-                    )))
+                    Err(PrefixDescriptorTypeError(IanaValueError::Unknown(value)))
                 }
             }
         }
@@ -1567,7 +1557,7 @@ pub enum BgpLsLinkDescriptorType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct LinkDescriptorTypeError(pub BgpLsIanaValueError<u16>);
+pub struct LinkDescriptorTypeError(pub IanaValueError<u16>);
 
 impl From<BgpLsLinkDescriptorType> for u16 {
     fn from(value: BgpLsLinkDescriptorType) -> Self {
@@ -1583,11 +1573,9 @@ impl TryFrom<u16> for BgpLsLinkDescriptorType {
             Some(val) => Ok(val),
             None => {
                 if value <= 255 {
-                    Err(LinkDescriptorTypeError(BgpLsIanaValueError::Reserved(
-                        value,
-                    )))
+                    Err(LinkDescriptorTypeError(IanaValueError::Reserved(value)))
                 } else {
-                    Err(LinkDescriptorTypeError(BgpLsIanaValueError::Unknown(value)))
+                    Err(LinkDescriptorTypeError(IanaValueError::Unknown(value)))
                 }
             }
         }
@@ -1611,7 +1599,7 @@ pub enum BgpLsDescriptorTlvType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct DescriptorTlvTypeError(pub BgpLsIanaValueError<u16>);
+pub struct DescriptorTlvTypeError(pub IanaValueError<u16>);
 
 impl From<BgpLsDescriptorTlvType> for u16 {
     fn from(value: BgpLsDescriptorTlvType) -> Self {
@@ -1627,9 +1615,9 @@ impl TryFrom<u16> for BgpLsDescriptorTlvType {
             Some(val) => Ok(val),
             None => {
                 if value <= 255 {
-                    Err(DescriptorTlvTypeError(BgpLsIanaValueError::Reserved(value)))
+                    Err(DescriptorTlvTypeError(IanaValueError::Reserved(value)))
                 } else {
-                    Err(DescriptorTlvTypeError(BgpLsIanaValueError::Unknown(value)))
+                    Err(DescriptorTlvTypeError(IanaValueError::Unknown(value)))
                 }
             }
         }
@@ -1673,7 +1661,7 @@ pub enum BgpLsAttributeType {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize, Display)]
-pub enum BgpLsIanaValueError<T> {
+pub enum IanaValueError<T> {
     /// Reserved Values
     Reserved(T),
 
@@ -1683,7 +1671,7 @@ pub enum BgpLsIanaValueError<T> {
 
 #[repr(C)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub struct BgpLsAttributeTypeError(pub BgpLsIanaValueError<u16>);
+pub struct BgpLsAttributeTypeError(pub IanaValueError<u16>);
 
 impl From<BgpLsAttributeType> for u16 {
     fn from(afi: BgpLsAttributeType) -> Self {
@@ -1699,11 +1687,9 @@ impl TryFrom<u16> for BgpLsAttributeType {
             Some(val) => Ok(val),
             None => {
                 if value <= 255 {
-                    Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Reserved(
-                        value,
-                    )))
+                    Err(BgpLsAttributeTypeError(IanaValueError::Reserved(value)))
                 } else {
-                    Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Unknown(value)))
+                    Err(BgpLsAttributeTypeError(IanaValueError::Unknown(value)))
                 }
             }
         }
@@ -1808,6 +1794,67 @@ pub enum BgpLsNodeFlagsBits {
     Abr = 0b_0001_0000,
     Router = 0b_0000_1000,
     V6 = 0b_0000_0100,
+}
+
+/// ```text
+///       Values 1-254, Expert Review as defined in [RFC8126]
+///       Values 0 and 255, Reserved
+///
+///    +-------+-----------------+---------------+
+///    | Value | Type            | Reference     |
+///    +=======+=================+===============+
+///    | 0     | Reserved        | This document |
+///    +-------+-----------------+---------------+
+///    | 1     | Label-Index     | This document |
+///    +-------+-----------------+---------------+
+///    | 2     | Deprecated      | This document |
+///    +-------+-----------------+---------------+
+///    | 3     | Originator SRGB | This document |
+///    +-------+-----------------+---------------+
+///    | 4-254 | Unassigned      |               |
+///    +-------+-----------------+---------------+
+///    | 255   | Reserved        | This document |
+///    +-------+-----------------+---------------+
+///
+///         Table 1: BGP Prefix-SID TLV Types
+/// ```
+///
+/// see [RFC8669 Section 7](https://www.rfc-editor.org/rfc/rfc8669#section-7)
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpSidAttributeType {
+    LabelIndex = 1,
+    Originator = 3,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct BgpSidAttributeTypeError(pub IanaValueError<u8>);
+
+impl From<BgpSidAttributeType> for u8 {
+    fn from(value: BgpSidAttributeType) -> Self {
+        value as u8
+    }
+}
+
+impl TryFrom<u8> for BgpSidAttributeType {
+    type Error = BgpSidAttributeTypeError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(value) => Ok(value),
+            None => {
+                let iana = if value == 0 || value == 255 {
+                    IanaValueError::Reserved(value)
+                } else {
+                    // FIXME Deprecated is a Reserved value??
+                    IanaValueError::Unknown(value)
+                };
+
+                Err(BgpSidAttributeTypeError(iana))
+            }
+        }
+    }
 }
 
 #[cfg(test)]

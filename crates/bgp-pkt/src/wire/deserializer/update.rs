@@ -292,6 +292,10 @@ fn handle_path_error<'a>(
             let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
             buf
         }
+        PathAttributeParsingError::SegmentIdentifierParsingError(_) => {
+            let (buf, _) = advance_attr_buffer(path_attributes_buf)?;
+            buf
+        }
     };
     Ok((buf, ()))
 }
@@ -385,6 +389,9 @@ impl From<BgpUpdateMessageParsingError> for UpdateMessageError {
                     PathAttributeParsingError::BgpLsError(_) => {
                         // TODO what to do here ?
                         UpdateMessageError::Unspecific { value: vec![] }
+                    }
+                    PathAttributeParsingError::SegmentIdentifierParsingError(_) => {
+                        UpdateMessageError::OptionalAttributeError { value: vec![] }
                     }
                 }
             }
