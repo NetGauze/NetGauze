@@ -21,7 +21,10 @@ use crate::{
     path_attribute::*,
     wire::{
         serializer::{
-            community::*, nlri::*, path_attribute::BgpLsAttributeWritingError, IpAddrWritingError,
+            community::*,
+            nlri::*,
+            path_attribute::{bgp_sid::SegmentIdentifierWritingError, BgpLsAttributeWritingError},
+            IpAddrWritingError,
         },
         ACCUMULATED_IGP_METRIC,
     },
@@ -52,6 +55,7 @@ pub enum PathAttributeWritingError {
     BgpLsAttributeError(#[from] BgpLsAttributeWritingError),
     OnlyToCustomerError(#[from] OnlyToCustomerWritingError),
     AigpError(#[from] AigpWritingError),
+    SegmentIdentifierError(#[from] SegmentIdentifierWritingError),
     UnknownAttributeError(#[from] UnknownAttributeWritingError),
 }
 
@@ -79,6 +83,7 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
             PathAttributeValue::BgpLs(value) => value.len(self.extended_length()),
             PathAttributeValue::OnlyToCustomer(value) => value.len(self.extended_length()),
             PathAttributeValue::Aigp(value) => value.len(self.extended_length()),
+            PathAttributeValue::SegmentIdentifier(value) => value.len(self.extended_length()),
             PathAttributeValue::UnknownAttribute(value) => value.len(self.extended_length()) - 1,
         };
         Self::BASE_LENGTH + value_len
@@ -158,6 +163,9 @@ impl WritablePdu<PathAttributeWritingError> for PathAttribute {
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::Aigp(value) => {
+                value.write(writer, self.extended_length())?;
+            }
+            PathAttributeValue::SegmentIdentifier(value) => {
                 value.write(writer, self.extended_length())?;
             }
             PathAttributeValue::UnknownAttribute(value) => {
