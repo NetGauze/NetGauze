@@ -902,9 +902,8 @@ impl ClusterId {
 ///
 /// 1. to advertise a feasible route to a peer
 /// 2. to permit a router to advertise the Network Layer address of the router
-/// that should be used as the next hop to the destinations
-/// listed in the Network Layer Reachability Information field of the `MP_NLRI`
-/// attribute.
+///    that should be used as the next hop to the destinations listed in the
+///    Network Layer Reachability Information field of the `MP_NLRI` attribute.
 ///
 /// see [RFC4760](https://www.rfc-editor.org/rfc/rfc4760)
 ///
