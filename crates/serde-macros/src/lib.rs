@@ -397,10 +397,10 @@ impl WritingError {
 /// provides the following decorations for any members of the enum.
 ///
 /// 1. `#[from_std_io_error]` automatically generate [`From`] implementation
-/// from [`std::io::Error`] to a [`String`].
+///    from [`std::io::Error`] to a [`String`].
 ///
 /// 2. `#[from]`, automatically generates a [`From`] implementation for a given
-/// type.
+///    type.
 ///
 ///
 /// Example:
