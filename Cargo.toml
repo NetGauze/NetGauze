@@ -113,6 +113,7 @@ sha2 = { version = "0.10" }
 schema-registry-client = { version = "0.4" }
 bitflags = { version = "2.10" }
 axum = { version = "0.8"}
+schemars = { version = "0.8.17", features = ["derive"] }
 
 [profile.release]
 codegen-units = 1

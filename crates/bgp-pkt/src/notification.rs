@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpNotificationMessage {
     MessageHeaderError(MessageHeaderError),
     OpenMessageError(OpenMessageError),
@@ -40,6 +41,7 @@ pub enum BgpNotificationMessage {
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum MessageHeaderError {
     Unspecific { value: Vec<u8> },
     ConnectionNotSynchronized { value: Vec<u8> },
@@ -50,6 +52,7 @@ pub enum MessageHeaderError {
 /// See [`crate::iana::OpenMessageErrorSubCode`] for full documentation
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum OpenMessageError {
     Unspecific { value: Vec<u8> },
     UnsupportedVersionNumber { value: Vec<u8> },
@@ -64,6 +67,7 @@ pub enum OpenMessageError {
 /// See [`crate::iana::UpdateMessageErrorSubCode`] for full documentation
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum UpdateMessageError {
     Unspecific { value: Vec<u8> },
     MalformedAttributeList { value: Vec<u8> },
@@ -80,6 +84,7 @@ pub enum UpdateMessageError {
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum HoldTimerExpiredError {
     Unspecific { sub_code: u8, value: Vec<u8> },
 }
@@ -87,6 +92,7 @@ pub enum HoldTimerExpiredError {
 /// See [`crate::iana::FiniteStateMachineErrorSubCode`] for full documentation
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum FiniteStateMachineError {
     Unspecific { value: Vec<u8> },
     ReceiveUnexpectedMessageInOpenSentState { value: Vec<u8> },
@@ -97,6 +103,7 @@ pub enum FiniteStateMachineError {
 /// See [`crate::iana::CeaseErrorSubCode`] for full documentation
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum CeaseError {
     MaximumNumberOfPrefixesReached { value: Vec<u8> },
     AdministrativeShutdown { value: Vec<u8> },
@@ -113,6 +120,7 @@ pub enum CeaseError {
 /// See [`crate::iana::RouteRefreshMessageErrorSubCode`] for full documentation
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteRefreshError {
     InvalidMessageLength { value: Vec<u8> },
 }

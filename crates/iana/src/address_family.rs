@@ -58,6 +58,7 @@ use strum_macros::{Display, FromRepr};
 #[repr(u16)]
 #[derive(FromRepr, Display, Hash, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum AddressFamily {
     IPv4 = 1,
     IPv6 = 2,
@@ -218,6 +219,7 @@ impl TryFrom<u16> for AddressFamily {
 #[repr(u8)]
 #[derive(FromRepr, Display, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum SubsequentAddressFamily {
     /// Network Layer Reachability Information used for unicast forwarding
     /// [RFC4760](https://datatracker.ietf.org/doc/html/RFC4760)
@@ -399,6 +401,7 @@ impl TryFrom<u8> for SubsequentAddressFamily {
 /// valid AFI/SAFI are used at compile time.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum AddressType {
     Ipv4Unicast,
     Ipv4Multicast,

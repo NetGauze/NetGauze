@@ -24,6 +24,7 @@ use strum_macros::{Display, FromRepr};
 /// The BGP Link-State Attribute. see [RFC7752 Section 3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsAttribute {
     pub attributes: Vec<BgpLsAttributeValue>,
 }
@@ -47,6 +48,7 @@ impl PathAttributeValueProperties for BgpLsAttribute {
 
 #[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpLsAttributeValue {
     /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
     LocalNodeIpv4RouterId(
@@ -462,6 +464,7 @@ pub enum LinkProtectionType {
 
 #[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpLsPeerSid {
     LabelValue {
         flags: u8,

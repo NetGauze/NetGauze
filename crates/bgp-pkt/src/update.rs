@@ -39,6 +39,7 @@ use crate::path_attribute::{MpUnreach, PathAttribute, PathAttributeValue};
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpUpdateMessage {
     withdrawn_routes: Vec<Ipv4UnicastAddress>,
     path_attributes: Vec<PathAttribute>,

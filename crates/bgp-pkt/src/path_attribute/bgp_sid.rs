@@ -19,6 +19,7 @@ use strum_macros::Display;
 /// 3 bytes for range size
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SegmentRoutingGlobalBlock {
     pub first_label: MplsLabel,
     pub range_size: [u8; 3],
@@ -26,6 +27,7 @@ pub struct SegmentRoutingGlobalBlock {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpSidAttribute {
     /// ```text
     ///  0                   1                   2                   3
@@ -188,6 +190,7 @@ pub enum BgpSidAttribute {
 ///       whose format is described in Section 3.2 below.
 #[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum SRv6ServiceSubTlv {
     /// ```text
     ///     0                   1                   2                   3
@@ -300,6 +303,7 @@ impl SRv6ServiceSubTlv {
 
 #[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum SRv6ServiceSubSubTlv {
     /// ```text
     ///     0                   1                   2                   3
@@ -380,6 +384,7 @@ impl SRv6ServiceSubSubTlv {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PrefixSegmentIdentifier {
     tlvs: Vec<BgpSidAttribute>,
 }
