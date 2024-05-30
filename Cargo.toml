@@ -53,3 +53,4 @@ arbitrary_ext = { version = "0.3" }
 async-trait = "0.1"
 rstest = "0.19"
 pcap-parser = { version = "0.15", features = ["data"] }
+schemars = { version = "0.8.17", features = ["derive"] }

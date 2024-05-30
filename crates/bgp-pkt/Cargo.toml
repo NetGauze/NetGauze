@@ -14,11 +14,11 @@ keywords = ["bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-iana = { version = "0.3.0", path = "../iana" }
+netgauze-iana = { version = "0.3.0", path = "../iana", features = ["json-schema"] }
 netgauze-locate = { version = "0.3.0", path = "../locate", optional = true }
 netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils", optional = true }
 netgauze-serde-macros = { version = "0.3.0", path = "../serde-macros", optional = true }
-ipnet = { workspace = true }
+ipnet = { workspace = true, features = ["schemars"]}
 strum = { workspace = true }
 strum_macros = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -30,13 +30,15 @@ arbitrary_ext = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["codec"], optional = true }
 bytes = { workspace = true, optional = true }
+schemars = { workspace = true, features = ["derive"], optional = true }
 
 [features]
-default = ["serde"]
+default = ["serde", "json-schema", "schemars"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
 codec = ["log", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
+json-schema = ["schemars"]
 
 
 [dev-dependencies]

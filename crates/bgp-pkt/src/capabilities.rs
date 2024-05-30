@@ -39,6 +39,7 @@ use strum_macros::{Display, FromRepr};
 /// ```
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpCapability {
     /// Defined in [RFC4760](https://datatracker.ietf.org/doc/html/rfc4760)
     MultiProtocolExtensions(MultiProtocolExtensionsCapability),
@@ -146,6 +147,7 @@ impl BgpCapability {
 #[repr(C)]
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct UnrecognizedCapability {
     code: u8,
     value: Vec<u8>,
@@ -169,6 +171,7 @@ impl UnrecognizedCapability {
 #[repr(u8)]
 #[derive(Display, FromRepr, Hash, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum ExperimentalCapabilityCode {
     Experimental239 = 239,
     Experimental240 = 240,
@@ -192,6 +195,7 @@ pub enum ExperimentalCapabilityCode {
 /// by IANA See [RFC8810](https://datatracker.ietf.org/doc/html/RFC8810)
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExperimentalCapability {
     code: ExperimentalCapabilityCode,
     value: Vec<u8>,
@@ -222,6 +226,7 @@ impl ExperimentalCapability {
 /// ```
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultiProtocolExtensionsCapability {
     address_type: AddressType,
 }
@@ -239,6 +244,7 @@ impl MultiProtocolExtensionsCapability {
 /// Defined in [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793)
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FourOctetAsCapability {
     asn4: u32,
 }
@@ -257,6 +263,7 @@ impl FourOctetAsCapability {
 /// and [RFC8538](https://datatracker.ietf.org/doc/html/rfc8538)
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GracefulRestartCapability {
     restart: bool,
     graceful_notification: bool,
@@ -298,6 +305,7 @@ impl GracefulRestartCapability {
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GracefulRestartAddressFamily {
     forwarding_state: bool,
     address_type: AddressType,
@@ -326,6 +334,7 @@ impl GracefulRestartAddressFamily {
 /// See [RFC7911](https://datatracker.ietf.org/doc/html/RFC7911)
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct AddPathCapability {
     address_families: Vec<AddPathAddressFamily>,
 }
@@ -352,6 +361,7 @@ impl AddPathCapability {
 /// ```
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct AddPathAddressFamily {
     address_type: AddressType,
     send: bool,
@@ -408,6 +418,7 @@ impl AddPathAddressFamily {
 /// ```
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExtendedNextHopEncodingCapability {
     encodings: Vec<ExtendedNextHopEncoding>,
 }
@@ -435,6 +446,7 @@ impl ExtendedNextHopEncodingCapability {
 /// ```
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExtendedNextHopEncoding {
     address_type: AddressType,
     next_hop_afi: AddressFamily,
@@ -468,6 +480,7 @@ impl ExtendedNextHopEncoding {
 /// ```
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultipleLabel {
     address_type: AddressType,
     count: u8,
@@ -494,6 +507,7 @@ impl MultipleLabel {
 /// defined by: [RFC9234](https://datatracker.ietf.org/doc/html/rfc9234)
 #[derive(Debug, Hash, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpRoleCapability {
     role: BgpRoleValue,
 }

@@ -41,6 +41,7 @@ pub const BGP_VERSION: u8 = 4;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpOpenMessage {
     version: u8,
     my_as: u16,
@@ -124,6 +125,7 @@ impl BgpOpenMessage {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-...
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpOpenMessageParameter {
     /// Capabilities Advertisement
     Capabilities(Vec<BgpCapability>),

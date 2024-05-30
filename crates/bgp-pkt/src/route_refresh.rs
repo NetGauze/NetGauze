@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpRouteRefreshMessage {
     address_type: AddressType,
     operation_type: RouteRefreshSubcode,

@@ -30,6 +30,7 @@ pub trait NlriAddressType {
 /// Temporary representation of MPLS Labels
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MplsLabel([u8; 3]);
 
 impl MplsLabel {
@@ -54,6 +55,7 @@ impl MplsLabel {
 ///     - Value Field: 6 bytes
 #[derive(Hash, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum RouteDistinguisher {
     /// The Value field consists of two subfields:
     ///     - Administrator subfield: ASN2
@@ -119,6 +121,7 @@ impl From<RouteDistinguisher> for u64 {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LabeledIpv4NextHop {
     rd: RouteDistinguisher,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
@@ -141,6 +144,7 @@ impl LabeledIpv4NextHop {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LabeledIpv6NextHop {
     rd: RouteDistinguisher,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6))]
@@ -177,6 +181,7 @@ impl LabeledIpv6NextHop {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum LabeledNextHop {
     Ipv4(LabeledIpv4NextHop),
     Ipv6(LabeledIpv6NextHop),
@@ -202,6 +207,7 @@ impl LabeledNextHop {
 /// networks
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv4Unicast(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] Ipv4Net,
 );
@@ -209,6 +215,7 @@ pub struct Ipv4Unicast(
 /// Raised when the network is not a unicast range
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 
 pub struct InvalidIpv4UnicastNetwork(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] pub Ipv4Net,
@@ -243,6 +250,7 @@ impl TryFrom<Ipv4Net> for Ipv4Unicast {
 /// Ipv4 Network address in NLRI
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv4UnicastAddress {
     path_id: Option<u32>,
     network: Ipv4Unicast,
@@ -277,6 +285,7 @@ impl NlriAddressType for Ipv4UnicastAddress {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv4MplsVpnUnicastAddress {
     path_id: Option<u32>,
     rd: RouteDistinguisher,
@@ -339,12 +348,14 @@ impl NlriAddressType for Ipv4MplsVpnUnicastAddress {
 /// networks
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv4Multicast(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] Ipv4Net,
 );
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InvalidIpv4MulticastNetwork(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] pub Ipv4Net,
 );
@@ -374,6 +385,7 @@ impl TryFrom<Ipv4Net> for Ipv4Multicast {
 /// Ipv4 Multicast Network address in NLRI
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv4MulticastAddress {
     path_id: Option<u32>,
     network: Ipv4Multicast,
@@ -410,12 +422,14 @@ impl NlriAddressType for Ipv4MulticastAddress {
 /// networks
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv6Unicast(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] Ipv6Net,
 );
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InvalidIpv6UnicastNetwork(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] pub Ipv6Net,
 );
@@ -444,6 +458,7 @@ impl TryFrom<Ipv6Net> for Ipv6Unicast {
 /// Ipv6 Network address in NLRI
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv6UnicastAddress {
     path_id: Option<u32>,
     network: Ipv6Unicast,
@@ -471,6 +486,7 @@ impl NlriAddressType for Ipv6UnicastAddress {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv6MplsVpnUnicastAddress {
     path_id: Option<u32>,
     rd: RouteDistinguisher,
@@ -533,12 +549,14 @@ impl NlriAddressType for Ipv6MplsVpnUnicastAddress {
 /// networks
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv6Multicast(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] Ipv6Net,
 );
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InvalidIpv6MulticastNetwork(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] pub Ipv6Net,
 );
@@ -572,6 +590,7 @@ impl TryFrom<Ipv6Net> for Ipv6Multicast {
 /// Ipv4 Multicast Network address in NLRI
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv6MulticastAddress {
     path_id: Option<u32>,
     network: Ipv6Multicast,
@@ -606,18 +625,22 @@ impl NlriAddressType for Ipv6MulticastAddress {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EthernetSegmentIdentifier(pub [u8; 10]);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EthernetTag(pub u32);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MacAddress(pub [u8; 6]);
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct L2EvpnAddress {
     path_id: Option<u32>,
     route: L2EvpnRoute,
@@ -639,6 +662,7 @@ impl L2EvpnAddress {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum L2EvpnRoute {
     EthernetAutoDiscovery(EthernetAutoDiscovery),
     MacIpAdvertisement(MacIpAdvertisement),
@@ -683,6 +707,7 @@ impl NlriAddressType for L2EvpnAddress {
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EthernetAutoDiscovery {
     rd: RouteDistinguisher,
     segment_id: EthernetSegmentIdentifier,
@@ -747,6 +772,7 @@ impl EthernetAutoDiscovery {
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MacIpAdvertisement {
     rd: RouteDistinguisher,
     segment_id: EthernetSegmentIdentifier,
@@ -825,6 +851,7 @@ impl MacIpAdvertisement {
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InclusiveMulticastEthernetTagRoute {
     rd: RouteDistinguisher,
     tag: EthernetTag,
@@ -867,6 +894,7 @@ impl InclusiveMulticastEthernetTagRoute {
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EthernetSegmentRoute {
     rd: RouteDistinguisher,
     segment_id: EthernetSegmentIdentifier,
@@ -899,6 +927,7 @@ impl EthernetSegmentRoute {
 /// The BGP EVPN IPv4 or IPv6 Prefix Route
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum L2EvpnIpPrefixRoute {
     V4(L2EvpnIpv4PrefixRoute),
     V6(L2EvpnIpv6PrefixRoute),
@@ -925,6 +954,7 @@ pub enum L2EvpnIpPrefixRoute {
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct L2EvpnIpv4PrefixRoute {
     rd: RouteDistinguisher,
     segment_id: EthernetSegmentIdentifier,
@@ -999,6 +1029,7 @@ impl L2EvpnIpv4PrefixRoute {
 /// ```
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct L2EvpnIpv6PrefixRoute {
     rd: RouteDistinguisher,
     segment_id: EthernetSegmentIdentifier,
@@ -1054,6 +1085,7 @@ impl L2EvpnIpv6PrefixRoute {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RouteTargetMembershipAddress {
     path_id: Option<u32>,
     membership: Option<RouteTargetMembership>,
@@ -1089,6 +1121,7 @@ impl RouteTargetMembershipAddress {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RouteTargetMembership {
     origin_as: u32,
     /// Route targets can then be expressed as prefixes, where, for instance,
@@ -1122,6 +1155,7 @@ impl NlriAddressType for RouteTargetMembershipAddress {
 
 #[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum InvalidIpv4NlriMplsLabelsAddress {
     /// Total length should not exceed 255, each MPLS Label is 24 bit and
     /// account for up to 32 bit IPv4 prefix length
@@ -1161,6 +1195,7 @@ pub enum InvalidIpv4NlriMplsLabelsAddress {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv4NlriMplsLabelsAddress {
     path_id: Option<u32>,
     labels: Vec<MplsLabel>,
@@ -1217,6 +1252,7 @@ impl NlriAddressType for Ipv4NlriMplsLabelsAddress {
 
 #[derive(Copy, Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum InvalidIpv6NlriMplsLabelsAddress {
     /// Total length should not exceed 255, each MPLS Label is 24 bit and
     /// account for up to 128 bit IPv6 prefix length
@@ -1256,6 +1292,7 @@ pub enum InvalidIpv6NlriMplsLabelsAddress {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Ipv6NlriMplsLabelsAddress {
     path_id: Option<u32>,
     labels: Vec<MplsLabel>,
