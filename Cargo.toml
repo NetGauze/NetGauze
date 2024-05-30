@@ -51,5 +51,5 @@ roxmltree = "0.20"
 arbitrary = { version = "1", features = ["derive"] }
 arbitrary_ext = { version = "0.3" }
 async-trait = "0.1"
-rstest = "0.19"
+rstest = "0.20"
 pcap-parser = { version = "0.15", features = ["data"] }
