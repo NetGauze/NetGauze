@@ -31,6 +31,7 @@ arbitrary_ext = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
 tokio-util = { workspace = true, default-features = false, features = ["codec"], optional = true }
 bytes = { workspace = true, optional = true }
+schemars = { workspace = true, features = ["derive"], optional = true }
 
 [features]
 default = ["serde"]
@@ -44,6 +45,7 @@ serde = [
 codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
+json-schema = ["schemars", "netgauze-iana/json-schema", "ipnet/schemars"]
 
 [dev-dependencies]
 netgauze-pcap-reader = { workspace = true }

@@ -27,6 +27,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 /// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Community(u32);
 
 impl Community {
@@ -88,6 +89,7 @@ impl std::fmt::Display for Community {
 /// Local Data Part 2:  A four-octet operator-defined value.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LargeCommunity {
     global_admin: u32,
     local_data1: u32,
@@ -163,6 +165,7 @@ pub trait ExtendedCommunityProperties {
 /// See [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum ExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     TransitiveTwoOctet(TransitiveTwoOctetExtendedCommunity),
@@ -551,6 +554,7 @@ impl std::fmt::Display for ExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TransitiveTwoOctetExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteTarget {
@@ -629,6 +633,7 @@ impl ExtendedCommunityProperties for TransitiveTwoOctetExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum NonTransitiveTwoOctetExtendedCommunity {
     LinkBandwidth {
         global_admin: u16,
@@ -657,6 +662,7 @@ impl ExtendedCommunityProperties for NonTransitiveTwoOctetExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TransitiveFourOctetExtendedCommunity {
     /// [RFC5668](https://datatracker.ietf.org/doc/html/rfc5668)
     RouteTarget {
@@ -724,6 +730,7 @@ impl ExtendedCommunityProperties for TransitiveFourOctetExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum NonTransitiveFourOctetExtendedCommunity {
     Unassigned {
         sub_type: u8,
@@ -744,6 +751,7 @@ impl ExtendedCommunityProperties for NonTransitiveFourOctetExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TransitiveIpv4ExtendedCommunity {
     /// [RFC4360](https://datatracker.ietf.org/doc/html/rfc4360)
     RouteTarget {
@@ -868,6 +876,7 @@ impl ExtendedCommunityProperties for TransitiveIpv4ExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum NonTransitiveIpv4ExtendedCommunity {
     Unassigned {
         sub_type: u8,
@@ -889,6 +898,7 @@ impl ExtendedCommunityProperties for NonTransitiveIpv4ExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TransitiveOpaqueExtendedCommunity {
     /// The Default Gateway community  It is a transitive community,
     /// which means that the first octet is 0x03.  The value of the second
@@ -915,6 +925,7 @@ impl ExtendedCommunityProperties for TransitiveOpaqueExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum NonTransitiveOpaqueExtendedCommunity {
     Unassigned { sub_type: u8, value: [u8; 6] },
 }
@@ -931,6 +942,7 @@ impl ExtendedCommunityProperties for NonTransitiveOpaqueExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExperimentalExtendedCommunity {
     code: u8,
     sub_type: u8,
@@ -971,6 +983,7 @@ impl ExtendedCommunityProperties for ExperimentalExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct UnknownExtendedCommunity {
     code: u8,
     sub_type: u8,
@@ -1029,6 +1042,7 @@ impl ExtendedCommunityProperties for UnknownExtendedCommunity {
 /// See [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum ExtendedCommunityIpv6 {
     /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
     TransitiveIpv6(TransitiveIpv6ExtendedCommunity),
@@ -1059,6 +1073,7 @@ impl ExtendedCommunityProperties for ExtendedCommunityIpv6 {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum TransitiveIpv6ExtendedCommunity {
     /// [RFC5701](https://datatracker.ietf.org/doc/html/rfc5701)
     RouteTarget {
@@ -1143,6 +1158,7 @@ impl ExtendedCommunityProperties for TransitiveIpv6ExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum NonTransitiveIpv6ExtendedCommunity {
     Unassigned {
         sub_type: u8,
@@ -1164,6 +1180,7 @@ impl ExtendedCommunityProperties for NonTransitiveIpv6ExtendedCommunity {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct UnknownExtendedCommunityIpv6 {
     code: u8,
     sub_type: u8,
@@ -1204,6 +1221,7 @@ impl ExtendedCommunityProperties for UnknownExtendedCommunityIpv6 {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum EvpnExtendedCommunity {
     /// MAC Mobility extended community
     /// ```text

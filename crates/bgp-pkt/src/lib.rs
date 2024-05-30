@@ -58,6 +58,7 @@ pub mod codec;
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpMessage {
     Open(BgpOpenMessage),
     Update(BgpUpdateMessage),

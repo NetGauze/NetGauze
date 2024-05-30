@@ -39,6 +39,7 @@ use strum_macros::{Display, FromRepr};
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNlri {
     pub path_id: Option<u32>,
     pub value: BgpLsNlriValue,
@@ -71,6 +72,7 @@ impl BgpLsNlri {
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsVpnNlri {
     pub path_id: Option<u32>,
     pub rd: RouteDistinguisher,
@@ -102,6 +104,7 @@ impl BgpLsVpnNlri {
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpLsNlriValue {
     /// ```text
     ///  0                   1                   2                   3
@@ -213,6 +216,7 @@ impl BgpLsNlriValue {
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNlriIpPrefix {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
@@ -223,6 +227,7 @@ pub struct BgpLsNlriIpPrefix {
 #[repr(u8)]
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum OspfRouteType {
     IntraArea = 1,
     InterArea = 2,
@@ -304,6 +309,7 @@ pub enum IgpFlags {
 /// see [RFC7752 Section 3.3.2.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.3.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct IpReachabilityInformationData(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipnet))] pub IpNet,
 );
@@ -334,6 +340,7 @@ impl IpReachabilityInformationData {
 
 #[derive(Display, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpLsPrefixDescriptor {
     /// The format of the MT-ID TLV is shown in the following figure.
     ///
@@ -424,6 +431,7 @@ impl BgpLsPrefixDescriptor {
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNlriNode {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
@@ -443,6 +451,7 @@ pub struct BgpLsNlriNode {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNodeDescriptors(pub Vec<BgpLsNodeDescriptorSubTlv>);
 
 /// ```text
@@ -458,6 +467,7 @@ pub struct BgpLsNodeDescriptors(pub Vec<BgpLsNodeDescriptorSubTlv>);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsLocalNodeDescriptors(pub BgpLsNodeDescriptors);
 /// ```text
 ///  0                   1                   2                   3
@@ -472,6 +482,7 @@ pub struct BgpLsLocalNodeDescriptors(pub BgpLsNodeDescriptors);
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsRemoteNodeDescriptors(pub BgpLsNodeDescriptors);
 
 impl BgpLsNodeDescriptors {
@@ -487,6 +498,7 @@ impl BgpLsNodeDescriptors {
 /// see [RFC7752 Section 3.2.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpLsLinkDescriptor {
     /// ```text
     ///  0                   1                   2                   3
@@ -566,6 +578,7 @@ impl BgpLsLinkDescriptor {
 /// see [RFC7752 Section 3.2.1](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum BgpLsNodeDescriptorSubTlv {
     AutonomousSystem(u32),
     BgpLsIdentifier(u32),
@@ -626,6 +639,7 @@ impl BgpLsNodeDescriptorSubTlv {
 /// see [RFC7752 Section 3.2](https://www.rfc-editor.org/rfc/rfc7752#section-3.2)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BgpLsNlriLink {
     pub protocol_id: BgpLsProtocolId,
     pub identifier: u64,
@@ -653,6 +667,7 @@ pub struct BgpLsNlriLink {
 /// see [RFC7752 Section 3.2.1.5](https://www.rfc-editor.org/rfc/rfc7752#section-3.2.1.5)
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultiTopologyIdData(pub Vec<MultiTopologyId>);
 
 impl From<Vec<MultiTopologyId>> for MultiTopologyIdData {
@@ -691,6 +706,7 @@ impl MultiTopologyIdData {
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultiTopologyId(pub u16);
 
 impl MultiTopologyId {
@@ -736,6 +752,7 @@ impl From<u16> for MultiTopologyId {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SharedRiskLinkGroupValue(pub u32);
 
 impl SharedRiskLinkGroupValue {
