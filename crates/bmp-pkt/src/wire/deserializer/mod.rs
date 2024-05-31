@@ -51,7 +51,7 @@ pub enum BmpMessageParsingError {
     BmpMessageValueError(#[from_located(module = "self")] BmpMessageValueParsingError),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct BmpParsingContext(HashMap<PeerKey, BgpParsingContext>);
 
 impl BmpParsingContext {
