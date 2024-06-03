@@ -164,14 +164,25 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                         SetParsingError::NoTemplateDefinedFor(id),
                     )));
                 };
+
                 let (scope_field_specs, field_specs) = template.as_ref();
-                let mut total_record_count = scope_field_specs.len() + field_specs.len();
+                // since we could have vlen fields, we can only state a min_record_len here
+                let min_record_length = scope_field_specs
+                    .iter()
+                    .map(|x| if x.length() == 65535 { 0 } else { x.length() as usize })
+                    .sum::<usize>()
+                    + field_specs
+                        .iter()
+                        .map(|x| if x.length() == 65535 { 0 } else { x.length() as usize })
+                        .sum::<usize>();
+
+                let mut remaining_buf_len = buf.len();
                 let mut records = Vec::new();
-                while total_record_count > 0 {
+                while remaining_buf_len >= min_record_length {
                     let (t, record): (Span<'_>, DataRecord) =
                         parse_into_located_one_input(buf, Rc::clone(template))?;
                     buf = t;
-                    total_record_count -= record.scope_fields().len() + record.fields().len();
+                    remaining_buf_len -= remaining_buf_len - buf.len();
                     records.push(record);
                 }
                 // buf could be a non zero value for padding
