@@ -169,11 +169,23 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                 // since we could have vlen fields, we can only state a min_record_len here
                 let min_record_length = scope_field_specs
                     .iter()
-                    .map(|x| if x.length() == 65535 { 0 } else { x.length() as usize })
+                    .map(|x| {
+                        if x.length() == 65535 {
+                            0
+                        } else {
+                            x.length() as usize
+                        }
+                    })
                     .sum::<usize>()
                     + field_specs
                         .iter()
-                        .map(|x| if x.length() == 65535 { 0 } else { x.length() as usize })
+                        .map(|x| {
+                            if x.length() == 65535 {
+                                0
+                            } else {
+                                x.length() as usize
+                            }
+                        })
                         .sum::<usize>();
 
                 let mut remaining_buf_len = buf.len();
