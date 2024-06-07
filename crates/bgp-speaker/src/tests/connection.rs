@@ -30,12 +30,15 @@ async fn get_connection(
     config: ConnectionConfig,
 ) -> Result<Connection<SocketAddr, Mock, BgpCodec>, FsmStateError<SocketAddr>> {
     let framed = Framed::new(io, BgpCodec::new(true));
+    // fix jitter value for more deterministic testing
+    let jitter = 0.95;
     let mut connection = Connection::new(
         &PROPERTIES,
         PEER_ADDR,
         ConnectionType::Active,
         config,
         framed,
+        jitter,
     );
     connection
         .handle_event(
@@ -346,6 +349,7 @@ async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::KeepAlive)
+        .write(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
                 sub_code: 0,
@@ -391,17 +395,16 @@ async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
     // Receive and handle third KeepAliveTimerExpires
     let event =
         tokio::time::timeout(Duration::from_secs(hold_time_seconds), connection.next()).await;
-    // There's no guarantees KeepAlive or HoldTimersExpires will be fired first
-    assert!(
-        event == Ok(Some(ConnectionEvent::HoldTimerExpires))
-            || event == Ok(Some(ConnectionEvent::KeepAliveTimerExpires))
-    );
-    if event == Ok(Some(ConnectionEvent::KeepAliveTimerExpires)) {
-        // If KeepAlive is first check HoldTimersExpires is fired after
-        let event =
-            tokio::time::timeout(Duration::from_secs(hold_time_seconds), connection.next()).await;
-        assert_eq!(event, Ok(Some(ConnectionEvent::HoldTimerExpires)));
-    }
+    assert_eq!(event, Ok(Some(ConnectionEvent::KeepAliveTimerExpires)));
+    let event = event.unwrap().unwrap();
+    let event = connection.handle_event(&mut policy, event).await;
+    assert_eq!(event, Ok(ConnectionEvent::KeepAliveTimerExpires));
+
+    // Receive and handle HoldTimer expire after multiple Keep Alive messages sent
+    // without response
+    let event =
+        tokio::time::timeout(Duration::from_secs(hold_time_seconds), connection.next()).await;
+    assert_eq!(event, Ok(Some(ConnectionEvent::HoldTimerExpires)));
 
     let event = event.unwrap().unwrap();
     let event = connection.handle_event(&mut policy, event).await;
@@ -409,7 +412,7 @@ async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
 
     assert_eq!(connection.state(), ConnectionState::Terminate);
     assert_eq!(connection.stats().open_sent(), 1);
-    assert_eq!(connection.stats().keepalive_sent(), 3);
+    assert_eq!(connection.stats().keepalive_sent(), 4);
     assert_eq!(connection.stats().keepalive_received(), 0);
     assert_eq!(connection.stats().notification_sent(), 1);
     assert!(connection.stats().last_sent().is_some());
