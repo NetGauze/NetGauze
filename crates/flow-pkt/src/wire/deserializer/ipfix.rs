@@ -188,13 +188,11 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                         })
                         .sum::<usize>();
 
-                let mut remaining_buf_len = buf.len();
                 let mut records = Vec::new();
-                while remaining_buf_len >= min_record_length {
+                while buf.len() >= min_record_length {
                     let (t, record): (Span<'_>, DataRecord) =
                         parse_into_located_one_input(buf, Rc::clone(template))?;
                     buf = t;
-                    remaining_buf_len -= remaining_buf_len - buf.len();
                     records.push(record);
                 }
                 // buf could be a non zero value for padding
