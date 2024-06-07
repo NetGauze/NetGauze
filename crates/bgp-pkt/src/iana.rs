@@ -1664,6 +1664,7 @@ pub enum BgpLsAttributeType {
 pub enum IanaValueError<T> {
     /// Reserved Values
     Reserved(T),
+    Deprecated(T),
 
     /// Unassigned or Private Use values
     Unknown(T),
@@ -1846,8 +1847,9 @@ impl TryFrom<u8> for BgpSidAttributeType {
             None => {
                 let iana = if value == 0 || value == 255 {
                     IanaValueError::Reserved(value)
+                } else if value == 2 {
+                    IanaValueError::Deprecated(value)
                 } else {
-                    // FIXME Deprecated is a Reserved value??
                     IanaValueError::Unknown(value)
                 };
 
