@@ -179,7 +179,7 @@ pub enum ConnectionType {
 /// For duration config, unsigned numbers are used to represent values in
 /// seconds. They're lighter and naturally keep upper bounds on the max values
 /// over custom runtime checks needed if `Duration` is used.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ConnectionConfig {
     send_notif_without_open: bool,
@@ -200,9 +200,11 @@ impl ConnectionConfig {
     pub const fn hold_timer_duration_large_value(&self) -> Duration {
         Duration::from_secs(self.hold_timer_duration_large_value as u64)
     }
+
     pub const fn keepalive_timer_duration(&self) -> Duration {
         Duration::from_secs(self.keepalive_timer_duration as u64)
     }
+
     pub const fn idle_hold_duration(&self) -> Duration {
         Duration::from_secs(self.idle_hold_duration as u64)
     }
@@ -317,6 +319,14 @@ pub struct Connection<
     #[pin]
     hold_timer: Option<tokio::time::Interval>,
     hold_timer_duration: Duration,
+    /// RFC 4721: A given BGP speaker MAY apply the same jitter to each of these
+    /// quantities, regardless of the destinations to which the updates are
+    /// being sent; that is, jitter need not be configured on a per-peer basis.
+    /// The suggested default amount of jitter SHALL be determined by
+    /// multiplying the base value of the appropriate timer by a random factor,
+    /// which is uniformly distributed in the range from 0.75 to 1.0.
+    #[pin]
+    jitter: f32,
 }
 
 impl<
@@ -332,6 +342,7 @@ impl<
         connection_type: ConnectionType,
         config: ConnectionConfig,
         inner: Framed<I, D>,
+        jitter: f32,
     ) -> Self {
         let my_asn = peer_properties.my_asn();
         let peer_asn = if peer_properties.allow_dynamic_as() {
@@ -361,6 +372,7 @@ impl<
             open_delay_timer: None,
             hold_timer: None,
             hold_timer_duration: config.hold_timer_duration(),
+            jitter,
         }
     }
 
@@ -537,7 +549,8 @@ impl<
                 self.set_negotiated_timers();
                 let open = policy.open_message().await;
                 if !self.keepalive_timer_duration.is_zero() {
-                    let mut interval = tokio::time::interval(self.keepalive_timer_duration);
+                    let duration = self.keepalive_timer_duration.mul_f32(self.jitter);
+                    let mut interval = tokio::time::interval(duration);
                     interval.reset();
                     self.keepalive_timer.replace(interval);
                 }
@@ -631,7 +644,8 @@ impl<
                 self.read_open_msg(open);
                 self.set_negotiated_timers();
                 if !self.keepalive_timer_duration.is_zero() {
-                    let mut interval = tokio::time::interval(self.keepalive_timer_duration);
+                    let duration = self.keepalive_timer_duration.mul_f32(self.jitter);
+                    let mut interval = tokio::time::interval(duration);
                     interval.reset();
                     self.keepalive_timer.replace(interval);
                 }

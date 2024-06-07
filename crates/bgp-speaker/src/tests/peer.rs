@@ -2666,6 +2666,7 @@ async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<Sock
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::KeepAlive)
+        .write(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
                 sub_code: 0,
@@ -2701,6 +2702,10 @@ async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<Sock
 
     let event = peer.run().await?;
     assert_eq!(event, BgpEvent::BGPOpen(peer_open));
+    assert_eq!(peer.fsm_state(), FsmState::OpenConfirm);
+
+    let event = peer.run().await?;
+    assert_eq!(event, BgpEvent::KeepAliveTimerExpires);
     assert_eq!(peer.fsm_state(), FsmState::OpenConfirm);
 
     let event = peer.run().await?;
@@ -3732,6 +3737,7 @@ async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<Socke
         .read(BgpMessage::KeepAlive)
         .write(BgpMessage::KeepAlive)
         .write(BgpMessage::KeepAlive)
+        .write(BgpMessage::KeepAlive)
         .write(BgpMessage::Notification(
             BgpNotificationMessage::HoldTimerExpiredError(HoldTimerExpiredError::Unspecific {
                 sub_code: 0,
@@ -3769,6 +3775,10 @@ async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<Socke
 
     let event = peer.run().await?;
     assert_eq!(event, BgpEvent::KeepAliveMsg);
+    assert_eq!(peer.fsm_state(), FsmState::Established);
+
+    let event = peer.run().await?;
+    assert_eq!(event, BgpEvent::KeepAliveTimerExpires);
     assert_eq!(peer.fsm_state(), FsmState::Established);
 
     let event = peer.run().await?;

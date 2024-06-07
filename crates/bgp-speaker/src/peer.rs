@@ -24,6 +24,7 @@ use std::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use futures_util::SinkExt;
+use rand::{rngs::SmallRng, thread_rng, Rng, RngCore, SeedableRng};
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     sync::oneshot,
@@ -353,6 +354,7 @@ pub struct PeerConfig {
     pub(crate) idle_hold_duration: u16,
     passive_tcp_establishment: bool,
     collision_detect_established_state: bool,
+    rng_seed: u64,
 }
 
 impl Default for PeerConfig {
@@ -370,6 +372,7 @@ impl Default for PeerConfig {
             idle_hold_duration: 1,
             passive_tcp_establishment: false,
             collision_detect_established_state: false,
+            rng_seed: thread_rng().next_u64(),
         }
     }
 }
@@ -485,6 +488,11 @@ impl PeerConfigBuilder {
         self
     }
 
+    pub const fn rng_seed(mut self, value: u64) -> Self {
+        self.config.rng_seed = value;
+        self
+    }
+
     pub const fn build(self) -> PeerConfig {
         self.config
     }
@@ -558,6 +566,7 @@ pub struct Peer<
     active_connect: C,
     allowed_to_active_connect: bool,
     waiting_admin_events: Vec<PeerAdminEvents<A, I>>,
+    rng: SmallRng,
 }
 
 impl<
@@ -592,6 +601,7 @@ impl<
             active_connect,
             allowed_to_active_connect: false,
             waiting_admin_events: vec![],
+            rng: SmallRng::seed_from_u64(config.rng_seed),
         }
     }
 
@@ -674,6 +684,7 @@ impl<
         peer_addr: A,
         stream: I,
         connection_type: ConnectionType,
+        jitter: f32,
     ) -> Result<Connection<A, I, D>, FsmStateError<A>> {
         let codec = D::new(self);
         let framed = Framed::new(stream, codec);
@@ -683,6 +694,7 @@ impl<
             connection_type,
             (&self.config).into(),
             framed,
+            jitter,
         );
         Ok(connection)
     }
@@ -718,8 +730,9 @@ impl<
         }
         log::info!("[{}][{}] Passive connected", self.peer_key, self.fsm_state);
         self.connect_retry_timer.take();
+        let jitter = self.rng.gen_range(0.75..=1.0);
         let mut connection =
-            self.create_connection(peer_addr, tcp_stream, ConnectionType::Passive)?;
+            self.create_connection(peer_addr, tcp_stream, ConnectionType::Passive, jitter)?;
         let event = connection
             .handle_event(
                 &mut self.policy,
@@ -843,10 +856,12 @@ impl<
     ) -> PeerResult<A> {
         match connect_result {
             Ok(stream) => {
+                let jitter = self.rng.gen_range(0.75..=1.0);
                 let mut connection = self.create_connection(
                     self.properties.peer_addr,
                     stream,
                     ConnectionType::Active,
+                    jitter,
                 )?;
                 self.connect_retry_timer.take();
                 let event = connection
