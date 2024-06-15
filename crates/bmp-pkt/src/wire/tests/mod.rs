@@ -1306,59 +1306,23 @@ fn test_termination_information() -> Result<(), TerminationInformationWritingErr
 
 #[test]
 fn test_termination_message() -> Result<(), TerminationMessageWritingError> {
-    let good_wire = [
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 172, 16, 0, 20, 0, 0, 0,
-        200, 172, 16, 0, 20, 99, 60, 152, 139, 0, 4, 90, 174, 0, 0, 0, 4, 116, 101, 115, 116,
-    ];
+    let good_wire = [0, 0, 0, 4, 116, 101, 115, 116];
+    let good = TerminationMessage::new(vec![TerminationInformation::String("test".to_string())]);
 
-    let good = TerminationMessage::new(
-        PeerHeader::new(
-            BmpPeerType::GlobalInstancePeer {
-                ipv6: false,
-                post_policy: false,
-                asn2: false,
-                adj_rib_out: false,
-            },
-            None,
-            Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
-            200,
-            Ipv4Addr::new(172, 16, 0, 20),
-            Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
-        ),
-        vec![TerminationInformation::String("test".to_string())],
-    );
     test_parsed_completely(&good_wire, &good);
-
     test_write(&good, &good_wire)?;
     Ok(())
 }
 
 #[test]
 fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
-    let good_wire = [
-        3, 0, 0, 0, 56, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 172,
-        16, 0, 20, 0, 0, 0, 200, 172, 16, 0, 20, 99, 60, 152, 139, 0, 4, 90, 174, 0, 0, 0, 4, 116,
-        101, 115, 116,
-    ];
+    let good_wire = [3, 0, 0, 0, 14, 5, 0, 0, 0, 4, 116, 101, 115, 116];
 
-    let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(
-        PeerHeader::new(
-            BmpPeerType::GlobalInstancePeer {
-                ipv6: false,
-                post_policy: false,
-                asn2: false,
-                adj_rib_out: false,
-            },
-            None,
-            Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
-            200,
-            Ipv4Addr::new(172, 16, 0, 20),
-            Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
-        ),
-        vec![TerminationInformation::String("test".to_string())],
-    )));
+    let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
+        TerminationInformation::String("test".to_string()),
+    ])));
+
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
-
     test_write(&good, &good_wire)?;
     Ok(())
 }

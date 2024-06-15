@@ -549,13 +549,10 @@ impl WritablePdu<TerminationMessageWritingError> for TerminationMessage {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
-        Self::BASE_LENGTH
-            + self.peer_header.len()
-            + self.information().iter().map(|x| x.len()).sum::<usize>()
+        Self::BASE_LENGTH + self.information().iter().map(|x| x.len()).sum::<usize>()
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), TerminationMessageWritingError> {
-        self.peer_header.write(writer)?;
         for info in &self.information {
             info.write(writer)?;
         }
