@@ -145,7 +145,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{TimeZone, Utc};
     use futures::StreamExt;
     use netgauze_bmp_pkt::{
         codec::{BmpCodec, BmpCodecDecoderError},
@@ -153,32 +152,14 @@ mod tests {
         wire::deserializer::BmpMessageParsingError,
         *,
     };
-    use std::net::{IpAddr, Ipv4Addr};
     use tokio_test::io::Builder;
 
     #[tokio::test]
     async fn read() {
-        let good_wire = [
-            3, 0, 0, 0, 56, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            172, 16, 0, 20, 0, 0, 0, 200, 172, 16, 0, 20, 99, 60, 152, 139, 0, 4, 90, 174, 0, 0, 0,
-            4, 116, 101, 115, 116,
-        ];
-        let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(
-            PeerHeader::new(
-                BmpPeerType::GlobalInstancePeer {
-                    ipv6: false,
-                    post_policy: false,
-                    asn2: false,
-                    adj_rib_out: false,
-                },
-                None,
-                Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
-                200,
-                Ipv4Addr::new(172, 16, 0, 20),
-                Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
-            ),
-            vec![TerminationInformation::String("test".to_string())],
-        )));
+        let good_wire = [3, 0, 0, 0, 14, 5, 0, 0, 0, 4, 116, 101, 115, 116];
+        let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
+            TerminationInformation::String("test".to_string()),
+        ])));
         let bad_wire1 = [0x03, 0x00, 0x00, 0x00, 0x01, 0xff];
         let bad_wire2 = [0xff];
         let read_mock = Builder::new()

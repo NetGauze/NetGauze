@@ -101,9 +101,8 @@ impl BmpParsingContext {
                     let peer_key = PeerKey::from_peer_header(peer_down.peer_header());
                     self.remove(&peer_key);
                 }
-                BmpMessageValue::Termination(termination) => {
-                    let peer_key = PeerKey::from_peer_header(termination.peer_header());
-                    self.remove(&peer_key);
+                BmpMessageValue::Termination(_) => {
+                    self.clear();
                 }
                 BmpMessageValue::PeerUpNotification(peer_up) => {
                     if let BgpMessage::Open(open) = peer_up.sent_message() {
@@ -377,10 +376,10 @@ mod tests {
             .unwrap(),
         ));
 
-        let terminate = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(
-            peer_header.clone(),
-            vec![TerminationInformation::String("test".to_string())],
-        )));
+        let terminate =
+            BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
+                TerminationInformation::String("test".to_string()),
+            ])));
 
         let mut codec = BmpCodec::default();
         let peer_key = PeerKey::from_peer_header(&peer_header);

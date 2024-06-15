@@ -787,9 +787,8 @@ impl<'a> ReadablePdu<'a, LocatedTerminationMessageParsingError<'a>> for Terminat
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedTerminationMessageParsingError<'a>> {
-        let (buf, peer_header) = parse_into_located(buf)?;
         let (buf, information) = parse_till_empty_into_located(buf)?;
-        Ok((buf, TerminationMessage::new(peer_header, information)))
+        Ok((buf, TerminationMessage::new(information)))
     }
 }
 

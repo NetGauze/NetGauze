@@ -391,20 +391,12 @@ impl InitiationInformation {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TerminationMessage {
-    peer_header: PeerHeader,
     information: Vec<TerminationInformation>,
 }
 
 impl TerminationMessage {
-    pub const fn new(peer_header: PeerHeader, information: Vec<TerminationInformation>) -> Self {
-        Self {
-            peer_header,
-            information,
-        }
-    }
-
-    pub const fn peer_header(&self) -> &PeerHeader {
-        &self.peer_header
+    pub const fn new(information: Vec<TerminationInformation>) -> Self {
+        Self { information }
     }
 
     pub const fn information(&self) -> &Vec<TerminationInformation> {
