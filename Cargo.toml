@@ -18,7 +18,7 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-dashmap = "5.5"
+dashmap = "6.0"
 log = "0.4"
 thiserror = "1.0"
 byteorder = { version = "1.4" }
