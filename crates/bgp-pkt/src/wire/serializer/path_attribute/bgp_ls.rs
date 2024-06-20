@@ -18,7 +18,7 @@ use crate::{
     nlri::{IgpFlags, MplsProtocolMask},
     path_attribute::{BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, LinkProtectionType},
     wire::serializer::{
-        nlri::MplsLabelWritingError, path_attribute::write_length, write_tlv_header,
+        nlri::MplsLabelWritingError, path_attribute::write_length, write_tlv_header_t16_l16,
         IpAddrWritingError, MultiTopologyIdWritingError,
     },
 };
@@ -106,7 +106,7 @@ impl WritablePdu<BgpLsAttributeWritingError> for BgpLsAttributeValue {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.raw_code(), self.len() as u16)?;
+        write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
             BgpLsAttributeValue::LocalNodeIpv4RouterId(ipv4) => writer.write_all(&ipv4.octets())?,
