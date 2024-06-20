@@ -15,6 +15,7 @@ use crate::{
     path_attribute::{BgpSidAttribute, SegmentIdentifier, SegmentRoutingGlobalBlock},
     wire::deserializer::nlri::MplsLabelParsingError,
 };
+use crate::wire::deserializer::read_tlv_header_t8_l16;
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum SegmentIdentifierParsingError {
@@ -54,9 +55,7 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for BgpSidAtt
     fn from_wire(
         buf: Span<'a>,
     ) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>> {
-        let (span, tlv_type) = be_u8(buf)?;
-        let (span, tlv_length) = be_u16(span)?;
-        let (remainder, data) = nom::bytes::complete::take(tlv_length)(span)?;
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t8_l16(buf)?;
 
         let tlv_type = match BgpSidAttributeType::try_from(tlv_type) {
             Ok(value) => value,

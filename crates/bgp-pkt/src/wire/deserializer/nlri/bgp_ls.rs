@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::wire::deserializer::read_tlv_header_t16_l16;
 use crate::{
     iana,
     iana::{
@@ -29,8 +30,7 @@ use crate::{
         UnknownOspfRouteType,
     },
     wire::deserializer::{
-        nlri::RouteDistinguisherParsingError, read_tlv_header, Ipv4PrefixParsingError,
-        Ipv6PrefixParsingError,
+        nlri::RouteDistinguisherParsingError, Ipv4PrefixParsingError, Ipv6PrefixParsingError,
     },
 };
 use ipnet::IpNet;
@@ -204,7 +204,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLinkDescript
     where
         Self: Sized,
     {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsLinkDescriptorType::try_from(tlv_type) {
             Ok(value) => value,
@@ -345,7 +345,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescript
     where
         Self: Sized,
     {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsNodeDescriptorSubType::try_from(tlv_type) {
             Ok(value) => value,
@@ -435,7 +435,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
     where
         Self: Sized,
     {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsPrefixDescriptorType::try_from(tlv_type) {
             Ok(value) => value,

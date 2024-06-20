@@ -9,6 +9,7 @@ use crate::{
     path_attribute::{BgpSidAttribute, SegmentIdentifier, SegmentRoutingGlobalBlock},
     wire::serializer::{nlri::MplsLabelWritingError, path_attribute::write_length},
 };
+use crate::wire::serializer::write_tlv_header_t8_l16;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum SegmentIdentifierWritingError {
@@ -66,8 +67,12 @@ impl WritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
     where
         Self: Sized,
     {
-        writer.write_u8(self.raw_code())?;
-        writer.write_u16::<NetworkEndian>((self.len() - Self::BASE_LENGTH) as u16)?;
+        write_tlv_header_t8_l16(
+            writer,
+            self.raw_code(),
+            self.len() as u16,
+            Self::BASE_LENGTH as u16,
+        )?;
 
         match self {
             BgpSidAttribute::LabelIndex { label_index, flags } => {
