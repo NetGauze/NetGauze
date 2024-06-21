@@ -1826,6 +1826,8 @@ pub enum BgpLsNodeFlagsBits {
 pub enum BgpSidAttributeType {
     LabelIndex = 1,
     Originator = 3,
+    SRv6ServiceL3 = 5,
+    SRv6ServiceL2 = 6,
 }
 
 #[repr(C)]
@@ -1854,6 +1856,76 @@ impl TryFrom<u8> for BgpSidAttributeType {
                 };
 
                 Err(BgpSidAttributeTypeError(iana))
+            }
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpSrv6ServiceSubTlvType {
+    SRv6SIDInformation = 1,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct BgpSrv6ServiceSubTlvTypeError(pub IanaValueError<u8>);
+
+impl From<BgpSrv6ServiceSubTlvType> for u8 {
+    fn from(value: BgpSrv6ServiceSubTlvType) -> Self {
+        value as u8
+    }
+}
+
+impl TryFrom<u8> for BgpSrv6ServiceSubTlvType {
+    type Error = BgpSrv6ServiceSubTlvTypeError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(value) => Ok(value),
+            None => {
+                let iana = if value == 0 || value == 255 {
+                    IanaValueError::Reserved(value)
+                } else {
+                    IanaValueError::Unknown(value)
+                };
+
+                Err(BgpSrv6ServiceSubTlvTypeError(iana))
+            }
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum BgpSrv6ServiceSubSubTlvType {
+    SRv6SIDStructure = 1,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub struct BgpSrv6ServiceSubSubTlvTypeError(pub IanaValueError<u8>);
+
+impl From<BgpSrv6ServiceSubSubTlvType> for u8 {
+    fn from(value: BgpSrv6ServiceSubSubTlvType) -> Self {
+        value as u8
+    }
+}
+
+impl TryFrom<u8> for BgpSrv6ServiceSubSubTlvType {
+    type Error = BgpSrv6ServiceSubSubTlvTypeError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match Self::from_repr(value) {
+            Some(value) => Ok(value),
+            None => {
+                let iana = if value == 0 || value == 255 {
+                    IanaValueError::Reserved(value)
+                } else {
+                    IanaValueError::Unknown(value)
+                };
+
+                Err(BgpSrv6ServiceSubSubTlvTypeError(iana))
             }
         }
     }
