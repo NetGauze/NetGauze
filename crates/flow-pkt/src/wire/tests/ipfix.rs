@@ -15,6 +15,7 @@
 
 use crate::{
     ie,
+    ie::nokia,
     ipfix::*,
     wire::{deserializer::ipfix::*, serializer::ipfix::*},
     DataSetId, FieldSpecifier,
@@ -588,5 +589,108 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
         &good_template_wire,
     )?;
     test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
+    let good_template_wire = [
+        0x00, 0x0a, 0x00, 0x5c, 0x66, 0x74, 0x35, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x4c, 0x01, 0x90, 0x00, 0x0e, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c,
+        0x00, 0x04, 0x00, 0x07, 0x00, 0x02, 0x00, 0x0b, 0x00, 0x02, 0x00, 0xe1, 0x00, 0x04, 0x00,
+        0xe3, 0x00, 0x02, 0x00, 0x94, 0x00, 0x08, 0x00, 0x04, 0x00, 0x01, 0x00, 0x26, 0x00, 0x01,
+        0x80, 0x5b, 0x00, 0x02, 0x00, 0x00, 0x02, 0x7d, 0x80, 0x5c, 0x00, 0x02, 0x00, 0x00, 0x02,
+        0x7d, 0x80, 0x5d, 0xff, 0xff, 0x00, 0x00, 0x02, 0x7d, 0x00, 0x01, 0x00, 0x04, 0x00, 0x02,
+        0x00, 0x04,
+    ];
+
+    let good_data_wire = [
+        0x00, 0x0a, 0x00, 0x54, 0x66, 0x74, 0x35, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x90, 0x00, 0x44, 0x0a, 0x64, 0x00, 0x01, 0x0a, 0x64, 0x00, 0x97, 0x27, 0x14,
+        0x00, 0x01, 0x08, 0x08, 0x08, 0x08, 0x22, 0xb1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x9a, 0x21,
+        0x12, 0x01, 0x00, 0x00, 0x01, 0x00, 0x0f, 0x15, 0x4c, 0x53, 0x4e, 0x2d, 0x48, 0x6f, 0x73,
+        0x74, 0x40, 0x31, 0x30, 0x2e, 0x31, 0x30, 0x2e, 0x31, 0x30, 0x2e, 0x31, 0x30, 0x31, 0x00,
+        0x00, 0x04, 0xb0, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+    ];
+    let good_template = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+        0,
+        0,
+        vec![Set::Template(vec![TemplateRecord::new(
+            400,
+            vec![
+                FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::postNATSourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::postNAPTSourceTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::flowId, 8).unwrap(),
+                FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::engineType, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::Nokia(nokia::IE::aluInsideServiceId), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::Nokia(nokia::IE::aluOutsideServiceId), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::Nokia(nokia::IE::aluNatSubString), 65535).unwrap(),
+                FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
+            ],
+        )])],
+    );
+
+    let good_data = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+        0,
+        0,
+        vec![Set::Data {
+            id: DataSetId::new(400).unwrap(),
+            records: vec![DataRecord::new(
+                vec![],
+                vec![
+                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
+                        10, 100, 0, 1,
+                    ))),
+                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
+                        10, 100, 0, 151,
+                    ))),
+                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
+                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
+                    ie::Field::postNATSourceIPv4Address(ie::postNATSourceIPv4Address(
+                        Ipv4Addr::new(8, 8, 8, 8),
+                    )),
+                    ie::Field::postNAPTSourceTransportPort(ie::postNAPTSourceTransportPort(8881)),
+                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::engineType(ie::engineType(0)),
+                    ie::Field::Nokia(nokia::Field::aluInsideServiceId(nokia::aluInsideServiceId(
+                        1,
+                    ))),
+                    ie::Field::Nokia(nokia::Field::aluOutsideServiceId(
+                        nokia::aluOutsideServiceId(15),
+                    )),
+                    ie::Field::Nokia(nokia::Field::aluNatSubString(nokia::aluNatSubString(
+                        String::from("LSN-Host@10.10.10.101"),
+                    ))),
+                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
+                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
+                ],
+            )],
+        }],
+    );
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(
+        &good_template_wire,
+        templates_map.clone(),
+        &good_template,
+    );
+    test_parsed_completely_with_one_input(&good_data_wire, templates_map.clone(), &good_data);
+
+    test_write_with_one_input(
+        &good_template,
+        Some(templates_map.clone()),
+        &good_template_wire,
+    )?;
+    test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+
     Ok(())
 }

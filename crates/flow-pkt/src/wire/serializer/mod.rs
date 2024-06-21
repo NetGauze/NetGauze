@@ -44,9 +44,18 @@ impl WritablePdu<FieldSpecifierWritingError> for FieldSpecifier {
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), FieldSpecifierWritingError> {
-        writer.write_u16::<NetworkEndian>(self.element_id.id())?;
-        writer.write_u16::<NetworkEndian>(self.length)?;
+        let element_id = self.element_id.id();
         let pen = self.element_id.pen();
+
+        if pen == 0 {
+            writer.write_u16::<NetworkEndian>(element_id)?;
+        } else {
+            // Set Enterprise bit
+            writer.write_u16::<NetworkEndian>(element_id | 0x8000)?;
+        }
+
+        writer.write_u16::<NetworkEndian>(self.length)?;
+
         if pen != 0 {
             writer.write_u32::<NetworkEndian>(pen)?;
         }
