@@ -121,7 +121,7 @@ pub trait InformationElementTemplate {
             InformationElementDataType::signed64 => Some(std::ops::Range { start: 1, end: 9 }),
             InformationElementDataType::float32 => Some(std::ops::Range { start: 4, end: 5 }),
             InformationElementDataType::float64 => Some(std::ops::Range { start: 8, end: 9 }),
-            InformationElementDataType::boolean => Some(std::ops::Range { start: 1, end: 1 }),
+            InformationElementDataType::boolean => Some(std::ops::Range { start: 1, end: 2 }),
             InformationElementDataType::macAddress => Some(std::ops::Range { start: 6, end: 7 }),
             InformationElementDataType::string => None,
             InformationElementDataType::dateTimeSeconds => {

@@ -215,7 +215,7 @@ fn generate_vendor_ie(
     let root = xml_doc.root();
 
     let ie_node = find_node_by_id(&root, ID_IE).unwrap();
-    let ie_node_parsed = parse_information_elements(&ie_node, 0);
+    let ie_node_parsed = parse_information_elements(&ie_node, config.pen);
     let ie_generated = generate_information_element_ids(&ie_node_parsed);
 
     let deser_generated = generate_pkg_ie_deserializers(config.mod_name.as_str(), &ie_node_parsed);
