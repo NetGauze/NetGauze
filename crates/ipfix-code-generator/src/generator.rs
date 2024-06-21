@@ -1153,7 +1153,7 @@ pub(crate) fn generate_pkg_ie_deserializers(
     let mut ret = String::new();
     // Not every vendor contains big integer types
     if ies.iter().any(|x| {
-        vec![
+        [
             "unsigned32",
             "unsigned64",
             "signed16",
