@@ -203,10 +203,9 @@ fn write_tlv_header_t8_l16<T: Write>(
     writer: &mut T,
     tlv_type: u8,
     tlv_length: u16,
-    base_length: u16,
 ) -> Result<(), std::io::Error> {
     // do not account for the tlv type u16 and tlv length u16
-    let effective_length = tlv_length - base_length;
+    let effective_length = tlv_length - 3;
 
     writer.write_u8(tlv_type)?;
     writer.write_u16::<NetworkEndian>(effective_length)?;
