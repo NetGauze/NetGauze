@@ -245,7 +245,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttribut
             }
             Ok(PathAttributeType::BgpPrefixSid) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
-                let value = PathAttributeValue::SegmentIdentifier(value);
+                let value = PathAttributeValue::PrefixSegmentIdentifier(value);
                 (buf, value)
             }
             Ok(_code) => {
