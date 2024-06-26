@@ -379,11 +379,11 @@ impl SRv6ServiceSubSubTlv {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SegmentIdentifier {
+pub struct PrefixSegmentIdentifier {
     tlvs: Vec<BgpSidAttribute>,
 }
 
-impl SegmentIdentifier {
+impl PrefixSegmentIdentifier {
     pub fn new(tlvs: Vec<BgpSidAttribute>) -> Self {
         Self { tlvs }
     }
@@ -393,7 +393,7 @@ impl SegmentIdentifier {
     }
 }
 
-impl PathAttributeValueProperties for SegmentIdentifier {
+impl PathAttributeValueProperties for PrefixSegmentIdentifier {
     fn can_be_optional() -> Option<bool> {
         Some(true)
     }
