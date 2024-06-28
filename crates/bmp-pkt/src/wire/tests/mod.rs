@@ -1328,6 +1328,23 @@ fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
 }
 
 #[test]
+fn test_bmp_termination_with_reason() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x03, 0x00, 0x00, 0x00, 0x1e, 0x05, 0x00, 0x00, 0x00, 0x0e, 0x63, 0x6f, 0x6e, 0x66, 0x69,
+        0x67, 0x20, 0x72, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x64, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00,
+    ];
+
+    let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
+        TerminationInformation::String("config removed".to_string()),
+        TerminationInformation::Reason(PeerTerminationCode::AdministrativelyClosed),
+    ])));
+
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
     let good_wire = [
         0x03, 0x00, 0x00, 0x00, 0x6c, 0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
