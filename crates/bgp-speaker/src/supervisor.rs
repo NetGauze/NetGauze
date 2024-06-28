@@ -96,10 +96,9 @@ impl<
     }
 
     pub fn remove_peer(&mut self, peer_key: &K) -> Option<PeerController<K, A, I>> {
-        self.peers.remove(peer_key).map(|controller| {
+        self.peers.remove(peer_key).inspect(|controller| {
             let handler = controller.get_new_handle();
             let _ = handler.shutdown();
-            controller
         })
     }
 
