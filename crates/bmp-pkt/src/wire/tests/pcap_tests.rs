@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::codec::BmpCodec;
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 use pcap_parser::LegacyPcapReader;
 use rstest::*;
@@ -86,30 +86,34 @@ fn test_bmp_pcap(overwrite: bool, pcap_path: PathBuf) {
         let (codec, buf) = peers
             .entry(key)
             .or_insert((BmpCodec::default(), BytesMut::new()));
-        let value_copy = value.as_slice();
-        buf.extend_from_slice(value_copy);
-        let serialized = match codec.decode(buf) {
-            Ok(Some(msg)) => {
-                serde_json::to_string(&msg).expect("Couldn't serialize BMP message to json")
+        buf.extend_from_slice(&value);
+        while buf.has_remaining() {
+            let serialized = match codec.decode(buf) {
+                Ok(Some(msg)) => {
+                    serde_json::to_string(&msg).expect("Couldn't serialize BMP message to json")
+                }
+                Ok(None) => {
+                    // packet is fragmented, need to read the next PDU first before attempting to
+                    // deserialize it
+                    break;
+                }
+                Err(err) => serde_json::to_string(&err)
+                    .expect("Couldn't serialize BMP error message to json"),
+            };
+            if let Some(file) = json_file.as_mut() {
+                file.write_all(serialized.as_bytes())
+                    .expect("Couldn't write json message");
+                file.write_all(b"\n").expect("Couldn't write json message");
             }
-            Ok(None) => String::new(),
-            Err(err) => {
-                serde_json::to_string(&err).expect("Couldn't serialize BMP error message to json")
+            if let Some(lines) = lines.as_mut() {
+                let err_msg = format!(
+                    "PCAP PDU is not found in expected output file.\
+                    \nPCAP PDU {serialized}.\
+                    \nExpected output file: {json_path:?}",
+                );
+                let expected = lines.next().expect(&err_msg).expect("Error reading");
+                assert_eq!(expected, serialized);
             }
-        };
-        if let Some(file) = json_file.as_mut() {
-            file.write_all(serialized.as_bytes())
-                .expect("Couldn't write json message");
-            file.write_all(b"\n").expect("Couldn't write json message");
-        }
-        if let Some(lines) = lines.as_mut() {
-            let err_msg = format!(
-                "PCAP PDU is not found in expected output file.\
-                \nPCAP PDU {serialized}.\
-                \nExpected output file: {json_path:?}",
-            );
-            let expected = lines.next().expect(&err_msg).expect("Error reading");
-            assert_eq!(expected, serialized);
         }
     }
 }
