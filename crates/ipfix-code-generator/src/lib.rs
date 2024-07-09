@@ -46,6 +46,18 @@ pub struct InformationElement {
     pub xrefs: Vec<Xref>,
     pub units: Option<String>,
     pub range: Option<String>,
+    pub subregistry: Option<Vec<InformationElementSubRegistry>>,
+}
+
+// Represent Information Element Subregistry
+#[derive(Debug, Clone)]
+pub struct InformationElementSubRegistry {
+    pub value: u8,
+    pub name: String,
+    pub description: String,
+    pub comments: Option<String>,
+    pub parameters: Option<String>,
+    pub xrefs: Vec<Xref>,
 }
 
 /// Describes simple registries such as

@@ -685,7 +685,7 @@ fn get_deserializer_header(ty_name: &str) -> String {
     header
 }
 
-fn generate_u8_deserializer(ie_name: &String) -> String {
+fn generate_u8_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -695,13 +695,20 @@ fn generate_u8_deserializer(ie_name: &String) -> String {
     ret.push_str("            1 => nom::number::complete::be_u8(buf)?,\n");
     ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
+        ret.push_str("        Ok((buf, enum_val))\n");
+    } else {
+        ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    }
+
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_u16_deserializer(ie_name: &String) -> String {
+fn generate_u16_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -715,13 +722,20 @@ fn generate_u16_deserializer(ie_name: &String) -> String {
     ret.push_str("            2 => nom::number::complete::be_u16(buf)?,\n");
     ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
+        ret.push_str("        Ok((buf, enum_val))\n");
+    } else {
+        ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    }
+
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_u32_deserializer(ie_name: &String) -> String {
+fn generate_u32_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -735,13 +749,20 @@ fn generate_u32_deserializer(ie_name: &String) -> String {
     ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
     ret.push_str("            res = (res << 8) + byte as u32;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("        let enum_val = {ie_name}::from(res);\n").as_str());
+        ret.push_str("        Ok((buf.slice(len..), enum_val))\n");
+    } else {
+        ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+    }
+
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_u64_deserializer(ie_name: &String) -> String {
+fn generate_u64_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -755,7 +776,14 @@ fn generate_u64_deserializer(ie_name: &String) -> String {
     ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
     ret.push_str("            res = (res << 8) + byte as u64;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("        let enum_val = {ie_name}::from(res);\n").as_str());
+        ret.push_str("        Ok((buf.slice(len..), enum_val))\n");
+    } else {
+        ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+    }
+
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1111,14 +1139,14 @@ fn generate_vec_u8_deserializer(ie_name: &String) -> String {
     ret
 }
 
-fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
+fn generate_ie_deserializer(data_type: &str, ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let gen = match data_type {
         "octetArray" => generate_vec_u8_deserializer(ie_name),
-        "unsigned8" => generate_u8_deserializer(ie_name),
-        "unsigned16" => generate_u16_deserializer(ie_name),
-        "unsigned32" => generate_u32_deserializer(ie_name),
-        "unsigned64" => generate_u64_deserializer(ie_name),
+        "unsigned8" => generate_u8_deserializer(ie_name, enum_subreg),
+        "unsigned16" => generate_u16_deserializer(ie_name, enum_subreg),
+        "unsigned32" => generate_u32_deserializer(ie_name, enum_subreg),
+        "unsigned64" => generate_u64_deserializer(ie_name, enum_subreg),
         "signed8" => generate_i8_deserializer(ie_name),
         "signed16" => generate_i16_deserializer(ie_name),
         "signed32" => generate_i32_deserializer(ie_name),
@@ -1171,7 +1199,9 @@ pub(crate) fn generate_pkg_ie_deserializers(
     ret.push_str(format!("use crate::ie::{vendor_mod}::*;\n\n").as_str());
 
     for ie in ies {
-        ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
+        ret.push_str(
+            generate_ie_deserializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
+        );
     }
 
     ret.push_str(generate_ie_values_deserializers(ies).as_str());
@@ -1187,7 +1217,9 @@ pub(crate) fn generate_pkg_ie_serializers(
     ret.push_str(format!("use crate::ie::{vendor_mod}::*;\n\n").as_str());
 
     for ie in ies {
-        ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
+        ret.push_str(
+            generate_ie_serializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
+        );
     }
     let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
@@ -1289,13 +1321,67 @@ pub(crate) fn generate_ie_values(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         let rust_type = get_rust_type(&ie.data_type);
         ret.push_str("#[allow(non_camel_case_types)]\n");
-        let generate_derive = generate_derive(
-            false,
+
+        let gen_derive = generate_derive(
+            ie.subregistry.is_some(),
             rust_type != "Vec<u8>" && rust_type != "String",
             rust_type != "f32" && rust_type != "f64",
         );
-        ret.push_str(generate_derive.as_str());
-        ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
+        ret.push_str(gen_derive.as_str());
+
+        if let Some(ie_subregistry) = &ie.subregistry {
+            ret.push_str(format!("#[repr({rust_type})]\n").as_str());
+            ret.push_str(format!("pub enum {} {{\n", ie.name).as_str());
+
+            for rec in ie_subregistry {
+                for line in rec.description.split('\n') {
+                    ret.push_str(format!("    /// {}\n", line.trim()).as_str());
+                }
+                if !rec.description.is_empty() && !ie.xrefs.is_empty() {
+                    ret.push_str("    ///\n");
+                }
+                for xref in rec.xrefs.iter().filter_map(generate_xref_link) {
+                    ret.push_str(format!("    /// Reference: {xref}\n").as_str());
+                }
+
+                ret.push_str(format!("    {} = {},\n", rec.name, rec.value).as_str());
+            }
+
+            ret.push_str(format!("    Unknown({rust_type}),\n").as_str());
+            ret.push_str("}\n");
+
+            ret.push_str(format!("impl From<{}> for {} {{\n", ie.name, rust_type).as_str());
+            ret.push_str(format!("    fn from(value: {}) -> Self {{\n", ie.name).as_str());
+            ret.push_str("        match value {\n");
+
+            for rec in ie_subregistry {
+                ret.push_str(
+                    format!("            {}::{} => {},\n", ie.name, rec.name, rec.value).as_str(),
+                );
+            }
+
+            ret.push_str(format!("            {}::Unknown(x) => x,\n", ie.name).as_str());
+            ret.push_str("        }\n");
+            ret.push_str("    }\n");
+            ret.push_str("}\n");
+
+            ret.push_str(format!("impl From<{}> for {} {{\n", rust_type, ie.name).as_str());
+            ret.push_str(format!("    fn from(value: {rust_type}) -> Self {{\n").as_str());
+            ret.push_str("        match value {\n");
+
+            for rec in ie_subregistry {
+                ret.push_str(
+                    format!("            {} => {}::{},\n", rec.value, ie.name, rec.name).as_str(),
+                );
+            }
+
+            ret.push_str(format!("            x => {}::Unknown(x),\n", ie.name).as_str());
+            ret.push_str("        }\n");
+            ret.push_str("    }\n");
+            ret.push_str("}\n\n");
+        } else {
+            ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
+        }
 
         // TODO: check if value converters are needed
         //ret.push_str(generate_ie_value_converters(&rust_type,
@@ -1356,7 +1442,9 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str("use chrono::TimeZone;\n\n\n");
     // Generate IANA Deser
     for ie in iana_ies {
-        ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
+        ret.push_str(
+            generate_ie_deserializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
+        );
     }
 
     let ty_name = "Field";
@@ -1429,7 +1517,7 @@ fn get_std_serializer_error(ty_name: &str) -> String {
     ret
 }
 
-fn generate_num8_serializer(num_type: &str, ie_name: &String) -> String {
+fn generate_num8_serializer(num_type: &str, ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
     ret.push_str(
@@ -1443,14 +1531,26 @@ fn generate_num8_serializer(num_type: &str, ie_name: &String) -> String {
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
     ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str(format!("         writer.write_{num_type}(self.0)?;\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("         let num_val = {num_type}::from(*self);\n").as_str());
+        ret.push_str(format!("         writer.write_{num_type}(num_val)?;\n").as_str());
+    } else {
+        ret.push_str(format!("         writer.write_{num_type}(self.0)?;\n").as_str());
+    }
+
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_num_serializer(num_type: &str, length: u16, ie_name: &str) -> String {
+fn generate_num_serializer(
+    num_type: &str,
+    length: u16,
+    ie_name: &str,
+    enum_subreg: bool,
+) -> String {
     let mut ret = String::new();
     ret.push_str(get_std_serializer_error(ie_name).as_str());
     ret.push_str(
@@ -1468,15 +1568,21 @@ fn generate_num_serializer(num_type: &str, length: u16, ie_name: &str) -> String
     ret.push_str("     }\n\n");
     ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
 
+    if enum_subreg {
+        ret.push_str(format!("         let num_val = {num_type}::from(*self);\n").as_str());
+    } else {
+        ret.push_str("         let num_val = self.0;\n");
+    }
+
     ret.push_str("         match length {\n");
     ret.push_str(
         format!(
-            "             None => writer.write_{num_type}::<byteorder::NetworkEndian>(self.0)?,\n"
+            "             None => writer.write_{num_type}::<byteorder::NetworkEndian>(num_val)?,\n"
         )
         .as_str(),
     );
     ret.push_str("             Some(len) => {\n");
-    ret.push_str("                 let be_bytes = self.0.to_be_bytes();\n");
+    ret.push_str("                 let be_bytes = num_val.to_be_bytes();\n");
     ret.push_str("                 let begin_offset = be_bytes.len() - len as usize;\n");
     ret.push_str("                 writer.write_all(&be_bytes[begin_offset..])?;\n");
     ret.push_str("             }\n");
@@ -1677,20 +1783,20 @@ fn generate_fraction_serializer(ie_name: &String) -> String {
     ret
 }
 
-fn generate_ie_serializer(data_type: &str, ie_name: &String) -> String {
+fn generate_ie_serializer(data_type: &str, ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let gen = match data_type {
         "octetArray" => generate_array_serializer(ie_name),
-        "unsigned8" => generate_num8_serializer("u8", ie_name),
-        "unsigned16" => generate_num_serializer("u16", 2, ie_name),
-        "unsigned32" => generate_num_serializer("u32", 4, ie_name),
-        "unsigned64" => generate_num_serializer("u64", 8, ie_name),
-        "signed8" => generate_num8_serializer("i8", ie_name),
-        "signed16" => generate_num_serializer("i16", 2, ie_name),
-        "signed32" => generate_num_serializer("i32", 4, ie_name),
-        "signed64" => generate_num_serializer("i64", 8, ie_name),
-        "float32" => generate_num_serializer("f32", 4, ie_name),
-        "float64" => generate_num_serializer("f64", 8, ie_name),
+        "unsigned8" => generate_num8_serializer("u8", ie_name, enum_subreg),
+        "unsigned16" => generate_num_serializer("u16", 2, ie_name, enum_subreg),
+        "unsigned32" => generate_num_serializer("u32", 4, ie_name, enum_subreg),
+        "unsigned64" => generate_num_serializer("u64", 8, ie_name, enum_subreg),
+        "signed8" => generate_num8_serializer("i8", ie_name, enum_subreg),
+        "signed16" => generate_num_serializer("i16", 2, ie_name, enum_subreg),
+        "signed32" => generate_num_serializer("i32", 4, ie_name, enum_subreg),
+        "signed64" => generate_num_serializer("i64", 8, ie_name, enum_subreg),
+        "float32" => generate_num_serializer("f32", 4, ie_name, enum_subreg),
+        "float64" => generate_num_serializer("f64", 8, ie_name, enum_subreg),
         "boolean" => generate_bool_serializer(ie_name),
         "macAddress" => generate_array_serializer(ie_name),
         "string" => generate_string_serializer(ie_name),
@@ -1720,7 +1826,9 @@ pub(crate) fn generate_ie_ser_main(
     ret.push_str("use byteorder::WriteBytesExt;\n\n\n");
 
     for ie in iana_ies {
-        ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
+        ret.push_str(
+            generate_ie_serializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
+        );
     }
 
     let ty_name = "Field";

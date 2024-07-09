@@ -329,8 +329,8 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
                         Field::sourceTransportPort(sourceTransportPort(38718)),
                         Field::destinationTransportPort(destinationTransportPort(53)),
                         Field::mplsTopLabelPrefixLength(mplsTopLabelPrefixLength(0)),
-                        Field::mplsTopLabelType(mplsTopLabelType(0)),
-                        Field::forwardingStatus(forwardingStatus(0x40)),
+                        Field::mplsTopLabelType(mplsTopLabelType::Unknown0),
+                        Field::forwardingStatus(forwardingStatus::ForwardedUnknown),
                         Field::flowDirection(flowDirection(0)),
                         Field::ipClassOfService(ipClassOfService(0)),
                         Field::protocolIdentifier(protocolIdentifier(6)),
@@ -381,8 +381,8 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
                         Field::sourceTransportPort(sourceTransportPort(38722)),
                         Field::destinationTransportPort(destinationTransportPort(53)),
                         Field::mplsTopLabelPrefixLength(mplsTopLabelPrefixLength(0)),
-                        Field::mplsTopLabelType(mplsTopLabelType(0)),
-                        Field::forwardingStatus(forwardingStatus(0x40)),
+                        Field::mplsTopLabelType(mplsTopLabelType::Unknown0),
+                        Field::forwardingStatus(forwardingStatus::ForwardedUnknown),
                         Field::flowDirection(flowDirection(0)),
                         Field::ipClassOfService(ipClassOfService(0)),
                         Field::protocolIdentifier(protocolIdentifier(6)),
@@ -652,5 +652,141 @@ fn test_padding() -> Result<(), NetFlowV9WritingError> {
         true,
         &good_with_padding_wire,
     )?;
+    Ok(())
+}
+
+#[test]
+fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
+    let good_template_wire = [
+        0x00, 0x09, 0x00, 0x01, 0x00, 0x00, 0x00, 0x78, 0x66, 0x8b, 0xe2, 0xd0, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6c, 0x01, 0x90, 0x00, 0x19, 0x00, 0x08,
+        0x00, 0x04, 0x00, 0x0c, 0x00, 0x04, 0x00, 0x07, 0x00, 0x02, 0x00, 0x0b, 0x00, 0x02, 0x00,
+        0x94, 0x00, 0x08, 0x00, 0x04, 0x00, 0x01, 0x00, 0x01, 0x00, 0x04, 0x00, 0x02, 0x00, 0x04,
+        0x00, 0x2e, 0x00, 0x01, 0x00, 0x59, 0x00, 0x04, 0x00, 0x65, 0x00, 0x01, 0x00, 0x88, 0x00,
+        0x01, 0x00, 0xe5, 0x00, 0x01, 0x00, 0xe9, 0x00, 0x01, 0x00, 0xef, 0x00, 0x01, 0x01, 0x15,
+        0x00, 0x01, 0x01, 0x1e, 0x00, 0x02, 0x01, 0x29, 0x00, 0x01, 0x01, 0x80, 0x00, 0x01, 0x01,
+        0x86, 0x00, 0x02, 0x01, 0x98, 0x00, 0x02, 0x01, 0xc0, 0x00, 0x01, 0x01, 0xd2, 0x00, 0x01,
+        0x01, 0xd3, 0x00, 0x01, 0x01, 0xf4, 0x00, 0x01,
+    ];
+
+    let good_data_wire = [
+        0x00, 0x09, 0x00, 0x01, 0x00, 0x00, 0x00, 0x78, 0x66, 0x8b, 0xe2, 0xd0, 0x00, 0x00, 0x00,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x90, 0x00, 0x38, 0x0a, 0x64, 0x00, 0x01, 0x0a, 0x64,
+        0x00, 0x97, 0x27, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x9a, 0x21, 0x12, 0x01,
+        0x00, 0x00, 0x04, 0xb0, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x86, 0x12, 0x05,
+        0x0f, 0x02, 0x03, 0x01, 0x00, 0x06, 0x05, 0x04, 0x00, 0x04, 0x00, 0x0a, 0x04, 0x04, 0x01,
+        0x05,
+    ];
+
+    let good_template = NetFlowV9Packet::new(
+        120,
+        Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
+        0,
+        0,
+        vec![Set::Template(vec![TemplateRecord::new(
+            400,
+            vec![
+                FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::flowId, 8).unwrap(),
+                FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::mplsTopLabelType, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::forwardingStatus, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::classificationEngineId, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::flowEndReason, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::natOriginatingAddressRealm, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::firewallEvent, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::biflowDirection, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::observationPointType, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::anonymizationTechnique, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::natType, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::valueDistributionMethod, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::flowSelectorAlgorithm, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::dataLinkFrameType, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::mibCaptureTimeSemantics, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::natQuotaExceededEvent, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::natThresholdEvent, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::srhIPv6ActiveSegmentType, 1).unwrap(),
+            ],
+        )])],
+    );
+
+    let good_data = NetFlowV9Packet::new(
+        120,
+        Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
+        1,
+        0,
+        vec![Set::Data {
+            id: DataSetId::new(400).unwrap(),
+            records: vec![DataRecord::new(
+                vec![],
+                vec![
+                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
+                        10, 100, 0, 1,
+                    ))),
+                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
+                        10, 100, 0, 151,
+                    ))),
+                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
+                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
+                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
+                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
+                    ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown0),
+                    ie::Field::forwardingStatus(ie::forwardingStatus::DroppedBadheaderchecksum),
+                    ie::Field::classificationEngineId(ie::classificationEngineId::ETHERTYPE),
+                    ie::Field::flowEndReason(ie::flowEndReason::lackofresources),
+                    ie::Field::natOriginatingAddressRealm(ie::natOriginatingAddressRealm::Unknown(
+                        15,
+                    )),
+                    ie::Field::firewallEvent(ie::firewallEvent::FlowDeleted),
+                    ie::Field::biflowDirection(ie::biflowDirection::perimeter),
+                    ie::Field::observationPointType(ie::observationPointType::Physicalport),
+                    ie::Field::anonymizationTechnique(
+                        ie::anonymizationTechnique::StructuredPermutation,
+                    ),
+                    ie::Field::natType(ie::natType::NAT66translated),
+                    ie::Field::valueDistributionMethod(
+                        ie::valueDistributionMethod::SimpleUniformDistribution,
+                    ),
+                    ie::Field::flowSelectorAlgorithm(
+                        ie::flowSelectorAlgorithm::UniformprobabilisticSampling,
+                    ),
+                    ie::Field::dataLinkFrameType(ie::dataLinkFrameType::Unknown(10)),
+                    ie::Field::mibCaptureTimeSemantics(ie::mibCaptureTimeSemantics::average),
+                    ie::Field::natQuotaExceededEvent(
+                        ie::natQuotaExceededEvent::Maximumactivehostsorsubscribers,
+                    ),
+                    ie::Field::natThresholdEvent(
+                        ie::natThresholdEvent::Addresspoolhighthresholdevent,
+                    ),
+                    ie::Field::srhIPv6ActiveSegmentType(
+                        ie::srhIPv6ActiveSegmentType::BGPSegmentRoutingPrefixSID,
+                    ),
+                ],
+            )],
+        }],
+    );
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(
+        &good_template_wire,
+        templates_map.clone(),
+        &good_template,
+    );
+    test_parsed_completely_with_one_input(&good_data_wire, templates_map.clone(), &good_data);
+
+    test_write_with_one_input(
+        &good_template,
+        Some(templates_map.clone()),
+        &good_template_wire,
+    )?;
+    test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+
     Ok(())
 }

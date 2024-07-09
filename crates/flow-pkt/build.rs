@@ -34,6 +34,18 @@ fn main() {
         "nokia".to_string(),
         "Nokia".to_string(),
     );
+    let vmware_path = registry_path
+        .join("vmware.xml")
+        .into_os_string()
+        .into_string()
+        .expect("Couldn't load VMWare registry file");
+    let vmware_source = SourceConfig::new(
+        RegistrySource::File(vmware_path),
+        RegistryType::IanaXML,
+        6876,
+        "vmware".to_string(),
+        "VMWare".to_string(),
+    );
     let iana_source = SourceConfig::new(
         RegistrySource::Http(IPFIX_URL.to_string()),
         RegistryType::IanaXML,
@@ -41,7 +53,7 @@ fn main() {
         "iana".to_string(),
         "IANA".to_string(),
     );
-    let configs = Config::new(iana_source, vec![nokia_source]);
+    let configs = Config::new(iana_source, vec![nokia_source, vmware_source]);
     generate(&out_dir, &configs).unwrap();
 
     println!("cargo:rerun-if-changed=build.rs");
