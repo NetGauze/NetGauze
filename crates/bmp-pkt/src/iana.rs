@@ -110,7 +110,7 @@ impl TryFrom<u8> for BmpMessageType {
 
 /// BMP Message types as registered in IANA [BMP Message Types](https://www.iana.org/assignments/bmp-parameters/bmp-parameters.xhtml#message-types)
 #[repr(u8)]
-#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpPeerTypeCode {
     GlobalInstancePeer = 0,

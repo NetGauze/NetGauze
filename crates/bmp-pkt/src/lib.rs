@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    net::{IpAddr, Ipv4Addr},
-    ops::Deref,
-};
-
 #[cfg(feature = "fuzz")]
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
+use std::{
+    hash::{Hash, Hasher},
+    net::{IpAddr, Ipv4Addr},
+    ops::Deref,
+};
 
 use netgauze_bgp_pkt::{iana::BgpMessageType, nlri::RouteDistinguisher, BgpMessage};
 use netgauze_iana::address_family::AddressType;
@@ -1016,7 +1016,7 @@ fn arbitrary_ipv4(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Ipv4
 
 /// PeerKey is used to identify a BMP peer. This key is unique only
 /// to the BMP session.
-#[derive(Debug, Hash, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PeerKey {
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ext::arbitrary_option(crate::arbitrary_ip)))]
@@ -1027,6 +1027,27 @@ pub struct PeerKey {
     #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
     bgp_id: Ipv4Addr,
 }
+
+impl Hash for PeerKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.peer_address.hash(state);
+        self.peer_type.get_type().hash(state);
+        self.rd.hash(state);
+        self.asn.hash(state);
+        self.bgp_id.hash(state);
+    }
+}
+impl PartialEq<Self> for PeerKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.peer_address.eq(&other.peer_address)
+            && std::mem::discriminant(&self.peer_type) == std::mem::discriminant(&other.peer_type)
+            && self.rd == other.rd
+            && self.asn == other.asn
+            && self.bgp_id == other.bgp_id
+    }
+}
+
+impl Eq for PeerKey {}
 
 impl PeerKey {
     pub const fn new(
