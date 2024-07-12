@@ -417,6 +417,7 @@ pub enum AddressType {
     Ipv6FlowSpecL3Vpn,
     Ipv6NlriMplsLabels,
     L2VpnBgpEvpn,
+    L2VpnVpls,
     BgpLs,
     BgpLsVpn,
     RouteTargetConstrains,
@@ -472,6 +473,7 @@ impl AddressType {
             Self::Ipv6NlriMplsLabels => AddressFamily::IPv6,
 
             Self::L2VpnBgpEvpn => AddressFamily::L2vpn,
+            Self::L2VpnVpls => AddressFamily::L2vpn,
             Self::BgpLs => AddressFamily::BgpLs,
             Self::BgpLsVpn => AddressFamily::BgpLs,
             Self::RouteTargetConstrains => AddressFamily::IPv4,
@@ -499,6 +501,7 @@ impl AddressType {
             Self::Ipv6NlriMplsLabels => SubsequentAddressFamily::NlriMplsLabels,
 
             Self::L2VpnBgpEvpn => SubsequentAddressFamily::BgpEvpn,
+            Self::L2VpnVpls => SubsequentAddressFamily::VPLS,
 
             Self::BgpLs => SubsequentAddressFamily::BgpLs,
             Self::BgpLsVpn => SubsequentAddressFamily::BgpLsVpn,
@@ -546,6 +549,7 @@ impl AddressType {
             }
 
             (AddressFamily::L2vpn, SubsequentAddressFamily::BgpEvpn) => Ok(Self::L2VpnBgpEvpn),
+            (AddressFamily::L2vpn, SubsequentAddressFamily::VPLS) => Ok(Self::L2VpnVpls),
 
             (AddressFamily::BgpLs, SubsequentAddressFamily::BgpLs) => Ok(Self::BgpLs),
             (AddressFamily::BgpLs, SubsequentAddressFamily::BgpLsVpn) => Ok(Self::BgpLsVpn),
