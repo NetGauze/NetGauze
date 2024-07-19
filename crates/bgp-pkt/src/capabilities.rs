@@ -338,6 +338,10 @@ impl AddPathCapability {
     pub const fn address_families(&self) -> &Vec<AddPathAddressFamily> {
         &self.address_families
     }
+
+    pub fn address_families_mut(&mut self) -> &mut Vec<AddPathAddressFamily> {
+        &mut self.address_families
+    }
 }
 
 /// Single Address Family with Add Path capability enabled
