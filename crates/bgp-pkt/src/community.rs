@@ -24,7 +24,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 /// Four octet values to specify a community.
 ///
 /// See [RFC1997](https://datatracker.ietf.org/doc/html/rfc1997)
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Community(u32);
 
