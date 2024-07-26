@@ -1,0 +1,21 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="ipfix.xsl"?>
+<?xml-model href="ipfix.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
+<registry xmlns="http://www.iana.org/assignments" id="ipfix">
+    <registry id="ipfix-information-elements">
+        <title>IPFIX Information Elements</title>
+        <registry id="ipfix-flow-direction">
+            <title>flowDirection</title>    
+            <record>
+              <value>0x00</value>
+              <name>ingress</name>
+              <description>Ingress flow</description>
+            </record>
+            <record>
+              <value>0x01</value>
+              <name>egress</name>
+              <description>Egress flow </description>
+            </record>
+        </registry>
+    </registry>
+</registry>

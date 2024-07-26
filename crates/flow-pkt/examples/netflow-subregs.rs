@@ -94,16 +94,18 @@ fn main() {
                     ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
                     ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
                     ie::Field::flowId(ie::flowId(10101010)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
                     ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
                     ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
-                    ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown0),
-                    ie::Field::forwardingStatus(ie::forwardingStatus::DroppedBadheaderchecksum),
+                    ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown),
+                    ie::Field::forwardingStatus(ie::forwardingStatus::Dropped(
+                        ie::forwardingStatusDroppedReason::Badheaderchecksum,
+                    )),
                     ie::Field::classificationEngineId(ie::classificationEngineId::ETHERTYPE),
                     ie::Field::flowEndReason(ie::flowEndReason::lackofresources),
-                    ie::Field::natOriginatingAddressRealm(ie::natOriginatingAddressRealm::Unknown(
-                        15,
-                    )),
+                    ie::Field::natOriginatingAddressRealm(
+                        ie::natOriginatingAddressRealm::Unassigned(15),
+                    ),
                     ie::Field::firewallEvent(ie::firewallEvent::FlowDeleted),
                     ie::Field::biflowDirection(ie::biflowDirection::perimeter),
                     ie::Field::observationPointType(ie::observationPointType::Physicalport),
@@ -117,7 +119,7 @@ fn main() {
                     ie::Field::flowSelectorAlgorithm(
                         ie::flowSelectorAlgorithm::UniformprobabilisticSampling,
                     ),
-                    ie::Field::dataLinkFrameType(ie::dataLinkFrameType::Unknown(10)),
+                    ie::Field::dataLinkFrameType(ie::dataLinkFrameType::Unassigned(10)),
                     ie::Field::mibCaptureTimeSemantics(ie::mibCaptureTimeSemantics::average),
                     ie::Field::natQuotaExceededEvent(
                         ie::natQuotaExceededEvent::Maximumactivehostsorsubscribers,

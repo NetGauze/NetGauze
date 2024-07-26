@@ -14,9 +14,12 @@
 // limitations under the License.
 
 //! Generate Rust code for the given Netflow/IPFIX definitions
-use crate::{InformationElement, SimpleRegistry, Xref};
+use crate::{
+    generator_sub_registries::*, InformationElement, InformationElementSubRegistry, SimpleRegistry,
+    Xref,
+};
 
-fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
+pub fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
     let mut base = "".to_string();
     if num_enum {
         base.push_str("strum_macros::Display, strum_macros::FromRepr, ");
@@ -32,7 +35,7 @@ fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
 }
 
 /// Convert [Xref] to markdown link
-fn generate_xref_link(xref: &Xref) -> Option<String> {
+pub fn generate_xref_link(xref: &Xref) -> Option<String> {
     match xref.ty.as_str() {
         "rfc" => Some(format!(
             "[{}](https://datatracker.ietf.org/doc/html/{})",
@@ -284,7 +287,13 @@ pub(crate) fn generate_ie_status() -> String {
 
 /// Use at the beginning of `ie_generated` for defining custom types
 pub(crate) fn generate_common_types() -> String {
-    "pub type MacAddress = [u8; 6];\n\n".to_string()
+    //TEMP, and in the future move it to another function generate_imports
+    let mut ret = String::new();
+    ret.push_str("use netgauze_iana::tcp::*;\n\n");
+    ret.push_str("pub type MacAddress = [u8; 6];\n\n");
+    ret
+
+    // "pub type MacAddress = [u8; 6];\n\n".to_string()
 }
 
 /// `TryFrom` block for  InformationElementId
@@ -473,7 +482,11 @@ fn generate_ie_field_enum_for_ie(
         ret.push_str(format!("    {name}({pkg}::Field),\n").as_str());
     }
     for ie in iana_ies {
-        ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
+        if ie.name == "tcpControlBits" {
+            ret.push_str(format!("    {}(TCPHeaderFlags),\n", ie.name).as_str());
+        } else {
+            ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
+        }
     }
     ret.push_str("}\n\n");
     ret
@@ -679,7 +692,12 @@ fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
 }
 
 fn get_deserializer_header(ty_name: &str) -> String {
-    let mut header = format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n");
+    let mut header = String::new();
+    if ty_name == "tcpControlBits" {
+        header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for TCPHeaderFlags {{\n").as_str());
+    } else {
+        header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n").as_str());
+    }
     header.push_str("    #[inline]\n");
     header.push_str(format!("    fn from_wire(buf: netgauze_parse_utils::Span<'a>, length: u16) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
     header
@@ -699,6 +717,8 @@ fn generate_u8_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     if enum_subreg {
         ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
         ret.push_str("        Ok((buf, enum_val))\n");
+    } else if ie_name == "tcpControlBits" {
+        ret.push_str("        Ok((buf, TCPHeaderFlags::from(value)))\n");
     } else {
         ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     }
@@ -726,6 +746,8 @@ fn generate_u16_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     if enum_subreg {
         ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
         ret.push_str("        Ok((buf, enum_val))\n");
+    } else if ie_name == "tcpControlBits" {
+        ret.push_str("        Ok((buf, TCPHeaderFlags::from(value)))\n");
     } else {
         ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     }
@@ -1320,66 +1342,30 @@ pub(crate) fn generate_ie_values(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     for ie in ies {
         let rust_type = get_rust_type(&ie.data_type);
-        ret.push_str("#[allow(non_camel_case_types)]\n");
 
+        // Check if we have an InformationElementSubRegistry and is of type
+        // ValueNameDescRegistry
+        let strum_macros = matches!(
+            ie.subregistry.as_ref().and_then(|v| v.first()),
+            Some(InformationElementSubRegistry::ValueNameDescRegistry(_))
+        );
         let gen_derive = generate_derive(
-            ie.subregistry.is_some(),
+            strum_macros,
             rust_type != "Vec<u8>" && rust_type != "String",
             rust_type != "f32" && rust_type != "f64",
         );
-        ret.push_str(gen_derive.as_str());
 
         if let Some(ie_subregistry) = &ie.subregistry {
-            ret.push_str(format!("#[repr({rust_type})]\n").as_str());
-            ret.push_str(format!("pub enum {} {{\n", ie.name).as_str());
-
-            for rec in ie_subregistry {
-                for line in rec.description.split('\n') {
-                    ret.push_str(format!("    /// {}\n", line.trim()).as_str());
-                }
-                if !rec.description.is_empty() && !ie.xrefs.is_empty() {
-                    ret.push_str("    ///\n");
-                }
-                for xref in rec.xrefs.iter().filter_map(generate_xref_link) {
-                    ret.push_str(format!("    /// Reference: {xref}\n").as_str());
-                }
-
-                ret.push_str(format!("    {} = {},\n", rec.name, rec.value).as_str());
-            }
-
-            ret.push_str(format!("    Unknown({rust_type}),\n").as_str());
-            ret.push_str("}\n");
-
-            ret.push_str(format!("impl From<{}> for {} {{\n", ie.name, rust_type).as_str());
-            ret.push_str(format!("    fn from(value: {}) -> Self {{\n", ie.name).as_str());
-            ret.push_str("        match value {\n");
-
-            for rec in ie_subregistry {
-                ret.push_str(
-                    format!("            {}::{} => {},\n", ie.name, rec.name, rec.value).as_str(),
-                );
-            }
-
-            ret.push_str(format!("            {}::Unknown(x) => x,\n", ie.name).as_str());
-            ret.push_str("        }\n");
-            ret.push_str("    }\n");
-            ret.push_str("}\n");
-
-            ret.push_str(format!("impl From<{}> for {} {{\n", rust_type, ie.name).as_str());
-            ret.push_str(format!("    fn from(value: {rust_type}) -> Self {{\n").as_str());
-            ret.push_str("        match value {\n");
-
-            for rec in ie_subregistry {
-                ret.push_str(
-                    format!("            {} => {}::{},\n", rec.value, ie.name, rec.name).as_str(),
-                );
-            }
-
-            ret.push_str(format!("            x => {}::Unknown(x),\n", ie.name).as_str());
-            ret.push_str("        }\n");
-            ret.push_str("    }\n");
-            ret.push_str("}\n\n");
+            ret.push_str("#[allow(non_camel_case_types)]\n");
+            ret.push_str(gen_derive.as_str());
+            ret.push_str(
+                generate_subregistry_enum_and_impl(&ie.name, &rust_type, ie_subregistry).as_str(),
+            );
+        } else if ie.name == "tcpControlBits" {
+            continue;
         } else {
+            ret.push_str("#[allow(non_camel_case_types)]\n");
+            ret.push_str(gen_derive.as_str());
             ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
         }
 
@@ -1520,19 +1506,30 @@ fn get_std_serializer_error(ty_name: &str) -> String {
 fn generate_num8_serializer(num_type: &str, ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
-    ret.push_str(
+
+    if ie_name == "tcpControlBits" {
+        ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for TCPHeaderFlags {{\n"
+        )
+        .as_str(),
+      );
+    } else {
+        ret.push_str(
         format!(
             "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
-    );
+      );
+    }
+
     ret.push_str("    const BASE_LENGTH: usize = 1;\n\n");
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
     ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
 
-    if enum_subreg {
+    if enum_subreg || ie_name == "tcpControlBits" {
         ret.push_str(format!("         let num_val = {num_type}::from(*self);\n").as_str());
         ret.push_str(format!("         writer.write_{num_type}(num_val)?;\n").as_str());
     } else {
@@ -1553,12 +1550,23 @@ fn generate_num_serializer(
 ) -> String {
     let mut ret = String::new();
     ret.push_str(get_std_serializer_error(ie_name).as_str());
-    ret.push_str(
+
+    if ie_name == "tcpControlBits" {
+        ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for TCPHeaderFlags {{\n"
+        )
+        .as_str(),
+      );
+    } else {
+        ret.push_str(
         format!(
             "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
-    );
+      );
+    }
+
     ret.push_str(format!("    const BASE_LENGTH: usize = {length};\n\n").as_str());
     ret.push_str("     fn len(&self, length: Option<u16>) -> usize {\n");
     ret.push_str("         match length {\n");
@@ -1568,7 +1576,7 @@ fn generate_num_serializer(
     ret.push_str("     }\n\n");
     ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
 
-    if enum_subreg {
+    if enum_subreg || ie_name == "tcpControlBits" {
         ret.push_str(format!("         let num_val = {num_type}::from(*self);\n").as_str());
     } else {
         ret.push_str("         let num_val = self.0;\n");

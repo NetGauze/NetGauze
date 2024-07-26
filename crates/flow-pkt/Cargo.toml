@@ -17,6 +17,7 @@ categories = ["network-programming", "parsing"]
 netgauze-locate = { version = "0.3.0", path = "../locate", optional = true }
 netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils", optional = true }
 netgauze-serde-macros = { version = "0.3.0", path = "../serde-macros", optional = true }
+netgauze-iana = { version = "0.3.0", path = "../iana" }
 serde = { workspace = true, features = ["derive"] }
 strum = { workspace = true }
 strum_macros = { workspace = true }

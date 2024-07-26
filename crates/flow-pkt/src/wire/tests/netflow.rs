@@ -21,9 +21,8 @@ use std::{
 };
 
 use chrono::{TimeZone, Utc};
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
-
-use netgauze_parse_utils::test_helpers::*;
+use netgauze_iana::tcp::*;
+use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
 
 use crate::{
     netflow::*,
@@ -140,8 +139,10 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                         Field::egressInterface(egressInterface(0)),
                         Field::sourceTransportPort(sourceTransportPort(52357)),
                         Field::destinationTransportPort(destinationTransportPort(443)),
-                        Field::protocolIdentifier(protocolIdentifier(17)),
-                        Field::tcpControlBits(tcpControlBits(0)),
+                        Field::protocolIdentifier(protocolIdentifier::UDP),
+                        Field::tcpControlBits(TCPHeaderFlags::new(
+                            false, false, false, false, false, false, false, false,
+                        )),
                         Field::ipVersion(ipVersion(4)),
                     ],
                 ),
@@ -162,8 +163,10 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                         Field::egressInterface(egressInterface(0)),
                         Field::sourceTransportPort(sourceTransportPort(443)),
                         Field::destinationTransportPort(destinationTransportPort(52357)),
-                        Field::protocolIdentifier(protocolIdentifier(17)),
-                        Field::tcpControlBits(tcpControlBits(0)),
+                        Field::protocolIdentifier(protocolIdentifier::UDP),
+                        Field::tcpControlBits(TCPHeaderFlags::new(
+                            false, false, false, false, false, false, false, false,
+                        )),
                         Field::ipVersion(ipVersion(4)),
                     ],
                 ),
@@ -184,8 +187,10 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                         Field::egressInterface(egressInterface(0)),
                         Field::sourceTransportPort(sourceTransportPort(63111)),
                         Field::destinationTransportPort(destinationTransportPort(443)),
-                        Field::protocolIdentifier(protocolIdentifier(17)),
-                        Field::tcpControlBits(tcpControlBits(0)),
+                        Field::protocolIdentifier(protocolIdentifier::UDP),
+                        Field::tcpControlBits(TCPHeaderFlags::new(
+                            false, false, false, false, false, false, false, false,
+                        )),
                         Field::ipVersion(ipVersion(4)),
                     ],
                 ),
@@ -206,8 +211,10 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                         Field::egressInterface(egressInterface(0)),
                         Field::sourceTransportPort(sourceTransportPort(63273)),
                         Field::destinationTransportPort(destinationTransportPort(443)),
-                        Field::protocolIdentifier(protocolIdentifier(17)),
-                        Field::tcpControlBits(tcpControlBits(0)),
+                        Field::protocolIdentifier(protocolIdentifier::UDP),
+                        Field::tcpControlBits(TCPHeaderFlags::new(
+                            false, false, false, false, false, false, false, false,
+                        )),
                         Field::ipVersion(ipVersion(4)),
                     ],
                 ),
@@ -329,12 +336,16 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
                         Field::sourceTransportPort(sourceTransportPort(38718)),
                         Field::destinationTransportPort(destinationTransportPort(53)),
                         Field::mplsTopLabelPrefixLength(mplsTopLabelPrefixLength(0)),
-                        Field::mplsTopLabelType(mplsTopLabelType::Unknown0),
-                        Field::forwardingStatus(forwardingStatus::ForwardedUnknown),
-                        Field::flowDirection(flowDirection(0)),
+                        Field::mplsTopLabelType(mplsTopLabelType::Unknown),
+                        Field::forwardingStatus(forwardingStatus::Forwarded(
+                            ie::forwardingStatusForwardedReason::Unknown,
+                        )),
+                        Field::flowDirection(flowDirection::ingress),
                         Field::ipClassOfService(ipClassOfService(0)),
-                        Field::protocolIdentifier(protocolIdentifier(6)),
-                        Field::tcpControlBits(tcpControlBits(2)),
+                        Field::protocolIdentifier(protocolIdentifier::TCP),
+                        Field::tcpControlBits(TCPHeaderFlags::new(
+                            false, true, false, false, false, false, false, false,
+                        )),
                         Field::samplerId(samplerId(1)),
                         Field::ingressVRFID(ingressVRFID(1610612736)),
                         Field::egressVRFID(egressVRFID(1610612741)),
@@ -381,12 +392,16 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
                         Field::sourceTransportPort(sourceTransportPort(38722)),
                         Field::destinationTransportPort(destinationTransportPort(53)),
                         Field::mplsTopLabelPrefixLength(mplsTopLabelPrefixLength(0)),
-                        Field::mplsTopLabelType(mplsTopLabelType::Unknown0),
-                        Field::forwardingStatus(forwardingStatus::ForwardedUnknown),
-                        Field::flowDirection(flowDirection(0)),
+                        Field::mplsTopLabelType(mplsTopLabelType::Unknown),
+                        Field::forwardingStatus(forwardingStatus::Forwarded(
+                            ie::forwardingStatusForwardedReason::Unknown,
+                        )),
+                        Field::flowDirection(flowDirection::ingress),
                         Field::ipClassOfService(ipClassOfService(0)),
-                        Field::protocolIdentifier(protocolIdentifier(6)),
-                        Field::tcpControlBits(tcpControlBits(2)),
+                        Field::protocolIdentifier(protocolIdentifier::TCP),
+                        Field::tcpControlBits(TCPHeaderFlags::new(
+                            false, true, false, false, false, false, false, false,
+                        )),
                         Field::samplerId(samplerId(1)),
                         Field::ingressVRFID(ingressVRFID(1610612736)),
                         Field::egressVRFID(egressVRFID(1610612741)),
@@ -734,16 +749,18 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
                     ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
                     ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
                     ie::Field::flowId(ie::flowId(10101010)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
                     ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
                     ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
-                    ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown0),
-                    ie::Field::forwardingStatus(ie::forwardingStatus::DroppedBadheaderchecksum),
+                    ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown),
+                    ie::Field::forwardingStatus(ie::forwardingStatus::Dropped(
+                        ie::forwardingStatusDroppedReason::Badheaderchecksum,
+                    )),
                     ie::Field::classificationEngineId(ie::classificationEngineId::ETHERTYPE),
                     ie::Field::flowEndReason(ie::flowEndReason::lackofresources),
-                    ie::Field::natOriginatingAddressRealm(ie::natOriginatingAddressRealm::Unknown(
-                        15,
-                    )),
+                    ie::Field::natOriginatingAddressRealm(
+                        ie::natOriginatingAddressRealm::Unassigned(15),
+                    ),
                     ie::Field::firewallEvent(ie::firewallEvent::FlowDeleted),
                     ie::Field::biflowDirection(ie::biflowDirection::perimeter),
                     ie::Field::observationPointType(ie::observationPointType::Physicalport),
@@ -757,7 +774,7 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
                     ie::Field::flowSelectorAlgorithm(
                         ie::flowSelectorAlgorithm::UniformprobabilisticSampling,
                     ),
-                    ie::Field::dataLinkFrameType(ie::dataLinkFrameType::Unknown(10)),
+                    ie::Field::dataLinkFrameType(ie::dataLinkFrameType::Unassigned(10)),
                     ie::Field::mibCaptureTimeSemantics(ie::mibCaptureTimeSemantics::average),
                     ie::Field::natQuotaExceededEvent(
                         ie::natQuotaExceededEvent::Maximumactivehostsorsubscribers,

@@ -395,20 +395,5 @@
             <revision>0</revision>
             <date>2019-06-27</date>
         </record>
-
-        <registry id="ipfix-flow-direction">
-            <title>flowDirection (Value 954)</title>    
-            <record>
-              <value>0x00</value>
-              <name>ingress</name>
-              <description>Ingress flow</description>
-            </record>
-            <record>
-              <value>0x01</value>
-              <name>egress</name>
-              <description>Egress flow </description>
-            </record>
-
-        </registry>
     </registry>
 </registry>

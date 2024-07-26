@@ -87,7 +87,7 @@ fn main() {
                     ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
                     ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
                     ie::Field::flowId(ie::flowId(10101010)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
                     ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
                     ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
                     ie::Field::VMWare(vmware::Field::ingressInterfaceAttr(
@@ -107,7 +107,7 @@ fn main() {
                         20023,
                     ))),
                     ie::Field::VMWare(vmware::Field::tenantDestPort(vmware::tenantDestPort(443))),
-                    ie::Field::VMWare(vmware::Field::tenantProtocol(vmware::tenantProtocol(6))),
+                    ie::Field::VMWare(vmware::Field::tenantProtocol(vmware::tenantProtocol::TCP)),
                     ie::Field::VMWare(vmware::Field::flowDirection(vmware::flowDirection::ingress)),
                     ie::Field::VMWare(vmware::Field::virtualObsID(vmware::virtualObsID(
                         String::from("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),

@@ -21,6 +21,7 @@ use crate::{
     DataSetId, FieldSpecifier,
 };
 use chrono::{TimeZone, Timelike, Utc};
+use netgauze_iana::tcp::*;
 use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
 use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};
 
@@ -250,7 +251,7 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
                         50, 0, 71, 1,
                     ))),
                     ie::Field::ipClassOfService(ie::ipClassOfService(0)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(61)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::anyhostinternalprotocol),
                     ie::Field::sourceTransportPort(ie::sourceTransportPort(0)),
                     ie::Field::destinationTransportPort(ie::destinationTransportPort(0)),
                     ie::Field::icmpTypeCodeIPv4(ie::icmpTypeCodeIPv4(0)),
@@ -270,7 +271,9 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
                     ))),
                     ie::Field::sourceIPv4PrefixLength(ie::sourceIPv4PrefixLength(24)),
                     ie::Field::destinationIPv4PrefixLength(ie::destinationIPv4PrefixLength(24)),
-                    ie::Field::tcpControlBits(ie::tcpControlBits(0)),
+                    ie::Field::tcpControlBits(TCPHeaderFlags::new(
+                        false, false, false, false, false, false, false, false,
+                    )),
                     ie::Field::ipVersion(ie::ipVersion(4)),
                     ie::Field::flowStartMilliseconds(ie::flowStartMilliseconds(
                         Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
@@ -659,7 +662,7 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
                     )),
                     ie::Field::postNAPTSourceTransportPort(ie::postNAPTSourceTransportPort(8881)),
                     ie::Field::flowId(ie::flowId(10101010)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
                     ie::Field::engineType(ie::engineType(0)),
                     ie::Field::Nokia(nokia::Field::aluInsideServiceId(nokia::aluInsideServiceId(
                         1,
@@ -768,7 +771,7 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
                     ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
                     ie::Field::flowId(ie::flowId(10101010)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
                     ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
                     ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
                     ie::Field::VMWare(vmware::Field::ingressInterfaceAttr(
@@ -788,7 +791,7 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
                         20023,
                     ))),
                     ie::Field::VMWare(vmware::Field::tenantDestPort(vmware::tenantDestPort(443))),
-                    ie::Field::VMWare(vmware::Field::tenantProtocol(vmware::tenantProtocol(6))),
+                    ie::Field::VMWare(vmware::Field::tenantProtocol(vmware::tenantProtocol::TCP)),
                     ie::Field::VMWare(vmware::Field::flowDirection(vmware::flowDirection::ingress)),
                     ie::Field::VMWare(vmware::Field::virtualObsID(vmware::virtualObsID(
                         String::from("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
@@ -892,16 +895,18 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
                     ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
                     ie::Field::flowId(ie::flowId(10101010)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
                     ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
                     ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
-                    ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown0),
-                    ie::Field::forwardingStatus(ie::forwardingStatus::DroppedBadheaderchecksum),
+                    ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown),
+                    ie::Field::forwardingStatus(ie::forwardingStatus::Dropped(
+                        ie::forwardingStatusDroppedReason::Badheaderchecksum,
+                    )),
                     ie::Field::classificationEngineId(ie::classificationEngineId::ETHERTYPE),
                     ie::Field::flowEndReason(ie::flowEndReason::lackofresources),
-                    ie::Field::natOriginatingAddressRealm(ie::natOriginatingAddressRealm::Unknown(
-                        15,
-                    )),
+                    ie::Field::natOriginatingAddressRealm(
+                        ie::natOriginatingAddressRealm::Unassigned(15),
+                    ),
                     ie::Field::firewallEvent(ie::firewallEvent::FlowDeleted),
                     ie::Field::biflowDirection(ie::biflowDirection::perimeter),
                     ie::Field::observationPointType(ie::observationPointType::Physicalport),
@@ -915,7 +920,7 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::flowSelectorAlgorithm(
                         ie::flowSelectorAlgorithm::UniformprobabilisticSampling,
                     ),
-                    ie::Field::dataLinkFrameType(ie::dataLinkFrameType::Unknown(10)),
+                    ie::Field::dataLinkFrameType(ie::dataLinkFrameType::Unassigned(10)),
                     ie::Field::mibCaptureTimeSemantics(ie::mibCaptureTimeSemantics::average),
                     ie::Field::natQuotaExceededEvent(
                         ie::natQuotaExceededEvent::Maximumactivehostsorsubscribers,
