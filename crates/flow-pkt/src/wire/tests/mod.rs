@@ -77,7 +77,7 @@ fn test_field() -> Result<(), FieldSpecifierWritingError> {
 #[test]
 fn test_u8_value() -> Result<(), ie_ser::protocolIdentifierWritingError> {
     let value_wire = [123];
-    let value = ie::protocolIdentifier(123);
+    let value = ie::protocolIdentifier::PTP;
     let invalid_length = ie_desr::LocatedprotocolIdentifierParsingError::new(
         Span::new(&value_wire),
         ie_desr::protocolIdentifierParsingError::InvalidLength(2),

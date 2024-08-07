@@ -14,9 +14,12 @@
 // limitations under the License.
 
 //! Generate Rust code for the given Netflow/IPFIX definitions
-use crate::{InformationElement, SimpleRegistry, Xref};
+use crate::{
+    generator_sub_registries::*, InformationElement, InformationElementSubRegistry, SimpleRegistry,
+    Xref,
+};
 
-fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
+pub fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
     let mut base = "".to_string();
     if num_enum {
         base.push_str("strum_macros::Display, strum_macros::FromRepr, ");
@@ -32,7 +35,7 @@ fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
 }
 
 /// Convert [Xref] to markdown link
-fn generate_xref_link(xref: &Xref) -> Option<String> {
+pub fn generate_xref_link(xref: &Xref) -> Option<String> {
     match xref.ty.as_str() {
         "rfc" => Some(format!(
             "[{}](https://datatracker.ietf.org/doc/html/{})",
@@ -473,7 +476,13 @@ fn generate_ie_field_enum_for_ie(
         ret.push_str(format!("    {name}({pkg}::Field),\n").as_str());
     }
     for ie in iana_ies {
-        ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
+        if ie.name == "tcpControlBits" {
+            ret.push_str(
+                format!("    {}(netgauze_iana::tcp::TCPHeaderFlags),\n", ie.name).as_str(),
+            );
+        } else {
+            ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
+        }
     }
     ret.push_str("}\n\n");
     ret
@@ -679,13 +688,18 @@ fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
 }
 
 fn get_deserializer_header(ty_name: &str) -> String {
-    let mut header = format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n");
+    let mut header = String::new();
+    if ty_name == "tcpControlBits" {
+        header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for netgauze_iana::tcp::TCPHeaderFlags {{\n").as_str());
+    } else {
+        header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n").as_str());
+    }
     header.push_str("    #[inline]\n");
     header.push_str(format!("    fn from_wire(buf: netgauze_parse_utils::Span<'a>, length: u16) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
     header
 }
 
-fn generate_u8_deserializer(ie_name: &String) -> String {
+fn generate_u8_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -695,13 +709,22 @@ fn generate_u8_deserializer(ie_name: &String) -> String {
     ret.push_str("            1 => nom::number::complete::be_u8(buf)?,\n");
     ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
+        ret.push_str("        Ok((buf, enum_val))\n");
+    } else if ie_name == "tcpControlBits" {
+        ret.push_str("        Ok((buf, netgauze_iana::tcp::TCPHeaderFlags::from(value)))\n");
+    } else {
+        ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    }
+
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_u16_deserializer(ie_name: &String) -> String {
+fn generate_u16_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -715,13 +738,22 @@ fn generate_u16_deserializer(ie_name: &String) -> String {
     ret.push_str("            2 => nom::number::complete::be_u16(buf)?,\n");
     ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
+        ret.push_str("        Ok((buf, enum_val))\n");
+    } else if ie_name == "tcpControlBits" {
+        ret.push_str("        Ok((buf, netgauze_iana::tcp::TCPHeaderFlags::from(value)))\n");
+    } else {
+        ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    }
+
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_u32_deserializer(ie_name: &String) -> String {
+fn generate_u32_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -735,13 +767,20 @@ fn generate_u32_deserializer(ie_name: &String) -> String {
     ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
     ret.push_str("            res = (res << 8) + byte as u32;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("        let enum_val = {ie_name}::from(res);\n").as_str());
+        ret.push_str("        Ok((buf.slice(len..), enum_val))\n");
+    } else {
+        ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+    }
+
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_u64_deserializer(ie_name: &String) -> String {
+fn generate_u64_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -755,7 +794,14 @@ fn generate_u64_deserializer(ie_name: &String) -> String {
     ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
     ret.push_str("            res = (res << 8) + byte as u64;\n");
     ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+
+    if enum_subreg {
+        ret.push_str(format!("        let enum_val = {ie_name}::from(res);\n").as_str());
+        ret.push_str("        Ok((buf.slice(len..), enum_val))\n");
+    } else {
+        ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+    }
+
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1111,14 +1157,14 @@ fn generate_vec_u8_deserializer(ie_name: &String) -> String {
     ret
 }
 
-fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
+fn generate_ie_deserializer(data_type: &str, ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let gen = match data_type {
         "octetArray" => generate_vec_u8_deserializer(ie_name),
-        "unsigned8" => generate_u8_deserializer(ie_name),
-        "unsigned16" => generate_u16_deserializer(ie_name),
-        "unsigned32" => generate_u32_deserializer(ie_name),
-        "unsigned64" => generate_u64_deserializer(ie_name),
+        "unsigned8" => generate_u8_deserializer(ie_name, enum_subreg),
+        "unsigned16" => generate_u16_deserializer(ie_name, enum_subreg),
+        "unsigned32" => generate_u32_deserializer(ie_name, enum_subreg),
+        "unsigned64" => generate_u64_deserializer(ie_name, enum_subreg),
         "signed8" => generate_i8_deserializer(ie_name),
         "signed16" => generate_i16_deserializer(ie_name),
         "signed32" => generate_i32_deserializer(ie_name),
@@ -1171,7 +1217,9 @@ pub(crate) fn generate_pkg_ie_deserializers(
     ret.push_str(format!("use crate::ie::{vendor_mod}::*;\n\n").as_str());
 
     for ie in ies {
-        ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
+        ret.push_str(
+            generate_ie_deserializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
+        );
     }
 
     ret.push_str(generate_ie_values_deserializers(ies).as_str());
@@ -1187,7 +1235,9 @@ pub(crate) fn generate_pkg_ie_serializers(
     ret.push_str(format!("use crate::ie::{vendor_mod}::*;\n\n").as_str());
 
     for ie in ies {
-        ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
+        ret.push_str(
+            generate_ie_serializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
+        );
     }
     let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
@@ -1288,14 +1338,32 @@ pub(crate) fn generate_ie_values(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     for ie in ies {
         let rust_type = get_rust_type(&ie.data_type);
-        ret.push_str("#[allow(non_camel_case_types)]\n");
-        let generate_derive = generate_derive(
-            false,
+
+        // Check if we have an InformationElementSubRegistry and is of type
+        // ValueNameDescRegistry
+        let strum_macros = matches!(
+            ie.subregistry.as_ref().and_then(|v| v.first()),
+            Some(InformationElementSubRegistry::ValueNameDescRegistry(_))
+        );
+        let gen_derive = generate_derive(
+            strum_macros,
             rust_type != "Vec<u8>" && rust_type != "String",
             rust_type != "f32" && rust_type != "f64",
         );
-        ret.push_str(generate_derive.as_str());
-        ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
+
+        if let Some(ie_subregistry) = &ie.subregistry {
+            ret.push_str("#[allow(non_camel_case_types)]\n");
+            ret.push_str(gen_derive.as_str());
+            ret.push_str(
+                generate_subregistry_enum_and_impl(&ie.name, &rust_type, ie_subregistry).as_str(),
+            );
+        } else if ie.name == "tcpControlBits" {
+            continue;
+        } else {
+            ret.push_str("#[allow(non_camel_case_types)]\n");
+            ret.push_str(gen_derive.as_str());
+            ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
+        }
 
         // TODO: check if value converters are needed
         //ret.push_str(generate_ie_value_converters(&rust_type,
@@ -1356,7 +1424,9 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str("use chrono::TimeZone;\n\n\n");
     // Generate IANA Deser
     for ie in iana_ies {
-        ret.push_str(generate_ie_deserializer(&ie.data_type, &ie.name).as_str());
+        ret.push_str(
+            generate_ie_deserializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
+        );
     }
 
     let ty_name = "Field";
@@ -1429,36 +1499,70 @@ fn get_std_serializer_error(ty_name: &str) -> String {
     ret
 }
 
-fn generate_num8_serializer(num_type: &str, ie_name: &String) -> String {
+fn generate_num8_serializer(num_type: &str, ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
-    ret.push_str(
+
+    if ie_name == "tcpControlBits" {
+        ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for netgauze_iana::tcp::TCPHeaderFlags {{\n"
+        )
+        .as_str(),
+      );
+    } else {
+        ret.push_str(
         format!(
             "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
-    );
+      );
+    }
+
     ret.push_str("    const BASE_LENGTH: usize = 1;\n\n");
     ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
     ret.push_str("         Self::BASE_LENGTH\n");
     ret.push_str("     }\n\n");
     ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str(format!("         writer.write_{num_type}(self.0)?;\n").as_str());
+
+    if enum_subreg || ie_name == "tcpControlBits" {
+        ret.push_str(format!("         let num_val = {num_type}::from(*self);\n").as_str());
+        ret.push_str(format!("         writer.write_{num_type}(num_val)?;\n").as_str());
+    } else {
+        ret.push_str(format!("         writer.write_{num_type}(self.0)?;\n").as_str());
+    }
+
     ret.push_str("         Ok(())\n");
     ret.push_str("     }\n");
     ret.push_str("}\n\n");
     ret
 }
 
-fn generate_num_serializer(num_type: &str, length: u16, ie_name: &str) -> String {
+fn generate_num_serializer(
+    num_type: &str,
+    length: u16,
+    ie_name: &str,
+    enum_subreg: bool,
+) -> String {
     let mut ret = String::new();
     ret.push_str(get_std_serializer_error(ie_name).as_str());
-    ret.push_str(
+
+    if ie_name == "tcpControlBits" {
+        ret.push_str(
+        format!(
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for netgauze_iana::tcp::TCPHeaderFlags {{\n"
+        )
+        .as_str(),
+      );
+    } else {
+        ret.push_str(
         format!(
             "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
         )
         .as_str(),
-    );
+      );
+    }
+
     ret.push_str(format!("    const BASE_LENGTH: usize = {length};\n\n").as_str());
     ret.push_str("     fn len(&self, length: Option<u16>) -> usize {\n");
     ret.push_str("         match length {\n");
@@ -1468,15 +1572,21 @@ fn generate_num_serializer(num_type: &str, length: u16, ie_name: &str) -> String
     ret.push_str("     }\n\n");
     ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
 
+    if enum_subreg || ie_name == "tcpControlBits" {
+        ret.push_str(format!("         let num_val = {num_type}::from(*self);\n").as_str());
+    } else {
+        ret.push_str("         let num_val = self.0;\n");
+    }
+
     ret.push_str("         match length {\n");
     ret.push_str(
         format!(
-            "             None => writer.write_{num_type}::<byteorder::NetworkEndian>(self.0)?,\n"
+            "             None => writer.write_{num_type}::<byteorder::NetworkEndian>(num_val)?,\n"
         )
         .as_str(),
     );
     ret.push_str("             Some(len) => {\n");
-    ret.push_str("                 let be_bytes = self.0.to_be_bytes();\n");
+    ret.push_str("                 let be_bytes = num_val.to_be_bytes();\n");
     ret.push_str("                 let begin_offset = be_bytes.len() - len as usize;\n");
     ret.push_str("                 writer.write_all(&be_bytes[begin_offset..])?;\n");
     ret.push_str("             }\n");
@@ -1677,20 +1787,20 @@ fn generate_fraction_serializer(ie_name: &String) -> String {
     ret
 }
 
-fn generate_ie_serializer(data_type: &str, ie_name: &String) -> String {
+fn generate_ie_serializer(data_type: &str, ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let gen = match data_type {
         "octetArray" => generate_array_serializer(ie_name),
-        "unsigned8" => generate_num8_serializer("u8", ie_name),
-        "unsigned16" => generate_num_serializer("u16", 2, ie_name),
-        "unsigned32" => generate_num_serializer("u32", 4, ie_name),
-        "unsigned64" => generate_num_serializer("u64", 8, ie_name),
-        "signed8" => generate_num8_serializer("i8", ie_name),
-        "signed16" => generate_num_serializer("i16", 2, ie_name),
-        "signed32" => generate_num_serializer("i32", 4, ie_name),
-        "signed64" => generate_num_serializer("i64", 8, ie_name),
-        "float32" => generate_num_serializer("f32", 4, ie_name),
-        "float64" => generate_num_serializer("f64", 8, ie_name),
+        "unsigned8" => generate_num8_serializer("u8", ie_name, enum_subreg),
+        "unsigned16" => generate_num_serializer("u16", 2, ie_name, enum_subreg),
+        "unsigned32" => generate_num_serializer("u32", 4, ie_name, enum_subreg),
+        "unsigned64" => generate_num_serializer("u64", 8, ie_name, enum_subreg),
+        "signed8" => generate_num8_serializer("i8", ie_name, enum_subreg),
+        "signed16" => generate_num_serializer("i16", 2, ie_name, enum_subreg),
+        "signed32" => generate_num_serializer("i32", 4, ie_name, enum_subreg),
+        "signed64" => generate_num_serializer("i64", 8, ie_name, enum_subreg),
+        "float32" => generate_num_serializer("f32", 4, ie_name, enum_subreg),
+        "float64" => generate_num_serializer("f64", 8, ie_name, enum_subreg),
         "boolean" => generate_bool_serializer(ie_name),
         "macAddress" => generate_array_serializer(ie_name),
         "string" => generate_string_serializer(ie_name),
@@ -1720,7 +1830,9 @@ pub(crate) fn generate_ie_ser_main(
     ret.push_str("use byteorder::WriteBytesExt;\n\n\n");
 
     for ie in iana_ies {
-        ret.push_str(generate_ie_serializer(&ie.data_type, &ie.name).as_str());
+        ret.push_str(
+            generate_ie_serializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
+        );
     }
 
     let ty_name = "Field";

@@ -13,76 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{InformationElement, SimpleRegistry, Xref};
-use regex::{Captures, Regex, Replacer};
-use roxmltree::{ExpandedName, Node};
+use crate::{
+    xml_parsers::{sub_registries::parse_subregistry, xml_common::*},
+    InformationElement, InformationElementSubRegistry, SimpleRegistry, SubRegistryType,
+};
+use regex::Regex;
+use roxmltree::Node;
+use std::collections::HashMap;
 
-const IANA_NAMESPACE: &str = "http://www.iana.org/assignments";
 const ID_IE_DATA_TYPES: &str = "ipfix-information-element-data-types";
 pub(crate) const ID_IE: &str = "ipfix-information-elements";
 const ID_SEMANTICS: &str = "ipfix-information-element-semantics";
 const ID_UNITS: &str = "ipfix-information-element-units";
-const UNASSIGNED: &str = "Unassigned";
-const RESERVED: &str = "Reserved";
 const ASSIGNED_FOR_NF_V9: &str = "Assigned for NetFlow v9 compatibility";
+pub(crate) const ID_SUBREG_DEFAULT_ID_PATTERN: &str = "ipfix-";
+pub const ID_SUBREG_FW_STATUS: &str = "forwarding-status";
+pub const ID_SUBREG_CLASS_ENG_ID: &str = "classification-engine-ids";
 
-struct RfcLinkSwapper;
-impl Replacer for RfcLinkSwapper {
-    fn replace_append(&mut self, caps: &Captures<'_>, dst: &mut String) {
-        dst.push_str("[RFC");
-        dst.push_str(&caps["RFCNUM"]);
-        dst.push_str("](https://datatracker.ietf.org/doc/rfc");
-        dst.push_str(&caps["RFCNUM"]);
-        dst.push(')');
-    }
-}
-
-struct HttpLinkSwapper;
-impl Replacer for HttpLinkSwapper {
-    fn replace_append(&mut self, caps: &Captures<'_>, dst: &mut String) {
-        dst.push('<');
-        dst.push_str(&caps["href"]);
-        dst.push('>');
-    }
-}
-
-/// Find descendant node by it's ID
-/// If multiple nodes with the same ID exists, the first one is returned
-pub(crate) fn find_node_by_id<'a, 'input>(
-    node: &'input Node<'a, 'input>,
-    id: &str,
-) -> Option<Node<'a, 'input>> {
-    node.descendants().find(|x| x.attribute("id") == Some(id))
-}
-
-/// Get the text value of an XML node if applicable
-/// For example `<a>bb</a>` returns `Some("bb".to_string())`,
-/// while `<a><b/></a>` returns `None`
-fn get_string_child(node: &Node<'_, '_>, tag_name: ExpandedName<'_, '_>) -> Option<String> {
-    node.children()
-        .find(|x| x.tag_name() == tag_name)
-        .map(|x| x.text().map(|txt| txt.trim().to_string()))
-        .unwrap_or_default()
-}
-
-/// Parse tags such as `<xref type="rfc">rfc1233</xref>`
-fn parse_xref(node: &Node<'_, '_>) -> Vec<Xref> {
-    let children = node
-        .children()
-        .filter(|x| x.tag_name() == (IANA_NAMESPACE, "xref").into())
-        .collect::<Vec<_>>();
-    let mut xrefs = Vec::new();
-    for child in children {
-        let ty = child.attribute("type").map(ToString::to_string);
-        let data = child.attribute("data").map(ToString::to_string);
-        if let (Some(ty), Some(data)) = (ty, data) {
-            xrefs.push(Xref { ty, data });
-        }
-    }
-    xrefs
-}
-
-/// Parse simple registries with just value, name (description), and optionally
+/// Parse simple registries with just value, description, and optionally
 /// a comment [IPFIX Information Element Data Types](https://www.iana.org/assignments/ipfix/ipfix.xml#ipfix-information-element-data-types)
 /// And [IPFIX Information Element Semantics](https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-information-element-semantics)
 pub(crate) fn parse_simple_registry(node: &Node<'_, '_>) -> Vec<SimpleRegistry> {
@@ -115,6 +63,40 @@ pub(crate) fn parse_simple_registry(node: &Node<'_, '_>) -> Vec<SimpleRegistry> 
         }
     }
     ret
+}
+
+/// Parse Information Elements Subregistries from the main Registry XML
+pub(crate) fn parse_ie_subregistries(
+    node: &Node<'_, '_>,
+    _pen: u32,
+) -> HashMap<u16, Vec<InformationElementSubRegistry>> {
+    // Subregistry nodes (following ipfix- naming pattern)
+    let ie_subreg_pattern = Regex::new(ID_SUBREG_DEFAULT_ID_PATTERN).unwrap();
+    let mut ie_subreg_nodes = find_nodes_by_regex(node, &ie_subreg_pattern);
+
+    // Classification Engine Id subregistry node
+    if let Some(ie_subreg_class_eng_id) = find_node_by_id(node, ID_SUBREG_CLASS_ENG_ID) {
+        ie_subreg_nodes.push(ie_subreg_class_eng_id);
+    }
+
+    // HashMap <IE_ID, Vec<InformationElementSubRegistry>>
+    let mut ie_subregs: HashMap<u16, Vec<InformationElementSubRegistry>> = HashMap::new();
+    for node in ie_subreg_nodes {
+        ie_subregs.extend(vec![parse_subregistry(
+            &node,
+            SubRegistryType::ValueNameDescRegistry,
+        )]);
+    }
+
+    // Parse Forwarding Status (Value 89) subregistry
+    if let Some(ie_subreg_fw_status) = find_node_by_id(node, ID_SUBREG_FW_STATUS) {
+        ie_subregs.extend(vec![parse_subregistry(
+            &ie_subreg_fw_status,
+            SubRegistryType::ReasonCodeNestedRegistry,
+        )]);
+    }
+
+    ie_subregs
 }
 
 pub fn parse_description_string(node: &Node<'_, '_>) -> Option<String> {
@@ -156,7 +138,18 @@ pub fn parse_description_string(node: &Node<'_, '_>) -> Option<String> {
     }
 }
 
-pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<InformationElement> {
+pub(crate) fn parse_information_elements(
+    node: &Node<'_, '_>,
+    pen: u32,
+    ext_subregs: HashMap<u16, Vec<InformationElementSubRegistry>>,
+) -> Vec<InformationElement> {
+    // Parse any sub-registries in the main registry
+    let mut ie_subreg_parsed = parse_ie_subregistries(node, pen);
+
+    // Add external sub-registries (if for an IE we already have a sub-registry,
+    // this will be overwritten by the externally provided one)
+    ie_subreg_parsed.extend(ext_subregs);
+
     let children = node
         .children()
         .filter(|x| x.tag_name() == (IANA_NAMESPACE, "record").into())
@@ -271,6 +264,8 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
         });
         let range = get_string_child(child, (IANA_NAMESPACE, "range").into());
 
+        let subregistry = ie_subreg_parsed.get(&element_id).cloned();
+
         let ie = InformationElement {
             pen,
             name,
@@ -287,6 +282,7 @@ pub(crate) fn parse_information_elements(node: &Node<'_, '_>, pen: u32) -> Vec<I
             xrefs,
             units,
             range,
+            subregistry,
         };
         ret.push(ie);
     }

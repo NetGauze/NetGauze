@@ -1,0 +1,399 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="ipfix.xsl"?>
+<?xml-model href="ipfix.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
+<registry xmlns="http://www.iana.org/assignments" id="ipfix">
+    <registry id="ipfix-information-elements">
+        <title>VMWare IPFIX Information Elements</title>
+        <record>
+            <name>tenantProtocol</name>
+            <dataType>unsigned8</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>880</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: tenantProtocol
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>tenantSourceIPv4</name>
+            <dataType>ipv4Address</dataType>
+            <dataTypeSemantics>default</dataTypeSemantics>
+            <elementId>881</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: tenantSourceIPv4
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>tenantDestIPv4</name>
+            <dataType>ipv4Address</dataType>
+            <dataTypeSemantics>default</dataTypeSemantics>
+            <elementId>882</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: tenantDestIPv4
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>tenantSourceIPv6</name>
+            <dataType>ipv6Address</dataType>
+            <dataTypeSemantics>default</dataTypeSemantics>
+            <elementId>883</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: tenantSourceIPv6
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>tenantDestIPv6</name>
+            <dataType>ipv6Address</dataType>
+            <dataTypeSemantics>default</dataTypeSemantics>
+            <elementId>884</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: tenantDestIPv6
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>tenantSourcePort</name>
+            <dataType>unsigned16</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>886</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: tenantSourcePort
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>tenantDestPort</name>
+            <dataType>unsigned16</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>887</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: tenantDestPort
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>egressInterfaceAttr</name>
+            <dataType>unsigned16</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>888</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: egressInterfaceAttr
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>vxlanExportRole</name>
+            <dataType>unsigned8</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>889</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: vxlanExportRole
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>ingressInterfaceAttr</name>
+            <dataType>unsigned16</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>890</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: ingressInterfaceAttr
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>virtualObsID</name>
+            <dataType>string</dataType>
+            <dataTypeSemantics>default</dataTypeSemantics>
+            <elementId>898</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Logical Swith: virtualObsID
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>ruleId</name>
+            <dataType>unsigned32</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>950</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: ruleId
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>vmUuid</name>
+            <dataType>string</dataType>
+            <dataTypeSemantics>default</dataTypeSemantics>
+            <elementId>951</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: vmUuid
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>vnicIndex</name>
+            <dataType>unsigned32</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>952</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: vnicIndex
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>sessionFlags</name>
+            <dataType>unsigned8</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>953</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: sessionFlags
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>flowDirection</name>
+            <dataType>unsigned8</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>954</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: flowDirection
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>algControlFlowId</name>
+            <dataType>unsigned64</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>955</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: algControlFlowId
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>algType</name>
+            <dataType>unsigned8</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>956</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: algType
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>algFlowType</name>
+            <dataType>unsigned8</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>957</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: algFlowType
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>averageLatency</name>
+            <dataType>unsigned32</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>958</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: averageLatency
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>retransmissionCount</name>
+            <dataType>unsigned32</dataType>
+            <dataTypeSemantics>identifier</dataTypeSemantics>
+            <elementId>959</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: retransmissionCount
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>vifUuid</name>
+            <dataType>octetArray</dataType>
+            <dataTypeSemantics>default</dataTypeSemantics>
+            <elementId>960</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: vifUuid
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+        <record>
+            <name>vifId</name>
+            <dataType>string</dataType>
+            <dataTypeSemantics>default</dataTypeSemantics>
+            <elementId>961</elementId>
+            <applicability>data</applicability>
+            <status>current</status>
+            <description>
+                <paragraph>
+                    NSX-T-Data-Center 3.2 - Distributed Firewall: vifId
+                </paragraph>
+            </description>
+            <units></units>
+            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <revision>0</revision>
+            <date>2019-06-27</date>
+        </record>
+    </registry>
+</registry>

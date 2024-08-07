@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Handling [`AddressFamily`] (SAFI) and [`SubsequentAddressFamily`] (SAFI).
+//! Handling [`AddressFamily`] (AFI) and [`SubsequentAddressFamily`] (SAFI).
 //! Also introduces a new `enum` [`AddressType`] to make sure we can only
 //! construct valid AFI/SAFI combinations
 //!

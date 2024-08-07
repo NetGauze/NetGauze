@@ -15,12 +15,13 @@
 
 use crate::{
     ie,
-    ie::nokia,
+    ie::*,
     ipfix::*,
     wire::{deserializer::ipfix::*, serializer::ipfix::*},
     DataSetId, FieldSpecifier,
 };
 use chrono::{TimeZone, Timelike, Utc};
+use netgauze_iana::tcp::*;
 use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
 use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};
 
@@ -250,7 +251,7 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
                         50, 0, 71, 1,
                     ))),
                     ie::Field::ipClassOfService(ie::ipClassOfService(0)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(61)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::anyhostinternalprotocol),
                     ie::Field::sourceTransportPort(ie::sourceTransportPort(0)),
                     ie::Field::destinationTransportPort(ie::destinationTransportPort(0)),
                     ie::Field::icmpTypeCodeIPv4(ie::icmpTypeCodeIPv4(0)),
@@ -270,7 +271,9 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
                     ))),
                     ie::Field::sourceIPv4PrefixLength(ie::sourceIPv4PrefixLength(24)),
                     ie::Field::destinationIPv4PrefixLength(ie::destinationIPv4PrefixLength(24)),
-                    ie::Field::tcpControlBits(ie::tcpControlBits(0)),
+                    ie::Field::tcpControlBits(TCPHeaderFlags::new(
+                        false, false, false, false, false, false, false, false,
+                    )),
                     ie::Field::ipVersion(ie::ipVersion(4)),
                     ie::Field::flowStartMilliseconds(ie::flowStartMilliseconds(
                         Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
@@ -659,7 +662,7 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
                     )),
                     ie::Field::postNAPTSourceTransportPort(ie::postNAPTSourceTransportPort(8881)),
                     ie::Field::flowId(ie::flowId(10101010)),
-                    ie::Field::protocolIdentifier(ie::protocolIdentifier(1)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
                     ie::Field::engineType(ie::engineType(0)),
                     ie::Field::Nokia(nokia::Field::aluInsideServiceId(nokia::aluInsideServiceId(
                         1,
@@ -672,6 +675,262 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
                     ))),
                     ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
                     ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
+                ],
+            )],
+        }],
+    );
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(
+        &good_template_wire,
+        templates_map.clone(),
+        &good_template,
+    );
+    test_parsed_completely_with_one_input(&good_data_wire, templates_map.clone(), &good_data);
+
+    test_write_with_one_input(
+        &good_template,
+        Some(templates_map.clone()),
+        &good_template_wire,
+    )?;
+    test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
+    let good_template_wire = [
+        0x00, 0x0a, 0x00, 0x88, 0x66, 0x8b, 0xb8, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x78, 0x01, 0x90, 0x00, 0x12, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c,
+        0x00, 0x04, 0x00, 0x07, 0x00, 0x02, 0x00, 0x0b, 0x00, 0x02, 0x00, 0x94, 0x00, 0x08, 0x00,
+        0x04, 0x00, 0x01, 0x00, 0x01, 0x00, 0x04, 0x00, 0x02, 0x00, 0x04, 0x83, 0x7a, 0x00, 0x02,
+        0x00, 0x00, 0x1a, 0xdc, 0x83, 0x78, 0x00, 0x02, 0x00, 0x00, 0x1a, 0xdc, 0x83, 0x79, 0x00,
+        0x01, 0x00, 0x00, 0x1a, 0xdc, 0x83, 0x71, 0x00, 0x04, 0x00, 0x00, 0x1a, 0xdc, 0x83, 0x72,
+        0x00, 0x04, 0x00, 0x00, 0x1a, 0xdc, 0x83, 0x76, 0x00, 0x02, 0x00, 0x00, 0x1a, 0xdc, 0x83,
+        0x77, 0x00, 0x02, 0x00, 0x00, 0x1a, 0xdc, 0x83, 0x70, 0x00, 0x01, 0x00, 0x00, 0x1a, 0xdc,
+        0x83, 0xba, 0x00, 0x01, 0x00, 0x00, 0x1a, 0xdc, 0x83, 0x82, 0xff, 0xff, 0x00, 0x00, 0x1a,
+        0xdc,
+    ];
+
+    let good_data_wire = [
+        0x00, 0x0a, 0x00, 0x6a, 0x66, 0x74, 0x35, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x90, 0x00, 0x5a, 0x0a, 0x64, 0x00, 0x01, 0x0a, 0x64, 0x00, 0x97, 0x27, 0x14,
+        0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x9a, 0x21, 0x12, 0x01, 0x00, 0x00, 0x04, 0xb0,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x0a, 0x00, 0x0c, 0x00, 0xc0, 0xa8, 0x8c, 0x06, 0xc0, 0xa8,
+        0x8c, 0x44, 0x4e, 0x37, 0x01, 0xbb, 0x06, 0x00, 0x24, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61,
+        0x61, 0x61, 0x2d, 0x62, 0x62, 0x62, 0x62, 0x2d, 0x63, 0x63, 0x63, 0x63, 0x2d, 0x64, 0x64,
+        0x64, 0x64, 0x2d, 0x65, 0x65, 0x65, 0x65, 0x65, 0x65, 0x65, 0x65, 0x65, 0x65, 0x65, 0x65,
+        0x00,
+    ];
+
+    let good_template = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
+        0,
+        0,
+        vec![Set::Template(vec![TemplateRecord::new(
+            400,
+            vec![
+                FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::flowId, 8).unwrap(),
+                FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::ingressInterfaceAttr), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::egressInterfaceAttr), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::vxlanExportRole), 1).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantSourceIPv4), 4).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantDestIPv4), 4).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantSourcePort), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantDestPort), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantProtocol), 1).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::flowDirection), 1).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::virtualObsID), 65535).unwrap(),
+            ],
+        )])],
+    );
+
+    let good_data = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+        0,
+        0,
+        vec![Set::Data {
+            id: DataSetId::new(400).unwrap(),
+            records: vec![DataRecord::new(
+                vec![],
+                vec![
+                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
+                        10, 100, 0, 1,
+                    ))),
+                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
+                        10, 100, 0, 151,
+                    ))),
+                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
+                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
+                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
+                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
+                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
+                    ie::Field::VMWare(vmware::Field::ingressInterfaceAttr(
+                        vmware::ingressInterfaceAttr(10),
+                    )),
+                    ie::Field::VMWare(vmware::Field::egressInterfaceAttr(
+                        vmware::egressInterfaceAttr(12),
+                    )),
+                    ie::Field::VMWare(vmware::Field::vxlanExportRole(vmware::vxlanExportRole(0))),
+                    ie::Field::VMWare(vmware::Field::tenantSourceIPv4(vmware::tenantSourceIPv4(
+                        Ipv4Addr::new(192, 168, 140, 6),
+                    ))),
+                    ie::Field::VMWare(vmware::Field::tenantDestIPv4(vmware::tenantDestIPv4(
+                        Ipv4Addr::new(192, 168, 140, 68),
+                    ))),
+                    ie::Field::VMWare(vmware::Field::tenantSourcePort(vmware::tenantSourcePort(
+                        20023,
+                    ))),
+                    ie::Field::VMWare(vmware::Field::tenantDestPort(vmware::tenantDestPort(443))),
+                    ie::Field::VMWare(vmware::Field::tenantProtocol(vmware::tenantProtocol::TCP)),
+                    ie::Field::VMWare(vmware::Field::flowDirection(vmware::flowDirection::ingress)),
+                    ie::Field::VMWare(vmware::Field::virtualObsID(vmware::virtualObsID(
+                        String::from("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                    ))),
+                ],
+            )],
+        }],
+    );
+
+    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    test_parsed_completely_with_one_input(
+        &good_template_wire,
+        templates_map.clone(),
+        &good_template,
+    );
+    test_parsed_completely_with_one_input(&good_data_wire, templates_map.clone(), &good_data);
+
+    test_write_with_one_input(
+        &good_template,
+        Some(templates_map.clone()),
+        &good_template_wire,
+    )?;
+    test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
+    let good_template_wire = [
+        0x00, 0x0a, 0x00, 0x7c, 0x66, 0x8b, 0xb8, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x6c, 0x01, 0x90, 0x00, 0x19, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c,
+        0x00, 0x04, 0x00, 0x07, 0x00, 0x02, 0x00, 0x0b, 0x00, 0x02, 0x00, 0x94, 0x00, 0x08, 0x00,
+        0x04, 0x00, 0x01, 0x00, 0x01, 0x00, 0x04, 0x00, 0x02, 0x00, 0x04, 0x00, 0x2e, 0x00, 0x01,
+        0x00, 0x59, 0x00, 0x04, 0x00, 0x65, 0x00, 0x01, 0x00, 0x88, 0x00, 0x01, 0x00, 0xe5, 0x00,
+        0x01, 0x00, 0xe9, 0x00, 0x01, 0x00, 0xef, 0x00, 0x01, 0x01, 0x15, 0x00, 0x01, 0x01, 0x1e,
+        0x00, 0x02, 0x01, 0x29, 0x00, 0x01, 0x01, 0x80, 0x00, 0x01, 0x01, 0x86, 0x00, 0x02, 0x01,
+        0x98, 0x00, 0x02, 0x01, 0xc0, 0x00, 0x01, 0x01, 0xd2, 0x00, 0x01, 0x01, 0xd3, 0x00, 0x01,
+        0x01, 0xf4, 0x00, 0x01,
+    ];
+
+    let good_data_wire = [
+        0x00, 0x0a, 0x00, 0x48, 0x66, 0x74, 0x35, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x90, 0x00, 0x38, 0x0a, 0x64, 0x00, 0x01, 0x0a, 0x64, 0x00, 0x97, 0x27, 0x14,
+        0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x9a, 0x21, 0x12, 0x01, 0x00, 0x00, 0x04, 0xb0,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x86, 0x12, 0x05, 0x0f, 0x02, 0x03, 0x01,
+        0x00, 0x06, 0x05, 0x04, 0x00, 0x04, 0x00, 0x0a, 0x04, 0x04, 0x01, 0x05,
+    ];
+
+    let good_template = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
+        0,
+        0,
+        vec![Set::Template(vec![TemplateRecord::new(
+            400,
+            vec![
+                FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationTransportPort, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::flowId, 8).unwrap(),
+                FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::mplsTopLabelType, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::forwardingStatus, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::classificationEngineId, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::flowEndReason, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::natOriginatingAddressRealm, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::firewallEvent, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::biflowDirection, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::observationPointType, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::anonymizationTechnique, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::natType, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::valueDistributionMethod, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::flowSelectorAlgorithm, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::dataLinkFrameType, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::mibCaptureTimeSemantics, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::natQuotaExceededEvent, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::natThresholdEvent, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::srhIPv6ActiveSegmentType, 1).unwrap(),
+            ],
+        )])],
+    );
+
+    let good_data = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+        0,
+        0,
+        vec![Set::Data {
+            id: DataSetId::new(400).unwrap(),
+            records: vec![DataRecord::new(
+                vec![],
+                vec![
+                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
+                        10, 100, 0, 1,
+                    ))),
+                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
+                        10, 100, 0, 151,
+                    ))),
+                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
+                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
+                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
+                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
+                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
+                    ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown),
+                    ie::Field::forwardingStatus(ie::forwardingStatus::Dropped(
+                        ie::forwardingStatusDroppedReason::Badheaderchecksum,
+                    )),
+                    ie::Field::classificationEngineId(ie::classificationEngineId::ETHERTYPE),
+                    ie::Field::flowEndReason(ie::flowEndReason::lackofresources),
+                    ie::Field::natOriginatingAddressRealm(
+                        ie::natOriginatingAddressRealm::Unassigned(15),
+                    ),
+                    ie::Field::firewallEvent(ie::firewallEvent::FlowDeleted),
+                    ie::Field::biflowDirection(ie::biflowDirection::perimeter),
+                    ie::Field::observationPointType(ie::observationPointType::Physicalport),
+                    ie::Field::anonymizationTechnique(
+                        ie::anonymizationTechnique::StructuredPermutation,
+                    ),
+                    ie::Field::natType(ie::natType::NAT66translated),
+                    ie::Field::valueDistributionMethod(
+                        ie::valueDistributionMethod::SimpleUniformDistribution,
+                    ),
+                    ie::Field::flowSelectorAlgorithm(
+                        ie::flowSelectorAlgorithm::UniformprobabilisticSampling,
+                    ),
+                    ie::Field::dataLinkFrameType(ie::dataLinkFrameType::Unassigned(10)),
+                    ie::Field::mibCaptureTimeSemantics(ie::mibCaptureTimeSemantics::average),
+                    ie::Field::natQuotaExceededEvent(
+                        ie::natQuotaExceededEvent::Maximumactivehostsorsubscribers,
+                    ),
+                    ie::Field::natThresholdEvent(
+                        ie::natThresholdEvent::Addresspoolhighthresholdevent,
+                    ),
+                    ie::Field::srhIPv6ActiveSegmentType(
+                        ie::srhIPv6ActiveSegmentType::BGPSegmentRoutingPrefixSID,
+                    ),
                 ],
             )],
         }],
