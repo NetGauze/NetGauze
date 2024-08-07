@@ -1,8 +1,9 @@
 [package]
 name = "netgauze-fuzz"
-version = "0.3.0"
+version = "0.4.0"
 publish = false
 edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
 readme = "README.md"
 description = """Fuzzers for NetGauze"""
@@ -20,7 +21,6 @@ netgauze-bgp-pkt = { path = "../crates/bgp-pkt", features = ["serde", "fuzz"] }
 netgauze-bgp-speaker = { path = "../crates/bgp-speaker", features = ["fuzz"] }
 netgauze-bmp-pkt = { path = "../crates/bmp-pkt", features = ["serde", "fuzz"] }
 netgauze-flow-pkt = { path = "../crates/flow-pkt", features = ["serde"] }
-
 async-trait = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
@@ -51,13 +51,11 @@ path = "fuzz_targets/fuzz_bmp_pkt.rs"
 test = false
 doc = false
 
-
 [[bin]]
 name = "fuzz-bmp-pkt-serialize"
 path = "fuzz_targets/fuzz_bmp_pkt_serialize.rs"
 test = false
 doc = false
-
 
 [[bin]]
 name = "fuzz-ipfix-pkt"
