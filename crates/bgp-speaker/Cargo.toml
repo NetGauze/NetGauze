@@ -35,20 +35,16 @@ ipnet = { workspace = true }
 rand = { workspace = true, features = ["small_rng"] }
 async-trait = { workspace = true }
 strum_macros = { workspace = true }
-serde = { workspace = true, features = ["derive"], optional = true }
+serde = { workspace = true, features = ["derive"] }
 
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
 
 [features]
-default = ["serde"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
 tokio-test = { workspace = true }
 env_logger = "0.11"
 test-log = "0.2"
-clap = { version = "4.4", features = ["derive"] }
-
-[profile.release]
-debug = 1
+clap = {  workspace = true, features = ["derive"] }
