@@ -287,13 +287,7 @@ pub(crate) fn generate_ie_status() -> String {
 
 /// Use at the beginning of `ie_generated` for defining custom types
 pub(crate) fn generate_common_types() -> String {
-    //TEMP, and in the future move it to another function generate_imports
-    let mut ret = String::new();
-    ret.push_str("use netgauze_iana::tcp::*;\n\n");
-    ret.push_str("pub type MacAddress = [u8; 6];\n\n");
-    ret
-
-    // "pub type MacAddress = [u8; 6];\n\n".to_string()
+    "pub type MacAddress = [u8; 6];\n\n".to_string()
 }
 
 /// `TryFrom` block for  InformationElementId
@@ -483,7 +477,9 @@ fn generate_ie_field_enum_for_ie(
     }
     for ie in iana_ies {
         if ie.name == "tcpControlBits" {
-            ret.push_str(format!("    {}(TCPHeaderFlags),\n", ie.name).as_str());
+            ret.push_str(
+                format!("    {}(netgauze_iana::tcp::TCPHeaderFlags),\n", ie.name).as_str(),
+            );
         } else {
             ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
         }
@@ -694,7 +690,7 @@ fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
 fn get_deserializer_header(ty_name: &str) -> String {
     let mut header = String::new();
     if ty_name == "tcpControlBits" {
-        header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for TCPHeaderFlags {{\n").as_str());
+        header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for netgauze_iana::tcp::TCPHeaderFlags {{\n").as_str());
     } else {
         header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n").as_str());
     }
@@ -718,7 +714,7 @@ fn generate_u8_deserializer(ie_name: &String, enum_subreg: bool) -> String {
         ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
         ret.push_str("        Ok((buf, enum_val))\n");
     } else if ie_name == "tcpControlBits" {
-        ret.push_str("        Ok((buf, TCPHeaderFlags::from(value)))\n");
+        ret.push_str("        Ok((buf, netgauze_iana::tcp::TCPHeaderFlags::from(value)))\n");
     } else {
         ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     }
@@ -747,7 +743,7 @@ fn generate_u16_deserializer(ie_name: &String, enum_subreg: bool) -> String {
         ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
         ret.push_str("        Ok((buf, enum_val))\n");
     } else if ie_name == "tcpControlBits" {
-        ret.push_str("        Ok((buf, TCPHeaderFlags::from(value)))\n");
+        ret.push_str("        Ok((buf, netgauze_iana::tcp::TCPHeaderFlags::from(value)))\n");
     } else {
         ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
     }
@@ -1510,7 +1506,7 @@ fn generate_num8_serializer(num_type: &str, ie_name: &String, enum_subreg: bool)
     if ie_name == "tcpControlBits" {
         ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for TCPHeaderFlags {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for netgauze_iana::tcp::TCPHeaderFlags {{\n"
         )
         .as_str(),
       );
@@ -1554,7 +1550,7 @@ fn generate_num_serializer(
     if ie_name == "tcpControlBits" {
         ret.push_str(
         format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for TCPHeaderFlags {{\n"
+            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for netgauze_iana::tcp::TCPHeaderFlags {{\n"
         )
         .as_str(),
       );

@@ -26,10 +26,15 @@ This project is still in an early stage.
 
 ## Running tests
 
-NetGauze uses macro test from the [trybuild](https://crates.io/crates/trybuild) crate. To generate the expected output
-for macro test an override env var must be set.
+NetGauze uses macro test from the [trybuild](https://crates.io/crates/trybuild) crate. 
 
-```OVERWRITE=true cargo test```
+To generate the expected output for macro test the TRYBUILD env var must be set:
+
+```TRYBUILD=overwrite cargo test```
+
+To generate the expected output for pcap tests the OVERWRITE env var must be set:
+
+```OVERWRITE=true cargo test``
 
 ## Running code formatting and clippy checks
 

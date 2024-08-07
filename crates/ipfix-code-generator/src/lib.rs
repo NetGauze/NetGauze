@@ -430,9 +430,7 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
     let mut ie_deser = String::new();
     let mut ie_ser = String::new();
     ie_deser.push_str("use crate::ie::*;\n\n");
-    ie_deser.push_str("use netgauze_iana::tcp::*;\n\n");
     ie_ser.push_str("use crate::ie::*;\n\n");
-    ie_ser.push_str("use netgauze_iana::tcp::*;\n\n");
 
     for vendor in &config.vendors {
         ie_output.push_str(

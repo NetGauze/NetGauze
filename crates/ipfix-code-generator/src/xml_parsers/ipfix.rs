@@ -96,7 +96,6 @@ pub(crate) fn parse_ie_subregistries(
         )]);
     }
 
-    //dbg!(&ie_subregs);
     ie_subregs
 }
 

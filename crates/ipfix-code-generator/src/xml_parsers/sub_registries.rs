@@ -209,7 +209,6 @@ pub fn parse_val_name_desc_u8_registry(node: &Node<'_, '_>) -> (u16, Vec<ValueNa
         }
     }
 
-    // dbg!(&ret);
     (ie_id, ret)
 }
 
@@ -246,6 +245,5 @@ pub fn parse_reason_code_nested_u8_registry_2bit(
         })
         .collect();
 
-    // dbg!(&ret);
     (ie_id, ret)
 }

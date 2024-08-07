@@ -20,7 +20,7 @@
 //! use netgauze_iana::tcp::*;
 //! use serde_json;
 //!
-//! let value: u8 = 71;
+//! let value: u8 = 0b01000111;
 //! let flags = TCPHeaderFlags::from(value);
 //! println!("{:?}", flags);
 //! // output: TCPHeaderFlags { FIN: true, SYN: true, RST: true, PSH: false, ACK: false, URG: false, ECE: true, CWR: false }
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_fin_u8() {
-        let value: u8 = 1;
+        let value: u8 = 0b00000001;
         let flags = TCPHeaderFlags::from(value);
         assert_eq!(
             flags,
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_psh_ack_u16() {
-        let value: u16 = 24;
+        let value: u16 = 0b00011000;
         let flags = TCPHeaderFlags::from(value);
         assert_eq!(
             flags,
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_syn_ack_u8() {
-        let value: u8 = 18;
+        let value: u8 = 0b00010010;
         let flags = TCPHeaderFlags::from(value);
         assert_eq!(
             flags,
