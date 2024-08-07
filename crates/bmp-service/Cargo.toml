@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-bmp-service"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
@@ -14,10 +14,10 @@ keywords = ["bmp", "bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-iana = { version = "0.3.0", path = "../iana" }
-netgauze-bmp-pkt = { version = "0.3.0", path = "../bmp-pkt", features = ["serde", "codec"] }
-netgauze-bgp-pkt = { version = "0.3.0", path = "../bgp-pkt", features = ["serde"] }
-netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils" }
+netgauze-iana = { version = "0.4.0", path = "../iana" }
+netgauze-bmp-pkt = { version = "0.4.0", path = "../bmp-pkt", features = ["serde", "codec"] }
+netgauze-bgp-pkt = { version = "0.4.0", path = "../bgp-pkt", features = ["serde"] }
+netgauze-parse-utils = { version = "0.4.0", path = "../parse-utils" }
 
 nom = { workspace = true }
 byteorder = { workspace = true }
@@ -34,7 +34,6 @@ tower-service = { workspace = true }
 tower-layer = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-
 
 [dev-dependencies]
 tokio-test = { workspace = true }

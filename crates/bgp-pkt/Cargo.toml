@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-bgp-pkt"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
@@ -14,10 +14,10 @@ keywords = ["bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-iana = { version = "0.3.0", path = "../iana" }
-netgauze-locate = { version = "0.3.0", path = "../locate", optional = true }
-netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils", optional = true }
-netgauze-serde-macros = { version = "0.3.0", path = "../serde-macros", optional = true }
+netgauze-iana = { version = "0.4.0", path = "../iana" }
+netgauze-locate = { version = "0.4.0", path = "../locate", optional = true }
+netgauze-parse-utils = { version = "0.4.0", path = "../parse-utils", optional = true }
+netgauze-serde-macros = { version = "0.4.0", path = "../serde-macros", optional = true }
 ipnet = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
@@ -38,15 +38,12 @@ codec = ["log", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 
-
 [dev-dependencies]
-netgauze-pcap-reader = { version = "0.3.0", path = "../pcap-reader" }
-netgauze-parse-utils = { version = "0.3.0", path = "../parse-utils", features = ["test-helpers"] }
+netgauze-pcap-reader = { version = "0.4.0", path = "../pcap-reader" }
+netgauze-parse-utils = { version = "0.4.0", path = "../parse-utils", features = ["test-helpers"] }
 serde_json = { workspace = true }
 rstest = { workspace = true }
 pcap-parser = { workspace = true, features = ["data"] }
-
-
 
 [[bench]]
 name = "serde_benchmark"
