@@ -13,6 +13,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Helper library to read pcap files, this library is not meant for production
+//! use but rather for testing purposes.
+//!
+//! Example:
+//! ```rust,ignore
+//! use std::{collections::HashMap, fs::File};
+//!
+//! use bytes::BytesMut;
+//! use pcap_parser::PcapNGReader;
+//! use tokio_util::codec::Decoder;
+//!
+//! use netgauze_bmp_pkt::codec::BmpCodec;
+//! use netgauze_pcap_reader::{PcapIter, TransportProtocol};
+//!
+//! let mut path = env!("CARGO_MANIFEST_DIR").to_owned();
+//! path.push_str("/data/bmp.pcapng");
+//! let file = File::open(path).unwrap();
+//! let reader = PcapNGReader::new(165536, file).unwrap();
+//! let reader = Box::new(reader);
+//! let iter = PcapIter::new(reader);
+//! let mut peers = HashMap::new();
+//! for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
+//!     if protocol != TransportProtocol::TCP {
+//!         continue;
+//!     }
+//!     let key = (src_ip, src_port, dst_ip, dst_port);
+//!     let (codec, buf) = peers
+//!         .entry(key)
+//!         .or_insert((BmpCodec::default(), BytesMut::new()));
+//!     buf.extend_from_slice(value.as_slice());
+//!     match codec.decode(buf) {
+//!         Ok(Some(msg)) => println!("{}", serde_json::to_string(&msg).unwrap()),
+//!         Ok(None) => {}
+//!         Err(err) => println!("Error parsing BMP Message: {:?}", err),
+//!     }
+//! }
+//! ```
+
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use pcap_parser::{data::PacketData, traits::PcapReaderIterator, *};
