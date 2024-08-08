@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-locate"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
