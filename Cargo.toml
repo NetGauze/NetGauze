@@ -32,7 +32,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tokio-test = "0.4"
-tower = { version = "0.4", features = ["full"] }
+tower = { version = "0.5", features = ["full"] }
 tower-service = "0.3"
 tower-layer = "0.3"
 tracing = "0.1"
