@@ -17,11 +17,14 @@
 use libfuzzer_sys::fuzz_target;
 use netgauze_flow_pkt::ipfix::IpfixPacket;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 fuzz_target!(|data: &[u8]| {
     let mut buf = data;
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     while let Ok((retbuf, _msg)) = IpfixPacket::from_wire(Span::new(buf), templates_map.clone()) {
         buf = retbuf.fragment();
     }

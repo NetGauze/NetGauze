@@ -13,16 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr},
-    rc::Rc,
-};
-
 use chrono::{TimeZone, Utc};
 use netgauze_iana::tcp::*;
 use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
+use std::{
+    collections::HashMap,
+    net::{Ipv4Addr, Ipv6Addr},
+    sync::{Arc, RwLock},
+};
 
 use crate::{
     netflow::*,
@@ -70,7 +68,7 @@ fn test_netflow9_template_record() -> Result<(), NetFlowV9WritingError> {
             ],
         )])],
     );
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
     test_write_with_two_inputs(&good, None, true, &good_wire)?;
     Ok(())
@@ -109,9 +107,9 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
         FieldSpecifier::new(IE::ipVersion, 1).unwrap(),
     ];
 
-    let templates_map = Rc::new(RefCell::new(HashMap::from([(
+    let templates_map = Arc::new(RwLock::new(HashMap::from([(
         1024,
-        Rc::new((vec![], fields.clone())),
+        Arc::new((vec![], fields.clone())),
     )])));
 
     let good = NetFlowV9Packet::new(
@@ -223,7 +221,7 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
     );
 
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    test_write_with_two_inputs(&good, Some(Rc::clone(&templates_map)), true, &good_wire)?;
+    test_write_with_two_inputs(&good, Some(Arc::clone(&templates_map)), true, &good_wire)?;
     Ok(())
 }
 
@@ -284,8 +282,8 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
         FieldSpecifier::new(IE::egressVRFID, 4).unwrap(),
     ];
 
-    let fields = Rc::new((vec![], field_specifiers.clone()));
-    let templates_map = Rc::new(RefCell::new(HashMap::from([(313, fields)])));
+    let fields = Arc::new((vec![], field_specifiers.clone()));
+    let templates_map = Arc::new(RwLock::new(HashMap::from([(313, fields)])));
 
     let good = NetFlowV9Packet::new(
         201984782,
@@ -412,7 +410,7 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
     );
 
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    test_write_with_two_inputs(&good, Some(Rc::clone(&templates_map)), true, &good_wire)?;
+    test_write_with_two_inputs(&good, Some(Arc::clone(&templates_map)), true, &good_wire)?;
     Ok(())
 }
 
@@ -432,9 +430,9 @@ fn test_mix_option_template_set() -> Result<(), SetWritingError> {
         ],
     )]);
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    test_write_with_two_inputs(&good, Some(Rc::clone(&templates_map)), false, &good_wire)?;
+    test_write_with_two_inputs(&good, Some(Arc::clone(&templates_map)), false, &good_wire)?;
     Ok(())
 }
 
@@ -453,9 +451,9 @@ fn test_mix_option_template_set2() -> Result<(), SetWritingError> {
         ],
     )]);
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    test_write_with_two_inputs(&good, Some(Rc::clone(&templates_map)), true, &good_wire)?;
+    test_write_with_two_inputs(&good, Some(Arc::clone(&templates_map)), true, &good_wire)?;
     Ok(())
 }
 
@@ -609,18 +607,18 @@ fn test_padding() -> Result<(), NetFlowV9WritingError> {
         unsafe { Span::new_from_raw_offset(107, &[0x01, 0x00, 0x00]) },
         NetFlowV9PacketParsingError::SetError(SetParsingError::InvalidPaddingValue(1)),
     );
-    let templates_no_padding_map = Rc::new(RefCell::new(HashMap::new()));
-    let templates_with_padding_map = Rc::new(RefCell::new(HashMap::new()));
-    let template_bad_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_no_padding_map = Arc::new(RwLock::new(HashMap::new()));
+    let templates_with_padding_map = Arc::new(RwLock::new(HashMap::new()));
+    let template_bad_map = Arc::new(RwLock::new(HashMap::new()));
 
     let (_, good_no_padding) = NetFlowV9Packet::from_wire(
         Span::new(&good_no_padding_wire),
-        Rc::clone(&templates_no_padding_map),
+        Arc::clone(&templates_no_padding_map),
     )
     .unwrap();
     let (_, good_with_padding) = NetFlowV9Packet::from_wire(
         Span::new(&good_with_padding_wire),
-        Rc::clone(&templates_with_padding_map),
+        Arc::clone(&templates_with_padding_map),
     )
     .unwrap();
 
@@ -630,7 +628,7 @@ fn test_padding() -> Result<(), NetFlowV9WritingError> {
         LocatedNetFlowV9PacketParsingError<'_>,
     >(
         &bad_padding_options_wire,
-        Rc::clone(&template_bad_map),
+        Arc::clone(&template_bad_map),
         &bad_options_template_padding,
     );
     test_parse_error_with_one_input::<
@@ -639,31 +637,31 @@ fn test_padding() -> Result<(), NetFlowV9WritingError> {
         LocatedNetFlowV9PacketParsingError<'_>,
     >(
         &bad_padding_data_wire,
-        Rc::clone(&template_bad_map),
+        Arc::clone(&template_bad_map),
         &bad_data_padding,
     );
 
     // Packets should be equal regardless of the padding
     test_parsed_completely_with_one_input(
         &good_no_padding_wire,
-        Rc::clone(&templates_no_padding_map),
+        Arc::clone(&templates_no_padding_map),
         &good_with_padding,
     );
     test_parsed_completely_with_one_input(
         &good_with_padding_wire,
-        Rc::clone(&templates_with_padding_map),
+        Arc::clone(&templates_with_padding_map),
         &good_no_padding,
     );
 
     test_write_with_two_inputs(
         &good_no_padding,
-        Some(Rc::clone(&templates_no_padding_map)),
+        Some(Arc::clone(&templates_no_padding_map)),
         false,
         &good_no_padding_wire,
     )?;
     test_write_with_two_inputs(
         &good_with_padding,
-        Some(Rc::clone(&templates_with_padding_map)),
+        Some(Arc::clone(&templates_with_padding_map)),
         true,
         &good_with_padding_wire,
     )?;
@@ -790,7 +788,7 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(
         &good_template_wire,
         templates_map.clone(),

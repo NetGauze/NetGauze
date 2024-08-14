@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cell::RefMut, rc::Rc};
-
 use chrono::{LocalResult, TimeZone, Utc};
 use nom::{
     error::ErrorKind,
@@ -22,6 +20,7 @@ use nom::{
     IResult,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::{
     ipfix::*,
@@ -97,6 +96,7 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedIpfixPacketParsingErro
 pub enum SetParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    LockError,
     InvalidLength(u16),
     InvalidSetId(u16),
     NoTemplateDefinedFor(u16),
@@ -144,7 +144,7 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                 // less than 4-octets (min field size) is padding
                 while buf.len() > 3 {
                     let (t, option_template) =
-                        parse_into_located_one_input(buf, Rc::clone(&templates_map))?;
+                        parse_into_located_one_input(buf, Arc::clone(&templates_map))?;
                     buf = t;
                     option_templates.push(option_template);
                 }
@@ -155,56 +155,64 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
             // We don't need to check for valid Set ID again, since we already checked
             id => {
                 // Temp variable to keep the borrowed value from RC
-                let binding = templates_map.as_ref().borrow();
-                let template = if let Some(fields) = binding.get(&id) {
-                    fields
-                } else {
-                    return Err(nom::Err::Error(LocatedSetParsingError::new(
-                        input,
-                        SetParsingError::NoTemplateDefinedFor(id),
-                    )));
-                };
-
-                let (scope_field_specs, field_specs) = template.as_ref();
-                // since we could have vlen fields, we can only state a min_record_len here
-                let min_record_length = scope_field_specs
-                    .iter()
-                    .map(|x| {
-                        if x.length() == 65535 {
-                            0
+                match templates_map.read() {
+                    Ok(guard) => {
+                        let template = if let Some(fields) = guard.get(&id) {
+                            fields
                         } else {
-                            x.length() as usize
+                            return Err(nom::Err::Error(LocatedSetParsingError::new(
+                                input,
+                                SetParsingError::NoTemplateDefinedFor(id),
+                            )));
+                        };
+                        let (scope_field_specs, field_specs) = template.as_ref();
+                        // since we could have vlen fields, we can only state a min_record_len here
+                        let min_record_length = scope_field_specs
+                            .iter()
+                            .map(|x| {
+                                if x.length() == 65535 {
+                                    0
+                                } else {
+                                    x.length() as usize
+                                }
+                            })
+                            .sum::<usize>()
+                            + field_specs
+                                .iter()
+                                .map(|x| {
+                                    if x.length() == 65535 {
+                                        0
+                                    } else {
+                                        x.length() as usize
+                                    }
+                                })
+                                .sum::<usize>();
+
+                        let mut records = Vec::new();
+                        while buf.len() >= min_record_length {
+                            let (t, record): (Span<'_>, DataRecord) =
+                                parse_into_located_one_input(buf, Arc::clone(template))?;
+                            buf = t;
+                            records.push(record);
                         }
-                    })
-                    .sum::<usize>()
-                    + field_specs
-                        .iter()
-                        .map(|x| {
-                            if x.length() == 65535 {
-                                0
-                            } else {
-                                x.length() as usize
-                            }
-                        })
-                        .sum::<usize>();
+                        // buf could be a non zero value for padding
+                        while buf.len() > 0 && nom::combinator::peek(be_u8)(buf)?.1 == 0 {
+                            let (t, _) = be_u8(buf)?;
+                            buf = t;
+                        }
 
-                let mut records = Vec::new();
-                while buf.len() >= min_record_length {
-                    let (t, record): (Span<'_>, DataRecord) =
-                        parse_into_located_one_input(buf, Rc::clone(template))?;
-                    buf = t;
-                    records.push(record);
-                }
-                // buf could be a non zero value for padding
-                while buf.len() > 0 && nom::combinator::peek(be_u8)(buf)?.1 == 0 {
-                    let (t, _) = be_u8(buf)?;
-                    buf = t;
-                }
-
-                // We can safely unwrap DataSetId here since we already checked the range
-                Set::Data {
-                    id: DataSetId::new(id).unwrap(),
-                    records,
+                        // We can safely unwrap DataSetId here since we already checked the range
+                        Set::Data {
+                            id: DataSetId::new(id).unwrap(),
+                            records,
+                        }
+                    }
+                    Err(_) => {
+                        return Err(nom::Err::Error(LocatedSetParsingError::new(
+                            input,
+                            SetParsingError::LockError,
+                        )));
+                    }
                 }
             }
         };
@@ -231,6 +239,7 @@ fn check_padding_value(mut buf: Span<'_>) -> IResult<Span<'_>, (), LocatedSetPar
 pub enum OptionsTemplateRecordParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    LockError,
     InvalidTemplateId(u16),
     /// Scope fields count must be less than the total fields count
     InvalidScopeFieldsCount(u16),
@@ -281,8 +290,20 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordP
             buf = t;
         }
         {
-            let mut map: RefMut<'_, _> = templates_map.borrow_mut();
-            map.insert(template_id, Rc::new((scope_fields.clone(), fields.clone())));
+            match templates_map.write() {
+                Ok(mut map) => map.insert(
+                    template_id,
+                    Arc::new((scope_fields.clone(), fields.clone())),
+                ),
+                Err(_) => {
+                    return Err(nom::Err::Error(
+                        LocatedOptionsTemplateRecordParsingError::new(
+                            input,
+                            OptionsTemplateRecordParsingError::LockError,
+                        ),
+                    ));
+                }
+            };
         }
         Ok((
             buf,
@@ -296,12 +317,12 @@ pub enum DataRecordParsingError {
     FieldError(#[from_located(module = "")] ie::FieldParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, Arc<DecodingTemplate>, LocatedDataRecordParsingError<'a>>
     for DataRecord
 {
     fn from_wire(
         buf: Span<'a>,
-        field_specifiers: Rc<DecodingTemplate>,
+        field_specifiers: Arc<DecodingTemplate>,
     ) -> IResult<Span<'a>, Self, LocatedDataRecordParsingError<'a>> {
         let mut buf = buf;
         let (scope_fields_specs, field_specs) = field_specifiers.as_ref();
@@ -328,6 +349,7 @@ impl<'a> ReadablePduWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordPars
 pub enum TemplateRecordParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    LockError,
     InvalidTemplateId(u16),
     FieldSpecifierError(
         #[from_located(module = "crate::wire::deserializer")] FieldSpecifierParsingError,
@@ -359,8 +381,17 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingE
             buf = t;
         }
         {
-            let mut map: RefMut<'_, _> = templates_map.borrow_mut();
-            map.insert(template_id, Rc::new((vec![], fields.clone())));
+            match templates_map.write() {
+                Ok(mut map) => {
+                    map.insert(template_id, Arc::new((vec![], fields.clone())));
+                }
+                Err(_) => {
+                    return Err(nom::Err::Error(LocatedTemplateRecordParsingError::new(
+                        input,
+                        TemplateRecordParsingError::LockError,
+                    )));
+                }
+            }
         }
         Ok((buf, TemplateRecord::new(template_id, fields)))
     }

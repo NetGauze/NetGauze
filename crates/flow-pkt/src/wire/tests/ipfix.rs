@@ -23,7 +23,11 @@ use crate::{
 use chrono::{TimeZone, Timelike, Utc};
 use netgauze_iana::tcp::*;
 use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
-use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};
+use std::{
+    collections::HashMap,
+    net::Ipv4Addr,
+    sync::{Arc, RwLock},
+};
 
 #[test]
 fn test_ipfix_header() -> Result<(), IpfixPacketWritingError> {
@@ -113,16 +117,16 @@ fn test_ipfix_header() -> Result<(), IpfixPacketWritingError> {
         IpfixPacketParsingError::InvalidLength(0),
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    assert!(templates_map.borrow().contains_key(&307));
+    assert!(templates_map.read().unwrap().contains_key(&307));
 
-    test_parse_error_with_one_input::<IpfixPacket, Rc<_>, LocatedIpfixPacketParsingError<'_>>(
+    test_parse_error_with_one_input::<IpfixPacket, Arc<_>, LocatedIpfixPacketParsingError<'_>>(
         &bad_version_wire,
         templates_map.clone(),
         &bad_version,
     );
-    test_parse_error_with_one_input::<IpfixPacket, Rc<_>, LocatedIpfixPacketParsingError<'_>>(
+    test_parse_error_with_one_input::<IpfixPacket, Arc<_>, LocatedIpfixPacketParsingError<'_>>(
         &bad_length_wire,
         templates_map,
         &bad_length,
@@ -183,9 +187,9 @@ fn test_template_packet() -> Result<(), IpfixPacketWritingError> {
         )])],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    assert!(templates_map.borrow().contains_key(&307));
+    assert!(templates_map.read().unwrap().contains_key(&307));
 
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
@@ -233,8 +237,8 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
         FieldSpecifier::new(ie::IE::flowStartMilliseconds, 8).unwrap(),
         FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
     ];
-    let fields = Rc::new((vec![], f.clone()));
-    let templates_map = Rc::new(RefCell::new(HashMap::from([(307, fields)])));
+    let fields = Arc::new((vec![], f.clone()));
+    let templates_map = Arc::new(RwLock::new(HashMap::from([(307, fields)])));
     let good = IpfixPacket::new(
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
         3812,
@@ -325,7 +329,7 @@ fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
         )])],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
@@ -334,7 +338,7 @@ fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
 #[test]
 #[rustfmt::skip]
 fn test_complex_sequence() -> Result<(), IpfixPacketWritingError> {
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     let pkt1_wire = [
         0x00, 0x0a, 0x02, 0x24, 0x63, 0x4a, 0xe2, 0x9d, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x02, 0x00, 0x40, 0x04, 0x00, 0x00, 0x0e, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c, 0x00, 0x04,
@@ -510,7 +514,7 @@ fn test_example() -> Result<(), IpfixPacketWritingError> {
             )])],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     //let (_, pkt1) = IpfixPacket::from_wire(Span::new(&good), templates_map.clone()).unwrap();
     test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
 
@@ -578,7 +582,7 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(
         &good_template_wire,
         templates_map.clone(),
@@ -680,7 +684,7 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(
         &good_template_wire,
         templates_map.clone(),
@@ -801,7 +805,7 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(
         &good_template_wire,
         templates_map.clone(),
@@ -936,7 +940,7 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     test_parsed_completely_with_one_input(
         &good_template_wire,
         templates_map.clone(),

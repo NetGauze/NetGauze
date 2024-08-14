@@ -13,11 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::{ie::Field, DataSetId, FieldSpecifier};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
-
-use crate::{ie::Field, DataSetId, FieldSpecifier};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 pub const IPFIX_VERSION: u16 = 10;
 
@@ -31,7 +33,7 @@ pub(crate) const IPFIX_OPTIONS_TEMPLATE_SET_ID: u16 = 3;
 pub type DecodingTemplate = (Vec<FieldSpecifier>, Vec<FieldSpecifier>);
 
 /// Cache to store templates needed for decoding data packets
-pub type TemplatesMap = Rc<RefCell<HashMap<u16, Rc<DecodingTemplate>>>>;
+pub type TemplatesMap = Arc<RwLock<HashMap<u16, Arc<DecodingTemplate>>>>;
 
 /// IP Flow Information Export (IPFIX) v10 Packet.
 ///

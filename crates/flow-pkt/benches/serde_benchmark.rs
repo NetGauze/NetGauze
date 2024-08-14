@@ -174,7 +174,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mixed_span = Span::new(&IPFIX_PKT_MIXED);
     let data_span = Span::new(&IPFIX_PKT_DATA_PKT_ONLY);
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     c.bench_function("Deserialize IPFIX pkt with template only pkt", |b| {
         b.iter(|| test_parse(template_span, templates_map.clone()))
     });
@@ -189,7 +189,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     c.bench_function("Deserialize IPFIX with options template only pkt", |b| {
         b.iter(|| test_parse(options_template_span, templates_map.clone()))
     });
@@ -205,7 +205,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     c.bench_function("Deserialize IPFIX mixed with all set types", |b| {
         b.iter(|| test_parse(mixed_span, templates_map.clone()))
     });
@@ -221,7 +221,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     // Initialize the templates
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let templates_map = Arc::new(RwLock::new(HashMap::new()));
     IpfixPacket::from_wire(mixed_span, templates_map.clone()).unwrap();
     c.bench_function("Deserialize IPFIX mixed with data only", |b| {
         b.iter(|| test_parse(data_span, templates_map.clone()))
