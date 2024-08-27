@@ -21,7 +21,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 fuzz_target!(|data: &[u8]| {
     let mut buf = data;
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let mut templates_map = HashMap::new();
     while let Ok((retbuf, _msg)) = IpfixPacket::from_wire(Span::new(buf), templates_map.clone()) {
         buf = retbuf.fragment();
     }

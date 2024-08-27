@@ -1,8 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, io::Cursor, rc::Rc};
+use std::{collections::HashMap, io::Cursor};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use netgauze_flow_pkt::{ipfix::IpfixPacket, FieldSpecifier};
+use netgauze_flow_pkt::{ipfix, ipfix::IpfixPacket};
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};
 
 const IPFIX_PKT_TEMPLATE_RAW: &[u8] = &[
@@ -156,10 +156,7 @@ const IPFIX_PKT_DATA_PKT_ONLY: &[u8] = &[
     0x06, 0x02, 0x04, 0x00
 ];
 
-pub fn test_parse(
-    span: Span<'_>,
-    templates_map: Rc<RefCell<HashMap<u16, Rc<(Vec<FieldSpecifier>, Vec<FieldSpecifier>)>>>>,
-) {
+pub fn test_parse(span: Span<'_>, templates_map: &mut ipfix::TemplatesMap) {
     let x = IpfixPacket::from_wire(span, templates_map);
     x.unwrap();
 }
@@ -174,13 +171,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mixed_span = Span::new(&IPFIX_PKT_MIXED);
     let data_span = Span::new(&IPFIX_PKT_DATA_PKT_ONLY);
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let mut templates_map = HashMap::new();
     c.bench_function("Deserialize IPFIX pkt with template only pkt", |b| {
-        b.iter(|| test_parse(template_span, templates_map.clone()))
+        b.iter(|| test_parse(template_span, &mut templates_map))
     });
 
-    let (_, pkt) =
-        IpfixPacket::from_wire(template_span, Rc::new(RefCell::new(HashMap::new()))).unwrap();
+    let (_, pkt) = IpfixPacket::from_wire(template_span, &mut HashMap::new()).unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     c.bench_function("Serialize IPFIX pkt with template only pkt", |b| {
         b.iter(|| {
@@ -189,14 +185,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let mut templates_map = HashMap::new();
     c.bench_function("Deserialize IPFIX with options template only pkt", |b| {
-        b.iter(|| test_parse(options_template_span, templates_map.clone()))
+        b.iter(|| test_parse(options_template_span, &mut templates_map))
     });
 
-    let (_, pkt) =
-        IpfixPacket::from_wire(options_template_span, Rc::new(RefCell::new(HashMap::new())))
-            .unwrap();
+    let (_, pkt) = IpfixPacket::from_wire(options_template_span, &mut HashMap::new()).unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     c.bench_function("Serialize IPFIX with options template only pkt", |b| {
         b.iter(|| {
@@ -205,13 +199,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let mut templates_map = HashMap::new();
     c.bench_function("Deserialize IPFIX mixed with all set types", |b| {
-        b.iter(|| test_parse(mixed_span, templates_map.clone()))
+        b.iter(|| test_parse(mixed_span, &mut templates_map))
     });
 
-    let (_, pkt) =
-        IpfixPacket::from_wire(mixed_span, Rc::new(RefCell::new(HashMap::new()))).unwrap();
+    let (_, pkt) = IpfixPacket::from_wire(mixed_span, &mut HashMap::new()).unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     c.bench_function("Serialize IPFIX  IPFIX mixed with all set types", |b| {
         b.iter(|| {
@@ -221,13 +214,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     // Initialize the templates
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    IpfixPacket::from_wire(mixed_span, templates_map.clone()).unwrap();
+    let mut templates_map = HashMap::new();
+    IpfixPacket::from_wire(mixed_span, &mut templates_map).unwrap();
     c.bench_function("Deserialize IPFIX mixed with data only", |b| {
-        b.iter(|| test_parse(data_span, templates_map.clone()))
+        b.iter(|| test_parse(data_span, &mut templates_map))
     });
 
-    let (_, pkt) = IpfixPacket::from_wire(data_span, templates_map).unwrap();
+    let (_, pkt) = IpfixPacket::from_wire(data_span, &mut templates_map).unwrap();
     let mut buf: [u8; 1024] = [0; 1024];
     c.bench_function("Serialize IPFIX mixed with data only", |b| {
         b.iter(|| {

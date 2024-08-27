@@ -23,7 +23,7 @@ use crate::{
 use chrono::{TimeZone, Timelike, Utc};
 use netgauze_iana::tcp::*;
 use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
-use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};
+use std::{collections::HashMap, net::Ipv4Addr};
 
 #[test]
 fn test_ipfix_header() -> Result<(), IpfixPacketWritingError> {
@@ -113,20 +113,20 @@ fn test_ipfix_header() -> Result<(), IpfixPacketWritingError> {
         IpfixPacketParsingError::InvalidLength(0),
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    assert!(templates_map.borrow().contains_key(&307));
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    assert!(templates_map.contains_key(&307));
 
-    test_parse_error_with_one_input::<IpfixPacket, Rc<_>, LocatedIpfixPacketParsingError<'_>>(
-        &bad_version_wire,
-        templates_map.clone(),
-        &bad_version,
-    );
-    test_parse_error_with_one_input::<IpfixPacket, Rc<_>, LocatedIpfixPacketParsingError<'_>>(
-        &bad_length_wire,
-        templates_map,
-        &bad_length,
-    );
+    test_parse_error_with_one_input::<
+        IpfixPacket,
+        &mut TemplatesMap,
+        LocatedIpfixPacketParsingError<'_>,
+    >(&bad_version_wire, &mut templates_map, &bad_version);
+    test_parse_error_with_one_input::<
+        IpfixPacket,
+        &mut TemplatesMap,
+        LocatedIpfixPacketParsingError<'_>,
+    >(&bad_length_wire, &mut templates_map, &bad_length);
 
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
@@ -183,9 +183,9 @@ fn test_template_packet() -> Result<(), IpfixPacketWritingError> {
         )])],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    assert!(templates_map.borrow().contains_key(&307));
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    assert!(templates_map.contains_key(&307));
 
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
@@ -233,8 +233,8 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
         FieldSpecifier::new(ie::IE::flowStartMilliseconds, 8).unwrap(),
         FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
     ];
-    let fields = Rc::new((vec![], f.clone()));
-    let templates_map = Rc::new(RefCell::new(HashMap::from([(307, fields)])));
+    let fields = (vec![], f.clone());
+    let mut templates_map = HashMap::from([(307, fields)]);
     let good = IpfixPacket::new(
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
         3812,
@@ -291,8 +291,8 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
             )],
         }],
     );
-    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
-    test_write_with_one_input(&good, Some(templates_map), &good_wire)?;
+    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    test_write_with_one_input(&good, Some(&templates_map), &good_wire)?;
     Ok(())
 }
 
@@ -325,8 +325,8 @@ fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
         )])],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
 }
@@ -334,7 +334,7 @@ fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
 #[test]
 #[rustfmt::skip]
 fn test_complex_sequence() -> Result<(), IpfixPacketWritingError> {
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let mut templates_map = HashMap::new();
     let pkt1_wire = [
         0x00, 0x0a, 0x02, 0x24, 0x63, 0x4a, 0xe2, 0x9d, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x02, 0x00, 0x40, 0x04, 0x00, 0x00, 0x0e, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c, 0x00, 0x04,
@@ -462,8 +462,8 @@ fn test_complex_sequence() -> Result<(), IpfixPacketWritingError> {
         0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc3, 0xc8, 0x80, 0xe8,
         0x06, 0x02, 0x04, 0x00];
 
-    let (_, _pkt1) = IpfixPacket::from_wire(Span::new(&pkt1_wire), templates_map.clone()).unwrap();
-    let (_, _pkt2)  = IpfixPacket::from_wire(Span::new(&pkt2_wire), templates_map).unwrap();
+    let (_, _pkt1) = IpfixPacket::from_wire(Span::new(&pkt1_wire), &mut templates_map).unwrap();
+    let (_, _pkt2)  = IpfixPacket::from_wire(Span::new(&pkt2_wire), &mut templates_map).unwrap();
     // TODO: test writing complex packets
     Ok(())
 }
@@ -510,9 +510,9 @@ fn test_example() -> Result<(), IpfixPacketWritingError> {
             )])],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    //let (_, pkt1) = IpfixPacket::from_wire(Span::new(&good), templates_map.clone()).unwrap();
-    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
+    let mut templates_map = HashMap::new();
+    //let (_, pkt1) = IpfixPacket::from_wire(Span::new(&good), &mut templates_map).unwrap();
+    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
 
     //test_write_with_one_input(&good, None, &good_wire)?;
 
@@ -578,20 +578,12 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(
-        &good_template_wire,
-        templates_map.clone(),
-        &good_template,
-    );
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
 
-    test_parsed_completely_with_one_input(&good_data_wire, templates_map.clone(), &good_data);
-    test_write_with_one_input(
-        &good_template,
-        Some(templates_map.clone()),
-        &good_template_wire,
-    )?;
-    test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+    test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
+    test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
     Ok(())
 }
 
@@ -680,20 +672,12 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(
-        &good_template_wire,
-        templates_map.clone(),
-        &good_template,
-    );
-    test_parsed_completely_with_one_input(&good_data_wire, templates_map.clone(), &good_data);
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
+    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
 
-    test_write_with_one_input(
-        &good_template,
-        Some(templates_map.clone()),
-        &good_template_wire,
-    )?;
-    test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+    test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
+    test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
 
     Ok(())
 }
@@ -801,20 +785,12 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(
-        &good_template_wire,
-        templates_map.clone(),
-        &good_template,
-    );
-    test_parsed_completely_with_one_input(&good_data_wire, templates_map.clone(), &good_data);
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
+    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
 
-    test_write_with_one_input(
-        &good_template,
-        Some(templates_map.clone()),
-        &good_template_wire,
-    )?;
-    test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+    test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
+    test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
 
     Ok(())
 }
@@ -936,20 +912,12 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
         }],
     );
 
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(
-        &good_template_wire,
-        templates_map.clone(),
-        &good_template,
-    );
-    test_parsed_completely_with_one_input(&good_data_wire, templates_map.clone(), &good_data);
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
+    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
 
-    test_write_with_one_input(
-        &good_template,
-        Some(templates_map.clone()),
-        &good_template_wire,
-    )?;
-    test_write_with_one_input(&good_data, Some(templates_map.clone()), &good_data_wire)?;
+    test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
+    test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
 
     Ok(())
 }
