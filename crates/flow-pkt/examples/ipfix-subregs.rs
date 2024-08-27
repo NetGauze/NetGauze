@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, io::Cursor, net::Ipv4Addr, rc::Rc};
+use std::{collections::HashMap, io::Cursor, net::Ipv4Addr};
 
 use chrono::{TimeZone, Utc};
 
@@ -7,7 +7,7 @@ use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInpu
 
 fn main() {
     // Cache to share the templates for decoding data packets
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
+    let mut templates_map = HashMap::new();
 
     // IPFIX template packet
     let ipfix_template = IpfixPacket::new(
@@ -70,7 +70,7 @@ fn main() {
     // Deserialize the message from binary format (this will also add the Template
     // to templates_map, otherwise the packet will be generated with all the
     // default lengths)
-    let (_, msg_back) = IpfixPacket::from_wire(Span::new(&buf), Rc::clone(&templates_map)).unwrap();
+    let (_, msg_back) = IpfixPacket::from_wire(Span::new(&buf), &mut templates_map).unwrap();
     assert_eq!(ipfix_template, msg_back);
 
     // IPFIX data packet
@@ -141,7 +141,7 @@ fn main() {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
     ipfix_data
-        .write(&mut cursor, Some(Rc::clone(&templates_map)))
+        .write(&mut cursor, Some(&mut templates_map))
         .unwrap();
     assert_eq!(
         buf,
@@ -155,6 +155,6 @@ fn main() {
         ]
     );
     // Deserialize the message from binary format
-    let (_, msg_back) = IpfixPacket::from_wire(Span::new(&buf), Rc::clone(&templates_map)).unwrap();
+    let (_, msg_back) = IpfixPacket::from_wire(Span::new(&buf), &mut templates_map).unwrap();
     assert_eq!(ipfix_data, msg_back);
 }

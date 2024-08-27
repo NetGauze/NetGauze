@@ -21,7 +21,7 @@ pub mod pcap_tests;
 
 use chrono::{TimeZone, Timelike, Utc};
 use netgauze_parse_utils::{test_helpers::*, Span};
-use std::{cell::RefCell, collections::HashMap, net::Ipv4Addr, rc::Rc};
+use std::{collections::HashMap, net::Ipv4Addr};
 
 use crate::{
     ie,
@@ -54,13 +54,13 @@ fn test_template_record() -> Result<(), TemplateRecordWritingError> {
         Span::new(&bad_template_id_wire),
         TemplateRecordParsingError::InvalidTemplateId(0),
     );
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(&good_wire, templates_map.clone(), &good);
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
     test_parse_error_with_one_input::<
         TemplateRecord,
-        Rc<RefCell<HashMap<u16, Rc<(Vec<FieldSpecifier>, Vec<FieldSpecifier>)>>>>,
+        &mut TemplatesMap,
         LocatedTemplateRecordParsingError<'_>,
-    >(&bad_template_id_wire, templates_map, &bad_template_id);
+    >(&bad_template_id_wire, &mut templates_map, &bad_template_id);
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -280,19 +280,19 @@ fn test_data_record_value() -> Result<(), DataRecordWritingError> {
         ],
     );
 
-    let fields: Rc<DecodingTemplate> = Rc::new((
+    let fields: DecodingTemplate = (
         vec![],
         vec![
             FieldSpecifier::new(ie::IE::sourceMacAddress, 6).unwrap(),
             FieldSpecifier::new(ie::IE::destinationMacAddress, 6).unwrap(),
         ],
-    ));
+    );
     test_parsed_completely_with_one_input::<
         DataRecord,
-        Rc<DecodingTemplate>,
+        &DecodingTemplate,
         LocatedDataRecordParsingError<'_>,
-    >(&value_wire, fields.clone(), &flow);
-    test_write_with_one_input(&flow, Some(fields), &value_wire)?;
+    >(&value_wire, &fields, &flow);
+    test_write_with_one_input(&flow, Some(&fields), &value_wire)?;
     Ok(())
 }
 
@@ -336,8 +336,8 @@ fn test_set_template() -> Result<(), SetWritingError> {
             FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
         ],
     )]);
-    let templates_map = Rc::new(RefCell::new(HashMap::new()));
-    test_parsed_completely_with_one_input(&good_wire, templates_map, &good);
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
     test_write_with_one_input(&good, None, &good_wire)?;
     Ok(())
 }

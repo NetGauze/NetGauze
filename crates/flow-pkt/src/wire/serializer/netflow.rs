@@ -24,7 +24,7 @@ use crate::{
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput, WritablePduWithTwoInputs};
 use netgauze_serde_macros::WritingError;
-use std::{io::Write, rc::Rc};
+use std::io::Write;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum NetFlowV9WritingError {
@@ -35,25 +35,25 @@ pub enum NetFlowV9WritingError {
 /// [RFC 3954](https://www.rfc-editor.org/rfc/rfc3954) defines padding to 4-bytes start as
 /// SHOULD (optional). The second option is a boolean to indicate if padding
 /// should be included in the output.
-impl WritablePduWithTwoInputs<Option<TemplatesMap>, bool, NetFlowV9WritingError>
+impl WritablePduWithTwoInputs<Option<&TemplatesMap>, bool, NetFlowV9WritingError>
     for NetFlowV9Packet
 {
     /// 2-octets version, 2-octets count, 4-octets * 4 for meta data
     const BASE_LENGTH: usize = NETFLOW_V9_HEADER_LENGTH as usize;
 
-    fn len(&self, templates_map: Option<TemplatesMap>, align_to_4_bytes: bool) -> usize {
+    fn len(&self, templates_map: Option<&TemplatesMap>, align_to_4_bytes: bool) -> usize {
         <Self as WritablePduWithTwoInputs<_, _, _>>::BASE_LENGTH
             + self
                 .sets()
                 .iter()
-                .map(|x| x.len(templates_map.clone(), align_to_4_bytes))
+                .map(|x| x.len(templates_map, align_to_4_bytes))
                 .sum::<usize>()
     }
 
     fn write<T: Write>(
         &self,
         writer: &mut T,
-        templates_map: Option<TemplatesMap>,
+        templates_map: Option<&TemplatesMap>,
         align_to_4_bytes: bool,
     ) -> Result<(), NetFlowV9WritingError> {
         let count = self
@@ -72,23 +72,23 @@ impl WritablePduWithTwoInputs<Option<TemplatesMap>, bool, NetFlowV9WritingError>
         writer.write_u32::<NetworkEndian>(self.sequence_number())?;
         writer.write_u32::<NetworkEndian>(self.source_id())?;
         for set in self.sets() {
-            set.write(writer, templates_map.clone(), align_to_4_bytes)?;
+            set.write(writer, templates_map, align_to_4_bytes)?;
         }
         Ok(())
     }
 }
 
-impl WritablePduWithOneInput<Option<TemplatesMap>, NetFlowV9WritingError> for NetFlowV9Packet {
+impl WritablePduWithOneInput<Option<&TemplatesMap>, NetFlowV9WritingError> for NetFlowV9Packet {
     const BASE_LENGTH: usize = 0;
 
-    fn len(&self, templates_map: Option<TemplatesMap>) -> usize {
+    fn len(&self, templates_map: Option<&TemplatesMap>) -> usize {
         <Self as WritablePduWithTwoInputs<_, _, _>>::len(self, templates_map, false)
     }
 
     fn write<T: Write>(
         &self,
         writer: &mut T,
-        templates_map: Option<TemplatesMap>,
+        templates_map: Option<&TemplatesMap>,
     ) -> Result<(), NetFlowV9WritingError> {
         <Self as WritablePduWithTwoInputs<_, _, _>>::write(self, writer, templates_map, false)
     }
@@ -105,7 +105,7 @@ pub enum SetWritingError {
 /// Calculate padding such that next set starts at a 4-byte aligned boundary
 #[inline]
 fn calculate_set_size_with_padding(
-    templates_map: Option<TemplatesMap>,
+    templates_map: Option<&TemplatesMap>,
     align_to_4_bytes: bool,
     set: &Set,
 ) -> (usize, usize) {
@@ -114,11 +114,10 @@ fn calculate_set_size_with_padding(
             Set::Template(records) => records.iter().map(|x| x.len()).sum::<usize>(),
             Set::OptionsTemplate(records) => records.iter().map(|x| x.len()).sum::<usize>(),
             Set::Data { id: _, records } => {
-                let decoding_template =
-                    templates_map.and_then(|x| x.as_ref().borrow().get(&set.id()).cloned());
+                let decoding_template = templates_map.and_then(|x| x.get(&set.id()));
                 records
                     .iter()
-                    .map(|x| x.len(decoding_template.clone()))
+                    .map(|x| x.len(decoding_template))
                     .sum::<usize>()
             }
         };
@@ -129,11 +128,11 @@ fn calculate_set_size_with_padding(
     }
 }
 
-impl WritablePduWithTwoInputs<Option<TemplatesMap>, bool, SetWritingError> for Set {
+impl WritablePduWithTwoInputs<Option<&TemplatesMap>, bool, SetWritingError> for Set {
     /// 2-octets set id + 2-octet set length
     const BASE_LENGTH: usize = 4;
 
-    fn len(&self, template_map: Option<TemplatesMap>, align_to_4_bytes: bool) -> usize {
+    fn len(&self, template_map: Option<&TemplatesMap>, align_to_4_bytes: bool) -> usize {
         let (length, padding) =
             calculate_set_size_with_padding(template_map, align_to_4_bytes, self);
         length + padding
@@ -142,11 +141,11 @@ impl WritablePduWithTwoInputs<Option<TemplatesMap>, bool, SetWritingError> for S
     fn write<T: Write>(
         &self,
         writer: &mut T,
-        templates_map: Option<TemplatesMap>,
+        templates_map: Option<&TemplatesMap>,
         align_to_4_bytes: bool,
     ) -> Result<(), SetWritingError> {
         let (length, padding) =
-            calculate_set_size_with_padding(templates_map.clone(), align_to_4_bytes, self);
+            calculate_set_size_with_padding(templates_map, align_to_4_bytes, self);
         let length = (length + padding) as u16;
         match self {
             Self::Template(records) => {
@@ -166,10 +165,9 @@ impl WritablePduWithTwoInputs<Option<TemplatesMap>, bool, SetWritingError> for S
             Self::Data { id, records } => {
                 writer.write_u16::<NetworkEndian>(id.id())?;
                 writer.write_u16::<NetworkEndian>(length)?;
-                let decoding_template =
-                    templates_map.and_then(|x| x.as_ref().borrow().get(&self.id()).cloned());
+                let decoding_template = templates_map.and_then(|x| x.get(&self.id()));
                 for record in records {
-                    record.write(writer, decoding_template.clone())?;
+                    record.write(writer, decoding_template)?;
                 }
             }
         }
@@ -265,14 +263,14 @@ pub enum DataRecordWritingError {
     FieldError(#[from] FieldWritingError),
 }
 
-impl WritablePduWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingError> for DataRecord {
+impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> for DataRecord {
     const BASE_LENGTH: usize = 0;
 
-    fn len(&self, decoding_template: Option<Rc<DecodingTemplate>>) -> usize {
+    fn len(&self, decoding_template: Option<&DecodingTemplate>) -> usize {
         let (scope_lens, field_lens) = match decoding_template {
             None => (None, None),
             Some(template) => {
-                let (scope_fields_spec, fields_spec) = template.as_ref();
+                let (scope_fields_spec, fields_spec) = template;
                 let scope_lens = scope_fields_spec.iter().map(|x| x.length()).sum::<u16>();
                 let fields_lens = fields_spec.iter().map(|x| x.length()).sum::<u16>();
                 (Some(scope_lens), Some(fields_lens))
@@ -296,12 +294,12 @@ impl WritablePduWithOneInput<Option<Rc<DecodingTemplate>>, DataRecordWritingErro
     fn write<T: Write>(
         &self,
         writer: &mut T,
-        decoding_template: Option<Rc<DecodingTemplate>>,
+        decoding_template: Option<&DecodingTemplate>,
     ) -> Result<(), DataRecordWritingError> {
         let written = match decoding_template {
             None => None,
             Some(template) => {
-                let (scope_fields_spec, fields_spec) = template.as_ref();
+                let (scope_fields_spec, fields_spec) = template;
                 for (index, record) in self.scope_fields().iter().enumerate() {
                     let field_length = scope_fields_spec.get(index).map(|x| x.length());
                     record.write(writer, field_length)?;

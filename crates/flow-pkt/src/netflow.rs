@@ -22,7 +22,7 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::HashMap, ops::Range, rc::Rc};
+use std::{collections::HashMap, ops::Range};
 
 pub const NETFLOW_V9_VERSION: u16 = 9;
 
@@ -36,7 +36,7 @@ pub(crate) const NETFLOW_OPTIONS_TEMPLATE_SET_ID: u16 = 1;
 pub type DecodingTemplate = (Vec<ScopeFieldSpecifier>, Vec<FieldSpecifier>);
 
 /// Cache to store templates needed for decoding data packets
-pub type TemplatesMap = Rc<RefCell<HashMap<u16, Rc<DecodingTemplate>>>>;
+pub type TemplatesMap = HashMap<u16, DecodingTemplate>;
 
 ///
 /// ```text

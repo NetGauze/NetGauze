@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{cell::RefMut, rc::Rc};
-
 use chrono::{LocalResult, TimeZone, Utc};
 use nom::{
     error::ErrorKind,
@@ -30,8 +28,7 @@ use crate::{
 };
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    parse_till_empty_into_with_one_input_located, ErrorKindSerdeDeref, ReadablePduWithOneInput,
-    Span,
+    ErrorKindSerdeDeref, ReadablePduWithOneInput, Span,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -49,12 +46,12 @@ pub enum IpfixPacketParsingError {
     SetParsingError(#[from_located(module = "self")] SetParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedIpfixPacketParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedIpfixPacketParsingError<'a>>
     for IpfixPacket
 {
     fn from_wire(
         buf: Span<'a>,
-        templates_map: TemplatesMap,
+        templates_map: &mut TemplatesMap,
     ) -> IResult<Span<'a>, Self, LocatedIpfixPacketParsingError<'a>> {
         let input = buf;
         let (buf, version) = be_u16(buf)?;
@@ -84,8 +81,20 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedIpfixPacketParsingErro
             }
         };
         let (buf, sequence_number) = be_u32(buf)?;
-        let (buf, observation_domain_id) = be_u32(buf)?;
-        let (_, payload) = parse_till_empty_into_with_one_input_located(buf, templates_map)?;
+        let (mut buf, observation_domain_id) = be_u32(buf)?;
+        let mut payload = Vec::new();
+        while !buf.is_empty() {
+            let (tmp, element) = match Set::from_wire(buf, templates_map) {
+                Ok((buf, value)) => Ok((buf, value)),
+                Err(err) => match err {
+                    nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                    nom::Err::Error(error) => Err(nom::Err::Error(error.into())),
+                    nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into())),
+                },
+            }?;
+            payload.push(element);
+            buf = tmp;
+        }
         Ok((
             reminder,
             IpfixPacket::new(export_time, sequence_number, observation_domain_id, payload),
@@ -106,10 +115,10 @@ pub enum SetParsingError {
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> for Set {
+impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'a>> for Set {
     fn from_wire(
         buf: Span<'a>,
-        templates_map: TemplatesMap,
+        templates_map: &mut TemplatesMap,
     ) -> IResult<Span<'a>, Self, LocatedSetParsingError<'a>> {
         let input = buf;
         let (buf, id) = nom::combinator::map_res(be_u16, |id| {
@@ -132,8 +141,19 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
         let (reminder, mut buf) = nom::bytes::complete::take(length - 4)(buf)?;
         let set = match id {
             IPFIX_TEMPLATE_SET_ID => {
-                let (_buf, templates) =
-                    parse_till_empty_into_with_one_input_located(buf, templates_map)?;
+                let mut templates = Vec::new();
+                while !buf.is_empty() {
+                    let (tmp, element) = match TemplateRecord::from_wire(buf, templates_map) {
+                        Ok((buf, value)) => Ok((buf, value)),
+                        Err(err) => match err {
+                            nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                            nom::Err::Error(error) => Err(nom::Err::Error(error.into())),
+                            nom::Err::Failure(failure) => Err(nom::Err::Failure(failure.into())),
+                        },
+                    }?;
+                    templates.push(element);
+                    buf = tmp;
+                }
                 Set::Template(templates)
             }
             IPFIX_OPTIONS_TEMPLATE_SET_ID => {
@@ -143,8 +163,19 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                 // Template set. Like Wireshark implementation, we assume anything
                 // less than 4-octets (min field size) is padding
                 while buf.len() > 3 {
+                    // let (t, option_template) =
+                    //     parse_into_located_one_input(buf, templates_map)?;
                     let (t, option_template) =
-                        parse_into_located_one_input(buf, Rc::clone(&templates_map))?;
+                        match OptionsTemplateRecord::from_wire(buf, templates_map) {
+                            Ok((buf, value)) => Ok((buf, value)),
+                            Err(err) => match err {
+                                nom::Err::Incomplete(needed) => Err(nom::Err::Incomplete(needed)),
+                                nom::Err::Error(error) => Err(nom::Err::Error(error.into())),
+                                nom::Err::Failure(failure) => {
+                                    Err(nom::Err::Failure(failure.into()))
+                                }
+                            },
+                        }?;
                     buf = t;
                     option_templates.push(option_template);
                 }
@@ -155,8 +186,7 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
             // We don't need to check for valid Set ID again, since we already checked
             id => {
                 // Temp variable to keep the borrowed value from RC
-                let binding = templates_map.as_ref().borrow();
-                let template = if let Some(fields) = binding.get(&id) {
+                let template = if let Some(fields) = templates_map.get(&id) {
                     fields
                 } else {
                     return Err(nom::Err::Error(LocatedSetParsingError::new(
@@ -165,7 +195,7 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                     )));
                 };
 
-                let (scope_field_specs, field_specs) = template.as_ref();
+                let (scope_field_specs, field_specs) = template;
                 // since we could have vlen fields, we can only state a min_record_len here
                 let min_record_length = scope_field_specs
                     .iter()
@@ -191,7 +221,7 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedSetParsingError<'a>> f
                 let mut records = Vec::new();
                 while buf.len() >= min_record_length {
                     let (t, record): (Span<'_>, DataRecord) =
-                        parse_into_located_one_input(buf, Rc::clone(template))?;
+                        parse_into_located_one_input(buf, template)?;
                     buf = t;
                     records.push(record);
                 }
@@ -237,12 +267,13 @@ pub enum OptionsTemplateRecordParsingError {
     FieldError(#[from_located(module = "crate::wire::deserializer")] FieldSpecifierParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordParsingError<'a>>
+impl<'a>
+    ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedOptionsTemplateRecordParsingError<'a>>
     for OptionsTemplateRecord
 {
     fn from_wire(
         buf: Span<'a>,
-        templates_map: TemplatesMap,
+        templates_map: &mut TemplatesMap,
     ) -> IResult<Span<'a>, Self, LocatedOptionsTemplateRecordParsingError<'a>> {
         let input = buf;
         let (buf, template_id) = be_u16(buf)?;
@@ -280,10 +311,7 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedOptionsTemplateRecordP
             fields.push(field);
             buf = t;
         }
-        {
-            let mut map: RefMut<'_, _> = templates_map.borrow_mut();
-            map.insert(template_id, Rc::new((scope_fields.clone(), fields.clone())));
-        }
+        templates_map.insert(template_id, (scope_fields.clone(), fields.clone()));
         Ok((
             buf,
             OptionsTemplateRecord::new(template_id, scope_fields, fields),
@@ -296,15 +324,15 @@ pub enum DataRecordParsingError {
     FieldError(#[from_located(module = "")] ie::FieldParsingError),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, Rc<DecodingTemplate>, LocatedDataRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, &DecodingTemplate, LocatedDataRecordParsingError<'a>>
     for DataRecord
 {
     fn from_wire(
         buf: Span<'a>,
-        field_specifiers: Rc<DecodingTemplate>,
+        field_specifiers: &DecodingTemplate,
     ) -> IResult<Span<'a>, Self, LocatedDataRecordParsingError<'a>> {
         let mut buf = buf;
-        let (scope_fields_specs, field_specs) = field_specifiers.as_ref();
+        let (scope_fields_specs, field_specs) = field_specifiers;
 
         let mut scope_fields = Vec::<crate::ie::Field>::with_capacity(scope_fields_specs.len());
         for spec in scope_fields_specs {
@@ -334,12 +362,12 @@ pub enum TemplateRecordParsingError {
     ),
 }
 
-impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingError<'a>>
+impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedTemplateRecordParsingError<'a>>
     for TemplateRecord
 {
     fn from_wire(
         buf: Span<'a>,
-        templates_map: TemplatesMap,
+        templates_map: &mut TemplatesMap,
     ) -> IResult<Span<'a>, Self, LocatedTemplateRecordParsingError<'a>> {
         let input = buf;
         let (buf, template_id) = be_u16(buf)?;
@@ -358,10 +386,7 @@ impl<'a> ReadablePduWithOneInput<'a, TemplatesMap, LocatedTemplateRecordParsingE
             fields.push(field);
             buf = t;
         }
-        {
-            let mut map: RefMut<'_, _> = templates_map.borrow_mut();
-            map.insert(template_id, Rc::new((vec![], fields.clone())));
-        }
+        templates_map.insert(template_id, (vec![], fields.clone()));
         Ok((buf, TemplateRecord::new(template_id, fields)))
     }
 }

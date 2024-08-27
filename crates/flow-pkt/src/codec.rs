@@ -71,9 +71,9 @@ impl Encoder<ipfix::IpfixPacket> for FlowInfoCodec {
     type Error = IpfixPacketWritingError;
 
     fn encode(&mut self, pkt: ipfix::IpfixPacket, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        dst.reserve(4 + pkt.len(Some(self.ipfix_templates_map.clone())));
+        dst.reserve(4 + pkt.len(Some(&self.ipfix_templates_map)));
         let mut writer = dst.writer();
-        pkt.write(&mut writer, Some(self.ipfix_templates_map.clone()))?;
+        pkt.write(&mut writer, Some(&self.ipfix_templates_map))?;
         Ok(())
     }
 }
@@ -86,9 +86,9 @@ impl Encoder<netflow::NetFlowV9Packet> for FlowInfoCodec {
         pkt: netflow::NetFlowV9Packet,
         dst: &mut BytesMut,
     ) -> Result<(), Self::Error> {
-        dst.reserve(4 + pkt.len(Some(self.netflow_v9_templates_map.clone())));
+        dst.reserve(4 + pkt.len(Some(&self.netflow_v9_templates_map)));
         let mut writer = dst.writer();
-        pkt.write(&mut writer, Some(self.netflow_v9_templates_map.clone()))?;
+        pkt.write(&mut writer, Some(&self.netflow_v9_templates_map))?;
         Ok(())
     }
 }
@@ -109,7 +109,7 @@ impl Encoder<FlowInfo> for FlowInfoCodec {
 fn parse_ipfix(
     buf: &mut BytesMut,
     length: usize,
-    templates_map: ipfix::TemplatesMap,
+    templates_map: &mut ipfix::TemplatesMap,
 ) -> Result<Option<FlowInfo>, FlowInfoCodecDecoderError> {
     let msg = match ipfix::IpfixPacket::from_wire(Span::new(buf), templates_map) {
         Ok((span, msg)) => {
@@ -141,7 +141,7 @@ fn parse_ipfix(
 #[instrument(skip_all)]
 fn parse_netflow_v9(
     buf: &mut BytesMut,
-    templates_map: netflow::TemplatesMap,
+    templates_map: &mut netflow::TemplatesMap,
 ) -> Result<Option<FlowInfo>, FlowInfoCodecDecoderError> {
     let msg = match netflow::NetFlowV9Packet::from_wire(Span::new(buf), templates_map) {
         Ok((span, msg)) => {
@@ -193,9 +193,9 @@ impl Decoder for FlowInfoCodec {
             } else {
                 self.in_message = false;
                 if version == ipfix::IPFIX_VERSION {
-                    parse_ipfix(buf, length, self.ipfix_templates_map.clone())
+                    parse_ipfix(buf, length, &mut self.ipfix_templates_map)
                 } else if version == netflow::NETFLOW_V9_VERSION {
-                    parse_netflow_v9(buf, self.netflow_v9_templates_map.clone())
+                    parse_netflow_v9(buf, &mut self.netflow_v9_templates_map)
                 } else {
                     let err = FlowInfoCodecDecoderError::UnsupportedVersion(version);
                     buf.clear();
