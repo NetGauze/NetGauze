@@ -107,7 +107,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@clippy
-      - run: cargo clippy --tests -- -Dclippy::all
+      - run: cargo clippy --tests -- -Dclippy::all -A clippy::too-long-first-doc-paragraph
 
   coverage:
     # use llvm-cov to build and collect coverage and outputs in a format that is compatible with
