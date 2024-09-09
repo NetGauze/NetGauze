@@ -21,6 +21,7 @@ use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use nom::Needed;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing::instrument;
 
@@ -65,6 +66,36 @@ pub struct FlowInfoCodec {
     in_message: bool,
     netflow_v9_templates_map: netflow::TemplatesMap,
     ipfix_templates_map: ipfix::TemplatesMap,
+}
+
+impl FlowInfoCodec {
+    pub fn new() -> Self {
+        Self {
+            in_message: false,
+            netflow_v9_templates_map: HashMap::new(),
+            ipfix_templates_map: HashMap::new(),
+        }
+    }
+
+    /// Get immutable reference to the Netflow V9 templates map
+    pub const fn netflow_templates_map(&self) -> &netflow::TemplatesMap {
+        &self.netflow_v9_templates_map
+    }
+
+    /// Get mutable reference to the Netflow V9 templates map
+    pub fn netflow_templates_map_mut(&mut self) -> &mut netflow::TemplatesMap {
+        &mut self.netflow_v9_templates_map
+    }
+
+    /// Get immutable reference to the IPFIX V10 templates map
+    pub const fn ipfix_templates_map(&self) -> &ipfix::TemplatesMap {
+        &self.ipfix_templates_map
+    }
+
+    /// Get mutable reference to the IPFIX V10 templates map
+    pub fn ipfix_templates_map_mut(&mut self) -> &mut ipfix::TemplatesMap {
+        &mut self.ipfix_templates_map
+    }
 }
 
 impl Encoder<ipfix::IpfixPacket> for FlowInfoCodec {
