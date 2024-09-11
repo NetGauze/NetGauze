@@ -287,7 +287,16 @@ pub(crate) fn generate_ie_status() -> String {
 
 /// Use at the beginning of `ie_generated` for defining custom types
 pub(crate) fn generate_common_types() -> String {
-    "pub type MacAddress = [u8; 6];\n\n".to_string()
+    let mut ret = String::new();
+    ret.push_str("pub type MacAddress = [u8; 6];\n\n");
+    ret.push_str(
+        r##"/// A trait to inidcate that we can get the [IE] for a given element
+    pub trait HasIE {
+        fn ie(&self) -> IE;
+    }
+    "##,
+    );
+    ret
 }
 
 /// `TryFrom` block for  InformationElementId
@@ -471,7 +480,7 @@ fn generate_ie_field_enum_for_ie(
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str(generate_derive(false, false, false).as_str());
     ret.push_str("pub enum Field {\n");
-    ret.push_str("    Unknown(Vec<u8>),\n");
+    ret.push_str("    Unknown{pen: u32, id: u16, value: Vec<u8>},\n");
     for (name, pkg, _) in vendors {
         ret.push_str(format!("    {name}({pkg}::Field),\n").as_str());
     }
@@ -484,6 +493,23 @@ fn generate_ie_field_enum_for_ie(
             ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
         }
     }
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl HasIE for Field {\n");
+    ret.push_str("    /// Get the [IE] element for a given field\n");
+    ret.push_str("    fn ie(&self) -> IE {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str(
+        "            Self::Unknown{pen, id, value: _value} => IE::Unknown{pen: *pen, id: *id},\n",
+    );
+    for (name, _pkg, _) in vendors {
+        ret.push_str(format!("            Self::{name}(x) => IE::{name}(x.ie()),\n").as_str());
+    }
+    for ie in iana_ies {
+        ret.push_str(format!("            Self::{}(_) => IE::{},\n", ie.name, ie.name).as_str());
+    }
+    ret.push_str("        }\n\n");
+    ret.push_str("    }\n\n");
     ret.push_str("}\n\n");
     ret
 }
@@ -1302,7 +1328,18 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
     }
-    ret.push_str("}\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl Field {\n");
+    ret.push_str("    /// Get the [IE] element for a given field\n");
+    ret.push_str("    pub const fn ie(&self) -> IE {\n");
+    ret.push_str("        match self {\n");
+    for ie in ies {
+        ret.push_str(format!("            Self::{}(_) => IE::{},\n", ie.name, ie.name).as_str());
+    }
+    ret.push_str("        }\n\n");
+    ret.push_str("    }\n\n");
+    ret.push_str("}\n\n");
     ret
 }
 
@@ -1334,7 +1371,10 @@ fn get_rust_type(data_type: &str) -> String {
     rust_type.to_string()
 }
 
-pub(crate) fn generate_ie_values(ies: &Vec<InformationElement>) -> String {
+pub(crate) fn generate_ie_values(
+    ies: &Vec<InformationElement>,
+    vendor_name: Option<String>,
+) -> String {
     let mut ret = String::new();
     for ie in ies {
         let rust_type = get_rust_type(&ie.data_type);
@@ -1357,12 +1397,48 @@ pub(crate) fn generate_ie_values(ies: &Vec<InformationElement>) -> String {
             ret.push_str(
                 generate_subregistry_enum_and_impl(&ie.name, &rust_type, ie_subregistry).as_str(),
             );
+            match &vendor_name {
+                None => {
+                    ret.push_str(format!("impl HasIE for {} {{\n", ie.name).as_str());
+                    ret.push_str("    fn ie(&self) -> IE {\n");
+                    ret.push_str(format!("        IE::{}\n", ie.name).as_str());
+                    ret.push_str("   }\n");
+                    ret.push_str("}\n\n");
+                }
+                Some(name) => {
+                    ret.push_str(format!("impl crate::HasIE for {} {{\n", ie.name).as_str());
+                    ret.push_str("    fn ie(&self) -> crate::IE {\n");
+                    ret.push_str(format!("        crate::IE::{name}(IE::{})\n", ie.name).as_str());
+                    ret.push_str("   }\n");
+                    ret.push_str("}\n\n");
+                }
+            }
         } else if ie.name == "tcpControlBits" {
-            continue;
+            ret.push_str("impl HasIE for netgauze_iana::tcp::TCPHeaderFlags {\n");
+            ret.push_str("    fn ie(&self) -> IE {\n");
+            ret.push_str(format!("        IE::{}\n", ie.name).as_str());
+            ret.push_str("   }\n");
+            ret.push_str("}\n\n");
         } else {
             ret.push_str("#[allow(non_camel_case_types)]\n");
             ret.push_str(gen_derive.as_str());
             ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
+            match &vendor_name {
+                None => {
+                    ret.push_str(format!("impl HasIE for {} {{\n", ie.name).as_str());
+                    ret.push_str("    fn ie(&self) -> IE {\n");
+                    ret.push_str(format!("        IE::{}\n", ie.name).as_str());
+                    ret.push_str("   }\n");
+                    ret.push_str("}\n\n");
+                }
+                Some(name) => {
+                    ret.push_str(format!("impl crate::HasIE for {} {{\n", ie.name).as_str());
+                    ret.push_str("    fn ie(&self) -> crate::IE {\n");
+                    ret.push_str(format!("        crate::IE::{name}(IE::{})\n", ie.name).as_str());
+                    ret.push_str("   }\n");
+                    ret.push_str("}\n\n");
+                }
+            }
         }
 
         // TODO: check if value converters are needed
@@ -1857,7 +1933,7 @@ pub(crate) fn generate_ie_ser_main(
     ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
     ret.push_str("    fn len(&self, length: Option<u16>) -> usize {\n");
     ret.push_str("        match self {\n");
-    ret.push_str("            Self::Unknown(value) => value.len(),\n");
+    ret.push_str("            Self::Unknown{pen: _pen, id: _id, value} => value.len(),\n");
     for (name, _, _) in vendor_prefixes {
         ret.push_str(format!("            Self::{name}(value) => value.len(length),\n").as_str());
     }
@@ -1875,7 +1951,9 @@ pub(crate) fn generate_ie_ser_main(
     ret.push_str("     }\n\n");
     ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ty_name}WritingError> {{\n").as_str());
     ret.push_str("        match self {\n");
-    ret.push_str("            Self::Unknown(value) => writer.write_all(value)?,\n");
+    ret.push_str(
+        "            Self::Unknown{pen: _pen, id: _id, value} => writer.write_all(value)?,\n",
+    );
     for (name, _pkg, _) in vendor_prefixes {
         ret.push_str(
             format!("            Self::{name}(value) => value.write(writer, length)?,\n").as_str(),

@@ -339,7 +339,7 @@ fn generate_vendor_ie(
     output.push_str(ie_generated.as_str());
     output.push_str("\n\n");
 
-    output.push_str(generate_ie_values(&ie_parsed).as_str());
+    output.push_str(generate_ie_values(&ie_parsed, Some(config.name().clone())).as_str());
     output.push_str(generate_fields_enum(&ie_parsed).as_str());
 
     let dest_path = Path::new(&out_dir).join(format!(
@@ -425,7 +425,7 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
 
     // Generate IANA IE and reference to vendor specific IEs
     ie_output.push_str(generate_ie_ids(&iana_ie_parsed, &vendors).as_str());
-    ie_output.push_str(generate_ie_values(&iana_ie_parsed).as_str());
+    ie_output.push_str(generate_ie_values(&iana_ie_parsed, None).as_str());
 
     let mut ie_deser = String::new();
     let mut ie_ser = String::new();
