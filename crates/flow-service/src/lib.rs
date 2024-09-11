@@ -17,11 +17,14 @@ pub mod flow_actor;
 pub mod flow_supervisor;
 
 use netgauze_flow_pkt::FlowInfo;
-use std::{fmt::Display, io, net::SocketAddr};
+use std::{fmt::Display, io, net::SocketAddr, sync::Arc};
 
 pub type ActorId = u32;
 pub type SubscriberId = u32;
 pub type FlowRequest = (SocketAddr, FlowInfo);
+
+pub type FlowSender = tokio::sync::mpsc::Sender<Arc<FlowRequest>>;
+pub type FlowReceiver = tokio::sync::mpsc::Receiver<Arc<FlowRequest>>;
 
 #[derive(Debug, Clone)]
 pub struct Subscription {

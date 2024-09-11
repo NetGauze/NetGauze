@@ -65,7 +65,7 @@ use crate::{
         FlowCollectorActorCommand, FlowCollectorActorError, FlowCollectorActorHandle,
         PeerTemplateIds,
     },
-    ActorId, FlowRequest, SubscriberId, Subscription,
+    ActorId, FlowReceiver, FlowSender, SubscriberId, Subscription,
 };
 use netgauze_flow_pkt::{ipfix, netflow};
 use serde::{Deserialize, Serialize};
@@ -113,7 +113,7 @@ enum FlowCollectorsSupervisorActorCommand {
     FlowActorCommand(FlowCollectorActorCommand),
     /// Command to subscribe to flow data
     Unsubscribe(Vec<Subscription>, mpsc::Sender<Option<ActorId>>),
-    /// Shutdown the supervisor and all its maanged actors
+    /// Shutdown the supervisor and all its manged actors
     Shutdown(oneshot::Sender<()>),
 }
 
@@ -349,13 +349,7 @@ impl FlowCollectorsSupervisorActorHandle {
     pub async fn subscribe(
         &self,
         buffer_size: usize,
-    ) -> Result<
-        (
-            mpsc::Receiver<Result<FlowRequest, std::io::Error>>,
-            Vec<Subscription>,
-        ),
-        FlowCollectorsSupervisorActorHandleError,
-    > {
+    ) -> Result<(FlowReceiver, Vec<Subscription>), FlowCollectorsSupervisorActorHandleError> {
         trace!("[SupervisorHandle] Sending new subscription request to supervisor");
         let (pkt_tx, pkt_rx) = mpsc::channel(buffer_size);
         let subscriptions = self.subscribe_tx(pkt_tx).await?;
@@ -364,7 +358,7 @@ impl FlowCollectorsSupervisorActorHandle {
 
     pub async fn subscribe_tx(
         &self,
-        pkt_tx: mpsc::Sender<Result<FlowRequest, std::io::Error>>,
+        pkt_tx: FlowSender,
     ) -> Result<Vec<Subscription>, FlowCollectorsSupervisorActorHandleError> {
         trace!("[SupervisorHandle] Sending new subscription with pre-created channel request to supervisor");
         let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
@@ -653,7 +647,7 @@ mod test {
         assert_eq!(unsubscribe_results.len(), 3);
         assert!(unsubscribe_results.iter().all(|r| r.is_some()));
         tokio::time::sleep(Duration::from_secs(1)).await;
-        // Try to receive a message (should return None denoating channel is closed as
+        // Try to receive a message (should return None denoting channel is closed as
         // we've unsubscribed)
         let timeout_result = timeout(Duration::from_secs(1), rx.recv()).await;
         assert!(matches!(timeout_result, Ok(None)));

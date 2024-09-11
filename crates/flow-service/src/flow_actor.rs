@@ -105,13 +105,14 @@
 //! }
 //! ```
 
-use crate::{ActorId, FlowRequest, SubscriberId, Subscription};
+use crate::{ActorId, FlowReceiver, FlowRequest, FlowSender, SubscriberId, Subscription};
 use bytes::{Bytes, BytesMut};
 use futures_util::{stream::SplitSink, StreamExt};
-use netgauze_flow_pkt::{codec::FlowInfoCodec, ipfix, netflow, FlowInfo};
+use netgauze_flow_pkt::{codec::FlowInfoCodec, ipfix, netflow};
 use std::{
     collections::HashMap,
     net::SocketAddr,
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -138,10 +139,7 @@ pub(crate) enum FlowCollectorActorCommand {
     /// Command to shut down the actor.
     Shutdown(mpsc::Sender<ActorId>),
     /// Command to subscribe to flow packets.
-    Subscribe(
-        mpsc::Sender<Subscription>,
-        mpsc::Sender<Result<FlowRequest, std::io::Error>>,
-    ),
+    Subscribe(mpsc::Sender<Subscription>, FlowSender),
     Unsubscribe(SubscriberId, mpsc::Sender<Option<Subscription>>),
     PurgeUnusedPeers(Duration, mpsc::Sender<Vec<SocketAddr>>),
     PurgePeer(SocketAddr, mpsc::Sender<Option<ActorId>>),
@@ -238,7 +236,7 @@ struct FlowCollectorActor {
     next_subscriber_id: SubscriberId,
     // TODO: in future allow subscribers to subscribe to a subset of events (i.e., specific peers
     //       or specific record types)
-    subscribers: HashMap<SubscriberId, mpsc::Sender<Result<FlowRequest, std::io::Error>>>,
+    subscribers: HashMap<SubscriberId, FlowSender>,
     /// Timeout for sending a [FlowInfo] pkt to a subscriber before dropping it.
     subscriber_timeout: Duration,
     peers_usage: HashMap<SocketAddr, PeerUsage>,
@@ -295,17 +293,16 @@ impl FlowCollectorActor {
     async fn send_to_subscriber(
         actor_id: ActorId,
         socket_addr: SocketAddr,
-        peer: SocketAddr,
-        pkt: FlowInfo,
+        pkt: Arc<FlowRequest>,
         id: SubscriberId,
-        tx: mpsc::Sender<Result<FlowRequest, std::io::Error>>,
+        tx: FlowSender,
         timeout: Duration,
     ) {
         // The send operation is bounded by timeout period to avoid blocking on a slow
         // subscriber.
-        //
+        let ref_clone = pkt.clone();
         let timeout_ret = tokio::time::timeout(timeout, async move {
-            match tx.send(Ok((peer, pkt))).await {
+            match tx.send(ref_clone).await {
                 Ok(_) => {
                     debug!("[Actor {actor_id}-{socket_addr}] Sent flow flow to subscriber: {id}");
                 }
@@ -339,6 +336,7 @@ impl FlowCollectorActor {
             });
             debug!("[Actor {actor_id}-{socket_addr}] Sending flow packet received from {peer} to a total of {} subscribers", self.subscribers.len());
             let mut send_handlers = vec![];
+            let flow_request = Arc::new((peer, pkt));
             for (id, tx) in &self.subscribers {
                 // We fire and all the send operations to the subscribers
                 // in parallel
@@ -346,8 +344,7 @@ impl FlowCollectorActor {
                 let send_handler = Self::send_to_subscriber(
                     actor_id,
                     socket_addr,
-                    peer,
-                    pkt.clone(),
+                    flow_request.clone(),
                     *id,
                     tx.clone(),
                     self.subscriber_timeout,
@@ -371,7 +368,7 @@ impl FlowCollectorActor {
     async fn handle_subscribe(
         &mut self,
         tx: mpsc::Sender<Subscription>,
-        pkt_tx: mpsc::Sender<Result<FlowRequest, std::io::Error>>,
+        pkt_tx: FlowSender,
     ) -> bool {
         let id = self.next_subscriber_id;
         self.next_subscriber_id += 1;
@@ -753,13 +750,7 @@ impl FlowCollectorActorHandle {
     pub async fn subscribe(
         &self,
         buffer_size: usize,
-    ) -> Result<
-        (
-            mpsc::Receiver<Result<FlowRequest, std::io::Error>>,
-            Vec<Subscription>,
-        ),
-        FlowCollectorActorHandleError,
-    > {
+    ) -> Result<(FlowReceiver, Vec<Subscription>), FlowCollectorActorHandleError> {
         let (pkt_tx, pkt_rx) = mpsc::channel(buffer_size);
         let subscriptions = self.subscribe_tx(pkt_tx).await?;
         Ok((pkt_rx, subscriptions))
@@ -767,7 +758,7 @@ impl FlowCollectorActorHandle {
 
     pub async fn subscribe_tx(
         &self,
-        pkt_tx: mpsc::Sender<Result<FlowRequest, std::io::Error>>,
+        pkt_tx: FlowSender,
     ) -> Result<Vec<Subscription>, FlowCollectorActorHandleError> {
         let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
         self.cmd_tx
@@ -1057,14 +1048,17 @@ mod tests {
         let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
 
         // Generate and send FlowInfo data to register the peer
-        let (_, mut data) = generate_flow_info_data();
+        let (sent_pkt, mut data) = generate_flow_info_data();
         send_data(listening_socket, &socket, &mut data).await;
 
         let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
             .await
             .unwrap();
         // Ensure the packet was handled
-        assert!(matches!(handled_pkt, Some(Ok((_, _)))));
+        assert_eq!(
+            handled_pkt,
+            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+        );
 
         // Purge the specific peer
         let peer_addr = socket.local_addr().unwrap();
@@ -1090,11 +1084,11 @@ mod tests {
         // Receive the packet
         let received = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
         assert!(received.is_ok());
-        let received_packet = received.unwrap().unwrap();
-        assert!(received_packet.is_ok());
-        let (peer, received_pkt) = received_packet.unwrap();
-        assert_eq!(sent_pkt, received_pkt);
-        assert_eq!(peer, socket.local_addr().unwrap());
+        let received_packet = received.unwrap();
+        assert_eq!(
+            received_packet,
+            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+        );
     }
 
     #[tokio::test]
@@ -1119,12 +1113,10 @@ mod tests {
 
         // Receive packets
         let received1 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
-        assert!(matches!(received1, Ok(Some(Ok((_, _))))));
-        assert_eq!(received1.unwrap().unwrap().unwrap(), (local_addr1, pkt1));
+        assert_eq!(received1, Ok(Some(Arc::new((local_addr1, pkt1)))));
 
         let received2 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
-        assert!(matches!(received2, Ok(Some(Ok((_, _))))));
-        assert_eq!(received2.unwrap().unwrap().unwrap(), (local_addr2, pkt2));
+        assert_eq!(received2, Ok(Some(Arc::new((local_addr2, pkt2)))));
     }
 
     #[tokio::test]
@@ -1137,13 +1129,16 @@ mod tests {
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
 
         // Generate and send FlowInfo data to register the peer
-        let (_, mut data) = generate_flow_info_data();
+        let (sent_pkt, mut data) = generate_flow_info_data();
         send_data(listening_socket, &socket, &mut data).await;
         // Ensure the packet was handled before getting peers
         let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
             .await
             .unwrap();
-        assert!(matches!(handled_pkt, Some(Ok((_, _)))));
+        assert_eq!(
+            handled_pkt,
+            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+        );
 
         // Get peers
         let (actor_id, peers) = handle.get_peers().await.unwrap();
@@ -1162,13 +1157,16 @@ mod tests {
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
 
         // Generate and send FlowInfo data to register the peer
-        let (_, mut data) = generate_flow_info_data();
+        let (sent_pkt, mut data) = generate_flow_info_data();
         send_data(listening_socket, &socket, &mut data).await;
         // Ensure the packet was handled before getting template IDs
         let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
             .await
             .unwrap();
-        assert!(matches!(handled_pkt, Some(Ok((_, _)))));
+        assert_eq!(
+            handled_pkt,
+            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+        );
 
         // Get peer template IDs
         let peer_addr = socket.local_addr().unwrap();
@@ -1188,20 +1186,23 @@ mod tests {
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
 
         // Generate and send FlowInfo data to register the peer
-        let (pkt, mut data) = generate_flow_info_data();
+        let (sent_pkt, mut data) = generate_flow_info_data();
         send_data(listening_socket, &socket, &mut data).await;
         // Ensure the packet was handled before getting templates
         let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
             .await
             .unwrap();
-        assert!(matches!(handled_pkt, Some(Ok((_, _)))));
+        assert_eq!(
+            handled_pkt,
+            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt.clone())))
+        );
 
         // Get peer templates
         let peer_addr = socket.local_addr().unwrap();
         let (actor_id, netflow_templates, ipfix_templates) =
             handle.get_peer_templates(peer_addr).await.unwrap();
         assert_eq!(actor_id, handle.actor_id());
-        match pkt {
+        match sent_pkt {
             FlowInfo::NetFlowV9(v9_pkt) => {
                 for set in v9_pkt.sets() {
                     match set {
