@@ -1511,6 +1511,7 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
+    ret.push_str("    UnknownInformationElement(IE),\n");
     for (name, pkg, _) in vendor_prefixes {
         let value_name = format!("{pkg}::FieldParsingError");
         ret.push_str(
@@ -1556,7 +1557,10 @@ pub(crate) fn generate_ie_deser_main(
         );
         ret.push_str("            }\n");
     }
-    ret.push_str("            _ => todo!(\"Handle unknown IEs\")\n");
+    ret.push_str("            ie => {\n");
+    ret.push_str("                // todo Handle unknown IEs\n");
+    ret.push_str("                return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::UnknownInformationElement(*ie))))\n");
+    ret.push_str("            }\n");
     ret.push_str("        };\n");
     ret.push_str("        Ok((buf, value))\n");
     ret.push_str("    }\n");
