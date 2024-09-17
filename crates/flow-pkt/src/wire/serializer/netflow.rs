@@ -271,13 +271,19 @@ impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> 
             None => (None, None),
             Some(template) => {
                 let (scope_fields_spec, fields_spec) = template;
-                let scope_lens = scope_fields_spec.iter().map(|x| x.length()).sum::<u16>();
-                let fields_lens = fields_spec.iter().map(|x| x.length()).sum::<u16>();
+                let scope_lens = scope_fields_spec
+                    .iter()
+                    .map(|x| x.length() as usize)
+                    .sum::<usize>();
+                let fields_lens = fields_spec
+                    .iter()
+                    .map(|x| x.length() as usize)
+                    .sum::<usize>();
                 (Some(scope_lens), Some(fields_lens))
             }
         };
         let scope_fields_len = match scope_lens {
-            Some(len) => len as usize,
+            Some(len) => len,
             None => self
                 .scope_fields()
                 .iter()
@@ -285,7 +291,7 @@ impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> 
                 .sum::<usize>(),
         };
         let fields_len = match field_lens {
-            Some(len) => len as usize,
+            Some(len) => len,
             None => self.fields().iter().map(|x| x.len(None)).sum::<usize>(),
         };
         Self::BASE_LENGTH + scope_fields_len + fields_len
