@@ -1,0 +1,32 @@
+[package]
+name = "netgauze-udp-pkt"
+version = "0.4.1"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+UDP NOTIF packet representation as defind by https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif
+"""
+keywords = ["udp-notif", "ipfix", "netflow", "parser", "protocol"]
+categories = ["network-programming", "parsing"]
+
+
+[dependencies]
+netgauze-locate = { version = "0.4.1", path = "../locate" }
+netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils" }
+netgauze-serde-macros = { version = "0.4.1", path = "../serde-macros" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+
+
+serde = { workspace = true, features = ["derive"] }
+nom = { workspace = true }
+byteorder = { workspace = true }
+bytes = { workspace = true, features = ["serde"] }
+tokio-util = { workspace = true, features = ["full", "tracing"] }
+
+[dev-dependencies]
+netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", features = ["test-helpers"] }
