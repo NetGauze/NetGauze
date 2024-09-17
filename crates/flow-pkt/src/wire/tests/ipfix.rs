@@ -921,3 +921,14 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
 
     Ok(())
 }
+
+#[test]
+fn test_zero_length_fields() {
+    let good_template_wire = [
+        0, 10, 0, 52, 52, 48, 24, 48, 48, 48, 1, 0, 1, 7, 0, 0, 0, 3, 0, 10, 53, 1, 0, 0, 0, 0, 0,
+        3, 0, 10, 55, 1, 0, 0, 0, 0, 55, 1, 0, 10, 48, 56, 48, 0, 0, 0, 0, 55, 48, 0, 10, 55,
+    ];
+    let mut templates_map = HashMap::new();
+    let ret = IpfixPacket::from_wire(Span::new(&good_template_wire), &mut templates_map);
+    assert!(ret.is_err());
+}
