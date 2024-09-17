@@ -92,7 +92,15 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedNetFlowV9PacketPa
             match set {
                 Set::Template(_) => i -= 1,
                 Set::OptionsTemplate(_) => i -= 1,
-                Set::Data { id: _, ref records } => i -= records.len(),
+                Set::Data { id: _, ref records } => {
+                    if records.len() > i {
+                        return Err(nom::Err::Error(LocatedNetFlowV9PacketParsingError::new(
+                            input,
+                            NetFlowV9PacketParsingError::InvalidCount(count),
+                        )));
+                    }
+                    i -= records.len()
+                }
             }
             payload.push(set);
         }
