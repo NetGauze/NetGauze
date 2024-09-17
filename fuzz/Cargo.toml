@@ -20,7 +20,7 @@ netgauze-iana = { path = "../crates/iana", features = ["fuzz"] }
 netgauze-bgp-pkt = { path = "../crates/bgp-pkt", features = ["serde", "fuzz"] }
 netgauze-bgp-speaker = { path = "../crates/bgp-speaker", features = ["fuzz"] }
 netgauze-bmp-pkt = { path = "../crates/bmp-pkt", features = ["serde", "fuzz"] }
-netgauze-flow-pkt = { path = "../crates/flow-pkt", features = ["serde", "fuzz"] }
+netgauze-flow-pkt = { path = "../crates/flow-pkt", features = ["serde", "fuzz", "codec"] }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
@@ -79,5 +79,11 @@ doc = false
 [[bin]]
 name = "fuzz-netflow-v9-pkt-serialize"
 path = "fuzz_targets/fuzz_netflow_v9_pkt_serialize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz-flow-codec"
+path = "fuzz_targets/fuzz_flow_codec.rs"
 test = false
 doc = false
