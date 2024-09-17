@@ -38,6 +38,7 @@ use serde::{Deserialize, Serialize};
 /// [TCP Parameters](https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xml)
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash, Serialize, Deserialize)]
 #[allow(non_snake_case)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TCPHeaderFlags {
     /// No more data from sender (FIN)
     /// [RFC9293](https://datatracker.ietf.org/doc/html/RFC9293)

@@ -65,6 +65,7 @@ pub(crate) fn generate_ie_data_type(data_types: &[SimpleRegistry]) -> String {
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementDataType {\n");
     for x in data_types {
         for xref in x.xref.iter().filter_map(generate_xref_link) {
@@ -82,6 +83,7 @@ pub(crate) fn generate_ie_units(entries: &[SimpleRegistry]) -> String {
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementUnits {\n");
     for entry in entries {
         ret.push('\n');
@@ -110,6 +112,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementSemantics {\n");
     for x in data_types {
         ret.push('\n');
@@ -222,6 +225,7 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
 fn generate_from_for_ie() -> String {
     let mut ret = String::new();
     ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub struct UndefinedIE(pub u16);\n");
 
     ret.push_str("impl From<IE> for u16 {\n");
@@ -251,6 +255,7 @@ pub(crate) fn generate_information_element_ids(ie: &Vec<InformationElement>) -> 
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u16)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IE {\n");
     for ie in ie {
         for line in ie.description.split('\n') {
@@ -278,6 +283,7 @@ pub(crate) fn generate_ie_status() -> String {
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
     ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementStatus {\n");
     ret.push_str("    current = 0,\n");
     ret.push_str("    deprecated = 1,\n");
@@ -479,6 +485,7 @@ fn generate_ie_field_enum_for_ie(
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str(generate_derive(false, false, false).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     ret.push_str("    Unknown{pen: u32, id: u16, value: Vec<u8>},\n");
     for (name, pkg, _) in vendors {
@@ -521,6 +528,7 @@ pub(crate) fn generate_ie_ids(
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IE {\n");
     ret.push_str("    Unknown{pen: u32, id: u16},\n");
     for (name, pkg, _) in vendors {
@@ -541,6 +549,7 @@ pub(crate) fn generate_ie_ids(
     ret.push_str("}\n\n");
 
     ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IEError {\n");
     ret.push_str("    UndefinedIANAIE(u16),\n");
     for (name, pkg, _) in vendors {
@@ -1324,6 +1333,7 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
         .iter()
         .any(|x| get_rust_type(&x.data_type) == "f32" || get_rust_type(&x.data_type) == "f64");
     ret.push_str(generate_derive(false, !not_copy, !not_eq).as_str());
+    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     for ie in ies {
         ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
@@ -1422,7 +1432,16 @@ pub(crate) fn generate_ie_values(
         } else {
             ret.push_str("#[allow(non_camel_case_types)]\n");
             ret.push_str(gen_derive.as_str());
-            ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
+            ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
+            if rust_type.contains("Date") {
+                let arb =
+                    "#[cfg_attr(feature = \"fuzz\", arbitrary(with = crate::arbitrary_datetime))]";
+                ret.push_str(
+                    format!("pub struct {}({} pub {});\n\n", ie.name, arb, rust_type).as_str(),
+                );
+            } else {
+                ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
+            }
             match &vendor_name {
                 None => {
                     ret.push_str(format!("impl HasIE for {} {{\n", ie.name).as_str());
@@ -1575,6 +1594,7 @@ fn get_std_serializer_error(ty_name: &str) -> String {
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
     ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
+    ret.push_str("    InvalidLength(u16),\n");
     ret.push_str("}\n\n");
     ret
 }
@@ -1667,6 +1687,12 @@ fn generate_num_serializer(
     );
     ret.push_str("             Some(len) => {\n");
     ret.push_str("                 let be_bytes = num_val.to_be_bytes();\n");
+    ret.push_str("                 if usize::from(len) > be_bytes.len() {\n");
+    ret.push_str(
+        format!("                     return Err({ie_name}WritingError::InvalidLength(len));\n")
+            .as_str(),
+    );
+    ret.push_str("                 }\n");
     ret.push_str("                 let begin_offset = be_bytes.len() - len as usize;\n");
     ret.push_str("                 writer.write_all(&be_bytes[begin_offset..])?;\n");
     ret.push_str("             }\n");
