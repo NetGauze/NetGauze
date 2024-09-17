@@ -15,7 +15,7 @@
 
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use netgauze_flow_pkt::ipfix::IpfixPacket;
+use netgauze_flow_pkt::netflow::NetFlowV9Packet;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 use std::collections::HashMap;
 
@@ -23,7 +23,7 @@ fuzz_target!(|data: &[u8]| {
     let mut buf = data;
     let templates_map = HashMap::new();
     while let Ok((retbuf, _msg)) =
-        IpfixPacket::from_wire(Span::new(buf), &mut templates_map.clone())
+        NetFlowV9Packet::from_wire(Span::new(buf), &mut templates_map.clone())
     {
         buf = retbuf.fragment();
     }
