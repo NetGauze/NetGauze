@@ -50,6 +50,7 @@ pub enum FieldSpecifierError {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FieldSpecifier {
     element_id: IE,
     length: u16,
@@ -80,6 +81,7 @@ pub enum DataSetIdError {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataSetId(u16);
 
 /// Values 256 and above are used for Data Sets
@@ -105,5 +107,18 @@ impl Deref for DataSetId {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(feature = "fuzz")]
+fn arbitrary_datetime(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<chrono::DateTime<chrono::Utc>> {
+    use chrono::TimeZone;
+    loop {
+        let seconds = u.int_in_range(0..=i64::MAX)?;
+        if let chrono::LocalResult::Single(tt) = chrono::Utc.timestamp_opt(seconds, 0) {
+            return Ok(tt);
+        }
     }
 }

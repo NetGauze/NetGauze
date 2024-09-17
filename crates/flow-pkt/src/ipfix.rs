@@ -58,8 +58,10 @@ pub type TemplatesMap = HashMap<u16, DecodingTemplate>;
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct IpfixPacket {
     version: u16,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_datetime))]
     export_time: DateTime<Utc>,
     sequence_number: u32,
     observation_domain_id: u32,
@@ -128,6 +130,7 @@ impl IpfixPacket {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Set {
     Template(Vec<TemplateRecord>),
     OptionsTemplate(Vec<OptionsTemplateRecord>),
@@ -175,6 +178,7 @@ impl Set {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TemplateRecord {
     id: u16,
     field_specifiers: Vec<FieldSpecifier>,
@@ -261,6 +265,7 @@ impl TemplateRecord {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct OptionsTemplateRecord {
     id: u16,
     scope_field_specifiers: Vec<FieldSpecifier>,
@@ -294,6 +299,7 @@ impl OptionsTemplateRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataRecord {
     scope_fields: Vec<Field>,
     fields: Vec<Field>,
