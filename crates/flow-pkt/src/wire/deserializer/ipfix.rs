@@ -185,7 +185,6 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
             }
             // We don't need to check for valid Set ID again, since we already checked
             id => {
-                // Temp variable to keep the borrowed value from RC
                 let template = if let Some(fields) = templates_map.get(&id) {
                     fields
                 } else {
@@ -194,7 +193,6 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         SetParsingError::NoTemplateDefinedFor(id),
                     )));
                 };
-
                 let (scope_field_specs, field_specs) = template;
                 // since we could have vlen fields, we can only state a min_record_len here
                 let min_record_length = scope_field_specs
@@ -219,7 +217,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         .sum::<usize>();
 
                 let mut records = Vec::new();
-                while buf.len() >= min_record_length {
+                while buf.len() >= min_record_length && min_record_length > 0 {
                     let (t, record): (Span<'_>, DataRecord) =
                         parse_into_located_one_input(buf, template)?;
                     buf = t;
