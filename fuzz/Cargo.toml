@@ -25,6 +25,7 @@ async-trait = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-test = { workspace = true }
+tokio-util = { workspace = true }
 futures-core = { workspace = true }
 
 [[bin]]
@@ -72,5 +73,11 @@ doc = false
 [[bin]]
 name = "fuzz-netflow-v9-pkt"
 path = "fuzz_targets/fuzz_netflow_v9_pkt.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz-netflow-v9-pkt-serialize"
+path = "fuzz_targets/fuzz_netflow_v9_pkt_serialize.rs"
 test = false
 doc = false
