@@ -359,6 +359,7 @@ impl WritablePdu<ScopeFieldSpecifierWritingError> for ScopeFieldSpecifier {
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum ScopeFieldWritingError {
     StdIOError(#[from_std_io_error] String),
+    InvalidLength(u16),
 }
 
 impl WritablePduWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField {
@@ -398,6 +399,9 @@ impl WritablePduWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField
                 None => writer.write_u32::<NetworkEndian>(*value)?,
                 Some(len) => {
                     let be_bytes = value.to_be_bytes();
+                    if be_bytes.len() < len as usize {
+                        return Err(ScopeFieldWritingError::InvalidLength(len));
+                    }
                     let begin_offset = be_bytes.len() - len as usize;
                     writer.write_all(&be_bytes[begin_offset..])?;
                 }
@@ -406,6 +410,9 @@ impl WritablePduWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField
                 None => writer.write_u32::<NetworkEndian>(*value)?,
                 Some(len) => {
                     let be_bytes = value.to_be_bytes();
+                    if be_bytes.len() < len as usize {
+                        return Err(ScopeFieldWritingError::InvalidLength(len));
+                    }
                     let begin_offset = be_bytes.len() - len as usize;
                     writer.write_all(&be_bytes[begin_offset..])?;
                 }
@@ -414,6 +421,9 @@ impl WritablePduWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField
                 None => writer.write_u32::<NetworkEndian>(*value)?,
                 Some(len) => {
                     let be_bytes = value.to_be_bytes();
+                    if be_bytes.len() < len as usize {
+                        return Err(ScopeFieldWritingError::InvalidLength(len));
+                    }
                     let begin_offset = be_bytes.len() - len as usize;
                     writer.write_all(&be_bytes[begin_offset..])?;
                 }
