@@ -794,3 +794,16 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
 
     Ok(())
 }
+
+#[test]
+fn test_zero_length_fields() {
+    let good_template_wire = [
+        0, 9, 75, 9, 0, 0, 96, 0, 33, 0, 0, 0, 47, 0, 9, 1, 0, 0, 0, 0, 0, 1, 0, 15, 91, 0, 0, 4,
+        0, 0, 91, 0, 0, 0, 0, 91, 0, 0, 4, 0, 0, 0, 0, 32, 0, 0,
+    ];
+    let mut templates_map = HashMap::new();
+    // The test here will produce invalid packet, but what we are testing for is not
+    // crashing due to divide by zero
+    let ret = NetFlowV9Packet::from_wire(Span::new(&good_template_wire), &mut templates_map);
+    assert!(ret.is_err());
+}

@@ -183,7 +183,6 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
             }
             // We don't need to check for valid Set ID again, since we already checked
             id => {
-                // Temp variable to keep the borrowed value from RC
                 let template = if let Some(fields) = templates_map.get(&id) {
                     fields
                 } else {
@@ -201,13 +200,18 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         .iter()
                         .map(|x| x.length() as usize)
                         .sum::<usize>();
-                let count = buf.len() / record_length;
-                let mut records = Vec::with_capacity(count);
-                while buf.len() >= record_length {
-                    let (t, record) = parse_into_located_one_input(buf, template)?;
-                    buf = t;
-                    records.push(record);
-                }
+                let records = if record_length > 0 {
+                    let count = buf.len() / record_length;
+                    let mut records = Vec::with_capacity(count);
+                    while buf.len() >= record_length {
+                        let (t, record) = parse_into_located_one_input(buf, template)?;
+                        buf = t;
+                        records.push(record);
+                    }
+                    records
+                } else {
+                    vec![]
+                };
                 // buf could be a non zero value for padding
                 check_padding_value(buf)?;
                 // We can safely unwrap DataSetId here since we already checked the range
