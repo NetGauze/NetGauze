@@ -78,17 +78,15 @@
 //! async fn main() {
 //!     use std::time::Duration;
 //!     let addr: SocketAddr = "127.0.0.1:9995".parse().unwrap();
+//!     let (events_tx, events_rx) = async_channel::bounded(100);
 //!     let (join_handle, actor_handle) =
-//!         FlowCollectorActorHandle::new(1, addr, 100, Duration::from_millis(500))
+//!         FlowCollectorActorHandle::new(1, addr, 100, events_tx, events_rx.clone())
 //!             .await
 //!             .expect("Failed to create FlowCollectorActor");
 //!
-//!     // Subscribe to receive flow packets
-//!     let (mut packet_rx, _) = actor_handle.subscribe(10).await.unwrap();
-//!
 //!     // In a real application, you might want to spawn a new task to handle packets
 //!     tokio::spawn(async move {
-//!         while let Some(packet) = packet_rx.recv().await {
+//!         while let Ok(packet) = events_rx.recv().await {
 //!             println!("Received packet: {:?}", packet);
 //!         }
 //!     });
@@ -105,14 +103,13 @@
 //! }
 //! ```
 
-use crate::{ActorId, FlowReceiver, FlowRequest, FlowSender, SubscriberId, Subscription};
+use crate::{ActorId, FlowReceiver, FlowRequest, FlowSender};
 use bytes::{Bytes, BytesMut};
 use futures_util::{stream::SplitSink, StreamExt};
 use netgauze_flow_pkt::{codec::FlowInfoCodec, ipfix, netflow};
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -138,9 +135,6 @@ pub struct PeerTemplateIds {
 pub(crate) enum FlowCollectorActorCommand {
     /// Command to shut down the actor.
     Shutdown(mpsc::Sender<ActorId>),
-    /// Command to subscribe to flow packets.
-    Subscribe(mpsc::Sender<Subscription>, FlowSender),
-    Unsubscribe(SubscriberId, mpsc::Sender<Option<Subscription>>),
     PurgeUnusedPeers(Duration, mpsc::Sender<Vec<SocketAddr>>),
     PurgePeer(SocketAddr, mpsc::Sender<Option<ActorId>>),
     LocalAddr(mpsc::Sender<(ActorId, SocketAddr)>),
@@ -233,12 +227,7 @@ struct FlowCollectorActor {
     actor_id: ActorId,
     socket_addr: SocketAddr,
     cmd_rx: mpsc::Receiver<FlowCollectorActorCommand>,
-    next_subscriber_id: SubscriberId,
-    // TODO: in future allow subscribers to subscribe to a subset of events (i.e., specific peers
-    //       or specific record types)
-    subscribers: HashMap<SubscriberId, FlowSender>,
-    /// Timeout for sending a [FlowInfo] pkt to a subscriber before dropping it.
-    subscriber_timeout: Duration,
+    events_tx: FlowSender,
     peers_usage: HashMap<SocketAddr, PeerUsage>,
     clients: HashMap<SocketAddr, FlowInfoCodec>,
 }
@@ -248,15 +237,13 @@ impl FlowCollectorActor {
         actor_id: ActorId,
         socket_addr: SocketAddr,
         cmd_rx: mpsc::Receiver<FlowCollectorActorCommand>,
-        subscriber_timeout: Duration,
+        events_tx: FlowSender,
     ) -> Self {
         Self {
             actor_id,
             socket_addr,
             cmd_rx,
-            next_subscriber_id: 1,
-            subscribers: HashMap::default(),
-            subscriber_timeout,
+            events_tx,
             peers_usage: HashMap::default(),
             clients: HashMap::new(),
         }
@@ -290,69 +277,20 @@ impl FlowCollectorActor {
         }
     }
 
-    async fn send_to_subscriber(
-        actor_id: ActorId,
-        socket_addr: SocketAddr,
-        pkt: Arc<FlowRequest>,
-        id: SubscriberId,
-        tx: FlowSender,
-        timeout: Duration,
-    ) {
-        // The send operation is bounded by timeout period to avoid blocking on a slow
-        // subscriber.
-        let ref_clone = pkt.clone();
-        let timeout_ret = tokio::time::timeout(timeout, async move {
-            match tx.send(ref_clone).await {
-                Ok(_) => {
-                    debug!("[Actor {actor_id}-{socket_addr}] Sent flow flow to subscriber: {id}");
-                }
-                Err(_err) => {
-                    warn!("[Actor {actor_id}-{socket_addr}] Subscriber {id} is unresponsive, removing it from the list");
-                }
-            }
-        },
-        ).await;
-        if timeout_ret.is_err() {
-            warn!("[Actor {actor_id}-{socket_addr}] Subscriber {id} is experiencing backpressure and possibly dropping packets");
-        }
-    }
-
     /// This function handles a decoded packet.
     /// In the current implementation, it sends the packet to all subscribers.
-    fn handle_decoded_pkt(&mut self, next: Option<FlowRequest>) {
-        let actor_id = self.actor_id;
-        let socket_addr = self.socket_addr;
+    async fn handle_decoded_pkt(&mut self, next: Option<FlowRequest>) {
         if let Some((peer, pkt)) = next {
             let usage = self.peers_usage.entry(peer).or_default();
             usage.current_count += 1;
-            // Clean closed subscribers
-            self.subscribers.retain(|id, tx| {
-                if tx.is_closed() {
-                    info!("[Actor {actor_id}-{socket_addr}] Subscriber {id} is closed, removing it from the list");
-                    false
-                } else {
-                    true
-                }
-            });
-            debug!("[Actor {actor_id}-{socket_addr}] Sending flow packet received from {peer} to a total of {} subscribers", self.subscribers.len());
-            let mut send_handlers = vec![];
-            let flow_request = Arc::new((peer, pkt));
-            for (id, tx) in &self.subscribers {
-                // We fire and all the send operations to the subscribers
-                // in parallel
-                // TODO: if there's only one subscriber avoid clone
-                let send_handler = Self::send_to_subscriber(
-                    actor_id,
-                    socket_addr,
-                    flow_request.clone(),
-                    *id,
-                    tx.clone(),
-                    self.subscriber_timeout,
-                );
-                send_handlers.push(send_handler);
+            let flow_request = (peer, pkt);
+            let actor_id = self.actor_id;
+            let socket_addr = self.socket_addr;
+            if let Err(err) = self.events_tx.send(flow_request).await {
+                error!("[Actor {actor_id}-{socket_addr}] Error sending flow request to subscribers: {err:?}");
+            } else {
+                debug!("[Actor {actor_id}-{socket_addr}] Sent flow flow to subscribers");
             }
-            // Avoid blocking on sending the packet to the subscribers, and focus on
-            tokio::spawn(async move { futures::future::join_all(send_handlers).await });
         }
     }
 
@@ -363,64 +301,6 @@ impl FlowCollectorActor {
         );
         let _ = tx.send(self.actor_id).await;
         true
-    }
-
-    async fn handle_subscribe(
-        &mut self,
-        tx: mpsc::Sender<Subscription>,
-        pkt_tx: FlowSender,
-    ) -> bool {
-        let id = self.next_subscriber_id;
-        self.next_subscriber_id += 1;
-        self.subscribers.insert(id, pkt_tx);
-        info!(
-            "[Actor {}-{}] New subscriber {id} is registered",
-            self.actor_id, self.socket_addr
-        );
-        if let Err(_err) = tx
-            .send(Subscription {
-                actor_id: self.actor_id,
-                id,
-            })
-            .await
-        {
-            self.subscribers.remove(&id);
-            warn!("[Actor {}-{}] New subscriber {id} is removed, unable to send back the subscriber id", self.actor_id, self.socket_addr);
-        }
-        false
-    }
-
-    async fn handle_unsubscribe(
-        &mut self,
-        id: SubscriberId,
-        tx: mpsc::Sender<Option<Subscription>>,
-    ) -> bool {
-        info!(
-            "[Actor {}-{}] removing subscriber {id}",
-            self.actor_id, self.socket_addr
-        );
-        let ret = self.subscribers.remove(&id);
-        match ret {
-            Some(_) => {
-                info!(
-                    "[Actor {}-{}] subscriber {id} removed",
-                    self.actor_id, self.socket_addr
-                );
-                let _ = tx
-                    .send(Some(Subscription {
-                        actor_id: self.actor_id,
-                        id,
-                    }))
-                    .await;
-            }
-            None => {
-                info!(
-                    "[Actor {}-{}] subscriber {id} not found",
-                    self.actor_id, self.socket_addr
-                );
-            }
-        }
-        false
     }
 
     async fn handle_purge_peer(
@@ -570,12 +450,12 @@ impl FlowCollectorActor {
 
         let cmd_result = match cmd {
             Some(FlowCollectorActorCommand::Shutdown(tx)) => self.handle_shutdown(tx).await,
-            Some(FlowCollectorActorCommand::Subscribe(tx, pkt_tx)) => {
-                self.handle_subscribe(tx, pkt_tx).await
-            }
-            Some(FlowCollectorActorCommand::Unsubscribe(id, tx)) => {
-                self.handle_unsubscribe(id, tx).await
-            }
+            // Some(FlowCollectorActorCommand::Subscribe(tx, pkt_tx)) => {
+            //     self.handle_subscribe(tx, pkt_tx).await
+            // }
+            // Some(FlowCollectorActorCommand::Unsubscribe(id, tx)) => {
+            //     self.handle_unsubscribe(id, tx).await
+            // }
             Some(FlowCollectorActorCommand::PurgePeer(peer, tx)) => {
                 self.handle_purge_peer(peer, tx).await
             }
@@ -636,7 +516,7 @@ impl FlowCollectorActor {
                     match next {
                         Some(Ok(next)) => {
                             let next = self.decode_pkt(next);
-                            self.handle_decoded_pkt(next);
+                            self.handle_decoded_pkt(next).await;
                         }
                         Some(Err(err)) => {
                             error!("[Actor {actor_id}-{socket_addr}] Shutting down due to unrecoverable error: {err}");
@@ -699,6 +579,7 @@ pub struct FlowCollectorActorHandle {
     local_addr: SocketAddr,
     cmd_buffer_size: usize,
     pub(crate) cmd_tx: mpsc::Sender<FlowCollectorActorCommand>,
+    events_rx: FlowReceiver,
 }
 
 impl FlowCollectorActorHandle {
@@ -706,7 +587,8 @@ impl FlowCollectorActorHandle {
         actor_id: ActorId,
         socket_addr: SocketAddr,
         cmd_buffer_size: usize,
-        subscriber_timeout: Duration,
+        events_tx: FlowSender,
+        events_rx: FlowReceiver,
     ) -> Result<
         (
             JoinHandle<Result<(ActorId, SocketAddr), FlowCollectorActorError>>,
@@ -715,7 +597,7 @@ impl FlowCollectorActorHandle {
         FlowCollectorActorHandleError,
     > {
         let (cmd_tx, cmd_rx) = mpsc::channel(cmd_buffer_size);
-        let actor = FlowCollectorActor::new(actor_id, socket_addr, cmd_rx, subscriber_timeout);
+        let actor = FlowCollectorActor::new(actor_id, socket_addr, cmd_rx, events_tx);
         let join_handle = tokio::spawn(actor.run());
         let (tx, mut rx) = mpsc::channel(cmd_buffer_size);
         cmd_tx
@@ -727,6 +609,7 @@ impl FlowCollectorActorHandle {
             .await
             .ok_or(FlowCollectorActorHandleError::ReceiveError)?
             .1;
+
         Ok((
             join_handle,
             Self {
@@ -734,6 +617,7 @@ impl FlowCollectorActorHandle {
                 local_addr,
                 cmd_buffer_size,
                 cmd_tx,
+                events_rx,
             },
         ))
     }
@@ -747,47 +631,8 @@ impl FlowCollectorActorHandle {
     }
 
     /// This function sends a command to the actor to subscribe to the packets.
-    pub async fn subscribe(
-        &self,
-        buffer_size: usize,
-    ) -> Result<(FlowReceiver, Vec<Subscription>), FlowCollectorActorHandleError> {
-        let (pkt_tx, pkt_rx) = mpsc::channel(buffer_size);
-        let subscriptions = self.subscribe_tx(pkt_tx).await?;
-        Ok((pkt_rx, subscriptions))
-    }
-
-    pub async fn subscribe_tx(
-        &self,
-        pkt_tx: FlowSender,
-    ) -> Result<Vec<Subscription>, FlowCollectorActorHandleError> {
-        let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
-        self.cmd_tx
-            .send(FlowCollectorActorCommand::Subscribe(tx, pkt_tx))
-            .await
-            .map_err(|_| FlowCollectorActorHandleError::SendError)?;
-        let mut subscriptions = vec![];
-        while let Some(subscription) = rx.recv().await {
-            subscriptions.push(subscription);
-        }
-        Ok(subscriptions)
-    }
-
-    pub async fn unsubscribe(
-        &self,
-        subscription: SubscriberId,
-    ) -> Result<Vec<Subscription>, FlowCollectorActorHandleError> {
-        let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
-        self.cmd_tx
-            .send(FlowCollectorActorCommand::Unsubscribe(subscription, tx))
-            .await
-            .map_err(|_| FlowCollectorActorHandleError::SendError)?;
-        let mut subscriptions = vec![];
-        while let Some(subscription) = rx.recv().await {
-            if let Some(s) = subscription {
-                subscriptions.push(s);
-            }
-        }
-        Ok(subscriptions)
+    pub fn subscribe(&self) -> FlowReceiver {
+        self.events_rx.clone()
     }
 
     pub async fn shutdown(&self) -> Result<Vec<ActorId>, FlowCollectorActorHandleError> {
@@ -892,6 +737,7 @@ impl FlowCollectorActorHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_channel::RecvError;
     use bytes::{Buf, BytesMut};
     use chrono::{TimeZone, Utc};
     use netgauze_flow_pkt::{
@@ -907,8 +753,9 @@ mod tests {
     ) {
         let actor_id = 1;
         let socket_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let (events_tx, events_rx) = async_channel::bounded(100);
         let (join_handle, handle) =
-            FlowCollectorActorHandle::new(actor_id, socket_addr, 10, Duration::from_secs(1))
+            FlowCollectorActorHandle::new(actor_id, socket_addr, 10, events_tx, events_rx)
                 .await
                 .expect("Couldn't start test actor");
         let socket_addr = handle.local_addr();
@@ -960,37 +807,11 @@ mod tests {
         send_data(listening_socket, &socket, &mut invalid_data.clone()).await;
 
         // Subscribe to receive packets
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let receiver = handle.subscribe();
 
         // Ensure no packet is received due to decoding error
-        let received = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
+        let received = tokio::time::timeout(Duration::from_secs(1), receiver.recv()).await;
         assert!(received.is_err());
-    }
-
-    #[tokio::test]
-    #[tracing_test::traced_test]
-    async fn test_subscribe_unsubscribe() {
-        let (_, handle, _join_handle) = setup_actor().await;
-
-        // Subscribe
-        let (_pkt_rx, subscriptions) = handle.subscribe(10).await.unwrap();
-        assert_eq!(subscriptions.len(), 1);
-
-        // Unsubscribe
-        let subscription_id = subscriptions[0].id;
-        let unsubscribed = handle.unsubscribe(subscription_id).await.unwrap();
-        assert_eq!(unsubscribed.len(), 1);
-        assert_eq!(unsubscribed[0].id, subscription_id);
-    }
-
-    #[tokio::test]
-    #[tracing_test::traced_test]
-    async fn test_unsubscribe_non_existent() {
-        let (_, handle, _join_handle) = setup_actor().await;
-
-        // Unsubscribe a non-existent subscriber
-        let unsubscribed = handle.unsubscribe(999).await.unwrap();
-        assert!(unsubscribed.is_empty());
     }
 
     #[tokio::test]
@@ -1045,20 +866,17 @@ mod tests {
 
         // Bind a UDP socket to send a packet
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let flow_rx = handle.subscribe();
 
         // Generate and send FlowInfo data to register the peer
         let (sent_pkt, mut data) = generate_flow_info_data();
         send_data(listening_socket, &socket, &mut data).await;
 
-        let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
+        let handled_pkt = tokio::time::timeout(Duration::from_secs(1), flow_rx.recv())
             .await
             .unwrap();
         // Ensure the packet was handled
-        assert_eq!(
-            handled_pkt,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
-        );
+        assert_eq!(handled_pkt, Ok((socket.local_addr().unwrap(), sent_pkt)));
 
         // Purge the specific peer
         let peer_addr = socket.local_addr().unwrap();
@@ -1079,15 +897,15 @@ mod tests {
         send_data(listening_socket, &socket, &mut data).await;
 
         // Subscribe to receive packets
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let flow_rx = handle.subscribe();
 
         // Receive the packet
-        let received = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
+        let received = tokio::time::timeout(Duration::from_secs(1), flow_rx.recv()).await;
         assert!(received.is_ok());
         let received_packet = received.unwrap();
         assert_eq!(
             received_packet,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+            Ok((socket.local_addr().unwrap(), sent_pkt))
         );
     }
 
@@ -1103,7 +921,7 @@ mod tests {
         let local_addr2 = socket2.local_addr().unwrap();
 
         // Subscribe to receive packets
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let flow_rx = handle.subscribe();
 
         // Generate and send FlowInfo data from multiple sockets
         let (pkt1, mut data1) = generate_flow_info_data();
@@ -1112,18 +930,18 @@ mod tests {
         send_data(listening_socket, &socket2, &mut data2).await;
 
         // Receive packets
-        let received1 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
-        assert_eq!(received1, Ok(Some(Arc::new((local_addr1, pkt1)))));
+        let received1 = tokio::time::timeout(Duration::from_secs(1), flow_rx.recv()).await;
+        assert_eq!(received1, Ok(Ok((local_addr1, pkt1))));
 
-        let received2 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
-        assert_eq!(received2, Ok(Some(Arc::new((local_addr2, pkt2)))));
+        let received2 = tokio::time::timeout(Duration::from_secs(1), flow_rx.recv()).await;
+        assert_eq!(received2, Ok(Ok((local_addr2, pkt2))));
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_peers() {
         let (listening_socket, handle, _join_handle) = setup_actor().await;
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let flow_rx = handle.subscribe();
 
         // Bind a UDP socket to send a packet
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -1132,13 +950,10 @@ mod tests {
         let (sent_pkt, mut data) = generate_flow_info_data();
         send_data(listening_socket, &socket, &mut data).await;
         // Ensure the packet was handled before getting peers
-        let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
+        let handled_pkt = tokio::time::timeout(Duration::from_secs(1), flow_rx.recv())
             .await
             .unwrap();
-        assert_eq!(
-            handled_pkt,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
-        );
+        assert_eq!(handled_pkt, Ok((socket.local_addr().unwrap(), sent_pkt)));
 
         // Get peers
         let (actor_id, peers) = handle.get_peers().await.unwrap();
@@ -1151,7 +966,7 @@ mod tests {
     #[tracing_test::traced_test]
     async fn test_get_peer_template_ids() {
         let (listening_socket, handle, _join_handle) = setup_actor().await;
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let flow_rx = handle.subscribe();
 
         // Bind a UDP socket to send a packet
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -1160,13 +975,10 @@ mod tests {
         let (sent_pkt, mut data) = generate_flow_info_data();
         send_data(listening_socket, &socket, &mut data).await;
         // Ensure the packet was handled before getting template IDs
-        let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
+        let handled_pkt = tokio::time::timeout(Duration::from_secs(1), flow_rx.recv())
             .await
             .unwrap();
-        assert_eq!(
-            handled_pkt,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
-        );
+        assert_eq!(handled_pkt, Ok((socket.local_addr().unwrap(), sent_pkt)));
 
         // Get peer template IDs
         let peer_addr = socket.local_addr().unwrap();
@@ -1180,7 +992,7 @@ mod tests {
     #[tracing_test::traced_test]
     async fn test_get_peer_templates() {
         let (listening_socket, handle, _join_handle) = setup_actor().await;
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let flow_rx = handle.subscribe();
 
         // Bind a UDP socket to send a packet
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -1189,12 +1001,12 @@ mod tests {
         let (sent_pkt, mut data) = generate_flow_info_data();
         send_data(listening_socket, &socket, &mut data).await;
         // Ensure the packet was handled before getting templates
-        let handled_pkt = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv())
+        let handled_pkt = tokio::time::timeout(Duration::from_secs(1), flow_rx.recv())
             .await
             .unwrap();
         assert_eq!(
             handled_pkt,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt.clone())))
+            Ok((socket.local_addr().unwrap(), sent_pkt.clone()))
         );
 
         // Get peer templates
@@ -1262,15 +1074,7 @@ mod tests {
         let (_, handle, join_handle) = setup_actor().await;
 
         // Test subscribe and unsubscribe
-        let (_rx, subscriptions) = handle.subscribe(10).await.unwrap();
-        assert_eq!(subscriptions.len(), 1, "Should have one subscription");
-
-        let unsubscribed = handle.unsubscribe(subscriptions[0].id).await.unwrap();
-        assert_eq!(
-            unsubscribed.len(),
-            1,
-            "Should have unsubscribed successfully"
-        );
+        let flow_rx = handle.subscribe();
 
         // Test shutdown
         let shutdown_result = handle.shutdown().await.unwrap();
@@ -1284,6 +1088,9 @@ mod tests {
         // Ensure the actor has terminated
         let result = tokio::time::timeout(Duration::from_secs(5), join_handle).await;
         assert!(result.is_ok(), "Actor should have terminated");
+
+        let result = tokio::time::timeout(Duration::from_secs(1), flow_rx.recv()).await;
+        assert_eq!(result, Ok(Err(RecvError)), "channel should be closed");
     }
 
     #[tokio::test]
@@ -1296,10 +1103,7 @@ mod tests {
         join_handle.await.unwrap().unwrap();
 
         // Try to send a command to the closed actor
-        let result = handle.subscribe(10).await;
-        assert!(matches!(
-            result,
-            Err(FlowCollectorActorHandleError::SendError)
-        ));
+        let result = handle.subscribe().recv().await;
+        assert!(matches!(result, Err(async_channel::RecvError)));
     }
 }

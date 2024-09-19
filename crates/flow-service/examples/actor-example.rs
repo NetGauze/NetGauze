@@ -42,19 +42,18 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
         let socket_addr = "0.0.0.0:9999".parse().unwrap();
         let actor_id = 1;
         let cmd_buffer_size = 10;
+        let (events_tx, events_rx) = async_channel::bounded(1000);
         let (join_handle, handler) = FlowCollectorActorHandle::new(
             actor_id,
             socket_addr,
             cmd_buffer_size,
-            Duration::from_millis(500),
+            events_tx,
+            events_rx,
         )
         .await?;
-        let (mut pkt_rx, subscriptions) = handler.subscribe(10).await?;
-        for subscription in &subscriptions {
-            info!("Subscribed to {:?}", subscription);
-        }
+        let flows_rx = handler.subscribe();
         tokio::spawn(async move {
-            while let Some(pkt) = pkt_rx.recv().await {
+            while let Ok(pkt) = flows_rx.recv().await {
                 info!("[Printer] Received packet: {pkt:?}");
             }
         });
