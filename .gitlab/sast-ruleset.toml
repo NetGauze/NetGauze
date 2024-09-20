@@ -1,0 +1,9 @@
+[semgrep]
+  description = "Rust ruleset for Semgrep"
+  targetdir = "/sgrules"
+  timeout = 60
+
+  [[semgrep.passthrough]]
+    type  = "url"
+    value = "https://semgrep.dev/c/p/rust"
+    target = "rust.yml"
