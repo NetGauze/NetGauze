@@ -49,18 +49,18 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
             Duration::from_millis(500),
         )
         .await?;
-        let (mut pkt_rx, subscriptions) = handler.subscribe(10).await?;
+        let (pkt_rx, subscriptions) = handler.subscribe(10).await?;
         for subscription in &subscriptions {
             info!("Subscribed to {:?}", subscription);
         }
         tokio::spawn(async move {
-            while let Some(pkt) = pkt_rx.recv().await {
+            while let Ok(pkt) = pkt_rx.recv().await {
                 info!("[Printer] Received packet: {pkt:?}");
             }
         });
 
         // Purge old entries periodically
-        let forever = tokio::spawn(async move {
+        let cleanup_task = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(60));
             loop {
                 interval.tick().await;
@@ -71,7 +71,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
             }
         });
         let _ = tokio::join!(join_handle).0?;
-        forever.abort();
+        cleanup_task.abort();
         Ok::<(), Box<dyn std::error::Error + Send + Sync + 'static>>(())
     })
 }

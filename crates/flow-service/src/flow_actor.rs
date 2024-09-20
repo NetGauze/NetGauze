@@ -88,7 +88,7 @@
 //!
 //!     // In a real application, you might want to spawn a new task to handle packets
 //!     tokio::spawn(async move {
-//!         while let Some(packet) = packet_rx.recv().await {
+//!         while let Ok(packet) = packet_rx.recv().await {
 //!             println!("Received packet: {:?}", packet);
 //!         }
 //!     });
@@ -105,7 +105,9 @@
 //! }
 //! ```
 
-use crate::{ActorId, FlowReceiver, FlowRequest, FlowSender, SubscriberId, Subscription};
+use crate::{
+    create_flow_channel, ActorId, FlowReceiver, FlowRequest, FlowSender, SubscriberId, Subscription,
+};
 use bytes::{Bytes, BytesMut};
 use futures_util::{stream::SplitSink, StreamExt};
 use netgauze_flow_pkt::{codec::FlowInfoCodec, ipfix, netflow};
@@ -319,7 +321,7 @@ impl FlowCollectorActor {
 
     /// This function handles a decoded packet.
     /// In the current implementation, it sends the packet to all subscribers.
-    fn handle_decoded_pkt(&mut self, next: Option<FlowRequest>) {
+    async fn handle_decoded_pkt(&mut self, next: Option<FlowRequest>) {
         let actor_id = self.actor_id;
         let socket_addr = self.socket_addr;
         if let Some((peer, pkt)) = next {
@@ -352,7 +354,7 @@ impl FlowCollectorActor {
                 send_handlers.push(send_handler);
             }
             // Avoid blocking on sending the packet to the subscribers, and focus on
-            tokio::spawn(async move { futures::future::join_all(send_handlers).await });
+            futures::future::join_all(send_handlers).await;
         }
     }
 
@@ -636,7 +638,7 @@ impl FlowCollectorActor {
                     match next {
                         Some(Ok(next)) => {
                             let next = self.decode_pkt(next);
-                            self.handle_decoded_pkt(next);
+                            self.handle_decoded_pkt(next).await;
                         }
                         Some(Err(err)) => {
                             error!("[Actor {actor_id}-{socket_addr}] Shutting down due to unrecoverable error: {err}");
@@ -691,7 +693,7 @@ impl std::error::Error for FlowCollectorActorHandleError {
 /// responses. It encapsulates the communication channels to the actor, adhering
 /// to the principle of message-passing in the actor model.
 ///
-/// The handle is clonable allowing multiple entities to interact with the
+/// The handle is cloneable allowing multiple entities to interact with the
 /// actor.
 #[derive(Debug, Clone)]
 pub struct FlowCollectorActorHandle {
@@ -751,7 +753,7 @@ impl FlowCollectorActorHandle {
         &self,
         buffer_size: usize,
     ) -> Result<(FlowReceiver, Vec<Subscription>), FlowCollectorActorHandleError> {
-        let (pkt_tx, pkt_rx) = mpsc::channel(buffer_size);
+        let (pkt_tx, pkt_rx) = create_flow_channel(buffer_size);
         let subscriptions = self.subscribe_tx(pkt_tx).await?;
         Ok((pkt_rx, subscriptions))
     }
@@ -894,9 +896,7 @@ mod tests {
     use super::*;
     use bytes::{Buf, BytesMut};
     use chrono::{TimeZone, Utc};
-    use netgauze_flow_pkt::{
-        codec::FlowInfoCodec, ie, ipfix::*, netflow, FieldSpecifier, FlowInfo,
-    };
+    use netgauze_flow_pkt::{codec::FlowInfoCodec, ie, ipfix, netflow, FieldSpecifier, FlowInfo};
     use tokio::{net::UdpSocket, time::Duration};
     use tokio_util::codec::Encoder;
 
@@ -925,11 +925,11 @@ mod tests {
 
     fn generate_flow_info_data() -> (FlowInfo, BytesMut) {
         // sample IPFIX packet
-        let ipfix_template = IpfixPacket::new(
+        let ipfix_template = ipfix::IpfixPacket::new(
             Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
             0,
             0,
-            vec![Set::Template(vec![TemplateRecord::new(
+            vec![ipfix::Set::Template(vec![ipfix::TemplateRecord::new(
                 400,
                 vec![
                     FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
@@ -960,7 +960,7 @@ mod tests {
         send_data(listening_socket, &socket, &mut invalid_data.clone()).await;
 
         // Subscribe to receive packets
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let (pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
 
         // Ensure no packet is received due to decoding error
         let received = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
@@ -1045,7 +1045,7 @@ mod tests {
 
         // Bind a UDP socket to send a packet
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let (pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
 
         // Generate and send FlowInfo data to register the peer
         let (sent_pkt, mut data) = generate_flow_info_data();
@@ -1057,7 +1057,7 @@ mod tests {
         // Ensure the packet was handled
         assert_eq!(
             handled_pkt,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+            Ok(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
         );
 
         // Purge the specific peer
@@ -1079,7 +1079,7 @@ mod tests {
         send_data(listening_socket, &socket, &mut data).await;
 
         // Subscribe to receive packets
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let (pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
 
         // Receive the packet
         let received = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
@@ -1087,7 +1087,7 @@ mod tests {
         let received_packet = received.unwrap();
         assert_eq!(
             received_packet,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+            Ok(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
         );
     }
 
@@ -1103,7 +1103,7 @@ mod tests {
         let local_addr2 = socket2.local_addr().unwrap();
 
         // Subscribe to receive packets
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let (pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
 
         // Generate and send FlowInfo data from multiple sockets
         let (pkt1, mut data1) = generate_flow_info_data();
@@ -1113,17 +1113,17 @@ mod tests {
 
         // Receive packets
         let received1 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
-        assert_eq!(received1, Ok(Some(Arc::new((local_addr1, pkt1)))));
+        assert_eq!(received1, Ok(Ok(Arc::new((local_addr1, pkt1)))));
 
         let received2 = tokio::time::timeout(Duration::from_secs(1), pkt_rx.recv()).await;
-        assert_eq!(received2, Ok(Some(Arc::new((local_addr2, pkt2)))));
+        assert_eq!(received2, Ok(Ok(Arc::new((local_addr2, pkt2)))));
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_get_peers() {
         let (listening_socket, handle, _join_handle) = setup_actor().await;
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let (pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
 
         // Bind a UDP socket to send a packet
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -1137,7 +1137,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             handled_pkt,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+            Ok(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
         );
 
         // Get peers
@@ -1151,7 +1151,7 @@ mod tests {
     #[tracing_test::traced_test]
     async fn test_get_peer_template_ids() {
         let (listening_socket, handle, _join_handle) = setup_actor().await;
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let (pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
 
         // Bind a UDP socket to send a packet
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -1165,7 +1165,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             handled_pkt,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
+            Ok(Arc::new((socket.local_addr().unwrap(), sent_pkt)))
         );
 
         // Get peer template IDs
@@ -1180,7 +1180,7 @@ mod tests {
     #[tracing_test::traced_test]
     async fn test_get_peer_templates() {
         let (listening_socket, handle, _join_handle) = setup_actor().await;
-        let (mut pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
+        let (pkt_rx, _subscriptions) = handle.subscribe(10).await.unwrap();
 
         // Bind a UDP socket to send a packet
         let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -1194,7 +1194,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             handled_pkt,
-            Some(Arc::new((socket.local_addr().unwrap(), sent_pkt.clone())))
+            Ok(Arc::new((socket.local_addr().unwrap(), sent_pkt.clone())))
         );
 
         // Get peer templates

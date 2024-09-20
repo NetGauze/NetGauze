@@ -61,6 +61,7 @@
 //!   with multiple flow collectors.
 
 use crate::{
+    create_flow_channel,
     flow_actor::{
         FlowCollectorActorCommand, FlowCollectorActorError, FlowCollectorActorHandle,
         PeerTemplateIds,
@@ -80,7 +81,7 @@ use tracing::{debug, error, info, trace};
 pub struct SupervisorConfig {
     pub binding_addresses: Vec<BindingAddress>,
     pub cmd_buffer_size: usize,
-    subscriber_timeout: Duration,
+    pub subscriber_timeout: Duration,
 }
 
 /// Configuration to a given listening address
@@ -351,7 +352,7 @@ impl FlowCollectorsSupervisorActorHandle {
         buffer_size: usize,
     ) -> Result<(FlowReceiver, Vec<Subscription>), FlowCollectorsSupervisorActorHandleError> {
         trace!("[SupervisorHandle] Sending new subscription request to supervisor");
-        let (pkt_tx, pkt_rx) = mpsc::channel(buffer_size);
+        let (pkt_tx, pkt_rx) = create_flow_channel(buffer_size);
         let subscriptions = self.subscribe_tx(pkt_tx).await?;
         Ok((pkt_rx, subscriptions))
     }
@@ -636,7 +637,7 @@ mod test {
         let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config).await;
 
         // Subscribe
-        let (mut rx, subscriptions) = handle.subscribe(10).await.expect("Failed to subscribe");
+        let (pkt_rx, subscriptions) = handle.subscribe(10).await.expect("Failed to subscribe");
         assert_eq!(subscriptions.len(), 3); // 2 + 1 workers from our config
 
         // Unsubscribe
@@ -649,8 +650,8 @@ mod test {
         tokio::time::sleep(Duration::from_secs(1)).await;
         // Try to receive a message (should return None denoting channel is closed as
         // we've unsubscribed)
-        let timeout_result = timeout(Duration::from_secs(1), rx.recv()).await;
-        assert!(matches!(timeout_result, Ok(None)));
+        let timeout_result = timeout(Duration::from_secs(1), pkt_rx.recv()).await;
+        assert!(matches!(timeout_result, Ok(Err(_))));
 
         handle
             .shutdown()

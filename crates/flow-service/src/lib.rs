@@ -23,8 +23,12 @@ pub type ActorId = u32;
 pub type SubscriberId = u32;
 pub type FlowRequest = (SocketAddr, FlowInfo);
 
-pub type FlowSender = tokio::sync::mpsc::Sender<Arc<FlowRequest>>;
-pub type FlowReceiver = tokio::sync::mpsc::Receiver<Arc<FlowRequest>>;
+pub type FlowSender = async_channel::Sender<Arc<FlowRequest>>;
+pub type FlowReceiver = async_channel::Receiver<Arc<FlowRequest>>;
+
+pub fn create_flow_channel(buffer_size: usize) -> (FlowSender, FlowReceiver) {
+    async_channel::bounded(buffer_size)
+}
 
 #[derive(Debug, Clone)]
 pub struct Subscription {
