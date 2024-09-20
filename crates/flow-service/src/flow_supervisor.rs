@@ -65,7 +65,7 @@ use crate::{
         FlowCollectorActorCommand, FlowCollectorActorError, FlowCollectorActorHandle,
         PeerTemplateIds,
     },
-    ActorId, FlowReceiver,
+    ActorId, FlowReceiver, FlowSender, SubscriberId, Subscription,
 };
 use netgauze_flow_pkt::{ipfix, netflow};
 use serde::{Deserialize, Serialize};
@@ -80,7 +80,7 @@ use tracing::{debug, error, info, trace};
 pub struct SupervisorConfig {
     pub binding_addresses: Vec<BindingAddress>,
     pub cmd_buffer_size: usize,
-    pub events_buffer_size: usize,
+    subscriber_timeout: Duration,
 }
 
 /// Configuration to a given listening address
@@ -97,11 +97,11 @@ impl Default for SupervisorConfig {
     fn default() -> Self {
         Self {
             binding_addresses: vec![BindingAddress {
-                socket_addr: SocketAddr::from_str("0.0.0.0:9999").unwrap(),
+                socket_addr: SocketAddr::from_str("0.0.0.0:9991").unwrap(),
                 num_workers: 2,
             }],
             cmd_buffer_size: 100,
-            events_buffer_size: 1000,
+            subscriber_timeout: Duration::from_secs(1),
         }
     }
 }
@@ -111,6 +111,8 @@ impl Default for SupervisorConfig {
 enum FlowCollectorsSupervisorActorCommand {
     /// Command to send to all [FlowCollectorActor]
     FlowActorCommand(FlowCollectorActorCommand),
+    /// Command to subscribe to flow data
+    Unsubscribe(Vec<Subscription>, mpsc::Sender<Option<ActorId>>),
     /// Shutdown the supervisor and all its manged actors
     Shutdown(oneshot::Sender<()>),
 }
@@ -181,6 +183,43 @@ impl FlowCollectorsSupervisorActor {
                         };
                     }
                 }
+                FlowCollectorsSupervisorActorCommand::Unsubscribe(subscriptions, tx) => {
+                    let mut mapped: HashMap<ActorId, Vec<SubscriberId>> = HashMap::new();
+                    subscriptions
+                        .iter()
+                        .for_each(|s| mapped.entry(s.actor_id).or_default().push(s.id));
+                    for (actor_id, handle) in &self.actor_handlers {
+                        let mut send_back = None;
+                        if let Some(subscription_ids) = mapped.get(actor_id) {
+                            for id in subscription_ids {
+                                match handle.unsubscribe(*id).await {
+                                    Ok(_) => {
+                                        info!(
+                                            "[FlowSupervisor] Unsubscribed from actor {}-{}",
+                                            handle.actor_id(),
+                                            handle.local_addr(),
+                                        );
+                                        send_back = Some(*actor_id);
+                                    }
+                                    Err(err) => {
+                                        error!(
+                                            "[FlowSupervisor] Failed to send command to Actor {}-{}: {err:?}",
+                                            handle.actor_id(),
+                                            handle.local_addr(),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if let Err(err) = tx.send(send_back).await {
+                            error!(
+                                "[FlowSupervisor] Failed to send back the results unsubscribe command from Actor {}-{}: {err:?}",
+                                handle.actor_id(),
+                                handle.local_addr(),
+                            )
+                        }
+                    }
+                }
                 FlowCollectorsSupervisorActorCommand::Shutdown(tx) => {
                     info!("[FlowSupervisor] Received shutdown command, shutting down all actors");
                     for handle in self.actor_handlers.values() {
@@ -247,7 +286,6 @@ impl std::error::Error for FlowCollectorsSupervisorActorHandleError {
 pub struct FlowCollectorsSupervisorActorHandle {
     cmd_tx: mpsc::Sender<FlowCollectorsSupervisorActorCommand>,
     cmd_buffer_size: usize,
-    events_rx: FlowReceiver,
 }
 
 impl FlowCollectorsSupervisorActorHandle {
@@ -257,7 +295,6 @@ impl FlowCollectorsSupervisorActorHandle {
         let mut next_actor_id = 0;
         let mut actor_handlers = HashMap::new();
         let mut actors_join = vec![];
-        let (events_tx, events_rx) = async_channel::bounded(config.events_buffer_size);
         for binding_address in config.binding_addresses {
             for _ in 0..binding_address.num_workers {
                 info!(
@@ -267,9 +304,8 @@ impl FlowCollectorsSupervisorActorHandle {
                 let actor_ret = FlowCollectorActorHandle::new(
                     next_actor_id,
                     binding_address.socket_addr,
-                    config.cmd_buffer_size,
-                    events_tx.clone(),
-                    events_rx.clone(),
+                    10,
+                    config.subscriber_timeout,
                 )
                 .await;
                 match actor_ret {
@@ -289,7 +325,6 @@ impl FlowCollectorsSupervisorActorHandle {
         let handle = FlowCollectorsSupervisorActorHandle {
             cmd_tx: tx.clone(),
             cmd_buffer_size: config.cmd_buffer_size,
-            events_rx,
         };
 
         let join_handle = tokio::spawn(async move { supervisor.run(actors_join, rx).await });
@@ -311,12 +346,61 @@ impl FlowCollectorsSupervisorActorHandle {
             .map_err(|_| FlowCollectorsSupervisorActorHandleError::ReceiveError)
     }
 
-    pub fn subscribe(&self) -> FlowReceiver {
+    pub async fn subscribe(
+        &self,
+        buffer_size: usize,
+    ) -> Result<(FlowReceiver, Vec<Subscription>), FlowCollectorsSupervisorActorHandleError> {
         trace!("[SupervisorHandle] Sending new subscription request to supervisor");
-        // let (pkt_tx, pkt_rx) = mpsc::channel(buffer_size);
-        // let subscriptions = self.subscribe_tx(pkt_tx).await?;
-        // Ok((pkt_rx, subscriptions))
-        self.events_rx.clone()
+        let (pkt_tx, pkt_rx) = mpsc::channel(buffer_size);
+        let subscriptions = self.subscribe_tx(pkt_tx).await?;
+        Ok((pkt_rx, subscriptions))
+    }
+
+    pub async fn subscribe_tx(
+        &self,
+        pkt_tx: FlowSender,
+    ) -> Result<Vec<Subscription>, FlowCollectorsSupervisorActorHandleError> {
+        trace!("[SupervisorHandle] Sending new subscription with pre-created channel request to supervisor");
+        let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
+        if let Err(err) = self
+            .cmd_tx
+            .send(FlowCollectorsSupervisorActorCommand::FlowActorCommand(
+                FlowCollectorActorCommand::Subscribe(tx, pkt_tx),
+            ))
+            .await
+        {
+            error!("[SupervisorHandle] Error sending subscription request: {err:?}");
+            return Err(FlowCollectorsSupervisorActorHandleError::SendError);
+        }
+        let mut subscriptions = vec![];
+        while let Some(subscription) = rx.recv().await {
+            subscriptions.push(subscription);
+        }
+        Ok(subscriptions)
+    }
+
+    pub async fn unsubscribe(
+        &self,
+        subscriptions: Vec<Subscription>,
+    ) -> Result<Vec<Option<ActorId>>, FlowCollectorsSupervisorActorHandleError> {
+        trace!("[SupervisorHandle] Sending unsubscribe request to supervisor");
+        let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
+        if let Err(err) = self
+            .cmd_tx
+            .send(FlowCollectorsSupervisorActorCommand::Unsubscribe(
+                subscriptions,
+                tx,
+            ))
+            .await
+        {
+            error!("[SupervisorHandle] Error sending unsubscription request: {err:?}");
+            return Err(FlowCollectorsSupervisorActorHandleError::SendError);
+        }
+        let mut actors = vec![];
+        while let Some(actor) = rx.recv().await {
+            actors.push(actor);
+        }
+        Ok(actors)
     }
 
     pub async fn purge_unused_peers(
@@ -488,7 +572,7 @@ mod test {
                 },
             ],
             cmd_buffer_size: 10,
-            events_buffer_size: 100,
+            subscriber_timeout: Duration::from_secs(1),
         }
     }
 
@@ -543,6 +627,35 @@ mod test {
             .await
             .expect("Supervisor didn't shut down in time")
             .expect("Supervisor panicked");
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_supervisor_subscribe_unsubscribe() {
+        let config = create_test_config();
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config).await;
+
+        // Subscribe
+        let (mut rx, subscriptions) = handle.subscribe(10).await.expect("Failed to subscribe");
+        assert_eq!(subscriptions.len(), 3); // 2 + 1 workers from our config
+
+        // Unsubscribe
+        let unsubscribe_results = handle
+            .unsubscribe(subscriptions)
+            .await
+            .expect("Failed to unsubscribe");
+        assert_eq!(unsubscribe_results.len(), 3);
+        assert!(unsubscribe_results.iter().all(|r| r.is_some()));
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        // Try to receive a message (should return None denoting channel is closed as
+        // we've unsubscribed)
+        let timeout_result = timeout(Duration::from_secs(1), rx.recv()).await;
+        assert!(matches!(timeout_result, Ok(None)));
+
+        handle
+            .shutdown()
+            .await
+            .expect("Failed to shutdown supervisor");
     }
 
     #[tokio::test]

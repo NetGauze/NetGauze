@@ -44,9 +44,12 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
         init_tracing();
         let (supervisor_join_handle, handler) =
             FlowCollectorsSupervisorActorHandle::new(config).await;
-        let flow_rx = handler.subscribe();
+        let (mut pkt_rx, subscriptions) = handler.subscribe(10).await?;
+        for subscription in &subscriptions {
+            info!("Subscribed to {:?}", subscription);
+        }
         tokio::spawn(async move {
-            while let Ok(pkt) = flow_rx.recv().await {
+            while let Some(pkt) = pkt_rx.recv().await {
                 info!("[Printer] Received packet: {pkt:?}");
             }
         });

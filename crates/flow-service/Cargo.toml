@@ -27,7 +27,7 @@ futures-util = { workspace = true }
 socket2 = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-async-channel = { version = "2.3" }
+
 
 [dev-dependencies]
 dashmap = { workspace = true }
