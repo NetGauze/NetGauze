@@ -304,6 +304,10 @@ impl FlowCollectorActor {
         // subscriber.
         let ref_clone = pkt.clone();
         let timeout_ret = tokio::time::timeout(timeout, async move {
+            if tx.is_full() {
+                warn!("[Actor {actor_id}-{socket_addr}] Channel for subscriber {id} is full, dropping packet");
+                return;
+            }
             match tx.send(ref_clone).await {
                 Ok(_) => {
                     debug!("[Actor {actor_id}-{socket_addr}] Sent flow flow to subscriber: {id}");
