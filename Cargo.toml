@@ -13,6 +13,7 @@ members = [
     "crates/locate",
     "crates/parse-utils",
     "crates/serde-macros",
+    "crates/flow-bench-client",
     "fuzz",
 ]
 resolver = "2"
@@ -55,3 +56,7 @@ rstest = "0.23"
 pcap-parser = { version = "0.15", features = ["data"] }
 clap = { version = "4.5", features = ["derive"] }
 socket2 = { version = "0.5" }
+
+
+[profile.release]
+debug = true
