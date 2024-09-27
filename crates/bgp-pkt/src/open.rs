@@ -104,13 +104,12 @@ impl BgpOpenMessage {
 
     /// Shortcut to get a list of all the capabilities from all the parameters
     pub fn capabilities(&self) -> Vec<&BgpCapability> {
-        return self
-            .params
+        self.params
             .iter()
             .flat_map(|x| match x {
                 BgpOpenMessageParameter::Capabilities(capabilities_vec) => capabilities_vec,
             })
-            .collect();
+            .collect()
     }
 }
 

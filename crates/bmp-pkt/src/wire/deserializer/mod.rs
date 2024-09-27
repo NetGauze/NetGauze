@@ -532,14 +532,12 @@ impl<'a>
         );
         match peer_up_msg {
             Ok(msg) => Ok((buf, msg)),
-            Err(err) => {
-                return Err(nom::Err::Error(
-                    LocatedPeerUpNotificationMessageParsingError::new(
-                        input,
-                        PeerUpNotificationMessageParsingError::PeerUpMessageError(err),
-                    ),
-                ))
-            }
+            Err(err) => Err(nom::Err::Error(
+                LocatedPeerUpNotificationMessageParsingError::new(
+                    input,
+                    PeerUpNotificationMessageParsingError::PeerUpMessageError(err),
+                ),
+            )),
         }
     }
 }
@@ -573,14 +571,12 @@ impl<'a>
         let msg = PeerDownNotificationMessage::build(peer_header, reason);
         match msg {
             Ok(msg) => Ok((buf, msg)),
-            Err(err) => {
-                return Err(nom::Err::Error(
-                    LocatedPeerDownNotificationMessageParsingError::new(
-                        input,
-                        PeerDownNotificationMessageParsingError::PeerDownMessageError(err),
-                    ),
-                ))
-            }
+            Err(err) => Err(nom::Err::Error(
+                LocatedPeerDownNotificationMessageParsingError::new(
+                    input,
+                    PeerDownNotificationMessageParsingError::PeerDownMessageError(err),
+                ),
+            )),
         }
     }
 }

@@ -127,7 +127,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpParameter
         match param_type {
             BgpOpenMessageParameterType::Capability => parse_capability_param(buf, ctx),
             BgpOpenMessageParameterType::ExtendedLength => {
-                return Err(nom::Err::Error(LocatedBgpParameterParsingError::new(
+                Err(nom::Err::Error(LocatedBgpParameterParsingError::new(
                     begin_buf,
                     BgpParameterParsingError::UndefinedParameterType(
                         UndefinedBgpOpenMessageParameterType(

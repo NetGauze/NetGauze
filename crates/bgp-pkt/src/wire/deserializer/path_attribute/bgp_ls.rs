@@ -361,7 +361,7 @@ impl<'a> ReadablePduWithOneInput<'a, u16, LocatedBgpLsAttributeParsingError<'a>>
         let (span, weight) = be_u8(span)?;
         let (span, _reserved) = be_u16(span)?;
 
-        return if length == 7 && Self::flags_have_v_flag(flags) {
+        if length == 7 && Self::flags_have_v_flag(flags) {
             let (span, label) = parse_into_located(span)?;
 
             // TODO check if max 20 rightmost bits are set
@@ -376,7 +376,6 @@ impl<'a> ReadablePduWithOneInput<'a, u16, LocatedBgpLsAttributeParsingError<'a>>
             ))
         } else if length == 8 && !Self::flags_have_v_flag(flags) {
             let (span, index) = be_u32(span)?;
-
             Ok((
                 span,
                 BgpLsPeerSid::IndexValue {
@@ -390,6 +389,6 @@ impl<'a> ReadablePduWithOneInput<'a, u16, LocatedBgpLsAttributeParsingError<'a>>
                 buf,
                 BgpLsAttributeParsingError::BadSidValue(flags),
             )))
-        };
+        }
     }
 }

@@ -944,15 +944,13 @@ fn parse_ip4_or_ipv6_next_hop(
             let next_hop_local = Ipv6Addr::from(next_hop_local);
             Ok((mp_buf, (IpAddr::V6(next_hop), Some(next_hop_local))))
         }
-        _ => {
-            return Err(nom::Err::Error(LocatedMpReachParsingError::new(
-                begin_buf,
-                MpReachParsingError::IpAddrError(
-                    address_type,
-                    IpAddrParsingError::InvalidIpAddressLength(next_hop_len),
-                ),
-            )));
-        }
+        _ => Err(nom::Err::Error(LocatedMpReachParsingError::new(
+            begin_buf,
+            MpReachParsingError::IpAddrError(
+                address_type,
+                IpAddrParsingError::InvalidIpAddressLength(next_hop_len),
+            ),
+        ))),
     }
 }
 
