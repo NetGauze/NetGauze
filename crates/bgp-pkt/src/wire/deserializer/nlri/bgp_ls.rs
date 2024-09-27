@@ -534,12 +534,10 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
             BgpLsNlriType::Node
             | BgpLsNlriType::Link
             | BgpLsNlriType::TePolicy
-            | BgpLsNlriType::Srv6Sid => {
-                return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
-                    span,
-                    BgpLsNlriParsingError::BadTlvTypeInNlri(nlri_type),
-                )));
-            }
+            | BgpLsNlriType::Srv6Sid => Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
+                span,
+                BgpLsNlriParsingError::BadTlvTypeInNlri(nlri_type),
+            ))),
         }
     }
 }
