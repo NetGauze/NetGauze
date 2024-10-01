@@ -58,6 +58,26 @@ impl BmpParsingContext {
     pub fn new(map: HashMap<PeerKey, BgpParsingContext>) -> Self {
         Self(map)
     }
+
+    pub fn peer_count(&self) -> usize {
+        self.len()
+    }
+
+    pub fn add_peer(&mut self, peer_key: PeerKey, parsing_context: BgpParsingContext) {
+        self.insert(peer_key, parsing_context);
+    }
+
+    pub fn add_default_peer(&mut self, peer_key: PeerKey) {
+        self.add_peer(peer_key, BgpParsingContext::default())
+    }
+
+    pub fn delete_peer(&mut self, peer_key: &PeerKey) {
+        self.remove(peer_key);
+    }
+
+    pub fn get_peer(&mut self, peer_key: &PeerKey) -> Option<&mut BgpParsingContext> {
+        self.get_mut(peer_key)
+    }
 }
 
 impl Deref for BmpParsingContext {
