@@ -98,7 +98,18 @@ impl LargeCommunity {
     pub const fn local_data2(&self) -> u32 {
         self.local_data2
     }
+
+    pub fn to_bytes(&self) -> [u8; 12] {
+        let mut bytes = [0; 12];
+
+        bytes[0..4].copy_from_slice(&self.global_admin.to_be_bytes());
+        bytes[4..8].copy_from_slice(&self.local_data1.to_be_bytes());
+        bytes[8..12].copy_from_slice(&self.local_data2.to_be_bytes());
+
+        bytes
+    }
 }
+
 pub trait ExtendedCommunityProperties {
     fn iana_defined(&self) -> bool;
     fn transitive(&self) -> bool;
@@ -988,5 +999,15 @@ mod tests {
         let comm = Community::new(0x10012003);
         assert_eq!(comm.collection_asn(), 0x1001);
         assert_eq!(comm.collection_value(), 0x2003);
+    }
+
+    #[test]
+    pub fn test_large_community_to_bytes() {
+        let input = LargeCommunity::new(123456789, 987654321, 159734628);
+        let expected_output = [
+            0x07, 0x5b, 0xcd, 0x15, 0x3a, 0xde, 0x68, 0xb1, 0x9, 0x85, 0x5b, 0x64,
+        ];
+        let to_bytes_output = input.to_bytes();
+        assert_eq!(to_bytes_output, expected_output);
     }
 }
