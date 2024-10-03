@@ -226,7 +226,7 @@ fn generate_from_for_ie() -> String {
     let mut ret = String::new();
     ret.push_str(generate_derive(false, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
-    ret.push_str("pub struct UndefinedIE(pub u16);\n");
+    ret.push_str("pub struct UndefinedIE(pub u16);\n\n");
 
     ret.push_str("impl From<IE> for u16 {\n");
     ret.push_str("    fn from(value: IE) -> Self {\n");
@@ -557,6 +557,22 @@ pub(crate) fn generate_ie_ids(
     }
     ret.push_str("}\n\n");
 
+    ret.push_str("impl std::fmt::Display for IEError {\n");
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::UndefinedIANAIE(id) => write!(f, \"invalid IE id {id}\"),\n");
+    for (name, pkg, _) in vendors {
+        ret.push_str(
+            format!("            Self::{name}(e) => write!(f, \"invalid {pkg} IE {{}}\", e.0),\n")
+                .as_str(),
+        );
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl std::error::Error for IEError {}\n\n");
+
     ret.push_str(generate_ie_try_from_pen_code(iana_ies, vendors).as_str());
     ret.push_str(generate_ie_template_trait_for_main(iana_ies, vendors).as_str());
     ret.push_str(generate_ie_field_enum_for_ie(iana_ies, vendors).as_str());
@@ -680,6 +696,28 @@ fn get_std_deserializer_error(ty_name: &str) -> String {
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     ret.push_str("    InvalidLength(u16),\n");
     ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str(
+        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
+    );
+    ret.push_str(
+        "           Self::InvalidLength(len) => write!(f, \"invalid field length {len}\"),\n",
+    );
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("           Self::NomError(_err) => None,\n");
+    ret.push_str("           Self::InvalidLength(_len) => None,\n");
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
     ret
 }
 
@@ -693,6 +731,24 @@ fn get_time_millis_deserializer_error(ty_name: &str) -> String {
     ret.push_str("    InvalidLength(u16),\n");
     ret.push_str("    InvalidTimestampMillis(u64),\n");
     ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str(
+        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
+    );
+    ret.push_str(
+        "           Self::InvalidLength(len) => write!(f, \"invalid field length {len}\"),\n",
+    );
+    ret.push_str(
+        "           Self::InvalidTimestampMillis(val) => write!(f, \"invalid timestamp {val}\"),\n",
+    );
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{}}\n").as_str());
     ret
 }
 
@@ -706,6 +762,24 @@ fn get_timestamp_deserializer_error(ty_name: &str) -> String {
     ret.push_str("    InvalidLength(u16),\n");
     ret.push_str("    InvalidTimestamp(u32),\n");
     ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str(
+        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
+    );
+    ret.push_str(
+        "           Self::InvalidLength(len) => write!(f, \"invalid field length {len}\"),\n",
+    );
+    ret.push_str(
+        "           Self::InvalidTimestamp(val) => write!(f, \"invalid timestamp {val}\"),\n",
+    );
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{}}\n").as_str());
     ret
 }
 
@@ -719,6 +793,22 @@ fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
     ret.push_str("    InvalidLength(u16),\n");
     ret.push_str("    InvalidTimestamp(u32, u32),\n");
     ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str(
+        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
+    );
+    ret.push_str(
+        "           Self::InvalidLength(len) => write!(f, \"invalid field length {len}\"),\n",
+    );
+    ret.push_str("           Self::InvalidTimestamp(v1, v2) => write!(f, \"invalid timestamp ({v1}, {v2})\"),\n");
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{}}\n").as_str());
     ret
 }
 
@@ -1031,7 +1121,20 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     );
     string_error.push_str("        )\n");
     string_error.push_str("    }\n");
-    string_error.push_str("}\n");
+    string_error.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ie_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str(
+        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
+    );
+    ret.push_str("           Self::Utf8Error(val) => write!(f, \"utf8 error {val}\"),\n");
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ie_name}ParsingError {{}}\n").as_str());
 
     ret.push_str(string_error.as_str());
     ret.push_str(header.as_str());
@@ -1487,6 +1590,36 @@ fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str(
+        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
+    );
+    for ie in ies {
+        ret.push_str(
+            format!(
+                "           Self::{}Error(err) => write!(f, \"{{err}}\"),\n",
+                ie.name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("           Self::NomError(_err) => None,\n");
+    for ie in ies {
+        ret.push_str(format!("           Self::{}Error(err) => Some(err),\n", ie.name).as_str());
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
     ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, Located{ty_name}ParsingError<'a>>\n").as_str());
     ret.push_str(format!("for {ty_name} {{\n").as_str());
     ret.push_str("    #[inline]\n");
@@ -1548,6 +1681,46 @@ pub(crate) fn generate_ie_deser_main(
     }
     ret.push_str("}\n");
     ret.push_str("\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str(
+        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
+    );
+    ret.push_str("           Self::UnknownInformationElement(ie) => write!(f, \"unknown information element {ie:?}\"),\n");
+    for (name, _pkg, _) in vendor_prefixes {
+        ret.push_str(
+            format!("           Self::{name}Error(err) => write!(f, \"{{err}}\"),\n").as_str(),
+        );
+    }
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "           Self::{}Error(err) => write!(f, \"{{err}}\"),\n",
+                ie.name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("           Self::NomError(_err) => None,\n");
+    ret.push_str("           Self::UnknownInformationElement(_ie) => None,\n");
+    for (name, _pkg, _) in vendor_prefixes {
+        ret.push_str(format!("           Self::{name}Error(err) => Some(err),\n").as_str());
+    }
+    for ie in iana_ies {
+        ret.push_str(format!("           Self::{}Error(err) => Some(err),\n", ie.name).as_str());
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
 
     ret.push_str("impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, LocatedFieldParsingError<'a>>\n");
     ret.push_str("for Field {\n");

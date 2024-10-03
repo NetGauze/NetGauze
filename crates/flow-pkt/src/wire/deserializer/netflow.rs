@@ -47,6 +47,32 @@ pub enum NetFlowV9PacketParsingError {
     SetError(#[from_located(module = "self")] SetParsingError),
 }
 
+impl std::fmt::Display for NetFlowV9PacketParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(e) => write!(f, "{}", nom::Err::Error(e)),
+            Self::UnsupportedVersion(version) => {
+                write!(f, "unsupported NetFlow V9 version: {version}")
+            }
+            Self::InvalidCount(len) => write!(f, "invalid records count: {len}"),
+            Self::InvalidUnixTime(time) => write!(f, "invalid Netflow export time: {time}"),
+            Self::SetError(e) => write!(f, "Set parsing error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for NetFlowV9PacketParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            NetFlowV9PacketParsingError::UnsupportedVersion(_) => None,
+            NetFlowV9PacketParsingError::InvalidCount(_) => None,
+            NetFlowV9PacketParsingError::InvalidUnixTime(_) => None,
+            NetFlowV9PacketParsingError::SetError(err) => Some(err),
+        }
+    }
+}
+
 impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedNetFlowV9PacketParsingError<'a>>
     for NetFlowV9Packet
 {
@@ -124,6 +150,35 @@ pub enum SetParsingError {
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
 }
 
+impl std::fmt::Display for SetParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(e) => write!(f, "{}", nom::Err::Error(e)),
+            Self::InvalidLength(len) => write!(f, "invalid Set length: {len}"),
+            Self::InvalidSetId(id) => write!(f, "invalid Set id: {id}"),
+            Self::NoTemplateDefinedFor(id) => write!(f, "no template defined for: {id}"),
+            Self::InvalidPaddingValue(padding) => write!(f, "invalid Padding value: {padding}"),
+            Self::TemplateRecordError(e) => write!(f, "{e}"),
+            Self::OptionsTemplateRecordError(e) => write!(f, "{e}"),
+            Self::DataRecordError(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for SetParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            Self::InvalidLength(_) => None,
+            Self::InvalidSetId(_) => None,
+            Self::NoTemplateDefinedFor(_) => None,
+            Self::InvalidPaddingValue(_) => None,
+            Self::TemplateRecordError(e) => Some(e),
+            Self::OptionsTemplateRecordError(e) => Some(e),
+            Self::DataRecordError(e) => Some(e),
+        }
+    }
+}
 impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'a>> for Set {
     fn from_wire(
         buf: Span<'a>,
@@ -261,6 +316,30 @@ pub enum OptionsTemplateRecordParsingError {
     ScopeFieldSpecifierError(#[from_located(module = "self")] ScopeFieldSpecifierParsingError),
 }
 
+impl std::fmt::Display for OptionsTemplateRecordParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(err) => write!(f, "Nom error {}", nom::Err::Error(err)),
+            Self::InvalidTemplateId(id) => write!(f, "invalid template ID {id}"),
+            Self::InvalidScopeFieldsCount(count) => write!(f, "invalid scope {count}"),
+            Self::FieldSpecifierError(err) => write!(f, "{err}"),
+            Self::ScopeFieldSpecifierError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for OptionsTemplateRecordParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            Self::InvalidTemplateId(_) => None,
+            Self::InvalidScopeFieldsCount(_) => None,
+            Self::FieldSpecifierError(err) => Some(err),
+            Self::ScopeFieldSpecifierError(err) => Some(err),
+        }
+    }
+}
+
 impl<'a>
     ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedOptionsTemplateRecordParsingError<'a>>
     for OptionsTemplateRecord
@@ -315,6 +394,26 @@ pub enum TemplateRecordParsingError {
     ),
 }
 
+impl std::fmt::Display for TemplateRecordParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(err) => write!(f, "Nom error {}", nom::Err::Error(err)),
+            Self::InvalidTemplateId(err) => write!(f, "Invalid template id {err}"),
+            Self::FieldSpecifierError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for TemplateRecordParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            Self::InvalidTemplateId(_) => None,
+            Self::FieldSpecifierError(err) => Some(err),
+        }
+    }
+}
+
 impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedTemplateRecordParsingError<'a>>
     for TemplateRecord
 {
@@ -350,6 +449,19 @@ pub enum ScopeFieldSpecifierParsingError {
     NomError(#[from_nom] ErrorKind),
     InvalidLength(ScopeIE, u16),
 }
+
+impl std::fmt::Display for ScopeFieldSpecifierParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(err) => write!(f, "Nom error {}", nom::Err::Error(err)),
+            Self::InvalidLength(field, length) => {
+                write!(f, "Invalid length {field:?}, length {length}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ScopeFieldSpecifierParsingError {}
 
 impl<'a> ReadablePdu<'a, LocatedScopeFieldSpecifierParsingError<'a>> for ScopeFieldSpecifier {
     fn from_wire(
@@ -388,6 +500,24 @@ pub enum DataRecordParsingError {
     ScopeFieldError(#[from_located(module = "self")] ScopeFieldParsingError),
 }
 
+impl std::fmt::Display for DataRecordParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FieldError(err) => write!(f, "{err}"),
+            Self::ScopeFieldError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for DataRecordParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::FieldError(err) => Some(err),
+            Self::ScopeFieldError(err) => Some(err),
+        }
+    }
+}
+
 impl<'a> ReadablePduWithOneInput<'a, &DecodingTemplate, LocatedDataRecordParsingError<'a>>
     for DataRecord
 {
@@ -423,6 +553,18 @@ pub enum ScopeFieldParsingError {
     InvalidLength(u16),
     Utf8Error(String),
 }
+
+impl std::fmt::Display for ScopeFieldParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(err) => write!(f, "Nom error {}", nom::Err::Error(err)),
+            Self::InvalidLength(len) => write!(f, "Invalid length {len}"),
+            Self::Utf8Error(err) => write!(f, "UTF8 error {err}"),
+        }
+    }
+}
+
+impl std::error::Error for ScopeFieldParsingError {}
 
 impl<'a> nom::error::FromExternalError<Span<'a>, std::str::Utf8Error>
     for LocatedScopeFieldParsingError<'a>

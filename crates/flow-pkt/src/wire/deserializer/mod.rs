@@ -36,12 +36,54 @@ pub enum FlowParsingError {
     NetFlowV9ParsingError(netflow::NetFlowV9PacketParsingError),
 }
 
+impl std::fmt::Display for FlowParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FlowParsingError::IpfixParsingError(err) => {
+                write!(f, "Flow parsing error parsing IPFIX packet: {err}")
+            }
+            FlowParsingError::NetFlowV9ParsingError(err) => {
+                write!(f, "Flow parsing error parsing Netflow V9 packet: {err}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for FlowParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            FlowParsingError::IpfixParsingError(err) => Some(err),
+            FlowParsingError::NetFlowV9ParsingError(err) => Some(err),
+        }
+    }
+}
+
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum FieldSpecifierParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     FieldSpecifierError(FieldSpecifierError),
     IEError(IEError),
+}
+
+impl std::fmt::Display for FieldSpecifierParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(e) => write!(f, "{}", nom::Err::Error(e)),
+            Self::FieldSpecifierError(e) => write!(f, "{e}"),
+            Self::IEError(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for FieldSpecifierParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            Self::FieldSpecifierError(err) => Some(err),
+            Self::IEError(err) => Some(err),
+        }
+    }
 }
 
 impl<'a> ReadablePdu<'a, LocatedFieldSpecifierParsingError<'a>> for FieldSpecifier {

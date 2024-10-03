@@ -38,6 +38,18 @@ pub enum FieldSpecifierError {
     InvalidLength(u16, IE),
 }
 
+impl std::fmt::Display for FieldSpecifierError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FieldSpecifierError::InvalidLength(len, ie) => {
+                write!(f, "Invalid length specified {len} for IE: {ie:?}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for FieldSpecifierError {}
+
 /// Field Specifier
 ///
 /// ```text
@@ -79,6 +91,18 @@ impl FieldSpecifier {
 pub enum DataSetIdError {
     InvalidId(u16),
 }
+
+impl std::fmt::Display for DataSetIdError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidId(id) => {
+                write!(f, "Invalid data set id specified {id}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DataSetIdError {}
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
