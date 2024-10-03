@@ -66,11 +66,12 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
 
         let recv_counter = Arc::new(AtomicU64::new(0));
         let recv_counter_total = Arc::new(AtomicU64::new(0));
-        for i in 0..4 {
+        for _i in 0..4 {
             let rec_counter_clone = recv_counter.clone();
             let recv_counter_total_clone = recv_counter_total.clone();
+            let pkt_rx_clone = pkt_rx.clone();
             tokio::spawn(async move {
-                while let Ok(_pkt) = pkt_rx.recv().await {
+                while let Ok(_pkt) = pkt_rx_clone.recv().await {
                     rec_counter_clone.fetch_add(1, Ordering::Relaxed);
                     recv_counter_total_clone.fetch_add(1, Ordering::Relaxed);
                 }
