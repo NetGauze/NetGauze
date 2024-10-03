@@ -1386,6 +1386,35 @@ pub(crate) fn generate_pkg_ie_serializers(
         ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
     }
     ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}WritingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::StdIOError(err) => write!(f, \"{err}\"),\n");
+    for ie in ies {
+        ret.push_str(
+            format!(
+                "            Self::{}Error(err) => write!(f, \"{{err}}\"),\n",
+                ie.name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}WritingError {{\n").as_str());
+    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::StdIOError(_) => None,\n");
+    for ie in ies {
+        ret.push_str(format!("            Self::{}Error(err) => Some(err),\n", ie.name).as_str());
+    }
+    ret.push_str("        }");
+    ret.push_str("    }");
+    ret.push_str("}\n\n");
+
     ret.push_str(
         format!(
             "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
@@ -1769,6 +1798,17 @@ fn get_std_serializer_error(ty_name: &str) -> String {
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
     ret.push_str("    InvalidLength(u16),\n");
     ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}WritingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::StdIOError(err) => write!(f, \"{err}\"),\n");
+    ret.push_str("            Self::InvalidLength(len) => write!(f, \"invalid length {len}\"),\n");
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}WritingError {{}}\n\n").as_str());
     ret
 }
 
@@ -2125,6 +2165,40 @@ pub(crate) fn generate_ie_ser_main(
     for ie in iana_ies {
         ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
     }
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::fmt::Display for {ty_name}WritingError {{\n").as_str());
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::StdIOError(err) => write!(f, \"{err}\"),\n");
+    for (name, pkg, _) in vendor_prefixes {
+        ret.push_str(format!("            Self::{name}Error(err) => write!(f, \"writing error of {pkg}{{err}}\"),\n").as_str());
+    }
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "            Self::{}Error(err) => write!(f, \"{{err}}\"),\n",
+                ie.name
+            )
+            .as_str(),
+        );
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(format!("impl std::error::Error for {ty_name}WritingError {{\n").as_str());
+    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::StdIOError(_) => None,\n");
+    for (name, _pkg, _) in vendor_prefixes {
+        ret.push_str(format!("            Self::{name}Error(err) => Some(err),\n").as_str());
+    }
+    for ie in iana_ies {
+        ret.push_str(format!("            Self::{}Error(err) => Some(err),\n", ie.name).as_str());
+    }
+    ret.push_str("        }");
+    ret.push_str("    }");
     ret.push_str("}\n\n");
 
     ret.push_str(

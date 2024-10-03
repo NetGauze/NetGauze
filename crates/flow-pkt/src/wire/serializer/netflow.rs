@@ -32,6 +32,24 @@ pub enum NetFlowV9WritingError {
     SetError(#[from] SetWritingError),
 }
 
+impl std::fmt::Display for NetFlowV9WritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::SetError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for NetFlowV9WritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::SetError(err) => Some(err),
+        }
+    }
+}
+
 /// [RFC 3954](https://www.rfc-editor.org/rfc/rfc3954) defines padding to 4-bytes start as
 /// SHOULD (optional). The second option is a boolean to indicate if padding
 /// should be included in the output.
@@ -100,6 +118,28 @@ pub enum SetWritingError {
     DataRecordError(#[from] DataRecordWritingError),
     TemplateRecordError(#[from] TemplateRecordWritingError),
     OptionsTemplateRecordError(#[from] OptionsTemplateRecordWritingError),
+}
+
+impl std::fmt::Display for SetWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::DataRecordError(err) => write!(f, "{err}"),
+            Self::TemplateRecordError(err) => write!(f, "{err}"),
+            Self::OptionsTemplateRecordError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for SetWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::DataRecordError(err) => Some(err),
+            Self::TemplateRecordError(err) => Some(err),
+            Self::OptionsTemplateRecordError(err) => Some(err),
+        }
+    }
 }
 
 /// Calculate padding such that next set starts at a 4-byte aligned boundary
@@ -184,6 +224,24 @@ pub enum TemplateRecordWritingError {
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
 }
 
+impl std::fmt::Display for TemplateRecordWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::FieldSpecifierError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for TemplateRecordWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::FieldSpecifierError(err) => Some(err),
+        }
+    }
+}
+
 impl WritablePdu<TemplateRecordWritingError> for TemplateRecord {
     /// 2-octets template_id, 2-octets field count
     const BASE_LENGTH: usize = 4;
@@ -212,6 +270,26 @@ pub enum OptionsTemplateRecordWritingError {
     StdIOError(#[from_std_io_error] String),
     ScopeFieldSpecifierError(#[from] ScopeFieldSpecifierWritingError),
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
+}
+
+impl std::fmt::Display for OptionsTemplateRecordWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::ScopeFieldSpecifierError(err) => write!(f, "{err}"),
+            Self::FieldSpecifierError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for OptionsTemplateRecordWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::ScopeFieldSpecifierError(err) => Some(err),
+            Self::FieldSpecifierError(err) => Some(err),
+        }
+    }
 }
 
 impl WritablePdu<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
@@ -261,6 +339,26 @@ pub enum DataRecordWritingError {
     StdIOError(#[from_std_io_error] String),
     ScopeFieldError(#[from] ScopeFieldWritingError),
     FieldError(#[from] FieldWritingError),
+}
+
+impl std::fmt::Display for DataRecordWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::ScopeFieldError(err) => write!(f, "{err}"),
+            Self::FieldError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for DataRecordWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::ScopeFieldError(err) => Some(err),
+            Self::FieldError(err) => Some(err),
+        }
+    }
 }
 
 impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> for DataRecord {
@@ -337,6 +435,16 @@ pub enum ScopeFieldSpecifierWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
+impl std::fmt::Display for ScopeFieldSpecifierWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for ScopeFieldSpecifierWritingError {}
+
 impl WritablePdu<ScopeFieldSpecifierWritingError> for ScopeFieldSpecifier {
     /// 2-octets field id, 2-octets length
     const BASE_LENGTH: usize = 4;
@@ -361,6 +469,17 @@ pub enum ScopeFieldWritingError {
     StdIOError(#[from_std_io_error] String),
     InvalidLength(u16),
 }
+
+impl std::fmt::Display for ScopeFieldWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::InvalidLength(len) => write!(f, "invalid field length{len}"),
+        }
+    }
+}
+
+impl std::error::Error for ScopeFieldWritingError {}
 
 impl WritablePduWithOneInput<Option<u16>, ScopeFieldWritingError> for ScopeField {
     /// 2-octets field id, 2-octets length
