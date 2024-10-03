@@ -30,10 +30,40 @@ pub enum FlowWritingError {
     NetFlowV9WritingError(#[from] netflow::NetFlowV9WritingError),
 }
 
+impl std::fmt::Display for FlowWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(e) => write!(f, "StdIO error: {e}"),
+            Self::IpfixWritingError(e) => write!(f, "IPFIX writing error: {e}"),
+            Self::NetFlowV9WritingError(e) => write!(f, "NetFlow V9 writing error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for FlowWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::IpfixWritingError(e) => Some(e),
+            Self::NetFlowV9WritingError(e) => Some(e),
+        }
+    }
+}
+
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum FieldSpecifierWritingError {
     StdIOError(#[from_std_io_error] String),
 }
+
+impl std::fmt::Display for FieldSpecifierWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(e) => write!(f, "StdIO error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for FieldSpecifierWritingError {}
 
 impl WritablePdu<FieldSpecifierWritingError> for FieldSpecifier {
     /// 2-octets field id, 2-octets length

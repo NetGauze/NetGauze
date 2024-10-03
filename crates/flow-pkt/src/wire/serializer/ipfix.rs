@@ -29,6 +29,24 @@ pub enum IpfixPacketWritingError {
     SetError(#[from] SetWritingError),
 }
 
+impl std::fmt::Display for IpfixPacketWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::SetError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for IpfixPacketWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::SetError(err) => Some(err),
+        }
+    }
+}
+
 impl WritablePduWithOneInput<Option<&TemplatesMap>, IpfixPacketWritingError> for IpfixPacket {
     /// 2-octets version, 2-octets length, 4-octets * 3 (export time, seq no,
     /// observation domain id)
@@ -66,6 +84,24 @@ pub enum TemplateRecordWritingError {
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
 }
 
+impl std::fmt::Display for TemplateRecordWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::FieldSpecifierError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for TemplateRecordWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::FieldSpecifierError(err) => Some(err),
+        }
+    }
+}
+
 impl WritablePdu<TemplateRecordWritingError> for TemplateRecord {
     /// 2-octets template_id, 2-octets field count
     const BASE_LENGTH: usize = 4;
@@ -93,6 +129,24 @@ impl WritablePdu<TemplateRecordWritingError> for TemplateRecord {
 pub enum OptionsTemplateRecordWritingError {
     StdIOError(#[from_std_io_error] String),
     FieldSpecifierError(#[from] FieldSpecifierWritingError),
+}
+
+impl std::fmt::Display for OptionsTemplateRecordWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::FieldSpecifierError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for OptionsTemplateRecordWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::FieldSpecifierError(err) => Some(err),
+        }
+    }
 }
 
 impl WritablePdu<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
@@ -133,6 +187,24 @@ impl WritablePdu<OptionsTemplateRecordWritingError> for OptionsTemplateRecord {
 pub enum DataRecordWritingError {
     StdIOError(#[from_std_io_error] String),
     FieldError(#[from] FieldWritingError),
+}
+
+impl std::fmt::Display for DataRecordWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::FieldError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for DataRecordWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::FieldError(err) => Some(err),
+        }
+    }
 }
 
 impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> for DataRecord {
@@ -246,6 +318,28 @@ pub enum SetWritingError {
     FlowError(#[from] DataRecordWritingError),
     TemplateRecordError(#[from] TemplateRecordWritingError),
     OptionsTemplateRecordError(#[from] OptionsTemplateRecordWritingError),
+}
+
+impl std::fmt::Display for SetWritingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StdIOError(err) => write!(f, "{err}"),
+            Self::FlowError(err) => write!(f, "{err}"),
+            Self::TemplateRecordError(err) => write!(f, "{err}"),
+            Self::OptionsTemplateRecordError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for SetWritingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::StdIOError(_) => None,
+            Self::FlowError(err) => Some(err),
+            Self::TemplateRecordError(err) => Some(err),
+            Self::OptionsTemplateRecordError(err) => Some(err),
+        }
+    }
 }
 
 impl WritablePduWithOneInput<Option<&TemplatesMap>, SetWritingError> for Set {
