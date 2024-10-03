@@ -46,6 +46,30 @@ pub enum IpfixPacketParsingError {
     SetParsingError(#[from_located(module = "self")] SetParsingError),
 }
 
+impl std::fmt::Display for IpfixPacketParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(e) => write!(f, "{}", nom::Err::Error(e)),
+            Self::UnsupportedVersion(version) => write!(f, "unsupported IPFIX version: {version}"),
+            Self::InvalidLength(len) => write!(f, "invalid IPFIX packet length: {len}"),
+            Self::InvalidExportTime(time) => write!(f, "invalid IPFIX export time: {time}"),
+            Self::SetParsingError(e) => write!(f, "Set parsing error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for IpfixPacketParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            Self::UnsupportedVersion(_) => None,
+            Self::InvalidLength(_) => None,
+            Self::InvalidExportTime(_) => None,
+            Self::SetParsingError(err) => Some(err),
+        }
+    }
+}
+
 impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedIpfixPacketParsingError<'a>>
     for IpfixPacket
 {
@@ -113,6 +137,36 @@ pub enum SetParsingError {
     TemplateRecordError(#[from_located(module = "self")] TemplateRecordParsingError),
     OptionsTemplateRecordError(#[from_located(module = "self")] OptionsTemplateRecordParsingError),
     DataRecordError(#[from_located(module = "self")] DataRecordParsingError),
+}
+
+impl std::fmt::Display for SetParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(e) => write!(f, "{}", nom::Err::Error(e)),
+            Self::InvalidLength(len) => write!(f, "invalid Set length: {len}"),
+            Self::InvalidSetId(id) => write!(f, "invalid Set id: {id}"),
+            Self::NoTemplateDefinedFor(id) => write!(f, "no template defined for: {id}"),
+            Self::InvalidPaddingValue(padding) => write!(f, "invalid Padding value: {padding}"),
+            Self::TemplateRecordError(e) => write!(f, "{e}"),
+            Self::OptionsTemplateRecordError(e) => write!(f, "{e}"),
+            Self::DataRecordError(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for SetParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            Self::InvalidLength(_) => None,
+            Self::InvalidSetId(_) => None,
+            Self::NoTemplateDefinedFor(_) => None,
+            Self::InvalidPaddingValue(_) => None,
+            Self::TemplateRecordError(e) => Some(e),
+            Self::OptionsTemplateRecordError(e) => Some(e),
+            Self::DataRecordError(e) => Some(e),
+        }
+    }
 }
 
 impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'a>> for Set {
@@ -265,6 +319,28 @@ pub enum OptionsTemplateRecordParsingError {
     FieldError(#[from_located(module = "crate::wire::deserializer")] FieldSpecifierParsingError),
 }
 
+impl std::fmt::Display for OptionsTemplateRecordParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(err) => write!(f, "Nom error {}", nom::Err::Error(err)),
+            Self::InvalidTemplateId(id) => write!(f, "invalid template ID {id}"),
+            Self::InvalidScopeFieldsCount(count) => write!(f, "invalid scope {count}"),
+            Self::FieldError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for OptionsTemplateRecordParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            Self::InvalidTemplateId(_) => None,
+            Self::InvalidScopeFieldsCount(_) => None,
+            Self::FieldError(err) => Some(err),
+        }
+    }
+}
+
 impl<'a>
     ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedOptionsTemplateRecordParsingError<'a>>
     for OptionsTemplateRecord
@@ -322,6 +398,22 @@ pub enum DataRecordParsingError {
     FieldError(#[from_located(module = "")] ie::FieldParsingError),
 }
 
+impl std::fmt::Display for DataRecordParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FieldError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for DataRecordParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::FieldError(err) => Some(err),
+        }
+    }
+}
+
 impl<'a> ReadablePduWithOneInput<'a, &DecodingTemplate, LocatedDataRecordParsingError<'a>>
     for DataRecord
 {
@@ -358,6 +450,26 @@ pub enum TemplateRecordParsingError {
     FieldSpecifierError(
         #[from_located(module = "crate::wire::deserializer")] FieldSpecifierParsingError,
     ),
+}
+
+impl std::fmt::Display for TemplateRecordParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NomError(err) => write!(f, "Nom error {}", nom::Err::Error(err)),
+            Self::InvalidTemplateId(err) => write!(f, "Invalid template id {err}"),
+            Self::FieldSpecifierError(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for TemplateRecordParsingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::NomError(_err) => None,
+            Self::InvalidTemplateId(_) => None,
+            Self::FieldSpecifierError(err) => Some(err),
+        }
+    }
 }
 
 impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedTemplateRecordParsingError<'a>>
