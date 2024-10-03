@@ -107,6 +107,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@clippy
+        with:
+          toolchain: beta
       - run: cargo clippy --tests -- -Dclippy::all -A clippy::too-long-first-doc-paragraph
 
   coverage:
