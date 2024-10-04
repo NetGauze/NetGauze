@@ -65,6 +65,7 @@ pub fn new_udp_reuse_port(
     )?;
     #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
     udp_sock.set_reuse_port(true)?;
+    udp_sock.set_recv_buffer_size(1024 * 1024 * 20)?; // 20 MB
     // from tokio-rs/mio/blob/master/src/sys/unix/net.rs
     #[cfg(unix)]
     udp_sock.set_cloexec(true)?;
