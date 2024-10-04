@@ -71,7 +71,7 @@ pub async fn start_sender(
             index = 0;
         }
     }
-    tracing::info!("Client shutdown");
+    //tracing::info!("Client shutdown");
     Ok(())
 }
 
@@ -85,7 +85,7 @@ fn read_input(file_path: String) -> anyhow::Result<Vec<FlowInfo>> {
     Ok(ret)
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 32)]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
