@@ -103,6 +103,9 @@ pub enum InformationElementDataType {
     /// [RFC6313](https://datatracker.ietf.org/doc/html/rfc6313)
     /// [RFC7011](https://datatracker.ietf.org/doc/html/rfc7011)
     subTemplateMultiList = 22,
+
+    /// [RFC-ietf-opsawg-ipfix-tcpo-v6eh-18](https://datatracker.ietf.org/doc/draft-ietf-opsawg-ipfix-tcpo-v6eh/18/)
+    unsigned256 = 23,
 }
 
 pub trait InformationElementTemplate {
@@ -141,6 +144,7 @@ pub trait InformationElementTemplate {
             InformationElementDataType::basicList => None,
             InformationElementDataType::subTemplateList => None,
             InformationElementDataType::subTemplateMultiList => None,
+            InformationElementDataType::unsigned256 => Some(std::ops::Range { start: 1, end: 33 }),
         }
     }
     fn value_range(&self) -> Option<std::ops::Range<u64>>;
