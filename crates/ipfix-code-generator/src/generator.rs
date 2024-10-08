@@ -759,7 +759,7 @@ fn generate_u64_deserializer(ie_name: &String) -> String {
     ret
 }
 
-fn generate_u256_deserializer(ie_name: &String, enum_subreg: bool) -> String {
+fn generate_u256_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
     let std_error = get_std_deserializer_error(ie_name.as_str());
     let header = get_deserializer_header(ie_name.as_str());
@@ -771,12 +771,7 @@ fn generate_u256_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     ret.push_str("        }\n");
     ret.push_str("        let mut ret: [u8; 32] = [0; 32];\n");
     ret.push_str("        ret.copy_from_slice(buf.slice(..8).fragment());\n");
-    if enum_subreg {
-        ret.push_str(format!("        let enum_val = {ie_name}::from(ret);\n").as_str());
-        ret.push_str("        Ok((buf.slice(len..), ret))\n");
-    } else {
-        ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(ret)))\n").as_str());
-    }
+    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(ret)))\n").as_str());
 
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
@@ -1141,7 +1136,7 @@ fn generate_ie_deserializer(data_type: &str, ie_name: &String) -> String {
         "basicList" => generate_vec_u8_deserializer(ie_name),
         "subTemplateList" => generate_vec_u8_deserializer(ie_name),
         "subTemplateMultiList" => generate_vec_u8_deserializer(ie_name),
-        "unsigned256" => generate_u256_deserializer(ie_name, enum_subreg),
+        "unsigned256" => generate_u256_deserializer(ie_name),
         ty => todo!("Unsupported deserialization for type: {}", ty),
     };
     ret.push_str(gen.as_str());
