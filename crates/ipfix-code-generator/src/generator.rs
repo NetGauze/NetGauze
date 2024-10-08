@@ -772,7 +772,6 @@ fn generate_u256_deserializer(ie_name: &String) -> String {
     ret.push_str("        let mut ret: [u8; 32] = [0; 32];\n");
     ret.push_str("        ret.copy_from_slice(buf.slice(..8).fragment());\n");
     ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(ret)))\n").as_str());
-
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
