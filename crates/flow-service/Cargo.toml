@@ -14,20 +14,27 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-flow-pkt = { version = "0.4.1", path = "../flow-pkt", features = ["codec"] }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils" }
-nom = { workspace = true }
-byteorder = { workspace = true }
+netgauze-flow-pkt = { version = "0.4.1", path = "../flow-pkt", features = [
+    "codec",
+] }
 tokio = { workspace = true, features = ["full", "tracing"] }
 tokio-util = { workspace = true, features = ["full", "tracing"] }
 bytes = { workspace = true }
-dashmap = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
-futures-core = { workspace = true }
+socket2 = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+async-channel = "2.3"
 
 [dev-dependencies]
+dashmap = { workspace = true }
+chrono = { workspace = true, default-features = false, features = [
+    "std",
+    "clock",
+] }
 tracing-subscriber = { workspace = true }
+tracing-test = { version = "0.2" }
 serde_json = { workspace = true }
