@@ -31,12 +31,32 @@ pub enum SegmentIdentifierParsingError {
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] nom::error::ErrorKind),
-    MplsLabelParsingError(
-        #[from_located(module = "crate::wire::deserializer::nlri")] MplsLabelParsingError,
-    ),
+    // TODO split into own error types
+    BgpPrefixSidTlvError(#[from_located(module = "self")] BgpPrefixSidTlvParsingError),
+}
+
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum BgpPrefixSidTlvParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] nom::error::ErrorKind),
+    BgpSRv6SRGBError(#[from_located(module = "self")] BgpSRv6SRGBParsingError),
     BadBgpPrefixSidTlvType(#[from_external] BgpSidAttributeTypeError),
-    BadSRv6ServiceSubTlvType(#[from_external] BgpSrv6ServiceSubTlvTypeError),
-    BadSRv6ServiceSubSubTlvType(#[from_external] BgpSrv6ServiceSubSubTlvTypeError),
+    SRv6ServiceSubTlvError(#[from_located(module = "self")] BgpPrefixSidSubTlvParsingError),
+}
+
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum BgpPrefixSidSubTlvParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] nom::error::ErrorKind),
+    BgpPrefixSidSubTlvType(#[from_external] BgpSrv6ServiceSubTlvTypeError),
+    SRv6ServiceSubTlvError(#[from_located(module = "self")] BgpPrefixSidSubSubTlvParsingError),
+}
+
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum BgpPrefixSidSubSubTlvParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] nom::error::ErrorKind),
+    BadBgpPrefixSidSubSubTlvType(#[from_external] BgpSrv6ServiceSubSubTlvTypeError),
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedSegmentIdentifierParsingError<'a>>
@@ -61,10 +81,10 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedSegmentIdentifierParsingError<
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for BgpSidAttribute {
+impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidTlvParsingError<'a>> for BgpSidAttribute {
     fn from_wire(
         buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>> {
+    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidTlvParsingError<'a>> {
         let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t8_l16(buf)?;
 
         let tlv_type = match BgpSidAttributeType::try_from(tlv_type) {
@@ -79,9 +99,9 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for BgpSidAtt
                 ))
             }
             Err(error) => {
-                return Err(nom::Err::Error(LocatedSegmentIdentifierParsingError::new(
+                return Err(nom::Err::Error(LocatedBgpPrefixSidTlvParsingError::new(
                     buf,
-                    SegmentIdentifierParsingError::BadBgpPrefixSidTlvType(error),
+                    BgpPrefixSidTlvParsingError::BadBgpPrefixSidTlvType(error),
                 )));
             }
         };
@@ -116,8 +136,10 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for BgpSidAtt
         Ok((remainder, attribute))
     }
 }
-impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SRv6ServiceSubTlv {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubTlvParsingError<'a>> for SRv6ServiceSubTlv {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidSubTlvParsingError<'a>>
     where
         Self: Sized,
     {
@@ -135,9 +157,9 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SRv6Servi
                 ))
             }
             Err(error) => {
-                return Err(nom::Err::Error(LocatedSegmentIdentifierParsingError::new(
+                return Err(nom::Err::Error(LocatedBgpPrefixSidSubTlvParsingError::new(
                     buf,
-                    SegmentIdentifierParsingError::BadSRv6ServiceSubTlvType(error),
+                    BgpPrefixSidSubTlvParsingError::BgpPrefixSidSubTlvType(error),
                 )));
             }
         };
@@ -166,8 +188,10 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SRv6Servi
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SRv6ServiceSubSubTlv {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubSubTlvParsingError<'a>> for SRv6ServiceSubSubTlv {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidSubSubTlvParsingError<'a>>
     where
         Self: Sized,
     {
@@ -185,10 +209,12 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SRv6Servi
                 ))
             }
             Err(error) => {
-                return Err(nom::Err::Error(LocatedSegmentIdentifierParsingError::new(
-                    buf,
-                    SegmentIdentifierParsingError::BadSRv6ServiceSubSubTlvType(error),
-                )));
+                return Err(nom::Err::Error(
+                    LocatedBgpPrefixSidSubSubTlvParsingError::new(
+                        buf,
+                        BgpPrefixSidSubSubTlvParsingError::BadBgpPrefixSidSubSubTlvType(error),
+                    ),
+                ));
             }
         };
 
@@ -216,8 +242,17 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SRv6Servi
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SegmentRoutingGlobalBlock {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>>
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum BgpSRv6SRGBParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] nom::error::ErrorKind),
+    MplsLabelParsingError(
+        #[from_located(module = "crate::wire::deserializer::nlri")] MplsLabelParsingError,
+    ),
+}
+
+impl<'a> ReadablePdu<'a, LocatedBgpSRv6SRGBParsingError<'a>> for SegmentRoutingGlobalBlock {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpSRv6SRGBParsingError<'a>>
     where
         Self: Sized,
     {
