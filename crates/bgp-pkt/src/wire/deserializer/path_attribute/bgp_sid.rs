@@ -12,16 +12,15 @@ use netgauze_serde_macros::LocatedError;
 
 use crate::{
     iana::{
-    BgpSidAttributeType, BgpSidAttributeTypeError, BgpSrv6ServiceSubSubTlvType,
-    BgpSrv6ServiceSubSubTlvTypeError, BgpSrv6ServiceSubTlvType, BgpSrv6ServiceSubTlvTypeError,
-    IanaValueError,
-},
+        BgpSidAttributeType, BgpSidAttributeTypeError, BgpSrv6ServiceSubSubTlvType,
+        BgpSrv6ServiceSubSubTlvTypeError, BgpSrv6ServiceSubTlvType, BgpSrv6ServiceSubTlvTypeError,
+        IanaValueError,
+    },
     path_attribute::{
-    BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv, SRGB,
-},
-    wire::deserializer::nlri::MplsLabelParsingError,
+        BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv, SRGB,
+    },
+    wire::deserializer::{nlri::MplsLabelParsingError, read_tlv_header_t8_l16},
 };
-use crate::wire::deserializer::read_tlv_header_t8_l16;
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum SegmentIdentifierParsingError {
@@ -278,23 +277,24 @@ pub mod tests {
 
     use netgauze_parse_utils::test_helpers::{test_parsed_completely_with_one_input, test_write};
 
-    use crate::community::{
-        Community, ExtendedCommunity, LargeCommunity, TransitiveTwoOctetExtendedCommunity,
+    use crate::{
+        community::{
+            Community, ExtendedCommunity, LargeCommunity, TransitiveTwoOctetExtendedCommunity,
+        },
+        nlri::{
+            Ipv4MplsVpnUnicastAddress, Ipv4Unicast, Ipv4UnicastAddress, LabeledIpv6NextHop,
+            LabeledNextHop, MplsLabel, RouteDistinguisher,
+        },
+        path_attribute::{
+            Aigp, As4PathSegment, AsPath, AsPathSegmentType, BgpSidAttribute, Communities,
+            ExtendedCommunities, LargeCommunities, LocalPreference, MpReach,
+            MultiExitDiscriminator, Origin, PathAttribute, PathAttributeValue,
+            PrefixSegmentIdentifier, SRv6ServiceSubSubTlv::SRv6SIDStructure,
+            SRv6ServiceSubTlv::SRv6SIDInformation,
+        },
+        wire::{deserializer::BgpParsingContext, serializer::BgpMessageWritingError},
+        *,
     };
-    use crate::nlri::{
-        Ipv4MplsVpnUnicastAddress, Ipv4Unicast, Ipv4UnicastAddress, LabeledIpv6NextHop,
-        LabeledNextHop, MplsLabel, RouteDistinguisher,
-    };
-    use crate::path_attribute::SRv6ServiceSubSubTlv::SRv6SIDStructure;
-    use crate::path_attribute::SRv6ServiceSubTlv::SRv6SIDInformation;
-    use crate::path_attribute::{
-        Aigp, As4PathSegment, AsPath, AsPathSegmentType, BgpSidAttribute, Communities,
-        ExtendedCommunities, LargeCommunities, LocalPreference, MpReach, MultiExitDiscriminator,
-        Origin, PathAttribute, PathAttributeValue, PrefixSegmentIdentifier,
-    };
-    use crate::wire::deserializer::BgpParsingContext;
-    use crate::wire::serializer::BgpMessageWritingError;
-    use crate::*;
 
     #[test]
     pub fn test_bgp_sid_l3_service_tlv() -> Result<(), BgpMessageWritingError> {

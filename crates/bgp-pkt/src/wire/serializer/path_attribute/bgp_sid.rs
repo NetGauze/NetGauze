@@ -7,11 +7,12 @@ use netgauze_serde_macros::WritingError;
 
 use crate::{
     path_attribute::{
-    BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv, SRGB,
-},
-    wire::serializer::{nlri::MplsLabelWritingError, path_attribute::write_length},
+        BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv, SRGB,
+    },
+    wire::serializer::{
+        nlri::MplsLabelWritingError, path_attribute::write_length, write_tlv_header_t8_l16,
+    },
 };
-use crate::wire::serializer::write_tlv_header_t8_l16;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum SegmentIdentifierWritingError {
