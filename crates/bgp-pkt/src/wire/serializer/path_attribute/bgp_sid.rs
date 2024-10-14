@@ -7,12 +7,13 @@ use netgauze_serde_macros::WritingError;
 
 use crate::{
     path_attribute::{
-    BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv, SRGB,
-},
-    path_attribute::{BgpSidAttribute, SegmentIdentifier, SegmentRoutingGlobalBlock},
-    wire::serializer::{nlri::MplsLabelWritingError, path_attribute::write_length},
+        BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv,
+        SegmentRoutingGlobalBlock,
+    },
+    wire::serializer::{
+        nlri::MplsLabelWritingError, path_attribute::write_length, write_tlv_header_t8_l16,
+    },
 };
-use crate::wire::serializer::write_tlv_header_t8_l16;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum SegmentIdentifierWritingError {
@@ -55,7 +56,7 @@ pub enum BgpSidAttributeWritingError {
     BgpSRv6SubTlvServiceError(#[from] SRv6ServiceSubTlvWritingError),
 }
 
-impl WrPrefixSegmentIdentifieritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
+impl WritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
     const BASE_LENGTH: usize = 3; /* type u8 + length u16 */
 
     fn len(&self) -> usize {

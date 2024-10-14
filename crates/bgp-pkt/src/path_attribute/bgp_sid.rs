@@ -1,5 +1,7 @@
 use crate::{
-    iana::BgpSidAttributeType, nlri::MplsLabel, path_attribute::PathAttributeValueProperties,
+    iana::{BgpSidAttributeType, BgpSrv6ServiceSubSubTlvType, BgpSrv6ServiceSubTlvType},
+    nlri::MplsLabel,
+    path_attribute::PathAttributeValueProperties,
 };
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
@@ -48,7 +50,8 @@ pub enum BgpSidAttribute {
     /// ```
     LabelIndex {
         /// Flags for the SR Label Index are not yet defined (RFC8669).
-        /// The Flags field MUST be clear on transmission and MUST be ignored on reception.
+        /// The Flags field MUST be clear on transmission and MUST be ignored on
+        /// reception.
         flags: u16,
         label_index: u32,
     },

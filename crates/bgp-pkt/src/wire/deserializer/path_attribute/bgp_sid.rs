@@ -12,18 +12,16 @@ use netgauze_serde_macros::LocatedError;
 
 use crate::{
     iana::{
-    BgpSidAttributeType, BgpSidAttributeTypeError, BgpSrv6ServiceSubSubTlvType,
-    BgpSrv6ServiceSubSubTlvTypeError, BgpSrv6ServiceSubTlvType, BgpSrv6ServiceSubTlvTypeError,
-    IanaValueError,
-},
+        BgpSidAttributeType, BgpSidAttributeTypeError, BgpSrv6ServiceSubSubTlvType,
+        BgpSrv6ServiceSubSubTlvTypeError, BgpSrv6ServiceSubTlvType, BgpSrv6ServiceSubTlvTypeError,
+        IanaValueError,
+    },
     path_attribute::{
-    BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv, SRGB,
-},
-    iana::{BgpSidAttributeType, BgpSidAttributeTypeError, IanaValueError},
-    path_attribute::{BgpSidAttribute, SegmentIdentifier, SegmentRoutingGlobalBlock},
-    wire::deserializer::nlri::MplsLabelParsingError,
+        BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv,
+        SegmentRoutingGlobalBlock,
+    },
+    wire::deserializer::{nlri::MplsLabelParsingError, read_tlv_header_t8_l16},
 };
-use crate::wire::deserializer::read_tlv_header_t8_l16;
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum SegmentIdentifierParsingError {
@@ -31,7 +29,6 @@ pub enum SegmentIdentifierParsingError {
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] nom::error::ErrorKind),
-    // TODO split into own error types
     BgpPrefixSidTlvError(#[from_located(module = "self")] BgpPrefixSidTlvParsingError),
 }
 
@@ -39,8 +36,8 @@ pub enum SegmentIdentifierParsingError {
 pub enum BgpPrefixSidTlvParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] nom::error::ErrorKind),
-    BgpSRv6SRGBError(#[from_located(module = "self")] BgpSRv6SRGBParsingError),
     BadBgpPrefixSidTlvType(#[from_external] BgpSidAttributeTypeError),
+    BgpSRv6SRGBError(#[from_located(module = "self")] BgpSRv6SRGBParsingError),
     SRv6ServiceSubTlvError(#[from_located(module = "self")] BgpPrefixSidSubTlvParsingError),
 }
 
@@ -48,7 +45,7 @@ pub enum BgpPrefixSidTlvParsingError {
 pub enum BgpPrefixSidSubTlvParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] nom::error::ErrorKind),
-    BgpPrefixSidSubTlvType(#[from_external] BgpSrv6ServiceSubTlvTypeError),
+    BadBgpPrefixSidSubTlvType(#[from_external] BgpSrv6ServiceSubTlvTypeError),
     SRv6ServiceSubTlvError(#[from_located(module = "self")] BgpPrefixSidSubSubTlvParsingError),
 }
 
@@ -82,9 +79,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedSegmentIdentifierParsingError<
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidTlvParsingError<'a>> for BgpSidAttribute {
-    fn from_wire(
-        buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidTlvParsingError<'a>> {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidTlvParsingError<'a>> {
         let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t8_l16(buf)?;
 
         let tlv_type = match BgpSidAttributeType::try_from(tlv_type) {
@@ -159,7 +154,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubTlvParsingError<'a>> for SRv6Serv
             Err(error) => {
                 return Err(nom::Err::Error(LocatedBgpPrefixSidSubTlvParsingError::new(
                     buf,
-                    BgpPrefixSidSubTlvParsingError::BgpPrefixSidSubTlvType(error),
+                    BgpPrefixSidSubTlvParsingError::BadBgpPrefixSidSubTlvType(error),
                 )));
             }
         };
@@ -279,23 +274,24 @@ pub mod tests {
 
     use netgauze_parse_utils::test_helpers::{test_parsed_completely_with_one_input, test_write};
 
-    use crate::community::{
-        Community, ExtendedCommunity, LargeCommunity, TransitiveTwoOctetExtendedCommunity,
+    use crate::{
+        community::{
+            Community, ExtendedCommunity, LargeCommunity, TransitiveTwoOctetExtendedCommunity,
+        },
+        nlri::{
+            Ipv4MplsVpnUnicastAddress, Ipv4Unicast, Ipv4UnicastAddress, LabeledIpv6NextHop,
+            LabeledNextHop, MplsLabel, RouteDistinguisher,
+        },
+        path_attribute::{
+            Aigp, As4PathSegment, AsPath, AsPathSegmentType, BgpSidAttribute, Communities,
+            ExtendedCommunities, LargeCommunities, LocalPreference, MpReach,
+            MultiExitDiscriminator, Origin, PathAttribute, PathAttributeValue,
+            PrefixSegmentIdentifier, SRv6ServiceSubSubTlv::SRv6SIDStructure,
+            SRv6ServiceSubTlv::SRv6SIDInformation,
+        },
+        wire::{deserializer::BgpParsingContext, serializer::BgpMessageWritingError},
+        *,
     };
-    use crate::nlri::{
-        Ipv4MplsVpnUnicastAddress, Ipv4Unicast, Ipv4UnicastAddress, LabeledIpv6NextHop,
-        LabeledNextHop, MplsLabel, RouteDistinguisher,
-    };
-    use crate::path_attribute::SRv6ServiceSubSubTlv::SRv6SIDStructure;
-    use crate::path_attribute::SRv6ServiceSubTlv::SRv6SIDInformation;
-    use crate::path_attribute::{
-        Aigp, As4PathSegment, AsPath, AsPathSegmentType, BgpSidAttribute, Communities,
-        ExtendedCommunities, LargeCommunities, LocalPreference, MpReach, MultiExitDiscriminator,
-        Origin, PathAttribute, PathAttributeValue, PrefixSegmentIdentifier,
-    };
-    use crate::wire::deserializer::BgpParsingContext;
-    use crate::wire::serializer::BgpMessageWritingError;
-    use crate::*;
 
     #[test]
     pub fn test_bgp_sid_l3_service_tlv() -> Result<(), BgpMessageWritingError> {
@@ -410,8 +406,8 @@ pub mod tests {
                     true,
                     false,
                     false,
-                    PathAttributeValue::PrefixSegmentIdentifier(PrefixSegmentIdentifier {
-                        tlvs: vec![BgpSidAttribute::SRv6ServiceL3 {
+                    PathAttributeValue::PrefixSegmentIdentifier(PrefixSegmentIdentifier::new(
+                        vec![BgpSidAttribute::SRv6ServiceL3 {
                             reserved: 0,
                             subtlvs: vec![SRv6SIDInformation {
                                 reserved1: 0,
@@ -429,7 +425,7 @@ pub mod tests {
                                 }],
                             }],
                         }],
-                    }),
+                    )),
                 )
                 .unwrap(),
             ],
@@ -520,12 +516,12 @@ pub mod tests {
                     true,
                     false,
                     false,
-                    PathAttributeValue::PrefixSegmentIdentifier(PrefixSegmentIdentifier {
-                        tlvs: vec![BgpSidAttribute::LabelIndex {
+                    PathAttributeValue::PrefixSegmentIdentifier(PrefixSegmentIdentifier::new(
+                        vec![BgpSidAttribute::LabelIndex {
                             flags: 0,
                             label_index: 53,
                         }],
-                    }),
+                    )),
                 )
                 .unwrap(),
             ],

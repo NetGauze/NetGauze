@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::wire::deserializer::read_tlv_header_t16_l16;
 use crate::{
     iana,
     iana::{
@@ -30,7 +29,8 @@ use crate::{
         UnknownOspfRouteType,
     },
     wire::deserializer::{
-        nlri::RouteDistinguisherParsingError, Ipv4PrefixParsingError, Ipv6PrefixParsingError,
+        nlri::RouteDistinguisherParsingError, read_tlv_header_t16_l16, Ipv4PrefixParsingError,
+        Ipv6PrefixParsingError,
     },
 };
 use ipnet::IpNet;

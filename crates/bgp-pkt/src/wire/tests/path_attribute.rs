@@ -2687,7 +2687,7 @@ pub fn test_segment_identifier_label_index() -> Result<(), BgpMessageWritingErro
                 true,
                 false,
                 false,
-                PathAttributeValue::SegmentIdentifier(SegmentIdentifier::new(vec![
+                PathAttributeValue::PrefixSegmentIdentifier(PrefixSegmentIdentifier::new(vec![
                     BgpSidAttribute::LabelIndex {
                         flags: 0,
                         label_index: 90,
@@ -2709,12 +2709,14 @@ pub fn test_segment_identifier_bad_tlv_type_error() {
     let bad_wire = [10, 0, 0, 7, 0, 0, 0, 0, 0, 0, 90];
     let bad = &LocatedSegmentIdentifierParsingError::new(
         unsafe { Span::new_from_raw_offset(1, &bad_wire[1..]) },
-        SegmentIdentifierParsingError::BadBgpPrefixSidTlvType(BgpSidAttributeTypeError(
-            IanaValueError::Reserved(0),
-        )),
+        SegmentIdentifierParsingError::BgpPrefixSidTlvError(
+            BgpPrefixSidTlvParsingError::BadBgpPrefixSidTlvType(BgpSidAttributeTypeError(
+                IanaValueError::Reserved(0),
+            )),
+        ),
     );
     test_parse_error_with_one_input::<
-        SegmentIdentifier,
+        PrefixSegmentIdentifier,
         bool,
         LocatedSegmentIdentifierParsingError<'_>,
     >(&bad_wire, false, bad);
