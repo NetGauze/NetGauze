@@ -19,15 +19,25 @@ use netgauze_ipfix_code_generator::{
 };
 use std::env;
 
-const IPFIX_URL: &str = "https://www.iana.org/assignments/ipfix/ipfix.xml";
-const PROTOCOL_NUMBERS_URL: &str =
-    "https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xml";
-
 fn main() {
     let out_dir = env::var_os("OUT_DIR").expect("Couldn't find OUT_DIR in OS env variables");
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let registry_path = std::path::Path::new(&manifest_dir).join("registry");
     let subregistry_path = registry_path.join("subregistry");
+
+    // IPFIX Information Elements SubRegistry Path
+    let ipfix_elements_path = subregistry_path
+        .join("iana_ipfix_information_elements.xml")
+        .into_os_string()
+        .into_string()
+        .expect("Couldn't load ipfixElements registry file");
+
+    // Protocol Numbers SubRegistry Path
+    let protocol_numbers_path = subregistry_path
+        .join("iana_protocol-numbers.xml")
+        .into_os_string()
+        .into_string()
+        .expect("Couldn't load protocolNumbers registry");
 
     // FlowDirection SubRegistry Path
     let flow_direction_path = subregistry_path
@@ -53,7 +63,7 @@ fn main() {
     // Add any external sub-registries for VMWare
     let external_subregs = vec![
         ExternalSubRegistrySource::new(
-            RegistrySource::Http(PROTOCOL_NUMBERS_URL.to_string()),
+            RegistrySource::File(protocol_numbers_path.clone()),
             SubRegistryType::ValueNameDescRegistry,
             String::from("protocol-numbers-1"),
             880,
@@ -82,7 +92,7 @@ fn main() {
     // Add any external sub-registries for IANA
     let external_subregs = vec![
         ExternalSubRegistrySource::new(
-            RegistrySource::Http(PROTOCOL_NUMBERS_URL.to_string()),
+            RegistrySource::File(protocol_numbers_path.clone()),
             SubRegistryType::ValueNameDescRegistry,
             String::from("protocol-numbers-1"),
             4,
@@ -95,7 +105,7 @@ fn main() {
         ),
     ];
     let iana_source = SourceConfig::new(
-        RegistrySource::Http(IPFIX_URL.to_string()),
+        RegistrySource::File(ipfix_elements_path.clone()),
         RegistryType::IanaXML,
         0,
         "iana".to_string(),
