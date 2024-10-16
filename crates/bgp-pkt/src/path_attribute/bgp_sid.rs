@@ -32,7 +32,8 @@ pub enum BgpSidAttribute {
     /// Type: 1
     /// Length: 7, the total length in octets of the value portion of the TLV.
     /// RESERVED: 8-bit field. It MUST be clear on transmission and MUST be ignored on reception.
-    /// Flags: 16 bits of flags. None are defined by this document. The Flags field MUST be clear on transmission and MUST be ignored on reception.
+    /// Flags: 16 bits of flags. None are defined by this document.
+    /// The Flags field MUST be clear on transmission and MUST be ignored on reception.
     /// Label Index: 32-bit value representing the index value in the SRGB space.
     /// ```
     LabelIndex {
@@ -65,8 +66,11 @@ pub enum BgpSidAttribute {
     ///
     /// Type: 3
     /// Length: The total length in octets of the value portion of the TLV: 2 + (non-zero multiple of 6).
-    /// Flags: 16 bits of flags. None are defined in this document. The Flags field MUST be clear on transmission and MUST be ignored on reception.
-    /// SRGB: 3 octets specifying the first label in the range followed by 3 octets specifying the number of labels in the range. Note that the SRGB field MAY appear multiple times. If the SRGB field appears multiple times, the SRGB consists of multiple ranges that are concatenated.
+    /// Flags: 16 bits of flags. None are defined in this document.
+    /// The Flags field MUST be clear on transmission and MUST be ignored on reception.
+    /// SRGB: 3 octets specifying the first label in the range followed by 3 octets specifying
+    /// the number of labels in the range. Note that the SRGB field MAY appear multiple times.
+    /// If the SRGB field appears multiple times, the SRGB consists of multiple ranges that are concatenated.
     /// ```
     Originator {
         /// None defined in RFC8669
@@ -82,7 +86,17 @@ pub enum BgpSidAttribute {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct SegmentIdentifier {
-    pub tlvs: Vec<BgpSidAttribute>,
+    tlvs: Vec<BgpSidAttribute>,
+}
+
+impl SegmentIdentifier {
+    pub fn new(tlvs: Vec<BgpSidAttribute>) -> Self {
+        Self { tlvs }
+    }
+
+    pub fn tlvs(&self) -> &[BgpSidAttribute] {
+        &self.tlvs
+    }
 }
 
 impl PathAttributeValueProperties for SegmentIdentifier {
