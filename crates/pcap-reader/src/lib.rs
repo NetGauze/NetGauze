@@ -78,7 +78,7 @@ impl<'a> PcapIter<'a> {
     }
 }
 
-impl<'a> Iterator for PcapIter<'a> {
+impl Iterator for PcapIter<'_> {
     type Item = (IpAddr, u16, IpAddr, u16, TransportProtocol, Vec<u8>);
 
     fn next(&mut self) -> Option<Self::Item> {
