@@ -34,7 +34,7 @@ fn main() {
 
     // Protocol Numbers SubRegistry Path
     let protocol_numbers_path = subregistry_path
-        .join("iana_protocol-numbers.xml")
+        .join("iana_protocol_numbers.xml")
         .into_os_string()
         .into_string()
         .expect("Couldn't load protocolNumbers registry");
