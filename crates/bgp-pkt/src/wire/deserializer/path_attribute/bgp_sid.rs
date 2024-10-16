@@ -46,7 +46,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedSegmentIdentifierParsingError<
 
         let (_, tlvs) = parse_till_empty_into_located(segment_id_buf)?;
 
-        Ok((buf, SegmentIdentifier { tlvs }))
+        Ok((buf, SegmentIdentifier::new(tlvs)))
     }
 }
 
