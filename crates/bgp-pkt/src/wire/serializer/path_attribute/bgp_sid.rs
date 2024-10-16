@@ -23,7 +23,7 @@ impl WritablePduWithOneInput<bool, SegmentIdentifierWritingError> for SegmentIde
     fn len(&self, extended_length: bool) -> usize {
         let len = Self::BASE_LENGTH;
 
-        len + usize::from(extended_length) + self.tlvs.iter().map(|tlv| tlv.len()).sum::<usize>()
+        len + usize::from(extended_length) + self.tlvs().iter().map(|tlv| tlv.len()).sum::<usize>()
     }
 
     fn write<T: Write>(
@@ -36,7 +36,7 @@ impl WritablePduWithOneInput<bool, SegmentIdentifierWritingError> for SegmentIde
     {
         write_length(self, extended_length, writer)?;
 
-        for tlv in &self.tlvs {
+        for tlv in self.tlvs() {
             tlv.write(writer)?;
         }
 
