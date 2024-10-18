@@ -16,6 +16,7 @@
 use crate::{
     path_attribute::*,
     wire::{deserializer::path_attribute::*, serializer::path_attribute::*},
+    BgpMessage,
 };
 
 use crate::{
@@ -35,6 +36,9 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{test_helpers::*, Span};
 
+use crate::iana::{BgpSidAttributeTypeError, IanaValueError};
+use crate::update::BgpUpdateMessage;
+use crate::wire::serializer::BgpMessageWritingError;
 use crate::{
     community::*,
     iana::UndefinedRouteDistinguisherTypeCode,
@@ -2604,4 +2608,113 @@ fn test_ipv4_nlri_mpls_labels_address() -> Result<(), PathAttributeWritingError>
     test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
     test_write(&good, &good_wire)?;
     Ok(())
+}
+#[test]
+pub fn test_segment_identifier_label_index() -> Result<(), BgpMessageWritingError> {
+    let good_wire: [u8; 89] = [
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x59, 0x02, 0x00, 0x00, 0x00, 0x42, 0x90, 0x0e, 0x00, 0x0e, 0x00, 0x01, 0x01,
+        0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0xcb, 0x00, 0x71, 0x5a, 0x40, 0x01, 0x01, 0x00,
+        0x40, 0x02, 0x00, 0x80, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0x40, 0x05, 0x04, 0x00, 0x00,
+        0x00, 0x64, 0x80, 0x1a, 0x0b, 0x01, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xc0, 0x28, 0x0a, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5a,
+    ];
+
+    let good = BgpMessage::Update(BgpUpdateMessage::new(
+        vec![],
+        vec![
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                true,
+                PathAttributeValue::MpReach(MpReach::Ipv4Unicast {
+                    next_hop: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
+                    next_hop_local: None,
+                    nlri: vec![Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(
+                            Ipv4Net::new(Ipv4Addr::new(203, 0, 113, 90), 32).unwrap(),
+                        )
+                        .unwrap(),
+                    )],
+                }),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::Origin(Origin::IGP),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(0)),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                false,
+                true,
+                false,
+                false,
+                PathAttributeValue::LocalPreference(LocalPreference::new(100)),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                false,
+                PathAttributeValue::Aigp(Aigp::AccumulatedIgpMetric(0)),
+            )
+            .unwrap(),
+            PathAttribute::from(
+                true,
+                true,
+                false,
+                false,
+                PathAttributeValue::SegmentIdentifier(SegmentIdentifier::new(vec![
+                    BgpSidAttribute::LabelIndex {
+                        flags: 0,
+                        label_index: 90,
+                    },
+                ])),
+            )
+            .unwrap(),
+        ],
+        vec![],
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+pub fn test_segment_identifier_bad_tlv_type_error() {
+    let bad_wire = [10, 0, 0, 7, 0, 0, 0, 0, 0, 0, 90];
+    let bad = &LocatedSegmentIdentifierParsingError::new(
+        unsafe { Span::new_from_raw_offset(1, &bad_wire[1..]) },
+        SegmentIdentifierParsingError::BadBgpPrefixSidTlvType(BgpSidAttributeTypeError(
+            IanaValueError::Reserved(0),
+        )),
+    );
+    test_parse_error_with_one_input::<
+        SegmentIdentifier,
+        bool,
+        LocatedSegmentIdentifierParsingError<'_>,
+    >(&bad_wire, false, &bad);
 }

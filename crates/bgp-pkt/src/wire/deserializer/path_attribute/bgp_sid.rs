@@ -25,7 +25,7 @@ pub enum SegmentIdentifierParsingError {
     MplsLabelParsingError(
         #[from_located(module = "crate::wire::deserializer::nlri")] MplsLabelParsingError,
     ),
-    UnknownBgpPrefixSidTlvType(#[from_external] BgpSidAttributeTypeError),
+    BadBgpPrefixSidTlvType(#[from_external] BgpSidAttributeTypeError),
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedSegmentIdentifierParsingError<'a>>
@@ -73,7 +73,7 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for BgpSidAtt
             Err(error) => {
                 return Err(nom::Err::Error(LocatedSegmentIdentifierParsingError::new(
                     buf,
-                    SegmentIdentifierParsingError::UnknownBgpPrefixSidTlvType(error),
+                    SegmentIdentifierParsingError::BadBgpPrefixSidTlvType(error),
                 )));
             }
         };
