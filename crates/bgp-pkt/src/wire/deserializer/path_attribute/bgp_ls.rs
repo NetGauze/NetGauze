@@ -14,13 +14,13 @@
 // limitations under the License.
 
 use crate::{
-    iana::{BgpLsAttributeType, BgpLsAttributeTypeError, BgpLsIanaValueError, BgpLsNodeFlagsBits},
+    iana::{BgpLsAttributeType, BgpLsAttributeTypeError, BgpLsNodeFlagsBits, IanaValueError},
     nlri::{
         IgpFlags, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, SharedRiskLinkGroupValue,
     },
     path_attribute::{BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, LinkProtectionType},
     wire::{
-        deserializer::{nlri::MplsLabelParsingError, read_tlv_header},
+        deserializer::{nlri::MplsLabelParsingError, read_tlv_header_t16_l16},
         serializer::nlri::{IPV4_LEN, IPV6_LEN},
     },
 };
@@ -94,11 +94,11 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
     where
         Self: Sized,
     {
-        let (tlv_type, tlv_length, data, remainder) = read_tlv_header(buf)?;
+        let (tlv_type, tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsAttributeType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(BgpLsAttributeTypeError(IanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
                     BgpLsAttributeValue::Unknown {

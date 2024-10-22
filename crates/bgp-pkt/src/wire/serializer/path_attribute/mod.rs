@@ -15,6 +15,7 @@
 
 mod bgp_ls;
 
+mod bgp_sid;
 #[allow(clippy::module_inception)]
 mod path_attribute;
 

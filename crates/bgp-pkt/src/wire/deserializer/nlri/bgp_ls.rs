@@ -16,9 +16,9 @@
 use crate::{
     iana,
     iana::{
-        BgpLsIanaValueError, BgpLsLinkDescriptorType, BgpLsNlriType, BgpLsNodeDescriptorSubType,
+        BgpLsLinkDescriptorType, BgpLsNlriType, BgpLsNodeDescriptorSubType,
         BgpLsNodeDescriptorType, BgpLsNodeDescriptorTypeError, BgpLsPrefixDescriptorType,
-        BgpLsProtocolIdError, LinkDescriptorTypeError, NodeDescriptorSubTypeError,
+        BgpLsProtocolIdError, IanaValueError, LinkDescriptorTypeError, NodeDescriptorSubTypeError,
         PrefixDescriptorTypeError, UnknownBgpLsNlriType,
     },
     nlri::{
@@ -29,7 +29,7 @@ use crate::{
         UnknownOspfRouteType,
     },
     wire::deserializer::{
-        nlri::RouteDistinguisherParsingError, read_tlv_header, Ipv4PrefixParsingError,
+        nlri::RouteDistinguisherParsingError, read_tlv_header_t16_l16, Ipv4PrefixParsingError,
         Ipv6PrefixParsingError,
     },
 };
@@ -204,11 +204,11 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLinkDescript
     where
         Self: Sized,
     {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsLinkDescriptorType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(LinkDescriptorTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(LinkDescriptorTypeError(IanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
                     BgpLsLinkDescriptor::Unknown {
@@ -345,11 +345,11 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescript
     where
         Self: Sized,
     {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsNodeDescriptorSubType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(NodeDescriptorSubTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(NodeDescriptorSubTypeError(IanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
                     BgpLsNodeDescriptorSubTlv::Unknown {
@@ -435,11 +435,11 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
     where
         Self: Sized,
     {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsPrefixDescriptorType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(PrefixDescriptorTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(PrefixDescriptorTypeError(IanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
                     BgpLsPrefixDescriptor::Unknown {

@@ -22,7 +22,8 @@ use crate::{
         IpReachabilityInformationData,
     },
     wire::serializer::{
-        nlri::nlri::RouteDistinguisherWritingError, write_tlv_header, MultiTopologyIdWritingError,
+        nlri::nlri::RouteDistinguisherWritingError, write_tlv_header_t16_l16,
+        MultiTopologyIdWritingError,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -55,7 +56,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlri {
 
         // do not count add_path length since it is before the tlv
         let tlv_len = self.len() as u16 - self.path_id.map_or(0, |_| 4);
-        write_tlv_header(writer, nlri.raw_code(), tlv_len)?;
+        write_tlv_header_t16_l16(writer, nlri.raw_code(), tlv_len)?;
 
         nlri.write(writer)?;
 
@@ -80,7 +81,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsVpnNlri {
 
         // do not count add_path length since it is before the tlv
         let tlv_len = self.len() as u16 - self.path_id.map_or(0, |_| 4);
-        write_tlv_header(writer, self.value.raw_code(), tlv_len)?;
+        write_tlv_header_t16_l16(writer, self.value.raw_code(), tlv_len)?;
 
         self.rd.write(writer)?;
         self.value.write(writer)?;
@@ -197,7 +198,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsPrefixDescriptor {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.raw_code(), self.len() as u16)?;
+        write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
         match self {
             BgpLsPrefixDescriptor::MultiTopologyIdentifier(data) => data.write(writer)?,
             BgpLsPrefixDescriptor::OspfRouteType(data) => writer.write_u8(*data as u8)?,
@@ -278,7 +279,7 @@ impl WritablePduWithOneInput<BgpLsNodeDescriptorType, BgpLsNlriWritingError>
     where
         Self: Sized,
     {
-        write_tlv_header(writer, input as u16, self.len(input) as u16)?;
+        write_tlv_header_t16_l16(writer, input as u16, self.len(input) as u16)?;
         for tlv in self.subtlvs() {
             tlv.write(writer)?;
         }
@@ -307,7 +308,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsLinkDescriptor {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.raw_code(), self.len() as u16)?;
+        write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
             BgpLsLinkDescriptor::LinkLocalRemoteIdentifiers {
@@ -353,7 +354,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorSubTlv {
     where
         Self: Sized,
     {
-        write_tlv_header(writer, self.raw_code(), self.len() as u16)?;
+        write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
             BgpLsNodeDescriptorSubTlv::AutonomousSystem(data) => {
