@@ -772,13 +772,13 @@ fn test_atomic_aggregate() -> Result<(), AtomicAggregateWritingError> {
 
 #[test]
 fn test_path_attribute_atomic_aggregate() -> Result<(), PathAttributeWritingError> {
-    let good_wire = [0xc0, 0x06, 0x00];
-    let good_extended_wire = [0xd0, 0x06, 0x00, 0x00];
-    let bad_length_wire = [0xc0, 0x06, 0x01];
-    let bad_extended_length_wire = [0xd0, 0x06, 0x00, 0x01];
+    let good_wire = [0x40, 0x06, 0x00];
+    let good_extended_wire = [0x50, 0x06, 0x00, 0x00];
+    let bad_length_wire = [0x40, 0x06, 0x01];
+    let bad_extended_length_wire = [0x50, 0x06, 0x00, 0x01];
 
     let good = PathAttribute::from(
-        true,
+        false,
         true,
         false,
         false,
@@ -787,7 +787,7 @@ fn test_path_attribute_atomic_aggregate() -> Result<(), PathAttributeWritingErro
     .unwrap();
 
     let good_extended = PathAttribute::from(
-        true,
+        false,
         true,
         false,
         true,
