@@ -36,19 +36,20 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{test_helpers::*, Span};
 
-use crate::iana::{BgpSidAttributeTypeError, IanaValueError};
-use crate::update::BgpUpdateMessage;
-use crate::wire::serializer::BgpMessageWritingError;
 use crate::{
     community::*,
-    iana::UndefinedRouteDistinguisherTypeCode,
-    wire::deserializer::{
-        nlri::{
-            Ipv4MplsVpnUnicastAddressParsingError, Ipv4MulticastAddressParsingError,
-            Ipv4UnicastAddressParsingError, Ipv6MulticastAddressParsingError,
-            Ipv6UnicastAddressParsingError, RouteDistinguisherParsingError,
+    iana::{BgpSidAttributeTypeError, IanaValueError, UndefinedRouteDistinguisherTypeCode},
+    update::BgpUpdateMessage,
+    wire::{
+        deserializer::{
+            nlri::{
+                Ipv4MplsVpnUnicastAddressParsingError, Ipv4MulticastAddressParsingError,
+                Ipv4UnicastAddressParsingError, Ipv6MulticastAddressParsingError,
+                Ipv6UnicastAddressParsingError, RouteDistinguisherParsingError,
+            },
+            BgpParsingContext,
         },
-        BgpParsingContext,
+        serializer::BgpMessageWritingError,
     },
 };
 use nom::error::ErrorKind;
@@ -2716,5 +2717,5 @@ pub fn test_segment_identifier_bad_tlv_type_error() {
         SegmentIdentifier,
         bool,
         LocatedSegmentIdentifierParsingError<'_>,
-    >(&bad_wire, false, &bad);
+    >(&bad_wire, false, bad);
 }
