@@ -20,13 +20,23 @@ netgauze-iana = { path = "../crates/iana", features = ["fuzz"] }
 netgauze-bgp-pkt = { path = "../crates/bgp-pkt", features = ["serde", "fuzz"] }
 netgauze-bgp-speaker = { path = "../crates/bgp-speaker", features = ["fuzz"] }
 netgauze-bmp-pkt = { path = "../crates/bmp-pkt", features = ["serde", "fuzz"] }
-netgauze-flow-pkt = { path = "../crates/flow-pkt", features = ["serde", "fuzz", "codec"] }
+netgauze-flow-pkt = { path = "../crates/flow-pkt", features = [
+    "serde",
+    "fuzz",
+    "codec",
+] }
+netgauze-udp-notif-pkt = { path = "../crates/udp-notif-pkt", features = [
+    "serde",
+    "fuzz",
+    "codec",
+] }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-test = { workspace = true }
 tokio-util = { workspace = true }
 futures-core = { workspace = true }
+bytes = { workspace = true }
 
 [[bin]]
 name = "fuzz-bgp-peer"
@@ -85,5 +95,18 @@ doc = false
 [[bin]]
 name = "fuzz-flow-codec"
 path = "fuzz_targets/fuzz_flow_codec.rs"
+test = false
+doc = false
+
+
+[[bin]]
+name = "fuzz-udp-notif-pkt"
+path = "fuzz_targets/fuzz_udp_notif_pkt.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz-udp-notif-pkt-serialize"
+path = "fuzz_targets/fuzz_udp_notif_pkt_serialize.rs"
 test = false
 doc = false
