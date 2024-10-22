@@ -29,12 +29,20 @@ use std::collections::HashMap;
 pub enum UdpNotifOptionParsingError {
     #[serde(with = "netgauze_parse_utils::ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    InvalidOptionLength(u8),
 }
 
 impl<'a> ReadablePdu<'a, LocatedUdpNotifOptionParsingError<'a>> for UdpNotifOption {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedUdpNotifOptionParsingError<'a>> {
         let (buf, typ) = nom::number::complete::u8(buf)?;
+        let input = buf;
         let (buf, option_len) = nom::number::complete::u8(buf)?;
+        if option_len < 2 {
+            return Err(nom::Err::Error(LocatedUdpNotifOptionParsingError::new(
+                input,
+                UdpNotifOptionParsingError::InvalidOptionLength(option_len),
+            )));
+        }
         let (buf, value_buf) = nom::bytes::complete::take(option_len - 2)(buf)?;
         match typ {
             1 => {
@@ -64,6 +72,8 @@ pub enum UdpNotifHeaderParsingError {
     NomError(#[from_nom] ErrorKind),
     InvalidVersion(u8),
     UdpNotifOptionError(#[from_located(module = "self")] UdpNotifOptionParsingError),
+    InvalidHeaderLength(u8),
+    InvalidMessageLength(u16),
 }
 
 impl<'a> ReadablePdu<'a, LocatedUdpNotifHeaderParsingError<'a>> for UdpNotifHeader {
@@ -80,6 +90,18 @@ impl<'a> ReadablePdu<'a, LocatedUdpNotifHeaderParsingError<'a>> for UdpNotifHead
         let s_flag = (first_octet & 0b00010000) != 0;
         let media_type = (first_octet & 0b00001111).into();
         let (buf, header_len) = nom::number::complete::u8(buf)?;
+        if header_len < 2 {
+            return Err(nom::Err::Error(LocatedUdpNotifHeaderParsingError::new(
+                input,
+                UdpNotifHeaderParsingError::InvalidHeaderLength(header_len),
+            )));
+        }
+        if buf.len() < (header_len - 2) as usize {
+            return Err(nom::Err::Error(LocatedUdpNotifHeaderParsingError::new(
+                input,
+                UdpNotifHeaderParsingError::InvalidHeaderLength(header_len),
+            )));
+        }
         let (buf, header_buf) = nom::bytes::complete::take(header_len - 2)(buf)?;
         let (header_buf, _message_length) = be_u16(header_buf)?;
         let (header_buf, publisher_id) = be_u32(header_buf)?;
@@ -132,8 +154,24 @@ impl<'a> ReadablePduWithOneInput<'a, Bytes, LocatedUdpNotifPacketParsingError<'a
         let (_, first_word) = nom::combinator::peek(be_u32)(buf)?;
         let message_len = (first_word & 0x0000ffff) as u16;
         let header_len = ((first_word & 0x00ff0000) >> 16) as u8;
+        if header_len as u16 > message_len {
+            return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
+                buf,
+                UdpNotifPacketParsingError::UdpNotifHeaderError(
+                    UdpNotifHeaderParsingError::InvalidHeaderLength(header_len),
+                ),
+            )));
+        }
         let payload_len = message_len as usize - header_len as usize;
         let (buf, header) = parse_into_located(buf)?; // this is inefficient copying bytes around
+        if bytes_buf.len() < buf.location_offset() + payload_len {
+            return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
+                buf,
+                UdpNotifPacketParsingError::UdpNotifHeaderError(
+                    UdpNotifHeaderParsingError::InvalidMessageLength(message_len),
+                ),
+            )));
+        }
         let payload = bytes_buf.slice(buf.location_offset()..buf.location_offset() + payload_len);
         let (buf, _payload) = nom::bytes::complete::take(payload_len)(buf)?;
         Ok((buf, UdpNotifPacket::new(header, payload)))
