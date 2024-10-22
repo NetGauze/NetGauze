@@ -10,7 +10,7 @@ homepage = "https://github.com/NetGauze/NetGauze"
 description = """
 UDP NOTIF packet representation as defind by https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif
 """
-keywords = ["udp-notif", "ipfix", "netflow", "parser", "protocol"]
+keywords = ["udp-notif", "netconf", "yang", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 
