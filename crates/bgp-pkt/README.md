@@ -106,6 +106,7 @@ pub fn main() {
 | Four Octet AS Number             | [RFC 6793](https://datatracker.ietf.org/doc/html/RFC6793) |                                                                                             |
 | Extended Next Hop Encoding       | [RFC 8950](https://datatracker.ietf.org/doc/html/rfc8950) |                                                                                             |
 | Multiple Labels                  | [RFC 8277](https://datatracker.ietf.org/doc/html/rfc8277) |                                                                                             |
+| BGP Role                         | [RFC 9234](https://datatracker.ietf.org/doc/html/rfc9234) |                                                                                             |
 | Experimental                     | [RFC 8810](https://datatracker.ietf.org/doc/html/RFC8810) | Capabilities with codes 239-254 are marked as experimental, we read their values as Vec<u8> |
 | Unrecognized                     | [RFC 5492](https://datatracker.ietf.org/doc/html/rfc5492) | We carry the capability code and the `u8` vector for it's value                             |
 
@@ -124,10 +125,14 @@ pub fn main() {
 | Extended Communities         | [RFC 4360](https://datatracker.ietf.org/doc/html/rfc4360)                                                               | No         | Yes      | Yes        |                                                                    |
 | Extended Communities IPv6    | [RFC 5701](https://datatracker.ietf.org/doc/html/rfc5701)                                                               | No         | Yes      | Yes        |                                                                    |
 | Large Communities            | [RFC 8092](https://datatracker.ietf.org/doc/html/rfc8092)                                                               | No         | Yes      | Yes        |                                                                    |
-| Route Reflection             | [RFC 4456](https://datatracker.ietf.org/doc/html/rfc4456)                                                               | No         | Yes      | No         |                                                                    |
+| Originator                   | [RFC 4456](https://datatracker.ietf.org/doc/html/rfc4456)                                                               | No         | Yes      | No         |                                                                    |
+| Cluster List                 | [RFC 4456](https://datatracker.ietf.org/doc/html/rfc4456)                                                               | No         | Yes      | No         |                                                                    |
 | Four Octet AS_PATH           | [RFC 6793](https://datatracker.ietf.org/doc/html/RFC6793)                                                               | No         | Yes      | Yes        |                                                                    |
 | MP_REACH_NLRI                | [RFC 4760](https://datatracker.ietf.org/doc/html/rfc4760)                                                               | No         | Yes      | No         |                                                                    |
 | MP_UNREACH_NLRI              | [RFC 4760](https://datatracker.ietf.org/doc/html/rfc4760)                                                               | No         | Yes      | No         |                                                                    |
+| BGP-LS (link-state)          | [RFC 7752](https://datatracker.ietf.org/doc/html/rfc7752)                                                               | No         | Yes      | No         |                                                                    |
+| Only To Customer (OTC)       | [RFC 9234](https://datatracker.ietf.org/doc/html/rfc9234)                                                               | No         | Yes      | Yes        |                                                                    |
+| AccumulatedIGP Metric (AIGP) | [RFC 7311](https://datatracker.ietf.org/doc/html/rfc7311)                                                               | No         | Yes      | No         |                                                                    |
 | UnknownAttribute             |                                                                                                                         | N/A        | N/A      | N/A        | Catch all attribute that will read and keep the value as a Vec<u8> |
 
 ### MP-BGP supported address families
@@ -137,15 +142,75 @@ pub fn main() {
 |                                                                                                                        | 1 = IPv4             | 1 = Unicast                       |                                         |
 |                                                                                                                        | 1 = IPv4             | 2 = Multicast                     |                                         |
 | [RFC 8277](https://datatracker.ietf.org/doc/html/RFC8277)                                                              | 1 = IPv4             | 4 = MPLS Labeled Unicast          | NLRI with MPLS Labels                   |
-| [RFC 4364](https://datatracker.ietf.org/doc/html/RFC4364)                                                              | 1 = IPv4             | 128 = MPLS Labeled Unicast        |                                         |
+| [RFC 4364](https://datatracker.ietf.org/doc/html/RFC4364)                                                              | 1 = IPv4             | 128 = MPLS-labeled VPN address    |                                         |
 | [RFC 4684](https://datatracker.ietf.org/doc/html/RFC4684)                                                              | 1 = IPv4             | 132 = Route Target constrains     |                                         |
 |                                                                                                                        | 2 = IPv6             | 1 = Unicast                       |                                         |
 |                                                                                                                        | 2 = IPv6             | 2 = Multicast                     |                                         |
-| [RFC 8277](https://datatracker.ietf.org/doc/html/RFC8277)                                                              | 2 = IPv6             | 4 = MPLS Labeled Unicast          | NLRI with MPLS Labels                   |
-| [RFC 4659](https://datatracker.ietf.org/doc/html/RFC4659)                                                              | 2 = IPv4             | 128 = MPLS Labeled Unicast        |                                         |
+| [RFC 8277](https://datatracker.ietf.org/doc/html/RFC8277)                                                              | 2 = IPv6             | 4 = MPLS Labeled Unicast          |                                         |
+| [RFC 4659](https://datatracker.ietf.org/doc/html/RFC4659)                                                              | 2 = IPv4             | 128 = MPLS-labeled VPN address    |                                         |
 | [RFC 7432](https://datatracker.ietf.org/doc/html/RFC7432) and [RFC9136](https://datatracker.ietf.org/doc/html/rfc9136) | 25 = L2 VPN          | 70 = BGP EVPNs                    | Route types from 1 till 5 are supported |
+| [RFC 7432](https://datatracker.ietf.org/doc/html/RFC9552) and [RFC9136](https://datatracker.ietf.org/doc/html/rfc9552) | 16388 = BGP-LS       | 71 = BGP-LS                       |                                         |
+| [RFC 7432](https://datatracker.ietf.org/doc/html/RFC9552) and [RFC9136](https://datatracker.ietf.org/doc/html/rfc9552) | 16388 = BGP-LS       | 72 = BGP-LS-VPN                   |                                         |
 
-### Supported Notification Sub-Codes
+### Supported BGP Error Notification Codes
+
+| Capability                   | RFCs                                                      | Notes |
+|------------------------------|-----------------------------------------------------------|-------|
+| Message Header Error         | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271) |       |
+| OPEN Message Error           | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271) |       |
+| UPDATE Message Error         | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271) |       |
+| Hold Timer Expired           | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271) |       |
+| 	Finite State Machine Error  | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271) |       |
+| 	Cease Error                 | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271) |       |
+| 	ROUTE-REFRESH Message Error | [RFC 7313](https://datatracker.ietf.org/doc/html/rfc7313) |       |
+
+### Supported Message Header Error Notification Sub-Codes
+
+| Capability                  | RFCs                                                                     | Notes |
+|-----------------------------|--------------------------------------------------------------------------|-------|
+| Unspecified Error           | [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493) |       |
+| Connection Not Synchronized | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Bad Message Length          | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Bad Message Type            | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+
+### Supported Open Message Notification Sub-Codes
+
+| Capability                     | RFCs                                                                     | Notes |
+|--------------------------------|--------------------------------------------------------------------------|-------|
+| Unspecified Error              | [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493) |       |
+| Unsupported Version Number     | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Bad Peer AS                    | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Bad BGP Identifier             | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Unsupported Optional Parameter | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Unacceptable Hold Time         | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Unsupported Capability         | [RFC 5492](https://datatracker.ietf.org/doc/html/rfc5492)                |       |
+| Role Mismatch                  | [RFC 9234](https://datatracker.ietf.org/doc/html/rfc9234)                |       |
+
+### Supported Update Message Notification Sub-Codes
+
+| Capability                        | RFCs                                                                     | Notes |
+|-----------------------------------|--------------------------------------------------------------------------|-------|
+| Unspecified Error                 | [RFC Errata 4493](https://www.rfc-editor.org/errata_search.php?eid=4493) |       |
+| Malformed Attribute List          | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Unrecognized Well-known Attribute | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Missing Well-known Attribute      | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Attribute Flags Error             | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Attribute Length Error            | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Invalid ORIGIN Attribute          | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Invalid NEXT_HOP Attribute        | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Optional Attribute Error          | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+| Malformed AS_PATHd                | [RFC 4271](https://datatracker.ietf.org/doc/html/rfc4271)                |       |
+
+### Supported BGP Finite State Machine Notification Sub-Codes
+
+| Capability                                      | RFCs                                                      | Notes |
+|-------------------------------------------------|-----------------------------------------------------------|-------|
+| Unspecified Error                               | [RFC 6608](https://datatracker.ietf.org/doc/html/rfc6608) |       |
+| Receive Unexpected Message in OpenSent State    | [RFC 6608](https://datatracker.ietf.org/doc/html/rfc6608) |       |
+| Receive Unexpected Message in OpenConfirm State | [RFC 6608](https://datatracker.ietf.org/doc/html/rfc6608) |       |
+| Receive Unexpected Message in Established State | [RFC 6608](https://datatracker.ietf.org/doc/html/rfc6608) |       |
+
+### Supported Cease Notification Sub-Codes
 
 | Capability                         | RFCs                                                      | Notes |
 |------------------------------------|-----------------------------------------------------------|-------|
