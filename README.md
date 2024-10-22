@@ -34,7 +34,7 @@ To generate the expected output for macro test the TRYBUILD env var must be set:
 
 To generate the expected output for pcap tests the OVERWRITE env var must be set:
 
-```OVERWRITE=true cargo test``
+```OVERWRITE=true cargo test```
 
 ## Running code formatting and clippy checks
 
