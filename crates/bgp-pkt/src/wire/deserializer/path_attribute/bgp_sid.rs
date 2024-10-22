@@ -51,10 +51,9 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedSegmentIdentifierParsingError<
 }
 
 impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for BgpSidAttribute {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(
+        buf: Span<'a>,
+    ) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>> {
         let (span, tlv_type) = be_u8(buf)?;
         let (span, tlv_length) = be_u16(span)?;
         let (remainder, data) = nom::bytes::complete::take(tlv_length)(span)?;
