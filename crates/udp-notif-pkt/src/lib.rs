@@ -13,7 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "codec")]
 pub mod codec;
+#[cfg(feature = "serde")]
 pub mod wire;
 
 use bytes::Bytes;
@@ -21,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MediaType {
     Reserved,
     YangDataJson,
@@ -54,6 +57,7 @@ impl From<MediaType> for u8 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UdpNotifHeader {
     version: u8,
     s_flag: bool,
@@ -109,6 +113,7 @@ impl UdpNotifHeader {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[repr(u8)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum UdpNotifOptionCode {
     Segment = 1,
     PrivateEncoding = 2,
@@ -126,6 +131,7 @@ impl From<u8> for UdpNotifOptionCode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum UdpNotifOption {
     Segment { number: u16, last: bool },
     PrivateEncoding(Vec<u8>),
