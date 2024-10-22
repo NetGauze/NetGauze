@@ -1,0 +1,43 @@
+[package]
+name = "flow-bench-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils" }
+netgauze-flow-pkt = { version = "0.4.1", path = "../flow-pkt", features = ["codec"] }
+netgauze-flow-service = { version = "0.4.1", path = "../flow-service" }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+rand = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tokio-util = { workspace = true, features = ["codec", "net"] }
+tracing = { workspace = true }
+tracing-subscriber = {workspace = true}
+anyhow = "1"
+bytes = {workspace = true}
+futures-util = {workspace = true, features = ["tokio-io", "sink", "futures-sink"]}
+async-channel = "2.3"
+
+#[build]
+#target = "aarch64-apple-darwin"
+#
+#[target.x86_64-unknown-linux-gnu]
+#linker = "/usr/bin/clang"
+#rustflags = ["-Clink-arg=-fuse-ld=lld", "-Clink-arg=-Wl,--no-rosegment"]
+
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
+
+[[bin]]
+name = "single-actor"
+path = "src/single-actor.rs"
+
+[[bin]]
+name = "multiple-actors"
+path = "src/multiple-actors.rs"
+
+
