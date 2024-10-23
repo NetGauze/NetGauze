@@ -630,7 +630,7 @@ pub struct AtomicAggregate;
 
 impl PathAttributeValueProperties for AtomicAggregate {
     fn can_be_optional() -> Option<bool> {
-        Some(true)
+        Some(false)
     }
 
     fn can_be_transitive() -> Option<bool> {

@@ -55,17 +55,26 @@ pub enum BgpCapability {
     /// and [RFC8538](https://datatracker.ietf.org/doc/html/rfc8538)
     GracefulRestartCapability(GracefulRestartCapability),
 
+    /// Defined in [RFC7911](https://datatracker.ietf.org/doc/html/rfc7911)
     AddPath(AddPathCapability),
 
+    /// Defined in [RFC8654](https://datatracker.ietf.org/doc/html/rfc8654)
     ExtendedMessage,
 
+    /// Defined in [RFC8277](https://datatracker.ietf.org/doc/html/rfc8277)
     MultipleLabels(Vec<MultipleLabel>),
 
+    /// The BGP Role characterizes the relationship between the eBGP speakers
+    /// forming a session. BGP Role used in the route leak prevention and
+    /// detection procedures.
+    ///
+    /// Defined in [RFC9234](https://datatracker.ietf.org/doc/html/rfc9234)
     BgpRole(BgpRoleCapability),
 
+    /// Defined in [RFC6793](https://datatracker.ietf.org/doc/html/rfc6793)
     FourOctetAs(FourOctetAsCapability),
 
-    /// [RFC8950](https://datatracker.ietf.org/doc/html/rfc8950)
+    /// Defined in [RFC8950](https://datatracker.ietf.org/doc/html/rfc8950)
     ExtendedNextHopEncoding(ExtendedNextHopEncodingCapability),
 
     Experimental(ExperimentalCapability),

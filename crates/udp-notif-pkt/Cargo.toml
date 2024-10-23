@@ -1,0 +1,39 @@
+[package]
+name = "netgauze-udp-notif-pkt"
+version = "0.4.1"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+UDP NOTIF packet representation as defind by https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif
+"""
+keywords = ["udp-notif", "netconf", "yang", "parser", "protocol"]
+categories = ["network-programming", "parsing"]
+
+
+[dependencies]
+netgauze-locate = { version = "0.4.1", path = "../locate", optional = true }
+netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", optional = true }
+netgauze-serde-macros = { version = "0.4.1", path = "../serde-macros", optional = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+
+serde = { workspace = true, features = ["derive"] }
+nom = { workspace = true, optional = true }
+byteorder = { workspace = true, optional = true }
+bytes = { workspace = true, features = ["serde"], optional = true }
+tokio-util = { workspace = true, features = ["full", "tracing"] , optional = true}
+arbitrary = { workspace = true, optional = true }
+arbitrary_ext = { workspace = true, optional = true }
+
+[features]
+default = ["serde"]
+serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
+codec = ["tokio-util", "bytes"]
+fuzz = ["arbitrary", "arbitrary_ext"]
+
+[dev-dependencies]
+netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", features = ["test-helpers"] }

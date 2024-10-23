@@ -21,12 +21,15 @@ This project is still in an early stage.
     1. Packet representation and wire format
        serialization/deserialization: [`netgauze-flow-pkt`](crates/flow-pkt/README.md)
     2. Service building block to receive messages: [`netgauze-flow-service`](crates/flow-service/README.md)
+4. UDP-Notif
+    1. Packet representation and wire format
+       serialization/deserialization: [`netgauze-udp-notif-pkt`](crates/udp-notif-pkt/README.md)
 
 # Development documentation
 
 ## Running tests
 
-NetGauze uses macro test from the [trybuild](https://crates.io/crates/trybuild) crate. 
+NetGauze uses macro test from the [trybuild](https://crates.io/crates/trybuild) crate.
 
 To generate the expected output for macro test the TRYBUILD env var must be set:
 
@@ -34,7 +37,7 @@ To generate the expected output for macro test the TRYBUILD env var must be set:
 
 To generate the expected output for pcap tests the OVERWRITE env var must be set:
 
-```OVERWRITE=true cargo test``
+```OVERWRITE=true cargo test```
 
 ## Running code formatting and clippy checks
 
