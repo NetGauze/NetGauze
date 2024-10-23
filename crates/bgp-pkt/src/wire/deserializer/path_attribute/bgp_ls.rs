@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    iana::{BgpLsAttributeType, BgpLsAttributeTypeError, BgpLsIanaValueError, BgpLsNodeFlagsBits},
+    iana::{BgpLsAttributeType, BgpLsAttributeTypeError, BgpLsNodeFlagsBits, IanaValueError},
     nlri::{
         IgpFlags, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, SharedRiskLinkGroupValue,
     },
@@ -98,7 +98,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
 
         let tlv_type = match BgpLsAttributeType::try_from(tlv_type) {
             Ok(value) => value,
-            Err(BgpLsAttributeTypeError(BgpLsIanaValueError::Unknown(value))) => {
+            Err(BgpLsAttributeTypeError(IanaValueError::Unknown(value))) => {
                 return Ok((
                     remainder,
                     BgpLsAttributeValue::Unknown {

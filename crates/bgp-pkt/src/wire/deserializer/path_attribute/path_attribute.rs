@@ -25,8 +25,10 @@ use crate::{
     path_attribute::*,
     wire::{
         deserializer::{
-            community::*, nlri::*, path_attribute::BgpLsAttributeParsingError, BgpParsingContext,
-            IpAddrParsingError,
+            community::*,
+            nlri::*,
+            path_attribute::{BgpLsAttributeParsingError, SegmentIdentifierParsingError},
+            BgpParsingContext, IpAddrParsingError,
         },
         serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN},
         ACCUMULATED_IGP_METRIC,
@@ -105,6 +107,10 @@ pub enum PathAttributeParsingError {
     BgpLsError(
         #[from_located(module = "crate::wire::deserializer::path_attribute")]
         BgpLsAttributeParsingError,
+    ),
+    SegmentIdentifierParsingError(
+        #[from_located(module = "crate::wire::deserializer::path_attribute")]
+        SegmentIdentifierParsingError,
     ),
     UnknownAttributeError(#[from_located(module = "self")] UnknownAttributeParsingError),
     InvalidPathAttribute(InvalidPathAttribute, PathAttributeValue),
@@ -235,6 +241,11 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedPathAttribut
             Ok(PathAttributeType::BgpLsAttribute) => {
                 let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
                 let value = PathAttributeValue::BgpLs(value);
+                (buf, value)
+            }
+            Ok(PathAttributeType::BgpPrefixSid) => {
+                let (buf, value) = parse_into_located_one_input(buf, extended_length)?;
+                let value = PathAttributeValue::SegmentIdentifier(value);
                 (buf, value)
             }
             Ok(_code) => {
