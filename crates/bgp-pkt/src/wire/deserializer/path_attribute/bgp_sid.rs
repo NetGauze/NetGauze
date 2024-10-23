@@ -12,7 +12,7 @@ use netgauze_serde_macros::LocatedError;
 
 use crate::{
     iana::{BgpSidAttributeType, BgpSidAttributeTypeError, IanaValueError},
-    path_attribute::{BgpSidAttribute, SegmentIdentifier, SRGB},
+    path_attribute::{BgpSidAttribute, SegmentIdentifier, SegmentRoutingGlobalBlock},
     wire::deserializer::nlri::MplsLabelParsingError,
 };
 
@@ -96,7 +96,7 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for BgpSidAtt
     }
 }
 
-impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SRGB {
+impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SegmentRoutingGlobalBlock {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>>
     where
         Self: Sized,
@@ -108,7 +108,7 @@ impl<'a> ReadablePdu<'a, LocatedSegmentIdentifierParsingError<'a>> for SRGB {
 
         Ok((
             span,
-            SRGB {
+            SegmentRoutingGlobalBlock {
                 first_label,
                 range_size: [range_size_0, range_size_1, range_size_2],
             },

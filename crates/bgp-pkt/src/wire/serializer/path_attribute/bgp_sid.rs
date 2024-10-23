@@ -6,7 +6,7 @@ use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 
 use crate::{
-    path_attribute::{BgpSidAttribute, SegmentIdentifier, SRGB},
+    path_attribute::{BgpSidAttribute, SegmentIdentifier, SegmentRoutingGlobalBlock},
     wire::serializer::{nlri::MplsLabelWritingError, path_attribute::write_length},
 };
 
@@ -96,7 +96,7 @@ pub enum SrgbWritingError {
     MplsLabelError(#[from] MplsLabelWritingError),
 }
 
-impl WritablePdu<SrgbWritingError> for SRGB {
+impl WritablePdu<SrgbWritingError> for SegmentRoutingGlobalBlock {
     const BASE_LENGTH: usize = 6; /* 3 bytes MPLS Label + 3 bytes range size */
 
     fn len(&self) -> usize {

@@ -3,12 +3,21 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-/// 3 bytes MPLS Label
+/// SR Global Block (SRGB): the set of global segments in the SR domain.
+/// If a node participates in multiple SR domains, there is one SRGB for
+/// each SR domain.  In SR-MPLS, SRGB is a local property of a node and
+/// identifies the set of local labels reserved for global segments.  In
+/// SR-MPLS, using identical SRGBs on all nodes within the SR domain is
+/// strongly recommended.  Doing so eases operations and troubleshooting
+/// as the same label represents the same global segment at each node.
+/// In SRv6, the SRGB is the set of global SRv6 SIDs in the SR domain.
+///
+/// 3 bytes for the MPLS Label of the range
 /// followed by
 /// 3 bytes for range size
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SRGB {
+pub struct SegmentRoutingGlobalBlock {
     pub first_label: MplsLabel,
     pub range_size: [u8; 3],
 }
@@ -75,7 +84,7 @@ pub enum BgpSidAttribute {
     Originator {
         /// None defined in RFC8669
         flags: u16,
-        srgbs: Vec<SRGB>,
+        srgbs: Vec<SegmentRoutingGlobalBlock>,
     },
     Unknown {
         code: u8,
