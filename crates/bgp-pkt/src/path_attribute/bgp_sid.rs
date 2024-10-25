@@ -46,7 +46,8 @@ pub enum BgpSidAttribute {
     /// Label Index: 32-bit value representing the index value in the SRGB space.
     /// ```
     LabelIndex {
-        /// None defined in RFC8669
+        /// Flags for the SR Label Index are not yet defined (RFC8669).
+        /// The Flags field MUST be clear on transmission and MUST be ignored on reception.
         flags: u16,
         label_index: u32,
     },
