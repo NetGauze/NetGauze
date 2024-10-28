@@ -52,8 +52,8 @@ impl WritablePduWithOneInput<bool, SegmentIdentifierWritingError> for PrefixSegm
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BgpSidAttributeWritingError {
     StdIOError(#[from_std_io_error] String),
-    BgpSidSrgbError(#[from] SrgbWritingError),
-    BgpSRv6SubTlvServiceError(#[from] SRv6ServiceSubTlvWritingError),
+    BgpSidSrgb(#[from] SrgbWritingError),
+    BgpSRv6SubTlvService(#[from] SRv6ServiceSubTlvWritingError),
 }
 
 impl WritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
