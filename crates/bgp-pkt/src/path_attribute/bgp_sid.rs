@@ -220,7 +220,7 @@ pub enum SRv6ServiceSubTlv {
     ///      receiver.
     ///
     ///   SRv6 SID Value (16 octets):
-    ///      This field encodes an SRv6 SID, as defined in [RFC8986].
+    ///      This field encodes an SRv6 SID, as defined in [RFC8986](https://datatracker.ietf.org/doc/rfc8986).
     ///
     ///   SRv6 Service SID Flags (1 octet):
     ///      This field encodes SRv6 Service SID Flags -- none are currently
@@ -231,8 +231,8 @@ pub enum SRv6ServiceSubTlv {
     ///      This field encodes the SRv6 Endpoint Behavior codepoint value that
     ///      is associated with the SRv6 SID.  The codepoints used are from
     ///      IANA's "SRv6 Endpoint Behaviors" subregistry under the "Segment
-    ///      Routing" registry that was introduced by [RFC8986].  The opaque
-    ///      SRv6 Endpoint Behavior (i.e., value 0xFFFF) MAY be used when the
+    ///      Routing" registry that was introduced by [RFC8986](https://datatracker.ietf.org/doc/rfc8986).
+    ///     The opaque SRv6 Endpoint Behavior (i.e., value 0xFFFF) MAY be used when the
     ///      advertising router wishes to abstract the actual behavior of its
     ///      locally instantiated SRv6 SID.
     ///
@@ -243,7 +243,6 @@ pub enum SRv6ServiceSubTlv {
     ///   SRv6 Service Data Sub-Sub-TLV Value (variable):
     ///      This field is used to advertise properties of the SRv6 SID.  It is
     ///      encoded as a set of SRv6 Service Data Sub-Sub-TLVs.
-    /// ```
     SRv6SIDInformation {
         reserved1: u8,
         sid: u128,
