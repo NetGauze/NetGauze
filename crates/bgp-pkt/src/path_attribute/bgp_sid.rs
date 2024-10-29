@@ -47,7 +47,8 @@ pub enum BgpSidAttribute {
     /// ```
     LabelIndex {
         /// Flags for the SR Label Index are not yet defined (RFC8669).
-        /// The Flags field MUST be clear on transmission and MUST be ignored on reception.
+        /// The Flags field MUST be clear on transmission and MUST be ignored on
+        /// reception.
         flags: u16,
         label_index: u32,
     },
