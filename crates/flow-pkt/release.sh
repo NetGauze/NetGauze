@@ -17,7 +17,7 @@ curl https://www.iana.org/assignments/ipfix/ipfix.xml > iana_ipfix_information_e
 } > temp.xml && mv temp.xml iana_ipfix_information_elements.xml
 
 # Move the iana_ipfix_information_elements.xml file to registry/subregistry folder
-mv iana_ipfix_information_elements.xml registry
+mv iana_ipfix_information_elements.xml crates/flow-pkt/registry
 
 # Load the iana protocol numbers from IANA registry as xml
 curl https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xml > iana_protocol_numbers.xml
@@ -30,4 +30,4 @@ curl https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xml > ia
 } > temp.xml && mv temp.xml iana_protocol_numbers.xml
 
 # Move the iana_protocol_numbers.xml file to registry/subregistry folder
-mv iana_protocol_numbers.xml registry/subregistry
+mv iana_protocol_numbers.xml crates/flow-pkt/registry/subregistry

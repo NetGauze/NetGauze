@@ -12,6 +12,10 @@ Netflow(v9)/IPFIX(v10) Protocol representation and serde
 """
 keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
+# Specify the files to include in the crate
+include = [
+  "registry/**", # Specify entire folders if needed
+]
 
 [dependencies]
 netgauze-locate = { workspace = true , optional = true }
