@@ -23,7 +23,10 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 ipnet = { workspace = true, features = ["serde"] }
 lazy_static = { workspace = true }
-chrono = { workspace = true, default-features = false, features = ["std", "serde"] }
+chrono = { workspace = true, default-features = false, features = [
+  "std",
+  "serde",
+] }
 nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
 criterion = { workspace = true, optional = true } # Dev dep for bench
@@ -35,10 +38,17 @@ arbitrary_ext = { workspace = true, optional = true }
 
 [features]
 default = ["serde"]
-serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
+serde = [
+  "nom",
+  "byteorder",
+  "netgauze-locate",
+  "netgauze-parse-utils",
+  "netgauze-serde-macros",
+]
 codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
+backwards-compatibility-snapshot = ["serde"]
 
 [dev-dependencies]
 netgauze-pcap-reader = { workspace = true }
