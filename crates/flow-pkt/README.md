@@ -10,6 +10,10 @@
    registry [IP Flow Information Export (IPFIX) Entities](https://www.iana.org/assignments/ipfix/ipfix.xhtml). The crate
    to download and generate the necessary rust code
    is [`netgauze-ipfix-code-generator`](../ipfix-code-generator/README.md)
+   When the IANA registry introduces changes, such as a new data type, generation may fail.
+   If your project depends on this crate and requires stable generation, you can enable the
+   backwards-compatibility-snapshot feature in your Cargo.toml file. This feature uses a snapshot of registry
+   files taken at the time of the crate's release, ensuring reliable generation even if the registry is updated.
 
 ## Examples
 
