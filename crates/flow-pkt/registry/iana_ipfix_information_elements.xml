@@ -1,11 +1,11 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<!-- Date of download: 2024-10-16 -->
+<!-- Date of download: 2024-10-29 -->
 <?xml-stylesheet type="text/xsl" href="ipfix.xsl"?>
 <?xml-model href="ipfix.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
 <registry xmlns="http://www.iana.org/assignments" id="ipfix">
 <title>IP Flow Information Export (IPFIX) Entities</title>
 <created>2007-05-10</created>
-<updated>2024-10-14</updated>
+<updated>2024-10-23</updated>
 
 <note><xref type="rfc" data="rfc7012"/> has obsoleted <xref type="rfc" data="rfc5102"/>. However, references to <xref type="rfc" data="rfc5102"/>
 remain as part of the historical record.</note>
@@ -12550,9 +12550,160 @@ decode: 0001 - PDU Type value
                       <revision>0</revision>
                       <date>2024-10-07</date>
                     </record>
+
+                    <record date="2024-10-23">
+                      <name>udpSafeOptions</name>
+                      <dataType>unsigned256</dataType>
+                      <dataTypeSemantics>flags</dataTypeSemantics>
+                      <elementId>525</elementId>
+                      <status>current</status>
+                      <description>
+                        <paragraph>
+                          Observed SAFE UDP options in a Flow. The information is encoded in a set of bit fields.
+                        </paragraph>
+                        <paragraph>
+                          Options are mapped to bits according to their option numbers. UDP option Kind 0 corresponds
+                          to the least-significant bit in the udpSafeOptions IE while Kind 191 corresponds to the 65th
+                          most-significant bit of the IE. The bit is set to 1 if the corresponding SAFE UDP option is
+                          observed at least once in the Flow. The bit is set to 0 if the option is never observed in
+                          the Flow. The 64 most-significant bits MUST be set to 0.
+                        </paragraph>
+                        <paragraph>
+                          The reduced-size encoding per Section 6.2 of <xref type="rfc" data="rfc7011"/> is followed whenever fewer octets are
+                          needed to report observed SAFE UDP options. For example, if only option Kinds &lt;= 31 are
+                          observed, then the value of the udpSafeOptions IE can be encoded as unsigned32, or if only
+                          option Kinds &lt;= 63 are observed, then the value of the udpSafeOptions IE can be encoded as
+                          unsigned64.
+                        </paragraph>
+                        <paragraph>
+                          The presence of udpSafeExIDList is an indication that the SAFE Experimental option is observed in a Flow.
+                          The presence of udpSafeExIDList takes precedence over setting the corresponding bit in the udpSafeOptions
+                          IE for the same Flow. In order to optimize the use of the reduced-size encoding in the presence of
+                          udpSafeExIDList IE, the Exporter MUST NOT set to 1 the EXP flag of the udpSafeOptions IE that is reported
+                          for the same Flow.
+                        </paragraph>
+                      </description>
+                      <references>
+                        <paragraph>
+                        </paragraph>
+                      </references>
+                      <xref type="draft" data="RFC-ietf-opsawg-tsvwg-udp-ipfix-14"/>
+                      <revision>0</revision>
+                      <date>2024-10-23</date>
+                    </record>
+
+                    <record date="2024-10-23">
+                      <name>udpUnsafeOptions</name>
+                      <dataType>unsigned64</dataType>
+                      <dataTypeSemantics>flags</dataTypeSemantics>
+                      <elementId>526</elementId>
+                      <status>current</status>
+                      <description>
+                        <paragraph>
+                          Observed UNSAFE UDP options in a Flow. The information is encoded in a set of bit fields.
+                        </paragraph>
+                        <paragraph>
+                          Options are mapped to bits according to their option numbers. UDP option Kind 192 corresponds
+                          to the least-significant bit in the udpUnsafeOptions IE while Kind 255 corresponds to the
+                          most-significant bit of the IE. The bit is set to 1 if the corresponding UNSAFE UDP option is
+                          observed at least once in the Flow. The bit is set to 0 if the option is never observed in the
+                          Flow.
+                        </paragraph>
+                        <paragraph>
+                          The reduced-size encoding per Section 6.2 of <xref type="rfc" data="rfc7011"/> is followed
+                          whenever fewer octets are needed to report observed UNSAFE UDP options.
+                        </paragraph>
+                        <paragraph>
+                          The presence of udpUnsafeExIDList is an indication that the UNSAFE Experimental option is
+                          observed in a Flow. The presence of udpUnsafeExIDList takes precedence over setting the
+                          corresponding bit in the udpUnsafeOptions IE for the same Flow. In order to optimize the
+                          use of the reduced-size encoding in the presence of udpUnsafeExIDList IE, the Exporter
+                          MUST NOT set to 1 the UEXP flag of the udpUnsafeOptions IE that is reported for the same
+                          Flow.
+                        </paragraph>
+                      </description>
+                      <references>
+                        <paragraph>
+                        </paragraph>
+                      </references>
+                      <xref type="draft" data="RFC-ietf-opsawg-tsvwg-udp-ipfix-14"/>
+                      <revision>0</revision>
+                      <date>2024-10-23</date>
+                    </record>
+
+                    <record date="2024-10-23">
+                      <name>udpExID</name>
+                      <dataType>unsigned16</dataType>
+                      <dataTypeSemantics>identifier</dataTypeSemantics>
+                      <elementId>527</elementId>
+                      <status>current</status>
+                      <description>
+                        <paragraph>
+                          Observed ExID in an Experimental option (EXP, Kind=127) or an UNSAFE Experimental option (UEXP, Kind=254).
+                        </paragraph>
+                        <paragraph>
+                          A basicList of udpExID is used to report udpSafeExIDList and udpUnsafeExIDList values.
+                        </paragraph>
+                      </description>
+                      <references>
+                        <paragraph>
+                        </paragraph>
+                      </references>
+                      <xref type="draft" data="RFC-ietf-opsawg-tsvwg-udp-ipfix-14"/>
+                      <revision>0</revision>
+                      <date>2024-10-23</date>
+                    </record>
+
+                    <record date="2024-10-23">
+                      <name>udpSafeExIDList</name>
+                      <dataType>basicList</dataType>
+                      <dataTypeSemantics>list</dataTypeSemantics>
+                      <elementId>528</elementId>
+                      <status>current</status>
+                      <description>
+                        <paragraph>
+                          Observed ExIDs in the Experimental option (EXP, Kind=127).
+                        </paragraph>
+                        <paragraph>
+                          A basicList of udpExID Information Elements in which each udpExID Information
+                          Element carries the ExID observed in an EXP option.
+                        </paragraph>
+                      </description>
+                      <references>
+                        <paragraph>
+                        </paragraph>
+                      </references>
+                      <xref type="draft" data="RFC-ietf-opsawg-tsvwg-udp-ipfix-14"/>
+                      <revision>0</revision>
+                      <date>2024-10-23</date>
+                    </record>
+
+                    <record date="2024-10-23">
+                      <name>udpUnsafeExIDList</name>
+                      <dataType>basicList</dataType>
+                      <dataTypeSemantics>list</dataTypeSemantics>
+                      <elementId>529</elementId>
+                      <status>current</status>
+                      <description>
+                        <paragraph>
+                          Observed ExIDs in the UNSAFE Experimental option (UEXP, Kind=254).
+                        </paragraph>
+                        <paragraph>
+                          A basicList of udpExID Information Elements in which each udpExID Information
+                          Element carries the ExID observed in an UEXP option.
+                        </paragraph>
+                      </description>
+                      <references>
+                        <paragraph>
+                        </paragraph>
+                      </references>
+                      <xref type="draft" data="RFC-ietf-opsawg-tsvwg-udp-ipfix-14"/>
+                      <revision>0</revision>
+                      <date>2024-10-23</date>
+                    </record>
 <record>
   <name>Unassigned</name>
-  <elementId>525-32767</elementId>
+  <elementId>530-32767</elementId>
   </record>
 
 

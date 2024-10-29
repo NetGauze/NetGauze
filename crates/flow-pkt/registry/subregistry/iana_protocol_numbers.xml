@@ -1,10 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<!-- Date of download: 2024-10-16 -->
+<!-- Date of download: 2024-10-29 -->
 <?xml-stylesheet type="text/xsl" href="protocol-numbers.xsl"?>
 <?xml-model href="protocol-numbers.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
 <registry xmlns="http://www.iana.org/assignments" id="protocol-numbers">
   <title>Protocol Numbers</title>
-  <updated>2024-05-02</updated>
+  <updated>2024-10-24</updated>
   <registry id="protocol-numbers-1">
     <title>Assigned Internet Protocol Numbers</title>
     <xref type="rfc" data="rfc5237"/><xref type="rfc" data="rfc7045"/>
@@ -945,8 +945,16 @@ University of California at Berkeley, June 1986.</xref>
       <ipv6>N</ipv6>
       <xref type="rfc" data="rfc9491"/>
     </record>
+    <record date="2024-10-24">
+        <value>146</value>
+        <name>Homa</name>
+        <description>Homa</description>
+        <ipv6>N</ipv6>
+        <xref type="uri" data="https://github.com/PlatformLab/HomaModule">HomaModule</xref>
+        <xref type="person" data="John_Ousterhout"/>
+    </record>
     <record date="1995-06">
-      <value>146-252</value>
+      <value>147-252</value>
       <description>Unassigned</description>
       <xref type="person" data="Internet_Assigned_Numbers_Authority"/>
     </record>
@@ -1121,6 +1129,11 @@ University of California at Berkeley, June 1986.</xref>
       <name>John Murphy</name>
       <uri>mailto:john.m.murphy&amp;mci.com</uri>
       <updated>1998-10</updated>
+    </person>
+    <person id="John_Ousterhout">
+        <name>John Ousterhout</name>
+        <uri>mailto:john.ousterhout&amp;gmail.com</uri>
+        <updated>2024-10-24</updated>
     </person>
     <person id="John_Worley">
       <name>John Worley</name>
