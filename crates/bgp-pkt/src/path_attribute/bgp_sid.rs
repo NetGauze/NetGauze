@@ -232,9 +232,9 @@ pub enum SRv6ServiceSubTlv {
     ///      is associated with the SRv6 SID.  The codepoints used are from
     ///      IANA's "SRv6 Endpoint Behaviors" subregistry under the "Segment
     ///      Routing" registry that was introduced by [RFC8986](https://datatracker.ietf.org/doc/rfc8986).
-    ///     The opaque SRv6 Endpoint Behavior (i.e., value 0xFFFF) MAY be used when the
-    ///      advertising router wishes to abstract the actual behavior of its
-    ///      locally instantiated SRv6 SID.
+    ///      The opaque SRv6 Endpoint Behavior (i.e., value 0xFFFF) MAY be used
+    ///      when the advertising router wishes to abstract the actual
+    ///      behavior of its locally instantiated SRv6 SID.
     ///
     ///   RESERVED2 (1 octet):
     ///      This field MUST be set to 0 by the sender and ignored by the

@@ -151,7 +151,6 @@ impl WritablePdu<IpAddrWritingError> for IpAddr {
     }
 }
 
-#[inline]
 /// Write a TLV header.
 /// ```text
 /// 0                   1                   2                   3
@@ -168,6 +167,7 @@ impl WritablePdu<IpAddrWritingError> for IpAddr {
 ///
 /// Written length field will be `tlv_length - 4` since "Length" must not
 /// include the length of the "Type" and "Length" field
+#[inline]
 fn write_tlv_header_t16_l16<T: Write>(
     writer: &mut T,
     tlv_type: u16,
@@ -182,7 +182,6 @@ fn write_tlv_header_t16_l16<T: Write>(
     Ok(())
 }
 
-#[inline]
 /// Write a TLV header.
 /// ```text
 ///  0                   1                   2                   3
@@ -199,12 +198,13 @@ fn write_tlv_header_t16_l16<T: Write>(
 ///
 /// Written length field will be `tlv_length - 3` since "Length" must not
 /// include the length of the "Type" and "Length" field
+#[inline]
 fn write_tlv_header_t8_l16<T: Write>(
     writer: &mut T,
     tlv_type: u8,
     tlv_length: u16,
 ) -> Result<(), std::io::Error> {
-    // do not account for the tlv type u16 and tlv length u16
+    // do not account for the tlv type u8 and tlv length u16
     let effective_length = tlv_length - 3;
 
     writer.write_u8(tlv_type)?;

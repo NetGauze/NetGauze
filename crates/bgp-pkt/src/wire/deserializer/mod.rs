@@ -577,6 +577,7 @@ impl From<BgpMessageParsingError> for BgpNotificationMessage {
     }
 }
 
+#[inline]
 pub fn read_tlv_header_t16_l16<'a, E, T>(buf: Span<'a>) -> Result<(u16, u16, Span<'a>, Span<'a>), E>
 where
     E: From<nom::Err<T>>,
@@ -589,6 +590,7 @@ where
     Ok((tlv_type, tlv_length, data, remainder))
 }
 
+#[inline]
 pub fn read_tlv_header_t8_l16<'a, E, T>(buf: Span<'a>) -> Result<(u8, u16, Span<'a>, Span<'a>), E>
 where
     E: From<nom::Err<T>>,
