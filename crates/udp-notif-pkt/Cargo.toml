@@ -24,7 +24,7 @@ strum_macros = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
-bytes = { workspace = true, features = ["serde"], optional = true }
+bytes = { workspace = true, features = ["serde"]}
 tokio-util = { workspace = true, features = ["full", "tracing"] , optional = true}
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
@@ -32,8 +32,12 @@ arbitrary_ext = { workspace = true, optional = true }
 [features]
 default = ["serde"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
-codec = ["tokio-util", "bytes"]
+codec = ["tokio-util"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
+netgauze-pcap-reader = { version = "0.4.1", path = "../pcap-reader" }
 netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", features = ["test-helpers"] }
+serde_json = { workspace = true }
+rstest = { workspace = true }
+pcap-parser = { workspace = true, features = ["data"] }

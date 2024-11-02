@@ -19,6 +19,8 @@ use crate::{
 use bytes::Bytes;
 use netgauze_parse_utils::{test_helpers::test_write, ReadablePduWithOneInput, Span};
 use std::collections::HashMap;
+#[cfg(feature = "codec")]
+pub mod pcap_tests;
 
 #[test]
 fn test_simple() -> Result<(), UdpNotifPacketWritingError> {
