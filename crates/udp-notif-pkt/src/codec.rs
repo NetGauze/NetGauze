@@ -21,6 +21,7 @@ use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BytesMut};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePdu, Span};
 use nom::error::ErrorKind;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     io,
@@ -28,7 +29,7 @@ use std::{
 };
 use tokio_util::codec::Decoder;
 
-#[derive(Debug, strum_macros::Display, Eq, PartialEq, Clone)]
+#[derive(Debug, strum_macros::Display, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ReassemblyBufferError {
     LastSegmentIsNotReceived,
     NotEnoughSegments { needed: u16, received: u16 },
@@ -119,7 +120,7 @@ impl Default for ReassemblyBuffer {
     }
 }
 
-#[derive(Debug, strum_macros::Display, Eq, PartialEq, Clone)]
+#[derive(Debug, strum_macros::Display, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum UdpPacketCodecError {
     IoError(String),
     InvalidHeaderLength(u8),
