@@ -45,10 +45,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlri {
         Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.nlri().len()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         if let Some(path_id) = self.path_id() {
             writer.write_u32::<NetworkEndian>(path_id)?;
         }
@@ -71,10 +68,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsVpnNlri {
         Self::BASE_LENGTH + self.path_id().map_or(0, |_| 4) + self.value.len()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         if let Some(path_id) = self.path_id() {
             writer.write_u32::<NetworkEndian>(path_id)?;
         }
@@ -103,10 +97,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriValue {
         }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         match self {
             BgpLsNlriValue::Node(data) => data.write(writer),
             BgpLsNlriValue::Link(data) => data.write(writer),
@@ -130,10 +121,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriIpPrefix {
                 .sum::<usize>()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         writer.write_u8(self.protocol_id as u8)?;
         writer.write_u64::<NetworkEndian>(self.identifier)?;
 
@@ -154,10 +142,7 @@ impl WritablePdu<BgpLsNlriWritingError> for IpReachabilityInformationData {
         Self::BASE_LENGTH + Self::most_significant_bytes(self.address().prefix_len())
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         writer.write_u8(self.address().prefix_len())?;
 
         match self.address().network() {
@@ -194,10 +179,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsPrefixDescriptor {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
         match self {
             BgpLsPrefixDescriptor::MultiTopologyIdentifier(data) => data.write(writer)?,
@@ -217,10 +199,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriNode {
         Self::BASE_LENGTH + self.local_node_descriptors.len()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         writer.write_u8(self.protocol_id as u8)?;
         writer.write_u64::<NetworkEndian>(self.identifier)?;
 
@@ -237,10 +216,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsLocalNodeDescriptors {
         self.0.len(BgpLsNodeDescriptorType::LocalNodeDescriptor)
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         self.0
             .write(writer, BgpLsNodeDescriptorType::LocalNodeDescriptor)
     }
@@ -253,10 +229,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsRemoteNodeDescriptors {
         self.0.len(BgpLsNodeDescriptorType::RemoteNodeDescriptor)
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         self.0
             .write(writer, BgpLsNodeDescriptorType::RemoteNodeDescriptor)
     }
@@ -275,10 +248,7 @@ impl WritablePduWithOneInput<BgpLsNodeDescriptorType, BgpLsNlriWritingError>
         &self,
         writer: &mut T,
         input: BgpLsNodeDescriptorType,
-    ) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), BgpLsNlriWritingError> {
         write_tlv_header_t16_l16(writer, input as u16, self.len(input) as u16)?;
         for tlv in self.subtlvs() {
             tlv.write(writer)?;
@@ -304,10 +274,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsLinkDescriptor {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
@@ -350,10 +317,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNodeDescriptorSubTlv {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
@@ -394,10 +358,7 @@ impl WritablePdu<BgpLsNlriWritingError> for BgpLsNlriLink {
                 .sum::<usize>()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsNlriWritingError> {
         writer.write_u8(self.protocol_id as u8)?;
         writer.write_u64::<NetworkEndian>(self.identifier)?;
 

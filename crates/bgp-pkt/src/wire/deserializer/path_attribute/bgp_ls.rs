@@ -73,10 +73,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpLsAttributeParsingError<'a>
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
         let (_buf, ls_buf) = if extended_length {
             nom::multi::length_data(be_u16)(buf)?
         } else {
@@ -90,10 +87,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpLsAttributeParsingError<'a>
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttributeValue {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
         let (tlv_type, tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsAttributeType::try_from(tlv_type) {
@@ -297,38 +291,26 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for u32 {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
         be_u32(buf)
     }
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for u64 {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
         be_u64(buf)
     }
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for SharedRiskLinkGroupValue {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
         let (span, value) = be_u32(buf)?;
         Ok((span, SharedRiskLinkGroupValue(value)))
     }
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for MultiTopologyIdData {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
         let (span, value) = parse_till_empty_into_located::<
             LocatedBgpLsAttributeParsingError<'_>,
             LocatedBgpLsAttributeParsingError<'_>,
@@ -339,10 +321,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for MultiTopolog
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for MultiTopologyId {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
         let (buf, mtid) = be_u16(buf)?;
 
         Ok((buf, MultiTopologyId::from(mtid)))
@@ -353,10 +332,7 @@ impl<'a> ReadablePduWithOneInput<'a, u16, LocatedBgpLsAttributeParsingError<'a>>
     fn from_wire(
         buf: Span<'a>,
         length: u16,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsAttributeParsingError<'a>> {
         let (span, flags) = be_u8(buf)?;
         let (span, weight) = be_u8(span)?;
         let (span, _reserved) = be_u16(span)?;

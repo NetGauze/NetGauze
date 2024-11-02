@@ -225,10 +225,7 @@ impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyIdData {
         2 * self.id_count()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError> {
         for id in &self.0 {
             id.write(writer)?;
         }
@@ -244,10 +241,7 @@ impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyId {
         Self::BASE_LENGTH
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError> {
         writer.write_u16::<NetworkEndian>(self.value())?;
 
         Ok(())

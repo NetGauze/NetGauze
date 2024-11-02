@@ -35,10 +35,7 @@ impl WritablePduWithOneInput<bool, SegmentIdentifierWritingError> for PrefixSegm
         &self,
         writer: &mut T,
         extended_length: bool,
-    ) -> Result<(), SegmentIdentifierWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), SegmentIdentifierWritingError> {
         write_length(self, extended_length, writer)?;
 
         for tlv in self.tlvs() {
@@ -72,10 +69,7 @@ impl WritablePdu<BgpSidAttributeWritingError> for BgpSidAttribute {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpSidAttributeWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpSidAttributeWritingError> {
         write_tlv_header_t8_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
@@ -124,10 +118,7 @@ impl WritablePdu<SrgbWritingError> for SegmentRoutingGlobalBlock {
         Self::BASE_LENGTH
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), SrgbWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), SrgbWritingError> {
         self.first_label.write(writer)?;
         writer.write_all(&self.range_size)?;
 
@@ -161,10 +152,7 @@ impl WritablePdu<SRv6ServiceSubTlvWritingError> for SRv6ServiceSubTlv {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), SRv6ServiceSubTlvWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), SRv6ServiceSubTlvWritingError> {
         write_tlv_header_t8_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
@@ -209,10 +197,7 @@ impl WritablePdu<SRv6ServiceSubSubTlvWritingError> for SRv6ServiceSubSubTlv {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), SRv6ServiceSubSubTlvWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), SRv6ServiceSubSubTlvWritingError> {
         write_tlv_header_t8_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {

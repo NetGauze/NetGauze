@@ -62,10 +62,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedSegmentIdentifierParsingError<
     fn from_wire(
         buf: Span<'a>,
         extended_length: bool,
-    ) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedSegmentIdentifierParsingError<'a>> {
         let (buf, segment_id_buf) = if extended_length {
             nom::multi::length_data(be_u16)(buf)?
         } else {
@@ -134,10 +131,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidTlvParsingError<'a>> for BgpSidAttri
 impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubTlvParsingError<'a>> for SRv6ServiceSubTlv {
     fn from_wire(
         buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidSubTlvParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidSubTlvParsingError<'a>> {
         let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t8_l16(buf)?;
 
         let tlv_type = match BgpSrv6ServiceSubTlvType::try_from(tlv_type) {
@@ -186,10 +180,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubTlvParsingError<'a>> for SRv6Serv
 impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubSubTlvParsingError<'a>> for SRv6ServiceSubSubTlv {
     fn from_wire(
         buf: Span<'a>,
-    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidSubSubTlvParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpPrefixSidSubSubTlvParsingError<'a>> {
         let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t8_l16(buf)?;
 
         let tlv_type = match BgpSrv6ServiceSubSubTlvType::try_from(tlv_type) {
@@ -247,10 +238,7 @@ pub enum BgpSRv6SRGBParsingError {
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpSRv6SRGBParsingError<'a>> for SegmentRoutingGlobalBlock {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpSRv6SRGBParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpSRv6SRGBParsingError<'a>> {
         let (span, first_label) = parse_into_located(buf)?;
         let (span, range_size_0) = be_u8(span)?;
         let (span, range_size_1) = be_u8(span)?;

@@ -49,10 +49,7 @@ impl WritablePduWithOneInput<bool, BgpLsAttributeWritingError> for BgpLsAttribut
         &self,
         writer: &mut T,
         extended_length: bool,
-    ) -> Result<(), BgpLsAttributeWritingError>
-    where
-        Self: Sized,
-    {
+    ) -> Result<(), BgpLsAttributeWritingError> {
         write_length(self, extended_length, writer)?;
 
         for tlv in &self.attributes {
@@ -102,10 +99,7 @@ impl WritablePdu<BgpLsAttributeWritingError> for BgpLsAttributeValue {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsAttributeWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsAttributeWritingError> {
         write_tlv_header_t16_l16(writer, self.raw_code(), self.len() as u16)?;
 
         match self {
@@ -306,10 +300,7 @@ impl WritablePdu<BgpLsPeerSidWritingError> for BgpLsPeerSid {
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsPeerSidWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BgpLsPeerSidWritingError> {
         // tlv header is already written in BgpLsAttributeTlv
 
         writer.write_u8(self.flags())?;
