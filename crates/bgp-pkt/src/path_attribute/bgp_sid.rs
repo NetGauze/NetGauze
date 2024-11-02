@@ -1,7 +1,10 @@
 use crate::{
-    iana::BgpSidAttributeType, nlri::MplsLabel, path_attribute::PathAttributeValueProperties,
+    iana::{BgpSidAttributeType, BgpSrv6ServiceSubSubTlvType, BgpSrv6ServiceSubTlvType},
+    nlri::MplsLabel,
+    path_attribute::PathAttributeValueProperties,
 };
 use serde::{Deserialize, Serialize};
+use strum_macros::Display;
 
 /// SR Global Block (SRGB): the set of global segments in the SR domain.
 /// If a node participates in multiple SR domains, there is one SRGB for
@@ -88,19 +91,301 @@ pub enum BgpSidAttribute {
         flags: u16,
         srgbs: Vec<SegmentRoutingGlobalBlock>,
     },
+    /// ```text
+    ///     0                   1                   2                   3
+    ///     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///    |   TLV Type    |         TLV Length            |   RESERVED    |
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///    |   SRv6 Service Sub-TLVs                                      //
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    ///                         Figure 1: SRv6 Service TLVs
+    /// ```
+    ///
+    ///    TLV Type (1 octet):
+    ///       This field is assigned a value from IANA's "BGP Prefix-SID TLV
+    ///       Types" subregistry.  It is set to 5 for the SRv6 L3 Service TLV.
+    ///       It is set to 6 for the SRv6 L2 Service TLV.
+    ///
+    ///    TLV Length (2 octets):
+    ///       This field specifies the total length, in octets, of the TLV
+    ///       Value.
+    ///
+    ///    RESERVED (1 octet):
+    ///       This field is reserved; it MUST be set to 0 by the sender and
+    ///       ignored by the receiver.
+    ///
+    ///    SRv6 Service Sub-TLVs (variable):
+    ///       This field contains SRv6 service-related information and is
+    ///       encoded as an unordered list of Sub-TLVs whose format is described
+    ///       below.
+    SRv6ServiceL3 {
+        reserved: u8,
+        subtlvs: Vec<SRv6ServiceSubTlv>,
+    },
+    /// ```text
+    ///     0                   1                   2                   3
+    ///     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///    |   TLV Type    |         TLV Length            |   RESERVED    |
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///    |   SRv6 Service Sub-TLVs                                      //
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    ///                         Figure 1: SRv6 Service TLVs
+    /// ```
+    ///
+    ///    TLV Type (1 octet):
+    ///       This field is assigned a value from IANA's "BGP Prefix-SID TLV
+    ///       Types" subregistry.  It is set to 5 for the SRv6 L3 Service TLV.
+    ///       It is set to 6 for the SRv6 L2 Service TLV.
+    ///
+    ///    TLV Length (2 octets):
+    ///       This field specifies the total length, in octets, of the TLV
+    ///       Value.
+    ///
+    ///    RESERVED (1 octet):
+    ///       This field is reserved; it MUST be set to 0 by the sender and
+    ///       ignored by the receiver.
+    ///
+    ///    SRv6 Service Sub-TLVs (variable):
+    ///       This field contains SRv6 service-related information and is
+    ///       encoded as an unordered list of Sub-TLVs whose format is described
+    ///       below.
+    SRv6ServiceL2 {
+        reserved: u8,
+        subtlvs: Vec<SRv6ServiceSubTlv>,
+    },
+    Unknown {
+        code: u8,
+        value: Vec<u8>,
+    },
+}
+/// ```text
+///     0                   1                   2                   3
+///     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///    | SRv6 Service  |    SRv6 Service               | SRv6 Service //
+///    | Sub-TLV       |    Sub-TLV                    | Sub-TLV      //
+///    | Type          |    Length                     | Value        //
+///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///
+///                       Figure 2: SRv6 Service Sub-TLVs
+/// ```
+///    SRv6 Service Sub-TLV Type (1 octet):
+///       This field identifies the type of SRv6 service information.  It is
+///       assigned a value from IANA's "SRv6 Service Sub-TLV Types"
+///       subregistry.
+///
+///    SRv6 Service Sub-TLV Length (2 octets):
+///       This field specifies the total length, in octets, of the Sub-TLV
+///       Value field.
+///
+///    SRv6 Service Sub-TLV Value (variable):
+///       This field contains data specific to the Sub-TLV Type.  In
+///       addition to fixed-length data, it contains other properties of the
+///       SRv6 service encoded as a set of SRv6 Service Data Sub-Sub-TLVs
+///       whose format is described in Section 3.2 below.
+#[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SRv6ServiceSubTlv {
+    /// ```text
+    ///     0                   1                   2                   3
+    ///    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///   | SRv6 Service  |    SRv6 Service               |               |
+    ///   | Sub-TLV       |    Sub-TLV                    |               |
+    ///   | Type=1        |    Length                     |  RESERVED1    |
+    ///   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///   |  SRv6 SID Value (16 octets)                                  //
+    ///   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///   | Svc SID Flags |   SRv6 Endpoint Behavior      |   RESERVED2   |
+    ///   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///   |  SRv6 Service Data Sub-Sub-TLVs                              //
+    ///   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///
+    ///                   Figure 3: SRv6 SID Information Sub-TLV
+    /// ```
+    ///   SRv6 Service Sub-TLV Type (1 octet):
+    ///      This field is set to 1 to represent the SRv6 SID Information Sub-
+    ///      TLV.
+    ///
+    ///   SRv6 Service Sub-TLV Length (2 octets):
+    ///      This field contains the total length, in octets, of the Value
+    ///      field of the Sub-TLV.
+    ///
+    ///   RESERVED1 (1 octet):
+    ///      This field MUST be set to 0 by the sender and ignored by the
+    ///      receiver.
+    ///
+    ///   SRv6 SID Value (16 octets):
+    ///      This field encodes an SRv6 SID, as defined in [RFC8986](https://datatracker.ietf.org/doc/rfc8986).
+    ///
+    ///   SRv6 Service SID Flags (1 octet):
+    ///      This field encodes SRv6 Service SID Flags -- none are currently
+    ///      defined.  It MUST be set to 0 by the sender and any unknown flags
+    ///      MUST be ignored by the receiver.
+    ///
+    ///   SRv6 Endpoint Behavior (2 octets):
+    ///      This field encodes the SRv6 Endpoint Behavior codepoint value that
+    ///      is associated with the SRv6 SID.  The codepoints used are from
+    ///      IANA's "SRv6 Endpoint Behaviors" subregistry under the "Segment
+    ///      Routing" registry that was introduced by [RFC8986](https://datatracker.ietf.org/doc/rfc8986).
+    ///     The opaque SRv6 Endpoint Behavior (i.e., value 0xFFFF) MAY be used
+    /// when the      advertising router wishes to abstract the actual
+    /// behavior of its      locally instantiated SRv6 SID.
+    ///
+    ///   RESERVED2 (1 octet):
+    ///      This field MUST be set to 0 by the sender and ignored by the
+    ///      receiver.
+    ///
+    ///   SRv6 Service Data Sub-Sub-TLV Value (variable):
+    ///      This field is used to advertise properties of the SRv6 SID.  It is
+    ///      encoded as a set of SRv6 Service Data Sub-Sub-TLVs.
+    SRv6SIDInformation {
+        reserved1: u8,
+        sid: u128,
+        service_sid_flags: u8,
+        endpoint_behaviour: u16,
+        reserved2: u8,
+        subsubtlvs: Vec<SRv6ServiceSubSubTlv>,
+    },
     Unknown {
         code: u8,
         value: Vec<u8>,
     },
 }
 
+impl SRv6ServiceSubTlv {
+    pub fn code(&self) -> Result<BgpSrv6ServiceSubTlvType, u8> {
+        match self {
+            SRv6ServiceSubTlv::SRv6SIDInformation { .. } => {
+                Ok(BgpSrv6ServiceSubTlvType::SRv6SIDInformation)
+            }
+            SRv6ServiceSubTlv::Unknown { code, .. } => Err(*code),
+        }
+    }
+
+    pub fn raw_code(&self) -> u8 {
+        match self.code() {
+            Ok(value) => value as u8,
+            Err(value) => value,
+        }
+    }
+}
+
+/// ```text
+///     0                   1                   2                   3
+///     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///    | Service Data |  Sub-Sub-TLV Length               |Sub-Sub TLV //
+///    | Sub-Sub-TLV  |                                   |  Value     //
+///    | Type         |                                   |            //
+///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///
+///                   Figure 4: SRv6 Service Data Sub-Sub-TLVs
+/// ```
+///
+///    SRv6 Service Data Sub-Sub-TLV Type (1 octet):
+///       This field identifies the type of Sub-Sub-TLV.  It is assigned a
+///       value from IANA's "SRv6 Service Data Sub-Sub-TLV Types"
+///       subregistry.
+///
+///    SRv6 Service Data Sub-Sub-TLV Length (2 octets):
+///       This field specifies the total length, in octets, of the Sub-Sub-
+///       TLV Value field.
+///
+///    SRv6 Service Data Sub-Sub-TLV Value (variable):
+///       This field contains data specific to the Sub-Sub-TLV Type.
+
+#[derive(Display, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum SRv6ServiceSubSubTlv {
+    /// ```text
+    ///     0                   1                   2                   3
+    ///     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///    | SRv6 Service  |    SRv6 Service               | Locator Block |
+    ///    | Data Sub-Sub  |    Data Sub-Sub-TLV           | Length        |
+    ///    | -TLV Type=1   |    Length                     |               |
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///    | Locator Node  | Function      | Argument      | Transposition |
+    ///    | Length        | Length        | Length        | Length        |
+    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    ///    | Transposition |
+    ///    | Offset        |
+    ///    +-+-+-+-+-+-+-+-+
+    ///                   Figure 5: SRv6 SID Structure Sub-Sub-TLV
+    /// ```
+    ///
+    ///    SRv6 Service Data Sub-Sub-TLV Type (1 octet):
+    ///       This field is set to 1 to represent the SRv6 SID Structure Sub-
+    ///       Sub-TLV.
+    ///
+    ///    SRv6 Service Data Sub-Sub-TLV Length (2 octets):
+    ///       This field contains a total length of 6 octets.
+    ///
+    ///    Locator Block Length (1 octet):
+    ///       This field contains the length of the SRv6 SID Locator Block in
+    ///       bits.
+    ///
+    ///    Locator Node Length (1 octet):
+    ///       This field contains the length of the SRv6 SID Locator Node in
+    ///       bits.
+    ///
+    ///    Function Length (1 octet):
+    ///       This field contains the length of the SRv6 SID Function in bits.
+    ///
+    ///    Argument Length (1 octet):
+    ///       This field contains the length of the SRv6 SID Argument in bits.
+    ///
+    ///    Transposition Length (1 octet):
+    ///       This field is the size in bits for the part of the SID that has
+    ///       been transposed (or shifted) into an MPLS Label field.
+    ///
+    ///    Transposition Offset (1 octet):
+    ///       This field is the offset position in bits for the part of the SID
+    ///       that has been transposed (or shifted) into an MPLS Label field.
+    SRv6SIDStructure {
+        locator_block_len: u8,
+        locator_node_len: u8,
+        function_len: u8,
+        arg_len: u8,
+        transposition_len: u8,
+        transposition_offset: u8,
+    },
+    Unknown {
+        code: u8,
+        value: Vec<u8>,
+    },
+}
+
+impl SRv6ServiceSubSubTlv {
+    pub fn code(&self) -> Result<BgpSrv6ServiceSubSubTlvType, u8> {
+        match self {
+            SRv6ServiceSubSubTlv::SRv6SIDStructure { .. } => {
+                Ok(BgpSrv6ServiceSubSubTlvType::SRv6SIDStructure)
+            }
+            SRv6ServiceSubSubTlv::Unknown { code, .. } => Err(*code),
+        }
+    }
+
+    pub fn raw_code(&self) -> u8 {
+        match self.code() {
+            Ok(value) => value as u8,
+            Err(value) => value,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct SegmentIdentifier {
+pub struct PrefixSegmentIdentifier {
     tlvs: Vec<BgpSidAttribute>,
 }
 
-impl SegmentIdentifier {
+impl PrefixSegmentIdentifier {
     pub fn new(tlvs: Vec<BgpSidAttribute>) -> Self {
         Self { tlvs }
     }
@@ -110,7 +395,7 @@ impl SegmentIdentifier {
     }
 }
 
-impl PathAttributeValueProperties for SegmentIdentifier {
+impl PathAttributeValueProperties for PrefixSegmentIdentifier {
     fn can_be_optional() -> Option<bool> {
         Some(true)
     }
@@ -129,6 +414,8 @@ impl BgpSidAttribute {
         match self {
             BgpSidAttribute::LabelIndex { .. } => Ok(BgpSidAttributeType::LabelIndex),
             BgpSidAttribute::Originator { .. } => Ok(BgpSidAttributeType::Originator),
+            BgpSidAttribute::SRv6ServiceL3 { .. } => Ok(BgpSidAttributeType::SRv6ServiceL3),
+            BgpSidAttribute::SRv6ServiceL2 { .. } => Ok(BgpSidAttributeType::SRv6ServiceL2),
             BgpSidAttribute::Unknown { code, .. } => Err(*code),
         }
     }

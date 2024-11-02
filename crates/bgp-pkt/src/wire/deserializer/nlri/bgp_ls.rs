@@ -29,7 +29,7 @@ use crate::{
         UnknownOspfRouteType,
     },
     wire::deserializer::{
-        nlri::RouteDistinguisherParsingError, read_tlv_header, Ipv4PrefixParsingError,
+        nlri::RouteDistinguisherParsingError, read_tlv_header_t16_l16, Ipv4PrefixParsingError,
         Ipv6PrefixParsingError,
     },
 };
@@ -75,10 +75,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpLsNlriParsingError<'a>> for
     fn from_wire(
         buf: Span<'a>,
         add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (buf, path_id) = if add_path {
             let (tmp, add_path) = be_u32(buf)?;
             (tmp, Some(add_path))
@@ -99,10 +96,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedBgpLsNlriParsingError<'a>> for
     fn from_wire(
         buf: Span<'a>,
         add_path: bool,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (buf, path_id) = if add_path {
             let (tmp, add_path) = be_u32(buf)?;
             (tmp, Some(add_path))
@@ -134,10 +128,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
     fn from_wire(
         buf: Span<'a>,
         nlri_type: BgpLsNlriType,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let result = match nlri_type {
             BgpLsNlriType::Node => {
                 let (span, nlri_value) = BgpLsNlriNode::from_wire(buf)?;
@@ -175,10 +166,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriLink {
-    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (span, protocol_id) =
             nom::combinator::map_res(be_u8, iana::BgpLsProtocolId::try_from)(span)?;
         let (span, identifier) = be_u64(span)?;
@@ -200,11 +188,8 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriLink {
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLinkDescriptor {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsLinkDescriptorType::try_from(tlv_type) {
             Ok(value) => value,
@@ -267,10 +252,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLinkDescript
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriNode {
-    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (span, protocol_id) =
             nom::combinator::map_res(be_u8, iana::BgpLsProtocolId::try_from)(span)?;
         let (span, identifier) = be_u64(span)?;
@@ -288,10 +270,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNlriNode {
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLocalNodeDescriptors {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (span, value) =
             parse_into_located_one_input(buf, BgpLsNodeDescriptorType::LocalNodeDescriptor)?;
 
@@ -300,10 +279,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLocalNodeDes
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsRemoteNodeDescriptors {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (span, value) =
             parse_into_located_one_input(buf, BgpLsNodeDescriptorType::RemoteNodeDescriptor)?;
 
@@ -317,10 +293,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNodeDescriptorType, LocatedBgpLsNlriPa
     fn from_wire(
         span: Span<'a>,
         input: BgpLsNodeDescriptorType,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (span, tlv_type) =
             nom::combinator::map_res(be_u16, iana::BgpLsNodeDescriptorType::try_from)(span)?;
 
@@ -341,11 +314,8 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNodeDescriptorType, LocatedBgpLsNlriPa
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescriptorSubTlv {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsNodeDescriptorSubType::try_from(tlv_type) {
             Ok(value) => value,
@@ -402,10 +372,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
     fn from_wire(
         span: Span<'a>,
         nlri_type: BgpLsNlriType,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (span, protocol_id) =
             nom::combinator::map_res(be_u8, iana::BgpLsProtocolId::try_from)(span)?;
         let (span, identifier) = be_u64(span)?;
@@ -431,11 +398,8 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
     fn from_wire(
         buf: Span<'a>,
         nlri_type: BgpLsNlriType,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
-        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header(buf)?;
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
+        let (tlv_type, _tlv_length, data, remainder) = read_tlv_header_t16_l16(buf)?;
 
         let tlv_type = match BgpLsPrefixDescriptorType::try_from(tlv_type) {
             Ok(value) => value,
@@ -480,10 +444,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for MultiTopologyIdData {
-    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (span, ids) = parse_till_empty_into_located::<
             LocatedBgpLsNlriParsingError<'_>,
             LocatedBgpLsNlriParsingError<'_>,
@@ -494,20 +455,14 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for MultiTopologyIdDa
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for MultiTopologyId {
-    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         let (span, id) = be_u16(span)?;
         Ok((span, MultiTopologyId::from(id)))
     }
 }
 
 impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for OspfRouteType {
-    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    fn from_wire(span: Span<'a>) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         nom::combinator::map_res(be_u8, OspfRouteType::try_from)(span)
     }
 }
@@ -518,10 +473,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
     fn from_wire(
         span: Span<'a>,
         nlri_type: BgpLsNlriType,
-    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>>
-    where
-        Self: Sized,
-    {
+    ) -> IResult<Span<'a>, Self, LocatedBgpLsNlriParsingError<'a>> {
         match nlri_type {
             BgpLsNlriType::Ipv4TopologyPrefix => {
                 let (remainder, ipv4) = parse_into_located(span)?;

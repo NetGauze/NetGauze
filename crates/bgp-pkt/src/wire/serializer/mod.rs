@@ -151,7 +151,6 @@ impl WritablePdu<IpAddrWritingError> for IpAddr {
     }
 }
 
-#[inline]
 /// Write a TLV header.
 /// ```text
 /// 0                   1                   2                   3
@@ -168,7 +167,8 @@ impl WritablePdu<IpAddrWritingError> for IpAddr {
 ///
 /// Written length field will be `tlv_length - 4` since "Length" must not
 /// include the length of the "Type" and "Length" field
-fn write_tlv_header<T: Write>(
+#[inline]
+fn write_tlv_header_t16_l16<T: Write>(
     writer: &mut T,
     tlv_type: u16,
     tlv_length: u16,
@@ -177,6 +177,37 @@ fn write_tlv_header<T: Write>(
     let effective_length = tlv_length - 4;
 
     writer.write_u16::<NetworkEndian>(tlv_type)?;
+    writer.write_u16::<NetworkEndian>(effective_length)?;
+
+    Ok(())
+}
+
+/// Write a TLV header.
+/// ```text
+///  0                   1                   2                   3
+///  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// |   Type        |             Length            |               ~
+/// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+///
+/// `tlv_type` : tlv code point
+///
+/// `tlv_length` : total tlv length on the wire
+/// (as reported by the writer <=> including type and length fields)
+///
+/// Written length field will be `tlv_length - 3` since "Length" must not
+/// include the length of the "Type" and "Length" field
+#[inline]
+fn write_tlv_header_t8_l16<T: Write>(
+    writer: &mut T,
+    tlv_type: u8,
+    tlv_length: u16,
+) -> Result<(), std::io::Error> {
+    // do not account for the tlv type u8 and tlv length u16
+    let effective_length = tlv_length - 3;
+
+    writer.write_u8(tlv_type)?;
     writer.write_u16::<NetworkEndian>(effective_length)?;
 
     Ok(())
@@ -194,10 +225,7 @@ impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyIdData {
         2 * self.id_count()
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError> {
         for id in &self.0 {
             id.write(writer)?;
         }
@@ -213,10 +241,7 @@ impl WritablePdu<MultiTopologyIdWritingError> for MultiTopologyId {
         Self::BASE_LENGTH
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError>
-    where
-        Self: Sized,
-    {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), MultiTopologyIdWritingError> {
         writer.write_u16::<NetworkEndian>(self.value())?;
 
         Ok(())
