@@ -133,7 +133,7 @@ pub fn main() {
 | BGP-LS (link-state)           | [RFC 7752](https://datatracker.ietf.org/doc/html/rfc7752)                                                               | No         | Yes      | No         |                                                                    |
 | Only To Customer (OTC)        | [RFC 9234](https://datatracker.ietf.org/doc/html/rfc9234)                                                               | No         | Yes      | Yes        |                                                                    |
 | Accumulated IGP Metric (AIGP) | [RFC 7311](https://datatracker.ietf.org/doc/html/rfc7311)                                                               | No         | Yes      | No         |                                                                    |
-| BGP Prefix-SID                | [RFC 8669](https://datatracker.ietf.org/doc/html/rfc8669)                                                               | No         | Yes      | Yes        |                                                                    |
+| BGP Prefix-SID                | [RFC 8669](https://datatracker.ietf.org/doc/html/rfc8669) and [RFC 9252](https://datatracker.ietf.org/doc/html/rfc9252)                                                               | No         | Yes      | Yes        |                                                                    |
 | UnknownAttribute              |                                                                                                                         | N/A        | N/A      | N/A        | Catch all attribute that will read and keep the value as a Vec<u8> |
 
 ### MP-BGP supported address families
