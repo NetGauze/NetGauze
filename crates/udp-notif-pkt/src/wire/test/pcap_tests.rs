@@ -71,7 +71,11 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
     let iter = PcapIter::new(pcap_reader);
     let mut peers = HashMap::new();
     for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
-        if protocol != TransportProtocol::UDP || dst_port != 10003 {
+        // The filter for 161 is included because n7-sa1_yang-push.pcap have some snmp traffic
+        if protocol != TransportProtocol::UDP
+            || !vec![10003, 57499].contains(&dst_port)
+            || src_port == 161
+        {
             continue;
         }
         let key = (src_ip, src_port, dst_ip, dst_port);
