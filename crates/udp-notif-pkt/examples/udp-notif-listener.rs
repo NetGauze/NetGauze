@@ -1,18 +1,16 @@
-use std::collections::HashMap;
-use std::env;
-use std::net::SocketAddr;
+use bytes::Bytes;
+use netgauze_udp_notif_pkt::UdpNotifPacket;
 use rdkafka::{
     producer::{FutureProducer, FutureRecord},
     ClientConfig,
 };
 use serde::Serialize;
-use std::time::Duration;
-use bytes::Bytes;
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::{collections::HashMap, env, net::SocketAddr, time::Duration};
 use tokio::net::UdpSocket;
-use tokio_util::codec::{BytesCodec, Decoder};
-use tokio_util::udp::UdpFramed;
-use netgauze_udp_notif_pkt::UdpNotifPacket;
+use tokio_util::{
+    codec::{BytesCodec, Decoder},
+    udp::UdpFramed,
+};
 
 use futures_util::{stream::SplitSink, StreamExt};
 use netgauze_udp_notif_pkt::codec::UdpPacketCodec;
