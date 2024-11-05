@@ -30,7 +30,6 @@ strum_macros = { workspace = true }
 async-channel = "2.3"
 
 [dev-dependencies]
-dashmap = { workspace = true }
 chrono = { workspace = true, default-features = false, features = [
     "std",
     "clock",
