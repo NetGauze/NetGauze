@@ -21,7 +21,6 @@ use std::{
     time::Duration,
 };
 
-use async_trait::async_trait;
 use futures::StreamExt;
 use futures_util::SinkExt;
 use rand::{rngs::SmallRng, thread_rng, Rng, RngCore, SeedableRng};
@@ -50,7 +49,6 @@ use crate::{
 
 pub type PeerResult<A> = Result<BgpEvent<A>, FsmStateError<A>>;
 
-#[async_trait]
 pub trait PeerPolicy<
     A,
     I: AsyncWrite + AsyncRead,
@@ -58,29 +56,29 @@ pub trait PeerPolicy<
         + Encoder<BgpMessage, Error = BgpMessageWritingError>,
 >
 {
-    async fn open_message(&mut self) -> BgpOpenMessage;
+    fn open_message(&mut self) -> impl std::future::Future<Output = BgpOpenMessage> + Send;
 
-    async fn pre_handle_connection_event_hook(
+    fn pre_handle_connection_event_hook(
         &mut self,
         event: ConnectionEvent<A>,
         connection: &Connection<A, I, D>,
-    ) -> ConnectionEvent<A>;
+    ) -> impl std::future::Future<Output = ConnectionEvent<A>> + Send;
 
-    async fn post_handle_connection_event_hook(
+    fn post_handle_connection_event_hook(
         &self,
         event: ConnectionEvent<A>,
         connection: Option<&Connection<A, I, D>>,
-    ) -> ConnectionEvent<A>;
+    ) -> impl std::future::Future<Output = ConnectionEvent<A>> + Send;
 
-    async fn pre_handle_peer_event_hook(
+    fn pre_handle_peer_event_hook(
         &self,
         event: Option<PeerEvent<A, I>>,
-    ) -> Option<PeerEvent<A, I>>;
+    ) -> impl std::future::Future<Output = Option<PeerEvent<A, I>>> + Send;
 
-    async fn post_handle_peer_event_hook(
+    fn post_handle_peer_event_hook(
         &self,
         event: Option<PeerEvent<A, I>>,
-    ) -> Option<PeerEvent<A, I>>;
+    ) -> impl std::future::Future<Output = Option<PeerEvent<A, I>>> + Send;
 }
 
 /// Echo back BGP Capabilities to a peer. With the options to force using a
@@ -135,7 +133,6 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
     }
 }
 
-#[async_trait]
 impl<
         A: Send + Sync + 'static,
         I: AsyncWrite + AsyncRead + Send + Sync + 'static,

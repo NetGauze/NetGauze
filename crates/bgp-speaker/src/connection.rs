@@ -17,7 +17,6 @@ use chrono::prelude::*;
 use futures::{Sink, Stream, StreamExt};
 use futures_util::{FutureExt, SinkExt};
 
-use async_trait::async_trait;
 use pin_project::pin_project;
 use std::{
     fmt::{Debug, Display},
@@ -1507,7 +1506,6 @@ impl<
 }
 
 /// Encapsulate initiating a connection to a peer
-#[async_trait]
 pub trait ActiveConnect<
     P,
     I: AsyncRead + AsyncWrite,
@@ -1515,13 +1513,12 @@ pub trait ActiveConnect<
         + Encoder<BgpMessage, Error = BgpMessageWritingError>,
 >
 {
-    async fn connect(&mut self, peer_addr: P) -> io::Result<I>;
+    fn connect(&mut self, peer_addr: P) -> impl Future<Output = io::Result<I>> + Send;
 }
 
 #[derive(Debug, Clone)]
 pub struct TcpActiveConnect;
 
-#[async_trait]
 impl ActiveConnect<SocketAddr, TcpStream, BgpCodec> for TcpActiveConnect {
     async fn connect(&mut self, peer_addr: SocketAddr) -> io::Result<TcpStream> {
         TcpStream::connect(peer_addr).await
