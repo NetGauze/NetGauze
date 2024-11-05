@@ -14,9 +14,7 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-flow-pkt = { version = "0.4.1", path = "../flow-pkt", features = [
-    "codec",
-] }
+netgauze-flow-pkt = { workspace = true, features = ["codec"] }
 tokio = { workspace = true, features = ["full", "tracing"] }
 tokio-util = { workspace = true, features = ["full", "tracing"] }
 bytes = { workspace = true }
@@ -30,10 +28,7 @@ strum_macros = { workspace = true }
 async-channel = "2.3"
 
 [dev-dependencies]
-chrono = { workspace = true, default-features = false, features = [
-    "std",
-    "clock",
-] }
+chrono = { workspace = true, default-features = false, features = ["std", "clock"] }
 tracing-subscriber = { workspace = true }
 tracing-test = { version = "0.2" }
 serde_json = { workspace = true }

@@ -14,10 +14,10 @@ keywords = ["bgp", "protocol"]
 categories = ["network-programming"]
 
 [dependencies]
-netgauze-bgp-pkt = { version = "0.4.1", path = "../bgp-pkt", features = ["codec"] }
-netgauze-iana = { version = "0.4.1", path = "../iana" }
-netgauze-locate = { version = "0.4.1", path = "../locate" }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils" }
+netgauze-bgp-pkt = { workspace = true , features = ["codec"] }
+netgauze-iana = { workspace = true }
+netgauze-locate = { workspace = true  }
+netgauze-parse-utils = { workspace = true }
 byteorder = { workspace = true }
 chrono = { workspace = true, default-features = false, features = ["std", "clock"] }
 

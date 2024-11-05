@@ -15,9 +15,9 @@ categories = ["network-programming", "parsing"]
 
 
 [dependencies]
-netgauze-locate = { version = "0.4.1", path = "../locate", optional = true }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", optional = true }
-netgauze-serde-macros = { version = "0.4.1", path = "../serde-macros", optional = true }
+netgauze-locate = { workspace = true , optional = true }
+netgauze-parse-utils = { workspace = true, optional = true }
+netgauze-serde-macros = { workspace = true , optional = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 
@@ -36,8 +36,8 @@ codec = ["tokio-util"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
-netgauze-pcap-reader = { version = "0.4.1", path = "../pcap-reader" }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", features = ["test-helpers"] }
+netgauze-pcap-reader = { workspace = true }
+netgauze-parse-utils = { workspace = true, features = ["test-helpers"] }
 serde_json = { workspace = true }
 rstest = { workspace = true }
 pcap-parser = { workspace = true, features = ["data"] }

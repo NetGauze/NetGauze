@@ -14,11 +14,11 @@ keywords = ["bmp", "bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-iana = { version = "0.4.1", path = "../iana" }
-netgauze-bgp-pkt = { version = "0.4.1", path = "../bgp-pkt" }
-netgauze-locate = { version = "0.4.1", path = "../locate", optional = true }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", optional = true }
-netgauze-serde-macros = { version = "0.4.1", path = "../serde-macros", optional = true }
+netgauze-iana = { workspace = true }
+netgauze-bgp-pkt = { workspace = true  }
+netgauze-locate = { workspace = true , optional = true }
+netgauze-parse-utils = { workspace = true, optional = true }
+netgauze-serde-macros = { workspace = true , optional = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 chrono = { workspace = true }
@@ -41,8 +41,8 @@ bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
-netgauze-pcap-reader = { version = "0.4.1", path = "../pcap-reader" }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", features = ["test-helpers"] }
+netgauze-pcap-reader = { workspace = true }
+netgauze-parse-utils = { workspace = true, features = ["test-helpers"] }
 chrono = { workspace = true, default-features = false, features = ["std", "serde", "clock"] }
 serde_json = { workspace = true }
 rstest = { workspace = true }

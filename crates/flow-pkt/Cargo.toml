@@ -14,10 +14,10 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-locate = { version = "0.4.1", path = "../locate", optional = true }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", optional = true }
-netgauze-serde-macros = { version = "0.4.1", path = "../serde-macros", optional = true }
-netgauze-iana = { version = "0.4.1", path = "../iana" }
+netgauze-locate = { workspace = true , optional = true }
+netgauze-parse-utils = { workspace = true, optional = true }
+netgauze-serde-macros = { workspace = true , optional = true }
+netgauze-iana = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 strum = { workspace = true }
 strum_macros = { workspace = true }
@@ -41,8 +41,8 @@ bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
-netgauze-pcap-reader = { version = "0.4.1", path = "../pcap-reader" }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils", features = ["test-helpers"] }
+netgauze-pcap-reader = { workspace = true }
+netgauze-parse-utils = { workspace = true, features = ["test-helpers"] }
 serde_json = { workspace = true }
 rstest = { workspace = true }
 pcap-parser = { workspace = true, features = ["data"] }
@@ -50,7 +50,7 @@ pcap-parser = { workspace = true, features = ["data"] }
 [build-dependencies]
 reqwest = { workspace = true, features = ["blocking"] }
 roxmltree = { workspace = true }
-netgauze-ipfix-code-generator = { version = "0.4.1", path = "../ipfix-code-generator" }
+netgauze-ipfix-code-generator = { workspace = true }
 
 [[bench]]
 name = "serde_benchmark"

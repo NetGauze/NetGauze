@@ -14,10 +14,10 @@ keywords = ["bmp", "bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-iana = { version = "0.4.1", path = "../iana" }
-netgauze-bmp-pkt = { version = "0.4.1", path = "../bmp-pkt", features = ["serde", "codec"] }
-netgauze-bgp-pkt = { version = "0.4.1", path = "../bgp-pkt", features = ["serde"] }
-netgauze-parse-utils = { version = "0.4.1", path = "../parse-utils" }
+netgauze-iana = { workspace = true }
+netgauze-bmp-pkt = { workspace = true , features = ["serde", "codec"] }
+netgauze-bgp-pkt = { workspace = true , features = ["serde"] }
+netgauze-parse-utils = { workspace = true }
 
 nom = { workspace = true }
 byteorder = { workspace = true }
