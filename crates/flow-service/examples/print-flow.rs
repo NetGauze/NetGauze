@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use dashmap::DashMap;
 use futures_util::{stream::SplitSink, StreamExt};
+use std::collections::HashMap;
 use tokio::net::UdpSocket;
 use tokio_util::{
     codec::{BytesCodec, Decoder},
@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
 
     let framed = UdpFramed::new(socket, BytesCodec::default());
     let (_tx, mut stream): (SplitSink<_, (Bytes, _)>, _) = framed.split();
-    let clients = DashMap::new();
+    let mut clients = HashMap::new();
     while let Some(next) = stream.next().await {
         match next {
             Ok((mut buf, addr)) => {
