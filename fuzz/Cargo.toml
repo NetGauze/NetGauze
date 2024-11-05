@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-fuzz"
-version = "0.4.1"
+version = "0.5.0"
 publish = false
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]

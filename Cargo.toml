@@ -18,19 +18,19 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-netgauze-pcap-reader = { version = "0.4.1", path = "crates/pcap-reader" }
-netgauze-bgp-pkt = { version = "0.4.1", path = "crates/bgp-pkt" }
-netgauze-bgp-speaker = { version = "0.4.1", path = "crates/bgp-speaker" }
-netgauze-bmp-service = { version = "0.4.1", path = "crates/bmp-service" }
-netgauze-bmp-pkt = { version = "0.4.1", path = "crates/bmp-pkt" }
-netgauze-iana = { version = "0.4.1", path = "crates/iana" }
-netgauze-ipfix-code-generator = { version = "0.4.1", path = "crates/ipfix-code-generator" }
-netgauze-flow-pkt = { version = "0.4.1", path = "crates/flow-pkt" }
-netgauze-flow-service = { version = "0.4.1", path = "crates/flow-service" }
-netgauze-locate = { version = "0.4.1", path = "crates/locate" }
-netgauze-parse-utils = { version = "0.4.1", path = "crates/parse-utils" }
-netgauze-serde-macros = { version = "0.4.1", path = "crates/serde-macros" }
-netgauze-udp-notif-pkt = { version = "0.4.1", path = "crates/udp-notif-pkt" }
+netgauze-pcap-reader = { version = "0.5.0", path = "crates/pcap-reader" }
+netgauze-bgp-pkt = { version = "0.5.0", path = "crates/bgp-pkt" }
+netgauze-bgp-speaker = { version = "0.5.0", path = "crates/bgp-speaker" }
+netgauze-bmp-service = { version = "0.5.0", path = "crates/bmp-service" }
+netgauze-bmp-pkt = { version = "0.5.0", path = "crates/bmp-pkt" }
+netgauze-iana = { version = "0.5.0", path = "crates/iana" }
+netgauze-ipfix-code-generator = { version = "0.5.0", path = "crates/ipfix-code-generator" }
+netgauze-flow-pkt = { version = "0.5.0", path = "crates/flow-pkt" }
+netgauze-flow-service = { version = "0.5.0", path = "crates/flow-service" }
+netgauze-locate = { version = "0.5.0", path = "crates/locate" }
+netgauze-parse-utils = { version = "0.5.0", path = "crates/parse-utils" }
+netgauze-serde-macros = { version = "0.5.0", path = "crates/serde-macros" }
+netgauze-udp-notif-pkt = { version = "0.5.0", path = "crates/udp-notif-pkt" }
 log = "0.4"
 thiserror = "1.0"
 byteorder = { version = "1.5" }
@@ -67,7 +67,3 @@ rstest = "0.23"
 pcap-parser = { version = "0.16", features = ["data"] }
 clap = { version = "4.5", features = ["derive"] }
 socket2 = { version = "0.5" }
-
-
-[profile.release]
-debug = true
