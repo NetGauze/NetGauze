@@ -16,7 +16,6 @@
 use crate::peer::{EchoCapabilitiesPolicy, PeerProperties};
 use std::net::{IpAddr, Ipv4Addr};
 
-use async_trait::async_trait;
 use std::{io, io::Cursor, net::SocketAddr, time::Duration};
 
 use crate::connection::ActiveConnect;
@@ -107,7 +106,6 @@ pub struct MockActiveConnect {
     pub connect_delay: Duration,
 }
 
-#[async_trait]
 impl ActiveConnect<SocketAddr, tokio_test::io::Mock, BgpCodec> for MockActiveConnect {
     async fn connect(&mut self, peer_addr: SocketAddr) -> io::Result<tokio_test::io::Mock> {
         assert_eq!(self.peer_addr, peer_addr);
@@ -124,7 +122,6 @@ pub struct MockFailedActiveConnect {
     pub connect_delay: Duration,
 }
 
-#[async_trait]
 impl ActiveConnect<SocketAddr, tokio_test::io::Mock, BgpCodec> for MockFailedActiveConnect {
     async fn connect(&mut self, peer_addr: SocketAddr) -> io::Result<tokio_test::io::Mock> {
         assert_eq!(self.peer_addr, peer_addr);

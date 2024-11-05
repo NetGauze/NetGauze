@@ -30,7 +30,6 @@ netgauze-udp-notif-pkt = { path = "../crates/udp-notif-pkt", features = [
     "fuzz",
     "codec",
 ] }
-async-trait = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-test = { workspace = true }

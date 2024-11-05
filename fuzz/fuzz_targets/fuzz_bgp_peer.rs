@@ -388,7 +388,6 @@ pub struct MockActiveConnect {
     io_builder: IoBuilder,
 }
 
-#[async_trait::async_trait]
 impl ActiveConnect<SocketAddr, Mock, BgpCodec> for MockActiveConnect {
     async fn connect(&mut self, peer_addr: SocketAddr) -> io::Result<Mock> {
         assert_eq!(self.peer_addr, peer_addr);
