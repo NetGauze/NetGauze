@@ -53,24 +53,26 @@ impl PathAttributeValueProperties for BgpLsAttribute {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BgpLsAttributeValue {
     /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
-    LocalNodeIpv4RouterId(Ipv4Addr),
+    LocalNodeIpv4RouterId(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))] Ipv4Addr,
+    ),
 
     /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
-    LocalNodeIpv6RouterId(Ipv6Addr),
+    LocalNodeIpv6RouterId(
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6))] Ipv6Addr,
+    ),
 
     /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv4))]
     RemoteNodeIpv4RouterId(
         /// must be global
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4))]
         Ipv4Addr,
     ),
 
     /// see [RFC7752 Section 3.3.1.4](https://www.rfc-editor.org/rfc/rfc7752#section-3.3.1.4)
-    #[cfg_attr(feature = "fuzz", arbitrary(with = arbitrary_ipv6))]
     RemoteNodeIpv6RouterId(
         /// must be global
+        #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6))]
         Ipv6Addr,
     ),
 
