@@ -28,6 +28,15 @@ use std::{
 use tokio_util::codec::Decoder;
 
 #[rstest]
+fn test_pmacct_udp_notif(#[files("../../assets/pcaps/pmacct-tests/*/*.pcap")] path: PathBuf) {
+    let overwrite = std::env::var("OVERWRITE")
+        .to_owned()
+        .unwrap_or_default()
+        .eq_ignore_ascii_case("true");
+    test_udp_notif_pcap(overwrite, path);
+}
+
+#[rstest]
 fn test_pcap_udp_notif(#[files("../../assets/pcaps/udp-notif/*/*.pcap")] path: PathBuf) {
     let overwrite = std::env::var("OVERWRITE")
         .to_owned()
@@ -74,7 +83,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
         // The filter for 161 is included because n7-sa1_yang-push.pcap have some snmp
         // traffic
         if protocol != TransportProtocol::UDP
-            || [10003, 57499].contains(&dst_port)
+            || ![10003, 57499].contains(&dst_port)
             || src_port == 161
         {
             continue;
