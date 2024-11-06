@@ -32,7 +32,7 @@ netgauze-parse-utils = { version = "0.5.0", path = "crates/parse-utils" }
 netgauze-serde-macros = { version = "0.5.0", path = "crates/serde-macros" }
 netgauze-udp-notif-pkt = { version = "0.5.0", path = "crates/udp-notif-pkt" }
 log = "0.4"
-thiserror = "1.0"
+thiserror = "2.0"
 byteorder = { version = "1.5" }
 chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
 criterion = { version = "0.5" } # Dev dep for bench
