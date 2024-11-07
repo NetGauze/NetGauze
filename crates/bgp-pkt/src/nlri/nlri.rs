@@ -90,6 +90,17 @@ impl RouteDistinguisher {
     }
 }
 
+impl std::fmt::Display for RouteDistinguisher {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::As2Administrator { asn2, number } => write!(f, "{asn2}:{number}"),
+            Self::Ipv4Administrator { ip, number } => write!(f, "{ip}:{number}"),
+            Self::As4Administrator { asn4, number } => write!(f, "{asn4}:{number}"),
+            Self::LeafAdRoutes => write!(f, "leaf-A-D-route"),
+        }
+    }
+}
+
 impl From<RouteDistinguisher> for u64 {
     fn from(value: RouteDistinguisher) -> Self {
         match value {
@@ -615,6 +626,16 @@ pub struct EthernetTag(pub u32);
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct MacAddress(pub [u8; 6]);
+
+impl std::fmt::Display for MacAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
+        )
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]

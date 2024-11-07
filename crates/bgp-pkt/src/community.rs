@@ -53,6 +53,21 @@ impl Community {
     }
 }
 
+impl std::fmt::Display for Community {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.into_well_known() {
+            Some(w) => write!(f, "{w}"),
+            None => {
+                // Extract high 16 bits (AS number)
+                let as_number = (self.0 >> 16) & 0xFFFF;
+                // Extract low 16 bits (community value)
+                let value = self.0 & 0xFFFF;
+                write!(f, "{as_number}:{value}")
+            }
+        }
+    }
+}
+
 /// As defined in [RFC8092](https://www.rfc-editor.org/rfc/rfc8092)
 ///
 /// ```text
@@ -107,6 +122,16 @@ impl LargeCommunity {
         bytes[8..12].copy_from_slice(&self.local_data2.to_be_bytes());
 
         bytes
+    }
+}
+
+impl std::fmt::Display for LargeCommunity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}",
+            self.global_admin, self.local_data1, self.local_data2
+        )
     }
 }
 
@@ -200,6 +225,325 @@ impl ExtendedCommunityProperties for ExtendedCommunity {
             Self::Experimental(value) => value.transitive(),
             Self::Evpn(value) => value.transitive(),
             Self::Unknown(value) => value.transitive(),
+        }
+    }
+}
+
+impl std::fmt::Display for ExtendedCommunity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TransitiveTwoOctet(value) => match value {
+                TransitiveTwoOctetExtendedCommunity::RouteTarget {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::RouteOrigin {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "ro:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::OspfDomainIdentifier {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "ospf-domain:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::BgpDataCollection {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "bgp-data:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::SourceAs {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "source-as:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::L2VpnIdentifier {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "l2vpn:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::CiscoVpnDistinguisher {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "cisco-vpn:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::RouteTargetRecord {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt-record:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::RtDerivedEc {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt-derived:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::VirtualNetworkIdentifier {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "vni:{global_admin}:{local_admin}")
+                }
+                TransitiveTwoOctetExtendedCommunity::Unassigned {
+                    sub_type,
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "unassigned-{sub_type}:{global_admin}:{local_admin}")
+                }
+            },
+            Self::NonTransitiveTwoOctet(value) => match value {
+                NonTransitiveTwoOctetExtendedCommunity::LinkBandwidth {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "link-bw:{global_admin}:{local_admin}")
+                }
+                NonTransitiveTwoOctetExtendedCommunity::VirtualNetworkIdentifier {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "vni:{global_admin}:{local_admin}")
+                }
+                NonTransitiveTwoOctetExtendedCommunity::Unassigned {
+                    sub_type,
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "unassigned-{sub_type}:{global_admin}:{local_admin}")
+                }
+            },
+            Self::TransitiveIpv4(value) => match value {
+                TransitiveIpv4ExtendedCommunity::RouteTarget {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::RouteOrigin {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "ro:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::OspfDomainIdentifier {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "ospf-domain:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::OspfRouteID {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "ospf-rid:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::L2VpnIdentifier {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "l2vpn:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::VrfRouteImport {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "vrf-import:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::FlowSpecRedirectToIpv4 {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "flowspec-redirect:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::CiscoVpnDistinguisher {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "cisco-vpn:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::InterAreaP2MpSegmentedNextHop {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "p2mp-nexthop:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::RouteTargetRecord {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt-record:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::VrfRecursiveNextHop {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "vrf-nexthop:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::RtDerivedEc {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt-derived:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::MulticastVpnRpAddress {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "mvpn-rp:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::Unassigned {
+                    sub_type,
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "unassigned-{sub_type}:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::NodeTarget {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "node-target:{global_admin}:{local_admin}")
+                }
+                TransitiveIpv4ExtendedCommunity::Ipv4Ifit {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "ifit:{global_admin}:{local_admin}")
+                }
+            },
+            Self::NonTransitiveIpv4(value) => match value {
+                NonTransitiveIpv4ExtendedCommunity::Unassigned {
+                    sub_type,
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "unassigned-{sub_type}:{global_admin}:{local_admin}")
+                }
+            },
+            Self::TransitiveFourOctet(value) => match value {
+                TransitiveFourOctetExtendedCommunity::RouteTarget {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt:{global_admin}:{local_admin}")
+                }
+                TransitiveFourOctetExtendedCommunity::RouteOrigin {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "ro:{global_admin}:{local_admin}")
+                }
+                TransitiveFourOctetExtendedCommunity::OspfDomainIdentifier {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "ospf-domain:{global_admin}:{local_admin}")
+                }
+                TransitiveFourOctetExtendedCommunity::BgpDataCollection {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "bgp-data:{global_admin}:{local_admin}")
+                }
+                TransitiveFourOctetExtendedCommunity::SourceAs {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "source-as:{global_admin}:{local_admin}")
+                }
+                TransitiveFourOctetExtendedCommunity::CiscoVpnDistinguisher {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "cisco-vpn:{global_admin}:{local_admin}")
+                }
+                TransitiveFourOctetExtendedCommunity::RouteTargetRecord {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt-record:{global_admin}:{local_admin}")
+                }
+                TransitiveFourOctetExtendedCommunity::RtDerivedEc {
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "rt-derived:{global_admin}:{local_admin}")
+                }
+                TransitiveFourOctetExtendedCommunity::Unassigned {
+                    sub_type,
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "unassigned-{sub_type}:{global_admin}:{local_admin}")
+                }
+            },
+            Self::NonTransitiveFourOctet(value) => match value {
+                NonTransitiveFourOctetExtendedCommunity::Unassigned {
+                    sub_type,
+                    global_admin,
+                    local_admin,
+                } => {
+                    write!(f, "unassigned-{sub_type}:{global_admin}:{local_admin}")
+                }
+            },
+            Self::TransitiveOpaque(value) => match value {
+                TransitiveOpaqueExtendedCommunity::DefaultGateway => write!(f, "default-gateway"),
+                TransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value } => {
+                    write!(f, "unassigned-{sub_type}:{value:x?}")
+                }
+            },
+            Self::NonTransitiveOpaque(value) => match value {
+                NonTransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value } => {
+                    write!(f, "unassigned-{sub_type}:{value:x?}")
+                }
+            },
+            Self::Evpn(value) => match value {
+                EvpnExtendedCommunity::MacMobility { flags, seq_no } => {
+                    write!(f, "mac-mobility:flags={flags:x}:seq={seq_no}")
+                }
+                EvpnExtendedCommunity::EsiLabel { flags, esi_label } => {
+                    write!(f, "esi-label:flags={flags:x}:label={esi_label:x?}")
+                }
+                EvpnExtendedCommunity::EsImportRouteTarget { route_target } => {
+                    write!(f, "es-import:{route_target:?}",)
+                }
+                EvpnExtendedCommunity::EvpnRoutersMac { mac } => {
+                    write!(f, "router-mac:{mac}",)
+                }
+                EvpnExtendedCommunity::EvpnL2Attribute {
+                    control_flags,
+                    l2_mtu,
+                } => {
+                    write!(f, "l2-attr:flags={control_flags:x}:mtu={l2_mtu}")
+                }
+                EvpnExtendedCommunity::Unassigned { sub_type, value } => {
+                    write!(f, "unassigned-{sub_type}:{value:x?}")
+                }
+            },
+            Self::Experimental(value) => {
+                write!(
+                    f,
+                    "experimental:{}:{}:{:x?}",
+                    value.code, value.sub_type, value.value
+                )
+            }
+            Self::Unknown(value) => {
+                write!(
+                    f,
+                    "unknown:{}:{}:{:x?}",
+                    value.code, value.sub_type, value.value
+                )
+            }
         }
     }
 }
