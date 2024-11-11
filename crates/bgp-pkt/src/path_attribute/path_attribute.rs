@@ -384,6 +384,27 @@ impl PathAttributeValueProperties for AsPath {
     }
 }
 
+impl From<AsPath> for Vec<u32> {
+    fn from(value: AsPath) -> Self {
+        let mut ret = vec![];
+        match value {
+            AsPath::As2PathSegments(segments) => {
+                for seg in segments {
+                    for x in &seg.as_numbers {
+                        ret.push(*x as u32);
+                    }
+                }
+            }
+            AsPath::As4PathSegments(segments) => {
+                for seg in segments {
+                    ret.extend(seg.as_numbers.iter().cloned());
+                }
+            }
+        }
+        ret
+    }
+}
+
 /// AS Path Segment Type
 ///
 /// ```text
@@ -1828,5 +1849,23 @@ mod tests {
         );
         assert_eq!(unknown.afi(), AddressFamily::AppleTalk);
         assert_eq!(unknown.safi(), SubsequentAddressFamily::Unicast);
+    }
+
+    #[test]
+    fn test_as_path_to_vec() {
+        let as2_path = AsPath::As2PathSegments(vec![
+            As2PathSegment::new(AsPathSegmentType::AsSequence, vec![100, 200]),
+            As2PathSegment::new(AsPathSegmentType::AsSet, vec![300, 400]),
+        ]);
+        let as4_path = AsPath::As4PathSegments(vec![
+            As4PathSegment::new(AsPathSegmentType::AsSequence, vec![100000, 200000]),
+            As4PathSegment::new(AsPathSegmentType::AsSet, vec![300000, 400000]),
+        ]);
+
+        assert_eq!(Vec::<u32>::from(as2_path), vec![100, 200, 300, 400]);
+        assert_eq!(
+            Vec::<u32>::from(as4_path),
+            vec![100000, 200000, 300000, 400000]
+        );
     }
 }
