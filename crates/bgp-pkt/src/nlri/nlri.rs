@@ -649,8 +649,8 @@ impl L2EvpnAddress {
         Self { path_id, route }
     }
 
-    pub const fn path_id(&self) -> Option<&u32> {
-        self.path_id.as_ref()
+    pub const fn path_id(&self) -> Option<u32> {
+        self.path_id
     }
 
     pub const fn route(&self) -> &L2EvpnRoute {
