@@ -666,7 +666,7 @@ impl WritablePdu<L2EvpnAddressWritingError> for L2EvpnAddress {
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), L2EvpnAddressWritingError> {
         if let Some(path_id) = self.path_id() {
-            writer.write_u32::<NetworkEndian>(*path_id)?;
+            writer.write_u32::<NetworkEndian>(path_id)?;
         }
         self.route().write(writer)?;
         Ok(())
