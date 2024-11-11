@@ -1175,7 +1175,7 @@ pub enum MpUnreach {
         nlri: Vec<Ipv6MulticastAddress>,
     },
     Ipv6NlriMplsLabels {
-        nlri: Vec<Ipv4NlriMplsLabelsAddress>,
+        nlri: Vec<Ipv6NlriMplsLabelsAddress>,
     },
     Ipv6MplsVpnUnicast {
         nlri: Vec<Ipv6MplsVpnUnicastAddress>,
