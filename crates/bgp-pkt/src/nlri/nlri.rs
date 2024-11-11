@@ -217,6 +217,12 @@ pub struct Ipv4Unicast(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] Ipv4Net,
 );
 
+impl std::fmt::Display for Ipv4Unicast {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Raised when the network is not a unicast range
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -354,6 +360,12 @@ pub struct Ipv4Multicast(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] Ipv4Net,
 );
 
+impl std::fmt::Display for Ipv4Multicast {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct InvalidIpv4MulticastNetwork(
@@ -424,6 +436,12 @@ impl NlriAddressType for Ipv4MulticastAddress {
 pub struct Ipv6Unicast(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] Ipv6Net,
 );
+
+impl std::fmt::Display for Ipv6Unicast {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -547,6 +565,12 @@ impl NlriAddressType for Ipv6MplsVpnUnicastAddress {
 pub struct Ipv6Multicast(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv6net))] Ipv6Net,
 );
+
+impl std::fmt::Display for Ipv6Multicast {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
