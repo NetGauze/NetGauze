@@ -29,7 +29,85 @@ fn main() {
     let registry_path = std::path::Path::new(&manifest_dir).join("registry");
     let subregistry_path = registry_path.join("subregistry");
 
-    if cfg!(feature = "backwards-compatibility-snapshot") {
+    if cfg!(feature = "iana-upstream-build") {
+        // FlowDirection SubRegistry Path
+        let flow_direction_path = subregistry_path
+            .join("iana_flow_direction.xml")
+            .into_os_string()
+            .into_string()
+            .expect("Couldn't load flowDirection registry file");
+
+        let nokia_path = registry_path
+            .join("nokia.xml")
+            .into_os_string()
+            .into_string()
+            .expect("Couldn't load nokia registry file");
+        let nokia_source = SourceConfig::new(
+            RegistrySource::File(nokia_path),
+            RegistryType::IanaXML,
+            637,
+            "nokia".to_string(),
+            "Nokia".to_string(),
+            None,
+        );
+
+        // Add any external sub-registries for VMWare
+        let external_subregs = vec![
+            ExternalSubRegistrySource::new(
+                RegistrySource::Http(PROTOCOL_NUMBERS_URL.to_string()),
+                SubRegistryType::ValueNameDescRegistry,
+                String::from("protocol-numbers-1"),
+                880,
+            ),
+            ExternalSubRegistrySource::new(
+                RegistrySource::File(flow_direction_path.clone()),
+                SubRegistryType::ValueNameDescRegistry,
+                String::from("ipfix-flow-direction"),
+                954,
+            ),
+        ];
+        let vmware_path = registry_path
+            .join("vmware.xml")
+            .into_os_string()
+            .into_string()
+            .expect("Couldn't load VMWare registry file");
+        let vmware_source = SourceConfig::new(
+            RegistrySource::File(vmware_path),
+            RegistryType::IanaXML,
+            6876,
+            "vmware".to_string(),
+            "VMWare".to_string(),
+            Some(external_subregs),
+        );
+
+        // Add any external sub-registries for IANA
+        let external_subregs = vec![
+            ExternalSubRegistrySource::new(
+                RegistrySource::Http(PROTOCOL_NUMBERS_URL.to_string()),
+                SubRegistryType::ValueNameDescRegistry,
+                String::from("protocol-numbers-1"),
+                4,
+            ),
+            ExternalSubRegistrySource::new(
+                RegistrySource::File(flow_direction_path),
+                SubRegistryType::ValueNameDescRegistry,
+                String::from("ipfix-flow-direction"),
+                61,
+            ),
+        ];
+        let iana_source = SourceConfig::new(
+            RegistrySource::Http(IPFIX_URL.to_string()),
+            RegistryType::IanaXML,
+            0,
+            "iana".to_string(),
+            "IANA".to_string(),
+            Some(external_subregs),
+        );
+        let configs = Config::new(iana_source, vec![nokia_source, vmware_source]);
+        generate(&out_dir, &configs).unwrap();
+
+        println!("cargo:rerun-if-changed=build.rs");
+    } else {
         // IPFIX Information Elements Registry Path
         let ipfix_elements_path = registry_path
             .join("iana_ipfix_information_elements.xml")
@@ -122,86 +200,6 @@ fn main() {
 
         let configs = Config::new(iana_source, vec![nokia_source, vmware_source]);
         generate(&out_dir, &configs).unwrap();
-
-        println!("cargo:rerun-if-changed=build.rs");
-    } else {
-        // FlowDirection SubRegistry Path
-        let flow_direction_path = subregistry_path
-            .join("iana_flow_direction.xml")
-            .into_os_string()
-            .into_string()
-            .expect("Couldn't load flowDirection registry file");
-
-        let nokia_path = registry_path
-            .join("nokia.xml")
-            .into_os_string()
-            .into_string()
-            .expect("Couldn't load nokia registry file");
-        let nokia_source = SourceConfig::new(
-            RegistrySource::File(nokia_path),
-            RegistryType::IanaXML,
-            637,
-            "nokia".to_string(),
-            "Nokia".to_string(),
-            None,
-        );
-
-        // Add any external sub-registries for VMWare
-        let external_subregs = vec![
-            ExternalSubRegistrySource::new(
-                RegistrySource::Http(PROTOCOL_NUMBERS_URL.to_string()),
-                SubRegistryType::ValueNameDescRegistry,
-                String::from("protocol-numbers-1"),
-                880,
-            ),
-            ExternalSubRegistrySource::new(
-                RegistrySource::File(flow_direction_path.clone()),
-                SubRegistryType::ValueNameDescRegistry,
-                String::from("ipfix-flow-direction"),
-                954,
-            ),
-        ];
-        let vmware_path = registry_path
-            .join("vmware.xml")
-            .into_os_string()
-            .into_string()
-            .expect("Couldn't load VMWare registry file");
-        let vmware_source = SourceConfig::new(
-            RegistrySource::File(vmware_path),
-            RegistryType::IanaXML,
-            6876,
-            "vmware".to_string(),
-            "VMWare".to_string(),
-            Some(external_subregs),
-        );
-
-        // Add any external sub-registries for IANA
-        let external_subregs = vec![
-            ExternalSubRegistrySource::new(
-                RegistrySource::Http(PROTOCOL_NUMBERS_URL.to_string()),
-                SubRegistryType::ValueNameDescRegistry,
-                String::from("protocol-numbers-1"),
-                4,
-            ),
-            ExternalSubRegistrySource::new(
-                RegistrySource::File(flow_direction_path),
-                SubRegistryType::ValueNameDescRegistry,
-                String::from("ipfix-flow-direction"),
-                61,
-            ),
-        ];
-        let iana_source = SourceConfig::new(
-            RegistrySource::Http(IPFIX_URL.to_string()),
-            RegistryType::IanaXML,
-            0,
-            "iana".to_string(),
-            "IANA".to_string(),
-            Some(external_subregs),
-        );
-        let configs = Config::new(iana_source, vec![nokia_source, vmware_source]);
-        if let Err(e) = generate(&out_dir, &configs) {
-            println!("{:?}", e);
-        }
 
         println!("cargo:rerun-if-changed=build.rs");
     }
