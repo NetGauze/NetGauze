@@ -52,7 +52,7 @@ serde = [
 codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
-backwards-compatibility-snapshot = ["serde"]
+iana-upstream-build = ["serde"]
 
 [dev-dependencies]
 netgauze-pcap-reader = { workspace = true }
