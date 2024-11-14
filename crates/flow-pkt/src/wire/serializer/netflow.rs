@@ -162,7 +162,7 @@ fn calculate_set_size_with_padding(
             }
         };
     if align_to_4_bytes {
-        (length, 4 - length % 4)
+        (length, (4 - length % 4) % 4)
     } else {
         (length, 0)
     }
