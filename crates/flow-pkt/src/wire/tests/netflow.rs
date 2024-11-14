@@ -520,7 +520,7 @@ fn test_padding() -> Result<(), NetFlowV9WritingError> {
         0x00, 0x00, 0x00, 0x00, // Sampler Name
         0x02, // Random
         0x01, 0x00, // Sampler Random Interval
-        0x00, 0x00, 0x00, // Padding
+        0x00, // Padding
     ];
 
     let bad_padding_options_wire = [
