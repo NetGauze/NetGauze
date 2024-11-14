@@ -165,7 +165,7 @@ impl WritablePdu<SRv6ServiceSubTlvWritingError> for SRv6ServiceSubTlv {
                 subsubtlvs,
             } => {
                 writer.write_u8(*reserved1)?; // reserved1
-                writer.write_u128::<NetworkEndian>(*sid)?;
+                writer.write_all(&sid.octets())?;
                 writer.write_u8(*service_sid_flags)?;
                 writer.write_u16::<NetworkEndian>(*endpoint_behaviour)?;
                 writer.write_u8(*reserved2)?; // reserved2

@@ -3,6 +3,7 @@ use nom::{
     IResult,
 };
 use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
 
 use netgauze_parse_utils::{
     parse_into_located, parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePdu,
@@ -164,7 +165,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubTlvParsingError<'a>> for SRv6Serv
 
                 SRv6ServiceSubTlv::SRv6SIDInformation {
                     reserved1,
-                    sid,
+                    sid: Ipv6Addr::from(sid),
                     service_sid_flags,
                     endpoint_behaviour,
                     reserved2,
@@ -399,7 +400,7 @@ pub mod tests {
                             reserved: 0,
                             subtlvs: vec![SRv6SIDInformation {
                                 reserved1: 0,
-                                sid: 42540766411456678174928491552811515904,
+                                sid: Ipv6Addr::from(42540766411456678174928491552811515904),
                                 service_sid_flags: 0,
                                 endpoint_behaviour: 63,
                                 reserved2: 0,
