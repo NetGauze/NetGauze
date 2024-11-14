@@ -309,7 +309,7 @@ fn calculate_set_size_with_padding(
                     .sum::<usize>()
             }
         };
-    (length, length % 4)
+    (length, 4 - length % 4)
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
