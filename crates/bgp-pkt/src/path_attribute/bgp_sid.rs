@@ -4,6 +4,7 @@ use crate::{
     path_attribute::PathAttributeValueProperties,
 };
 use serde::{Deserialize, Serialize};
+use std::net::Ipv6Addr;
 use strum_macros::Display;
 
 /// SR Global Block (SRGB): the set of global segments in the SR domain.
@@ -245,7 +246,7 @@ pub enum SRv6ServiceSubTlv {
     ///      encoded as a set of SRv6 Service Data Sub-Sub-TLVs.
     SRv6SIDInformation {
         reserved1: u8,
-        sid: u128,
+        sid: Ipv6Addr,
         service_sid_flags: u8,
         endpoint_behaviour: u16,
         reserved2: u8,
