@@ -1,5 +1,4 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<!-- Date of download: 2024-11-14 -->
 <?xml-stylesheet type="text/xsl" href="ipfix.xsl"?>
 <?xml-model href="ipfix.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
 <registry xmlns="http://www.iana.org/assignments" id="ipfix">
