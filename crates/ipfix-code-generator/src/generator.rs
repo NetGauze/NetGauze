@@ -2027,7 +2027,7 @@ fn generate_string_serializer(ie_name: &str) -> String {
     ret.push_str("            Some(len) => {\n");
     ret.push_str("                writer.write_all(self.0.as_bytes())?;\n");
     ret.push_str("                // fill the rest with zeros\n");
-    ret.push_str("                for _ in self.0.as_bytes().len()..(len as usize) {\n");
+    ret.push_str("                for _ in self.0.len()..(len as usize) {\n");
     ret.push_str("                    writer.write_u8(0)?\n");
     ret.push_str("                }\n");
     ret.push_str("            }\n");
