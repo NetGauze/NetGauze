@@ -156,7 +156,7 @@ impl<'a>
         let add_path = ctx
             .add_path
             .get(&AddressType::Ipv4Unicast)
-            .map_or(false, |x| *x);
+            .is_some_and(|x| *x);
         let (buf, withdrawn_buf) = nom::multi::length_data(be_u16)(buf)?;
         let (_, withdrawn_routes) = parse_nlri(withdrawn_buf, add_path, false, ctx)?;
         let (buf, mut path_attributes_buf) = nom::multi::length_data(be_u16)(buf)?;
