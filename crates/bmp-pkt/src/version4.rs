@@ -76,20 +76,7 @@ impl BmpV4RouteMonitoringTlv {
 
         Ok(Self { index, value })
     }
-}
 
-// TODO assign real codes and move to IANA when draft becomes RFC
-#[repr(u16)]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRepr, Display)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpV4RouteMonitoringTlvType {
-    VrfTableName = 3,
-    BgpUpdatePdu = 4,
-    GroupTlv = 5,
-    StatelessParsing = 6,
-}
-
-impl BmpV4RouteMonitoringTlv {
     pub fn get_type(&self) -> BmpV4RouteMonitoringTlvType {
         match self.value {
             BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(_) => {
@@ -111,6 +98,17 @@ impl BmpV4RouteMonitoringTlv {
     pub fn value(&self) -> &BmpV4RouteMonitoringTlvValue {
         &self.value
     }
+}
+
+// TODO assign real codes and move to IANA when draft becomes RFC
+#[repr(u16)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRepr, Display)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum BmpV4RouteMonitoringTlvType {
+    VrfTableName = 3,
+    BgpUpdatePdu = 4,
+    GroupTlv = 5,
+    StatelessParsing = 6,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

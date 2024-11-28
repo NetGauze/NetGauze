@@ -10,9 +10,7 @@ use crate::{
     PeerHeader, PeerKey,
 };
 use netgauze_bgp_pkt::wire::deserializer::{read_tlv_header_t16_l16, BgpMessageParsingError};
-use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, ReadablePduWithOneInput, Span,
-};
+use netgauze_parse_utils::{parse_into_located, parse_into_located_one_input, ReadablePduWithOneInput, Span};
 use netgauze_serde_macros::LocatedError;
 use nom::{error::ErrorKind, number::complete::be_u8, IResult};
 use serde::{Deserialize, Serialize};
@@ -96,6 +94,8 @@ impl<'a>
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpV4RouteMonitoringMessageParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
     RouteMonitoringMessageError(BmpV4RouteMonitoringMessageError),
     PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
     BgpMessageError(
@@ -128,11 +128,35 @@ impl<'a>
         let (remainder, tlvs) = {
             let mut buf = buf;
             let mut ret = Vec::new();
+            let mut bgp_pdu = None;
             while !buf.is_empty() {
+
+                // Peek the TLV Type, if we have a BGP PDU we keep it for later and we'll decode it
+                // when we've decoded all the Stateless Parsing TLVs on which the PDU decoding depends
+                match be_u16(buf)? {
+                    (peek_buf, tlv_type) if tlv_type == BmpV4RouteMonitoringTlvType::BgpUpdatePdu as u16 => {
+                        let (peek_buf, length) = be_u16(peek_buf)?;
+                        let (remainder, bgp_pdu_buf) = nom::bytes::complete::take(length)(peek_buf)?;
+                        buf = remainder; // Skip the BGP PDU decoding for now
+                        bgp_pdu = Some(bgp_pdu_buf);
+                        continue; // Check again that we should still be parsing (buf is empty?)
+                    }
+                    _ => {}
+                }
+
                 let (tmp, element) = parse_into_located_one_input(buf, &mut *bgp_ctx)?;
                 ret.push(element);
                 buf = tmp;
             }
+
+            // Parse the PDU
+            // No else, let Self::build ensure that we have the pdu in the list of TLVs
+            if let Some(bgp_pdu_span) = bgp_pdu {
+                let (_, pdu): (_, BmpV4RouteMonitoringTlv) = parse_into_located_one_input(bgp_pdu_span, &mut *bgp_ctx)?;
+                debug_assert_eq!(pdu.get_type(), BmpV4RouteMonitoringTlvType::BgpUpdatePdu);
+                ret.push(pdu)
+            }
+
             (buf, ret)
         };
 
