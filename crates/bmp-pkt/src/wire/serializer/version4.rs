@@ -1,8 +1,4 @@
-use crate::{
-    version4::{
-        BmpV4MessageValue, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
-        BmpV4RouteMonitoringTlvValue, StatelessParsingTlv,
-    },
+use crate::{version4::{BmpV4MessageValue, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvValue, StatelessParsingTlv},
     wire::serializer::{
         InitiationMessageWritingError, PeerDownNotificationMessageWritingError,
         PeerHeaderWritingError, PeerUpNotificationMessageWritingError,
@@ -14,6 +10,7 @@ use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::wire::serializer::{write_tlv_header_t16_l16, BgpMessageWritingError};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
+use std::convert::identity;
 use std::io::Write;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
@@ -112,7 +109,7 @@ impl WritablePdu<BmpV4RouteMonitoringTlvWritingError> for BmpV4RouteMonitoringTl
         Self: Sized,
     {
         // Length - 2 to exclude the Index field from the TLV Length
-        write_tlv_header_t16_l16(writer, self.get_type() as u16, (self.len() - 2) as u16)?;
+        write_tlv_header_t16_l16(writer, self.get_type().either(|x| x as u16, identity), (self.len() - 2) as u16)?;
         writer.write_u16::<NetworkEndian>(self.index())?;
         self.value().write(writer)?;
         Ok(())
@@ -135,6 +132,7 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
             BmpV4RouteMonitoringTlvValue::GroupTlv(values) => values.len(),
             BmpV4RouteMonitoringTlvValue::StatelessParsing { .. } => 2 + 2 + 1, /* afi + safi +
                                                                                  * bool */
+            BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => value.len()
         }
     }
 
@@ -154,14 +152,17 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
                 }
             }
             BmpV4RouteMonitoringTlvValue::StatelessParsing(StatelessParsingTlv {
-                capability,
-                address_type,
-                enabled,
-            }) => {
+                                                               capability,
+                                                               address_type,
+                                                               enabled,
+                                                           }) => {
                 writer.write_u16::<NetworkEndian>(*capability as u16)?;
                 writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
                 writer.write_u8(address_type.subsequent_address_family().into())?;
                 writer.write_u8(u8::from(*enabled))?
+            }
+            BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => {
+                writer.write_all(value)?
             }
         }
 

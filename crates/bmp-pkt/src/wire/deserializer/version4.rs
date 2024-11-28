@@ -14,6 +14,7 @@ use netgauze_parse_utils::{parse_into_located, parse_into_located_one_input, Rea
 use netgauze_serde_macros::LocatedError;
 use nom::{error::ErrorKind, number::complete::be_u8, IResult};
 use serde::{Deserialize, Serialize};
+use either::Either;
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpV4MessageValueParsingError {
@@ -153,7 +154,7 @@ impl<'a>
             // No else, let Self::build ensure that we have the pdu in the list of TLVs
             if let Some(bgp_pdu_span) = bgp_pdu {
                 let (_, pdu): (_, BmpV4RouteMonitoringTlv) = parse_into_located_one_input(bgp_pdu_span, &mut *bgp_ctx)?;
-                debug_assert_eq!(pdu.get_type(), BmpV4RouteMonitoringTlvType::BgpUpdatePdu);
+                debug_assert_eq!(pdu.get_type(), Either::Left(BmpV4RouteMonitoringTlvType::BgpUpdatePdu));
                 ret.push(pdu)
             }
 
