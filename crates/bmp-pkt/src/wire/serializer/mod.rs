@@ -15,7 +15,9 @@
 
 //! Serializer library for BMP's wire protocol
 
-use crate::{iana::*, *};
+mod version4;
+
+use crate::{iana::*, wire::serializer::version4::BmpV4MessageValueWritingError, *};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::wire::serializer::{
     nlri::RouteDistinguisherWritingError, BgpMessageWritingError,
@@ -28,6 +30,7 @@ use std::io::Write;
 pub enum BmpMessageWritingError {
     StdIOError(#[from_std_io_error] String),
     BmpMessageValueError(#[from] BmpMessageValueWritingError),
+    BmpV4MessageValueError(#[from] BmpV4MessageValueWritingError),
 }
 
 impl WritablePdu<BmpMessageWritingError> for BmpMessage {
@@ -38,14 +41,19 @@ impl WritablePdu<BmpMessageWritingError> for BmpMessage {
         Self::BASE_LENGTH
             + match self {
                 Self::V3(value) => value.len(),
+                Self::V4(value) => value.len(),
             }
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageWritingError> {
+        writer.write_u8(self.get_version().into())?;
+        writer.write_u32::<NetworkEndian>(self.len() as u32)?;
+
         match self {
             Self::V3(value) => {
-                writer.write_u8(BmpVersion::Version3.into())?;
-                writer.write_u32::<NetworkEndian>(self.len() as u32)?;
+                value.write(writer)?;
+            }
+            Self::V4(value) => {
                 value.write(writer)?;
             }
         }

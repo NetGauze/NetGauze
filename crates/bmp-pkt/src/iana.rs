@@ -44,6 +44,7 @@ pub const PEER_FLAGS_IS_FILTERED: u8 = 0b10000000;
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpVersion {
     Version3 = 3,
+    Version4 = 4,
 }
 
 /// BGP version is not one of [`BmpVersion`], the carried value is the undefined

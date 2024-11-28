@@ -18,14 +18,14 @@
 use crate::{
     iana::BmpVersion,
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
-    BmpMessage, BmpMessageValue, PeerKey,
+    BmpMessage, BmpMessageValue, PeerKey, PeerUpNotificationMessage,
 };
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
 use std::collections::HashSet;
 
-use crate::wire::deserializer::BmpParsingContext;
+use crate::{version4::BmpV4MessageValue, wire::deserializer::BmpParsingContext};
 use netgauze_bgp_pkt::capabilities::{AddPathCapability, MultipleLabel};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 use nom::Needed;
@@ -96,6 +96,63 @@ impl BmpParsingContext {
     /// of BMP message. It updates BGP parsing flags such as: Add Path and
     /// Multi label MPLS capabilities
     pub fn update(&mut self, msg: &BmpMessage) {
+        fn handle_peer_up(ctx: &mut BmpParsingContext, peer_up: &PeerUpNotificationMessage) {
+            let (sent_open, received_open) =
+                match (peer_up.sent_message(), peer_up.received_message()) {
+                    (BgpMessage::Open(sent_open), BgpMessage::Open(received_open)) => {
+                        (sent_open, received_open)
+                    }
+                    _ => return,
+                };
+
+            let send_caps = sent_open.capabilities();
+            let received_caps = received_open.capabilities();
+            let (sent_add_path_caps, sent_multiple_labels_caps) = get_caps(send_caps);
+            let (received_add_path_caps, received_multiple_labels_caps) = get_caps(received_caps);
+
+            // Only enable the intersection of enabled AddPath and Multi-Label
+            let sent_add_path_caps: HashSet<AddPathCapability> =
+                HashSet::from_iter(sent_add_path_caps);
+            let received_add_path_caps: HashSet<AddPathCapability> =
+                HashSet::from_iter(received_add_path_caps);
+            let sent_multiple_labels_caps: HashSet<MultipleLabel> =
+                HashSet::from_iter(sent_multiple_labels_caps.into_iter().flatten());
+            let received_multiple_labels_caps: HashSet<MultipleLabel> =
+                HashSet::from_iter(received_multiple_labels_caps.into_iter().flatten());
+
+            let common_add_path_caps: Vec<&AddPathCapability> =
+                Vec::from_iter(sent_add_path_caps.intersection(&received_add_path_caps));
+            let common_multiple_labels_caps: Vec<&MultipleLabel> = Vec::from_iter(
+                sent_multiple_labels_caps.intersection(&received_multiple_labels_caps),
+            );
+
+            // Add Key for the router announcing BMP to the collector
+            let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
+            let bgp_ctx = ctx.entry(peer_key).or_default();
+            bgp_ctx.add_path_mut().clear();
+            bgp_ctx.multiple_labels_mut().clear();
+            for add_path in &common_add_path_caps {
+                bgp_ctx.update_add_path(add_path);
+            }
+            bgp_ctx.update_multiple_labels(&common_multiple_labels_caps);
+
+            // Add a key for the BGP Peer of the first router
+            let peer_key = PeerKey::new(
+                peer_up.peer_header().address(),
+                peer_up.peer_header().peer_type(),
+                peer_up.peer_header().rd(),
+                peer_up.peer_header().peer_as(),
+                received_open.bgp_id(),
+            );
+            let bgp_ctx = ctx.entry(peer_key).or_default();
+            bgp_ctx.add_path_mut().clear();
+            bgp_ctx.multiple_labels_mut().clear();
+            for add_path in common_add_path_caps {
+                bgp_ctx.update_add_path(add_path)
+            }
+            bgp_ctx.update_multiple_labels(&common_multiple_labels_caps)
+        }
+
         match msg {
             BmpMessage::V3(value) => match value {
                 BmpMessageValue::PeerDownNotification(peer_down) => {
@@ -106,61 +163,18 @@ impl BmpParsingContext {
                     self.clear();
                 }
                 BmpMessageValue::PeerUpNotification(peer_up) => {
-                    let (sent_open, received_open) =
-                        match (peer_up.sent_message(), peer_up.received_message()) {
-                            (BgpMessage::Open(sent_open), BgpMessage::Open(received_open)) => {
-                                (sent_open, received_open)
-                            }
-                            _ => return,
-                        };
-
-                    let send_caps = sent_open.capabilities();
-                    let received_caps = received_open.capabilities();
-                    let (sent_add_path_caps, sent_multiple_labels_caps) = get_caps(send_caps);
-                    let (received_add_path_caps, received_multiple_labels_caps) =
-                        get_caps(received_caps);
-
-                    // Only enable the intersection of enabled AddPath and Multi-Label
-                    let sent_add_path_caps: HashSet<AddPathCapability> =
-                        HashSet::from_iter(sent_add_path_caps);
-                    let received_add_path_caps: HashSet<AddPathCapability> =
-                        HashSet::from_iter(received_add_path_caps);
-                    let sent_multiple_labels_caps: HashSet<MultipleLabel> =
-                        HashSet::from_iter(sent_multiple_labels_caps.into_iter().flatten());
-                    let received_multiple_labels_caps: HashSet<MultipleLabel> =
-                        HashSet::from_iter(received_multiple_labels_caps.into_iter().flatten());
-
-                    let common_add_path_caps: Vec<&AddPathCapability> =
-                        Vec::from_iter(sent_add_path_caps.intersection(&received_add_path_caps));
-                    let common_multiple_labels_caps: Vec<&MultipleLabel> = Vec::from_iter(
-                        sent_multiple_labels_caps.intersection(&received_multiple_labels_caps),
-                    );
-
-                    // Add Key for the router announcing BMP to the collector
-                    let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
-                    let bgp_ctx = self.entry(peer_key).or_default();
-                    bgp_ctx.add_path_mut().clear();
-                    bgp_ctx.multiple_labels_mut().clear();
-                    for add_path in &common_add_path_caps {
-                        bgp_ctx.update_add_path(add_path);
-                    }
-                    bgp_ctx.update_multiple_labels(&common_multiple_labels_caps);
-
-                    // Add a key for the BGP Peer of the first router
-                    let peer_key = PeerKey::new(
-                        peer_up.peer_header().address(),
-                        peer_up.peer_header().peer_type(),
-                        peer_up.peer_header().rd(),
-                        peer_up.peer_header().peer_as(),
-                        received_open.bgp_id(),
-                    );
-                    let bgp_ctx = self.entry(peer_key).or_default();
-                    bgp_ctx.add_path_mut().clear();
-                    bgp_ctx.multiple_labels_mut().clear();
-                    for add_path in common_add_path_caps {
-                        bgp_ctx.update_add_path(add_path)
-                    }
-                    bgp_ctx.update_multiple_labels(&common_multiple_labels_caps)
+                    handle_peer_up(self, peer_up);
+                }
+                _ => {}
+            },
+            BmpMessage::V4(value) => match value {
+                BmpV4MessageValue::PeerDownNotification(peer_down) => {
+                    let peer_key = PeerKey::from_peer_header(peer_down.peer_header());
+                    self.remove(&peer_key);
+                }
+                BmpV4MessageValue::PeerUpNotification(peer_up) => handle_peer_up(self, peer_up),
+                BmpV4MessageValue::Termination(_) => {
+                    self.clear();
                 }
                 _ => {}
             },

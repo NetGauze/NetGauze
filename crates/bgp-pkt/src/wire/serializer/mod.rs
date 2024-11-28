@@ -168,7 +168,7 @@ impl WritablePdu<IpAddrWritingError> for IpAddr {
 /// Written length field will be `tlv_length - 4` since "Length" must not
 /// include the length of the "Type" and "Length" field
 #[inline]
-fn write_tlv_header_t16_l16<T: Write>(
+pub fn write_tlv_header_t16_l16<T: Write>(
     writer: &mut T,
     tlv_type: u16,
     tlv_length: u16,

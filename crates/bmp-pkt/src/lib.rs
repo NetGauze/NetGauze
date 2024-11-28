@@ -31,11 +31,13 @@ use crate::iana::{
     TerminationInformationTlvType,
 };
 
+use crate::version4::BmpV4MessageValue;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "codec")]
 pub mod codec;
 pub mod iana;
+pub mod version4;
 #[cfg(feature = "serde")]
 pub mod wire;
 
@@ -54,6 +56,7 @@ pub mod wire;
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpMessage {
     V3(BmpMessageValue),
+    V4(BmpV4MessageValue),
 }
 
 impl BmpMessage {
@@ -62,6 +65,7 @@ impl BmpMessage {
     pub fn get_version(&self) -> BmpVersion {
         match self {
             BmpMessage::V3(_) => BmpVersion::Version3,
+            BmpMessage::V4(_) => BmpVersion::Version4,
         }
     }
 
@@ -70,6 +74,7 @@ impl BmpMessage {
     pub fn get_type(&self) -> BmpMessageType {
         match &self {
             BmpMessage::V3(value) => value.get_type(),
+            BmpMessage::V4(value) => value.get_type(),
         }
     }
 }

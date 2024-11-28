@@ -15,6 +15,9 @@
 
 //! Deserializer library for BMP's wire protocol
 
+mod version4;
+
+use crate::wire::deserializer::version4::LocatedBmpV4MessageValueParsingError;
 use chrono::LocalResult;
 #[cfg(not(feature = "fuzz"))]
 use chrono::TimeZone;
@@ -40,7 +43,7 @@ use netgauze_parse_utils::{
 };
 use netgauze_serde_macros::LocatedError;
 
-use crate::{iana::*, *};
+use crate::{iana::*, wire::deserializer::version4::BmpV4MessageValueParsingError, *};
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpMessageParsingError {
@@ -49,6 +52,7 @@ pub enum BmpMessageParsingError {
     UndefinedBmpVersion(#[from_external] UndefinedBmpVersion),
     InvalidBmpLength(u32),
     BmpMessageValueError(#[from_located(module = "self")] BmpMessageValueParsingError),
+    BmpV4MessageValueError(#[from_located(module = "self")] BmpV4MessageValueParsingError),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -117,6 +121,10 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessagePa
             BmpVersion::Version3 => {
                 let (buf, value) = parse_into_located_one_input(buf, ctx)?;
                 (buf, BmpMessage::V3(value))
+            }
+            BmpVersion::Version4 => {
+                let (buf, value) = parse_into_located_one_input(buf, ctx)?;
+                (buf, BmpMessage::V4(value))
             }
         };
         // Make sure bmp message is fully parsed according to it's length
