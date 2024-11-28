@@ -1,4 +1,7 @@
-use crate::{version4::{BmpV4MessageValue, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvValue, StatelessParsingTlv},
+use crate::{version4::{
+    BmpV4MessageValue, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
+    BmpV4RouteMonitoringTlvValue, StatelessParsingTlv,
+},
     wire::serializer::{
         InitiationMessageWritingError, PeerDownNotificationMessageWritingError,
         PeerHeaderWritingError, PeerUpNotificationMessageWritingError,
@@ -16,13 +19,13 @@ use std::io::Write;
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpV4MessageValueWritingError {
     StdIOError(#[from_std_io_error] String),
-    RouteMonitoringMessageError(#[from] BmpV4RouteMonitoringMessageWritingError),
-    RouteMirroringMessageError(#[from] RouteMirroringMessageWritingError),
-    InitiationMessageError(#[from] InitiationMessageWritingError),
-    PeerUpNotificationMessageError(#[from] PeerUpNotificationMessageWritingError),
-    PeerDownNotificationMessageError(#[from] PeerDownNotificationMessageWritingError),
-    TerminationMessageError(#[from] TerminationMessageWritingError),
-    StatisticsReportMessageError(#[from] StatisticsReportMessageWritingError),
+    RouteMonitoringMessage(#[from] BmpV4RouteMonitoringMessageWritingError),
+    RouteMirroringMessage(#[from] RouteMirroringMessageWritingError),
+    InitiationMessage(#[from] InitiationMessageWritingError),
+    PeerUpNotificationMessage(#[from] PeerUpNotificationMessageWritingError),
+    PeerDownNotificationMessage(#[from] PeerDownNotificationMessageWritingError),
+    TerminationMessage(#[from] TerminationMessageWritingError),
+    StatisticsReportMessage(#[from] StatisticsReportMessageWritingError),
 }
 
 impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
@@ -68,8 +71,8 @@ impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpV4RouteMonitoringMessageWritingError {
     StdIOError(#[from_std_io_error] String),
-    PeerHeaderError(#[from] PeerHeaderWritingError),
-    TlvWritingError(#[from] BmpV4RouteMonitoringTlvWritingError),
+    PeerHeader(#[from] PeerHeaderWritingError),
+    TlvV4(#[from] BmpV4RouteMonitoringTlvWritingError),
 }
 
 impl WritablePdu<BmpV4RouteMonitoringMessageWritingError> for BmpV4RouteMonitoringMessage {
@@ -109,7 +112,11 @@ impl WritablePdu<BmpV4RouteMonitoringTlvWritingError> for BmpV4RouteMonitoringTl
         Self: Sized,
     {
         // Length - 2 to exclude the Index field from the TLV Length
-        write_tlv_header_t16_l16(writer, self.get_type().either(|x| x as u16, identity), (self.len() - 2) as u16)?;
+        write_tlv_header_t16_l16(
+            writer,
+            self.get_type().either(|x| x as u16, identity),
+            (self.len() - 2) as u16,
+        )?;
         writer.write_u16::<NetworkEndian>(self.index())?;
         self.value().write(writer)?;
         Ok(())
@@ -130,9 +137,9 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
             BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(update) => update.len(),
             BmpV4RouteMonitoringTlvValue::VrfTableName(str) => str.len(),
             BmpV4RouteMonitoringTlvValue::GroupTlv(values) => values.len(),
-            BmpV4RouteMonitoringTlvValue::StatelessParsing { .. } => 2 + 2 + 1, /* afi + safi +
-                                                                                 * bool */
-            BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => value.len()
+            /* afi + safi + bool */
+            BmpV4RouteMonitoringTlvValue::StatelessParsing { .. } => 2 + 2 + 1,
+            BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => value.len(),
         }
     }
 
@@ -152,18 +159,16 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
                 }
             }
             BmpV4RouteMonitoringTlvValue::StatelessParsing(StatelessParsingTlv {
-                                                               capability,
-                                                               address_type,
-                                                               enabled,
-                                                           }) => {
+                capability,
+                address_type,
+                enabled,
+            }) => {
                 writer.write_u16::<NetworkEndian>(*capability as u16)?;
                 writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
                 writer.write_u8(address_type.subsequent_address_family().into())?;
                 writer.write_u8(u8::from(*enabled))?
             }
-            BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => {
-                writer.write_all(value)?
-            }
+            BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => writer.write_all(value)?,
         }
 
         Ok(())

@@ -7,11 +7,11 @@ use crate::{
     InitiationMessage, PeerDownNotificationMessage, PeerHeader, PeerUpNotificationMessage,
     RouteMirroringMessage, StatisticsReportMessage, TerminationMessage,
 };
+use either::Either;
 use netgauze_bgp_pkt::{iana::BgpMessageType, BgpMessage};
 use netgauze_iana::address_family::AddressType;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
-use either::Either;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -58,6 +58,7 @@ pub struct BmpV4RouteMonitoringTlv {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpV4RouteMonitoringTlvError {
     BadGroupTlvIndex(u16),
+    VrfTableNameStringIsTooLong(usize),
 }
 
 impl BmpV4RouteMonitoringTlv {
@@ -67,9 +68,15 @@ impl BmpV4RouteMonitoringTlv {
     ) -> Result<Self, BmpV4RouteMonitoringTlvError> {
         match &value {
             BmpV4RouteMonitoringTlvValue::GroupTlv(_) => {
-                if index.leading_ones() < 1 {
+                if index.leading_ones() == 0 {
                     // First bit has to be one (G flag)
                     return Err(BadGroupTlvIndex(index));
+                }
+            }
+            BmpV4RouteMonitoringTlvValue::VrfTableName(str) => {
+                let len = str.len();
+                if len > 255 {
+                    return Err(VrfTableNameStringIsTooLong(len));
                 }
             }
             _ => {}
@@ -86,11 +93,13 @@ impl BmpV4RouteMonitoringTlv {
             BmpV4RouteMonitoringTlvValue::VrfTableName(_) => {
                 Either::Left(BmpV4RouteMonitoringTlvType::VrfTableName)
             }
-            BmpV4RouteMonitoringTlvValue::GroupTlv(_) => Either::Left(BmpV4RouteMonitoringTlvType::GroupTlv),
+            BmpV4RouteMonitoringTlvValue::GroupTlv(_) => {
+                Either::Left(BmpV4RouteMonitoringTlvType::GroupTlv)
+            }
             BmpV4RouteMonitoringTlvValue::StatelessParsing { .. } => {
                 Either::Left(BmpV4RouteMonitoringTlvType::StatelessParsing)
             }
-            BmpV4RouteMonitoringTlvValue::Unknown { code, .. } => Either::Right(code)
+            BmpV4RouteMonitoringTlvValue::Unknown { code, .. } => Either::Right(code),
         }
     }
     pub fn index(&self) -> u16 {
@@ -120,10 +129,7 @@ pub enum BmpV4RouteMonitoringTlvValue {
     VrfTableName(String),
     GroupTlv(Vec<u16>),
     StatelessParsing(StatelessParsingTlv),
-    Unknown {
-        code: u16,
-        value: Vec<u8>,
-    },
+    Unknown { code: u16, value: Vec<u8> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -187,15 +193,17 @@ impl BmpV4RouteMonitoringMessage {
         tlvs: Vec<BmpV4RouteMonitoringTlv>,
     ) -> Result<Self, BmpV4RouteMonitoringMessageError> {
         // Ensure we have at least one pdu tlv and it is an update
-        match tlvs
-            .iter()
-            .find(|tlv| matches!(tlv.get_type(), Either::Left(BmpV4RouteMonitoringTlvType::BgpUpdatePdu)))
-        {
+        match tlvs.iter().find(|tlv| {
+            matches!(
+                tlv.get_type(),
+                Either::Left(BmpV4RouteMonitoringTlvType::BgpUpdatePdu)
+            )
+        }) {
             None => return Err(MissingBgpUpdatePduTlv),
             Some(BmpV4RouteMonitoringTlv {
-                     index: _,
-                     value: BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(bgp_msg),
-                 }) => match bgp_msg {
+                index: _,
+                value: BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(bgp_msg),
+            }) => match bgp_msg {
                 BgpMessage::Update(_) => {}
                 _ => return Err(BadBgpMessageType(bgp_msg.get_type())),
             },
