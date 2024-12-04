@@ -47,6 +47,7 @@ use netgauze_parse_utils::{
 use nom::error::ErrorKind;
 use std::{net::Ipv6Addr, str::FromStr};
 
+use crate::version4::BmpV4PeerDownTlv;
 use crate::{
     iana::*,
     version4::{
@@ -1752,5 +1753,58 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
 
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x04, 0x00, 0x00, 0x00, 0x3f, 0x02, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0xfc, 0x00, 0x0a, 0x00, 0x00, 0x01, 0x63, 0x3b, 0x2a, 0x53, 0x00,
+        0x07, 0x71, 0xe3, 0x02, 0x00, 0x02, 0x00, 0x10, 0x00, 0x08, 0x00, 0x01, 0x02, 0x03, 0x04,
+        0x05, 0x06, 0x07,
+    ];
+    let bad_eof_wire = [];
+
+    let good = BmpMessage::V4(BmpV4MessageValue::PeerDownNotification {
+        v3_notif: PeerDownNotificationMessage::build(
+            PeerHeader::new(
+                BmpPeerType::GlobalInstancePeer {
+                    ipv6: true,
+                    post_policy: false,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                None,
+                Some(IpAddr::V6(Ipv6Addr::from_str("fc00::1").unwrap())),
+                64512,
+                Ipv4Addr::new(10, 0, 0, 1),
+                Some(Utc.timestamp_opt(1664821843, 487907000).unwrap()),
+            ),
+            PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
+        )
+        .unwrap(),
+        tlvs: vec![BmpV4PeerDownTlv::Unknown {
+            code: 16,
+            value: vec![0, 1, 2, 3, 4, 5, 6, 7],
+        }],
+    });
+
+    let bad_eof = LocatedBmpMessageValueParsingError::new(
+        Span::new(&bad_eof_wire),
+        BmpMessageValueParsingError::NomError(ErrorKind::Eof),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+
+    test_parse_error_with_one_input::<
+        BmpMessageValue,
+        &mut BmpParsingContext,
+        LocatedBmpMessageValueParsingError<'_>,
+    >(&bad_eof_wire, &mut Default::default(), &bad_eof);
+
+    test_write(&good, &good_wire)?;
+
     Ok(())
 }

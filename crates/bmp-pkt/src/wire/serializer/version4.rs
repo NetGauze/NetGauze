@@ -1,3 +1,4 @@
+use crate::version4::BmpV4PeerDownTlv;
 use crate::{
     version4::{
         BmpV4MessageValue, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
@@ -24,6 +25,7 @@ pub enum BmpV4MessageValueWritingError {
     InitiationMessage(#[from] InitiationMessageWritingError),
     PeerUpNotificationMessage(#[from] PeerUpNotificationMessageWritingError),
     PeerDownNotificationMessage(#[from] PeerDownNotificationMessageWritingError),
+    PeerDownTlvMessage(#[from] BmpV4PeerDownTlvWritingError),
     TerminationMessage(#[from] TerminationMessageWritingError),
     StatisticsReportMessage(#[from] StatisticsReportMessageWritingError),
 }
@@ -36,7 +38,9 @@ impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
         let len = match self {
             Self::RouteMonitoring(value) => value.len(),
             Self::StatisticsReport(value) => value.len(),
-            Self::PeerDownNotification(value) => value.len(),
+            Self::PeerDownNotification { v3_notif, tlvs } => {
+                v3_notif.len() + tlvs.iter().map(|x| x.len()).sum::<usize>()
+            }
             Self::PeerUpNotification(value) => value.len(),
             Self::Initiation(value) => value.len(),
             Self::Termination(value) => value.len(),
@@ -54,7 +58,12 @@ impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
         match self {
             Self::RouteMonitoring(value) => value.write(writer)?,
             Self::StatisticsReport(value) => value.write(writer)?,
-            Self::PeerDownNotification(value) => value.write(writer)?,
+            Self::PeerDownNotification { v3_notif, tlvs } => {
+                v3_notif.write(writer)?;
+                for tlv in tlvs {
+                    tlv.write(writer)?;
+                }
+            }
             Self::PeerUpNotification(value) => value.write(writer)?,
             Self::Initiation(value) => value.write(writer)?,
             Self::Termination(value) => value.write(writer)?,
@@ -64,6 +73,35 @@ impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
             Self::Experimental253(value) => writer.write_all(value)?,
             Self::Experimental254(value) => writer.write_all(value)?,
         }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum BmpV4PeerDownTlvWritingError {
+    StdIOError(#[from_std_io_error] String),
+}
+
+impl WritablePdu<BmpV4PeerDownTlvWritingError> for BmpV4PeerDownTlv {
+    const BASE_LENGTH: usize = 2 + 2; /* type + length */
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + match self {
+                BmpV4PeerDownTlv::Unknown { value, .. } => value.len(),
+            }
+    }
+
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpV4PeerDownTlvWritingError>
+    where
+        Self: Sized,
+    {
+        write_tlv_header_t16_l16(writer, self.code(), self.len() as u16)?;
+
+        match self {
+            BmpV4PeerDownTlv::Unknown { value, .. } => writer.write_all(value)?,
+        }
+
         Ok(())
     }
 }

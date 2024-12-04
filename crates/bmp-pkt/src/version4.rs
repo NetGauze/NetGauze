@@ -18,7 +18,10 @@ use strum_macros::{Display, FromRepr};
 pub enum BmpV4MessageValue {
     RouteMonitoring(BmpV4RouteMonitoringMessage),
     StatisticsReport(StatisticsReportMessage),
-    PeerDownNotification(PeerDownNotificationMessage), // TODO add tlv option
+    PeerDownNotification {
+        v3_notif: PeerDownNotificationMessage,
+        tlvs: Vec<BmpV4PeerDownTlv>,
+    },
     PeerUpNotification(PeerUpNotificationMessage),
     Initiation(InitiationMessage),
     Termination(TerminationMessage),
@@ -29,12 +32,26 @@ pub enum BmpV4MessageValue {
     Experimental254(Vec<u8>),
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum BmpV4PeerDownTlv {
+    Unknown { code: u16, value: Vec<u8> },
+}
+
+impl BmpV4PeerDownTlv {
+    pub fn code(&self) -> u16 {
+        match self {
+            BmpV4PeerDownTlv::Unknown { code, .. } => *code,
+        }
+    }
+}
+
 impl BmpV4MessageValue {
     pub fn get_type(&self) -> BmpMessageType {
         match self {
             BmpV4MessageValue::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
             BmpV4MessageValue::StatisticsReport(_) => BmpMessageType::StatisticsReport,
-            BmpV4MessageValue::PeerDownNotification(_) => BmpMessageType::PeerDownNotification,
+            BmpV4MessageValue::PeerDownNotification { .. } => BmpMessageType::PeerDownNotification,
             BmpV4MessageValue::PeerUpNotification(_) => BmpMessageType::PeerUpNotification,
             BmpV4MessageValue::Initiation(_) => BmpMessageType::Initiation,
             BmpV4MessageValue::Termination(_) => BmpMessageType::Termination,
