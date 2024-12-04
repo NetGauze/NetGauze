@@ -1,8 +1,8 @@
 use crate::{
     iana::{BmpMessageType, UndefinedBmpMessageType},
     version4::{
-        BmpStatelessParsingCapability, BmpV4MessageValue, BmpV4RouteMonitoringMessage,
-        BmpV4RouteMonitoringMessageError, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvError,
+        BmpStatelessParsingCapability, BmpV4MessageValue, BmpV4RouteMonitoringError,
+        BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvError,
         BmpV4RouteMonitoringTlvType, BmpV4RouteMonitoringTlvValue, StatelessParsingTlv,
         UnknownBmpStatelessParsingCapability,
     },
@@ -11,6 +11,7 @@ use crate::{
 };
 use crate::wire::deserializer::*;
 use netgauze_bgp_pkt::wire::deserializer::{read_tlv_header_t16_l16, BgpMessageParsingError};
+use netgauze_bgp_pkt::wire::deserializer::BgpMessageParsingError;
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, ReadablePduWithOneInput, Span,
 };
@@ -100,12 +101,13 @@ impl<'a>
 pub enum BmpV4RouteMonitoringMessageParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    RouteMonitoringMessage(BmpV4RouteMonitoringMessageError),
+    RouteMonitoringMessage(BmpV4RouteMonitoringError),
     PeerHeader(#[from_located(module = "self")] PeerHeaderParsingError),
     BgpMessage(
         #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
     ),
     RouteMonitoringTlvParsing(#[from_located(module = "self")] BmpV4RouteMonitoringTlvParsingError),
+    MissingBgpPdu,
 }
 
 impl<'a>
@@ -127,49 +129,57 @@ impl<'a>
         // Can't use parse_till_empty_into_with_one_input_located because
         //  - &mut BgpParsingContext is not Clone
         //  - we don't want to Clone our context
-        let (remainder, tlvs) = {
+        let (remainder, update_pdu, tlvs) = {
             let mut buf = buf;
-            let mut ret = Vec::new();
+            let mut tlvs = Vec::new();
             let mut bgp_pdu = None;
             while !buf.is_empty() {
-                // Peek the TLV Type, if we have a BGP PDU we keep it for later and we'll decode it
-                // when we've decoded all the Stateless Parsing TLVs on which the PDU decoding depends
-                match be_u16(buf)? {
-                    (peek_buf, tlv_type)
+                // Peek the TLV Type, if we have a BGP PDU we keep it for later and we'll decode
+                // it when we've decoded all the Stateless Parsing TLVs on which
+                // the PDU decoding depends
+                match nom::combinator::peek(be_u16)(buf)? {
+                    (_, tlv_type)
                         if tlv_type == BmpV4RouteMonitoringTlvType::BgpUpdatePdu as u16 =>
                     {
-                        let (peek_buf, length) = be_u16(peek_buf)?;
-                        let (remainder, bgp_pdu_buf) =
-                            nom::bytes::complete::take(length)(peek_buf)?;
-                        buf = remainder; // Skip the BGP PDU decoding for now
+                        let (tmp, _tlv_type) = be_u16(buf)?;
+                        let (tmp, length) = be_u16(tmp)?;
+                        let (tmp, _index) = be_u16(tmp)?;
+
+                        let (after_pdu, bgp_pdu_buf) = nom::bytes::complete::take(length)(tmp)?;
+
+                        buf = after_pdu;
                         bgp_pdu = Some(bgp_pdu_buf);
-                        continue; // Check again that we should still be parsing (buf is empty?)
+                        continue; // Check again that we should still be parsing
+                                  // (buf is empty?)
                     }
                     _ => {}
                 }
 
                 let (tmp, element) = parse_into_located_one_input(buf, &mut *bgp_ctx)?;
-                ret.push(element);
+                tlvs.push(element);
                 buf = tmp;
             }
 
             // Parse the PDU
-            // No else, let Self::build ensure that we have the pdu in the list of TLVs
-            if let Some(bgp_pdu_span) = bgp_pdu {
-                let (_, pdu): (_, BmpV4RouteMonitoringTlv) =
-                    parse_into_located_one_input(bgp_pdu_span, &mut *bgp_ctx)?;
-                debug_assert_eq!(
-                    pdu.get_type(),
-                    Either::Left(BmpV4RouteMonitoringTlvType::BgpUpdatePdu)
-                );
-                ret.push(pdu)
+            match bgp_pdu {
+                Some(bgp_pdu) => {
+                    let (_, bgp_pdu): (_, BgpMessage) =
+                        parse_into_located_one_input(bgp_pdu, &mut *bgp_ctx)?;
+                    (buf, bgp_pdu, tlvs)
+                }
+                None => {
+                    return Err(nom::Err::Error(
+                        LocatedBmpV4RouteMonitoringMessageParsingError::new(
+                            input,
+                            BmpV4RouteMonitoringMessageParsingError::MissingBgpPdu,
+                        ),
+                    ))
+                }
             }
-
-            (buf, ret)
         };
 
-        match Self::build(peer_header, tlvs) {
-            Ok(ok) => Ok((remainder, ok)),
+        match Self::build(peer_header, update_pdu, tlvs) {
+            Ok(rm) => Ok((remainder, rm)),
             Err(err) => Err(nom::Err::Error(
                 LocatedBmpV4RouteMonitoringMessageParsingError::new(
                     input,
@@ -184,13 +194,12 @@ impl<'a>
 pub enum BmpV4RouteMonitoringTlvParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    UnknownTlvType(u16),
-    BgpParsingError(
+    BgpMessage(
         #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
     ),
     FromUtf8Error(String),
-    StatelessParsingParsingError(#[from_located(module = "self")] StatelessParsingParsingError),
-    BmpV4RouteMonitoringTlvError(BmpV4RouteMonitoringTlvError),
+    StatelessParsingTlv(#[from_located(module = "self")] StatelessParsingTlvParsingError),
+    InvalidBmpV4RouteMonitoringTlv(BmpV4RouteMonitoringTlvError),
 }
 
 impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
@@ -212,55 +221,50 @@ impl<'a>
     > for BmpV4RouteMonitoringTlv
 {
     fn from_wire(
-        input: Span<'a>,
+        buf: Span<'a>,
         ctx: &mut BgpParsingContext,
     ) -> IResult<Span<'a>, Self, LocatedBmpV4RouteMonitoringTlvParsingError<'a>> {
-        let (tlv_type, length, data, remainder) = read_tlv_header_t16_l16(input)?;
+        // Can't use read_tlv_header_t16_l16 because Index is in the middle of the
+        // header and not counted in Length
+        let (span, tlv_type) = be_u16(buf)?;
+        let (span, tlv_length) = be_u16(span)?;
+        let (span, index) = be_u16(span)?;
+        let (remainder, data) = nom::bytes::complete::take(tlv_length)(span)?;
 
-        let (data, index) = be_u16(data)?;
-        let length = length - 2; // Index field is excluded from Length
-
-        let (remainder, value) = match BmpV4RouteMonitoringTlvType::from_repr(tlv_type) {
+        let value = match BmpV4RouteMonitoringTlvType::from_repr(tlv_type) {
             Some(tlv_type) => match tlv_type {
                 BmpV4RouteMonitoringTlvType::VrfTableName => {
                     let (_, str) = nom::combinator::map_res(
-                        nom::bytes::complete::take(length),
+                        nom::bytes::complete::take(tlv_length),
                         |x: Span<'_>| String::from_utf8(x.to_vec()),
                     )(data)?;
-                    (remainder, BmpV4RouteMonitoringTlvValue::VrfTableName(str))
+                    BmpV4RouteMonitoringTlvValue::VrfTableName(str)
                 }
                 BmpV4RouteMonitoringTlvType::BgpUpdatePdu => {
                     let (_, pdu) = parse_into_located_one_input(data, ctx)?;
-                    (remainder, BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(pdu))
+                    BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(pdu)
                 }
                 BmpV4RouteMonitoringTlvType::GroupTlv => {
                     let (_, values) = nom::multi::many0(be_u16)(data)?;
-                    (remainder, BmpV4RouteMonitoringTlvValue::GroupTlv(values))
+                    BmpV4RouteMonitoringTlvValue::GroupTlv(values)
                 }
                 BmpV4RouteMonitoringTlvType::StatelessParsing => {
                     let (_, stateless_parsing_tlv) = parse_into_located_one_input(data, ctx)?;
-                    (
-                        remainder,
-                        BmpV4RouteMonitoringTlvValue::StatelessParsing(stateless_parsing_tlv),
-                    )
+                    BmpV4RouteMonitoringTlvValue::StatelessParsing(stateless_parsing_tlv)
                 }
             },
-            None => {
-                return Err(nom::Err::Error(
-                    LocatedBmpV4RouteMonitoringTlvParsingError {
-                        span: data,
-                        error: BmpV4RouteMonitoringTlvParsingError::UnknownTlvType(tlv_type),
-                    },
-                ))
-            }
+            None => BmpV4RouteMonitoringTlvValue::Unknown {
+                code: tlv_type,
+                value: data.to_vec(),
+            },
         };
 
         match BmpV4RouteMonitoringTlv::build(index, value) {
             Ok(tlv) => Ok((remainder, tlv)),
             Err(err) => Err(nom::Err::Error(
                 LocatedBmpV4RouteMonitoringTlvParsingError {
-                    span: data,
-                    error: BmpV4RouteMonitoringTlvParsingError::BmpV4RouteMonitoringTlvError(err),
+                    span: buf,
+                    error: BmpV4RouteMonitoringTlvParsingError::InvalidBmpV4RouteMonitoringTlv(err),
                 },
             )),
         }
@@ -268,7 +272,7 @@ impl<'a>
 }
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum StatelessParsingParsingError {
+pub enum StatelessParsingTlvParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidAddressType(InvalidAddressType),
@@ -278,13 +282,13 @@ pub enum StatelessParsingParsingError {
 }
 
 impl<'a>
-    ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedStatelessParsingParsingError<'a>>
+    ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedStatelessParsingTlvParsingError<'a>>
     for StatelessParsingTlv
 {
     fn from_wire(
         input: Span<'a>,
         ctx: &mut BgpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedStatelessParsingParsingError<'a>> {
+    ) -> IResult<Span<'a>, Self, LocatedStatelessParsingTlvParsingError<'a>> {
         let buf = input;
         let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
         let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
@@ -292,10 +296,12 @@ impl<'a>
         let address_type = match AddressType::from_afi_safi(afi, safi) {
             Ok(val) => val,
             Err(err) => {
-                return Err(nom::Err::Error(LocatedStatelessParsingParsingError::new(
-                    input,
-                    StatelessParsingParsingError::InvalidAddressType(err),
-                )))
+                return Err(nom::Err::Error(
+                    LocatedStatelessParsingTlvParsingError::new(
+                        input,
+                        StatelessParsingTlvParsingError::InvalidAddressType(err),
+                    ),
+                ))
             }
         };
 
