@@ -96,7 +96,6 @@ impl ReassemblyBuffer {
             assembled_payload.unsplit(BytesMut::from(pkt.payload))
         });
         Ok(UdpNotifPacket::new(
-            first_segment.s_flag,
             first_segment.media_type,
             first_segment.publisher_id,
             first_segment.message_id,
@@ -289,7 +288,6 @@ mod tests {
             0xff, 0xff, // dummy payload
         ];
         let pkt = UdpNotifPacket::new(
-            false,
             MediaType::YangDataJson,
             0x01000001,
             0x02000002,
@@ -314,7 +312,6 @@ mod tests {
             0xff, 0xff, // dummy payload
         ];
         let pkt = UdpNotifPacket::new(
-            false,
             MediaType::YangDataJson,
             0x01000001,
             0x02000002,
@@ -356,7 +353,6 @@ mod tests {
         assert_eq!(
             value2,
             Ok(Some(UdpNotifPacket::new(
-                false,
                 MediaType::YangDataJson,
                 0x01000001,
                 0x02000002,
@@ -402,7 +398,6 @@ mod tests {
         assert_eq!(
             value2,
             Ok(Some(UdpNotifPacket::new(
-                false,
                 MediaType::YangDataJson,
                 0x01000001,
                 0x02000002,

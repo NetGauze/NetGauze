@@ -24,7 +24,10 @@ use std::collections::HashMap;
 
 const UDP_NOTIF_VERSION: u8 = 1;
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[derive(
+    Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, strum_macros::EnumDiscriminants,
+)]
+#[strum_discriminants(name(MediaTypeNames))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MediaType {
     Reserved,
@@ -97,7 +100,6 @@ impl UdpNotifOption {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct UdpNotifPacket {
-    s_flag: bool,
     media_type: MediaType,
     publisher_id: u32,
     message_id: u32,
@@ -107,7 +109,6 @@ pub struct UdpNotifPacket {
 
 impl UdpNotifPacket {
     pub const fn new(
-        s_flag: bool,
         media_type: MediaType,
         publisher_id: u32,
         message_id: u32,
@@ -115,7 +116,6 @@ impl UdpNotifPacket {
         payload: Bytes,
     ) -> Self {
         Self {
-            s_flag,
             media_type,
             publisher_id,
             message_id,
@@ -126,10 +126,6 @@ impl UdpNotifPacket {
 
     pub const fn version(&self) -> u8 {
         UDP_NOTIF_VERSION
-    }
-
-    pub const fn s_flag(&self) -> bool {
-        self.s_flag
     }
 
     pub const fn media_type(&self) -> MediaType {

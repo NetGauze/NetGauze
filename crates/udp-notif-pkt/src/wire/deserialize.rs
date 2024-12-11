@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{UdpNotifOption, UdpNotifPacket};
+use crate::{MediaType, MediaTypeNames, UdpNotifOption, UdpNotifPacket};
 use bytes::Bytes;
 use netgauze_parse_utils::{parse_into_located, ReadablePdu, Span};
 use netgauze_serde_macros::LocatedError;
@@ -71,6 +71,7 @@ pub enum UdpNotifPacketParsingError {
     #[serde(with = "netgauze_parse_utils::ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidVersion(u8),
+    InvalidSFlag,
     UdpNotifOptionError(#[from_located(module = "self")] UdpNotifOptionParsingError),
     InvalidHeaderLength(u8),
     InvalidMessageLength(u16),
@@ -104,7 +105,13 @@ impl<'a> ReadablePdu<'a, LocatedUdpNotifPacketParsingError<'a>> for UdpNotifPack
             )));
         }
         let s_flag = (first_octet & 0b00010000) != 0;
-        let media_type = (first_octet & 0b00001111).into();
+        let media_type: MediaType = (first_octet & 0b00001111).into();
+        if s_flag && MediaTypeNames::from(media_type) != MediaTypeNames::Unknown {
+            return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
+                input,
+                UdpNotifPacketParsingError::InvalidSFlag,
+            )));
+        }
         let (buf, header_len) = nom::number::complete::u8(buf)?;
         if header_len < 2 {
             return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
@@ -139,14 +146,7 @@ impl<'a> ReadablePdu<'a, LocatedUdpNotifPacketParsingError<'a>> for UdpNotifPack
         let payload = Bytes::from(payload.to_vec());
         Ok((
             buf,
-            UdpNotifPacket::new(
-                s_flag,
-                media_type,
-                publisher_id,
-                message_id,
-                options,
-                payload,
-            ),
+            UdpNotifPacket::new(media_type, publisher_id, message_id, options, payload),
         ))
     }
 }
