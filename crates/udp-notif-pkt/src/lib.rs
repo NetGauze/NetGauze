@@ -22,6 +22,8 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+const UDP_NOTIF_VERSION: u8 = 1;
+
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum MediaType {
@@ -59,7 +61,6 @@ impl From<MediaType> for u8 {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UdpNotifHeader {
-    version: u8,
     s_flag: bool,
     media_type: MediaType,
     publisher_id: u32,
@@ -69,7 +70,6 @@ pub struct UdpNotifHeader {
 
 impl UdpNotifHeader {
     pub const fn new(
-        version: u8,
         s_flag: bool,
         media_type: MediaType,
         publisher_id: u32,
@@ -77,7 +77,6 @@ impl UdpNotifHeader {
         options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
     ) -> Self {
         Self {
-            version,
             s_flag,
             media_type,
             publisher_id,
@@ -87,7 +86,7 @@ impl UdpNotifHeader {
     }
 
     pub const fn version(&self) -> u8 {
-        self.version
+        UDP_NOTIF_VERSION
     }
 
     pub const fn s_flag(&self) -> bool {

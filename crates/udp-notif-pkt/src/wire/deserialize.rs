@@ -120,7 +120,6 @@ impl<'a> ReadablePdu<'a, LocatedUdpNotifHeaderParsingError<'a>> for UdpNotifHead
         Ok((
             buf,
             UdpNotifHeader {
-                version,
                 s_flag,
                 media_type,
                 publisher_id,
