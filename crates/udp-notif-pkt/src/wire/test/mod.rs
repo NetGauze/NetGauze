@@ -36,7 +36,6 @@ fn test_simple() -> Result<(), UdpNotifPacketWritingError> {
         0xff, 0xff, // dummy payload
     ];
     let good = UdpNotifPacket::new(
-        false,
         MediaType::YangDataJson,
         0x01000001,
         0x02000002,
@@ -70,7 +69,6 @@ fn test_segment() -> Result<(), UdpNotifPacketWritingError> {
     ];
 
     let good_pkt1 = UdpNotifPacket::new(
-        false,
         MediaType::YangDataJson,
         0x01000001,
         0x02000002,
@@ -85,7 +83,6 @@ fn test_segment() -> Result<(), UdpNotifPacketWritingError> {
     );
 
     let good_pkt2 = UdpNotifPacket::new(
-        false,
         MediaType::YangDataJson,
         0x01000001,
         0x02000002,
