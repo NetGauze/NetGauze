@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{UdpNotifHeader, UdpNotifOption, UdpNotifPacket};
+use crate::{UdpNotifOption, UdpNotifPacket};
 use bytes::Bytes;
-use netgauze_parse_utils::{parse_into_located, ReadablePdu, ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::{parse_into_located, ReadablePdu, Span};
 use netgauze_serde_macros::LocatedError;
 use nom::{
     error::ErrorKind,
@@ -67,7 +67,7 @@ impl<'a> ReadablePdu<'a, LocatedUdpNotifOptionParsingError<'a>> for UdpNotifOpti
 }
 
 #[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum UdpNotifHeaderParsingError {
+pub enum UdpNotifPacketParsingError {
     #[serde(with = "netgauze_parse_utils::ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidVersion(u8),
@@ -76,74 +76,8 @@ pub enum UdpNotifHeaderParsingError {
     InvalidMessageLength(u16),
 }
 
-impl<'a> ReadablePdu<'a, LocatedUdpNotifHeaderParsingError<'a>> for UdpNotifHeader {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedUdpNotifHeaderParsingError<'a>> {
-        let input = buf;
-        let (buf, first_octet) = nom::number::complete::u8(buf)?;
-        let version = (first_octet >> 5) & 0b111;
-        if version != 1 {
-            return Err(nom::Err::Error(LocatedUdpNotifHeaderParsingError::new(
-                input,
-                UdpNotifHeaderParsingError::InvalidVersion(version),
-            )));
-        }
-        let s_flag = (first_octet & 0b00010000) != 0;
-        let media_type = (first_octet & 0b00001111).into();
-        let (buf, header_len) = nom::number::complete::u8(buf)?;
-        if header_len < 2 {
-            return Err(nom::Err::Error(LocatedUdpNotifHeaderParsingError::new(
-                input,
-                UdpNotifHeaderParsingError::InvalidHeaderLength(header_len),
-            )));
-        }
-        if buf.len() < (header_len - 2) as usize {
-            return Err(nom::Err::Error(LocatedUdpNotifHeaderParsingError::new(
-                input,
-                UdpNotifHeaderParsingError::InvalidHeaderLength(header_len),
-            )));
-        }
-        let (buf, header_buf) = nom::bytes::complete::take(header_len - 2)(buf)?;
-        let (header_buf, _message_length) = be_u16(header_buf)?;
-        let (header_buf, publisher_id) = be_u32(header_buf)?;
-        let (mut header_buf, message_id) = be_u32(header_buf)?;
-        let mut options = HashMap::new();
-        while !header_buf.is_empty() {
-            let (t, option) = parse_into_located::<
-                LocatedUdpNotifOptionParsingError<'_>,
-                LocatedUdpNotifHeaderParsingError<'_>,
-                UdpNotifOption,
-            >(header_buf)?;
-
-            options.insert(option.code(), option);
-            header_buf = t;
-        }
-        Ok((
-            buf,
-            UdpNotifHeader {
-                s_flag,
-                media_type,
-                publisher_id,
-                message_id,
-                options,
-            },
-        ))
-    }
-}
-
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum UdpNotifPacketParsingError {
-    #[serde(with = "netgauze_parse_utils::ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    UdpNotifHeaderError(#[from_located(module = "self")] UdpNotifHeaderParsingError),
-}
-
-impl<'a> ReadablePduWithOneInput<'a, Bytes, LocatedUdpNotifPacketParsingError<'a>>
-    for UdpNotifPacket
-{
-    fn from_wire(
-        buf: Span<'a>,
-        bytes_buf: Bytes,
-    ) -> IResult<Span<'a>, Self, LocatedUdpNotifPacketParsingError<'a>> {
+impl<'a> ReadablePdu<'a, LocatedUdpNotifPacketParsingError<'a>> for UdpNotifPacket {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedUdpNotifPacketParsingError<'a>> {
         if buf.len() < 12 {
             return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
                 buf,
@@ -156,23 +90,63 @@ impl<'a> ReadablePduWithOneInput<'a, Bytes, LocatedUdpNotifPacketParsingError<'a
         if header_len as u16 > message_len {
             return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
                 buf,
-                UdpNotifPacketParsingError::UdpNotifHeaderError(
-                    UdpNotifHeaderParsingError::InvalidHeaderLength(header_len),
-                ),
+                UdpNotifPacketParsingError::InvalidHeaderLength(header_len),
             )));
         }
         let payload_len = message_len as usize - header_len as usize;
-        let (buf, header) = parse_into_located(buf)?; // this is inefficient copying bytes around
-        if bytes_buf.len() < buf.location_offset() + payload_len {
+        let input = buf;
+        let (buf, first_octet) = nom::number::complete::u8(buf)?;
+        let version = (first_octet >> 5) & 0b111;
+        if version != 1 {
             return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
-                buf,
-                UdpNotifPacketParsingError::UdpNotifHeaderError(
-                    UdpNotifHeaderParsingError::InvalidMessageLength(message_len),
-                ),
+                input,
+                UdpNotifPacketParsingError::InvalidVersion(version),
             )));
         }
-        let payload = bytes_buf.slice(buf.location_offset()..buf.location_offset() + payload_len);
-        let (buf, _payload) = nom::bytes::complete::take(payload_len)(buf)?;
-        Ok((buf, UdpNotifPacket::new(header, payload)))
+        let s_flag = (first_octet & 0b00010000) != 0;
+        let media_type = (first_octet & 0b00001111).into();
+        let (buf, header_len) = nom::number::complete::u8(buf)?;
+        if header_len < 2 {
+            return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
+                input,
+                UdpNotifPacketParsingError::InvalidHeaderLength(header_len),
+            )));
+        }
+        if buf.len() < (header_len - 2) as usize {
+            return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
+                input,
+                UdpNotifPacketParsingError::InvalidHeaderLength(header_len),
+            )));
+        }
+        let (buf, header_buf) = nom::bytes::complete::take(header_len - 2)(buf)?;
+        let (header_buf, _message_length) = be_u16(header_buf)?;
+        let (header_buf, publisher_id) = be_u32(header_buf)?;
+        let (mut header_buf, message_id) = be_u32(header_buf)?;
+        let mut options = HashMap::new();
+
+        while !header_buf.is_empty() {
+            let (t, option) = parse_into_located::<
+                LocatedUdpNotifOptionParsingError<'_>,
+                LocatedUdpNotifPacketParsingError<'_>,
+                UdpNotifOption,
+            >(header_buf)?;
+
+            options.insert(option.code(), option);
+            header_buf = t;
+        }
+        let (buf, payload) = nom::bytes::complete::take(payload_len)(buf)?;
+        // TODO: find more efficient way without need to do a memory copy
+        let payload = Bytes::from(payload.to_vec());
+        Ok((
+            buf,
+            UdpNotifPacket::new(
+                s_flag,
+                media_type,
+                publisher_id,
+                message_id,
+                options,
+                payload,
+            ),
+        ))
     }
 }
