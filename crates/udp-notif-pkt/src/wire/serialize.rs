@@ -30,7 +30,11 @@ impl WritablePdu<UdpNotifOptionWritingError> for UdpNotifOption {
 
     fn len(&self) -> usize {
         match self {
-            UdpNotifOption::Segment { .. } => 2,
+            UdpNotifOption::Segment { .. } => {
+                // base length + two octets for segment length of which the last bit is a `last
+                // segment` flag
+                Self::BASE_LENGTH + 2
+            }
             UdpNotifOption::PrivateEncoding(value) => value.len(),
             UdpNotifOption::Unknown { value, .. } => value.len(),
         }
@@ -63,6 +67,7 @@ pub enum UdpNotifPacketWritingError {
     StdIOError(#[from_std_io_error] String),
     InvalidHeaderLength(usize),
     InvalidMessageLength(usize),
+    OptionError(#[from] UdpNotifOptionWritingError),
 }
 
 impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
@@ -71,7 +76,6 @@ impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
     fn len(&self) -> usize {
         Self::BASE_LENGTH
             + self
-                .header
                 .options
                 .values()
                 .map(UdpNotifOption::len)
@@ -82,15 +86,14 @@ impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), UdpNotifPacketWritingError> {
         let version: u8 = 0x01;
         let mut first_byte: u8 = version << 5;
-        if self.header.s_flag {
+        if self.s_flag {
             first_byte |= 0x10;
         }
-        let mt: u8 = self.header.media_type.into();
+        let mt: u8 = self.media_type.into();
         first_byte |= mt;
         writer.write_u8(first_byte)?;
         let header_len = 12
             + self
-                .header
                 .options
                 .values()
                 .map(UdpNotifOption::len)
@@ -106,8 +109,11 @@ impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
             ));
         }
         writer.write_u16::<NetworkEndian>(message_len as u16)?;
-        writer.write_u32::<NetworkEndian>(self.header.publisher_id())?;
-        writer.write_u32::<NetworkEndian>(self.header.message_id())?;
+        writer.write_u32::<NetworkEndian>(self.publisher_id())?;
+        writer.write_u32::<NetworkEndian>(self.message_id())?;
+        for option in self.options() {
+            option.1.write(writer)?;
+        }
         writer.write_all(self.payload())?;
         Ok(())
     }

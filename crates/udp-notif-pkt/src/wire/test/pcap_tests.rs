@@ -99,7 +99,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                     let mut value = serde_json::to_value(&msg)
                         .expect("Couldn't serialize UDP-Notif message to json");
                     // Convert when possible inner payload into human-readable format
-                    match msg.header.media_type {
+                    match msg.media_type {
                         MediaType::YangDataJson => {
                             let payload = serde_json::from_slice(msg.payload())
                                 .expect("Couldn't deserialize JSON payload into a JSON object");

@@ -58,58 +58,6 @@ impl From<MediaType> for u8 {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct UdpNotifHeader {
-    s_flag: bool,
-    media_type: MediaType,
-    publisher_id: u32,
-    message_id: u32,
-    options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
-}
-
-impl UdpNotifHeader {
-    pub const fn new(
-        s_flag: bool,
-        media_type: MediaType,
-        publisher_id: u32,
-        message_id: u32,
-        options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
-    ) -> Self {
-        Self {
-            s_flag,
-            media_type,
-            publisher_id,
-            message_id,
-            options,
-        }
-    }
-
-    pub const fn version(&self) -> u8 {
-        UDP_NOTIF_VERSION
-    }
-
-    pub const fn s_flag(&self) -> bool {
-        self.s_flag
-    }
-
-    pub const fn media_type(&self) -> MediaType {
-        self.media_type
-    }
-
-    pub const fn publisher_id(&self) -> u32 {
-        self.publisher_id
-    }
-
-    pub const fn message_id(&self) -> u32 {
-        self.message_id
-    }
-
-    pub const fn options(&self) -> &HashMap<UdpNotifOptionCode, UdpNotifOption> {
-        &self.options
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
 #[repr(u8)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -149,17 +97,55 @@ impl UdpNotifOption {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct UdpNotifPacket {
-    header: UdpNotifHeader,
+    s_flag: bool,
+    media_type: MediaType,
+    publisher_id: u32,
+    message_id: u32,
+    options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
     payload: Bytes,
 }
 
 impl UdpNotifPacket {
-    pub const fn new(header: UdpNotifHeader, payload: Bytes) -> Self {
-        Self { header, payload }
+    pub const fn new(
+        s_flag: bool,
+        media_type: MediaType,
+        publisher_id: u32,
+        message_id: u32,
+        options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
+        payload: Bytes,
+    ) -> Self {
+        Self {
+            s_flag,
+            media_type,
+            publisher_id,
+            message_id,
+            options,
+            payload,
+        }
     }
 
-    pub const fn header(&self) -> &UdpNotifHeader {
-        &self.header
+    pub const fn version(&self) -> u8 {
+        UDP_NOTIF_VERSION
+    }
+
+    pub const fn s_flag(&self) -> bool {
+        self.s_flag
+    }
+
+    pub const fn media_type(&self) -> MediaType {
+        self.media_type
+    }
+
+    pub const fn publisher_id(&self) -> u32 {
+        self.publisher_id
+    }
+
+    pub const fn message_id(&self) -> u32 {
+        self.message_id
+    }
+
+    pub const fn options(&self) -> &HashMap<UdpNotifOptionCode, UdpNotifOption> {
+        &self.options
     }
 
     pub const fn payload(&self) -> &Bytes {

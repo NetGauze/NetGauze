@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    wire::deserialize::{LocatedUdpNotifHeaderParsingError, UdpNotifHeaderParsingError},
-    UdpNotifHeader, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
+    wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError},
+    UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
 };
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BytesMut};
@@ -84,25 +84,20 @@ impl ReassemblyBuffer {
         let (_, first_segment) = self.segments.pop_first().unwrap();
         let mut assembled_payload = BytesMut::from(first_segment.payload);
         let mut options = HashMap::new();
-        self.segments
-            .into_iter()
-            .for_each(|(_, UdpNotifPacket { header, payload })| {
-                for (k, opt) in header.options {
-                    if k != UdpNotifOptionCode::Segment {
-                        options.insert(k, opt);
-                    }
+        self.segments.into_iter().for_each(|(_, pkt)| {
+            for (k, opt) in pkt.options() {
+                if k != &UdpNotifOptionCode::Segment {
+                    options.insert(k.clone(), opt.clone());
                 }
-                assembled_payload.unsplit(BytesMut::from(payload))
-            });
-        let final_header = UdpNotifHeader::new(
-            first_segment.header.s_flag,
-            first_segment.header.media_type,
-            first_segment.header.publisher_id,
-            first_segment.header.message_id,
-            options,
-        );
+            }
+            assembled_payload.unsplit(BytesMut::from(pkt.payload))
+        });
         Ok(UdpNotifPacket::new(
-            final_header,
+            first_segment.s_flag,
+            first_segment.media_type,
+            first_segment.publisher_id,
+            first_segment.message_id,
+            options,
             assembled_payload.freeze(),
         ))
     }
@@ -124,18 +119,18 @@ pub enum UdpPacketCodecError {
     IoError(String),
     InvalidHeaderLength(u8),
     InvalidMessageLength(u16),
-    UdpNotifHeaderError(UdpNotifHeaderParsingError),
+    UdpNotifError(UdpNotifPacketParsingError),
     ReassemblyError(ReassemblyBufferError),
 }
 
-impl<'a> From<nom::Err<LocatedUdpNotifHeaderParsingError<'a>>> for UdpPacketCodecError {
-    fn from(err: nom::Err<LocatedUdpNotifHeaderParsingError<'a>>) -> Self {
+impl<'a> From<nom::Err<LocatedUdpNotifPacketParsingError<'a>>> for UdpPacketCodecError {
+    fn from(err: nom::Err<LocatedUdpNotifPacketParsingError<'a>>) -> Self {
         match err {
             nom::Err::Incomplete(_) => {
-                Self::UdpNotifHeaderError(UdpNotifHeaderParsingError::NomError(ErrorKind::Eof))
+                Self::UdpNotifError(UdpNotifPacketParsingError::NomError(ErrorKind::Eof))
             }
             nom::Err::Error(err) | nom::Err::Failure(err) => {
-                Self::UdpNotifHeaderError(err.error().clone())
+                Self::UdpNotifError(err.error().clone())
             }
         }
     }
@@ -201,9 +196,8 @@ impl UdpPacketCodec {
     }
 
     #[inline]
-    fn extract_segment_info(header: &UdpNotifHeader) -> (u16, bool) {
-        header
-            .options
+    fn extract_segment_info(options: &HashMap<UdpNotifOptionCode, UdpNotifOption>) -> (u16, bool) {
+        options
             .get(&UdpNotifOptionCode::Segment)
             .map(|opt| {
                 if let UdpNotifOption::Segment { number, last } = opt {
@@ -212,29 +206,24 @@ impl UdpPacketCodec {
                     unreachable!()
                 }
             })
-            .unwrap_or((0, header.options.is_empty()))
+            .unwrap_or((0, options.is_empty()))
     }
 
     #[inline]
     fn try_reassemble_segments(
         &mut self,
-        header: UdpNotifHeader,
-        payload: BytesMut,
+        pkt: UdpNotifPacket,
     ) -> Result<Option<UdpNotifPacket>, UdpPacketCodecError> {
-        let (seg_no, is_last) = Self::extract_segment_info(&header);
+        let (seg_no, is_last) = Self::extract_segment_info(pkt.options());
 
         // Short-circuit for unsegmented or single-segment messages
         if seg_no == 0 && is_last {
-            return Ok(Some(UdpNotifPacket::new(header, payload.freeze())));
+            return Ok(Some(pkt));
         }
 
-        let message_key = (header.publisher_id(), header.message_id());
+        let message_key = (pkt.publisher_id(), pkt.message_id());
         let reassembly_buf = self.incomplete_messages.entry(message_key).or_default();
-        reassembly_buf.add_segment(
-            seg_no,
-            UdpNotifPacket::new(header.clone(), payload.freeze()),
-            is_last,
-        );
+        reassembly_buf.add_segment(seg_no, pkt, is_last);
         if !reassembly_buf.ready_to_reassemble() {
             return Ok(None);
         }
@@ -250,20 +239,16 @@ impl Decoder for UdpPacketCodec {
 
     #[inline]
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let (header_len, msg_len) = match self.check_len(buf)? {
+        let _ = match self.check_len(buf)? {
             None => return Ok(None),
             Some(val) => val,
         };
         // Parse the header
-        let (span, header) = UdpNotifHeader::from_wire(Span::new(buf))?;
-        // Advance the offset to consume the header and start the beginning of the
-        // payload
+        let (span, pkt) = UdpNotifPacket::from_wire(Span::new(buf))?;
+        // Advance the offset to consume the entire packet
         buf.advance(span.location_offset());
-
-        // shallow clone to avoid copying the entire payload buffer
-        let payload = buf.split_to(msg_len as usize - header_len as usize);
         self.in_message = false;
-        self.try_reassemble_segments(header, payload)
+        self.try_reassemble_segments(pkt)
     }
 }
 
@@ -283,22 +268,18 @@ mod tests {
             0x02, 0x00, 0x00, 0x02, // Message ID
             0xff, 0xff, // dummy payload
         ];
+        let pkt = UdpNotifPacket::new(
+            false,
+            MediaType::YangDataJson,
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            Bytes::from(&[0xff, 0xff][..]),
+        );
         let mut buf = BytesMut::from(&value[..]);
 
         let value = codec.decode(&mut buf);
-        assert_eq!(
-            value,
-            Ok(Some(UdpNotifPacket::new(
-                UdpNotifHeader::new(
-                    false,
-                    MediaType::YangDataJson,
-                    0x01000001,
-                    0x02000002,
-                    HashMap::new()
-                ),
-                Bytes::from(&[0xff, 0xff][..]),
-            )))
-        )
+        assert_eq!(value, Ok(Some(pkt)))
     }
 
     #[test]
@@ -327,17 +308,16 @@ mod tests {
         let value1 = codec.decode(&mut buf);
         let value2 = codec.decode(&mut buf);
 
+        eprintln!("Decoded {value1:?}");
         assert!(matches!(value1, Ok(None)));
         assert_eq!(
             value2,
             Ok(Some(UdpNotifPacket::new(
-                UdpNotifHeader::new(
-                    false,
-                    MediaType::YangDataJson,
-                    0x01000001,
-                    0x02000002,
-                    HashMap::new(),
-                ),
+                false,
+                MediaType::YangDataJson,
+                0x01000001,
+                0x02000002,
+                HashMap::new(),
                 Bytes::from(
                     &[
                         0xff, 0xff, 0xff, 0xff, // payload from first segment
