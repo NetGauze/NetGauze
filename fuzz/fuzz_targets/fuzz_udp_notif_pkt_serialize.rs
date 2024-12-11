@@ -17,13 +17,11 @@
 
 use libfuzzer_sys::fuzz_target;
 use netgauze_parse_utils::WritablePdu;
-use netgauze_udp_notif_pkt::{UdpNotifHeader, UdpNotifPacket};
+use netgauze_udp_notif_pkt::UdpNotifPacket;
 use std::io::Cursor;
 
-fuzz_target!(|data: (UdpNotifHeader, &[u8])| {
-    let (header, payload_data) = data;
-    let payload = bytes::Bytes::copy_from_slice(payload_data);
+fuzz_target!(|pkt: UdpNotifPacket| {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
-    let _ = UdpNotifPacket::new(header, payload).write(&mut cursor);
+    let _ = pkt.write(&mut cursor);
 });
