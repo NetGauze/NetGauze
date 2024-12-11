@@ -32,6 +32,18 @@ pub fn combine(v: Vec<&[u8]>) -> Vec<u8> {
         .collect::<Vec<u8>>()
 }
 
+pub fn test_parsed<'a, T, E>(input: &'a [u8], expected: &T) -> (Span<'a>, T)
+where
+    T: ReadablePdu<'a, E> + PartialEq + Debug,
+    E: Debug,
+{
+    let parsed = <T as ReadablePdu<E>>::from_wire(Span::new(input));
+    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
+    let (span, value) = parsed.unwrap();
+    assert_eq!(&value, expected);
+    (span, value)
+}
+
 /// Fancier assert to for more meaningful error messages
 pub fn test_parsed_completely<'a, T, E>(input: &'a [u8], expected: &T) -> T
 where
