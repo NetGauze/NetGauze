@@ -35,7 +35,6 @@ fn test_simple() -> Result<(), UdpNotifPacketWritingError> {
 
     let good = UdpNotifPacket::new(
         UdpNotifHeader::new(
-            1,
             false,
             MediaType::YangDataJson,
             0x01000001,

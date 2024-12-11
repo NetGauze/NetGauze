@@ -95,7 +95,6 @@ impl ReassemblyBuffer {
                 assembled_payload.unsplit(BytesMut::from(payload))
             });
         let final_header = UdpNotifHeader::new(
-            first_segment.header.version,
             first_segment.header.s_flag,
             first_segment.header.media_type,
             first_segment.header.publisher_id,
@@ -291,7 +290,6 @@ mod tests {
             value,
             Ok(Some(UdpNotifPacket::new(
                 UdpNotifHeader::new(
-                    1,
                     false,
                     MediaType::YangDataJson,
                     0x01000001,
@@ -334,7 +332,6 @@ mod tests {
             value2,
             Ok(Some(UdpNotifPacket::new(
                 UdpNotifHeader::new(
-                    1,
                     false,
                     MediaType::YangDataJson,
                     0x01000001,
