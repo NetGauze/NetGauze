@@ -14,12 +14,15 @@
 // limitations under the License.
 
 use crate::{
-    wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError},
+    wire::{
+        deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError},
+        serialize::UdpNotifPacketWritingError,
+    },
     UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
 };
 use byteorder::{ByteOrder, NetworkEndian};
-use bytes::{Buf, BytesMut};
-use netgauze_parse_utils::{LocatedParsingError, ReadablePdu, Span};
+use bytes::{Buf, BufMut, BytesMut};
+use netgauze_parse_utils::{LocatedParsingError, ReadablePdu, Span, WritablePdu};
 use nom::error::ErrorKind;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -27,7 +30,7 @@ use std::{
     io,
     time::{Duration, Instant},
 };
-use tokio_util::codec::Decoder;
+use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug, strum_macros::Display, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ReassemblyBufferError {
@@ -121,6 +124,7 @@ pub enum UdpPacketCodecError {
     InvalidMessageLength(u16),
     UdpNotifError(UdpNotifPacketParsingError),
     ReassemblyError(ReassemblyBufferError),
+    WritingError(UdpNotifPacketWritingError),
 }
 
 impl<'a> From<nom::Err<LocatedUdpNotifPacketParsingError<'a>>> for UdpPacketCodecError {
@@ -147,6 +151,12 @@ impl std::error::Error for UdpPacketCodecError {}
 impl From<io::Error> for UdpPacketCodecError {
     fn from(err: io::Error) -> Self {
         Self::IoError(err.to_string())
+    }
+}
+
+impl From<UdpNotifPacketWritingError> for UdpPacketCodecError {
+    fn from(e: UdpNotifPacketWritingError) -> Self {
+        Self::WritingError(e)
     }
 }
 
@@ -252,6 +262,16 @@ impl Decoder for UdpPacketCodec {
     }
 }
 
+impl Encoder<UdpNotifPacket> for UdpPacketCodec {
+    type Error = UdpPacketCodecError;
+
+    fn encode(&mut self, pkt: UdpNotifPacket, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let mut writer = dst.writer();
+        pkt.write(&mut writer)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283,6 +303,30 @@ mod tests {
     }
 
     #[test]
+    fn test_encode() {
+        let mut codec = UdpPacketCodec::default();
+        let expected: Vec<u8> = vec![
+            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
+            0x0c, // Header length
+            0x00, 0x0e, // Message length
+            0x01, 0x00, 0x00, 0x01, // Publisher ID
+            0x02, 0x00, 0x00, 0x02, // Message ID
+            0xff, 0xff, // dummy payload
+        ];
+        let pkt = UdpNotifPacket::new(
+            false,
+            MediaType::YangDataJson,
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            Bytes::from(&[0xff, 0xff][..]),
+        );
+        let mut buf = BytesMut::new();
+        codec.encode(pkt, &mut buf).expect("encode failed");
+        assert_eq!(buf, expected);
+    }
+
+    #[test]
     fn test_decode_segmented() {
         let mut codec = UdpPacketCodec::default();
         let value: Vec<u8> = vec![
@@ -308,7 +352,52 @@ mod tests {
         let value1 = codec.decode(&mut buf);
         let value2 = codec.decode(&mut buf);
 
-        eprintln!("Decoded {value1:?}");
+        assert!(matches!(value1, Ok(None)));
+        assert_eq!(
+            value2,
+            Ok(Some(UdpNotifPacket::new(
+                false,
+                MediaType::YangDataJson,
+                0x01000001,
+                0x02000002,
+                HashMap::new(),
+                Bytes::from(
+                    &[
+                        0xff, 0xff, 0xff, 0xff, // payload from first segment
+                        0xee, 0xee, 0xee, 0xee, // payload from second segment
+                        0xdd, 0xdd, 0xdd, 0xdd,
+                    ][..]
+                ),
+            )))
+        )
+    }
+
+    #[test]
+    fn test_decode_unordered_segmented() {
+        let mut codec = UdpPacketCodec::default();
+        let value: Vec<u8> = vec![
+            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
+            0x10, // Header length
+            0x00, 0x18, // Message length
+            0x01, 0x00, 0x00, 0x01, // Publisher ID
+            0x02, 0x00, 0x00, 0x02, // Message ID
+            0x01, 0x04, 0x00, 0x03, // segment 1, last segment
+            0xee, 0xee, 0xee, 0xee, // dummy payload
+            0xdd, 0xdd, 0xdd, 0xdd, // dummy payload
+            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
+            0x10, // Header length
+            0x00, 0x14, // Message length
+            0x01, 0x00, 0x00, 0x01, // Publisher ID
+            0x02, 0x00, 0x00, 0x02, // Message ID
+            0x01, 0x04, 0x00, 0x00, // segment 0, not last segment
+            0xff, 0xff, 0xff, 0xff, // dummy payload
+        ];
+
+        let mut buf = BytesMut::from(&value[..]);
+
+        let value1 = codec.decode(&mut buf);
+        let value2 = codec.decode(&mut buf);
+
         assert!(matches!(value1, Ok(None)));
         assert_eq!(
             value2,

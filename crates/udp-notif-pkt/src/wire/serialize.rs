@@ -19,7 +19,7 @@ use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum UdpNotifOptionWritingError {
     StdIOError(#[from_std_io_error] String),
 }
@@ -62,7 +62,7 @@ impl WritablePdu<UdpNotifOptionWritingError> for UdpNotifOption {
     }
 }
 
-#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+#[derive(WritingError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum UdpNotifPacketWritingError {
     StdIOError(#[from_std_io_error] String),
     InvalidHeaderLength(usize),
