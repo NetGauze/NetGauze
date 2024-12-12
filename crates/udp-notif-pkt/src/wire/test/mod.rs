@@ -14,11 +14,17 @@
 // limitations under the License.
 
 use crate::{
-    wire::serialize::UdpNotifPacketWritingError, MediaType, UdpNotifOption, UdpNotifOptionCode,
-    UdpNotifPacket,
+    wire::{
+        deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError},
+        serialize::UdpNotifPacketWritingError,
+    },
+    MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
 };
 use bytes::Bytes;
-use netgauze_parse_utils::test_helpers::{test_parsed, test_parsed_completely, test_write};
+use netgauze_parse_utils::{
+    test_helpers::{test_parse_error, test_parsed, test_parsed_completely, test_write},
+    Span,
+};
 use nom::AsBytes;
 use std::collections::HashMap;
 
@@ -45,6 +51,63 @@ fn test_simple() -> Result<(), UdpNotifPacketWritingError> {
 
     test_parsed_completely(&good_wire, &good);
     test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_invalid_s_flat() -> Result<(), UdpNotifPacketWritingError> {
+    let bad_wire = [
+        0x31, // version 1, private space set, Media type: 1 = YANG data JSON
+        0x0c, // Header length
+        0x00, 0x0e, // Message length
+        0x01, 0x00, 0x00, 0x01, // Publisher ID
+        0x02, 0x00, 0x00, 0x02, // Message ID
+        0xff, 0xff, // dummy payload
+    ];
+
+    let error = LocatedUdpNotifPacketParsingError::new(
+        Span::new(&bad_wire),
+        UdpNotifPacketParsingError::InvalidSFlag,
+    );
+    test_parse_error::<UdpNotifPacket, LocatedUdpNotifPacketParsingError<'_>>(&bad_wire, &error);
+    Ok(())
+}
+
+#[test]
+fn test_invalid_version() -> Result<(), UdpNotifPacketWritingError> {
+    let bad_wire = [
+        0x01, // version 0, no private space, Media type: 1 = YANG data JSON
+        0x0c, // Header length
+        0x00, 0x0e, // Message length
+        0x01, 0x00, 0x00, 0x01, // Publisher ID
+        0x02, 0x00, 0x00, 0x02, // Message ID
+        0xff, 0xff, // dummy payload
+    ];
+
+    let error = LocatedUdpNotifPacketParsingError::new(
+        Span::new(&bad_wire),
+        UdpNotifPacketParsingError::InvalidVersion(0),
+    );
+    test_parse_error::<UdpNotifPacket, LocatedUdpNotifPacketParsingError<'_>>(&bad_wire, &error);
+    Ok(())
+}
+
+#[test]
+fn test_invalid_header_length() -> Result<(), UdpNotifPacketWritingError> {
+    let bad_wire = [
+        0x21, // version 0, no private space, Media type: 1 = YANG data JSON
+        0xff, // Header length
+        0x00, 0x0e, // Message length
+        0x01, 0x00, 0x00, 0x01, // Publisher ID
+        0x02, 0x00, 0x00, 0x02, // Message ID
+        0xff, 0xff, // dummy payload
+    ];
+
+    let error = LocatedUdpNotifPacketParsingError::new(
+        Span::new(&bad_wire),
+        UdpNotifPacketParsingError::InvalidHeaderLength(0xff),
+    );
+    test_parse_error::<UdpNotifPacket, LocatedUdpNotifPacketParsingError<'_>>(&bad_wire, &error);
     Ok(())
 }
 
