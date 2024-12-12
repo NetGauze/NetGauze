@@ -169,3 +169,48 @@ fn test_segment() -> Result<(), UdpNotifPacketWritingError> {
     test_write(&good_pkt2, &good_wire[20..])?;
     Ok(())
 }
+
+#[test]
+fn test_private_encoding() -> Result<(), UdpNotifPacketWritingError> {
+    let good_wire = [
+        0x3a, // version 1, private space, Media type: 10 (just arbitrary picked)
+        0x10, // Header length
+        0x00, 0x14, // Message length
+        0x01, 0x00, 0x00, 0x01, // Publisher ID
+        0x02, 0x00, 0x00, 0x02, // Message ID
+        0x02, 0x04, 0xdd, 0xee, // private encoding pen
+        0xff, 0xff, 0xff, 0xff, // dummy payload
+    ];
+    let good = UdpNotifPacket::new(
+        MediaType::Unknown(0xa),
+        0x01000001,
+        0x02000002,
+        HashMap::from([(
+            UdpNotifOptionCode::PrivateEncoding,
+            UdpNotifOption::PrivateEncoding(vec![0xdd, 0xee]),
+        )]),
+        Bytes::from(&[0xff, 0xff, 0xff, 0xff][..]),
+    );
+
+    test_parsed_completely(&good_wire, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_private_encoding_pen_not_present() {
+    let bad_wire = [
+        0x3a, // version 1, private space, Media type: 10 (just arbitrary picked)
+        0x0c, // Header length
+        0x00, 0x0e, // Message length
+        0x01, 0x00, 0x00, 0x01, // Publisher ID
+        0x02, 0x00, 0x00, 0x02, // Message ID
+        0xff, 0xff, // dummy payload
+    ];
+
+    let error = LocatedUdpNotifPacketParsingError::new(
+        unsafe { Span::new_from_raw_offset(2, &bad_wire[2..]) },
+        UdpNotifPacketParsingError::PrivateEncodingOptionIsNotPresent,
+    );
+    test_parse_error::<UdpNotifPacket, LocatedUdpNotifPacketParsingError<'_>>(&bad_wire, &error);
+}

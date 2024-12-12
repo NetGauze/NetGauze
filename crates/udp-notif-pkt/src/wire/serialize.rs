@@ -35,8 +35,8 @@ impl WritablePdu<UdpNotifOptionWritingError> for UdpNotifOption {
                 // segment` flag
                 Self::BASE_LENGTH + 2
             }
-            UdpNotifOption::PrivateEncoding(value) => value.len(),
-            UdpNotifOption::Unknown { value, .. } => value.len(),
+            UdpNotifOption::PrivateEncoding(value) => Self::BASE_LENGTH + value.len(),
+            UdpNotifOption::Unknown { value, .. } => Self::BASE_LENGTH + value.len(),
         }
     }
 

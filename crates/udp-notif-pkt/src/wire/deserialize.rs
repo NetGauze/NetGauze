@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{MediaType, MediaTypeNames, UdpNotifOption, UdpNotifPacket};
+use crate::{MediaType, MediaTypeNames, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use bytes::Bytes;
 use netgauze_parse_utils::{parse_into_located, ReadablePdu, Span};
 use netgauze_serde_macros::LocatedError;
@@ -75,6 +75,7 @@ pub enum UdpNotifPacketParsingError {
     UdpNotifOptionError(#[from_located(module = "self")] UdpNotifOptionParsingError),
     InvalidHeaderLength(u8),
     InvalidMessageLength(u16),
+    PrivateEncodingOptionIsNotPresent,
 }
 
 impl<'a> ReadablePdu<'a, LocatedUdpNotifPacketParsingError<'a>> for UdpNotifPacket {
@@ -125,21 +126,33 @@ impl<'a> ReadablePdu<'a, LocatedUdpNotifPacketParsingError<'a>> for UdpNotifPack
                 UdpNotifPacketParsingError::InvalidHeaderLength(header_len),
             )));
         }
+        let header_buf_input = buf;
         let (buf, header_buf) = nom::bytes::complete::take(header_len - 2)(buf)?;
         let (header_buf, _message_length) = be_u16(header_buf)?;
         let (header_buf, publisher_id) = be_u32(header_buf)?;
         let (mut header_buf, message_id) = be_u32(header_buf)?;
         let mut options = HashMap::new();
-
+        // AS per UDP NOTIF RFC: When S is set, MT represents a private space to be
+        // freely used for non standard encodings. When S is set, the Private
+        // Encoding Option SHOULD be present in the UDP-Notif message header.
+        let mut private_is_correct = !s_flag;
         while !header_buf.is_empty() {
             let (t, option) = parse_into_located::<
                 LocatedUdpNotifOptionParsingError<'_>,
                 LocatedUdpNotifPacketParsingError<'_>,
                 UdpNotifOption,
             >(header_buf)?;
-
+            if s_flag && option.code() == UdpNotifOptionCode::PrivateEncoding {
+                private_is_correct = true;
+            }
             options.insert(option.code(), option);
             header_buf = t;
+        }
+        if !private_is_correct {
+            return Err(nom::Err::Error(LocatedUdpNotifPacketParsingError::new(
+                header_buf_input,
+                UdpNotifPacketParsingError::PrivateEncodingOptionIsNotPresent,
+            )));
         }
         let (buf, payload) = nom::bytes::complete::take(payload_len)(buf)?;
         // TODO: find more efficient way without need to do a memory copy
