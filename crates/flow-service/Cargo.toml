@@ -26,6 +26,7 @@ socket2 = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 async-channel = "2.3"
+libc = {version = "0.2"}
 
 [dev-dependencies]
 chrono = { workspace = true, default-features = false, features = ["std", "clock"] }
