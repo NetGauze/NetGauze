@@ -69,7 +69,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
 
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
-                info!("Termination signal recevied, gracefully shutting down actors");
+                info!("Termination signal received, gracefully shutting down actors");
                 cleanup_task.abort();
                 let _ = handler.shutdown().await;
             }

@@ -68,6 +68,12 @@ pub fn new_udp_reuse_port(
     udp_sock.set_cloexec(true)?;
     udp_sock.set_nonblocking(true)?;
     if let Some(name) = device {
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "watchos",
+        ))]
         unsafe {
             let c_str = std::ffi::CString::new(name)?;
             let index = libc::if_nametoindex(c_str.as_ptr() as *const libc::c_char);
@@ -77,6 +83,10 @@ pub fn new_udp_reuse_port(
             } else {
                 udp_sock.bind_device_by_index_v6(index)?;
             }
+        }
+        #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+        {
+            udp_sock.bind_device(Some(name.as_bytes()))?
         }
     }
     udp_sock.bind(&socket2::SockAddr::from(local_addr))?;
