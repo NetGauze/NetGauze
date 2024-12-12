@@ -16,13 +16,13 @@
 #![no_main]
 use bytes::Bytes;
 use libfuzzer_sys::fuzz_target;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePdu, Span};
 use netgauze_udp_notif_pkt::UdpNotifPacket;
 
 fuzz_target!(|data: &[u8]| {
     let mut buf = data;
     let mut bytes_buf = Bytes::from(Vec::from(buf));
-    while let Ok((retbuf, _msg)) = UdpNotifPacket::from_wire(Span::new(buf), bytes_buf.clone()) {
+    while let Ok((retbuf, _msg)) = UdpNotifPacket::from_wire(Span::new(buf)) {
         buf = retbuf.fragment();
         bytes_buf = Bytes::from(Vec::from(buf));
     }
