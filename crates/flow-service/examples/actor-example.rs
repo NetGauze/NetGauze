@@ -45,6 +45,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
         let (join_handle, handler) = FlowCollectorActorHandle::new(
             actor_id,
             socket_addr,
+            None,
             cmd_buffer_size,
             Duration::from_millis(500),
         )
