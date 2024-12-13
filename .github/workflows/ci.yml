@@ -32,6 +32,18 @@ jobs:
       - name: cargo fmt --check
         run: cargo fmt --check
 
+  build:
+    runs-on: ubuntu-latest
+    name: stable / build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: cargo build
+        run: cargo build
+
   test:
     name: Rust ${{matrix.rust}}
     runs-on: ubuntu-latest
