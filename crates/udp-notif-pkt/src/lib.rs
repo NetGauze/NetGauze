@@ -99,11 +99,13 @@ impl UdpNotifOption {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct UdpNotifPacket {
     media_type: MediaType,
     publisher_id: u32,
     message_id: u32,
     options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_bytes))]
     payload: Bytes,
 }
 
@@ -147,4 +149,10 @@ impl UdpNotifPacket {
     pub const fn payload(&self) -> &Bytes {
         &self.payload
     }
+}
+
+#[cfg(feature = "fuzz")]
+pub(crate) fn arbitrary_bytes(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Bytes> {
+    let value: Vec<u8> = u.arbitrary()?;
+    Ok(Bytes::from(value))
 }
