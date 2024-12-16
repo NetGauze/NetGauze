@@ -51,7 +51,7 @@ use crate::{
     iana::*,
     version4::{
         BmpV4PeerDownTlv, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
-        BmpV4RouteMonitoringTlvValue,
+        BmpV4RouteMonitoringTlvValue, BMPV4_TLV_GROUP_GBIT,
     },
     wire::{deserializer::*, serializer::*},
     *,
@@ -1733,6 +1733,97 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
                 )],
             )),
             vec![
+                BmpV4RouteMonitoringTlv::build(
+                    0,
+                    BmpV4RouteMonitoringTlvValue::VrfTableName("global".to_string()),
+                )
+                .unwrap(),
+                BmpV4RouteMonitoringTlv::build(
+                    0,
+                    BmpV4RouteMonitoringTlvValue::Unknown {
+                        code: 9,
+                        value: vec![0x00, 0x00, 0x00, 0x0a],
+                    },
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap(),
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x04, 0x00, 0x00, 0x00, 0x8c, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc0, 0x00,
+        0x02, 0x34, 0x00, 0x01, 0x00, 0x00, 0xc0, 0x00, 0x02, 0x34, 0x64, 0x91, 0xa6, 0xa2, 0x00,
+        0x0d, 0x51, 0x52, 0x00, 0x00, 0x00, 0x08, 0x84, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
+        0x00, 0x04, 0x00, 0x03, 0x00, 0x06, 0x00, 0x00, 0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x00,
+        0x09, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x02, 0x00, 0x32, 0x00, 0x00,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x32, 0x02, 0x00, 0x00, 0x00, 0x16, 0x40, 0x01, 0x01, 0x00, 0x50, 0x02, 0x00,
+        0x0e, 0x02, 0x03, 0x00, 0x01, 0x00, 0x38, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x13,
+        0x20, 0xc6, 0x33, 0x64, 0x13,
+    ];
+
+    let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
+        BmpV4RouteMonitoringMessage::build(
+            PeerHeader::new(
+                BmpPeerType::GlobalInstancePeer {
+                    ipv6: false,
+                    post_policy: true,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                None,
+                Some(IpAddr::V4(Ipv4Addr::from_str("192.0.2.52").unwrap())),
+                65536,
+                Ipv4Addr::new(192, 0, 2, 52),
+                Some(Utc.timestamp_opt(1687266978, 872786000).unwrap()),
+            ),
+            BgpMessage::Update(BgpUpdateMessage::new(
+                vec![],
+                vec![
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::Origin(Origin::IGP),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        true,
+                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                            As4PathSegment::new(
+                                AsPathSegmentType::AsSequence,
+                                vec![65592, 65536, 65555],
+                            ),
+                        ])),
+                    )
+                    .unwrap(),
+                ],
+                vec![Ipv4UnicastAddress::new_no_path_id(
+                    Ipv4Unicast::from_net(
+                        Ipv4Net::new(Ipv4Addr::from_str("198.51.100.19").unwrap(), 32).unwrap(),
+                    )
+                    .unwrap(),
+                )],
+            )),
+            vec![
+                BmpV4RouteMonitoringTlv::build(
+                    BMPV4_TLV_GROUP_GBIT + 1024,
+                    BmpV4RouteMonitoringTlvValue::GroupTlv(vec![1, 2, 3, 4]),
+                )
+                .unwrap(),
                 BmpV4RouteMonitoringTlv::build(
                     0,
                     BmpV4RouteMonitoringTlvValue::VrfTableName("global".to_string()),

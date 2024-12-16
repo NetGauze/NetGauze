@@ -144,6 +144,8 @@ pub enum BmpV4RouteMonitoringTlvType {
     VrfTableName = 3,
 }
 
+pub const BMPV4_TLV_GROUP_GBIT: u16 = 0x8000;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpV4RouteMonitoringTlvValue {
