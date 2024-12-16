@@ -1,0 +1,46 @@
+[package]
+name = "netgauze-collector"
+version = "0.5.0"
+edition = "2021"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+Network metrics collector
+"""
+keywords = ["ipfix", "netflow", "parser", "protocol"]
+categories = ["network-programming", "parsing"]
+
+[dependencies]
+netgauze-flow-service = { workspace = true }
+netgauze-flow-pkt = { workspace = true, features = ["codec"] }
+tokio = { workspace = true, features = ["full", "tracing", "rt-multi-thread"] }
+tokio-util = { workspace = true, features = ["full", "tracing"] }
+bytes = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
+futures = { workspace = true }
+futures-util = { workspace = true }
+socket2 = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+async-channel = { workspace = true }
+figment = { version = "0.10", features = ["toml", "yaml", "env"] }
+clap = { version = "4.5", features = ["derive"] }
+serde_yaml = "0.9"
+serde_with = { version = "3.11", features = ["default"] }
+reqwest = { workspace = true, features = ["http2", "json", "stream"] }
+chrono = { workspace = true, default-features = true }
+tracing-subscriber = { workspace = true }
+anyhow = { version = "1" }
+
+[dev-dependencies]
+chrono = { workspace = true, default-features = false, features = [
+    "std",
+    "clock",
+] }
+tracing-subscriber = { workspace = true }
+tracing-test = { version = "0.2" }
+serde_json = { workspace = true }
