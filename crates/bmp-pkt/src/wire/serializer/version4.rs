@@ -1,7 +1,6 @@
-use crate::version4::BmpV4PeerDownTlv;
 use crate::{
     version4::{
-        BmpV4MessageValue, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
+        BmpV4MessageValue, BmpV4PeerDownTlv, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
         BmpV4RouteMonitoringTlvValue, StatelessParsingTlv,
     },
     wire::serializer::{

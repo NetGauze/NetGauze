@@ -25,7 +25,6 @@ use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
 use std::collections::HashSet;
 
-use crate::version4::BmpV4MessageValue;
 use crate::{version4::BmpV4MessageValue, wire::deserializer::BmpParsingContext};
 use netgauze_bgp_pkt::capabilities::{AddPathCapability, MultipleLabel};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
@@ -169,8 +168,8 @@ impl BmpParsingContext {
                 _ => {}
             },
             BmpMessage::V4(value) => match value {
-                BmpV4MessageValue::PeerDownNotification(peer_down) => {
-                    let peer_key = PeerKey::from_peer_header(peer_down.peer_header());
+                BmpV4MessageValue::PeerDownNotification { v3_notif, .. } => {
+                    let peer_key = PeerKey::from_peer_header(v3_notif.peer_header());
                     self.remove(&peer_key);
                 }
                 BmpV4MessageValue::PeerUpNotification(peer_up) => handle_peer_up(self, peer_up),

@@ -1,8 +1,7 @@
 use crate::{
     iana::BmpMessageType,
-    version4::{
-        BmpV4RouteMonitoringMessageError::{BadBgpMessageType, MissingBgpUpdatePduTlv},
-        BmpV4RouteMonitoringTlvError::BadGroupTlvIndex,
+    version4::BmpV4RouteMonitoringTlvError::{
+        BadBgpMessageType, BadGroupTlvIndex, VrfTableNameStringIsTooLong,
     },
     InitiationMessage, PeerDownNotificationMessage, PeerHeader, PeerUpNotificationMessage,
     RouteMirroringMessage, StatisticsReportMessage, TerminationMessage,

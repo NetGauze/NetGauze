@@ -47,11 +47,11 @@ use netgauze_parse_utils::{
 use nom::error::ErrorKind;
 use std::{net::Ipv6Addr, str::FromStr};
 
-use crate::version4::BmpV4PeerDownTlv;
 use crate::{
     iana::*,
     version4::{
-        BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvValue,
+        BmpV4PeerDownTlv, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
+        BmpV4RouteMonitoringTlvValue,
     },
     wire::{deserializer::*, serializer::*},
     *,
