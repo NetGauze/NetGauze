@@ -1,0 +1,30 @@
+runtime:
+  threads: 4
+
+logging:
+  level: info
+
+flow:
+  subscriber_timeout: 100
+  template_cache_purge_timeout: 360
+  listeners:
+    - address: 0.0.0.0:9991
+      # currently not enabled to bind to an interface
+      interface: eth0
+      workers: 2
+#    - address: '[::1]:2713'
+#      workers: 2
+  publishers:
+    group1:
+      buffer_size: 1000
+      endpoints:
+        http1: !Http
+            url: http://10.212.242.69:8080/v0/pipelines/vmware/ingress/flows?format=json
+            writer_id: writer1
+            #http2: !Http
+            #url: http://10.212.242.69:8080/ingress/flows?format=json
+            #writer_id: writer2
+#    group2:
+#      kafka: !Kakfa
+#        url: http://10.212.242.69:8080/ingress/flows?format=json
+#        writer_id: writer1

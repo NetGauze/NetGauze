@@ -13,6 +13,7 @@ members = [
     "crates/parse-utils",
     "crates/serde-macros",
     "crates/udp-notif-pkt",
+    "crates/collector",
     "fuzz",
 ]
 resolver = "2"

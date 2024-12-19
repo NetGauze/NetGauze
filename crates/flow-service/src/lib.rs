@@ -47,9 +47,6 @@ impl Display for Subscription {
 }
 
 /// Enable socket reuse
-/// TODO: Allow interface bind to be optionally specified
-/// See: [bind_device_by_index_v4](https://docs.rs/socket2/latest/socket2/struct.Socket.html#method.bind_device_by_index_v4)
-/// and [bind_device_by_index_v6](https://docs.rs/socket2/latest/socket2/struct.Socket.html#method.bind_device_by_index_v6)
 pub fn new_udp_reuse_port(
     local_addr: SocketAddr,
     _device: Option<String>,

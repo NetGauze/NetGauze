@@ -91,7 +91,7 @@ pub struct BindingAddress {
     pub socket_addr: SocketAddr,
     /// How many workers assigned to the given socket
     pub num_workers: usize,
-    // TODO: optionally bind to a specific interface
+    pub interface: Option<String>,
 }
 
 impl Default for SupervisorConfig {
@@ -100,6 +100,7 @@ impl Default for SupervisorConfig {
             binding_addresses: vec![BindingAddress {
                 socket_addr: SocketAddr::from_str("0.0.0.0:9991").unwrap(),
                 num_workers: 2,
+                interface: None,
             }],
             cmd_buffer_size: 100,
             subscriber_timeout: Duration::from_secs(1),
@@ -305,6 +306,7 @@ impl FlowCollectorsSupervisorActorHandle {
                 let actor_ret = FlowCollectorActorHandle::new(
                     next_actor_id,
                     binding_address.socket_addr,
+                    binding_address.interface.clone(),
                     10,
                     config.subscriber_timeout,
                 )
@@ -566,10 +568,12 @@ mod test {
                 BindingAddress {
                     socket_addr: "127.0.0.1:0".parse().unwrap(),
                     num_workers: 2,
+                    interface: None,
                 },
                 BindingAddress {
                     socket_addr: "127.0.0.1:0".parse().unwrap(),
                     num_workers: 1,
+                    interface: None,
                 },
             ],
             cmd_buffer_size: 10,

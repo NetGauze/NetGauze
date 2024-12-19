@@ -78,8 +78,9 @@
 //! async fn main() {
 //!     use std::time::Duration;
 //!     let addr: SocketAddr = "127.0.0.1:9995".parse().unwrap();
+//!     let interface_bind = None;
 //!     let (join_handle, actor_handle) =
-//!         FlowCollectorActorHandle::new(1, addr, 100, Duration::from_millis(500))
+//!         FlowCollectorActorHandle::new(1, addr, interface_bind, 100, Duration::from_millis(500))
 //!             .await
 //!             .expect("Failed to create FlowCollectorActor");
 //!
@@ -234,6 +235,7 @@ impl std::error::Error for FlowCollectorActorError {
 struct FlowCollectorActor {
     actor_id: ActorId,
     socket_addr: SocketAddr,
+    interface_bind: Option<String>,
     cmd_rx: mpsc::Receiver<FlowCollectorActorCommand>,
     next_subscriber_id: SubscriberId,
     // TODO: in future allow subscribers to subscribe to a subset of events (i.e., specific peers
@@ -249,12 +251,14 @@ impl FlowCollectorActor {
     fn new(
         actor_id: ActorId,
         socket_addr: SocketAddr,
+        interface_bind: Option<String>,
         cmd_rx: mpsc::Receiver<FlowCollectorActorCommand>,
         subscriber_timeout: Duration,
     ) -> Self {
         Self {
             actor_id,
             socket_addr,
+            interface_bind,
             cmd_rx,
             next_subscriber_id: 1,
             subscribers: HashMap::default(),
@@ -619,9 +623,10 @@ impl FlowCollectorActor {
         let actor_id = self.actor_id;
         let socket_addr = self.socket_addr;
         info!("[Actor {actor_id}-{socket_addr}] Spawning Actor and binding UDP listener",);
-        let socket = crate::new_udp_reuse_port(self.socket_addr, None).map_err(|err| {
-            FlowCollectorActorError::SocketBindError(self.actor_id, socket_addr, err)
-        })?;
+        let socket = crate::new_udp_reuse_port(self.socket_addr, self.interface_bind.clone())
+            .map_err(|err| {
+                FlowCollectorActorError::SocketBindError(self.actor_id, socket_addr, err)
+            })?;
         // Get the local address of the socket, handy in cases where the port is 0
         self.socket_addr = socket.local_addr().map_err(|err| {
             FlowCollectorActorError::GetLocalAddressError(self.actor_id, socket_addr, err)
@@ -703,6 +708,7 @@ impl std::error::Error for FlowCollectorActorHandleError {
 pub struct FlowCollectorActorHandle {
     actor_id: ActorId,
     local_addr: SocketAddr,
+    interface_bind: Option<String>,
     cmd_buffer_size: usize,
     pub(crate) cmd_tx: mpsc::Sender<FlowCollectorActorCommand>,
 }
@@ -711,6 +717,7 @@ impl FlowCollectorActorHandle {
     pub async fn new(
         actor_id: ActorId,
         socket_addr: SocketAddr,
+        interface_bind: Option<String>,
         cmd_buffer_size: usize,
         subscriber_timeout: Duration,
     ) -> Result<
@@ -721,7 +728,13 @@ impl FlowCollectorActorHandle {
         FlowCollectorActorHandleError,
     > {
         let (cmd_tx, cmd_rx) = mpsc::channel(cmd_buffer_size);
-        let actor = FlowCollectorActor::new(actor_id, socket_addr, cmd_rx, subscriber_timeout);
+        let actor = FlowCollectorActor::new(
+            actor_id,
+            socket_addr,
+            interface_bind.clone(),
+            cmd_rx,
+            subscriber_timeout,
+        );
         let join_handle = tokio::spawn(actor.run());
         let (tx, mut rx) = mpsc::channel(cmd_buffer_size);
         cmd_tx
@@ -738,6 +751,7 @@ impl FlowCollectorActorHandle {
             Self {
                 actor_id,
                 local_addr,
+                interface_bind,
                 cmd_buffer_size,
                 cmd_tx,
             },
@@ -750,6 +764,10 @@ impl FlowCollectorActorHandle {
 
     pub fn local_addr(&self) -> SocketAddr {
         self.local_addr
+    }
+
+    pub fn interface_bind(&self) -> Option<&String> {
+        self.interface_bind.as_ref()
     }
 
     /// This function sends a command to the actor to subscribe to the packets.
@@ -912,7 +930,7 @@ mod tests {
         let actor_id = 1;
         let socket_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let (join_handle, handle) =
-            FlowCollectorActorHandle::new(actor_id, socket_addr, 10, Duration::from_secs(1))
+            FlowCollectorActorHandle::new(actor_id, socket_addr, None, 10, Duration::from_secs(1))
                 .await
                 .expect("Couldn't start test actor");
         let socket_addr = handle.local_addr();
