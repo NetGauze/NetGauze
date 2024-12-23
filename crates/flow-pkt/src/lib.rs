@@ -25,7 +25,7 @@ use crate::ie::*;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum FlowInfo {
     NetFlowV9(netflow::NetFlowV9Packet),
     IPFIX(ipfix::IpfixPacket),
@@ -104,7 +104,7 @@ impl std::fmt::Display for DataSetIdError {
 
 impl std::error::Error for DataSetIdError {}
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataSetId(u16);
 
