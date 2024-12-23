@@ -28,7 +28,7 @@
 //! println!("{}", flags_json);
 //! // output: {"FIN":true,"SYN":true,"RST":true,"PSH":false,"ACK":false,"URG":false,"ECE":true,"CWR":false}
 //! let value2: u8 = u8::from(flags);
-//!   
+//!
 //! assert_eq!(value, value2);
 //! ```
 
@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize};
 
 /// TCP Header Flags registered at IANA
 /// [TCP Parameters](https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xml)
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Ord, PartialOrd, Clone, Copy, Debug, Hash, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TCPHeaderFlags {

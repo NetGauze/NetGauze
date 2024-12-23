@@ -25,7 +25,7 @@ use crate::ie::*;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum FlowInfo {
     NetFlowV9(netflow::NetFlowV9Packet),
     IPFIX(ipfix::IpfixPacket),
@@ -61,7 +61,7 @@ impl std::error::Error for FieldSpecifierError {}
 /// |                      Enterprise Number                        |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FieldSpecifier {
     element_id: IE,
@@ -87,7 +87,7 @@ impl FieldSpecifier {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Debug, Serialize, Deserialize)]
 pub enum DataSetIdError {
     InvalidId(u16),
 }
@@ -104,7 +104,7 @@ impl std::fmt::Display for DataSetIdError {
 
 impl std::error::Error for DataSetIdError {}
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataSetId(u16);
 
