@@ -49,9 +49,9 @@ fn test_netflow9_template_record() -> Result<(), NetFlowV9WritingError> {
         Utc.with_ymd_and_hms(2017, 7, 25, 12, 49, 1).unwrap(),
         0,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             1024,
-            vec![
+            Box::new([
                 FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(IE::flowEndSysUpTime, 4).unwrap(),
@@ -65,8 +65,8 @@ fn test_netflow9_template_record() -> Result<(), NetFlowV9WritingError> {
                 FieldSpecifier::new(IE::protocolIdentifier, 1).unwrap(),
                 FieldSpecifier::new(IE::tcpControlBits, 1).unwrap(),
                 FieldSpecifier::new(IE::ipVersion, 1).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
     let mut templates_map = HashMap::new();
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
@@ -114,12 +114,12 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
         Utc.with_ymd_and_hms(2017, 7, 25, 12, 50, 1).unwrap(),
         1,
         0,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(1024).unwrap(),
-            records: vec![
+            records: Box::new([
                 DataRecord::new(
-                    vec![],
-                    vec![
+                    Box::new([]),
+                    Box::new([
                         Field::sourceIPv4Address(sourceIPv4Address(Ipv4Addr::new(
                             192, 168, 1, 100,
                         ))),
@@ -139,11 +139,11 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                             false, false, false, false, false, false, false, false,
                         )),
                         Field::ipVersion(ipVersion(4)),
-                    ],
+                    ]),
                 ),
                 DataRecord::new(
-                    vec![],
-                    vec![
+                    Box::new([]),
+                    Box::new([
                         Field::sourceIPv4Address(sourceIPv4Address(Ipv4Addr::new(
                             216, 58, 211, 99,
                         ))),
@@ -163,11 +163,11 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                             false, false, false, false, false, false, false, false,
                         )),
                         Field::ipVersion(ipVersion(4)),
-                    ],
+                    ]),
                 ),
                 DataRecord::new(
-                    vec![],
-                    vec![
+                    Box::new([]),
+                    Box::new([
                         Field::sourceIPv4Address(sourceIPv4Address(Ipv4Addr::new(
                             192, 168, 1, 100,
                         ))),
@@ -187,11 +187,11 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                             false, false, false, false, false, false, false, false,
                         )),
                         Field::ipVersion(ipVersion(4)),
-                    ],
+                    ]),
                 ),
                 DataRecord::new(
-                    vec![],
-                    vec![
+                    Box::new([]),
+                    Box::new([
                         Field::sourceIPv4Address(sourceIPv4Address(Ipv4Addr::new(
                             192, 168, 1, 100,
                         ))),
@@ -211,10 +211,10 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                             false, false, false, false, false, false, false, false,
                         )),
                         Field::ipVersion(ipVersion(4)),
-                    ],
+                    ]),
                 ),
-            ],
-        }],
+            ]),
+        }]),
     );
 
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
@@ -287,30 +287,30 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
         Utc.with_ymd_and_hms(2023, 1, 28, 15, 56, 9).unwrap(),
         14925203,
         2081,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(313).unwrap(),
-            records: vec![
+            records: Box::new([
                 DataRecord::new(
-                    vec![],
-                    vec![
-                        Field::mplsTopLabelStackSection(mplsTopLabelStackSection(vec![
+                    Box::new([]),
+                    Box::new([
+                        Field::mplsTopLabelStackSection(mplsTopLabelStackSection(Box::new([
                             0x05, 0xde, 0x01,
-                        ])),
-                        Field::mplsLabelStackSection2(mplsLabelStackSection2(vec![
+                        ]))),
+                        Field::mplsLabelStackSection2(mplsLabelStackSection2(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
-                        Field::mplsLabelStackSection3(mplsLabelStackSection3(vec![
+                        ]))),
+                        Field::mplsLabelStackSection3(mplsLabelStackSection3(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
-                        Field::mplsLabelStackSection4(mplsLabelStackSection4(vec![
+                        ]))),
+                        Field::mplsLabelStackSection4(mplsLabelStackSection4(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
-                        Field::mplsLabelStackSection5(mplsLabelStackSection5(vec![
+                        ]))),
+                        Field::mplsLabelStackSection5(mplsLabelStackSection5(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
-                        Field::mplsLabelStackSection6(mplsLabelStackSection6(vec![
+                        ]))),
+                        Field::mplsLabelStackSection6(mplsLabelStackSection6(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
+                        ]))),
                         Field::ingressInterface(ingressInterface(207)),
                         Field::egressInterface(egressInterface(161)),
                         Field::octetDeltaCount(octetDeltaCount(128)),
@@ -344,29 +344,29 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
                         Field::samplerId(samplerId(1)),
                         Field::ingressVRFID(ingressVRFID(1610612736)),
                         Field::egressVRFID(egressVRFID(1610612741)),
-                    ],
+                    ]),
                 ),
                 DataRecord::new(
-                    vec![],
-                    vec![
-                        Field::mplsTopLabelStackSection(mplsTopLabelStackSection(vec![
+                    Box::new([]),
+                    Box::new([
+                        Field::mplsTopLabelStackSection(mplsTopLabelStackSection(Box::new([
                             0x05, 0xde, 0x01,
-                        ])),
-                        Field::mplsLabelStackSection2(mplsLabelStackSection2(vec![
+                        ]))),
+                        Field::mplsLabelStackSection2(mplsLabelStackSection2(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
-                        Field::mplsLabelStackSection3(mplsLabelStackSection3(vec![
+                        ]))),
+                        Field::mplsLabelStackSection3(mplsLabelStackSection3(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
-                        Field::mplsLabelStackSection4(mplsLabelStackSection4(vec![
+                        ]))),
+                        Field::mplsLabelStackSection4(mplsLabelStackSection4(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
-                        Field::mplsLabelStackSection5(mplsLabelStackSection5(vec![
+                        ]))),
+                        Field::mplsLabelStackSection5(mplsLabelStackSection5(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
-                        Field::mplsLabelStackSection6(mplsLabelStackSection6(vec![
+                        ]))),
+                        Field::mplsLabelStackSection6(mplsLabelStackSection6(Box::new([
                             0x00, 0x00, 0x00,
-                        ])),
+                        ]))),
                         Field::ingressInterface(ingressInterface(207)),
                         Field::egressInterface(egressInterface(161)),
                         Field::octetDeltaCount(octetDeltaCount(128)),
@@ -400,10 +400,10 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
                         Field::samplerId(samplerId(1)),
                         Field::ingressVRFID(ingressVRFID(1610612736)),
                         Field::egressVRFID(egressVRFID(1610612741)),
-                    ],
+                    ]),
                 ),
-            ],
-        }],
+            ]),
+        }]),
     );
 
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
@@ -417,15 +417,15 @@ fn test_mix_option_template_set() -> Result<(), SetWritingError> {
         0x00, 0x01, 0x00, 0x1a, 0x01, 0x15, 0x00, 0x04, 0x00, 0x0c, 0x00, 0x01, 0x00, 0x04, 0x00,
         0x0a, 0x00, 0x02, 0x00, 0x52, 0x00, 0x10, 0x00, 0x53, 0x00, 0x20,
     ];
-    let good = Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
+    let good = Set::OptionsTemplate(Box::new([OptionsTemplateRecord::new(
         277,
-        vec![ScopeFieldSpecifier::new(ScopeIE::System, 4)],
-        vec![
+        Box::new([ScopeFieldSpecifier::new(ScopeIE::System, 4)]),
+        Box::new([
             FieldSpecifier::new(IE::ingressInterface, 2).unwrap(),
             FieldSpecifier::new(IE::interfaceName, 16).unwrap(),
             FieldSpecifier::new(IE::interfaceDescription, 32).unwrap(),
-        ],
-    )]);
+        ]),
+    )]));
 
     let mut templates_map = HashMap::new();
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
@@ -439,14 +439,14 @@ fn test_mix_option_template_set2() -> Result<(), SetWritingError> {
         0x00, 0x01, 0x00, 0x18, 0x01, 0x4e, 0x00, 0x04, 0x00, 0x08, 0x00, 0x01, 0x00, 0x04, 0x00,
         0xea, 0x00, 0x04, 0x00, 0xec, 0x00, 0x20, 0x00, 0x00,
     ];
-    let good = Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
+    let good = Set::OptionsTemplate(Box::new([OptionsTemplateRecord::new(
         334,
-        vec![ScopeFieldSpecifier::new(ScopeIE::System, 4)],
-        vec![
+        Box::new([ScopeFieldSpecifier::new(ScopeIE::System, 4)]),
+        Box::new([
             FieldSpecifier::new(IE::ingressVRFID, 4).unwrap(),
             FieldSpecifier::new(IE::VRFname, 32).unwrap(),
-        ],
-    )]);
+        ]),
+    )]));
 
     let mut templates_map = HashMap::new();
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
@@ -693,9 +693,9 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
         Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             400,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
@@ -721,8 +721,8 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
                 FieldSpecifier::new(ie::IE::natQuotaExceededEvent, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::natThresholdEvent, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::srhIPv6ActiveSegmentType, 1).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
 
     let good_data = NetFlowV9Packet::new(
@@ -730,11 +730,11 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
         Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
         1,
         0,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(400).unwrap(),
-            records: vec![DataRecord::new(
-                vec![],
-                vec![
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
                     ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
                         10, 100, 0, 1,
                     ))),
@@ -780,9 +780,9 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
                     ie::Field::srhIPv6ActiveSegmentType(
                         ie::srhIPv6ActiveSegmentType::BGPSegmentRoutingPrefixSID,
                     ),
-                ],
-            )],
-        }],
+                ]),
+            )]),
+        }]),
     );
 
     let mut templates_map = HashMap::new();

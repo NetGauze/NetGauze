@@ -44,10 +44,10 @@ fn test_template_record() -> Result<(), TemplateRecordWritingError> {
 
     let good = TemplateRecord::new(
         2049,
-        vec![
+        Box::new([
             FieldSpecifier::new(ie::IE::sourceIPv6Address, 16).unwrap(),
             FieldSpecifier::new(ie::IE::destinationIPv6Address, 16).unwrap(),
-        ],
+        ]),
     );
 
     let bad_template_id = LocatedTemplateRecordParsingError::new(
@@ -271,13 +271,13 @@ fn test_data_record_value() -> Result<(), DataRecordWritingError> {
     ];
 
     let flow = DataRecord::new(
-        vec![],
-        vec![
+        Box::new([]),
+        Box::new([
             ie::Field::sourceMacAddress(ie::sourceMacAddress([0x12, 0xc6, 0x21, 0x12, 0x69, 0x32])),
             ie::Field::destinationMacAddress(ie::destinationMacAddress([
                 0x12, 0xc6, 0x21, 0x12, 0x69, 0x32,
             ])),
-        ],
+        ]),
     );
 
     let fields: DecodingTemplate = (
@@ -308,9 +308,9 @@ fn test_set_template() -> Result<(), SetWritingError> {
         0x00, 0x01, 0x00, 0x98, 0x00, 0x08, 0x00, 0x99, 0x00, 0x08,
     ];
 
-    let good = Set::Template(vec![TemplateRecord::new(
+    let good = Set::Template(Box::new([TemplateRecord::new(
         307,
-        vec![
+        Box::new([
             FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
             FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
             FieldSpecifier::new(ie::IE::ipClassOfService, 1).unwrap(),
@@ -334,8 +334,8 @@ fn test_set_template() -> Result<(), SetWritingError> {
             FieldSpecifier::new(ie::IE::ipVersion, 1).unwrap(),
             FieldSpecifier::new(ie::IE::flowStartMilliseconds, 8).unwrap(),
             FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
-        ],
-    )]);
+        ]),
+    )]));
     let mut templates_map = HashMap::new();
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
     test_write_with_one_input(&good, None, &good_wire)?;

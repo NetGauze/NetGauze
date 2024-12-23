@@ -65,7 +65,7 @@ pub struct IpfixPacket {
     export_time: DateTime<Utc>,
     sequence_number: u32,
     observation_domain_id: u32,
-    sets: Vec<Set>,
+    sets: Box<[Set]>,
 }
 
 impl IpfixPacket {
@@ -73,7 +73,7 @@ impl IpfixPacket {
         export_time: DateTime<Utc>,
         sequence_number: u32,
         observation_domain_id: u32,
-        sets: Vec<Set>,
+        sets: Box<[Set]>,
     ) -> Self {
         Self {
             version: IPFIX_VERSION,
@@ -113,8 +113,8 @@ impl IpfixPacket {
         self.observation_domain_id
     }
 
-    /// The IPFIX payload is a vector of [Set].
-    pub const fn sets(&self) -> &Vec<Set> {
+    /// The IPFIX payload is a slice of Set.
+    pub const fn sets(&self) -> &[Set] {
         &self.sets
     }
 }
@@ -132,11 +132,11 @@ impl IpfixPacket {
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Set {
-    Template(Vec<TemplateRecord>),
-    OptionsTemplate(Vec<OptionsTemplateRecord>),
+    Template(Box<[TemplateRecord]>),
+    OptionsTemplate(Box<[OptionsTemplateRecord]>),
     Data {
         id: DataSetId,
-        records: Vec<DataRecord>,
+        records: Box<[DataRecord]>,
     },
 }
 
@@ -181,11 +181,11 @@ impl Set {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TemplateRecord {
     id: u16,
-    field_specifiers: Vec<FieldSpecifier>,
+    field_specifiers: Box<[FieldSpecifier]>,
 }
 
 impl TemplateRecord {
-    pub const fn new(id: u16, field_specifiers: Vec<FieldSpecifier>) -> Self {
+    pub const fn new(id: u16, field_specifiers: Box<[FieldSpecifier]>) -> Self {
         Self {
             id,
             field_specifiers,
@@ -200,7 +200,7 @@ impl TemplateRecord {
     }
 
     /// List of [`FieldSpecifier`] defined in the template.
-    pub const fn field_specifiers(&self) -> &Vec<FieldSpecifier> {
+    pub const fn field_specifiers(&self) -> &[FieldSpecifier] {
         &self.field_specifiers
     }
 }
@@ -268,15 +268,15 @@ impl TemplateRecord {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct OptionsTemplateRecord {
     id: u16,
-    scope_field_specifiers: Vec<FieldSpecifier>,
-    field_specifiers: Vec<FieldSpecifier>,
+    scope_field_specifiers: Box<[FieldSpecifier]>,
+    field_specifiers: Box<[FieldSpecifier]>,
 }
 
 impl OptionsTemplateRecord {
     pub const fn new(
         id: u16,
-        scope_field_specifiers: Vec<FieldSpecifier>,
-        field_specifiers: Vec<FieldSpecifier>,
+        scope_field_specifiers: Box<[FieldSpecifier]>,
+        field_specifiers: Box<[FieldSpecifier]>,
     ) -> Self {
         Self {
             id,
@@ -289,11 +289,11 @@ impl OptionsTemplateRecord {
         self.id
     }
 
-    pub const fn scope_field_specifiers(&self) -> &Vec<FieldSpecifier> {
+    pub const fn scope_field_specifiers(&self) -> &[FieldSpecifier] {
         &self.scope_field_specifiers
     }
 
-    pub const fn field_specifiers(&self) -> &Vec<FieldSpecifier> {
+    pub const fn field_specifiers(&self) -> &[FieldSpecifier] {
         &self.field_specifiers
     }
 }
@@ -301,23 +301,23 @@ impl OptionsTemplateRecord {
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataRecord {
-    scope_fields: Vec<Field>,
-    fields: Vec<Field>,
+    scope_fields: Box<[Field]>,
+    fields: Box<[Field]>,
 }
 
 impl DataRecord {
-    pub const fn new(scope_fields: Vec<Field>, fields: Vec<Field>) -> Self {
+    pub const fn new(scope_fields: Box<[Field]>, fields: Box<[Field]>) -> Self {
         Self {
             scope_fields,
             fields,
         }
     }
 
-    pub const fn scope_fields(&self) -> &Vec<Field> {
+    pub const fn scope_fields(&self) -> &[Field] {
         &self.scope_fields
     }
 
-    pub const fn fields(&self) -> &Vec<Field> {
+    pub const fn fields(&self) -> &[Field] {
         &self.fields
     }
 }

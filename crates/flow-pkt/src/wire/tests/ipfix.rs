@@ -74,9 +74,9 @@ fn test_ipfix_header() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
         3812,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             307,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::ipClassOfService, 1).unwrap(),
@@ -100,8 +100,8 @@ fn test_ipfix_header() -> Result<(), IpfixPacketWritingError> {
                 FieldSpecifier::new(ie::IE::ipVersion, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::flowStartMilliseconds, 8).unwrap(),
                 FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
 
     let bad_version = LocatedIpfixPacketParsingError::new(
@@ -153,9 +153,9 @@ fn test_template_packet() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
         3812,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             307,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::ipClassOfService, 1).unwrap(),
@@ -179,8 +179,8 @@ fn test_template_packet() -> Result<(), IpfixPacketWritingError> {
                 FieldSpecifier::new(ie::IE::ipVersion, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::flowStartMilliseconds, 8).unwrap(),
                 FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
 
     let mut templates_map = HashMap::new();
@@ -239,11 +239,11 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
         3812,
         0,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(307).unwrap(),
-            records: vec![DataRecord::new(
-                vec![],
-                vec![
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
                     ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
                         70, 1, 115, 1,
                     ))),
@@ -287,9 +287,9 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
                             .with_nanosecond(677_000_000)
                             .unwrap(),
                     )),
-                ],
-            )],
-        }],
+                ]),
+            )]),
+        }]),
     );
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
     test_write_with_one_input(&good, Some(&templates_map), &good_wire)?;
@@ -315,14 +315,16 @@ fn test_options_template_packet() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 55).unwrap(),
         3791,
         0,
-        vec![Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
-            308,
-            vec![FieldSpecifier::new(ie::IE::ipClassOfService, 1).unwrap()],
-            vec![
-                FieldSpecifier::new(ie::IE::flowActiveTimeout, 2).unwrap(),
-                FieldSpecifier::new(ie::IE::flowIdleTimeout, 2).unwrap(),
-            ],
-        )])],
+        Box::new([Set::OptionsTemplate(Box::new([
+            OptionsTemplateRecord::new(
+                308,
+                Box::new([FieldSpecifier::new(ie::IE::ipClassOfService, 1).unwrap()]),
+                Box::new([
+                    FieldSpecifier::new(ie::IE::flowActiveTimeout, 2).unwrap(),
+                    FieldSpecifier::new(ie::IE::flowIdleTimeout, 2).unwrap(),
+                ]),
+            ),
+        ]))]),
     );
 
     let mut templates_map = HashMap::new();
@@ -488,14 +490,14 @@ fn test_example() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2023, 1, 28, 15, 56, 28).unwrap(),
         3571,
         524288,
-        vec![Set::OptionsTemplate(
-                vec![
+        Box::new([Set::OptionsTemplate(
+                Box::new([
                     OptionsTemplateRecord::new(
                         512,
-                vec![
+                Box::new([
                     FieldSpecifier::new(ie::IE::exportingProcessId, 4).unwrap()
-                ],
-                vec![
+                ]),
+                Box::new([
                     FieldSpecifier::new(ie::IE::exportedMessageTotalCount, 8).unwrap(),
                     FieldSpecifier::new(ie::IE::exportedFlowRecordTotalCount, 8).unwrap(),
                     FieldSpecifier::new(ie::IE::systemInitTimeMilliseconds, 8).unwrap(),
@@ -506,8 +508,8 @@ fn test_example() -> Result<(), IpfixPacketWritingError> {
                     FieldSpecifier::new(ie::IE::flowIdleTimeout, 2).unwrap(),
                     FieldSpecifier::new(ie::IE::exportProtocolVersion, 1).unwrap(),
                     FieldSpecifier::new(ie::IE::exportTransportProtocol, 1).unwrap(),
-                ],
-            )])],
+                ]),
+            )]))]),
     );
 
     let mut templates_map = HashMap::new();
@@ -544,38 +546,40 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2023, 12, 22, 15, 18, 53).unwrap(),
         118278,
         33312,
-        vec![Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
-            257,
-            vec![FieldSpecifier::new(ie::IE::selectorId, 4).unwrap()],
-            vec![
-                FieldSpecifier::new(ie::IE::samplingPacketInterval, 4).unwrap(),
-                FieldSpecifier::new(ie::IE::selectorAlgorithm, 2).unwrap(),
-                FieldSpecifier::new(ie::IE::samplingSize, 4).unwrap(),
-                FieldSpecifier::new(ie::IE::samplingPopulation, 4).unwrap(),
-                FieldSpecifier::new(ie::IE::samplerName, 90).unwrap(),
-                FieldSpecifier::new(ie::IE::selectorName, 65535).unwrap(),
-            ],
-        )])],
+        Box::new([Set::OptionsTemplate(Box::new([
+            OptionsTemplateRecord::new(
+                257,
+                Box::new([FieldSpecifier::new(ie::IE::selectorId, 4).unwrap()]),
+                Box::new([
+                    FieldSpecifier::new(ie::IE::samplingPacketInterval, 4).unwrap(),
+                    FieldSpecifier::new(ie::IE::selectorAlgorithm, 2).unwrap(),
+                    FieldSpecifier::new(ie::IE::samplingSize, 4).unwrap(),
+                    FieldSpecifier::new(ie::IE::samplingPopulation, 4).unwrap(),
+                    FieldSpecifier::new(ie::IE::samplerName, 90).unwrap(),
+                    FieldSpecifier::new(ie::IE::selectorName, 65535).unwrap(),
+                ]),
+            ),
+        ]))]),
     );
 
     let good_data = IpfixPacket::new(
         Utc.with_ymd_and_hms(2023, 12, 22, 15, 18, 53).unwrap(),
         118278,
         33312,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(257).unwrap(),
-            records: vec![DataRecord::new(
-                vec![ie::Field::selectorId(ie::selectorId(1))],
-                vec![
+            records: Box::new([DataRecord::new(
+                Box::new([ie::Field::selectorId(ie::selectorId(1))]),
+                Box::new([
                     ie::Field::samplingPacketInterval(ie::samplingPacketInterval(1)),
                     ie::Field::selectorAlgorithm(ie::selectorAlgorithm(3)),
                     ie::Field::samplingSize(ie::samplingSize(1)),
                     ie::Field::samplingPopulation(ie::samplingPopulation(1)),
                     ie::Field::samplerName(ie::samplerName(String::from("NETFLOW-SAMPLER-MAP"))),
                     ie::Field::selectorName(ie::selectorName(String::from("NETFLOW-SAMPLER-MAP"))),
-                ],
-            )],
-        }],
+                ]),
+            )]),
+        }]),
     );
 
     let mut templates_map = HashMap::new();
@@ -611,9 +615,9 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             400,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
@@ -628,19 +632,19 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
                 FieldSpecifier::new(ie::IE::Nokia(nokia::IE::aluNatSubString), 65535).unwrap(),
                 FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
 
     let good_data = IpfixPacket::new(
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(400).unwrap(),
-            records: vec![DataRecord::new(
-                vec![],
-                vec![
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
                     ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
                         10, 100, 0, 1,
                     ))),
@@ -667,9 +671,9 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
                     ))),
                     ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
                     ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
-                ],
-            )],
-        }],
+                ]),
+            )]),
+        }]),
     );
 
     let mut templates_map = HashMap::new();
@@ -712,9 +716,9 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             400,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
@@ -733,19 +737,19 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
                 FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantProtocol), 1).unwrap(),
                 FieldSpecifier::new(ie::IE::VMWare(vmware::IE::flowDirection), 1).unwrap(),
                 FieldSpecifier::new(ie::IE::VMWare(vmware::IE::virtualObsID), 65535).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
 
     let good_data = IpfixPacket::new(
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(400).unwrap(),
-            records: vec![DataRecord::new(
-                vec![],
-                vec![
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
                     ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
                         10, 100, 0, 1,
                     ))),
@@ -780,9 +784,9 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::VMWare(vmware::Field::virtualObsID(vmware::virtualObsID(
                         String::from("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
                     ))),
-                ],
-            )],
-        }],
+                ]),
+            )]),
+        }]),
     );
 
     let mut templates_map = HashMap::new();
@@ -821,9 +825,9 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             400,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
@@ -849,19 +853,19 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
                 FieldSpecifier::new(ie::IE::natQuotaExceededEvent, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::natThresholdEvent, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::srhIPv6ActiveSegmentType, 1).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
 
     let good_data = IpfixPacket::new(
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(400).unwrap(),
-            records: vec![DataRecord::new(
-                vec![],
-                vec![
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
                     ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
                         10, 100, 0, 1,
                     ))),
@@ -907,9 +911,9 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::srhIPv6ActiveSegmentType(
                         ie::srhIPv6ActiveSegmentType::BGPSegmentRoutingPrefixSID,
                     ),
-                ],
-            )],
-        }],
+                ]),
+            )]),
+        }]),
     );
 
     let mut templates_map = HashMap::new();

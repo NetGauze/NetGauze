@@ -591,13 +591,13 @@ mod test {
             Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
             0,
             0,
-            vec![Set::Template(vec![TemplateRecord::new(
+            Box::new([Set::Template(Box::new([TemplateRecord::new(
                 400,
-                vec![
+                Box::new([
                     FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                     FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
-                ],
-            )])],
+                ]),
+            )]))]),
         );
         // Create a FlowInfo struct with some test data
         let flow_info = FlowInfo::IPFIX(ipfix_template);

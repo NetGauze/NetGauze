@@ -486,7 +486,7 @@ fn generate_ie_field_enum_for_ie(
     ret.push_str(generate_derive(false, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
-    ret.push_str("    Unknown{pen: u32, id: u16, value: Vec<u8>},\n");
+    ret.push_str("    Unknown{pen: u32, id: u16, value: Box<[u8]>},\n");
     for (name, pkg, _) in vendors {
         ret.push_str(format!("    {name}({pkg}::Field),\n").as_str());
     }
@@ -1312,7 +1312,7 @@ fn generate_vec_u8_deserializer(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value.into_boxed_slice())))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1483,7 +1483,7 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     let not_copy = ies.iter().any(|x| {
-        get_rust_type(&x.data_type) == "Vec<u8>" || get_rust_type(&x.data_type) == "String"
+        get_rust_type(&x.data_type) == "Box<[u8]>" || get_rust_type(&x.data_type) == "String"
     });
     ret.push_str(generate_derive(false, !not_copy).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
@@ -1508,7 +1508,7 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
 
 fn get_rust_type(data_type: &str) -> String {
     let rust_type = match data_type {
-        "octetArray" => "Vec<u8>",
+        "octetArray" => "Box<[u8]>",
         "unsigned8" => "u8",
         "unsigned16" => "u16",
         "unsigned32" => "u32",
@@ -1528,7 +1528,7 @@ fn get_rust_type(data_type: &str) -> String {
         | "dateTimeNanoseconds" => "chrono::DateTime<chrono::Utc>",
         "ipv4Address" => "std::net::Ipv4Addr",
         "ipv6Address" => "std::net::Ipv6Addr",
-        "basicList" | "subTemplateList" | "subTemplateMultiList" => "Vec<u8>",
+        "basicList" | "subTemplateList" | "subTemplateMultiList" => "Box<[u8]>",
         "unsigned256" => "[u8; 32]",
         other => todo!("Implement rust data type conversion for {}", other),
     };
@@ -1551,7 +1551,7 @@ pub(crate) fn generate_ie_values(
         );
         let gen_derive = generate_derive(
             strum_macros,
-            rust_type != "Vec<u8>" && rust_type != "String",
+            rust_type != "Box<[u8]>" && rust_type != "String",
         );
 
         if let Some(ie_subregistry) = &ie.subregistry {

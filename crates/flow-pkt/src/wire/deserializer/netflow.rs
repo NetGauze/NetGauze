@@ -132,7 +132,13 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedNetFlowV9PacketPa
         }
         Ok((
             buf,
-            NetFlowV9Packet::new(sys_up_time, unix_time, sequence_number, source_id, payload),
+            NetFlowV9Packet::new(
+                sys_up_time,
+                unix_time,
+                sequence_number,
+                source_id,
+                payload.into_boxed_slice(),
+            ),
         ))
     }
 }
@@ -218,7 +224,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                     templates.push(element);
                     buf = tmp;
                 }
-                Set::Template(templates)
+                Set::Template(templates.into_boxed_slice())
             }
             NETFLOW_OPTIONS_TEMPLATE_SET_ID => {
                 let mut option_templates = vec![];
@@ -242,7 +248,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                 }
                 // buf could be a non zero value for padding
                 check_padding_value(buf)?;
-                Set::OptionsTemplate(option_templates)
+                Set::OptionsTemplate(option_templates.into_boxed_slice())
             }
             // We don't need to check for valid Set ID again, since we already checked
             id => {
@@ -280,7 +286,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                 // We can safely unwrap DataSetId here since we already checked the range
                 Set::Data {
                     id: DataSetId::new(id).unwrap(),
-                    records,
+                    records: records.into_boxed_slice(),
                 }
             }
         };
@@ -379,7 +385,11 @@ impl<'a>
         templates_map.insert(template_id, (scope_fields.clone(), fields.clone()));
         Ok((
             buf,
-            OptionsTemplateRecord::new(template_id, scope_fields, fields),
+            OptionsTemplateRecord::new(
+                template_id,
+                scope_fields.into_boxed_slice(),
+                fields.into_boxed_slice(),
+            ),
         ))
     }
 }
@@ -439,7 +449,10 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedTemplateRecordPar
             buf = t;
         }
         templates_map.insert(template_id, (vec![], fields.clone()));
-        Ok((buf, TemplateRecord::new(template_id, fields)))
+        Ok((
+            buf,
+            TemplateRecord::new(template_id, fields.into_boxed_slice()),
+        ))
     }
 }
 
@@ -542,7 +555,10 @@ impl<'a> ReadablePduWithOneInput<'a, &DecodingTemplate, LocatedDataRecordParsing
             buf = t;
             fields.push(field);
         }
-        Ok((buf, DataRecord::new(scope_fields, fields)))
+        Ok((
+            buf,
+            DataRecord::new(scope_fields.into_boxed_slice(), fields.into_boxed_slice()),
+        ))
     }
 }
 
@@ -593,7 +609,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, &ScopeIE, u16, LocatedScopeFieldParsingErr
                     ScopeField::Unknown {
                         pen: ie.pen(),
                         id: ie.id(),
-                        value,
+                        value: value.into_boxed_slice(),
                     },
                 ))
             }
@@ -641,11 +657,14 @@ impl<'a> ReadablePduWithTwoInputs<'a, &ScopeIE, u16, LocatedScopeFieldParsingErr
             }
             ScopeIE::Cache => {
                 let (buf, value) = nom::multi::count(be_u8, length as usize)(buf)?;
-                Ok((buf, ScopeField::Cache(Cache(value))))
+                Ok((buf, ScopeField::Cache(Cache(value.into_boxed_slice()))))
             }
             ScopeIE::Template => {
                 let (buf, value) = nom::multi::count(be_u8, length as usize)(buf)?;
-                Ok((buf, ScopeField::Template(Template(value))))
+                Ok((
+                    buf,
+                    ScopeField::Template(Template(value.into_boxed_slice())),
+                ))
             }
         }
     }
