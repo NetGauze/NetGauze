@@ -28,7 +28,7 @@ pub fn generate_derive(num_enum: bool, copy: bool) -> String {
         base.push_str("Copy, ");
     }
     base.push_str(
-        "Clone, Eq, PartialEq, Ord, PartialOrd, Debug, serde::Serialize, serde::Deserialize",
+        "Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize",
     );
     format!("#[derive({base})]\n")
 }

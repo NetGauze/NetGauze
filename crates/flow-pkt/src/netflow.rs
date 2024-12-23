@@ -62,7 +62,7 @@ pub type TemplatesMap = HashMap<u16, DecodingTemplate>;
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// |                        Source ID                              |
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct NetFlowV9Packet {
     version: u16,
@@ -117,7 +117,7 @@ impl NetFlowV9Packet {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Set {
     Template(Box<[TemplateRecord]>),
@@ -138,7 +138,7 @@ impl Set {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TemplateRecord {
     id: u16,
@@ -168,7 +168,7 @@ impl TemplateRecord {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct OptionsTemplateRecord {
     id: u16,
@@ -202,7 +202,7 @@ impl OptionsTemplateRecord {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataRecord {
     scope_fields: Box<[ScopeField]>,
@@ -226,7 +226,9 @@ impl DataRecord {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ScopeField {
     Unknown { pen: u32, id: u16, value: Box<[u8]> },
@@ -237,28 +239,38 @@ pub enum ScopeField {
     Template(Template),
 }
 
-#[derive(Eq, Clone, PartialEq, Ord, PartialOrd, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Eq, Clone, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct System(pub u32);
 
-#[derive(Eq, Clone, PartialEq, Ord, PartialOrd, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Eq, Clone, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Interface(pub u32);
 
-#[derive(Eq, Clone, PartialEq, Ord, PartialOrd, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Eq, Clone, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct LineCard(pub u32);
 
-#[derive(Eq, Clone, PartialEq, Ord, PartialOrd, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Eq, Clone, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Cache(pub Box<[u8]>);
 
-#[derive(Eq, Clone, PartialEq, Ord, PartialOrd, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Eq, Clone, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Template(pub Box<[u8]>);
 
 #[derive(
-    Copy, Eq, Clone, PartialEq, Ord, PartialOrd, Debug, serde::Serialize, serde::Deserialize,
+    Copy, Eq, Clone, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize,
 )]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ScopeIE {
@@ -332,7 +344,7 @@ impl InformationElementTemplate for ScopeIE {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct ScopeFieldSpecifier {
     element_id: ScopeIE,
