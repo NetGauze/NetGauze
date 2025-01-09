@@ -442,7 +442,7 @@ impl FlowCollectorsSupervisorActorHandle {
             ))
             .await
         {
-            error!("[SupervisorHandle] Error sending purge unused peers request: {err:?}");
+            error!("[SupervisorHandle] Error sending purge peer request: {err:?}");
             return Err(FlowCollectorsSupervisorActorHandleError::SendError);
         }
         let mut purged_peers = vec![];
@@ -465,7 +465,7 @@ impl FlowCollectorsSupervisorActorHandle {
             ))
             .await
         {
-            error!("[SupervisorHandle] Error sending purge unused peers request: {err:?}");
+            error!("[SupervisorHandle] Error sending get local addresses request: {err:?}");
             return Err(FlowCollectorsSupervisorActorHandleError::SendError);
         }
         let mut local = vec![];

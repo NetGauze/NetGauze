@@ -207,7 +207,7 @@ impl std::fmt::Display for FlowCollectorActorError {
 impl std::error::Error for FlowCollectorActorError {
     fn description(&self) -> &str {
         match self {
-            Self::SocketBindError(_, _, _) => "failed tob bind to socket address",
+            Self::SocketBindError(_, _, _) => "failed to bind to socket address",
             Self::GetLocalAddressError(_, _, _) => "failed to get local address",
             Self::CommandChannelClosed(_, _) => "command channel closed",
             Self::UnrecoverablePacketProcessingError(_, _, _) => {
