@@ -63,7 +63,6 @@ impl From<std::io::Error> for FlowInfoCodecDecoderError {
 #[derive(Debug, Default)]
 pub struct FlowInfoCodec {
     /// Helper to track in the decoder if we are inside a message or not
-    in_message: bool,
     netflow_v9_templates_map: netflow::TemplatesMap,
     ipfix_templates_map: ipfix::TemplatesMap,
 }
@@ -71,7 +70,6 @@ pub struct FlowInfoCodec {
 impl FlowInfoCodec {
     pub fn new() -> Self {
         Self {
-            in_message: false,
             netflow_v9_templates_map: HashMap::new(),
             ipfix_templates_map: HashMap::new(),
         }
@@ -212,30 +210,26 @@ impl Decoder for FlowInfoCodec {
         // We're using IPFIX_HEADER_LENGTH as criteria to start parsing since it's
         // smaller than NetFlow v9 header size.
         let header_length = IPFIX_HEADER_LENGTH as usize;
-        if self.in_message || buf.len() >= header_length {
-            let version: u16 = NetworkEndian::read_u16(&buf[0..2]);
-            // Read the length (ipfix) or count (NetFlow v9), starting form after the
-            // version
-            let length = NetworkEndian::read_u16(&buf[2..4]) as usize;
-            if buf.len() < length {
-                // We still didn't read all the bytes for the message yet
-                self.in_message = true;
-                Ok(None)
-            } else {
-                self.in_message = false;
-                if version == ipfix::IPFIX_VERSION {
-                    parse_ipfix(buf, length, &mut self.ipfix_templates_map)
-                } else if version == netflow::NETFLOW_V9_VERSION {
-                    parse_netflow_v9(buf, &mut self.netflow_v9_templates_map)
-                } else {
-                    let err = FlowInfoCodecDecoderError::UnsupportedVersion(version);
-                    buf.clear();
-                    Err(err)
-                }
-            }
-        } else {
+        if buf.len() < header_length {
             // We don't have enough data yet to start processing
-            Ok(None)
+            return Ok(None);
+        }
+        let version: u16 = NetworkEndian::read_u16(&buf[0..2]);
+        // Read the length (ipfix) or count (NetFlow v9), starting from after the
+        // version
+        let length = NetworkEndian::read_u16(&buf[2..4]) as usize;
+        if buf.len() < length {
+            // We still didn't read all the bytes for the message yet
+            return Ok(None);
+        }
+        if version == ipfix::IPFIX_VERSION {
+            parse_ipfix(buf, length, &mut self.ipfix_templates_map)
+        } else if version == netflow::NETFLOW_V9_VERSION {
+            parse_netflow_v9(buf, &mut self.netflow_v9_templates_map)
+        } else {
+            let err = FlowInfoCodecDecoderError::UnsupportedVersion(version);
+            buf.clear();
+            Err(err)
         }
     }
 }
