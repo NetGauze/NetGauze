@@ -46,7 +46,12 @@ impl Display for Subscription {
     }
 }
 
-/// Enable socket reuse
+/// Enable socket reuse and bind to a device or a VRF on selected platforms.
+/// Binding to device or VRF is supported on: MacOS and Linux.
+///
+/// Unused variables is enabled to silence the Clippy error for platforms
+/// that doesn't support binding to an interface.
+#[allow(unused_variables)]
 pub fn new_udp_reuse_port(
     local_addr: SocketAddr,
     device: Option<String>,
@@ -67,6 +72,19 @@ pub fn new_udp_reuse_port(
     // from tokio-rs/mio/blob/master/src/sys/unix/net.rs
     udp_sock.set_cloexec(true)?;
     udp_sock.set_nonblocking(true)?;
+    // Binding a socket to a device or VRF is platform specific operation,
+    // hence we guard it for only selected subset of target platforms.
+    // The first cfg block filter for all supported platforms to avoid Clippy errors
+    // on unused `name` for the unsupported platforms.
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "android",
+        target_os = "fuchsia",
+        target_os = "linux"
+    ))]
     if let Some(name) = device {
         #[cfg(any(
             target_os = "ios",
@@ -74,10 +92,10 @@ pub fn new_udp_reuse_port(
             target_os = "tvos",
             target_os = "watchos",
         ))]
-        unsafe {
+        {
             let c_str = std::ffi::CString::new(name)?;
-            let index = libc::if_nametoindex(c_str.as_ptr() as *const libc::c_char);
-            let index = std::num::NonZeroU32::new(index as u32);
+            let c_index = unsafe { libc::if_nametoindex(c_str.as_ptr() as *const libc::c_char) };
+            let index = std::num::NonZeroU32::new(c_index as u32);
             if local_addr.is_ipv4() {
                 udp_sock.bind_device_by_index_v4(index)?;
             } else {
@@ -85,9 +103,7 @@ pub fn new_udp_reuse_port(
             }
         }
         #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-        {
-            udp_sock.bind_device(Some(name.as_bytes()))?
-        }
+        udp_sock.bind_device(Some(name.as_bytes()))?
     }
     udp_sock.bind(&socket2::SockAddr::from(local_addr))?;
     let udp_sock: std::net::UdpSocket = udp_sock.into();
