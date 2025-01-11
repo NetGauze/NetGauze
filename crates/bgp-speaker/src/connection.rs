@@ -314,7 +314,7 @@ pub struct Connection<
     keepalive_timer: Option<tokio::time::Interval>,
     keepalive_timer_duration: Duration,
     #[pin]
-    open_delay_timer: Option<tokio::time::Interval>,
+    pub(crate) open_delay_timer: Option<tokio::time::Interval>,
     #[pin]
     hold_timer: Option<tokio::time::Interval>,
     hold_timer_duration: Duration,
