@@ -1743,6 +1743,7 @@ pub(crate) fn generate_ie_deser_main(
     ret.push_str(
         "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
     );
+    #[allow(clippy::literal_string_with_formatting_args)]
     ret.push_str("           Self::UnknownInformationElement(ie) => write!(f, \"unknown information element {ie:?}\"),\n");
     for (name, _pkg, _) in vendor_prefixes {
         ret.push_str(
