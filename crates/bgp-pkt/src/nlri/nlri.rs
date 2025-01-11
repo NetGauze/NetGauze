@@ -106,21 +106,21 @@ impl From<RouteDistinguisher> for u64 {
         match value {
             RouteDistinguisher::As2Administrator { asn2, number } => {
                 let t: u16 = RouteDistinguisherTypeCode::As2Administrator.into();
-                (t as u64) << (u64::BITS - u16::BITS)
-                    | (asn2 as u64) << (u64::BITS - u16::BITS - u16::BITS)
+                ((t as u64) << (u64::BITS - u16::BITS))
+                    | ((asn2 as u64) << (u64::BITS - u16::BITS - u16::BITS))
                     | (number as u64)
             }
             RouteDistinguisher::Ipv4Administrator { ip, number } => {
                 let t: u16 = RouteDistinguisherTypeCode::Ipv4Administrator.into();
                 let ip: u32 = ip.into();
-                (t as u64) << (u64::BITS - u16::BITS)
-                    | (ip as u64) << (u64::BITS - u16::BITS - u32::BITS)
+                ((t as u64) << (u64::BITS - u16::BITS))
+                    | ((ip as u64) << (u64::BITS - u16::BITS - u32::BITS))
                     | (number as u64)
             }
             RouteDistinguisher::As4Administrator { asn4, number } => {
                 let t: u16 = RouteDistinguisherTypeCode::As4Administrator.into();
-                (t as u64) << (u64::BITS - u16::BITS)
-                    | (asn4 as u64) << (u64::BITS - u16::BITS - u32::BITS)
+                ((t as u64) << (u64::BITS - u16::BITS))
+                    | ((asn4 as u64) << (u64::BITS - u16::BITS - u32::BITS))
                     | (number as u64)
             }
             RouteDistinguisher::LeafAdRoutes => u64::MAX,
