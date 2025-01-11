@@ -45,7 +45,7 @@ impl WritablePdu<UdpNotifOptionWritingError> for UdpNotifOption {
             UdpNotifOption::Segment { number, last } => {
                 writer.write_u8(1)?;
                 writer.write_u8(4)?;
-                writer.write_u16::<NetworkEndian>(number << 1 | if *last { 1u16 } else { 0 })?;
+                writer.write_u16::<NetworkEndian>((number << 1) | if *last { 1u16 } else { 0 })?;
             }
             UdpNotifOption::PrivateEncoding(value) => {
                 writer.write_u8(2)?;

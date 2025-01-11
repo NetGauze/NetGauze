@@ -44,7 +44,7 @@ impl Community {
 
     /// Getting the ASN number part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
     pub const fn collection_asn(&self) -> u16 {
-        (self.0 >> 16 & 0xffff) as u16
+        ((self.0 >> 16) & 0xffff) as u16
     }
 
     /// Getting the value part according to [RFC4384](https://datatracker.ietf.org/doc/html/rfc4384)
