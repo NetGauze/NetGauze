@@ -1046,7 +1046,7 @@ impl<
                 | ConnectionEvent::RouteRefresh(_)
                 | ConnectionEvent::RouteRefreshErr(_) => {
                     self.connect_retry_timer.take();
-                    conn.open_delay_timer().take();
+                    conn.open_delay_timer.take();
                     self.stats.connect_retry_counter += 1;
                     self.connection.take();
                     self.fsm_transition(FsmState::Idle);
