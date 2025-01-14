@@ -13,6 +13,7 @@ members = [
     "crates/parse-utils",
     "crates/serde-macros",
     "crates/udp-notif-pkt",
+    "crates/udp-notif-service",
     "fuzz",
 ]
 resolver = "2"
@@ -31,6 +32,7 @@ netgauze-locate = { version = "0.5.0", path = "crates/locate" }
 netgauze-parse-utils = { version = "0.5.0", path = "crates/parse-utils" }
 netgauze-serde-macros = { version = "0.5.0", path = "crates/serde-macros" }
 netgauze-udp-notif-pkt = { version = "0.5.0", path = "crates/udp-notif-pkt" }
+netgauze-udp-notif-service = { version = "0.5.0", path = "crates/udp-notif-service" }
 log = "0.4"
 thiserror = "2.0"
 byteorder = { version = "1.5" }

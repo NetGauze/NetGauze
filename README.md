@@ -24,6 +24,7 @@ This project is still in an early stage.
 4. UDP-Notif
     1. Packet representation and wire format
        serialization/deserialization: [`netgauze-udp-notif-pkt`](crates/udp-notif-pkt/README.md)
+    2. Service building block to receive messages: [`netgauze-udp-notif-service`](crates/udp-notif-service/README.md)
 
 # Development documentation
 
