@@ -19,7 +19,7 @@ use crate::{
     Xref,
 };
 
-pub fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
+pub fn generate_derive(num_enum: bool, copy: bool) -> String {
     let mut base = "".to_string();
     if num_enum {
         base.push_str("strum_macros::Display, strum_macros::FromRepr, ");
@@ -27,10 +27,9 @@ pub fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
     if copy {
         base.push_str("Copy, ");
     }
-    if eq {
-        base.push_str("Eq, ");
-    }
-    base.push_str("Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize");
+    base.push_str(
+        "Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, serde::Serialize, serde::Deserialize",
+    );
     format!("#[derive({base})]\n")
 }
 
@@ -64,7 +63,7 @@ pub(crate) fn generate_ie_data_type(data_types: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementDataType {\n");
     for x in data_types {
@@ -82,7 +81,7 @@ pub(crate) fn generate_ie_units(entries: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementUnits {\n");
     for entry in entries {
@@ -111,7 +110,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementSemantics {\n");
     for x in data_types {
@@ -224,7 +223,7 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
 
 fn generate_from_for_ie() -> String {
     let mut ret = String::new();
-    ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str(generate_derive(false, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub struct UndefinedIE(pub u16);\n\n");
 
@@ -254,7 +253,7 @@ pub(crate) fn generate_information_element_ids(ie: &Vec<InformationElement>) -> 
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u16)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IE {\n");
     for ie in ie {
@@ -282,7 +281,7 @@ pub(crate) fn generate_ie_status() -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementStatus {\n");
     ret.push_str("    current = 0,\n");
@@ -484,10 +483,10 @@ fn generate_ie_field_enum_for_ie(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(generate_derive(false, false, false).as_str());
+    ret.push_str(generate_derive(false, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
-    ret.push_str("    Unknown{pen: u32, id: u16, value: Vec<u8>},\n");
+    ret.push_str("    Unknown{pen: u32, id: u16, value: Box<[u8]>},\n");
     for (name, pkg, _) in vendors {
         ret.push_str(format!("    {name}({pkg}::Field),\n").as_str());
     }
@@ -527,7 +526,7 @@ pub(crate) fn generate_ie_ids(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str(generate_derive(false, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IE {\n");
     ret.push_str("    Unknown{pen: u32, id: u16},\n");
@@ -548,7 +547,7 @@ pub(crate) fn generate_ie_ids(
     }
     ret.push_str("}\n\n");
 
-    ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str(generate_derive(false, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IEError {\n");
     ret.push_str("    UndefinedIANAIE(u16),\n");
@@ -1063,7 +1062,7 @@ fn generate_f32_deserializer(ie_name: &String) -> String {
     ret.push_str("            1 => nom::number::complete::be_f32(buf)?,\n");
     ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value.into())))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1079,7 +1078,7 @@ fn generate_f64_deserializer(ie_name: &String) -> String {
     ret.push_str("            1 => nom::number::complete::be_f64(buf)?,\n");
     ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
     ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value.into())))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1313,7 +1312,7 @@ fn generate_vec_u8_deserializer(ie_name: &String) -> String {
     ret.push_str(std_error.as_str());
     ret.push_str(header.as_str());
     ret.push_str("        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+    ret.push_str(format!("        Ok((buf, {ie_name}(value.into_boxed_slice())))\n").as_str());
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
     ret
@@ -1484,12 +1483,9 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     let not_copy = ies.iter().any(|x| {
-        get_rust_type(&x.data_type) == "Vec<u8>" || get_rust_type(&x.data_type) == "String"
+        get_rust_type(&x.data_type) == "Box<[u8]>" || get_rust_type(&x.data_type) == "String"
     });
-    let not_eq = ies
-        .iter()
-        .any(|x| get_rust_type(&x.data_type) == "f32" || get_rust_type(&x.data_type) == "f64");
-    ret.push_str(generate_derive(false, !not_copy, !not_eq).as_str());
+    ret.push_str(generate_derive(false, !not_copy).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     for ie in ies {
@@ -1512,7 +1508,7 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
 
 fn get_rust_type(data_type: &str) -> String {
     let rust_type = match data_type {
-        "octetArray" => "Vec<u8>",
+        "octetArray" => "Box<[u8]>",
         "unsigned8" => "u8",
         "unsigned16" => "u16",
         "unsigned32" => "u32",
@@ -1521,8 +1517,8 @@ fn get_rust_type(data_type: &str) -> String {
         "signed16" => "i16",
         "signed32" => "i32",
         "signed64" => "i64",
-        "float32" => "f32",
-        "float64" => "f64",
+        "float32" => "ordered_float::OrderedFloat<f32>",
+        "float64" => "ordered_float::OrderedFloat<f64>",
         "boolean" => "bool",
         "macAddress" => "super::MacAddress",
         "string" => "String",
@@ -1532,7 +1528,7 @@ fn get_rust_type(data_type: &str) -> String {
         | "dateTimeNanoseconds" => "chrono::DateTime<chrono::Utc>",
         "ipv4Address" => "std::net::Ipv4Addr",
         "ipv6Address" => "std::net::Ipv6Addr",
-        "basicList" | "subTemplateList" | "subTemplateMultiList" => "Vec<u8>",
+        "basicList" | "subTemplateList" | "subTemplateMultiList" => "Box<[u8]>",
         "unsigned256" => "[u8; 32]",
         other => todo!("Implement rust data type conversion for {}", other),
     };
@@ -1555,8 +1551,7 @@ pub(crate) fn generate_ie_values(
         );
         let gen_derive = generate_derive(
             strum_macros,
-            rust_type != "Vec<u8>" && rust_type != "String",
-            rust_type != "f32" && rust_type != "f64",
+            rust_type != "Box<[u8]>" && rust_type != "String",
         );
 
         if let Some(ie_subregistry) = &ie.subregistry {
@@ -1919,12 +1914,22 @@ fn generate_num_serializer(
     }
 
     ret.push_str("         match length {\n");
-    ret.push_str(
-        format!(
-            "             None => writer.write_{num_type}::<byteorder::NetworkEndian>(num_val)?,\n"
-        )
-        .as_str(),
-    );
+    if num_type == "ordered_float::OrderedFloat<f32>" {
+        ret.push_str(
+            "             None => writer.write_f32::<byteorder::NetworkEndian>(num_val.0)?,\n",
+        );
+    } else if num_type == "ordered_float::OrderedFloat<f64>" {
+        ret.push_str(
+            "             None => writer.write_f64::<byteorder::NetworkEndian>(num_val.0)?,\n",
+        );
+    } else {
+        ret.push_str(
+            format!(
+                "             None => writer.write_{num_type}::<byteorder::NetworkEndian>(num_val)?,\n"
+            )
+                .as_str(),
+        );
+    }
     ret.push_str("             Some(len) => {\n");
     ret.push_str("                 let be_bytes = num_val.to_be_bytes();\n");
     ret.push_str("                 if usize::from(len) > be_bytes.len() {\n");
@@ -2145,8 +2150,12 @@ fn generate_ie_serializer(data_type: &str, ie_name: &String, enum_subreg: bool) 
         "signed16" => generate_num_serializer("i16", 2, ie_name, enum_subreg),
         "signed32" => generate_num_serializer("i32", 4, ie_name, enum_subreg),
         "signed64" => generate_num_serializer("i64", 8, ie_name, enum_subreg),
-        "float32" => generate_num_serializer("f32", 4, ie_name, enum_subreg),
-        "float64" => generate_num_serializer("f64", 8, ie_name, enum_subreg),
+        "float32" => {
+            generate_num_serializer("ordered_float::OrderedFloat<f32>", 4, ie_name, enum_subreg)
+        }
+        "float64" => {
+            generate_num_serializer("ordered_float::OrderedFloat<f64>", 8, ie_name, enum_subreg)
+        }
         "boolean" => generate_bool_serializer(ie_name),
         "macAddress" => generate_array_serializer(ie_name),
         "string" => generate_string_serializer(ie_name),

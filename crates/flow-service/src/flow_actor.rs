@@ -951,13 +951,15 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
             0,
             0,
-            vec![ipfix::Set::Template(vec![ipfix::TemplateRecord::new(
-                400,
-                vec![
-                    FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
-                    FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
-                ],
-            )])],
+            Box::new([ipfix::Set::Template(Box::new([
+                ipfix::TemplateRecord::new(
+                    400,
+                    Box::new([
+                        FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                        FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+                    ]),
+                ),
+            ]))]),
         );
         // Create a FlowInfo struct with some test data
         let flow_info = FlowInfo::IPFIX(ipfix_template);
@@ -1233,7 +1235,7 @@ mod tests {
                                 assert!(netflow_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     netflow_templates.get(&template.id()),
-                                    Some(&(vec![], template.field_specifiers().clone()))
+                                    Some(&(vec![], template.field_specifiers().to_vec()))
                                 );
                             }
                         }
@@ -1242,7 +1244,7 @@ mod tests {
                                 assert!(netflow_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     netflow_templates.get(&template.id()),
-                                    Some(&(template.scope_field_specifiers().clone(), vec![]))
+                                    Some(&(template.scope_field_specifiers().to_vec(), vec![]))
                                 );
                             }
                         }
@@ -1258,7 +1260,7 @@ mod tests {
                                 assert!(ipfix_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     ipfix_templates.get(&template.id()),
-                                    Some(&(vec![], template.field_specifiers().clone()))
+                                    Some(&(vec![], template.field_specifiers().to_vec()))
                                 );
                             }
                         }
@@ -1267,7 +1269,7 @@ mod tests {
                                 assert!(ipfix_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     ipfix_templates.get(&template.id()),
-                                    Some(&(template.scope_field_specifiers().clone(), vec![]))
+                                    Some(&(template.scope_field_specifiers().to_vec(), vec![]))
                                 );
                             }
                         }

@@ -37,11 +37,8 @@ pub fn generate_subregistry_enum_and_impl(
             let enum_name = format!("{}{}Reason", ie_name, rec.name);
             ret.push_str("#[allow(non_camel_case_types)]\n");
 
-            let gen_derive = generate_derive(
-                false,
-                rust_type != "Vec<u8>" && rust_type != "String",
-                rust_type != "f32" && rust_type != "f64",
-            );
+            let gen_derive =
+                generate_derive(false, rust_type != "Vec<u8>" && rust_type != "String");
             ret.push_str(gen_derive.as_str());
             ret.push_str(generate_enum(&enum_name, rust_type, &rec.reason_code_reg).as_str());
             ret.push_str(

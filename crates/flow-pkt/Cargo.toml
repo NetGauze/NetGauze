@@ -14,26 +14,24 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 # Specify the files to include in the crate
 include = [
-  "registry/**", # Specify entire folders if needed
+    "registry/**", # Specify entire folders if needed
 ]
 
 [dependencies]
-netgauze-locate = { workspace = true , optional = true }
+netgauze-locate = { workspace = true, optional = true }
 netgauze-parse-utils = { workspace = true, optional = true }
-netgauze-serde-macros = { workspace = true , optional = true }
+netgauze-serde-macros = { workspace = true, optional = true }
 netgauze-iana = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"], optional = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-ipnet = { workspace = true, features = ["serde"] }
+ipnet = { workspace = true }
 lazy_static = { workspace = true }
-chrono = { workspace = true, default-features = false, features = [
-  "std",
-  "serde",
-] }
+chrono = { workspace = true, default-features = false, features = ["std"] }
+ordered-float = { workspace = true }
 nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
-criterion = { workspace = true, optional = true } # Dev dep for bench
+criterion = { workspace = true, optional = true }                           # Dev dep for bench
 tracing = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["codec"], optional = true }
 bytes = { workspace = true, optional = true }
@@ -43,15 +41,19 @@ arbitrary_ext = { workspace = true, optional = true }
 [features]
 default = ["serde"]
 serde = [
-  "nom",
-  "byteorder",
-  "netgauze-locate",
-  "netgauze-parse-utils",
-  "netgauze-serde-macros",
+    "dep:serde",
+    "nom",
+    "byteorder",
+    "netgauze-locate",
+    "netgauze-parse-utils",
+    "netgauze-serde-macros",
+    "chrono/serde",
+    "ipnet/serde",
+    "ordered-float/serde",
 ]
 codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
-fuzz = ["arbitrary", "arbitrary_ext"]
+fuzz = ["arbitrary", "arbitrary_ext", "ordered-float/arbitrary"]
 iana-upstream-build = ["serde"]
 
 [dev-dependencies]

@@ -14,9 +14,9 @@ fn main() {
         Utc.with_ymd_and_hms(2024, 7, 08, 10, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             400,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::sourceTransportPort, 2).unwrap(),
@@ -42,8 +42,8 @@ fn main() {
                 FieldSpecifier::new(ie::IE::natQuotaExceededEvent, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::natThresholdEvent, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::srhIPv6ActiveSegmentType, 1).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
 
     println!(
@@ -78,11 +78,11 @@ fn main() {
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(400).unwrap(),
-            records: vec![DataRecord::new(
-                vec![],
-                vec![
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
                     ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
                         10, 100, 0, 1,
                     ))),
@@ -128,9 +128,9 @@ fn main() {
                     ie::Field::srhIPv6ActiveSegmentType(
                         ie::srhIPv6ActiveSegmentType::BGPSegmentRoutingPrefixSID,
                     ),
-                ],
-            )],
-        }],
+                ]),
+            )]),
+        }]),
     );
 
     println!(
