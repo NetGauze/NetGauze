@@ -1,7 +1,7 @@
 # Services to receive udp-notif packets
 
 Building blocks to develop udp-notif collectors.
-See [print-udp-notif](examples/udp_notif_print.rs) for a simple
+See [udp-notif-print](examples/udp-notif-print.rs) for a simple
 example to receive udp-notif packets from the network.
 
 ## Run example
@@ -9,4 +9,4 @@ example to receive udp-notif packets from the network.
 Simple server that will listen to udp-notif packets.
 It decodes the packets and prints them out to the console.
 
-```cargo run --example udp_notif_print```
+```cargo run --example udp-notif-print```

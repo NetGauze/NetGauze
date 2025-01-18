@@ -496,7 +496,6 @@ mod test {
 
     use super::*;
     use bytes::{Buf, Bytes, BytesMut};
-    //use netgauze_udp_notif_pkt::codec::UdpNotifCodec;
     use netgauze_parse_utils::WritablePdu;
     use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
     use std::io::Cursor;
@@ -504,10 +503,6 @@ mod test {
         net::UdpSocket,
         time::{timeout, Duration},
     };
-    //use tokio_util::codec::Encoder;
-
-    //use crate::udp_notif_actor::generate_udp_notif_data;
-    //use crate::udp_notif_supervisor::generate_udp_notif_data;
 
     // Helper function to create a test configuration
     fn create_test_config() -> SupervisorConfig {
