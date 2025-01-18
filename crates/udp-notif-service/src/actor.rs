@@ -156,14 +156,14 @@ impl Default for PeerUsage {
 
 /// Errors that can occur in the `UdpNotifActor`.
 #[derive(Debug)]
-pub enum ActorError {
+pub enum UdpNotifActorError {
     SocketBindError(ActorId, SocketAddr, std::io::Error),
     GetLocalAddressError(ActorId, SocketAddr, std::io::Error),
     CommandChannelClosed(ActorId, SocketAddr),
     PacketProcessingError(ActorId, SocketAddr, std::io::Error),
 }
 
-impl std::fmt::Display for ActorError {
+impl std::fmt::Display for UdpNotifActorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::SocketBindError(actor_id, addr, err) => write!(
@@ -185,7 +185,7 @@ impl std::fmt::Display for ActorError {
     }
 }
 
-impl std::error::Error for ActorError {
+impl std::error::Error for UdpNotifActorError {
     fn description(&self) -> &str {
         match self {
             Self::SocketBindError(_, _, _) => "failed to bind to socket address",
@@ -520,7 +520,7 @@ impl UdpNotifActor {
         false
     }
 
-    async fn handle_cmd(&mut self, cmd: Option<ActorCommand>) -> Result<bool, ActorError> {
+    async fn handle_cmd(&mut self, cmd: Option<ActorCommand>) -> Result<bool, UdpNotifActorError> {
         let cmd_result = match cmd {
             Some(ActorCommand::Shutdown(tx)) => self.handle_shutdown(tx).await,
             Some(ActorCommand::Subscribe(tx, msg_tx)) => self.handle_subscribe(tx, msg_tx).await,
@@ -536,7 +536,7 @@ impl UdpNotifActor {
                     "[Actor {}-{}] command channel is closed, shutting down actor",
                     self.actor_id, self.socket_addr
                 );
-                return Err(ActorError::CommandChannelClosed(
+                return Err(UdpNotifActorError::CommandChannelClosed(
                     self.actor_id,
                     self.socket_addr,
                 ));
@@ -550,16 +550,17 @@ impl UdpNotifActor {
     /// handling both incoming UDP packets and command messages. This
     /// dual-channel approach allows the actor to efficiently manage network
     /// I/O and control messages concurrently.
-    async fn run(mut self) -> Result<(ActorId, SocketAddr), ActorError> {
+    async fn run(mut self) -> Result<(ActorId, SocketAddr), UdpNotifActorError> {
         info!(
             "[Actor {}-{}] spawning actor and binding UDP listener",
             self.actor_id, self.socket_addr
         );
-        let socket = crate::new_udp_reuse_port(self.socket_addr, None)
-            .map_err(|err| ActorError::SocketBindError(self.actor_id, self.socket_addr, err))?;
+        let socket = crate::new_udp_reuse_port(self.socket_addr, None).map_err(|err| {
+            UdpNotifActorError::SocketBindError(self.actor_id, self.socket_addr, err)
+        })?;
         // Get the local address of the socket, handy in cases where the port is 0
         self.socket_addr = socket.local_addr().map_err(|err| {
-            ActorError::GetLocalAddressError(self.actor_id, self.socket_addr, err)
+            UdpNotifActorError::GetLocalAddressError(self.actor_id, self.socket_addr, err)
         })?;
         let framed = UdpFramed::new(socket, BytesCodec::default());
         let (_tx, mut stream): (SplitSink<_, (Bytes, _)>, _) = framed.split();
@@ -582,7 +583,7 @@ impl UdpNotifActor {
                         Some(Err(err)) => {
                             error!("[Actor {}-{}] shutting down due to unrecoverable error: {}",
                                 self.actor_id, self.socket_addr, err);
-                            return Err(ActorError::PacketProcessingError(self.actor_id, self.socket_addr, err))
+                            return Err(UdpNotifActorError::PacketProcessingError(self.actor_id, self.socket_addr, err))
                         }
                         None => {
                             error!("[Actor {}-{}] shutting down because UDP socket is down",
@@ -647,8 +648,13 @@ impl ActorHandle {
         socket_addr: SocketAddr,
         cmd_buffer_size: usize,
         subscriber_timeout: Duration,
-    ) -> Result<(JoinHandle<Result<(ActorId, SocketAddr), ActorError>>, Self), ActorHandleError>
-    {
+    ) -> Result<
+        (
+            JoinHandle<Result<(ActorId, SocketAddr), UdpNotifActorError>>,
+            Self,
+        ),
+        ActorHandleError,
+    > {
         let (cmd_tx, cmd_rx) = mpsc::channel(cmd_buffer_size);
         let actor = UdpNotifActor::new(actor_id, socket_addr, cmd_rx, subscriber_timeout);
         let join_handle = tokio::spawn(actor.run());
@@ -787,7 +793,7 @@ mod tests {
     async fn setup_actor() -> (
         SocketAddr,
         ActorHandle,
-        JoinHandle<Result<(ActorId, SocketAddr), ActorError>>,
+        JoinHandle<Result<(ActorId, SocketAddr), UdpNotifActorError>>,
     ) {
         let actor_id = 1;
         let socket_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();

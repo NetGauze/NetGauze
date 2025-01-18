@@ -60,7 +60,7 @@
 //!   with multiple udp-notif collectors.
 
 use crate::{
-    actor::{ActorCommand, ActorError, ActorHandle},
+    actor::{ActorCommand, ActorHandle, UdpNotifActorError},
     create_udp_notif_channel, ActorId, SubscriberId, Subscription, UdpNotifReceiver,
     UdpNotifSender,
 };
@@ -125,7 +125,9 @@ impl UdpNotifSupervisor {
     }
 
     /// Wait for all [UdpNotifActor]s to finish
-    async fn join_actors(join_handles: Vec<JoinHandle<Result<(ActorId, SocketAddr), ActorError>>>) {
+    async fn join_actors(
+        join_handles: Vec<JoinHandle<Result<(ActorId, SocketAddr), UdpNotifActorError>>>,
+    ) {
         let mut handles = join_handles;
         loop {
             let awaited = futures::future::select_all(handles);
@@ -232,7 +234,7 @@ impl UdpNotifSupervisor {
     /// Consume the actor, run it and block till it finishes
     async fn run(
         mut self,
-        join_handles: Vec<JoinHandle<Result<(ActorId, SocketAddr), ActorError>>>,
+        join_handles: Vec<JoinHandle<Result<(ActorId, SocketAddr), UdpNotifActorError>>>,
         rx: mpsc::Receiver<SupervisorCommand>,
     ) {
         tokio::select! {
