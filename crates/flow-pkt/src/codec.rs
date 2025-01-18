@@ -233,3 +233,33 @@ impl Decoder for FlowInfoCodec {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_decode_partial_messages() {
+        // Partial IPFIX packet
+        let value1: Vec<u8> = vec![
+            0x00, 0x0a, // Version
+            0x00, 0x74, // Length = 116 bytes
+            0x58, 0x3d, 0xe0, 0x59, // Export time
+            0x00, 0x00, 0x0e, 0xe4, // Seq number
+            0x00, 0x00, 0x00, 0x00, // Observation domain
+            0xff,
+            0x01, // Arbitrary values with length less than the 116 specified in the header
+        ];
+        // Second part of the packet is less than header length
+        let value2: Vec<u8> = vec![0x01];
+        let mut buf1 = BytesMut::from_iter(value1.iter());
+        let mut buf2 = BytesMut::from_iter(value2.iter());
+
+        let mut codec = FlowInfoCodec::new();
+        let ret1 = codec.decode(&mut buf1);
+        // message is incomplete, should be ignored
+        assert_eq!(ret1, Ok(None));
+        // message is incomplete, should be ignored
+        let ret2 = codec.decode(&mut buf2);
+        assert_eq!(ret2, Ok(None));
+    }
+}
