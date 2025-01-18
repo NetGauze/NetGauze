@@ -14,7 +14,7 @@ keywords = ["udp-notif", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-async-channel = "2.3"
+async-channel = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
