@@ -185,25 +185,7 @@ impl std::fmt::Display for UdpNotifActorError {
     }
 }
 
-impl std::error::Error for UdpNotifActorError {
-    fn description(&self) -> &str {
-        match self {
-            Self::SocketBindError(_, _, _) => "failed to bind to socket address",
-            Self::GetLocalAddressError(_, _, _) => "failed to get local address",
-            Self::CommandChannelClosed(_, _) => "command channel closed",
-            Self::PacketProcessingError(_, _, _) => "unrecoverable error processing packet",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        match self {
-            Self::SocketBindError(_, _, err) => Some(err),
-            Self::GetLocalAddressError(_, _, err) => Some(err),
-            Self::CommandChannelClosed(_, _) => None,
-            Self::PacketProcessingError(_, _, err) => Some(err),
-        }
-    }
-}
+impl std::error::Error for UdpNotifActorError {}
 
 /// The main actor struct responsible for receiving and processing udp-notif
 /// packets. This struct encapsulates the state and behavior of the actor.
