@@ -1,5 +1,5 @@
 [package]
-name = "netgauze-flow-service"
+name = "netgauze-udp-notif-service"
 version = "0.5.0"
 edition = "2021"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
@@ -8,25 +8,25 @@ readme = "README.md"
 repository = "https://github.com/NetGauze/NetGauze"
 homepage = "https://github.com/NetGauze/NetGauze"
 description = """
-IPFIX/Netflow service
+UDP-Notif service
 """
-keywords = ["ipfix", "netflow", "parser", "protocol"]
+keywords = ["udp-notif", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-flow-pkt = { workspace = true, features = ["codec"] }
-tokio = { workspace = true, features = ["full", "tracing"] }
-tokio-util = { workspace = true, features = ["full", "tracing"] }
+async-channel = { workspace = true }
 bytes = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-tracing = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
+netgauze-parse-utils = { workspace = true }
+netgauze-udp-notif-pkt = { workspace = true, features = ["codec"] }
+serde = { workspace = true, features = ["derive"] }
 socket2 = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-async-channel = { workspace = true }
-libc = {version = "0.2"}
+tokio = { workspace = true, features = ["full", "tracing"] }
+tokio-util = { workspace = true, features = ["full", "tracing"] }
+tracing = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true, default-features = false, features = ["std", "clock"] }
