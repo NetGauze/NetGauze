@@ -38,6 +38,10 @@ pub(crate) const fn default_buffer_size() -> usize {
     1_000
 }
 
+pub(crate) const fn default_flatten() -> bool {
+    false
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CollectorConfig {
     #[serde(default)]
@@ -117,6 +121,8 @@ impl From<Binding> for BindingAddress {
 pub struct PublisherConfig {
     #[serde(default = "default_buffer_size")]
     pub buffer_size: usize,
+    #[serde(default = "default_flatten")]
+    pub flatten: bool,
     pub endpoints: HashMap<String, PublisherEndpoint>,
 }
 
