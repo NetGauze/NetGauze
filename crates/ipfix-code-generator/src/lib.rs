@@ -342,6 +342,8 @@ fn generate_vendor_ie(
     output.push_str(generate_ie_values(&ie_parsed, Some(config.name().clone())).as_str());
     output.push_str(generate_fields_enum(&ie_parsed).as_str());
 
+    output.push_str(generate_flat_ie_struct(&ie_parsed, &vec![]).as_str());
+
     let dest_path = Path::new(&out_dir).join(format!(
         "{}_{}",
         config.mod_name, GENERATED_VENDOR_MAIN_SUFFIX
@@ -462,6 +464,7 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
         );
     }
 
+    ie_output.push_str(generate_flat_ie_struct(&iana_ie_parsed, &vendors).as_str());
     ie_deser.push_str(generate_ie_deser_main(&iana_ie_parsed, &vendors).as_str());
     ie_ser.push_str(generate_ie_ser_main(&iana_ie_parsed, &vendors).as_str());
 

@@ -38,8 +38,10 @@ pub fn generate_subregistry_enum_and_impl(
             ret.push_str("#[allow(non_camel_case_types)]\n");
 
             let gen_derive = generate_derive(
+                true,
                 false,
                 rust_type != "Vec<u8>" && rust_type != "String",
+                rust_type != "f32" && rust_type != "f64",
                 rust_type != "f32" && rust_type != "f64",
             );
             ret.push_str(gen_derive.as_str());

@@ -15,8 +15,8 @@
 
 use crate::{
     ie::{
-        Field, InformationElementDataType, InformationElementSemantics, InformationElementTemplate,
-        InformationElementUnits,
+        Field, Fields, InformationElementDataType, InformationElementSemantics,
+        InformationElementTemplate, InformationElementUnits,
     },
     DataSetId, FieldSpecifier,
 };
@@ -115,6 +115,72 @@ impl NetFlowV9Packet {
     pub const fn sets(&self) -> &Vec<Set> {
         &self.sets
     }
+
+    pub fn flatten(self) -> Vec<FlatNetFlowV9Packet> {
+        let sys_up_time = self.sys_up_time;
+        let unix_time = self.unix_time;
+        let sequence_number = self.sequence_number;
+        let source_id = self.source_id;
+        self.sets
+            .into_iter()
+            .flat_map(|set| set.flatten())
+            .map(|set| FlatNetFlowV9Packet {
+                sys_up_time,
+                unix_time,
+                sequence_number,
+                source_id,
+                set,
+            })
+            .collect()
+    }
+}
+
+/// Flattened version of [NetFlowV9Packet]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FlatNetFlowV9Packet {
+    sys_up_time: u32,
+    unix_time: DateTime<Utc>,
+    sequence_number: u32,
+    source_id: u32,
+    set: FlatSet,
+}
+
+impl FlatNetFlowV9Packet {
+    pub fn new(
+        sys_up_time: u32,
+        unix_time: DateTime<Utc>,
+        sequence_number: u32,
+        source_id: u32,
+        set: FlatSet,
+    ) -> Self {
+        Self {
+            sys_up_time,
+            unix_time,
+            sequence_number,
+            source_id,
+            set,
+        }
+    }
+
+    pub const fn sys_up_time(&self) -> u32 {
+        self.sys_up_time
+    }
+
+    pub const fn unix_time(&self) -> DateTime<Utc> {
+        self.unix_time
+    }
+
+    pub const fn sequence_number(&self) -> u32 {
+        self.sequence_number
+    }
+
+    pub const fn source_id(&self) -> u32 {
+        self.source_id
+    }
+
+    pub const fn set(&self) -> &FlatSet {
+        &self.set
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -134,6 +200,46 @@ impl Set {
             Self::Template(_) => NETFLOW_TEMPLATE_SET_ID,
             Self::OptionsTemplate(_) => NETFLOW_OPTIONS_TEMPLATE_SET_ID,
             Self::Data { id, records: _ } => id.0,
+        }
+    }
+
+    pub fn flatten(self) -> Vec<FlatSet> {
+        match self {
+            Self::Template(values) => values.into_iter().map(FlatSet::Template).collect(),
+            Self::OptionsTemplate(values) => {
+                values.into_iter().map(FlatSet::OptionsTemplate).collect()
+            }
+            Self::Data { id, records } => records
+                .into_iter()
+                .map(|record| FlatSet::Data {
+                    id,
+                    record: Box::new(FlatDataRecord::new(
+                        record.scope_fields.into(),
+                        record.fields.into(),
+                    )),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Flattened version of [Set]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FlatSet {
+    Template(TemplateRecord),
+    OptionsTemplate(OptionsTemplateRecord),
+    Data {
+        id: DataSetId,
+        record: Box<FlatDataRecord>,
+    },
+}
+
+impl FlatSet {
+    pub const fn id(&self) -> u16 {
+        match self {
+            Self::Template(_) => NETFLOW_TEMPLATE_SET_ID,
+            Self::OptionsTemplate(_) => NETFLOW_OPTIONS_TEMPLATE_SET_ID,
+            Self::Data { id, record: _ } => id.0,
         }
     }
 }
@@ -226,6 +332,29 @@ impl DataRecord {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FlatDataRecord {
+    scope_fields: ScopeFields,
+    fields: Fields,
+}
+
+impl FlatDataRecord {
+    pub const fn new(scope_fields: ScopeFields, fields: Fields) -> Self {
+        Self {
+            scope_fields,
+            fields,
+        }
+    }
+
+    pub const fn scope_fields(&self) -> &ScopeFields {
+        &self.scope_fields
+    }
+
+    pub const fn fields(&self) -> &Fields {
+        &self.fields
+    }
+}
+
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ScopeField {
@@ -235,6 +364,86 @@ pub enum ScopeField {
     LineCard(LineCard),
     Cache(Cache),
     Template(Template),
+}
+
+impl ScopeField {
+    pub const fn ie(&self) -> ScopeIE {
+        match self {
+            Self::Unknown { pen, id, value: _ } => ScopeIE::Unknown { pen: *pen, id: *id },
+            Self::System(_) => ScopeIE::System,
+            Self::Interface(_) => ScopeIE::Interface,
+            Self::LineCard(_) => ScopeIE::LineCard,
+            Self::Cache(_) => ScopeIE::Cache,
+            Self::Template(_) => ScopeIE::Template,
+        }
+    }
+}
+
+#[derive(Default, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct ScopeFields {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system: Option<Vec<System>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interface: Option<Vec<Interface>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line_card: Option<Vec<LineCard>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache: Option<Vec<Cache>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<Vec<Template>>,
+}
+
+impl From<Vec<ScopeField>> for ScopeFields {
+    fn from(fields: Vec<ScopeField>) -> Self {
+        let mut out = ScopeFields::default();
+        for field in fields {
+            match field {
+                ScopeField::Unknown { .. } => {}
+                ScopeField::System(system) => {
+                    if out.system.is_none() {
+                        out.system = Some(Vec::with_capacity(1));
+                    }
+                    if let Some(inner) = out.system.as_mut() {
+                        inner.push(system)
+                    }
+                }
+                ScopeField::Interface(interface) => {
+                    if out.interface.is_none() {
+                        out.interface = Some(Vec::with_capacity(1));
+                    }
+                    if let Some(inner) = out.interface.as_mut() {
+                        inner.push(interface)
+                    }
+                }
+                ScopeField::LineCard(line_card) => {
+                    if out.line_card.is_none() {
+                        out.line_card = Some(Vec::with_capacity(1));
+                    }
+                    if let Some(inner) = out.line_card.as_mut() {
+                        inner.push(line_card)
+                    }
+                }
+                ScopeField::Cache(cache) => {
+                    if out.cache.is_none() {
+                        out.cache = Some(Vec::with_capacity(1));
+                    }
+                    if let Some(inner) = out.cache.as_mut() {
+                        inner.push(cache)
+                    }
+                }
+                ScopeField::Template(template) => {
+                    if out.template.is_none() {
+                        out.template = Some(Vec::with_capacity(1));
+                    }
+                    if let Some(inner) = out.template.as_mut() {
+                        inner.push(template)
+                    }
+                }
+            }
+        }
+        out
+    }
 }
 
 #[derive(Eq, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -257,7 +466,7 @@ pub struct Cache(pub Vec<u8>);
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Template(pub Vec<u8>);
 
-#[derive(Copy, Eq, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Eq, Clone, PartialEq, Hash, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ScopeIE {
     Unknown { pen: u32, id: u16 },
