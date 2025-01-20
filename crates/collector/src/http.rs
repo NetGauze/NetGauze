@@ -65,7 +65,7 @@ pub enum Message<T: Clone> {
     },
 }
 
-struct HttpPublisherActor<T, O: Clone, F: Fn(Arc<T>, String) -> Message<O>> {
+struct HttpPublisherActor<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> {
     /// Human friendly name for logging purposes
     name: String,
     /// Writer ID used to annotate the messages
@@ -82,12 +82,10 @@ struct HttpPublisherActor<T, O: Clone, F: Fn(Arc<T>, String) -> Message<O>> {
     converter: F,
     msg_recv: async_channel::Receiver<Arc<T>>,
     cmd_recv: mpsc::Receiver<HttpPublisherActorCommand>,
-    buf: Vec<Message<O>>,
+    buf: Vec<M>,
 }
 
-impl<T: Serialize, O: Serialize + Clone, F: Fn(Arc<T>, String) -> Message<O>>
-    HttpPublisherActor<T, O, F>
-{
+impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, F> {
     fn new(
         name: String,
         client: reqwest::Client,
@@ -109,10 +107,10 @@ impl<T: Serialize, O: Serialize + Clone, F: Fn(Arc<T>, String) -> Message<O>>
         }
     }
 
-    async fn send<M: Serialize>(
+    async fn send<O: Serialize>(
         client: &'_ reqwest::Client,
         url: String,
-        value: &'_ M,
+        value: &'_ O,
     ) -> reqwest::Result<()> {
         debug!("Sending new batch");
         client
@@ -147,8 +145,8 @@ impl<T: Serialize, O: Serialize + Clone, F: Fn(Arc<T>, String) -> Message<O>>
                 msg = self.msg_recv.recv() => {
                     match msg {
                         Ok(msg) => {
-                            let msg = (self.converter)(msg, self.writer_id.clone());
-                            self.buf.push(msg);
+                            let msgs = (self.converter)(msg, self.writer_id.clone());
+                            self.buf.extend(msgs.into_iter());
                             debug!("[{}] Queued up a message for sending, there are {} messages in the queue", self.name, self.buf.len());
                             if self.buf.len() > self.batch_size {
                                 debug!("[{}] Blocking to send {} messages", self.name, self.buf.len());
@@ -217,7 +215,7 @@ impl HttpPublisherActorHandle {
     pub fn new<
         T: Serialize + Send + Sync + 'static,
         O: Serialize + Clone + Send + Sync + 'static,
-        F: Fn(Arc<T>, String) -> Message<O> + Send + 'static,
+        F: Fn(Arc<T>, String) -> Vec<Message<O>> + Send + 'static,
     >(
         name: String,
         config: HttpPublisherEndpoint,
