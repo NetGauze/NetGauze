@@ -15,8 +15,8 @@
 
 use crate::{
     ie::{
-        Field, InformationElementDataType, InformationElementSemantics, InformationElementTemplate,
-        InformationElementUnits,
+        Field, HasIE, InformationElementDataType, InformationElementSemantics,
+        InformationElementTemplate, InformationElementUnits,
     },
     DataSetId, FieldSpecifier,
 };
@@ -115,6 +115,60 @@ impl NetFlowV9Packet {
     pub const fn sets(&self) -> &Vec<Set> {
         &self.sets
     }
+
+    pub fn flatten(self) -> Vec<FlatNetFlowV9Packet> {
+        todo!()
+    }
+}
+
+/// Flattened version of [NetFlowV9Packet]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FlatNetFlowV9Packet {
+    sys_up_time: u32,
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_datetime))]
+    unix_time: DateTime<Utc>,
+    sequence_number: u32,
+    source_id: u32,
+    set: FlatSet,
+}
+
+impl FlatNetFlowV9Packet {
+    pub fn new(
+        sys_up_time: u32,
+        unix_time: DateTime<Utc>,
+        sequence_number: u32,
+        source_id: u32,
+        set: FlatSet,
+    ) -> Self {
+        Self {
+            sys_up_time,
+            unix_time,
+            sequence_number,
+            source_id,
+            set,
+        }
+    }
+
+    pub const fn sys_up_time(&self) -> u32 {
+        self.sys_up_time
+    }
+
+    pub const fn unix_time(&self) -> DateTime<Utc> {
+        self.unix_time
+    }
+
+    pub const fn sequence_number(&self) -> u32 {
+        self.sequence_number
+    }
+
+    pub const fn source_id(&self) -> u32 {
+        self.source_id
+    }
+
+    pub const fn set(&self) -> &FlatSet {
+        &self.set
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -134,6 +188,28 @@ impl Set {
             Self::Template(_) => NETFLOW_TEMPLATE_SET_ID,
             Self::OptionsTemplate(_) => NETFLOW_OPTIONS_TEMPLATE_SET_ID,
             Self::Data { id, records: _ } => id.0,
+        }
+    }
+}
+
+/// Flattened version of [Set]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum FlatSet {
+    Template(TemplateRecord),
+    OptionsTemplate(OptionsTemplateRecord),
+    Data {
+        id: DataSetId,
+        record: FlatDataRecord,
+    },
+}
+
+impl FlatSet {
+    pub const fn id(&self) -> u16 {
+        match self {
+            Self::Template(_) => NETFLOW_TEMPLATE_SET_ID,
+            Self::OptionsTemplate(_) => NETFLOW_OPTIONS_TEMPLATE_SET_ID,
+            Self::Data { id, record: _ } => id.0,
         }
     }
 }
@@ -224,6 +300,62 @@ impl DataRecord {
     pub const fn fields(&self) -> &Vec<Field> {
         &self.fields
     }
+
+    pub fn flatten(self) -> FlatDataRecord {
+        let mut scope_fields = HashMap::with_capacity(self.scope_fields.len());
+        let mut fields = HashMap::with_capacity(self.fields.len());
+        for field in self.scope_fields {
+            let ie = field.ie();
+            // Most of the time there is only one entry per IE, so we allocated reserve only
+            // one element
+            let entry = scope_fields
+                .entry(ie)
+                .or_insert_with(|| Vec::with_capacity(1));
+            entry.push(field);
+        }
+        for field in self.fields {
+            let ie = field.ie();
+            // Most of the time there is only one entry per IE, so we allocated reserve only
+            // one element
+            let entry = fields.entry(ie).or_insert_with(|| Vec::with_capacity(1));
+            entry.push(field);
+        }
+        FlatDataRecord {
+            scope_fields,
+            fields,
+        }
+    }
+}
+
+/// A version of [DataRecord] in which fields are organized into a
+/// HashMap with the IE as key and a vector of the values.
+/// A vector of fields is used since fields with the same IE can be
+/// repeated multiple times.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FlatDataRecord {
+    scope_fields: HashMap<ScopeIE, Vec<ScopeField>>,
+    fields: HashMap<crate::ie::IE, Vec<Field>>,
+}
+
+impl FlatDataRecord {
+    pub const fn new(
+        scope_fields: HashMap<ScopeIE, Vec<ScopeField>>,
+        fields: HashMap<crate::ie::IE, Vec<Field>>,
+    ) -> Self {
+        Self {
+            scope_fields,
+            fields,
+        }
+    }
+
+    pub const fn scope_fields(&self) -> &HashMap<ScopeIE, Vec<ScopeField>> {
+        &self.scope_fields
+    }
+
+    pub const fn fields(&self) -> &HashMap<crate::ie::IE, Vec<Field>> {
+        &self.fields
+    }
 }
 
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -235,6 +367,19 @@ pub enum ScopeField {
     LineCard(LineCard),
     Cache(Cache),
     Template(Template),
+}
+
+impl ScopeField {
+    pub const fn ie(&self) -> ScopeIE {
+        match self {
+            Self::Unknown { pen, id, value: _ } => ScopeIE::Unknown { pen: *pen, id: *id },
+            Self::System(_) => ScopeIE::System,
+            Self::Interface(_) => ScopeIE::Interface,
+            Self::LineCard(_) => ScopeIE::LineCard,
+            Self::Cache(_) => ScopeIE::Cache,
+            Self::Template(_) => ScopeIE::Template,
+        }
+    }
 }
 
 #[derive(Eq, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -257,7 +402,7 @@ pub struct Cache(pub Vec<u8>);
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Template(pub Vec<u8>);
 
-#[derive(Copy, Eq, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Eq, Clone, PartialEq, Hash, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum ScopeIE {
     Unknown { pen: u32, id: u16 },

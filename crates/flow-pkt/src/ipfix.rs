@@ -17,7 +17,10 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{ie::Field, DataSetId, FieldSpecifier};
+use crate::{
+    ie::{Field, HasIE},
+    DataSetId, FieldSpecifier,
+};
 
 pub const IPFIX_VERSION: u16 = 10;
 
@@ -117,6 +120,49 @@ impl IpfixPacket {
     pub const fn sets(&self) -> &Vec<Set> {
         &self.sets
     }
+
+    pub fn flatten(self) -> Vec<FlatIpfixPacket> {
+        let export_time = self.export_time;
+        let sequence_number = self.sequence_number;
+        let observation_domain_id = self.observation_domain_id;
+        self.sets
+            .into_iter()
+            .flat_map(|set| set.flatten())
+            .map(|set| FlatIpfixPacket {
+                export_time,
+                sequence_number,
+                observation_domain_id,
+                set,
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FlatIpfixPacket {
+    export_time: DateTime<Utc>,
+    sequence_number: u32,
+    observation_domain_id: u32,
+    set: FlatSet,
+}
+
+impl FlatIpfixPacket {
+    pub const fn export_time(&self) -> DateTime<Utc> {
+        self.export_time
+    }
+
+    pub const fn sequence_number(&self) -> u32 {
+        self.sequence_number
+    }
+
+    pub const fn observation_domain_id(&self) -> u32 {
+        self.observation_domain_id
+    }
+
+    pub const fn set(&self) -> &FlatSet {
+        &self.set
+    }
 }
 
 /// Every Set contains a common header. The Sets can be any of these three
@@ -146,6 +192,44 @@ impl Set {
             Self::Template(_) => IPFIX_TEMPLATE_SET_ID,
             Self::OptionsTemplate(_) => IPFIX_OPTIONS_TEMPLATE_SET_ID,
             Self::Data { id, records: _ } => id.0,
+        }
+    }
+
+    pub fn flatten(self) -> Vec<FlatSet> {
+        match self {
+            Self::Template(values) => values.into_iter().map(FlatSet::Template).collect(),
+            Self::OptionsTemplate(values) => {
+                values.into_iter().map(FlatSet::OptionsTemplate).collect()
+            }
+            Self::Data { id, records } => records
+                .into_iter()
+                .map(|record| FlatSet::Data {
+                    id,
+                    record: record.flatten(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// A version of [Set] that contain only one record
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum FlatSet {
+    Template(TemplateRecord),
+    OptionsTemplate(OptionsTemplateRecord),
+    Data {
+        id: DataSetId,
+        record: FlatDataRecord,
+    },
+}
+
+impl FlatSet {
+    pub const fn id(&self) -> u16 {
+        match self {
+            Self::Template(_) => IPFIX_TEMPLATE_SET_ID,
+            Self::OptionsTemplate(_) => IPFIX_OPTIONS_TEMPLATE_SET_ID,
+            Self::Data { id, record: _ } => id.0,
         }
     }
 }
@@ -318,6 +402,62 @@ impl DataRecord {
     }
 
     pub const fn fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
+
+    pub fn flatten(self) -> FlatDataRecord {
+        let mut scope_fields = HashMap::with_capacity(self.scope_fields.len());
+        let mut fields = HashMap::with_capacity(self.fields.len());
+        for field in self.scope_fields {
+            let ie = field.ie().to_string();
+            // Most of the time there is only one entry per IE, so we allocated reserve only
+            // one element
+            let entry = scope_fields
+                .entry(ie)
+                .or_insert_with(|| Vec::with_capacity(1));
+            entry.push(field);
+        }
+        for field in self.fields {
+            let ie = field.ie().to_string();
+            // Most of the time there is only one entry per IE, so we allocated reserve only
+            // one element
+            let entry = fields.entry(ie).or_insert_with(|| Vec::with_capacity(1));
+            entry.push(field);
+        }
+        FlatDataRecord {
+            scope_fields,
+            fields,
+        }
+    }
+}
+
+/// A version of [DataRecord] in which fields are organized into a
+/// HashMap with the IE as key and a vector of the values.
+/// A vector of fields is used since fields with the same IE can be
+/// repeated multiple times.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct FlatDataRecord {
+    scope_fields: HashMap<String, Vec<Field>>,
+    fields: HashMap<String, Vec<Field>>,
+}
+
+impl FlatDataRecord {
+    pub const fn new(
+        scope_fields: HashMap<String, Vec<Field>>,
+        fields: HashMap<String, Vec<Field>>,
+    ) -> Self {
+        Self {
+            scope_fields,
+            fields,
+        }
+    }
+
+    pub const fn scope_fields(&self) -> &HashMap<String, Vec<Field>> {
+        &self.scope_fields
+    }
+
+    pub const fn fields(&self) -> &HashMap<String, Vec<Field>> {
         &self.fields
     }
 }

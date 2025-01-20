@@ -31,6 +31,25 @@ pub enum FlowInfo {
     IPFIX(ipfix::IpfixPacket),
 }
 
+impl FlowInfo {
+    pub fn flatten(self) -> Vec<FlatFlowInfo> {
+        match self {
+            FlowInfo::NetFlowV9(pkt) => pkt
+                .flatten()
+                .into_iter()
+                .map(FlatFlowInfo::NetFlowV9)
+                .collect(),
+            FlowInfo::IPFIX(pkt) => pkt.flatten().into_iter().map(FlatFlowInfo::IPFIX).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FlatFlowInfo {
+    NetFlowV9(netflow::FlatNetFlowV9Packet),
+    IPFIX(ipfix::FlatIpfixPacket),
+}
+
 /// Errors when crafting a new Set
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum FieldSpecifierError {

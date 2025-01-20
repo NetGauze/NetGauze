@@ -19,16 +19,28 @@ use crate::{
     Xref,
 };
 
-pub fn generate_derive(num_enum: bool, copy: bool, eq: bool) -> String {
+pub fn generate_derive(
+    num_enum: bool,
+    from_repr: bool,
+    copy: bool,
+    eq: bool,
+    hash: bool,
+) -> String {
     let mut base = "".to_string();
     if num_enum {
-        base.push_str("strum_macros::Display, strum_macros::FromRepr, ");
+        base.push_str("strum_macros::Display,");
+    }
+    if from_repr {
+        base.push_str("strum_macros::FromRepr,");
     }
     if copy {
         base.push_str("Copy, ");
     }
     if eq {
         base.push_str("Eq, ");
+    }
+    if hash {
+        base.push_str("Hash, ");
     }
     base.push_str("Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize");
     format!("#[derive({base})]\n")
@@ -64,7 +76,7 @@ pub(crate) fn generate_ie_data_type(data_types: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementDataType {\n");
     for x in data_types {
@@ -82,7 +94,7 @@ pub(crate) fn generate_ie_units(entries: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementUnits {\n");
     for entry in entries {
@@ -111,7 +123,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementSemantics {\n");
     for x in data_types {
@@ -224,7 +236,7 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
 
 fn generate_from_for_ie() -> String {
     let mut ret = String::new();
-    ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str(generate_derive(false, false, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub struct UndefinedIE(pub u16);\n\n");
 
@@ -254,7 +266,7 @@ pub(crate) fn generate_information_element_ids(ie: &Vec<InformationElement>) -> 
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u16)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IE {\n");
     for ie in ie {
@@ -282,7 +294,7 @@ pub(crate) fn generate_ie_status() -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementStatus {\n");
     ret.push_str("    current = 0,\n");
@@ -484,7 +496,7 @@ fn generate_ie_field_enum_for_ie(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(generate_derive(false, false, false).as_str());
+    ret.push_str(generate_derive(true, false, false, false, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     ret.push_str("    Unknown{pen: u32, id: u16, value: Vec<u8>},\n");
@@ -527,7 +539,7 @@ pub(crate) fn generate_ie_ids(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str(generate_derive(true, false, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IE {\n");
     ret.push_str("    Unknown{pen: u32, id: u16},\n");
@@ -548,7 +560,7 @@ pub(crate) fn generate_ie_ids(
     }
     ret.push_str("}\n\n");
 
-    ret.push_str(generate_derive(false, true, true).as_str());
+    ret.push_str(generate_derive(false, false, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IEError {\n");
     ret.push_str("    UndefinedIANAIE(u16),\n");
@@ -1489,7 +1501,7 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     let not_eq = ies
         .iter()
         .any(|x| get_rust_type(&x.data_type) == "f32" || get_rust_type(&x.data_type) == "f64");
-    ret.push_str(generate_derive(false, !not_copy, !not_eq).as_str());
+    ret.push_str(generate_derive(true, false, !not_copy, !not_eq, !not_eq).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     for ie in ies {
@@ -1554,8 +1566,10 @@ pub(crate) fn generate_ie_values(
             Some(InformationElementSubRegistry::ValueNameDescRegistry(_))
         );
         let gen_derive = generate_derive(
+            false,
             strum_macros,
             rust_type != "Vec<u8>" && rust_type != "String",
+            rust_type != "f32" && rust_type != "f64",
             rust_type != "f32" && rust_type != "f64",
         );
 
