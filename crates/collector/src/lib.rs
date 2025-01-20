@@ -18,12 +18,15 @@ use crate::{
     http::{HttpPublisherActorHandle, Message},
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
+use netgauze_flow_pkt::FlatFlowInfo;
 use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tracing::{info, warn};
 
 pub mod config;
 pub mod http;
+
+pub type FlatFlowRequest = (SocketAddr, FlatFlowInfo);
 
 pub async fn init_flow_collection(flow_config: FlowConfig) -> anyhow::Result<()> {
     let supervisor_config = flow_config.supervisor_config();
@@ -40,17 +43,46 @@ pub async fn init_flow_collection(flow_config: FlowConfig) -> anyhow::Result<()>
             info!("Creating publisher '{endpoint_name}'");
             match &endpoint {
                 PublisherEndpoint::Http(config) => {
-                    let (http_join, http_handler) = HttpPublisherActorHandle::new(
-                        endpoint_name.clone(),
-                        config.clone(),
-                        |x: Arc<FlowRequest>, writer_id: String| Message::insert {
+                    let flatten = publisher_config.flatten;
+                    let flat_converter = |request: Arc<FlowRequest>, writer_id: String| {
+                        let (socket, pkt) = request.as_ref();
+                        let flattened: Vec<Message<FlatFlowInfo>> = pkt
+                            .clone()
+                            .flatten()
+                            .into_iter()
+                            .map(|flat_info| Message::insert {
+                                ts: format!("{}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
+                                peer_src: format!("{}", socket.ip()),
+                                writer_id: writer_id.clone(),
+                                payload: flat_info,
+                            })
+                            .collect();
+                        flattened
+                    };
+                    let converter = |request: Arc<FlowRequest>, writer_id: String| {
+                        let ret = Message::insert {
                             ts: format!("{}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
-                            peer_src: format!("{}", x.0.ip()),
+                            peer_src: format!("{}", request.0.ip()),
                             writer_id,
-                            payload: x.1.clone(),
-                        },
-                        flow_recv.clone(),
-                    )?;
+                            payload: request.1.clone(),
+                        };
+                        vec![ret]
+                    };
+                    let (http_join, http_handler) = if flatten {
+                        HttpPublisherActorHandle::new(
+                            endpoint_name.clone(),
+                            config.clone(),
+                            flat_converter,
+                            flow_recv.clone(),
+                        )?
+                    } else {
+                        HttpPublisherActorHandle::new(
+                            endpoint_name.clone(),
+                            config.clone(),
+                            converter,
+                            flow_recv.clone(),
+                        )?
+                    };
                     http_join_set.push(http_join);
                     http_handlers.push(http_handler);
                 }
