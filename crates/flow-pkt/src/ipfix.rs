@@ -17,10 +17,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{
-    ie::{Field, HasIE},
-    DataSetId, FieldSpecifier,
-};
+use crate::{ie::Field, DataSetId, FieldSpecifier};
 
 pub const IPFIX_VERSION: u16 = 10;
 
@@ -203,10 +200,7 @@ impl Set {
             }
             Self::Data { id, records } => records
                 .into_iter()
-                .map(|record| FlatSet::Data {
-                    id,
-                    record: record.flatten(),
-                })
+                .map(|record| FlatSet::Data { id, record })
                 .collect(),
         }
     }
@@ -218,10 +212,7 @@ impl Set {
 pub enum FlatSet {
     Template(TemplateRecord),
     OptionsTemplate(OptionsTemplateRecord),
-    Data {
-        id: DataSetId,
-        record: FlatDataRecord,
-    },
+    Data { id: DataSetId, record: DataRecord },
 }
 
 impl FlatSet {
@@ -402,62 +393,6 @@ impl DataRecord {
     }
 
     pub const fn fields(&self) -> &Vec<Field> {
-        &self.fields
-    }
-
-    pub fn flatten(self) -> FlatDataRecord {
-        let mut scope_fields = HashMap::with_capacity(self.scope_fields.len());
-        let mut fields = HashMap::with_capacity(self.fields.len());
-        for field in self.scope_fields {
-            let ie = field.ie().to_string();
-            // Most of the time there is only one entry per IE, so we allocated reserve only
-            // one element
-            let entry = scope_fields
-                .entry(ie)
-                .or_insert_with(|| Vec::with_capacity(1));
-            entry.push(field);
-        }
-        for field in self.fields {
-            let ie = field.ie().to_string();
-            // Most of the time there is only one entry per IE, so we allocated reserve only
-            // one element
-            let entry = fields.entry(ie).or_insert_with(|| Vec::with_capacity(1));
-            entry.push(field);
-        }
-        FlatDataRecord {
-            scope_fields,
-            fields,
-        }
-    }
-}
-
-/// A version of [DataRecord] in which fields are organized into a
-/// HashMap with the IE as key and a vector of the values.
-/// A vector of fields is used since fields with the same IE can be
-/// repeated multiple times.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FlatDataRecord {
-    scope_fields: HashMap<String, Vec<Field>>,
-    fields: HashMap<String, Vec<Field>>,
-}
-
-impl FlatDataRecord {
-    pub const fn new(
-        scope_fields: HashMap<String, Vec<Field>>,
-        fields: HashMap<String, Vec<Field>>,
-    ) -> Self {
-        Self {
-            scope_fields,
-            fields,
-        }
-    }
-
-    pub const fn scope_fields(&self) -> &HashMap<String, Vec<Field>> {
-        &self.scope_fields
-    }
-
-    pub const fn fields(&self) -> &HashMap<String, Vec<Field>> {
         &self.fields
     }
 }
