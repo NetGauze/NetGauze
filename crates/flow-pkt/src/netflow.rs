@@ -15,8 +15,8 @@
 
 use crate::{
     ie::{
-        Field, HasIE, InformationElementDataType, InformationElementSemantics,
-        InformationElementTemplate, InformationElementUnits,
+        Field, InformationElementDataType, InformationElementSemantics, InformationElementTemplate,
+        InformationElementUnits,
     },
     DataSetId, FieldSpecifier,
 };
@@ -117,7 +117,21 @@ impl NetFlowV9Packet {
     }
 
     pub fn flatten(self) -> Vec<FlatNetFlowV9Packet> {
-        todo!()
+        let sys_up_time = self.sys_up_time;
+        let unix_time = self.unix_time;
+        let sequence_number = self.sequence_number;
+        let source_id = self.source_id;
+        self.sets
+            .into_iter()
+            .flat_map(|set| set.flatten())
+            .map(|set| FlatNetFlowV9Packet {
+                sys_up_time,
+                unix_time,
+                sequence_number,
+                source_id,
+                set,
+            })
+            .collect()
     }
 }
 
@@ -190,6 +204,19 @@ impl Set {
             Self::Data { id, records: _ } => id.0,
         }
     }
+
+    pub fn flatten(self) -> Vec<FlatSet> {
+        match self {
+            Self::Template(values) => values.into_iter().map(FlatSet::Template).collect(),
+            Self::OptionsTemplate(values) => {
+                values.into_iter().map(FlatSet::OptionsTemplate).collect()
+            }
+            Self::Data { id, records } => records
+                .into_iter()
+                .map(|record| FlatSet::Data { id, record })
+                .collect(),
+        }
+    }
 }
 
 /// Flattened version of [Set]
@@ -198,10 +225,7 @@ impl Set {
 pub enum FlatSet {
     Template(TemplateRecord),
     OptionsTemplate(OptionsTemplateRecord),
-    Data {
-        id: DataSetId,
-        record: FlatDataRecord,
-    },
+    Data { id: DataSetId, record: DataRecord },
 }
 
 impl FlatSet {
@@ -298,62 +322,6 @@ impl DataRecord {
     }
 
     pub const fn fields(&self) -> &Vec<Field> {
-        &self.fields
-    }
-
-    pub fn flatten(self) -> FlatDataRecord {
-        let mut scope_fields = HashMap::with_capacity(self.scope_fields.len());
-        let mut fields = HashMap::with_capacity(self.fields.len());
-        for field in self.scope_fields {
-            let ie = field.ie();
-            // Most of the time there is only one entry per IE, so we allocated reserve only
-            // one element
-            let entry = scope_fields
-                .entry(ie)
-                .or_insert_with(|| Vec::with_capacity(1));
-            entry.push(field);
-        }
-        for field in self.fields {
-            let ie = field.ie();
-            // Most of the time there is only one entry per IE, so we allocated reserve only
-            // one element
-            let entry = fields.entry(ie).or_insert_with(|| Vec::with_capacity(1));
-            entry.push(field);
-        }
-        FlatDataRecord {
-            scope_fields,
-            fields,
-        }
-    }
-}
-
-/// A version of [DataRecord] in which fields are organized into a
-/// HashMap with the IE as key and a vector of the values.
-/// A vector of fields is used since fields with the same IE can be
-/// repeated multiple times.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct FlatDataRecord {
-    scope_fields: HashMap<ScopeIE, Vec<ScopeField>>,
-    fields: HashMap<crate::ie::IE, Vec<Field>>,
-}
-
-impl FlatDataRecord {
-    pub const fn new(
-        scope_fields: HashMap<ScopeIE, Vec<ScopeField>>,
-        fields: HashMap<crate::ie::IE, Vec<Field>>,
-    ) -> Self {
-        Self {
-            scope_fields,
-            fields,
-        }
-    }
-
-    pub const fn scope_fields(&self) -> &HashMap<ScopeIE, Vec<ScopeField>> {
-        &self.scope_fields
-    }
-
-    pub const fn fields(&self) -> &HashMap<crate::ie::IE, Vec<Field>> {
         &self.fields
     }
 }
