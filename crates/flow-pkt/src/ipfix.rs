@@ -138,6 +138,7 @@ impl IpfixPacket {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FlatIpfixPacket {
+    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_datetime))]
     export_time: DateTime<Utc>,
     sequence_number: u32,
     observation_domain_id: u32,
