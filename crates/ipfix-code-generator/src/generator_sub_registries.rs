@@ -101,7 +101,7 @@ pub fn generate_enum(
         }
     }
     ret.push_str(format!("    Unassigned({rust_type}),\n").as_str());
-    ret.push_str("}\n");
+    ret.push_str("}\n\n");
     ret
 }
 
@@ -141,7 +141,7 @@ pub fn generate_from_impl_for_rust_type(
     ret.push_str(format!("            {enum_name}::Unassigned(x) => x,\n").as_str());
     ret.push_str("        }\n");
     ret.push_str("    }\n");
-    ret.push_str("}\n");
+    ret.push_str("}\n\n");
     ret
 }
 

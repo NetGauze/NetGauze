@@ -296,11 +296,12 @@ pub(crate) fn generate_common_types() -> String {
     let mut ret = String::new();
     ret.push_str("pub type MacAddress = [u8; 6];\n\n");
     ret.push_str(
-        r##"/// A trait to inidcate that we can get the [IE] for a given element
-    pub trait HasIE {
-        fn ie(&self) -> IE;
-    }
-    "##,
+        r##"/// A trait to indicate that we can get the [IE] for a given element
+pub trait HasIE {
+    fn ie(&self) -> IE;
+}
+
+"##,
     );
     ret
 }
@@ -497,9 +498,21 @@ fn generate_ie_field_enum_for_ie(
                 format!("    {}(netgauze_iana::tcp::TCPHeaderFlags),\n", ie.name).as_str(),
             );
         } else {
-            ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
+            let rust_type = get_rust_type(&ie.data_type);
+            let field_type = if ie.subregistry.is_some() {
+                ie.name.clone()
+            } else {
+                rust_type
+            };
+            let fuzz = if field_type.contains("Date") {
+                "#[cfg_attr(feature = \"fuzz\", arbitrary(with = crate::arbitrary_datetime))] "
+            } else {
+                ""
+            };
+            ret.push_str(format!("    {}({fuzz}{field_type}),\n", ie.name).as_str());
         }
     }
+
     ret.push_str("}\n\n");
 
     ret.push_str("impl HasIE for Field {\n");
@@ -687,635 +700,398 @@ fn generate_ie_value_converters(rust_type: &str, ie_name: &String) -> String {
     ret
 }
 
-fn get_std_deserializer_error(ty_name: &str) -> String {
-    let mut ret = String::new();
-    ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
-    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
-    ret.push_str("    InvalidLength(u16),\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str(
-        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
-    );
-    ret.push_str(
-        "           Self::InvalidLength(len) => write!(f, \"invalid field length {len}\"),\n",
-    );
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str("           Self::NomError(_err) => None,\n");
-    ret.push_str("           Self::InvalidLength(_len) => None,\n");
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn get_time_millis_deserializer_error(ty_name: &str) -> String {
-    let mut ret = String::new();
-    ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
-    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
-    ret.push_str("    InvalidLength(u16),\n");
-    ret.push_str("    InvalidTimestampMillis(u64),\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str(
-        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
-    );
-    ret.push_str(
-        "           Self::InvalidLength(len) => write!(f, \"invalid field length {len}\"),\n",
-    );
-    ret.push_str(
-        "           Self::InvalidTimestampMillis(val) => write!(f, \"invalid timestamp {val}\"),\n",
-    );
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{}}\n").as_str());
-    ret
-}
-
-fn get_timestamp_deserializer_error(ty_name: &str) -> String {
-    let mut ret = String::new();
-    ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
-    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
-    ret.push_str("    InvalidLength(u16),\n");
-    ret.push_str("    InvalidTimestamp(u32),\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str(
-        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
-    );
-    ret.push_str(
-        "           Self::InvalidLength(len) => write!(f, \"invalid field length {len}\"),\n",
-    );
-    ret.push_str(
-        "           Self::InvalidTimestamp(val) => write!(f, \"invalid timestamp {val}\"),\n",
-    );
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{}}\n").as_str());
-    ret
-}
-
-fn get_timestamp_fraction_deserializer_error(ty_name: &str) -> String {
-    let mut ret = String::new();
-    ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
-    ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
-    ret.push_str("    InvalidLength(u16),\n");
-    ret.push_str("    InvalidTimestamp(u32, u32),\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str(
-        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
-    );
-    ret.push_str(
-        "           Self::InvalidLength(len) => write!(f, \"invalid field length {len}\"),\n",
-    );
-    ret.push_str("           Self::InvalidTimestamp(v1, v2) => write!(f, \"invalid timestamp ({v1}, {v2})\"),\n");
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{}}\n").as_str());
-    ret
-}
-
-fn get_deserializer_header(ty_name: &str) -> String {
-    let mut header = String::new();
-    if ty_name == "tcpControlBits" {
-        header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for netgauze_iana::tcp::TCPHeaderFlags {{\n").as_str());
-    } else {
-        header.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithOneInput<'a, u16, Located{ty_name}ParsingError<'a>> for {ty_name} {{\n").as_str());
-    }
-    header.push_str("    #[inline]\n");
-    header.push_str(format!("    fn from_wire(buf: netgauze_parse_utils::Span<'a>, length: u16) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
-    header
-}
-
 fn generate_u8_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = match length {\n");
-    ret.push_str("            1 => nom::number::complete::be_u8(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        };\n");
+    ret.push_str("                let (buf, value) = match length {\n");
+    ret.push_str("                    1 => nom::number::complete::be_u8(buf)?,\n");
+    ret.push_str(format!("                   _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
 
     if enum_subreg {
-        ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
-        ret.push_str("        Ok((buf, enum_val))\n");
+        ret.push_str(format!("                let enum_val = {ie_name}::from(value);\n").as_str());
+        ret.push_str(format!("                (buf, Field::{ie_name}(enum_val))\n").as_str());
     } else if ie_name == "tcpControlBits" {
-        ret.push_str("        Ok((buf, netgauze_iana::tcp::TCPHeaderFlags::from(value)))\n");
+        ret.push_str("               (buf, netgauze_iana::tcp::TCPHeaderFlags::from(value))\n");
     } else {
-        ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+        ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
     }
-
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_u16_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = match length {\n");
-    ret.push_str("            1 => {\n");
-    ret.push_str("                let (buf, value) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("                (buf, value as u16)\n");
-    ret.push_str("            }\n");
-    ret.push_str("            2 => nom::number::complete::be_u16(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        };\n");
+    ret.push_str("                let (buf, value) = match length {\n");
+    ret.push_str("                    1 => {\n");
+    ret.push_str(
+        "                        let (buf, value) = nom::number::complete::be_u8(buf)?;\n",
+    );
+    ret.push_str("                        (buf, value as u16)\n");
+    ret.push_str("                    }\n");
+    ret.push_str("                    2 => nom::number::complete::be_u16(buf)?,\n");
+    ret.push_str(format!("                    _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
 
     if enum_subreg {
-        ret.push_str(format!("        let enum_val = {ie_name}::from(value);\n").as_str());
-        ret.push_str("        Ok((buf, enum_val))\n");
+        ret.push_str(format!("                let enum_val = {ie_name}::from(value);\n").as_str());
+        ret.push_str(format!("                (buf, Field::{ie_name}(enum_val))\n").as_str());
     } else if ie_name == "tcpControlBits" {
-        ret.push_str("        Ok((buf, netgauze_iana::tcp::TCPHeaderFlags::from(value)))\n");
+        ret.push_str(format!("                (buf, Field::{ie_name}(netgauze_iana::tcp::TCPHeaderFlags::from(value)))\n").as_str());
     } else {
-        ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
+        ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
     }
 
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_u32_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let len = length as usize;\n");
-    ret.push_str("        if length > 4 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        }\n");
-    ret.push_str("        let mut res = 0u32;\n");
-    ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
-    ret.push_str("            res = (res << 8) + byte as u32;\n");
-    ret.push_str("        }\n");
+    ret.push_str("                let len = length as usize;\n");
+    ret.push_str("                if length > 4 || buf.input_len() < len {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                }\n");
+    ret.push_str("                let mut res = 0u32;\n");
+    ret.push_str("                for byte in buf.iter_elements().take(len) {\n");
+    ret.push_str("                    res = (res << 8) + byte as u32;\n");
+    ret.push_str("                }\n");
 
     if enum_subreg {
-        ret.push_str(format!("        let enum_val = {ie_name}::from(res);\n").as_str());
-        ret.push_str("        Ok((buf.slice(len..), enum_val))\n");
+        ret.push_str(format!("                let enum_val = {ie_name}::from(res);\n").as_str());
+        ret.push_str(
+            format!("                (buf.slice(len..), Field::{ie_name}(enum_val))\n").as_str(),
+        );
     } else {
-        ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+        ret.push_str(
+            format!("                (buf.slice(len..), Field::{ie_name}(res))\n").as_str(),
+        );
     }
 
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_u64_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let len = length as usize;\n");
-    ret.push_str("        if length > 8 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        }\n");
-    ret.push_str("        let mut res = 0u64;\n");
-    ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
-    ret.push_str("            res = (res << 8) + byte as u64;\n");
-    ret.push_str("        }\n");
+    ret.push_str("                let len = length as usize;\n");
+    ret.push_str("                if length > 8 || buf.input_len() < len {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                }\n");
+    ret.push_str("                let mut res = 0u64;\n");
+    ret.push_str("                for byte in buf.iter_elements().take(len) {\n");
+    ret.push_str("                    res = (res << 8) + byte as u64;\n");
+    ret.push_str("                }\n");
 
     if enum_subreg {
-        ret.push_str(format!("        let enum_val = {ie_name}::from(res);\n").as_str());
-        ret.push_str("        Ok((buf.slice(len..), enum_val))\n");
+        ret.push_str(format!("                let enum_val = {ie_name}::from(res);\n").as_str());
+        ret.push_str(
+            format!("                (buf.slice(len..), Field::{ie_name}(enum_val))\n").as_str(),
+        );
     } else {
-        ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res)))\n").as_str());
+        ret.push_str(
+            format!("                (buf.slice(len..), Field::{ie_name}(res))\n").as_str(),
+        );
     }
 
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_u256_deserializer(ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let len = length as usize;\n");
-    ret.push_str("        if length > 32 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        }\n");
-    ret.push_str("        let mut ret: [u8; 32] = [0; 32];\n");
-    ret.push_str("        ret.copy_from_slice(buf.slice(..8).fragment());\n");
+    ret.push_str("                let len = length as usize;\n");
+    ret.push_str("                if length > 32 || buf.input_len() < len {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                }\n");
+    ret.push_str("                let mut ret: [u8; 32] = [0; 32];\n");
+    ret.push_str("                ret.copy_from_slice(buf.slice(..8).fragment());\n");
     if enum_subreg {
-        ret.push_str(format!("        let enum_val = {ie_name}::from(ret);\n").as_str());
-        ret.push_str("        Ok((buf.slice(len..), ret))\n");
+        ret.push_str(format!("                let enum_val = {ie_name}::from(ret);\n").as_str());
+        ret.push_str(
+            format!("                (buf.slice(len..), Field::{ie_name}(enum_val))\n").as_str(),
+        );
     } else {
-        ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(ret)))\n").as_str());
+        ret.push_str(
+            format!("                (buf.slice(len..), Field::{ie_name}(ret))\n").as_str(),
+        );
     }
 
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_i8_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = match length {\n");
-    ret.push_str("            1 => nom::number::complete::be_i8(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("                let (buf, value) = match length {\n");
+    ret.push_str("                    1 => nom::number::complete::be_i8(buf)?,\n");
+    ret.push_str(format!("                    _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_i16_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let len = length as usize;\n");
-    ret.push_str("        if length > 2 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        }\n");
-    ret.push_str("        let mut res = 0u16;\n");
-    ret.push_str("        let mut first = true;\n");
-    ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
-    ret.push_str("            if first {\n");
-    ret.push_str("                if byte & 0x80 != 0 {\n");
-    ret.push_str("                    res = u16::MAX;\n");
+    ret.push_str("                let len = length as usize;\n");
+    ret.push_str("                if length > 2 || buf.input_len() < len {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
     ret.push_str("                }\n");
-    ret.push_str("                first = false;\n");
+    ret.push_str("                let mut res = 0u16;\n");
+    ret.push_str("                let mut first = true;\n");
+    ret.push_str("                for byte in buf.iter_elements().take(len) {\n");
+    ret.push_str("                    if first {\n");
+    ret.push_str("                        if byte & 0x80 != 0 {\n");
+    ret.push_str("                            res = u16::MAX;\n");
+    ret.push_str("                        }\n");
+    ret.push_str("                        first = false;\n");
+    ret.push_str("                    }\n");
+    ret.push_str("                    res = (res << 8) + byte as u16;\n");
+    ret.push_str("                }\n");
+    ret.push_str("                (buf.slice(len..), res as i16))\n");
     ret.push_str("            }\n");
-    ret.push_str("            res = (res << 8) + byte as u16;\n");
-    ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res as i16)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
     ret
 }
 
 fn generate_i32_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let len = length as usize;\n");
-    ret.push_str("        if length > 4 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        }\n");
-    ret.push_str("        let mut res = 0u32;\n");
-    ret.push_str("        let mut first = true;\n");
-    ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
-    ret.push_str("            if first {\n");
-    ret.push_str("                if byte & 0x80 != 0 {\n");
-    ret.push_str("                    res = u32::MAX;\n");
+    ret.push_str("                let len = length as usize;\n");
+    ret.push_str("                if length > 4 || buf.input_len() < len {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
     ret.push_str("                }\n");
-    ret.push_str("                first = false;\n");
+    ret.push_str("                let mut res = 0u32;\n");
+    ret.push_str("                let mut first = true;\n");
+    ret.push_str("                for byte in buf.iter_elements().take(len) {\n");
+    ret.push_str("                    if first {\n");
+    ret.push_str("                        if byte & 0x80 != 0 {\n");
+    ret.push_str("                            res = u32::MAX;\n");
+    ret.push_str("                        }\n");
+    ret.push_str("                        first = false;\n");
+    ret.push_str("                    }\n");
+    ret.push_str("                    res = (res << 8) + byte as u32;\n");
+    ret.push_str("                }\n");
+    ret.push_str(
+        format!("                (buf.slice(len..), Field::{ie_name}(res as i32))\n").as_str(),
+    );
     ret.push_str("            }\n");
-    ret.push_str("            res = (res << 8) + byte as u32;\n");
-    ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res as i32)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
     ret
 }
 
 fn generate_i64_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let len = length as usize;\n");
-    ret.push_str("        if length > 8 || buf.input_len() < len {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        }\n");
-    ret.push_str("        let mut res = 0u64;\n");
-    ret.push_str("        let mut first = true;\n");
-    ret.push_str("        for byte in buf.iter_elements().take(len) {\n");
-    ret.push_str("            if first {\n");
-    ret.push_str("                if byte & 0x80 != 0 {\n");
-    ret.push_str("                    res = u64::MAX;\n");
+    ret.push_str("                let len = length as usize;\n");
+    ret.push_str("                if length > 8 || buf.input_len() < len {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
     ret.push_str("                }\n");
-    ret.push_str("                first = false;\n");
+    ret.push_str("                let mut res = 0u64;\n");
+    ret.push_str("                let mut first = true;\n");
+    ret.push_str("                for byte in buf.iter_elements().take(len) {\n");
+    ret.push_str("                    if first {\n");
+    ret.push_str("                        if byte & 0x80 != 0 {\n");
+    ret.push_str("                            res = u64::MAX;\n");
+    ret.push_str("                        }\n");
+    ret.push_str("                        first = false;\n");
+    ret.push_str("                    }\n");
+    ret.push_str("                    res = (res << 8) + byte as u64;\n");
+    ret.push_str("                }\n");
+    ret.push_str("                (buf.slice(len..), res as i64)\n");
     ret.push_str("            }\n");
-    ret.push_str("            res = (res << 8) + byte as u64;\n");
-    ret.push_str("        }\n");
-    ret.push_str(format!("        Ok((buf.slice(len..), {ie_name}(res as i64)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
     ret
 }
 
 fn generate_f32_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = match length {\n");
-    ret.push_str("            1 => nom::number::complete::be_f32(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("                let (buf, value) = match length {\n");
+    ret.push_str("                    1 => nom::number::complete::be_f32(buf)?,\n");
+    ret.push_str(format!("                    _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_f64_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = match length {\n");
-    ret.push_str("            1 => nom::number::complete::be_f64(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("                let (buf, value) = match length {\n");
+    ret.push_str("                    1 => nom::number::complete::be_f64(buf)?,\n");
+    ret.push_str(format!("                    _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_bool_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = match length {\n");
-    ret.push_str("            1 => nom::number::complete::be_u8(buf)?,\n");
-    ret.push_str(format!("            _ => return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))))\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value != 0)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("                let (buf, value) = match length {\n");
+    ret.push_str("                    1 => nom::number::complete::be_u8(buf)?,\n");
+    ret.push_str(format!("                    _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value != 0))\n").as_str());
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_mac_address_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        if length != 6 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str("        let (buf, b0) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("        let (buf, b1) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("        let (buf, b2) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("        let (buf, b3) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("        let (buf, b4) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("        let (buf, b5) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}([b0, b1, b2, b3, b4, b5])))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("                if length != 6 {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str("                let (buf, b0) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("                let (buf, b1) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("                let (buf, b2) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("                let (buf, b3) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("                let (buf, b4) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str("                let (buf, b5) = nom::number::complete::be_u8(buf)?;\n");
+    ret.push_str(
+        format!("                (buf, Field::{ie_name}([b0, b1, b2, b3, b4, b5]))\n").as_str(),
+    );
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_string_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let header = get_deserializer_header(ie_name.as_str());
-    let mut string_error = String::new();
-    string_error.push_str("#[allow(non_camel_case_types)]\n");
-    string_error.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    string_error.push_str(format!("pub enum {ie_name}ParsingError {{\n").as_str());
-    string_error.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
-    string_error.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
-    string_error.push_str("    Utf8Error(String),\n");
-    string_error.push_str("}\n\n");
-
-    string_error.push_str("impl<'a> nom::error::FromExternalError<netgauze_parse_utils::Span<'a>, std::str::Utf8Error>\n");
-    string_error.push_str(format!("for Located{ie_name}ParsingError<'a>\n").as_str());
-    string_error.push_str("{\n");
-    string_error.push_str("    fn from_external_error(input: netgauze_parse_utils::Span<'a>, _kind: nom::error::ErrorKind, error: std::str::Utf8Error) -> Self {\n");
-    string_error.push_str(format!("        Located{ie_name}ParsingError::new(\n").as_str());
-    string_error.push_str("            input,\n");
-    string_error.push_str(
-        format!("            {ie_name}ParsingError::Utf8Error(error.to_string()),\n").as_str(),
-    );
-    string_error.push_str("        )\n");
-    string_error.push_str("    }\n");
-    string_error.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::fmt::Display for {ie_name}ParsingError {{\n").as_str());
-    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
-    ret.push_str("        match self {\n");
+    ret.push_str("                if length == u16::MAX {\n");
     ret.push_str(
-        "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
+        "                    let (buf, short_length) = nom::number::complete::be_u8(buf)?;\n",
     );
-    ret.push_str("           Self::Utf8Error(val) => write!(f, \"utf8 error {val}\"),\n");
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::error::Error for {ie_name}ParsingError {{}}\n").as_str());
-
-    ret.push_str(string_error.as_str());
-    ret.push_str(header.as_str());
-
-    ret.push_str("        if length == u16::MAX {\n");
-    ret.push_str("            let (buf, short_length) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("            let (buf, variable_length) = if short_length == u8::MAX {\n");
-    ret.push_str("                let mut variable_length: u32= 0;\n");
-    ret.push_str("                let (buf, part1) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("                let (buf, part2) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("                let (buf, part3) = nom::number::complete::be_u8(buf)?;\n");
-    ret.push_str("                variable_length = (variable_length << 8) + part1  as u32;\n");
-    ret.push_str("                variable_length = (variable_length << 8) + part2  as u32;\n");
-    ret.push_str("                variable_length = (variable_length << 8) + part3  as u32;\n");
-    ret.push_str("                (buf, variable_length)\n");
-    ret.push_str("            } else {\n");
-    ret.push_str("                (buf, short_length as u32)\n");
-    ret.push_str("            };\n");
-    ret.push_str("            let (buf, value) = nom::combinator::map_res(nom::bytes::complete::take(variable_length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
-    ret.push_str("                let result = ::std::str::from_utf8(&str_buf);\n");
-    ret.push_str("                result.map(|x| x.to_string())\n");
-    ret.push_str("            })(buf)?;\n");
-    ret.push_str(format!("            Ok((buf,  {ie_name}(value.to_string())))\n").as_str());
-    ret.push_str("        } else {\n");
-    ret.push_str("            let (buf, value) =\n");
-    ret.push_str("                nom::combinator::map_res(nom::bytes::complete::take(length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
-    ret.push_str("                    let nul_range_end = str_buf\n");
-    ret.push_str("                        .iter()\n");
-    ret.push_str("                        .position(|&c| c == b'\0')\n");
-    ret.push_str("                        .unwrap_or(str_buf.len());\n");
+    ret.push_str("                    let (buf, variable_length) = if short_length == u8::MAX {\n");
+    ret.push_str("                        let mut variable_length: u32= 0;\n");
     ret.push_str(
-        "                    let result = ::std::str::from_utf8(&str_buf[..nul_range_end]);\n",
+        "                        let (buf, part1) = nom::number::complete::be_u8(buf)?;\n",
     );
-    ret.push_str("                    result.map(|x| x.to_string())\n");
-    ret.push_str("                })(buf)?;\n");
-    ret.push_str(format!("            Ok((buf,  {ie_name}(value)))\n").as_str());
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n");
+    ret.push_str(
+        "                        let (buf, part2) = nom::number::complete::be_u8(buf)?;\n",
+    );
+    ret.push_str(
+        "                        let (buf, part3) = nom::number::complete::be_u8(buf)?;\n",
+    );
+    ret.push_str(
+        "                        variable_length = (variable_length << 8) + part1  as u32;\n",
+    );
+    ret.push_str(
+        "                        variable_length = (variable_length << 8) + part2  as u32;\n",
+    );
+    ret.push_str(
+        "                        variable_length = (variable_length << 8) + part3  as u32;\n",
+    );
+    ret.push_str("                        (buf, variable_length)\n");
+    ret.push_str("                    } else {\n");
+    ret.push_str("                        (buf, short_length as u32)\n");
+    ret.push_str("                    };\n");
+    ret.push_str("                    let (buf, value) = nom::combinator::map_res(nom::bytes::complete::take(variable_length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
+    ret.push_str("                        let result = ::std::str::from_utf8(&str_buf);\n");
+    ret.push_str("                        result.map(|x| x.to_string())\n");
+    ret.push_str("                    })(buf)?;\n");
+    ret.push_str(
+        format!("                    (buf,  Field::{ie_name}(value.to_string()))\n").as_str(),
+    );
+    ret.push_str("                } else {\n");
+    ret.push_str("                    let (buf, value) =\n");
+    ret.push_str("                        nom::combinator::map_res(nom::bytes::complete::take(length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
+    ret.push_str("                            let nul_range_end = str_buf\n");
+    ret.push_str("                                .iter()\n");
+    ret.push_str("                                .position(|&c| c == b'\0')\n");
+    ret.push_str("                                .unwrap_or(str_buf.len());\n");
+    ret.push_str("                            let result = ::std::str::from_utf8(&str_buf[..nul_range_end]);\n", );
+    ret.push_str("                            result.map(|x| x.to_string())\n");
+    ret.push_str("                        })(buf)?;\n");
+    ret.push_str(format!("                    (buf,  Field::{ie_name}(value))\n").as_str());
+    ret.push_str("                }\n");
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_ipv4_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        if length != 4 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str("        let (buf, ip) = nom::number::complete::be_u32(buf)?;\n");
-    ret.push_str("        let value = std::net::Ipv4Addr::from(ip);\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("                if length != 4 {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str("                let (buf, ip) = nom::number::complete::be_u32(buf)?;\n");
+    ret.push_str("                let value = std::net::Ipv4Addr::from(ip);\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_ipv6_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        if length != 16 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str("        let (buf, ip) = nom::number::complete::be_u128(buf)?;\n");
-    ret.push_str("        let value = std::net::Ipv6Addr::from(ip);\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("                if length != 16 {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str("                let (buf, ip) = nom::number::complete::be_u128(buf)?;\n");
+    ret.push_str("                let value = std::net::Ipv6Addr::from(ip);\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str("            }\n");
     ret
 }
 
 fn generate_date_time_seconds(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_timestamp_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        if length != 4 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str("        let (buf, secs) = nom::number::complete::be_u32(buf)?;\n");
-    ret.push_str("        let value = match chrono::Utc.timestamp_opt(secs as i64, 0) {\n");
-    ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
-    ret.push_str("            _ => {\n");
-    ret.push_str(format!("                  return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidTimestamp(secs))));\n").as_str());
+    ret.push_str("                if length != 4 {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str("                let (buf, secs) = nom::number::complete::be_u32(buf)?;\n");
+    ret.push_str("                let value = match chrono::Utc.timestamp_opt(secs as i64, 0) {\n");
+    ret.push_str("                    chrono::LocalResult::Single(val) => val,\n");
+    ret.push_str("                    _ => {\n");
+    ret.push_str(format!("                        return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidTimestamp{{ie_name: \"{ie_name}\".to_string(), seconds: secs}})));\n").as_str());
+    ret.push_str("                    }\n");
+    ret.push_str("                };\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
     ret.push_str("            }\n");
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
     ret
 }
 
 fn generate_date_time_milli(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_time_millis_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        if length != 8 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str("        let (buf, millis) = nom::number::complete::be_u64(buf)?;\n");
-    ret.push_str("        let value = match chrono::Utc.timestamp_millis_opt(millis as i64) {\n");
-    ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
-    ret.push_str("            _ => {\n");
-    ret.push_str(format!("                  return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidTimestampMillis(millis))));\n").as_str());
+    ret.push_str("                if length != 8 {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str("                let (buf, millis) = nom::number::complete::be_u64(buf)?;\n");
+    ret.push_str(
+        "                let value = match chrono::Utc.timestamp_millis_opt(millis as i64) {\n",
+    );
+    ret.push_str("                    chrono::LocalResult::Single(val) => val,\n");
+    ret.push_str("                    _ => {\n");
+    ret.push_str(format!("                        return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidTimestampMillis{{ie_name: \"{ie_name}\".to_string(), millis}})));\n").as_str());
+    ret.push_str("                    }\n");
+    ret.push_str("                };\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
     ret.push_str("            }\n");
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
     ret
 }
 
 fn generate_date_time_micro(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_timestamp_fraction_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        if length != 8 {\n");
-    ret.push_str(format!("            return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidLength(length))));\n").as_str());
-    ret.push_str("        };\n");
-    ret.push_str("        let (buf, seconds) = nom::number::complete::be_u32(buf)?;\n");
-    ret.push_str("        let (buf, fraction) = nom::number::complete::be_u32(buf)?;\n");
-    ret.push_str("        // Convert 1/2^32 of a second to nanoseconds\n");
+    ret.push_str("                if length != 8 {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str("                let (buf, seconds) = nom::number::complete::be_u32(buf)?;\n");
+    ret.push_str("                let (buf, fraction) = nom::number::complete::be_u32(buf)?;\n");
+    ret.push_str("                // Convert 1/2^32 of a second to nanoseconds\n");
     ret.push_str(
-        "        let f: u32 = (1_000_000_000f64 * (fraction as f64 / u32::MAX as f64)) as u32;\n",
+        "                let f: u32 = (1_000_000_000f64 * (fraction as f64 / u32::MAX as f64)) as u32;\n",
     );
-    ret.push_str("        let value = match chrono::Utc.timestamp_opt(seconds as i64, f) {\n");
-    ret.push_str("            chrono::LocalResult::Single(val) => val,\n");
-    ret.push_str("            _ => {\n");
-    ret.push_str(format!("                  return Err(nom::Err::Error(Located{ie_name}ParsingError::new(buf, {ie_name}ParsingError::InvalidTimestamp(seconds, fraction))));\n").as_str());
+    ret.push_str(
+        "                let value = match chrono::Utc.timestamp_opt(seconds as i64, f) {\n",
+    );
+    ret.push_str("                    chrono::LocalResult::Single(val) => val,\n");
+    ret.push_str("                    _ => {\n");
+    ret.push_str(format!("                         return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidTimestampFraction{{ie_name: \"{ie_name}\".to_string(), seconds, fraction}})));\n").as_str());
+    ret.push_str("                    }\n");
+    ret.push_str("                };\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
     ret.push_str("            }\n");
-    ret.push_str("        };\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
     ret
 }
 
 fn generate_vec_u8_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
-    let std_error = get_std_deserializer_error(ie_name.as_str());
-    let header = get_deserializer_header(ie_name.as_str());
-    ret.push_str(std_error.as_str());
-    ret.push_str(header.as_str());
-    ret.push_str("        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;\n");
-    ret.push_str(format!("        Ok((buf, {ie_name}(value)))\n").as_str());
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("                let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;\n");
+    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str("            }\n");
     ret
 }
 
@@ -1378,13 +1154,6 @@ pub(crate) fn generate_pkg_ie_deserializers(
         ret.push_str("use chrono::TimeZone;\n");
     }
     ret.push_str(format!("use crate::ie::{vendor_mod}::*;\n\n").as_str());
-
-    for ie in ies {
-        ret.push_str(
-            generate_ie_deserializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
-        );
-    }
-
     ret.push_str(generate_ie_values_deserializers(ies).as_str());
     ret
 }
@@ -1397,80 +1166,441 @@ pub(crate) fn generate_pkg_ie_serializers(
     ret.push_str("use byteorder::WriteBytesExt;\n");
     ret.push_str(format!("use crate::ie::{vendor_mod}::*;\n\n").as_str());
 
-    for ie in ies {
-        ret.push_str(
-            generate_ie_serializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
-        );
-    }
-    let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
-    ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
+    ret.push_str("pub enum FieldWritingError {\n");
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
-    for ie in ies {
-        ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
-    }
+    ret.push_str("    InvalidLength{ie_name: String, length: u16},\n");
     ret.push_str("}\n\n");
 
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}WritingError {{\n").as_str());
+    ret.push_str("impl std::fmt::Display for FieldWritingError {\n");
     ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::StdIOError(err) => write!(f, \"{err}\"),\n");
-    for ie in ies {
-        ret.push_str(
-            format!(
-                "            Self::{}Error(err) => write!(f, \"{{err}}\"),\n",
-                ie.name
-            )
-            .as_str(),
-        );
-    }
+    ret.push_str("            Self::InvalidLength{ie_name, length} => write!(f, \"writing error of {ie_name} invalid length {length}\"),\n");
     ret.push_str("        }\n");
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
 
-    ret.push_str(format!("impl std::error::Error for {ty_name}WritingError {{\n").as_str());
-    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str("            Self::StdIOError(_) => None,\n");
-    for ie in ies {
-        ret.push_str(format!("            Self::{}Error(err) => Some(err),\n", ie.name).as_str());
-    }
-    ret.push_str("        }");
-    ret.push_str("    }");
-    ret.push_str("}\n\n");
+    ret.push_str("impl std::error::Error for FieldWritingError {}\n\n");
 
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
-        )
-            .as_str(),
-    );
+    ret.push_str("impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, FieldWritingError> for Field {\n");
     ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
     ret.push_str("    fn len(&self, length: Option<u16>) -> usize {\n");
     ret.push_str("        match self {\n");
     for ie in ies {
-        ret.push_str(
-            format!(
-                "            Self::{}(value) => value.len(length),\n",
-                ie.name
-            )
-            .as_str(),
-        );
+        match ie.data_type.as_str() {
+            "octetArray" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "unsigned8" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                1\n");
+            }
+            "unsigned16" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 2,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "unsigned32" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 4,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "unsigned64" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 8,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "signed8" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                1\n");
+            }
+            "signed16" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 2,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "signed32" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 4,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "signed64" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 8,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "float32" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 4,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "float64" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 8,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "boolean" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                1\n");
+            }
+            "macAddress" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "string" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => value.len(),\n");
+                ret.push_str("                    Some(len) => if len == u16::MAX {\n");
+                ret.push_str("                        if value.len() < u8::MAX as usize {\n");
+                ret.push_str("                            // One octet for the length field\n");
+                ret.push_str("                            value.len() + 1\n");
+                ret.push_str("                        } else {\n");
+                ret.push_str("                            // 4 octets for the length field, first is 255 and other three carries the len\n");
+                ret.push_str("                            value.len() + 4\n");
+                ret.push_str("                        }\n");
+                ret.push_str("                    } else {\n");
+                ret.push_str("                        len as usize\n");
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "dateTimeSeconds" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                4\n");
+            }
+            "dateTimeMilliseconds" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                8\n");
+            }
+            "dateTimeMicroseconds" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                8\n");
+            }
+            "dateTimeNanoseconds" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                8\n");
+            }
+            "ipv4Address" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                4\n");
+            }
+            "ipv6Address" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                16\n");
+            }
+            "basicList" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "subTemplateList" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "subTemplateMultiList" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "unsigned256" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            ty => todo!("Unsupported serialization for type: {}", ty),
+        }
+        ret.push_str("            }\n");
     }
-
     ret.push_str("         }\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ty_name}WritingError> {{\n").as_str());
+    ret.push_str("    fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), FieldWritingError> {\n");
     ret.push_str("        match self {\n");
     for ie in ies {
-        ret.push_str(
-            format!(
-                "           Self::{}(value) => value.write(writer, length)?,\n",
-                ie.name
-            )
-            .as_str(),
-        );
+        ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+        match ie.data_type.as_str() {
+            "octetArray" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "unsigned8" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let num_val = u8::from(*value);\n");
+                    ret.push_str("                writer.write_u8(num_val)?\n");
+                } else {
+                    ret.push_str("                writer.write_u8(*value)?\n");
+                }
+            }
+            "unsigned16" => {
+                if ie.subregistry.is_some() || ie.name == "tcpControlBits" {
+                    ret.push_str("                let value = u16::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_u16::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "unsigned32" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = u32::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_u32::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "unsigned64" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = u64::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_u64::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "signed8" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let num_val = i8::from(*value);\n");
+                    ret.push_str("                writer.write_i8(num_val)?\n");
+                } else {
+                    ret.push_str("                writer.write_i8(*value)?\n");
+                }
+            }
+            "signed16" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = i16::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_i16::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "signed32" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = i32::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_i32::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "signed64" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = i64::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_i64::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "float32" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = f32::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_f32::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "float64" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = f64::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_f64::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "boolean" => {
+                ret.push_str("                writer.write_u8(*value as u8)?\n");
+            }
+            "macAddress" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "string" => {
+                ret.push_str("                match length {\n");
+                ret.push_str("                    Some(u16::MAX) | None => {\n");
+                ret.push_str("                        let bytes = value.as_bytes();\n");
+                ret.push_str("                        if bytes.len() < u8::MAX as usize {\n");
+                ret.push_str("                            writer.write_u8(bytes.len() as u8)?;\n");
+                ret.push_str("                        } else {\n");
+                ret.push_str("                            writer.write_u8(u8::MAX)?;\n");
+                ret.push_str("                            writer.write_all(&bytes.len().to_be_bytes()[1..])?;\n");
+                ret.push_str("                        }\n");
+                ret.push_str("                        writer.write_all(value.as_bytes())?;\n");
+                ret.push_str("                    }\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        writer.write_all(value.as_bytes())?;\n");
+                ret.push_str("                        // fill the rest with zeros\n");
+                ret.push_str("                        for _ in value.len()..(len as usize) {\n");
+                ret.push_str("                            writer.write_u8(0)?\n");
+                ret.push_str("                        }\n");
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "dateTimeSeconds" => {
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;\n");
+            }
+            "dateTimeMilliseconds" => {
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;\n", );
+                ret.push_str("                let nanos = value.timestamp_subsec_nanos();\n");
+                ret.push_str("                // Convert 1/2**32 of a second to a fraction of a nano second\n");
+                ret.push_str("                let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;\n");
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;\n");
+            }
+            "dateTimeMicroseconds" => {
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;\n", );
+                ret.push_str("                let nanos = value.timestamp_subsec_nanos();\n");
+                ret.push_str("                // Convert 1/2**32 of a second to a fraction of a nano second\n");
+                ret.push_str("                let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;\n");
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;\n");
+            }
+            "dateTimeNanoseconds" => {
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;\n", );
+                ret.push_str("                let nanos = value.timestamp_subsec_nanos();\n");
+                ret.push_str("                // Convert 1/2**32 of a second to a fraction of a nano second\n");
+                ret.push_str("                let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;\n");
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;\n");
+            }
+            "ipv4Address" => {
+                ret.push_str("                writer.write_all(&value.octets())?\n");
+            }
+            "ipv6Address" => {
+                ret.push_str("                writer.write_all(&value.octets())?\n");
+            }
+            "basicList" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "subTemplateList" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "subTemplateMultiList" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "unsigned256" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            ty => todo!("Unsupported serialization for type: {}", ty),
+        }
+        ret.push_str("            }\n");
     }
     ret.push_str("        }\n");
     ret.push_str("        Ok(())\n");
@@ -1493,7 +1623,13 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     for ie in ies {
-        ret.push_str(format!("    {}({}),\n", ie.name, ie.name).as_str());
+        let rust_type = get_rust_type(&ie.data_type);
+        let field_type = if ie.subregistry.is_some() {
+            ie.name.clone()
+        } else {
+            rust_type
+        };
+        ret.push_str(format!("    {}({field_type}),\n", ie.name).as_str());
     }
     ret.push_str("}\n\n");
 
@@ -1587,39 +1723,10 @@ pub(crate) fn generate_ie_values(
             ret.push_str(format!("        IE::{}\n", ie.name).as_str());
             ret.push_str("   }\n");
             ret.push_str("}\n\n");
-        } else {
-            ret.push_str("#[allow(non_camel_case_types)]\n");
-            ret.push_str(gen_derive.as_str());
-            ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
-            if rust_type.contains("Date") {
-                let arb =
-                    "#[cfg_attr(feature = \"fuzz\", arbitrary(with = crate::arbitrary_datetime))]";
-                ret.push_str(
-                    format!("pub struct {}({} pub {});\n\n", ie.name, arb, rust_type).as_str(),
-                );
-            } else {
-                ret.push_str(format!("pub struct {}(pub {});\n\n", ie.name, rust_type).as_str());
-            }
-            match &vendor_name {
-                None => {
-                    ret.push_str(format!("impl HasIE for {} {{\n", ie.name).as_str());
-                    ret.push_str("    fn ie(&self) -> IE {\n");
-                    ret.push_str(format!("        IE::{}\n", ie.name).as_str());
-                    ret.push_str("   }\n");
-                    ret.push_str("}\n\n");
-                }
-                Some(name) => {
-                    ret.push_str(format!("impl crate::HasIE for {} {{\n", ie.name).as_str());
-                    ret.push_str("    fn ie(&self) -> crate::IE {\n");
-                    ret.push_str(format!("        crate::IE::{name}(IE::{})\n", ie.name).as_str());
-                    ret.push_str("   }\n");
-                    ret.push_str("}\n\n");
-                }
-            }
         }
 
         // TODO: check if value converters are needed
-        //ret.push_str(generate_ie_value_converters(&rust_type,
+        // ret.push_str(generate_ie_value_converters(&rust_type,
         // &ie.name).as_str());
     }
     ret
@@ -1627,74 +1734,69 @@ pub(crate) fn generate_ie_values(
 
 fn generate_ie_values_deserializers(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
-    let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("pub enum FieldParsingError {\n");
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
-    for ie in ies {
-        ret.push_str(
-            format!(
-                "    {}Error(#[from_located(module = \"self\")] {}ParsingError),\n",
-                ie.name, ie.name
-            )
-            .as_str(),
-        );
-    }
+    ret.push_str("    InvalidLength{ie_name: String, length: u16},\n");
+    ret.push_str("    InvalidTimestamp{ie_name: String, seconds: u32},\n");
+    ret.push_str("    InvalidTimestampMillis{ie_name: String, millis: u64},\n");
+    ret.push_str("    InvalidTimestampFraction{ie_name: String, seconds: u32, fraction: u32},\n");
+    ret.push_str("    Utf8Error(String),\n");
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("impl<'a> nom::error::FromExternalError<netgauze_parse_utils::Span<'a>, std::str::Utf8Error>\n");
+    ret.push_str("for LocatedFieldParsingError<'a>\n");
+    ret.push_str("{\n");
+    ret.push_str("    fn from_external_error(input: netgauze_parse_utils::Span<'a>, _kind: nom::error::ErrorKind, error: std::str::Utf8Error) -> Self {\n");
+    ret.push_str("        LocatedFieldParsingError::new(\n");
+    ret.push_str("            input,\n");
+    ret.push_str("            FieldParsingError::Utf8Error(error.to_string()),\n");
+    ret.push_str("        )\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl std::fmt::Display for FieldParsingError {\n");
     ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
     ret.push_str("        match self {\n");
     ret.push_str(
         "           Self::NomError(err) => write!(f, \"Nom error {}\", nom::Err::Error(err)),\n",
     );
-    for ie in ies {
-        ret.push_str(
-            format!(
-                "           Self::{}Error(err) => write!(f, \"{{err}}\"),\n",
-                ie.name
-            )
-            .as_str(),
-        );
-    }
+    #[allow(clippy::literal_string_with_formatting_args)]
+    ret.push_str("           Self::InvalidLength{ie_name, length} => write!(f, \"error parsing {ie_name} invalid field length {length}\"),\n", );
+    ret.push_str("           Self::InvalidTimestamp{ie_name, seconds} => write!(f, \"error parsing {ie_name} invalid timestamp {seconds}\"),\n", );
+    ret.push_str("           Self::InvalidTimestampMillis{ie_name, millis} => write!(f, \"error parsing {ie_name} invalid timestamp {millis}\"),\n", );
+    ret.push_str("           Self::InvalidTimestampFraction{ie_name, seconds, fraction} => write!(f, \"error parsing {ie_name} invalid timestamp fraction ({seconds}, {fraction})\"),\n");
+    ret.push_str("           Self::Utf8Error(val) => write!(f, \"utf8 error {val}\"),\n");
     ret.push_str("        }\n");
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
 
-    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str("           Self::NomError(_err) => None,\n");
-    for ie in ies {
-        ret.push_str(format!("           Self::{}Error(err) => Some(err),\n", ie.name).as_str());
-    }
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("impl std::error::Error for FieldParsingError {}\n\n");
 
-    ret.push_str(format!("impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, Located{ty_name}ParsingError<'a>>\n").as_str());
-    ret.push_str(format!("for {ty_name} {{\n").as_str());
+    ret.push_str("impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, LocatedFieldParsingError<'a>>\n");
+    ret.push_str("for Field {\n");
     ret.push_str("    #[inline]\n");
     ret.push_str("    fn from_wire(\n");
     ret.push_str("        buf: netgauze_parse_utils::Span<'a>,\n");
     ret.push_str("        ie: &IE,\n");
     ret.push_str("        length: u16,\n");
-    ret.push_str(format!("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, Located{ty_name}ParsingError<'a>> {{\n").as_str());
+    ret.push_str("    ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedFieldParsingError<'a>> {\n");
     ret.push_str("        let (buf, value) = match ie {\n");
     for ie in ies {
         ret.push_str(format!("            IE::{} => {{\n", ie.name).as_str());
-        ret.push_str(format!("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input::<'_, u16, Located{}ParsingError<'_>, Located{}ParsingError<'_>, {}>(buf, length)?;\n", ie.name, ty_name, ie.name).as_str());
-        ret.push_str(format!("                (buf, Field::{}(value))\n", ie.name).as_str());
-        ret.push_str("            }\n");
+        ret.push_str(&generate_ie_deserializer(
+            &ie.data_type,
+            &ie.name,
+            ie.subregistry.is_some(),
+        ));
     }
     ret.push_str("        };\n");
     ret.push_str("       Ok((buf, value))\n");
     ret.push_str("    }\n");
     ret.push_str("}\n");
-
     ret
 }
 
@@ -1705,17 +1807,9 @@ pub(crate) fn generate_ie_deser_main(
     let mut ret = String::new();
     ret.push_str("use nom::{InputLength, InputIter, Slice};\n");
     ret.push_str("use chrono::TimeZone;\n\n\n");
-    // Generate IANA Deser
-    for ie in iana_ies {
-        ret.push_str(
-            generate_ie_deserializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
-        );
-    }
-
-    let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::LocatedError, Eq, PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]\n");
-    ret.push_str(format!("pub enum {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("pub enum FieldParsingError {\n");
     ret.push_str("    #[serde(with = \"netgauze_parse_utils::ErrorKindSerdeDeref\")]\n");
     ret.push_str("    NomError(#[from_nom] nom::error::ErrorKind),\n");
     ret.push_str("    UnknownInformationElement(IE),\n");
@@ -1725,19 +1819,26 @@ pub(crate) fn generate_ie_deser_main(
             format!("    {name}Error(#[from_located(module = \"\")] {value_name}),\n").as_str(),
         );
     }
-    for ie in iana_ies {
-        ret.push_str(
-            format!(
-                "    {}Error(#[from_located(module = \"self\")] {}ParsingError),\n",
-                ie.name, ie.name
-            )
-            .as_str(),
-        );
-    }
+    ret.push_str("    InvalidLength{ie_name: String, length: u16},\n");
+    ret.push_str("    InvalidTimestamp{ie_name: String, seconds: u32},\n");
+    ret.push_str("    InvalidTimestampMillis{ie_name: String, millis: u64},\n");
+    ret.push_str("    InvalidTimestampFraction{ie_name: String, seconds: u32, fraction: u32},\n");
+    ret.push_str("    Utf8Error(String),\n");
     ret.push_str("}\n");
     ret.push_str("\n\n");
 
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}ParsingError {{\n").as_str());
+    ret.push_str("impl<'a> nom::error::FromExternalError<netgauze_parse_utils::Span<'a>, std::str::Utf8Error>\n");
+    ret.push_str("for LocatedFieldParsingError<'a>\n");
+    ret.push_str("{\n");
+    ret.push_str("    fn from_external_error(input: netgauze_parse_utils::Span<'a>, _kind: nom::error::ErrorKind, error: std::str::Utf8Error) -> Self {\n");
+    ret.push_str("        LocatedFieldParsingError::new(\n");
+    ret.push_str("            input,\n");
+    ret.push_str("            FieldParsingError::Utf8Error(error.to_string()),\n");
+    ret.push_str("        )\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl std::fmt::Display for FieldParsingError {\n");
     ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
     ret.push_str("        match self {\n");
     ret.push_str(
@@ -1750,33 +1851,16 @@ pub(crate) fn generate_ie_deser_main(
             format!("           Self::{name}Error(err) => write!(f, \"{{err}}\"),\n").as_str(),
         );
     }
-    for ie in iana_ies {
-        ret.push_str(
-            format!(
-                "           Self::{}Error(err) => write!(f, \"{{err}}\"),\n",
-                ie.name
-            )
-            .as_str(),
-        );
-    }
+    ret.push_str("           Self::InvalidLength{ie_name, length} => write!(f, \"error parsing {ie_name} invalid field length {length}\"),\n", );
+    ret.push_str("           Self::InvalidTimestamp{ie_name, seconds} => write!(f, \"error parsing {ie_name} invalid timestamp {seconds}\"),\n", );
+    ret.push_str("           Self::InvalidTimestampMillis{ie_name, millis} => write!(f, \"error parsing {ie_name} invalid timestamp {millis}\"),\n", );
+    ret.push_str("           Self::InvalidTimestampFraction{ie_name, seconds, fraction} => write!(f, \"error parsing {ie_name} invalid timestamp fraction ({seconds}, {fraction})\"),\n");
+    ret.push_str("           Self::Utf8Error(val) => write!(f, \"utf8 error {val}\"),\n");
     ret.push_str("        }\n");
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
 
-    ret.push_str(format!("impl std::error::Error for {ty_name}ParsingError {{\n").as_str());
-    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str("           Self::NomError(_err) => None,\n");
-    ret.push_str("           Self::UnknownInformationElement(_ie) => None,\n");
-    for (name, _pkg, _) in vendor_prefixes {
-        ret.push_str(format!("           Self::{name}Error(err) => Some(err),\n").as_str());
-    }
-    for ie in iana_ies {
-        ret.push_str(format!("           Self::{}Error(err) => Some(err),\n", ie.name).as_str());
-    }
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
+    ret.push_str("impl std::error::Error for FieldParsingError {}\n\n");
 
     ret.push_str("impl<'a> netgauze_parse_utils::ReadablePduWithTwoInputs<'a, &IE, u16, LocatedFieldParsingError<'a>>\n");
     ret.push_str("for Field {\n");
@@ -1795,15 +1879,11 @@ pub(crate) fn generate_ie_deser_main(
     }
     for ie in iana_ies {
         ret.push_str(format!("            IE::{} => {{\n", ie.name).as_str());
-        ret.push_str("                let (buf, value) = netgauze_parse_utils::parse_into_located_one_input(buf, length)?;\n");
-        ret.push_str(
-            format!(
-                "                (buf, crate::ie::Field::{}(value))\n",
-                ie.name
-            )
-            .as_str(),
-        );
-        ret.push_str("            }\n");
+        ret.push_str(&generate_ie_deserializer(
+            &ie.data_type,
+            &ie.name,
+            ie.subregistry.is_some(),
+        ));
     }
     ret.push_str("            ie => {\n");
     ret.push_str("                // todo Handle unknown IEs\n");
@@ -1817,358 +1897,6 @@ pub(crate) fn generate_ie_deser_main(
     ret
 }
 
-fn get_std_serializer_error(ty_name: &str) -> String {
-    let mut ret = String::new();
-    ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
-    ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
-    ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
-    ret.push_str("    InvalidLength(u16),\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}WritingError {{\n").as_str());
-    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str("            Self::StdIOError(err) => write!(f, \"{err}\"),\n");
-    ret.push_str("            Self::InvalidLength(len) => write!(f, \"invalid length {len}\"),\n");
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str(format!("impl std::error::Error for {ty_name}WritingError {{}}\n\n").as_str());
-    ret
-}
-
-fn generate_num8_serializer(num_type: &str, ie_name: &String, enum_subreg: bool) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
-
-    if ie_name == "tcpControlBits" {
-        ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for netgauze_iana::tcp::TCPHeaderFlags {{\n"
-        )
-        .as_str(),
-      );
-    } else {
-        ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-      );
-    }
-
-    ret.push_str("    const BASE_LENGTH: usize = 1;\n\n");
-    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
-    ret.push_str("         Self::BASE_LENGTH\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-
-    if enum_subreg || ie_name == "tcpControlBits" {
-        ret.push_str(format!("         let num_val = {num_type}::from(*self);\n").as_str());
-        ret.push_str(format!("         writer.write_{num_type}(num_val)?;\n").as_str());
-    } else {
-        ret.push_str(format!("         writer.write_{num_type}(self.0)?;\n").as_str());
-    }
-
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_num_serializer(
-    num_type: &str,
-    length: u16,
-    ie_name: &str,
-    enum_subreg: bool,
-) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name).as_str());
-
-    if ie_name == "tcpControlBits" {
-        ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for netgauze_iana::tcp::TCPHeaderFlags {{\n"
-        )
-        .as_str(),
-      );
-    } else {
-        ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-      );
-    }
-
-    ret.push_str(format!("    const BASE_LENGTH: usize = {length};\n\n").as_str());
-    ret.push_str("     fn len(&self, length: Option<u16>) -> usize {\n");
-    ret.push_str("         match length {\n");
-    ret.push_str("             None => Self::BASE_LENGTH,\n");
-    ret.push_str("             Some(len) => len as usize,\n");
-    ret.push_str("         }\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-
-    if enum_subreg || ie_name == "tcpControlBits" {
-        ret.push_str(format!("         let num_val = {num_type}::from(*self);\n").as_str());
-    } else {
-        ret.push_str("         let num_val = self.0;\n");
-    }
-
-    ret.push_str("         match length {\n");
-    ret.push_str(
-        format!(
-            "             None => writer.write_{num_type}::<byteorder::NetworkEndian>(num_val)?,\n"
-        )
-        .as_str(),
-    );
-    ret.push_str("             Some(len) => {\n");
-    ret.push_str("                 let be_bytes = num_val.to_be_bytes();\n");
-    ret.push_str("                 if usize::from(len) > be_bytes.len() {\n");
-    ret.push_str(
-        format!("                     return Err({ie_name}WritingError::InvalidLength(len));\n")
-            .as_str(),
-    );
-    ret.push_str("                 }\n");
-    ret.push_str("                 let begin_offset = be_bytes.len() - len as usize;\n");
-    ret.push_str("                 writer.write_all(&be_bytes[begin_offset..])?;\n");
-    ret.push_str("             }\n");
-    ret.push_str("         }\n");
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_array_serializer(ie_name: &str) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name).as_str());
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-    );
-    ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
-    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
-    ret.push_str("         self.0.len()\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str("         writer.write_all(&self.0)?;\n");
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_ip_serializer(length: u16, ie_name: &str) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name).as_str());
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-    );
-    ret.push_str(format!("    const BASE_LENGTH: usize = {length};\n\n").as_str());
-    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
-    ret.push_str("         Self::BASE_LENGTH\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str("         writer.write_all(&self.0.octets())?;\n");
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_string_serializer(ie_name: &str) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name).as_str());
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-    );
-    ret.push_str("    const BASE_LENGTH: usize = 0;\n");
-    ret.push('\n');
-    ret.push_str("    fn len(&self, length: Option<u16>) -> usize {\n");
-    ret.push_str("        match length {\n");
-    ret.push_str("            None => self.0.len(),\n");
-    ret.push_str("            Some(len) => if len == u16::MAX {\n");
-    ret.push_str("                if self.0.len() < u8::MAX as usize {\n");
-    ret.push_str("                    // One octet for the length field\n");
-    ret.push_str("                    self.0.len() + 1\n");
-    ret.push_str("                } else {\n");
-    ret.push_str("                    // 4 octets for the length field, first is 255 and other three carries the len\n");
-    ret.push_str("                    self.0.len() + 4\n");
-    ret.push_str("                }\n");
-    ret.push_str("            } else {\n");
-    ret.push_str("                len as usize\n");
-    ret.push_str("            },\n");
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push('\n');
-    ret.push_str(format!("    fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str("        match length {\n");
-    ret.push_str("            Some(u16::MAX) | None => {\n");
-    ret.push_str("                let bytes = self.0.as_bytes();\n");
-    ret.push_str("                if bytes.len() < u8::MAX as usize {\n");
-    ret.push_str("                    writer.write_u8(bytes.len() as u8)?;\n");
-    ret.push_str("                } else {\n");
-    ret.push_str("                    writer.write_u8(u8::MAX)?;\n");
-    ret.push_str("                    writer.write_all(&bytes.len().to_be_bytes()[1..])?;\n");
-    ret.push_str("                }\n");
-    ret.push_str("                writer.write_all(self.0.as_bytes())?;\n");
-    ret.push_str("            }\n");
-    ret.push_str("            Some(len) => {\n");
-    ret.push_str("                writer.write_all(self.0.as_bytes())?;\n");
-    ret.push_str("                // fill the rest with zeros\n");
-    ret.push_str("                for _ in self.0.len()..(len as usize) {\n");
-    ret.push_str("                    writer.write_u8(0)?\n");
-    ret.push_str("                }\n");
-    ret.push_str("            }\n");
-    ret.push_str("        }\n");
-    ret.push_str("        Ok(())\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_bool_serializer(ie_name: &String) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-    );
-    ret.push_str("    const BASE_LENGTH: usize = 1;\n\n");
-    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
-    ret.push_str("         Self::BASE_LENGTH\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str("         writer.write_u8(self.0.into())?;\n");
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_seconds_serializer(ie_name: &String) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-    );
-    ret.push_str("    const BASE_LENGTH: usize = 4;\n\n");
-    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
-    ret.push_str("         Self::BASE_LENGTH\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str(
-        "         writer.write_u32::<byteorder::NetworkEndian>(self.0.timestamp() as u32)?;\n",
-    );
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_milli_seconds_serializer(ie_name: &String) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-    );
-    ret.push_str("    const BASE_LENGTH: usize = 8;\n\n");
-    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
-    ret.push_str("         Self::BASE_LENGTH\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str(
-        "         writer.write_u64::<byteorder::NetworkEndian>(self.0.timestamp_millis() as u64)?;\n",
-    );
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_fraction_serializer(ie_name: &String) -> String {
-    let mut ret = String::new();
-    ret.push_str(get_std_serializer_error(ie_name.as_str()).as_str());
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ie_name}WritingError> for {ie_name} {{\n"
-        )
-        .as_str(),
-    );
-    ret.push_str("    const BASE_LENGTH: usize = 8;\n\n");
-    ret.push_str("     fn len(&self, _length: Option<u16>) -> usize {\n");
-    ret.push_str("         Self::BASE_LENGTH\n");
-    ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, _length: Option<u16>) -> Result<(), {ie_name}WritingError> {{\n").as_str());
-    ret.push_str(
-        "         writer.write_u32::<byteorder::NetworkEndian>(self.0.timestamp() as u32)?;\n",
-    );
-    ret.push_str("         let nanos = self.0.timestamp_subsec_nanos();\n");
-    ret.push_str("         // Convert 1/2**32 of a second to a fraction of a nano second\n");
-    ret.push_str("         let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;\n");
-    ret.push_str("         writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;\n");
-    ret.push_str("         Ok(())\n");
-    ret.push_str("     }\n");
-    ret.push_str("}\n\n");
-    ret
-}
-
-fn generate_ie_serializer(data_type: &str, ie_name: &String, enum_subreg: bool) -> String {
-    let mut ret = String::new();
-    let gen = match data_type {
-        "octetArray" => generate_array_serializer(ie_name),
-        "unsigned8" => generate_num8_serializer("u8", ie_name, enum_subreg),
-        "unsigned16" => generate_num_serializer("u16", 2, ie_name, enum_subreg),
-        "unsigned32" => generate_num_serializer("u32", 4, ie_name, enum_subreg),
-        "unsigned64" => generate_num_serializer("u64", 8, ie_name, enum_subreg),
-        "signed8" => generate_num8_serializer("i8", ie_name, enum_subreg),
-        "signed16" => generate_num_serializer("i16", 2, ie_name, enum_subreg),
-        "signed32" => generate_num_serializer("i32", 4, ie_name, enum_subreg),
-        "signed64" => generate_num_serializer("i64", 8, ie_name, enum_subreg),
-        "float32" => generate_num_serializer("f32", 4, ie_name, enum_subreg),
-        "float64" => generate_num_serializer("f64", 8, ie_name, enum_subreg),
-        "boolean" => generate_bool_serializer(ie_name),
-        "macAddress" => generate_array_serializer(ie_name),
-        "string" => generate_string_serializer(ie_name),
-        "dateTimeSeconds" => generate_seconds_serializer(ie_name),
-        "dateTimeMilliseconds" => generate_milli_seconds_serializer(ie_name),
-        "dateTimeMicroseconds" => generate_fraction_serializer(ie_name),
-        //// Nano and micro are using the same representation,
-        //// see https://www.rfc-editor.org/rfc/rfc7011.html#section-6.1.9
-        "dateTimeNanoseconds" => generate_fraction_serializer(ie_name),
-        "ipv4Address" => generate_ip_serializer(4, ie_name),
-        "ipv6Address" => generate_ip_serializer(16, ie_name),
-        //// TODO: better parsing for IPFIX structured Data
-        "basicList" => generate_array_serializer(ie_name),
-        "subTemplateList" => generate_array_serializer(ie_name),
-        "subTemplateMultiList" => generate_array_serializer(ie_name),
-        "unsigned256" => generate_array_serializer(ie_name),
-        ty => todo!("Unsupported serialization for type: {}", ty),
-    };
-    ret.push_str(gen.as_str());
-    ret
-}
-
 pub(crate) fn generate_ie_ser_main(
     iana_ies: &Vec<InformationElement>,
     vendor_prefixes: &[(String, String, u32)],
@@ -2176,65 +1904,31 @@ pub(crate) fn generate_ie_ser_main(
     let mut ret = String::new();
     ret.push_str("use byteorder::WriteBytesExt;\n\n\n");
 
-    for ie in iana_ies {
-        ret.push_str(
-            generate_ie_serializer(&ie.data_type, &ie.name, ie.subregistry.is_some()).as_str(),
-        );
-    }
-
-    let ty_name = "Field";
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[derive(netgauze_serde_macros::WritingError, Eq, PartialEq, Clone, Debug)]\n");
-    ret.push_str(format!("pub enum {ty_name}WritingError {{\n").as_str());
+    ret.push_str("pub enum FieldWritingError {\n");
     ret.push_str("    StdIOError(#[from_std_io_error] String),\n");
     for (name, pkg, _) in vendor_prefixes {
         ret.push_str(format!("    {name}Error(#[from] {pkg}::FieldWritingError),\n").as_str());
     }
-    for ie in iana_ies {
-        ret.push_str(format!("    {}Error(#[from] {}WritingError),\n", ie.name, ie.name).as_str());
-    }
+    ret.push_str("    InvalidLength{ie_name: String, length: u16},\n");
     ret.push_str("}\n\n");
 
-    ret.push_str(format!("impl std::fmt::Display for {ty_name}WritingError {{\n").as_str());
+    ret.push_str("impl std::fmt::Display for FieldWritingError {\n");
     ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
     ret.push_str("        match self {\n");
     ret.push_str("            Self::StdIOError(err) => write!(f, \"{err}\"),\n");
     for (name, pkg, _) in vendor_prefixes {
         ret.push_str(format!("            Self::{name}Error(err) => write!(f, \"writing error of {pkg}{{err}}\"),\n").as_str());
     }
-    for ie in iana_ies {
-        ret.push_str(
-            format!(
-                "            Self::{}Error(err) => write!(f, \"{{err}}\"),\n",
-                ie.name
-            )
-            .as_str(),
-        );
-    }
+    ret.push_str("            Self::InvalidLength{ie_name, length} => write!(f, \"writing error of {ie_name} invalid length {length}\"),\n");
     ret.push_str("        }\n");
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
 
-    ret.push_str(format!("impl std::error::Error for {ty_name}WritingError {{\n").as_str());
-    ret.push_str("    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {\n");
-    ret.push_str("        match self {\n");
-    ret.push_str("            Self::StdIOError(_) => None,\n");
-    for (name, _pkg, _) in vendor_prefixes {
-        ret.push_str(format!("            Self::{name}Error(err) => Some(err),\n").as_str());
-    }
-    for ie in iana_ies {
-        ret.push_str(format!("            Self::{}Error(err) => Some(err),\n", ie.name).as_str());
-    }
-    ret.push_str("        }");
-    ret.push_str("    }");
-    ret.push_str("}\n\n");
+    ret.push_str("impl std::error::Error for FieldWritingError {}\n\n");
 
-    ret.push_str(
-        format!(
-            "impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, {ty_name}WritingError> for {ty_name} {{\n"
-        )
-        .as_str(),
-    );
+    ret.push_str("impl netgauze_parse_utils::WritablePduWithOneInput<Option<u16>, FieldWritingError> for Field {\n");
     ret.push_str("    const BASE_LENGTH: usize = 0;\n\n");
     ret.push_str("    fn len(&self, length: Option<u16>) -> usize {\n");
     ret.push_str("        match self {\n");
@@ -2243,18 +1937,148 @@ pub(crate) fn generate_ie_ser_main(
         ret.push_str(format!("            Self::{name}(value) => value.len(length),\n").as_str());
     }
     for ie in iana_ies {
-        ret.push_str(
-            format!(
-                "            Self::{}(value) => value.len(length),\n",
-                ie.name
-            )
-            .as_str(),
-        );
+        match ie.data_type.as_str() {
+            "octetArray" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "unsigned8" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                1\n");
+            }
+            "unsigned16" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 2,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "unsigned32" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 4,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "unsigned64" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 8,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "signed8" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                1\n");
+            }
+            "signed16" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 2,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "signed32" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 4,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "signed64" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 8,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "float32" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 4,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "float64" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => 8,\n");
+                ret.push_str("                    Some(len) => len as usize,\n");
+                ret.push_str("                }\n");
+            }
+            "boolean" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                1\n");
+            }
+            "macAddress" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "string" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => value.len(),\n");
+                ret.push_str("                    Some(len) => if len == u16::MAX {\n");
+                ret.push_str("                        if value.len() < u8::MAX as usize {\n");
+                ret.push_str("                            // One octet for the length field\n");
+                ret.push_str("                            value.len() + 1\n");
+                ret.push_str("                        } else {\n");
+                ret.push_str("                            // 4 octets for the length field, first is 255 and other three carries the len\n");
+                ret.push_str("                            value.len() + 4\n");
+                ret.push_str("                        }\n");
+                ret.push_str("                    } else {\n");
+                ret.push_str("                        len as usize\n");
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "dateTimeSeconds" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                4\n");
+            }
+            "dateTimeMilliseconds" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                8\n");
+            }
+            "dateTimeMicroseconds" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                8\n");
+            }
+            "dateTimeNanoseconds" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                8\n");
+            }
+            "ipv4Address" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                4\n");
+            }
+            "ipv6Address" => {
+                ret.push_str(format!("            Self::{}(_value) => {{\n", ie.name).as_str());
+                ret.push_str("                16\n");
+            }
+            "basicList" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "subTemplateList" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "subTemplateMultiList" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            "unsigned256" => {
+                ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+                ret.push_str("                value.len()\n");
+            }
+            ty => todo!("Unsupported serialization for type: {}", ty),
+        }
+        ret.push_str("            }\n");
     }
 
     ret.push_str("         }\n");
     ret.push_str("     }\n\n");
-    ret.push_str(format!("     fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), {ty_name}WritingError> {{\n").as_str());
+    ret.push_str("    fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), FieldWritingError> {\n");
     ret.push_str("        match self {\n");
     ret.push_str(
         "            Self::Unknown{pen: _pen, id: _id, value} => writer.write_all(value)?,\n",
@@ -2265,13 +2089,271 @@ pub(crate) fn generate_ie_ser_main(
         );
     }
     for ie in iana_ies {
-        ret.push_str(
-            format!(
-                "            Self::{}(value) => value.write(writer, length)?,\n",
-                ie.name
-            )
-            .as_str(),
-        );
+        ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
+        match ie.data_type.as_str() {
+            "octetArray" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "unsigned8" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let num_val = u8::from(*value);\n");
+                    ret.push_str("                writer.write_u8(num_val)?\n");
+                } else {
+                    ret.push_str("                writer.write_u8(*value)?\n");
+                }
+            }
+            "unsigned16" => {
+                if ie.subregistry.is_some() || ie.name == "tcpControlBits" {
+                    ret.push_str("                let value = u16::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_u16::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "unsigned32" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = u32::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_u32::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "unsigned64" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = u64::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_u64::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "signed8" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let num_val = i8::from(*value);\n");
+                    ret.push_str("                writer.write_i8(num_val)?\n");
+                } else {
+                    ret.push_str("                writer.write_i8(*value)?\n");
+                }
+            }
+            "signed16" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = i16::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_i16::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "signed32" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = i32::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_i32::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "signed64" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = i64::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_i64::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "float32" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = f32::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_f32::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "float64" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str("                let value = f64::from(*value);\n");
+                } else {
+                    ret.push_str("                let value = *value;\n");
+                }
+                ret.push_str("                match length {\n");
+                ret.push_str("                    None => writer.write_f64::<byteorder::NetworkEndian>(value)?,\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        let be_bytes = value.to_be_bytes();\n");
+                ret.push_str("                        if usize::from(len) > be_bytes.len() {\n");
+                ret.push_str(format!("                           return Err(FieldWritingError::InvalidLength{{ie_name: \"{}\".to_string(), length: len}});\n", ie.name).as_str());
+                ret.push_str("                        }\n");
+                ret.push_str(
+                    "                        let begin_offset = be_bytes.len() - len as usize;\n",
+                );
+                ret.push_str(
+                    "                        writer.write_all(&be_bytes[begin_offset..])?\n",
+                );
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "boolean" => {
+                ret.push_str("                writer.write_u8(*value as u8)?\n");
+            }
+            "macAddress" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "string" => {
+                ret.push_str("                match length {\n");
+                ret.push_str("                    Some(u16::MAX) | None => {\n");
+                ret.push_str("                        let bytes = value.as_bytes();\n");
+                ret.push_str("                        if bytes.len() < u8::MAX as usize {\n");
+                ret.push_str("                            writer.write_u8(bytes.len() as u8)?;\n");
+                ret.push_str("                        } else {\n");
+                ret.push_str("                            writer.write_u8(u8::MAX)?;\n");
+                ret.push_str("                            writer.write_all(&bytes.len().to_be_bytes()[1..])?;\n");
+                ret.push_str("                        }\n");
+                ret.push_str("                        writer.write_all(value.as_bytes())?;\n");
+                ret.push_str("                    }\n");
+                ret.push_str("                    Some(len) => {\n");
+                ret.push_str("                        writer.write_all(value.as_bytes())?;\n");
+                ret.push_str("                        // fill the rest with zeros\n");
+                ret.push_str("                        for _ in value.len()..(len as usize) {\n");
+                ret.push_str("                            writer.write_u8(0)?\n");
+                ret.push_str("                        }\n");
+                ret.push_str("                    }\n");
+                ret.push_str("                }\n");
+            }
+            "dateTimeSeconds" => {
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;\n");
+            }
+            "dateTimeMilliseconds" => {
+                ret.push_str("                writer.write_u64::<byteorder::NetworkEndian>(value.timestamp_millis() as u64)?;\n", );
+            }
+            "dateTimeMicroseconds" => {
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;\n", );
+                ret.push_str("                let nanos = value.timestamp_subsec_nanos();\n");
+                ret.push_str("                // Convert 1/2**32 of a second to a fraction of a nano second\n");
+                ret.push_str("                let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;\n");
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;\n");
+            }
+            "dateTimeNanoseconds" => {
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(value.timestamp() as u32)?;\n", );
+                ret.push_str("                let nanos = value.timestamp_subsec_nanos();\n");
+                ret.push_str("                // Convert 1/2**32 of a second to a fraction of a nano second\n");
+                ret.push_str("                let fraction = (nanos as u64 * u32::MAX as u64) / 1_000_000_000;\n");
+                ret.push_str("                writer.write_u32::<byteorder::NetworkEndian>(fraction as u32)?;\n");
+            }
+            "ipv4Address" => {
+                ret.push_str("                writer.write_all(&value.octets())?\n");
+            }
+            "ipv6Address" => {
+                ret.push_str("                writer.write_all(&value.octets())?\n");
+            }
+            "basicList" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "subTemplateList" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "subTemplateMultiList" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            "unsigned256" => {
+                ret.push_str("                writer.write_all(value)?\n");
+            }
+            ty => todo!("Unsupported serialization for type: {}", ty),
+        }
+        ret.push_str("            }\n");
     }
     ret.push_str("         }\n");
     ret.push_str("         Ok(())\n");

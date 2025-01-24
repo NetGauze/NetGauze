@@ -83,18 +83,14 @@ fn main() {
             records: vec![DataRecord::new(
                 vec![],
                 vec![
-                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 1,
-                    ))),
-                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 151,
-                    ))),
-                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
-                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
-                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 151)),
+                    ie::Field::sourceTransportPort(10004),
+                    ie::Field::destinationTransportPort(1),
+                    ie::Field::flowId(10101010),
                     ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
-                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
-                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
+                    ie::Field::octetDeltaCount(1200),
+                    ie::Field::packetDeltaCount(1),
                     ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown),
                     ie::Field::forwardingStatus(ie::forwardingStatus::Dropped(
                         ie::forwardingStatusDroppedReason::Badheaderchecksum,

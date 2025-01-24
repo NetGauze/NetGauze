@@ -15,7 +15,6 @@
 
 use crate::{
     ie,
-    ie::*,
     ipfix::*,
     wire::{deserializer::ipfix::*, serializer::ipfix::*},
     DataSetId, FieldSpecifier,
@@ -244,49 +243,41 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
             records: vec![DataRecord::new(
                 vec![],
                 vec![
-                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                        70, 1, 115, 1,
-                    ))),
-                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
-                        50, 0, 71, 1,
-                    ))),
-                    ie::Field::ipClassOfService(ie::ipClassOfService(0)),
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(50, 0, 71, 1)),
+                    ie::Field::ipClassOfService(0),
                     ie::Field::protocolIdentifier(ie::protocolIdentifier::anyhostinternalprotocol),
-                    ie::Field::sourceTransportPort(ie::sourceTransportPort(0)),
-                    ie::Field::destinationTransportPort(ie::destinationTransportPort(0)),
-                    ie::Field::icmpTypeCodeIPv4(ie::icmpTypeCodeIPv4(0)),
-                    ie::Field::ingressInterface(ie::ingressInterface(827)),
-                    ie::Field::bgpSourceAsNumber(ie::bgpSourceAsNumber(2)),
-                    ie::Field::bgpDestinationAsNumber(ie::bgpDestinationAsNumber(3)),
-                    ie::Field::bgpNextHopIPv4Address(ie::bgpNextHopIPv4Address(Ipv4Addr::new(
-                        204, 42, 110, 101,
-                    ))),
-                    ie::Field::egressInterface(ie::egressInterface(854)),
-                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1312)),
-                    ie::Field::packetDeltaCount(ie::packetDeltaCount(9)),
-                    ie::Field::flowStartSysUpTime(ie::flowStartSysUpTime(0xb3f906ee)),
-                    ie::Field::flowEndSysUpTime(ie::flowEndSysUpTime(0xb3fbaf3c)),
-                    ie::Field::ipNextHopIPv4Address(ie::ipNextHopIPv4Address(Ipv4Addr::new(
-                        204, 42, 110, 189,
-                    ))),
-                    ie::Field::sourceIPv4PrefixLength(ie::sourceIPv4PrefixLength(24)),
-                    ie::Field::destinationIPv4PrefixLength(ie::destinationIPv4PrefixLength(24)),
+                    ie::Field::sourceTransportPort(0),
+                    ie::Field::destinationTransportPort(0),
+                    ie::Field::icmpTypeCodeIPv4(0),
+                    ie::Field::ingressInterface(827),
+                    ie::Field::bgpSourceAsNumber(2),
+                    ie::Field::bgpDestinationAsNumber(3),
+                    ie::Field::bgpNextHopIPv4Address(Ipv4Addr::new(204, 42, 110, 101)),
+                    ie::Field::egressInterface(854),
+                    ie::Field::octetDeltaCount(1312),
+                    ie::Field::packetDeltaCount(9),
+                    ie::Field::flowStartSysUpTime(0xb3f906ee),
+                    ie::Field::flowEndSysUpTime(0xb3fbaf3c),
+                    ie::Field::ipNextHopIPv4Address(Ipv4Addr::new(204, 42, 110, 189)),
+                    ie::Field::sourceIPv4PrefixLength(24),
+                    ie::Field::destinationIPv4PrefixLength(24),
                     ie::Field::tcpControlBits(TCPHeaderFlags::new(
                         false, false, false, false, false, false, false, false,
                     )),
-                    ie::Field::ipVersion(ie::ipVersion(4)),
-                    ie::Field::flowStartMilliseconds(ie::flowStartMilliseconds(
+                    ie::Field::ipVersion(4),
+                    ie::Field::flowStartMilliseconds(
                         Utc.with_ymd_and_hms(2016, 11, 29, 20, 5, 31)
                             .unwrap()
                             .with_nanosecond(519_000_000)
                             .unwrap(),
-                    )),
-                    ie::Field::flowEndMilliseconds(ie::flowEndMilliseconds(
+                    ),
+                    ie::Field::flowEndMilliseconds(
                         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 25)
                             .unwrap()
                             .with_nanosecond(677_000_000)
                             .unwrap(),
-                    )),
+                    ),
                 ],
             )],
         }],
@@ -565,14 +556,14 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
         vec![Set::Data {
             id: DataSetId::new(257).unwrap(),
             records: vec![DataRecord::new(
-                vec![ie::Field::selectorId(ie::selectorId(1))],
+                vec![ie::Field::selectorId(1)],
                 vec![
-                    ie::Field::samplingPacketInterval(ie::samplingPacketInterval(1)),
-                    ie::Field::selectorAlgorithm(ie::selectorAlgorithm(3)),
-                    ie::Field::samplingSize(ie::samplingSize(1)),
-                    ie::Field::samplingPopulation(ie::samplingPopulation(1)),
-                    ie::Field::samplerName(ie::samplerName(String::from("NETFLOW-SAMPLER-MAP"))),
-                    ie::Field::selectorName(ie::selectorName(String::from("NETFLOW-SAMPLER-MAP"))),
+                    ie::Field::samplingPacketInterval(1),
+                    ie::Field::selectorAlgorithm(3),
+                    ie::Field::samplingSize(1),
+                    ie::Field::samplingPopulation(1),
+                    ie::Field::samplerName(String::from("NETFLOW-SAMPLER-MAP")),
+                    ie::Field::selectorName(String::from("NETFLOW-SAMPLER-MAP")),
                 ],
             )],
         }],
@@ -623,9 +614,9 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
                 FieldSpecifier::new(ie::IE::flowId, 8).unwrap(),
                 FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::engineType, 1).unwrap(),
-                FieldSpecifier::new(ie::IE::Nokia(nokia::IE::aluInsideServiceId), 2).unwrap(),
-                FieldSpecifier::new(ie::IE::Nokia(nokia::IE::aluOutsideServiceId), 2).unwrap(),
-                FieldSpecifier::new(ie::IE::Nokia(nokia::IE::aluNatSubString), 65535).unwrap(),
+                FieldSpecifier::new(ie::IE::Nokia(ie::nokia::IE::aluInsideServiceId), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::Nokia(ie::nokia::IE::aluOutsideServiceId), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::Nokia(ie::nokia::IE::aluNatSubString), 65535).unwrap(),
                 FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
             ],
@@ -641,32 +632,22 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
             records: vec![DataRecord::new(
                 vec![],
                 vec![
-                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 1,
-                    ))),
-                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 151,
-                    ))),
-                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
-                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
-                    ie::Field::postNATSourceIPv4Address(ie::postNATSourceIPv4Address(
-                        Ipv4Addr::new(8, 8, 8, 8),
-                    )),
-                    ie::Field::postNAPTSourceTransportPort(ie::postNAPTSourceTransportPort(8881)),
-                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 151)),
+                    ie::Field::sourceTransportPort(10004),
+                    ie::Field::destinationTransportPort(1),
+                    ie::Field::postNATSourceIPv4Address(Ipv4Addr::new(8, 8, 8, 8)),
+                    ie::Field::postNAPTSourceTransportPort(8881),
+                    ie::Field::flowId(10101010),
                     ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
-                    ie::Field::engineType(ie::engineType(0)),
-                    ie::Field::Nokia(nokia::Field::aluInsideServiceId(nokia::aluInsideServiceId(
-                        1,
+                    ie::Field::engineType(0),
+                    ie::Field::Nokia(ie::nokia::Field::aluInsideServiceId(1)),
+                    ie::Field::Nokia(ie::nokia::Field::aluOutsideServiceId(15)),
+                    ie::Field::Nokia(ie::nokia::Field::aluNatSubString(String::from(
+                        "LSN-Host@10.10.10.101",
                     ))),
-                    ie::Field::Nokia(nokia::Field::aluOutsideServiceId(
-                        nokia::aluOutsideServiceId(15),
-                    )),
-                    ie::Field::Nokia(nokia::Field::aluNatSubString(nokia::aluNatSubString(
-                        String::from("LSN-Host@10.10.10.101"),
-                    ))),
-                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
-                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
+                    ie::Field::octetDeltaCount(1200),
+                    ie::Field::packetDeltaCount(1),
                 ],
             )],
         }],
@@ -723,16 +704,18 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
                 FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::ingressInterfaceAttr), 2).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::egressInterfaceAttr), 2).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::vxlanExportRole), 1).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantSourceIPv4), 4).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantDestIPv4), 4).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantSourcePort), 2).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantDestPort), 2).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::tenantProtocol), 1).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::flowDirection), 1).unwrap(),
-                FieldSpecifier::new(ie::IE::VMWare(vmware::IE::virtualObsID), 65535).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::ingressInterfaceAttr), 2)
+                    .unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::egressInterfaceAttr), 2)
+                    .unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::vxlanExportRole), 1).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::tenantSourceIPv4), 4).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::tenantDestIPv4), 4).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::tenantSourcePort), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::tenantDestPort), 2).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::tenantProtocol), 1).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::flowDirection), 1).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::virtualObsID), 65535).unwrap(),
             ],
         )])],
     );
@@ -746,39 +729,33 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
             records: vec![DataRecord::new(
                 vec![],
                 vec![
-                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 1,
-                    ))),
-                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 151,
-                    ))),
-                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
-                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
-                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 151)),
+                    ie::Field::sourceTransportPort(10004),
+                    ie::Field::destinationTransportPort(1),
+                    ie::Field::flowId(10101010),
                     ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
-                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
-                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
-                    ie::Field::VMWare(vmware::Field::ingressInterfaceAttr(
-                        vmware::ingressInterfaceAttr(10),
+                    ie::Field::octetDeltaCount(1200),
+                    ie::Field::packetDeltaCount(1),
+                    ie::Field::VMWare(ie::vmware::Field::ingressInterfaceAttr(10)),
+                    ie::Field::VMWare(ie::vmware::Field::egressInterfaceAttr(12)),
+                    ie::Field::VMWare(ie::vmware::Field::vxlanExportRole(0)),
+                    ie::Field::VMWare(ie::vmware::Field::tenantSourceIPv4(Ipv4Addr::new(
+                        192, 168, 140, 6,
+                    ))),
+                    ie::Field::VMWare(ie::vmware::Field::tenantDestIPv4(Ipv4Addr::new(
+                        192, 168, 140, 68,
+                    ))),
+                    ie::Field::VMWare(ie::vmware::Field::tenantSourcePort(20023)),
+                    ie::Field::VMWare(ie::vmware::Field::tenantDestPort(443)),
+                    ie::Field::VMWare(ie::vmware::Field::tenantProtocol(
+                        ie::vmware::tenantProtocol::TCP,
                     )),
-                    ie::Field::VMWare(vmware::Field::egressInterfaceAttr(
-                        vmware::egressInterfaceAttr(12),
+                    ie::Field::VMWare(ie::vmware::Field::flowDirection(
+                        ie::vmware::flowDirection::ingress,
                     )),
-                    ie::Field::VMWare(vmware::Field::vxlanExportRole(vmware::vxlanExportRole(0))),
-                    ie::Field::VMWare(vmware::Field::tenantSourceIPv4(vmware::tenantSourceIPv4(
-                        Ipv4Addr::new(192, 168, 140, 6),
-                    ))),
-                    ie::Field::VMWare(vmware::Field::tenantDestIPv4(vmware::tenantDestIPv4(
-                        Ipv4Addr::new(192, 168, 140, 68),
-                    ))),
-                    ie::Field::VMWare(vmware::Field::tenantSourcePort(vmware::tenantSourcePort(
-                        20023,
-                    ))),
-                    ie::Field::VMWare(vmware::Field::tenantDestPort(vmware::tenantDestPort(443))),
-                    ie::Field::VMWare(vmware::Field::tenantProtocol(vmware::tenantProtocol::TCP)),
-                    ie::Field::VMWare(vmware::Field::flowDirection(vmware::flowDirection::ingress)),
-                    ie::Field::VMWare(vmware::Field::virtualObsID(vmware::virtualObsID(
-                        String::from("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                    ie::Field::VMWare(ie::vmware::Field::virtualObsID(String::from(
+                        "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
                     ))),
                 ],
             )],
@@ -862,18 +839,14 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
             records: vec![DataRecord::new(
                 vec![],
                 vec![
-                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 1,
-                    ))),
-                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 151,
-                    ))),
-                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
-                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
-                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 151)),
+                    ie::Field::sourceTransportPort(10004),
+                    ie::Field::destinationTransportPort(1),
+                    ie::Field::flowId(10101010),
                     ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
-                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
-                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
+                    ie::Field::octetDeltaCount(1200),
+                    ie::Field::packetDeltaCount(1),
                     ie::Field::mplsTopLabelType(ie::mplsTopLabelType::Unknown),
                     ie::Field::forwardingStatus(ie::forwardingStatus::Dropped(
                         ie::forwardingStatusDroppedReason::Badheaderchecksum,
