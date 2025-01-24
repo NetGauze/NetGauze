@@ -56,14 +56,10 @@ fn main() {
             records: vec![DataRecord::new(
                 vec![],
                 vec![
-                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                        70, 1, 115, 1,
-                    ))),
-                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
-                        50, 0, 71, 1,
-                    ))),
-                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1312)),
-                    ie::Field::packetDeltaCount(ie::packetDeltaCount(9)),
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(50, 0, 71, 1)),
+                    ie::Field::octetDeltaCount(1312),
+                    ie::Field::packetDeltaCount(9),
                 ],
             )],
         }],

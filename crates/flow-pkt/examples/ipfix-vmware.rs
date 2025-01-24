@@ -78,39 +78,29 @@ fn main() {
             records: vec![DataRecord::new(
                 vec![],
                 vec![
-                    ie::Field::sourceIPv4Address(ie::sourceIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 1,
-                    ))),
-                    ie::Field::destinationIPv4Address(ie::destinationIPv4Address(Ipv4Addr::new(
-                        10, 100, 0, 151,
-                    ))),
-                    ie::Field::sourceTransportPort(ie::sourceTransportPort(10004)),
-                    ie::Field::destinationTransportPort(ie::destinationTransportPort(1)),
-                    ie::Field::flowId(ie::flowId(10101010)),
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 151)),
+                    ie::Field::sourceTransportPort(10004),
+                    ie::Field::destinationTransportPort(1),
+                    ie::Field::flowId(10101010),
                     ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
-                    ie::Field::octetDeltaCount(ie::octetDeltaCount(1200)),
-                    ie::Field::packetDeltaCount(ie::packetDeltaCount(1)),
-                    ie::Field::VMWare(vmware::Field::ingressInterfaceAttr(
-                        vmware::ingressInterfaceAttr(10),
-                    )),
-                    ie::Field::VMWare(vmware::Field::egressInterfaceAttr(
-                        vmware::egressInterfaceAttr(12),
-                    )),
-                    ie::Field::VMWare(vmware::Field::vxlanExportRole(vmware::vxlanExportRole(0))),
-                    ie::Field::VMWare(vmware::Field::tenantSourceIPv4(vmware::tenantSourceIPv4(
-                        Ipv4Addr::new(192, 168, 140, 6),
+                    ie::Field::octetDeltaCount(1200),
+                    ie::Field::packetDeltaCount(1),
+                    ie::Field::VMWare(vmware::Field::ingressInterfaceAttr(10)),
+                    ie::Field::VMWare(vmware::Field::egressInterfaceAttr(12)),
+                    ie::Field::VMWare(vmware::Field::vxlanExportRole(0)),
+                    ie::Field::VMWare(vmware::Field::tenantSourceIPv4(Ipv4Addr::new(
+                        192, 168, 140, 6,
                     ))),
-                    ie::Field::VMWare(vmware::Field::tenantDestIPv4(vmware::tenantDestIPv4(
-                        Ipv4Addr::new(192, 168, 140, 68),
+                    ie::Field::VMWare(vmware::Field::tenantDestIPv4(Ipv4Addr::new(
+                        192, 168, 140, 68,
                     ))),
-                    ie::Field::VMWare(vmware::Field::tenantSourcePort(vmware::tenantSourcePort(
-                        20023,
-                    ))),
-                    ie::Field::VMWare(vmware::Field::tenantDestPort(vmware::tenantDestPort(443))),
+                    ie::Field::VMWare(vmware::Field::tenantSourcePort(20023)),
+                    ie::Field::VMWare(vmware::Field::tenantDestPort(443)),
                     ie::Field::VMWare(vmware::Field::tenantProtocol(vmware::tenantProtocol::TCP)),
                     ie::Field::VMWare(vmware::Field::flowDirection(vmware::flowDirection::ingress)),
-                    ie::Field::VMWare(vmware::Field::virtualObsID(vmware::virtualObsID(
-                        String::from("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                    ie::Field::VMWare(vmware::Field::virtualObsID(String::from(
+                        "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
                     ))),
                 ],
             )],
