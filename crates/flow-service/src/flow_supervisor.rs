@@ -64,7 +64,7 @@ use crate::{
     create_flow_channel,
     flow_actor::{
         FlowCollectorActorCommand, FlowCollectorActorError, FlowCollectorActorHandle,
-        PeerTemplateIds,
+        FlowCollectorActorStats, PeerTemplateIds,
     },
     ActorId, FlowReceiver, FlowSender, SubscriberId, Subscription,
 };
@@ -293,10 +293,12 @@ pub struct FlowCollectorsSupervisorActorHandle {
 impl FlowCollectorsSupervisorActorHandle {
     pub async fn new(
         config: SupervisorConfig,
+        meter: opentelemetry::metrics::Meter,
     ) -> (JoinHandle<()>, FlowCollectorsSupervisorActorHandle) {
         let mut next_actor_id = 0;
         let mut actor_handlers = HashMap::new();
         let mut actors_join = vec![];
+        let stats = FlowCollectorActorStats::new(meter);
         for binding_address in config.binding_addresses {
             for _ in 0..binding_address.num_workers {
                 info!(
@@ -309,6 +311,7 @@ impl FlowCollectorsSupervisorActorHandle {
                     binding_address.interface.clone(),
                     10,
                     config.subscriber_timeout,
+                    either::Either::Right(stats.clone()),
                 )
                 .await;
                 match actor_ret {
@@ -617,7 +620,8 @@ mod test {
     #[tracing_test::traced_test]
     async fn test_supervisor_creation() {
         let config = create_test_config();
-        let (join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config).await;
+        let meter = opentelemetry::global::meter("test-meter");
+        let (join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
 
         assert!(!join_handle.is_finished());
 
@@ -638,7 +642,8 @@ mod test {
     #[tracing_test::traced_test]
     async fn test_supervisor_subscribe_unsubscribe() {
         let config = create_test_config();
-        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config).await;
+        let meter = opentelemetry::global::meter("test-meter");
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
 
         // Subscribe
         let (pkt_rx, subscriptions) = handle.subscribe(10).await.expect("Failed to subscribe");
@@ -667,7 +672,8 @@ mod test {
     #[tracing_test::traced_test]
     async fn test_supervisor_purge_unused_peers() {
         let config = create_test_config();
-        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config).await;
+        let meter = opentelemetry::global::meter("test-meter");
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
 
         // Purge unused peers (should be none at this point)
         let purged_peers = handle
@@ -719,7 +725,8 @@ mod test {
     #[tracing_test::traced_test]
     async fn test_supervisor_get_peer_templates() {
         let config = create_test_config();
-        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config).await;
+        let meter = opentelemetry::global::meter("test-meter");
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
 
         // Get local addresses that the flow actors are listening on
         let local_addrs = handle
@@ -789,7 +796,8 @@ mod test {
     #[tracing_test::traced_test]
     async fn test_supervisor_get_peer_template_ids() {
         let config = create_test_config();
-        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config).await;
+        let meter = opentelemetry::global::meter("test-meter");
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
 
         // Get local addresses that the flow actors are listening on
         let local_addrs = handle

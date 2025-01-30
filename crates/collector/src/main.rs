@@ -19,9 +19,48 @@ use figment::{
 };
 
 use figment::providers::Yaml;
-use netgauze_collector::{config::CollectorConfig, init_flow_collection};
+use netgauze_collector::{
+    config::{CollectorConfig, TelemetryConfig},
+    init_flow_collection,
+};
+use opentelemetry::global;
 use std::{env, path::PathBuf, str::FromStr};
 use tracing::{info, Level};
+
+fn init_open_telemetry(
+    config: &TelemetryConfig,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    use opentelemetry::{global, KeyValue};
+    use opentelemetry_otlp::{Protocol, WithExportConfig};
+    use opentelemetry_sdk::Resource;
+    use std::time::Duration;
+
+    let exporter = opentelemetry_otlp::MetricExporter::builder()
+        .with_tonic()
+        .with_endpoint(config.url())
+        .with_protocol(Protocol::Grpc)
+        .with_timeout(Duration::from_secs(3))
+        .build()?;
+
+    let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(
+        exporter,
+        opentelemetry_sdk::runtime::Tokio,
+    )
+    .with_interval(Duration::from_secs(60))
+    .with_timeout(Duration::from_secs(10))
+    .build();
+
+    let provider = opentelemetry_sdk::metrics::SdkMeterProvider::builder()
+        .with_reader(reader)
+        .with_resource(Resource::new(vec![KeyValue::new(
+            "service.name",
+            "NetGauze",
+        )]))
+        .build();
+
+    global::set_meter_provider(provider);
+    Ok(())
+}
 
 fn init_tracing(level: &'_ str) {
     // Very simple setup at the moment to validate the instrumentation in the code
@@ -59,7 +98,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     runtime_builder.enable_all();
     let runtime = runtime_builder.build()?;
     runtime.block_on(async move {
-        let flow_handle = init_flow_collection(config.flow.clone());
+        init_open_telemetry(&config.telemetry)?;
+        let meter = global::meter_provider().meter("netgauze");
+        let flow_handle = init_flow_collection(config.flow.clone(), meter);
 
         // // Purge old entries periodically
         // let purge_timeout = config.flow.template_cache_purge_timeout;

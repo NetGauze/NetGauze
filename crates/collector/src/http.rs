@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use opentelemetry::KeyValue;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -53,6 +54,35 @@ pub(crate) enum HttpPublisherActorCommand {
     Shutdown(mpsc::Sender<String>),
 }
 
+#[derive(Debug, Clone)]
+pub struct HttpPublisherStats {
+    received: opentelemetry::metrics::Counter<u64>,
+    success_sent: opentelemetry::metrics::Counter<u64>,
+    failed_sent: opentelemetry::metrics::Counter<u64>,
+}
+
+impl HttpPublisherStats {
+    pub fn new(metric: opentelemetry::metrics::Meter) -> Self {
+        let received = metric
+            .u64_counter("netgauze.http_publisher.received")
+            .with_description("total received packets from the producer actor subscription")
+            .build();
+        let success_sent = metric
+            .u64_counter("netgauze.http_publisher.sent")
+            .with_description("total received packets sent via HTTP")
+            .build();
+        let failed_sent = metric
+            .u64_counter("netgauze.http_publisher.sent")
+            .with_description("total received packets failed to be sent via HTTP")
+            .build();
+        Self {
+            received,
+            success_sent,
+            failed_sent,
+        }
+    }
+}
+
 /// Message representation to be sent to Feldera
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +113,7 @@ struct HttpPublisherActor<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> {
     msg_recv: async_channel::Receiver<Arc<T>>,
     cmd_recv: mpsc::Receiver<HttpPublisherActorCommand>,
     buf: Vec<M>,
+    stats: HttpPublisherStats,
 }
 
 impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, F> {
@@ -93,6 +124,7 @@ impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, 
         converter: F,
         msg_recv: async_channel::Receiver<Arc<T>>,
         cmd_recv: mpsc::Receiver<HttpPublisherActorCommand>,
+        stats: HttpPublisherStats,
     ) -> Self {
         Self {
             name,
@@ -104,6 +136,7 @@ impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, 
             msg_recv,
             cmd_recv,
             buf: Vec::new(),
+            stats,
         }
     }
 
@@ -111,6 +144,10 @@ impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, 
         client: &'_ reqwest::Client,
         url: String,
         value: &'_ O,
+        writer_id: String,
+        buf_len: usize,
+        success_counter: opentelemetry::metrics::Counter<u64>,
+        fail_counter: opentelemetry::metrics::Counter<u64>,
     ) -> reqwest::Result<()> {
         debug!("Sending new batch");
         client
@@ -118,7 +155,25 @@ impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, 
             .json(&value)
             .send()
             .await
-            .map(|response| debug!("Batch sent: {response:?}"))
+            .map(|response| {
+                success_counter.add(
+                    buf_len as u64,
+                    &[
+                        KeyValue::new("netgauze.http_publisher.sent.url", url.to_string()),
+                        KeyValue::new("netgauze.http_publisher.writer_id", writer_id.clone()),
+                    ],
+                );
+                debug!("Batch sent: {response:?}")
+            })
+            .inspect_err(|_err| {
+                fail_counter.add(
+                    1,
+                    &[
+                        KeyValue::new("netgauze.http_publisher.sent.url", url.to_string()),
+                        KeyValue::new("netgauze.http_publisher.writer_id", writer_id),
+                    ],
+                );
+            })
     }
 
     async fn run(mut self) -> Result<String, reqwest::Error> {
@@ -145,12 +200,13 @@ impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, 
                 msg = self.msg_recv.recv() => {
                     match msg {
                         Ok(msg) => {
+                            self.stats.received.add(1, &[KeyValue::new("netgauze.http_publisher.writer", self.writer_id.clone())]);
                             let msgs = (self.converter)(msg, self.writer_id.clone());
                             self.buf.extend(msgs.into_iter());
                             debug!("[{}] Queued up a message for sending, there are {} messages in the queue", self.name, self.buf.len());
                             if self.buf.len() > self.batch_size {
                                 debug!("[{}] Blocking to send {} messages", self.name, self.buf.len());
-                                Self::send(&self.client, self.url.clone(), &self.buf).await?;
+                                Self::send(&self.client, self.url.clone(), &self.buf, self.writer_id.clone(), self.buf.len(), self.stats.success_sent.clone(), self.stats.failed_sent.clone()).await?;
                                 debug!("[{}] messages send {} clearing buffer", self.name, self.buf.len());
                                 self.buf.clear();
                             }
@@ -221,12 +277,21 @@ impl HttpPublisherActorHandle {
         config: HttpPublisherEndpoint,
         converter: F,
         msg_recv: async_channel::Receiver<Arc<T>>,
+        meter: opentelemetry::metrics::Meter,
     ) -> Result<(JoinHandle<Result<String, reqwest::Error>>, Self), reqwest::Error> {
         let client = HttpPublisherActorHandle::create_http_client(&config)?;
+        let stats = HttpPublisherStats::new(meter);
         let (cmd_tx, cmd_rx) = mpsc::channel(100);
         info!("[{}] Starting HTTP publisher", name);
-        let actor =
-            HttpPublisherActor::new(name.clone(), client, config, converter, msg_recv, cmd_rx);
+        let actor = HttpPublisherActor::new(
+            name.clone(),
+            client,
+            config,
+            converter,
+            msg_recv,
+            cmd_rx,
+            stats,
+        );
         let join_handle = tokio::spawn(actor.run());
         Ok((join_handle, Self { name, cmd_tx }))
     }

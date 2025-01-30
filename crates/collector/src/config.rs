@@ -47,6 +47,7 @@ pub struct CollectorConfig {
     #[serde(default)]
     pub runtime: RuntimeConfig,
     pub logging: LoggingConfig,
+    pub telemetry: TelemetryConfig,
     pub flow: FlowConfig,
 }
 
@@ -66,6 +67,17 @@ impl Default for LoggingConfig {
         Self {
             level: "info".to_string(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TelemetryConfig {
+    pub url: String,
+}
+
+impl TelemetryConfig {
+    pub fn url(&self) -> &str {
+        self.url.as_str()
     }
 }
 

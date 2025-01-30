@@ -79,10 +79,17 @@
 //!     use std::time::Duration;
 //!     let addr: SocketAddr = "127.0.0.1:9995".parse().unwrap();
 //!     let interface_bind = None;
-//!     let (join_handle, actor_handle) =
-//!         FlowCollectorActorHandle::new(1, addr, interface_bind, 100, Duration::from_millis(500))
-//!             .await
-//!             .expect("Failed to create FlowCollectorActor");
+//!     let meter = opentelemetry::global::meter("my-library-name");
+//!     let (join_handle, actor_handle) = FlowCollectorActorHandle::new(
+//!         1,
+//!         addr,
+//!         interface_bind,
+//!         100,
+//!         Duration::from_millis(500),
+//!         either::Either::Left(meter),
+//!     )
+//!     .await
+//!     .expect("Failed to create FlowCollectorActor");
 //!
 //!     // Subscribe to receive flow packets
 //!     let (mut packet_rx, _) = actor_handle.subscribe(10).await.unwrap();
@@ -245,6 +252,65 @@ struct FlowCollectorActor {
     subscriber_timeout: Duration,
     peers_usage: HashMap<SocketAddr, PeerUsage>,
     clients: HashMap<SocketAddr, FlowInfoCodec>,
+    stats: FlowCollectorActorStats,
+}
+
+#[derive(Debug, Clone)]
+pub struct FlowCollectorActorStats {
+    received: opentelemetry::metrics::Counter<u64>,
+    decoded: opentelemetry::metrics::Counter<u64>,
+    malformed: opentelemetry::metrics::Counter<u64>,
+    subscribers: opentelemetry::metrics::Gauge<u64>,
+    subscriber_sent: opentelemetry::metrics::Counter<u64>,
+    subscriber_dropped: opentelemetry::metrics::Counter<u64>,
+}
+
+impl FlowCollectorActorStats {
+    pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
+        let received = meter
+            .u64_counter("netgauze.flow.decoder.received")
+            .with_description(
+                "Number successfully received and decoded flow packets from the network",
+            )
+            .build();
+        let decoded = meter
+            .u64_counter("netgauze.flow.decoder.decoded")
+            .with_description(
+                "Number successfully received (before decoding) flow packets from the network",
+            )
+            .build();
+        let malformed = meter
+            .u64_counter("netgauze.flow.decoder.malformed")
+            .with_description(
+                "Number flow packets from the network that were not decoded correctly",
+            )
+            .build();
+        let subscribers = meter
+            .u64_gauge("netgauze.flow.subscribers.number")
+            .with_description(
+                "Number of actors subscribed to receive flow info events from this actor",
+            )
+            .build();
+        let subscriber_sent = meter
+            .u64_counter("netgauze.flow.subscribers.sent")
+            .with_description("Number successfully received flow and sent to subscribers")
+            .build();
+        let subscriber_dropped = meter
+            .u64_counter("netgauze.flow.subscribers.dropped")
+            .with_description(
+                "Number successfully received flow but dropped before sending to the subscribers",
+            )
+            .build();
+
+        Self {
+            received,
+            decoded,
+            malformed,
+            subscribers,
+            subscriber_sent,
+            subscriber_dropped,
+        }
+    }
 }
 
 impl FlowCollectorActor {
@@ -254,6 +320,7 @@ impl FlowCollectorActor {
         interface_bind: Option<String>,
         cmd_rx: mpsc::Receiver<FlowCollectorActorCommand>,
         subscriber_timeout: Duration,
+        stats: FlowCollectorActorStats,
     ) -> Self {
         Self {
             actor_id,
@@ -265,6 +332,7 @@ impl FlowCollectorActor {
             subscriber_timeout,
             peers_usage: HashMap::default(),
             clients: HashMap::new(),
+            stats,
         }
     }
 
@@ -278,7 +346,26 @@ impl FlowCollectorActor {
         // the templates learned from the client
         let result = self.clients.entry(addr).or_default().decode(&mut buf);
         match result {
-            Ok(Some(pkt)) => Some((addr, pkt)),
+            Ok(Some(pkt)) => {
+                self.stats.decoded.add(
+                    1,
+                    &[
+                        opentelemetry::KeyValue::new(
+                            "netgauze.flow.actor",
+                            format!("{}", self.actor_id),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "network.peer.address",
+                            format!("{}", addr.ip()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "network.peer.port",
+                            opentelemetry::Value::I64(addr.port().into()),
+                        ),
+                    ],
+                );
+                Some((addr, pkt))
+            }
             Ok(None) => {
                 debug!(
                     "[Actor {}-{}] Needs more data to decode the packet",
@@ -287,6 +374,27 @@ impl FlowCollectorActor {
                 None
             }
             Err(err) => {
+                self.stats.malformed.add(
+                    1,
+                    &[
+                        opentelemetry::KeyValue::new(
+                            "netgauze.flow.actor",
+                            format!("{}", self.actor_id),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "network.peer.address",
+                            format!("{}", addr.ip()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "network.peer.port",
+                            opentelemetry::Value::I64(addr.port().into()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "netgauze.flow.decoding.error.msg",
+                            opentelemetry::Value::String(err.to_string().into()),
+                        ),
+                    ],
+                );
                 warn!(
                     "[Actor {}-{}] Dropping packet due to an error in decoding packet: {err:?}",
                     self.actor_id, self.socket_addr
@@ -296,6 +404,7 @@ impl FlowCollectorActor {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn send_to_subscriber(
         actor_id: ActorId,
         socket_addr: SocketAddr,
@@ -303,27 +412,69 @@ impl FlowCollectorActor {
         id: SubscriberId,
         tx: FlowSender,
         timeout: Duration,
+        sent_counter: opentelemetry::metrics::Counter<u64>,
+        drop_counter: opentelemetry::metrics::Counter<u64>,
     ) {
         // The send operation is bounded by timeout period to avoid blocking on a slow
         // subscriber.
         let ref_clone = pkt.clone();
+        let drop_counter_clone = drop_counter.clone();
         let timeout_ret = tokio::time::timeout(timeout, async move {
             if tx.is_full() {
                 warn!("[Actor {actor_id}-{socket_addr}] Channel for subscriber {id} is full, dropping packet");
+                drop_counter.add(1,&[
+                    opentelemetry::KeyValue::new("network.peer.address", format!("{}", socket_addr.ip())),
+                    opentelemetry::KeyValue::new("network.peer.port", opentelemetry::Value::I64(socket_addr.port().into())),
+                    opentelemetry::KeyValue::new("netgauze.flow.actor", format!("{actor_id}")),
+                    opentelemetry::KeyValue::new("netgauze.flow.subscriber.id", format!("{id}")),
+                    opentelemetry::KeyValue::new("netgauze.flow.subscriber.error.type", "channel is full".to_string()),
+                ]);
                 return;
             }
             match tx.send(ref_clone).await {
                 Ok(_) => {
                     debug!("[Actor {actor_id}-{socket_addr}] Sent flow flow to subscriber: {id}");
+                    sent_counter.add(1,&[
+                        opentelemetry::KeyValue::new("network.peer.address", format!("{}", socket_addr.ip())),
+                        opentelemetry::KeyValue::new("network.peer.port", opentelemetry::Value::I64(socket_addr.port().into())),
+                        opentelemetry::KeyValue::new("netgauze.flow.actor", format!("{actor_id}")),
+                        opentelemetry::KeyValue::new("netgauze.flow.subscriber.id", format!("{id}")),
+                    ]);
                 }
                 Err(_err) => {
                     warn!("[Actor {actor_id}-{socket_addr}] Subscriber {id} is unresponsive, removing it from the list");
+                    drop_counter.add(1,&[
+                        opentelemetry::KeyValue::new("network.peer.address", format!("{}", socket_addr.ip())),
+                        opentelemetry::KeyValue::new("network.peer.port", opentelemetry::Value::I64(socket_addr.port().into())),
+                        opentelemetry::KeyValue::new("netgauze.flow.actor", format!("{actor_id}")),
+                        opentelemetry::KeyValue::new("netgauze.flow.subscriber.id", format!("{id}")),
+                        opentelemetry::KeyValue::new("netgauze.flow.subscriber.error.type", "send error".to_string()),
+                    ]);
                 }
             }
         },
         ).await;
         if timeout_ret.is_err() {
             warn!("[Actor {actor_id}-{socket_addr}] Subscriber {id} is experiencing backpressure and possibly dropping packets");
+            drop_counter_clone.add(
+                1,
+                &[
+                    opentelemetry::KeyValue::new(
+                        "network.peer.address",
+                        format!("{}", socket_addr.ip()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        "network.peer.port",
+                        opentelemetry::Value::I64(socket_addr.port().into()),
+                    ),
+                    opentelemetry::KeyValue::new("netgauze.flow.actor", format!("{actor_id}")),
+                    opentelemetry::KeyValue::new("netgauze.flow.subscriber.id", format!("{id}")),
+                    opentelemetry::KeyValue::new(
+                        "netgauze.flow.subscriber.error.type",
+                        "timeout".to_string(),
+                    ),
+                ],
+            );
         }
     }
 
@@ -344,6 +495,13 @@ impl FlowCollectorActor {
                     true
                 }
             });
+            self.stats.subscribers.record(
+                self.subscribers.len() as u64,
+                &[opentelemetry::KeyValue::new(
+                    "netgauze.flow.actor",
+                    format!("{actor_id}"),
+                )],
+            );
             debug!("[Actor {actor_id}-{socket_addr}] Sending flow packet received from {peer} to a total of {} subscribers", self.subscribers.len());
             let mut send_handlers = vec![];
             let flow_request = Arc::new((peer, pkt));
@@ -358,6 +516,8 @@ impl FlowCollectorActor {
                     *id,
                     tx.clone(),
                     self.subscriber_timeout,
+                    self.stats.subscriber_sent.clone(),
+                    self.stats.subscriber_dropped.clone(),
                 );
                 send_handlers.push(send_handler);
             }
@@ -395,8 +555,22 @@ impl FlowCollectorActor {
             .await
         {
             self.subscribers.remove(&id);
+            self.stats.subscribers.record(
+                self.subscribers.len() as u64,
+                &[opentelemetry::KeyValue::new(
+                    "actor",
+                    format!("{}", self.actor_id),
+                )],
+            );
             warn!("[Actor {}-{}] New subscriber {id} is removed, unable to send back the subscriber id", self.actor_id, self.socket_addr);
         }
+        self.stats.subscribers.record(
+            self.subscribers.len() as u64,
+            &[opentelemetry::KeyValue::new(
+                "actor",
+                format!("{}", self.actor_id),
+            )],
+        );
         false
     }
 
@@ -430,6 +604,13 @@ impl FlowCollectorActor {
                 );
             }
         }
+        self.stats.subscribers.record(
+            self.subscribers.len() as u64,
+            &[opentelemetry::KeyValue::new(
+                "actor",
+                format!("{}", self.actor_id),
+            )],
+        );
         false
     }
 
@@ -646,6 +827,11 @@ impl FlowCollectorActor {
                 next = stream.next() => {
                     match next {
                         Some(Ok(next)) => {
+                            self.stats.received.add(1, &[
+                                opentelemetry::KeyValue::new("netgauze.flow.actor", format!("{}", self.actor_id)),
+                                opentelemetry::KeyValue::new("network.peer.address", format!("{}", next.1.ip())),
+                                opentelemetry::KeyValue::new("network.peer.port", opentelemetry::Value::I64(next.1.port().into())),
+                            ]);
                             let next = self.decode_pkt(next);
                             self.handle_decoded_pkt(next).await;
                         }
@@ -720,6 +906,7 @@ impl FlowCollectorActorHandle {
         interface_bind: Option<String>,
         cmd_buffer_size: usize,
         subscriber_timeout: Duration,
+        stats: either::Either<opentelemetry::metrics::Meter, FlowCollectorActorStats>,
     ) -> Result<
         (
             JoinHandle<Result<(ActorId, SocketAddr), FlowCollectorActorError>>,
@@ -727,6 +914,10 @@ impl FlowCollectorActorHandle {
         ),
         FlowCollectorActorHandleError,
     > {
+        let stats = match stats {
+            either::Either::Left(meter) => FlowCollectorActorStats::new(meter),
+            either::Either::Right(stats) => stats,
+        };
         let (cmd_tx, cmd_rx) = mpsc::channel(cmd_buffer_size);
         let actor = FlowCollectorActor::new(
             actor_id,
@@ -734,6 +925,7 @@ impl FlowCollectorActorHandle {
             interface_bind.clone(),
             cmd_rx,
             subscriber_timeout,
+            stats,
         );
         let join_handle = tokio::spawn(actor.run());
         let (tx, mut rx) = mpsc::channel(cmd_buffer_size);
@@ -929,10 +1121,17 @@ mod tests {
     ) {
         let actor_id = 1;
         let socket_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let (join_handle, handle) =
-            FlowCollectorActorHandle::new(actor_id, socket_addr, None, 10, Duration::from_secs(1))
-                .await
-                .expect("Couldn't start test actor");
+        let meter = opentelemetry::global::meter("test-meter");
+        let (join_handle, handle) = FlowCollectorActorHandle::new(
+            actor_id,
+            socket_addr,
+            None,
+            10,
+            Duration::from_secs(1),
+            either::Either::Left(meter),
+        )
+        .await
+        .expect("Couldn't start test actor");
         let socket_addr = handle.local_addr();
         (socket_addr, handle, join_handle)
     }

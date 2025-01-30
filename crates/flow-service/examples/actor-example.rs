@@ -48,6 +48,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
             None,
             cmd_buffer_size,
             Duration::from_millis(500),
+            either::Either::Left(opentelemetry::global::meter("example")),
         )
         .await?;
         let (pkt_rx, subscriptions) = handler.subscribe(10).await?;
