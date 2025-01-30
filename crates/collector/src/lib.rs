@@ -28,10 +28,14 @@ pub mod http;
 
 pub type FlatFlowRequest = (SocketAddr, FlatFlowInfo);
 
-pub async fn init_flow_collection(flow_config: FlowConfig) -> anyhow::Result<()> {
+pub async fn init_flow_collection(
+    flow_config: FlowConfig,
+    meter: opentelemetry::metrics::Meter,
+) -> anyhow::Result<()> {
     let supervisor_config = flow_config.supervisor_config();
+
     let (supervisor_join_handle, supervisor_handle) =
-        FlowCollectorsSupervisorActorHandle::new(supervisor_config).await;
+        FlowCollectorsSupervisorActorHandle::new(supervisor_config, meter.clone()).await;
     let mut http_handlers = Vec::new();
     let mut http_join_set = FuturesUnordered::new();
     for (group_name, publisher_config) in flow_config.publishers {
@@ -41,6 +45,7 @@ pub async fn init_flow_collection(flow_config: FlowConfig) -> anyhow::Result<()>
             .await?;
         for (endpoint_name, endpoint) in publisher_config.endpoints {
             info!("Creating publisher '{endpoint_name}'");
+
             match &endpoint {
                 PublisherEndpoint::Http(config) => {
                     let flatten = publisher_config.flatten;
@@ -74,6 +79,7 @@ pub async fn init_flow_collection(flow_config: FlowConfig) -> anyhow::Result<()>
                             config.clone(),
                             flat_converter,
                             flow_recv.clone(),
+                            meter.clone(),
                         )?
                     } else {
                         HttpPublisherActorHandle::new(
@@ -81,6 +87,7 @@ pub async fn init_flow_collection(flow_config: FlowConfig) -> anyhow::Result<()>
                             config.clone(),
                             converter,
                             flow_recv.clone(),
+                            meter.clone(),
                         )?
                     };
                     http_join_set.push(http_join);

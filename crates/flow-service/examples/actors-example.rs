@@ -42,8 +42,11 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
 
     runtime.block_on(async move {
         init_tracing();
-        let (supervisor_join_handle, handler) =
-            FlowCollectorsSupervisorActorHandle::new(config).await;
+        let (supervisor_join_handle, handler) = FlowCollectorsSupervisorActorHandle::new(
+            config,
+            opentelemetry::global::meter("example"),
+        )
+        .await;
         let (pkt_rx, subscriptions) = handler.subscribe(10).await?;
         for subscription in &subscriptions {
             info!("Subscribed to {:?}", subscription);

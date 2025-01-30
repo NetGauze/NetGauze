@@ -6,6 +6,9 @@ runtime:
 logging:
   level: info
 
+telemetry:
+  url: http://localhost:4317/v1/metrics
+
 flow:
   subscriber_timeout: 100
   template_cache_purge_timeout: 360
@@ -38,3 +41,4 @@ flow:
 #      kafka: !Kakfa
 #        url: http://10.212.242.69:8080/ingress/flows?format=json
 #        writer_id: writer1
+
