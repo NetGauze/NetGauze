@@ -79,7 +79,7 @@ fn test_flow_pcap(overwrite: bool, pcap_path: PathBuf) {
     let iter = PcapIter::new(pcap_reader);
     let mut peers = HashMap::new();
     for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
-        if protocol != TransportProtocol::UDP || dst_port != 9991 {
+        if protocol != TransportProtocol::UDP || !(dst_port == 9991 || dst_port == 9992) {
             continue;
         }
         let key = (src_ip, src_port, dst_ip, dst_port);
