@@ -218,10 +218,7 @@ impl Set {
                 .into_iter()
                 .map(|record| FlatSet::Data {
                     id,
-                    record: Box::new(FlatDataRecord::new(
-                        record.scope_fields.into(),
-                        record.fields.into(),
-                    )),
+                    record: Box::new(record.flatten()),
                 })
                 .collect(),
         }
@@ -419,6 +416,10 @@ impl DataRecord {
     pub const fn fields(&self) -> &Vec<Field> {
         &self.fields
     }
+
+    pub fn flatten(self) -> FlatDataRecord {
+        FlatDataRecord::new(self.scope_fields.into(), self.fields.into())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -441,5 +442,236 @@ impl FlatDataRecord {
 
     pub const fn fields(&self) -> &Fields {
         &self.fields
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ie;
+    use chrono::TimeZone;
+
+    #[test]
+    fn test_ipfix_packet() {
+        let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
+        let sequence_number = 0;
+        let observation_domain_id = 0;
+        let sets = vec![
+            Set::Template(vec![TemplateRecord::new(
+                256,
+                vec![
+                    FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                    FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
+                ],
+            )]),
+            Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
+                258,
+                vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
+                vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
+            )]),
+            Set::Data {
+                id: DataSetId::new(256).unwrap(),
+                records: vec![DataRecord::new(
+                    vec![Field::octetDeltaCount(189)],
+                    vec![Field::tcpDestinationPort(8080)],
+                )],
+            },
+        ];
+        let packet = IpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            sets.clone(),
+        );
+        assert_eq!(packet.version(), IPFIX_VERSION);
+        assert_eq!(packet.export_time(), export_time);
+        assert_eq!(packet.sequence_number(), sequence_number);
+        assert_eq!(packet.observation_domain_id(), observation_domain_id);
+        assert_eq!(packet.sets(), &sets);
+    }
+
+    #[test]
+    fn test_ipfix_packet_flatten() {
+        let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
+        let sequence_number = 0;
+        let observation_domain_id = 0;
+        let sets = vec![
+            Set::Template(vec![TemplateRecord::new(
+                256,
+                vec![
+                    FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                    FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
+                ],
+            )]),
+            Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
+                258,
+                vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
+                vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
+            )]),
+            Set::Data {
+                id: DataSetId::new(256).unwrap(),
+                records: vec![DataRecord::new(
+                    vec![Field::octetDeltaCount(189)],
+                    vec![Field::tcpDestinationPort(8080)],
+                )],
+            },
+        ];
+        let packet = IpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            sets.clone(),
+        );
+        let flat_packets = packet.flatten();
+        assert_eq!(flat_packets.len(), 3);
+        assert_eq!(flat_packets[0].export_time(), export_time);
+        assert_eq!(flat_packets[0].sequence_number(), sequence_number);
+        assert_eq!(
+            flat_packets[0].observation_domain_id(),
+            observation_domain_id
+        );
+        assert_eq!(flat_packets[0].set().id(), IPFIX_TEMPLATE_SET_ID);
+        assert_eq!(flat_packets[1].set().id(), IPFIX_OPTIONS_TEMPLATE_SET_ID);
+        assert_eq!(flat_packets[2].set().id(), 256);
+    }
+
+    #[test]
+    fn test_template_record() {
+        let template = TemplateRecord::new(
+            256,
+            vec![
+                FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
+            ],
+        );
+        assert_eq!(template.id(), 256);
+        assert_eq!(
+            template.field_specifiers(),
+            &vec![
+                FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_options_template_record() {
+        let template = OptionsTemplateRecord::new(
+            258,
+            vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
+            vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
+        );
+        assert_eq!(template.id(), 258);
+        assert_eq!(
+            template.scope_field_specifiers(),
+            &vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]
+        );
+        assert_eq!(
+            template.field_specifiers(),
+            &vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]
+        );
+    }
+
+    #[test]
+    fn test_data_record() {
+        let record = DataRecord::new(
+            vec![Field::octetDeltaCount(189)],
+            vec![Field::tcpDestinationPort(8080)],
+        );
+        assert_eq!(record.scope_fields(), &vec![Field::octetDeltaCount(189)]);
+        assert_eq!(record.fields(), &vec![Field::tcpDestinationPort(8080)]);
+    }
+
+    #[test]
+    fn test_flat_data_record() {
+        let record = FlatDataRecord::new(
+            Fields {
+                interfaceName: Some(vec!["eth0".to_string()]),
+                ..Default::default()
+            },
+            Fields {
+                octetDeltaCount: Some(vec![189]),
+                tcpDestinationPort: Some(vec![8080]),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            record.scope_fields(),
+            &Fields {
+                interfaceName: Some(vec!["eth0".to_string()]),
+                ..Default::default()
+            }
+        );
+        assert_eq!(
+            record.fields(),
+            &Fields {
+                octetDeltaCount: Some(vec![189]),
+                tcpDestinationPort: Some(vec![8080]),
+                ..Default::default()
+            }
+        );
+    }
+
+    #[test]
+    fn test_set() {
+        let template = TemplateRecord::new(
+            256,
+            vec![
+                FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
+            ],
+        );
+        let options_template = OptionsTemplateRecord::new(
+            258,
+            vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
+            vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
+        );
+        let data = DataRecord::new(
+            vec![Field::octetDeltaCount(189)],
+            vec![Field::tcpDestinationPort(8080)],
+        );
+        let sets = [
+            Set::Template(vec![template.clone()]),
+            Set::OptionsTemplate(vec![options_template.clone()]),
+            Set::Data {
+                id: DataSetId::new(256).unwrap(),
+                records: vec![data.clone()],
+            },
+        ];
+        assert_eq!(sets[0].id(), IPFIX_TEMPLATE_SET_ID);
+        assert_eq!(sets[1].id(), IPFIX_OPTIONS_TEMPLATE_SET_ID);
+        assert_eq!(sets[2].id(), 256);
+    }
+
+    #[test]
+    fn test_flat_set() {
+        let template = TemplateRecord::new(
+            256,
+            vec![
+                FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
+            ],
+        );
+        let options_template = OptionsTemplateRecord::new(
+            258,
+            vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
+            vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
+        );
+        let data = DataRecord::new(
+            vec![Field::octetDeltaCount(189)],
+            vec![Field::tcpDestinationPort(8080)],
+        );
+        let flat_data = data.clone().flatten();
+        let sets = [
+            FlatSet::Template(template.clone()),
+            FlatSet::OptionsTemplate(options_template.clone()),
+            FlatSet::Data {
+                id: DataSetId::new(256).unwrap(),
+                record: Box::new(flat_data),
+            },
+        ];
+        assert_eq!(sets[0].id(), IPFIX_TEMPLATE_SET_ID);
+        assert_eq!(sets[1].id(), IPFIX_OPTIONS_TEMPLATE_SET_ID);
+        assert_eq!(sets[2].id(), 256);
     }
 }
