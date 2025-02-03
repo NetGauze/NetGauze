@@ -559,3 +559,201 @@ impl ScopeFieldSpecifier {
         self.length
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn test_scope_fields_from() {
+        let fields = vec![
+            ScopeField::System(System(1)),
+            ScopeField::Interface(Interface(2)),
+            ScopeField::LineCard(LineCard(3)),
+            ScopeField::Cache(Cache(vec![1, 2, 3])),
+            ScopeField::Template(Template(vec![1, 2, 3])),
+        ];
+        let scope_fields = ScopeFields::from(fields);
+        assert_eq!(scope_fields.system.unwrap().len(), 1);
+        assert_eq!(scope_fields.interface.unwrap().len(), 1);
+        assert_eq!(scope_fields.line_card.unwrap().len(), 1);
+        assert_eq!(scope_fields.cache.unwrap().len(), 1);
+        assert_eq!(scope_fields.template.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_scope_ie_from() {
+        let ie = ScopeIE::from((0, 1));
+        assert_eq!(ie, ScopeIE::System);
+        let ie = ScopeIE::from((0, 2));
+        assert_eq!(ie, ScopeIE::Interface);
+        let ie = ScopeIE::from((0, 3));
+        assert_eq!(ie, ScopeIE::LineCard);
+        let ie = ScopeIE::from((0, 4));
+        assert_eq!(ie, ScopeIE::Cache);
+        let ie = ScopeIE::from((0, 5));
+        assert_eq!(ie, ScopeIE::Template);
+        let ie = ScopeIE::from((1, 1));
+        assert_eq!(ie, ScopeIE::Unknown { pen: 1, id: 1 });
+    }
+
+    #[test]
+    fn test_scope_ie_id() {
+        let ie = ScopeIE::System;
+        assert_eq!(ie.id(), 1);
+        let ie = ScopeIE::Interface;
+        assert_eq!(ie.id(), 2);
+        let ie = ScopeIE::LineCard;
+        assert_eq!(ie.id(), 3);
+        let ie = ScopeIE::Cache;
+        assert_eq!(ie.id(), 4);
+        let ie = ScopeIE::Template;
+        assert_eq!(ie.id(), 5);
+        let ie = ScopeIE::Unknown { pen: 1, id: 1 };
+        assert_eq!(ie.id(), 1);
+    }
+
+    #[test]
+    fn test_scope_ie_pen() {
+        let ie = ScopeIE::System;
+        assert_eq!(ie.pen(), 0);
+        let ie = ScopeIE::Interface;
+        assert_eq!(ie.pen(), 0);
+        let ie = ScopeIE::LineCard;
+        assert_eq!(ie.pen(), 0);
+        let ie = ScopeIE::Cache;
+        assert_eq!(ie.pen(), 0);
+        let ie = ScopeIE::Template;
+        assert_eq!(ie.pen(), 0);
+        let ie = ScopeIE::Unknown { pen: 1, id: 1 };
+        assert_eq!(ie.pen(), 1);
+    }
+
+    #[test]
+    fn test_scope_ie_data_type() {
+        let ie = ScopeIE::System;
+        assert_eq!(ie.data_type(), InformationElementDataType::octetArray);
+        let ie = ScopeIE::Interface;
+        assert_eq!(ie.data_type(), InformationElementDataType::unsigned32);
+        let ie = ScopeIE::LineCard;
+        assert_eq!(ie.data_type(), InformationElementDataType::unsigned32);
+        let ie = ScopeIE::Cache;
+        assert_eq!(ie.data_type(), InformationElementDataType::octetArray);
+        let ie = ScopeIE::Template;
+        assert_eq!(ie.data_type(), InformationElementDataType::octetArray);
+        let ie = ScopeIE::Unknown { pen: 1, id: 1 };
+        assert_eq!(ie.data_type(), InformationElementDataType::octetArray);
+    }
+
+    #[test]
+    fn test_scope_ie_semantics() {
+        let ie = ScopeIE::System;
+        assert_eq!(
+            ie.semantics(),
+            Some(InformationElementSemantics::identifier)
+        );
+        let ie = ScopeIE::Interface;
+        assert_eq!(
+            ie.semantics(),
+            Some(InformationElementSemantics::identifier)
+        );
+        let ie = ScopeIE::LineCard;
+        assert_eq!(
+            ie.semantics(),
+            Some(InformationElementSemantics::identifier)
+        );
+        let ie = ScopeIE::Cache;
+        assert_eq!(ie.semantics(), None);
+        let ie = ScopeIE::Template;
+        assert_eq!(ie.semantics(), None);
+        let ie = ScopeIE::Unknown { pen: 1, id: 1 };
+        assert_eq!(ie.semantics(), None);
+    }
+
+    #[test]
+    fn test_scope_ie_value_range() {
+        let ie = ScopeIE::System;
+        assert_eq!(ie.value_range(), None);
+        let ie = ScopeIE::Interface;
+        assert_eq!(ie.value_range(), None);
+        let ie = ScopeIE::LineCard;
+        assert_eq!(ie.value_range(), None);
+        let ie = ScopeIE::Cache;
+        assert_eq!(ie.value_range(), None);
+        let ie = ScopeIE::Template;
+        assert_eq!(ie.value_range(), None);
+        let ie = ScopeIE::Unknown { pen: 1, id: 1 };
+        assert_eq!(ie.value_range(), None);
+    }
+
+    #[test]
+    fn test_scope_ie_units() {
+        let ie = ScopeIE::System;
+        assert_eq!(ie.units(), None);
+        let ie = ScopeIE::Interface;
+        assert_eq!(ie.units(), None);
+        let ie = ScopeIE::LineCard;
+        assert_eq!(ie.units(), None);
+        let ie = ScopeIE::Cache;
+        assert_eq!(ie.units(), None);
+        let ie = ScopeIE::Template;
+        assert_eq!(ie.units(), None);
+        let ie = ScopeIE::Unknown { pen: 1, id: 1 };
+        assert_eq!(ie.units(), None);
+    }
+
+    #[test]
+    fn test_scope_field_specifier_new() {
+        let ie = ScopeIE::System;
+        let length = 1;
+        let field_specifier = ScopeFieldSpecifier::new(ie, length);
+        assert_eq!(field_specifier.element_id(), ie);
+        assert_eq!(field_specifier.length(), length);
+    }
+
+    #[test]
+    fn test_flatten_netflow() {
+        let sys_up_time = 0;
+        let unix_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
+        let sequence_number = 0;
+        let source_id = 0;
+        let set = Set::Data {
+            id: DataSetId(0),
+            records: vec![DataRecord::new(
+                vec![ScopeField::System(System(1))],
+                vec![Field::octetDeltaCount(1000)],
+            )],
+        };
+        let packet = NetFlowV9Packet::new(
+            sys_up_time,
+            unix_time,
+            sequence_number,
+            source_id,
+            vec![set],
+        );
+        let flat_packets = packet.flatten();
+        assert_eq!(flat_packets.len(), 1);
+        let flat_packet = &flat_packets[0];
+        assert_eq!(flat_packet.sys_up_time(), sys_up_time);
+        assert_eq!(flat_packet.unix_time(), unix_time);
+        assert_eq!(flat_packet.sequence_number(), sequence_number);
+        assert_eq!(flat_packet.source_id(), source_id);
+        let flat_set = flat_packet.set();
+        assert_eq!(flat_set.id(), NETFLOW_TEMPLATE_SET_ID);
+        let expected = FlatSet::Data {
+            id: DataSetId(0),
+            record: Box::new(FlatDataRecord::new(
+                ScopeFields {
+                    system: Some(vec![System(1)]),
+                    ..Default::default()
+                },
+                Fields {
+                    octetDeltaCount: Some(vec![1000]),
+                    ..Default::default()
+                },
+            )),
+        };
+        assert_eq!(flat_set, &expected);
+    }
+}
