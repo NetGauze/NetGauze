@@ -231,7 +231,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv4PrefixParsingErro
         let prefix_size = if prefix_len >= u8::MAX - 7 {
             u8::MAX
         } else {
-            (prefix_len + 7) / 8
+            prefix_len.div_ceil(8)
         };
         let (buf, prefix) = nom::bytes::complete::take(prefix_size.min(4))(buf)?;
         // Fill the rest of bits with zeros if
@@ -280,7 +280,7 @@ impl<'a> ReadablePduWithTwoInputs<'a, u8, Span<'a>, LocatedIpv6PrefixParsingErro
         let prefix_size = if prefix_len >= u8::MAX - 7 {
             u8::MAX
         } else {
-            (prefix_len + 7) / 8
+            prefix_len.div_ceil(8)
         };
         let (buf, prefix) = nom::bytes::complete::take(prefix_size.min(16))(buf)?;
         // Fill the rest of bits with zeros if

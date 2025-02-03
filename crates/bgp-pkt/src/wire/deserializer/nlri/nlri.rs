@@ -206,7 +206,7 @@ impl<'a>
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
             u8::MAX
         } else {
-            (prefix_len + 7) / 8
+            prefix_len.div_ceil(8)
         };
         // consuming only the bytes specified by the prefix length field, since MPLS
         // stack is read until the last bit is set.
@@ -282,7 +282,7 @@ impl<'a>
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
             u8::MAX
         } else {
-            (prefix_len + 7) / 8
+            prefix_len.div_ceil(8)
         };
         // consuming only the bytes specified by the prefix length field, since MPLS
         // stack is read until the last bit is set.
@@ -1065,7 +1065,7 @@ impl<'a>
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
             u8::MAX
         } else {
-            (prefix_len + 7) / 8
+            prefix_len.div_ceil(8)
         };
         let (buf, nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
         let (nlri_buf, label_stack) =
@@ -1129,7 +1129,7 @@ impl<'a>
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
             u8::MAX
         } else {
-            (prefix_len + 7) / 8
+            prefix_len.div_ceil(8)
         };
         let (buf, nlri_buf) = nom::bytes::complete::take(prefix_bytes)(buf)?;
         let (nlri_buf, label_stack) =
