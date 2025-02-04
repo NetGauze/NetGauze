@@ -44,6 +44,7 @@ use netgauze_parse_utils::{
 };
 
 use crate::{
+    capabilities::{AddPathCapability, BgpCapability, MultipleLabel},
     iana::{BgpMessageType, UndefinedBgpMessageType},
     notification::{BgpNotificationMessage, FiniteStateMachineError, MessageHeaderError},
     wire::{
@@ -158,12 +159,42 @@ impl BgpParsingContext {
         &mut self.multiple_labels
     }
 
+    #[inline]
+    pub fn update_multiple_labels<'a>(
+        &mut self,
+        multiple_labels: impl Iterator<Item = &'a MultipleLabel>,
+    ) {
+        for multiple_label in multiple_labels {
+            self.multiple_labels_mut()
+                .insert(multiple_label.address_type(), multiple_label.count());
+        }
+    }
+
     pub const fn add_path(&self) -> &HashMap<AddressType, bool> {
         &self.add_path
     }
 
     pub fn add_path_mut(&mut self) -> &mut HashMap<AddressType, bool> {
         &mut self.add_path
+    }
+
+    #[inline]
+    pub fn update_add_path(&mut self, add_path: &AddPathCapability) {
+        for address_family in add_path.address_families() {
+            self.add_path_mut()
+                .insert(address_family.address_type(), address_family.receive());
+        }
+    }
+
+    #[inline]
+    pub fn update_capabilities(&mut self, capability: &BgpCapability) {
+        match capability {
+            BgpCapability::AddPath(add_path) => self.update_add_path(add_path),
+            BgpCapability::MultipleLabels(multiple_labels) => {
+                self.update_multiple_labels(multiple_labels.iter())
+            }
+            _ => {}
+        }
     }
 
     pub const fn fail_on_non_unicast_withdraw_nlri(&self) -> bool {

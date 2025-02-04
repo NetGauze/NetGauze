@@ -106,80 +106,65 @@ impl BmpParsingContext {
                     self.clear();
                 }
                 BmpMessageValue::PeerUpNotification(peer_up) => {
-                    if let (BgpMessage::Open(sent_open), BgpMessage::Open(received_open)) =
-                        (peer_up.sent_message(), peer_up.received_message())
-                    {
-                        let send_caps = sent_open.capabilities();
-                        let received_caps = received_open.capabilities();
-                        let (sent_add_path_caps, sent_multiple_labels_caps) = get_caps(send_caps);
-                        let (received_add_path_caps, received_multiple_labels_caps) =
-                            get_caps(received_caps);
-
-                        // Only enable the intersection of enabled AddPath and Multi-Label
-                        let sent_add_path_caps: HashSet<AddPathCapability> =
-                            HashSet::from_iter(sent_add_path_caps);
-                        let received_add_path_caps: HashSet<AddPathCapability> =
-                            HashSet::from_iter(received_add_path_caps);
-                        let sent_multiple_labels_caps: HashSet<MultipleLabel> =
-                            HashSet::from_iter(sent_multiple_labels_caps.into_iter().flatten());
-                        let received_multiple_labels_caps: HashSet<MultipleLabel> =
-                            HashSet::from_iter(received_multiple_labels_caps.into_iter().flatten());
-
-                        let common_add_path_caps: Vec<&AddPathCapability> = Vec::from_iter(
-                            sent_add_path_caps.intersection(&received_add_path_caps),
-                        );
-                        let common_multiple_labels_caps: Vec<&MultipleLabel> = Vec::from_iter(
-                            sent_multiple_labels_caps.intersection(&received_multiple_labels_caps),
-                        );
-
-                        // Add Key for the router announcing BMP to the collector
-                        let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
-                        let bgp_ctx = self.entry(peer_key).or_default();
-                        bgp_ctx.add_path_mut().clear();
-                        bgp_ctx.multiple_labels_mut().clear();
-                        for add_path in &common_add_path_caps {
-                            for add_path_family in add_path.address_families() {
-                                bgp_ctx.add_path_mut().insert(
-                                    add_path_family.address_type(),
-                                    add_path_family.receive(),
-                                );
+                    let (sent_open, received_open) =
+                        match (peer_up.sent_message(), peer_up.received_message()) {
+                            (BgpMessage::Open(sent_open), BgpMessage::Open(received_open)) => {
+                                (sent_open, received_open)
                             }
-                        }
-                        for label in &common_multiple_labels_caps {
-                            bgp_ctx
-                                .multiple_labels_mut()
-                                .insert(label.address_type(), label.count());
-                        }
+                            _ => return,
+                        };
 
-                        // Add a key for the BGP Peer of the first router
-                        let peer_key = PeerKey::new(
-                            peer_up.peer_header().address(),
-                            peer_up.peer_header().peer_type(),
-                            peer_up.peer_header().rd(),
-                            peer_up.peer_header().peer_as(),
-                            received_open.bgp_id(),
-                        );
-                        let bgp_ctx = self.entry(peer_key).or_default();
-                        bgp_ctx.add_path_mut().clear();
-                        bgp_ctx.multiple_labels_mut().clear();
-                        for add_path in common_add_path_caps {
-                            for add_path_family in add_path.address_families() {
-                                bgp_ctx.add_path_mut().insert(
-                                    add_path_family.address_type(),
-                                    add_path_family.receive(),
-                                );
-                            }
-                        }
-                        for label in common_multiple_labels_caps {
-                            bgp_ctx
-                                .multiple_labels_mut()
-                                .insert(label.address_type(), label.count());
-                        }
+                    let send_caps = sent_open.capabilities();
+                    let received_caps = received_open.capabilities();
+                    let (sent_add_path_caps, sent_multiple_labels_caps) = get_caps(send_caps);
+                    let (received_add_path_caps, received_multiple_labels_caps) =
+                        get_caps(received_caps);
+
+                    // Only enable the intersection of enabled AddPath and Multi-Label
+                    let sent_add_path_caps: HashSet<AddPathCapability> =
+                        HashSet::from_iter(sent_add_path_caps);
+                    let received_add_path_caps: HashSet<AddPathCapability> =
+                        HashSet::from_iter(received_add_path_caps);
+                    let sent_multiple_labels_caps: HashSet<MultipleLabel> =
+                        HashSet::from_iter(sent_multiple_labels_caps.into_iter().flatten());
+                    let received_multiple_labels_caps: HashSet<MultipleLabel> =
+                        HashSet::from_iter(received_multiple_labels_caps.into_iter().flatten());
+
+                    let common_add_path_caps: Vec<&AddPathCapability> =
+                        Vec::from_iter(sent_add_path_caps.intersection(&received_add_path_caps));
+                    let common_multiple_labels_caps: Vec<&MultipleLabel> = Vec::from_iter(
+                        sent_multiple_labels_caps.intersection(&received_multiple_labels_caps),
+                    );
+
+                    // Add Key for the router announcing BMP to the collector
+                    let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
+                    let bgp_ctx = self.entry(peer_key).or_default();
+                    bgp_ctx.add_path_mut().clear();
+                    bgp_ctx.multiple_labels_mut().clear();
+                    for add_path in &common_add_path_caps {
+                        bgp_ctx.update_add_path(add_path);
                     }
+                    bgp_ctx.update_multiple_labels(common_multiple_labels_caps.iter().copied());
+
+                    // Add a key for the BGP Peer of the first router
+                    let peer_key = PeerKey::new(
+                        peer_up.peer_header().address(),
+                        peer_up.peer_header().peer_type(),
+                        peer_up.peer_header().rd(),
+                        peer_up.peer_header().peer_as(),
+                        received_open.bgp_id(),
+                    );
+                    let bgp_ctx = self.entry(peer_key).or_default();
+                    bgp_ctx.add_path_mut().clear();
+                    bgp_ctx.multiple_labels_mut().clear();
+                    for add_path in common_add_path_caps {
+                        bgp_ctx.update_add_path(add_path)
+                    }
+                    bgp_ctx.update_multiple_labels(common_multiple_labels_caps.iter().copied())
                 }
                 _ => {}
             },
-        };
+        }
     }
 }
 
