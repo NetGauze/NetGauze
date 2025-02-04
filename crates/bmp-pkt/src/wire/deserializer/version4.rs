@@ -1,15 +1,17 @@
 use crate::{
     iana::{BmpMessageType, UndefinedBmpMessageType},
     version4::{
-        BmpStatelessParsingCapability, BmpV4MessageValue, BmpV4PeerDownTlv,
-        BmpV4RouteMonitoringError, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
-        BmpV4RouteMonitoringTlvError, BmpV4RouteMonitoringTlvType, BmpV4RouteMonitoringTlvValue,
-        StatelessParsingTlv, UnknownBmpStatelessParsingCapability,
+        BmpV4MessageValue, BmpV4PeerDownTlv, BmpV4RouteMonitoringError,
+        BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvError,
+        BmpV4RouteMonitoringTlvType, BmpV4RouteMonitoringTlvValue,
     },
     wire::deserializer::*,
     PeerHeader, PeerKey,
 };
-use netgauze_bgp_pkt::wire::deserializer::{read_tlv_header_t16_l16, BgpMessageParsingError};
+use netgauze_bgp_pkt::wire::deserializer::{
+    capabilities::{BgpCapabilityParsingError, LocatedBgpCapabilityParsingError},
+    read_tlv_header_t16_l16, BgpMessageParsingError,
+};
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, ReadablePduWithOneInput, Span,
 };
@@ -151,6 +153,11 @@ impl<'a>
         let bgp_ctx = ctx.entry(peer_key).or_default();
         bgp_ctx.set_asn4(peer_header.is_asn4());
 
+        // Context represents what we learnt from the BGP Open
+        // We do not want to alter it permanently based on TLVs that are punctual in the
+        // messages
+        let mut ctx_clone = bgp_ctx.clone();
+
         // Can't use parse_till_empty_into_with_one_input_located because
         //  - &mut BgpParsingContext is not Clone
         //  - we don't want to Clone our context
@@ -180,7 +187,7 @@ impl<'a>
                     _ => {}
                 }
 
-                let (tmp, element) = parse_into_located_one_input(buf, &mut *bgp_ctx)?;
+                let (tmp, element) = parse_into_located_one_input(buf, &mut ctx_clone)?;
                 tlvs.push(element);
                 buf = tmp;
             }
@@ -223,7 +230,7 @@ pub enum BmpV4RouteMonitoringTlvParsingError {
         #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
     ),
     FromUtf8Error(String),
-    StatelessParsingTlv(#[from_located(module = "self")] StatelessParsingTlvParsingError),
+    BgpCapability(#[from_located(module = "self")] BgpCapabilityParsingError),
     InvalidBmpV4RouteMonitoringTlv(BmpV4RouteMonitoringTlvError),
 }
 
@@ -274,8 +281,9 @@ impl<'a>
                     BmpV4RouteMonitoringTlvValue::GroupTlv(values)
                 }
                 BmpV4RouteMonitoringTlvType::StatelessParsing => {
-                    let (_, stateless_parsing_tlv) = parse_into_located_one_input(data, ctx)?;
-                    BmpV4RouteMonitoringTlvValue::StatelessParsing(stateless_parsing_tlv)
+                    let (_, bgp_capability) = parse_into_located(data)?;
+                    ctx.update_capabilities(&bgp_capability);
+                    BmpV4RouteMonitoringTlvValue::StatelessParsing(bgp_capability)
                 }
             },
             None => BmpV4RouteMonitoringTlvValue::Unknown {
@@ -293,65 +301,5 @@ impl<'a>
                 },
             )),
         }
-    }
-}
-
-#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum StatelessParsingTlvParsingError {
-    #[serde(with = "ErrorKindSerdeDeref")]
-    NomError(#[from_nom] ErrorKind),
-    InvalidAddressType(InvalidAddressType),
-    UndefinedAddressFamily(#[from_external] UndefinedAddressFamily),
-    UndefinedSubsequentAddressFamily(#[from_external] UndefinedSubsequentAddressFamily),
-    UnknownBmpStatelessParsingCapability(#[from_external] UnknownBmpStatelessParsingCapability),
-}
-
-impl<'a>
-    ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedStatelessParsingTlvParsingError<'a>>
-    for StatelessParsingTlv
-{
-    fn from_wire(
-        input: Span<'a>,
-        ctx: &mut BgpParsingContext,
-    ) -> IResult<Span<'a>, Self, LocatedStatelessParsingTlvParsingError<'a>> {
-        let buf = input;
-        let (buf, afi) = nom::combinator::map_res(be_u16, AddressFamily::try_from)(buf)?;
-        let (buf, safi) = nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(buf)?;
-
-        let address_type = match AddressType::from_afi_safi(afi, safi) {
-            Ok(val) => val,
-            Err(err) => {
-                return Err(nom::Err::Error(
-                    LocatedStatelessParsingTlvParsingError::new(
-                        input,
-                        StatelessParsingTlvParsingError::InvalidAddressType(err),
-                    ),
-                ))
-            }
-        };
-
-        let (buf, capability) =
-            nom::combinator::map_res(be_u16, BmpStatelessParsingCapability::try_from)(buf)?;
-        let (buf, enabled) = be_u8(buf)?;
-        let enabled = enabled == 1;
-
-        match capability {
-            BmpStatelessParsingCapability::AddPath => {
-                ctx.add_path_mut().insert(address_type, enabled);
-            }
-            BmpStatelessParsingCapability::MultipleLabels => {
-                ctx.multiple_labels_mut()
-                    .insert(address_type, if enabled { u8::MAX } else { 0 });
-            }
-        }
-
-        Ok((
-            buf,
-            StatelessParsingTlv {
-                address_type,
-                capability,
-                enabled,
-            },
-        ))
     }
 }

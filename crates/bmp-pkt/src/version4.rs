@@ -7,8 +7,7 @@ use crate::{
     RouteMirroringMessage, StatisticsReportMessage, TerminationMessage,
 };
 use either::Either;
-use netgauze_bgp_pkt::{iana::BgpMessageType, BgpMessage};
-use netgauze_iana::address_family::AddressType;
+use netgauze_bgp_pkt::{capabilities::BgpCapability, iana::BgpMessageType, BgpMessage};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
 
@@ -152,39 +151,8 @@ pub enum BmpV4RouteMonitoringTlvValue {
     BgpUpdatePdu(BgpMessage),
     VrfTableName(String),
     GroupTlv(Vec<u16>),
-    StatelessParsing(StatelessParsingTlv),
+    StatelessParsing(BgpCapability),
     Unknown { code: u16, value: Vec<u8> },
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct StatelessParsingTlv {
-    pub address_type: AddressType,
-    pub capability: BmpStatelessParsingCapability,
-    pub enabled: bool,
-}
-
-#[repr(u16)]
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Display, FromRepr)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpStatelessParsingCapability {
-    AddPath = 0,
-    MultipleLabels = 1,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct UnknownBmpStatelessParsingCapability(u16);
-
-impl TryFrom<u16> for BmpStatelessParsingCapability {
-    type Error = UnknownBmpStatelessParsingCapability;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match Self::from_repr(value) {
-            None => Err(UnknownBmpStatelessParsingCapability(value)),
-            Some(ok) => Ok(ok),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
