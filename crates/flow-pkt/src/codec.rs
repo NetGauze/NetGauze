@@ -57,6 +57,27 @@ impl From<std::io::Error> for FlowInfoCodecDecoderError {
     }
 }
 
+impl std::error::Error for FlowInfoCodecDecoderError {}
+
+impl std::fmt::Display for FlowInfoCodecDecoderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IoError(err) => write!(f, "IO error: {err}"),
+            Self::Incomplete(len) => write!(
+                f,
+                "Incomplete pkt, need {}",
+                len.map(|x| format!("{x} bytes"))
+                    .unwrap_or("unknown".to_string())
+            ),
+            Self::UnsupportedVersion(version) => {
+                write!(f, "Unsupported protocol version: {version}")
+            }
+            Self::IpfixParsingError(err) => write!(f, "IPFIX parsing error: {err}"),
+            Self::NetFlowV9ParingError(err) => write!(f, "NetFlow V9 parsing error: {err}"),
+        }
+    }
+}
+
 /// [`FlowInfo`] is either IPFIX or Netflow V9 packet.
 /// This struct keep track of the decode process, and keep a cache of the
 /// templates sent by client.
