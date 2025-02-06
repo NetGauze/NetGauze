@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/analytics",
     "crates/pcap-reader",
     "crates/bgp-pkt",
     "crates/bgp-speaker",
