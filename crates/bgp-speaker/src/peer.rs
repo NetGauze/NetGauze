@@ -23,7 +23,7 @@ use std::{
 
 use futures::StreamExt;
 use futures_util::SinkExt;
-use rand::{rngs::SmallRng, thread_rng, Rng, RngCore, SeedableRng};
+use rand::{rngs::SmallRng, Rng, RngCore, SeedableRng};
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     sync::oneshot,
@@ -369,7 +369,7 @@ impl Default for PeerConfig {
             idle_hold_duration: 1,
             passive_tcp_establishment: false,
             collision_detect_established_state: false,
-            rng_seed: thread_rng().next_u64(),
+            rng_seed: rand::rng().next_u64(),
         }
     }
 }
@@ -727,7 +727,7 @@ impl<
         }
         log::info!("[{}][{}] Passive connected", self.peer_key, self.fsm_state);
         self.connect_retry_timer.take();
-        let jitter = self.rng.gen_range(0.75..=1.0);
+        let jitter = self.rng.random_range(0.75..=1.0);
         let mut connection =
             self.create_connection(peer_addr, tcp_stream, ConnectionType::Passive, jitter)?;
         let event = connection
@@ -853,7 +853,7 @@ impl<
     ) -> PeerResult<A> {
         match connect_result {
             Ok(stream) => {
-                let jitter = self.rng.gen_range(0.75..=1.0);
+                let jitter = self.rng.random_range(0.75..=1.0);
                 let mut connection = self.create_connection(
                     self.properties.peer_addr,
                     stream,
