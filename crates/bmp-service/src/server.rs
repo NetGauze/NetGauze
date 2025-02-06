@@ -211,8 +211,8 @@ mod tests {
     }
 
     fn get_free_socket() -> SocketAddr {
-        let mut rng = rand::thread_rng();
-        let port: u16 = rng.gen_range(25000..50000);
+        let mut rng = rand::rng();
+        let port: u16 = rng.random_range(25000..50000);
         SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port)
     }
 
