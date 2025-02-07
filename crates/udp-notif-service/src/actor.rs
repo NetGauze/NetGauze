@@ -76,8 +76,9 @@
 //! async fn main() {
 //!     use std::time::Duration;
 //!     let addr: SocketAddr = "127.0.0.1:9995".parse().unwrap();
+//!     let interface_bind = None;
 //!     let (join_handle, actor_handle) =
-//!         ActorHandle::new(1, addr, 100, Duration::from_millis(500))
+//!         ActorHandle::new(1, addr, interface_bind, 100, Duration::from_millis(500))
 //!             .await
 //!             .expect("failed to create UdpNotifActor");
 //!
@@ -195,6 +196,7 @@ impl std::error::Error for UdpNotifActorError {}
 struct UdpNotifActor {
     actor_id: ActorId,
     socket_addr: SocketAddr,
+    interface_bind: Option<String>,
     cmd_rx: mpsc::Receiver<ActorCommand>,
     next_subscriber_id: SubscriberId,
     // TODO: in future allow subscribers to subscribe to a subset of events
@@ -211,12 +213,14 @@ impl UdpNotifActor {
     fn new(
         actor_id: ActorId,
         socket_addr: SocketAddr,
+        interface_bind: Option<String>,
         cmd_rx: mpsc::Receiver<ActorCommand>,
         subscriber_timeout: Duration,
     ) -> Self {
         Self {
             actor_id,
             socket_addr,
+            interface_bind,
             cmd_rx,
             next_subscriber_id: 1,
             subscribers: HashMap::default(),
@@ -537,9 +541,10 @@ impl UdpNotifActor {
             "[Actor {}-{}] spawning actor and binding UDP listener",
             self.actor_id, self.socket_addr
         );
-        let socket = crate::new_udp_reuse_port(self.socket_addr, None).map_err(|err| {
-            UdpNotifActorError::SocketBindError(self.actor_id, self.socket_addr, err)
-        })?;
+        let socket = crate::new_udp_reuse_port(self.socket_addr, self.interface_bind.clone())
+            .map_err(|err| {
+                UdpNotifActorError::SocketBindError(self.actor_id, self.socket_addr, err)
+            })?;
         // Get the local address of the socket, handy in cases where the port is 0
         self.socket_addr = socket.local_addr().map_err(|err| {
             UdpNotifActorError::GetLocalAddressError(self.actor_id, self.socket_addr, err)
@@ -620,6 +625,7 @@ impl std::error::Error for ActorHandleError {
 pub struct ActorHandle {
     actor_id: ActorId,
     local_addr: SocketAddr,
+    interface_bind: Option<String>,
     cmd_buffer_size: usize,
     pub(crate) cmd_tx: mpsc::Sender<ActorCommand>,
 }
@@ -628,6 +634,7 @@ impl ActorHandle {
     pub async fn new(
         actor_id: ActorId,
         socket_addr: SocketAddr,
+        interface_bind: Option<String>,
         cmd_buffer_size: usize,
         subscriber_timeout: Duration,
     ) -> Result<
@@ -638,7 +645,13 @@ impl ActorHandle {
         ActorHandleError,
     > {
         let (cmd_tx, cmd_rx) = mpsc::channel(cmd_buffer_size);
-        let actor = UdpNotifActor::new(actor_id, socket_addr, cmd_rx, subscriber_timeout);
+        let actor = UdpNotifActor::new(
+            actor_id,
+            socket_addr,
+            interface_bind.clone(),
+            cmd_rx,
+            subscriber_timeout,
+        );
         let join_handle = tokio::spawn(actor.run());
         let (tx, mut rx) = mpsc::channel(cmd_buffer_size);
         cmd_tx
@@ -651,6 +664,7 @@ impl ActorHandle {
             Self {
                 actor_id,
                 local_addr,
+                interface_bind,
                 cmd_buffer_size,
                 cmd_tx,
             },
@@ -663,6 +677,10 @@ impl ActorHandle {
 
     pub fn local_addr(&self) -> SocketAddr {
         self.local_addr
+    }
+
+    pub fn interface_bind(&self) -> Option<&String> {
+        self.interface_bind.as_ref()
     }
 
     /// This function sends a command to the actor to subscribe to the packets.
@@ -780,7 +798,7 @@ mod tests {
         let actor_id = 1;
         let socket_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let (join_handle, handle) =
-            ActorHandle::new(actor_id, socket_addr, 10, Duration::from_secs(1))
+            ActorHandle::new(actor_id, socket_addr, None, 10, Duration::from_secs(1))
                 .await
                 .expect("couldn't start test actor");
         let socket_addr = handle.local_addr();
