@@ -18,6 +18,7 @@ async-channel = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
+libc = { workspace = true }
 netgauze-parse-utils = { workspace = true }
 netgauze-udp-notif-pkt = { workspace = true, features = ["codec"] }
 serde = { workspace = true, features = ["derive"] }
