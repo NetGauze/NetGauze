@@ -55,7 +55,7 @@ pub async fn init_flow_collection(
                             .clone()
                             .flatten()
                             .into_iter()
-                            .map(|flat_info| Message::insert {
+                            .map(|flat_info| Message {
                                 ts: format!("{}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
                                 peer_src: format!("{}", socket.ip()),
                                 writer_id: writer_id.clone(),
@@ -65,7 +65,7 @@ pub async fn init_flow_collection(
                         flattened
                     };
                     let converter = |request: Arc<FlowRequest>, writer_id: String| {
-                        let ret = Message::insert {
+                        let ret = Message {
                             ts: format!("{}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
                             peer_src: format!("{}", request.0.ip()),
                             writer_id,
