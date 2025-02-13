@@ -111,7 +111,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessagePa
                 BmpMessageParsingError::InvalidBmpLength(length),
             )));
         }
-        let (reminder, buf) = nom::bytes::complete::take(length - 5)(buf)?;
+        let (remainder, buf) = nom::bytes::complete::take(length - 5)(buf)?;
 
         let (buf, msg) = match version {
             BmpVersion::Version3 => {
@@ -126,7 +126,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessagePa
                 BmpMessageParsingError::NomError(ErrorKind::NonEmpty),
             )));
         }
-        Ok((reminder, msg))
+        Ok((remainder, msg))
     }
 }
 
@@ -246,57 +246,57 @@ impl<'a> ReadablePdu<'a, LocatedInitiationInformationParsingError<'a>> for Initi
         let (buf, tlv_type) =
             nom::combinator::map_res(be_u16, InitiationInformationTlvType::try_from)(buf)?;
         let (buf, length) = be_u16(buf)?;
-        let (reminder, buf) = nom::bytes::complete::take(length)(buf)?;
+        let (remainder, buf) = nom::bytes::complete::take(length)(buf)?;
         match tlv_type {
             InitiationInformationTlvType::String => {
                 let (_, str) =
                     nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
                         String::from_utf8(x.to_vec())
                     })(buf)?;
-                Ok((reminder, InitiationInformation::String(str)))
+                Ok((remainder, InitiationInformation::String(str)))
             }
             InitiationInformationTlvType::SystemDescription => {
                 let (_, str) =
                     nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
                         String::from_utf8(x.to_vec())
                     })(buf)?;
-                Ok((reminder, InitiationInformation::SystemDescription(str)))
+                Ok((remainder, InitiationInformation::SystemDescription(str)))
             }
             InitiationInformationTlvType::SystemName => {
                 let (_, str) =
                     nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
                         String::from_utf8(x.to_vec())
                     })(buf)?;
-                Ok((reminder, InitiationInformation::SystemName(str)))
+                Ok((remainder, InitiationInformation::SystemName(str)))
             }
             InitiationInformationTlvType::VrfTableName => {
                 let (_, str) =
                     nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
                         String::from_utf8(x.to_vec())
                     })(buf)?;
-                Ok((reminder, InitiationInformation::VrfTableName(str)))
+                Ok((remainder, InitiationInformation::VrfTableName(str)))
             }
             InitiationInformationTlvType::AdminLabel => {
                 let (_, str) =
                     nom::combinator::map_res(nom::bytes::complete::take(length), |x: Span<'_>| {
                         String::from_utf8(x.to_vec())
                     })(buf)?;
-                Ok((reminder, InitiationInformation::AdminLabel(str)))
+                Ok((remainder, InitiationInformation::AdminLabel(str)))
             }
             InitiationInformationTlvType::Experimental65531 => Ok((
-                reminder,
+                remainder,
                 InitiationInformation::Experimental65531(buf.to_vec()),
             )),
             InitiationInformationTlvType::Experimental65532 => Ok((
-                reminder,
+                remainder,
                 InitiationInformation::Experimental65532(buf.to_vec()),
             )),
             InitiationInformationTlvType::Experimental65533 => Ok((
-                reminder,
+                remainder,
                 InitiationInformation::Experimental65533(buf.to_vec()),
             )),
             InitiationInformationTlvType::Experimental65534 => Ok((
-                reminder,
+                remainder,
                 InitiationInformation::Experimental65534(buf.to_vec()),
             )),
         }
@@ -744,7 +744,7 @@ impl<'a>
     ) -> IResult<Span<'a>, Self, LocatedRouteMirroringValueParsingError<'a>> {
         let (buf, code) = nom::combinator::map_res(be_u16, RouteMirroringTlvType::try_from)(buf)?;
         let (_, length): (_, u16) = nom::combinator::peek(be_u16)(buf)?;
-        let (reminder, buf) = nom::multi::length_data(be_u16)(buf)?;
+        let (remainder, buf) = nom::multi::length_data(be_u16)(buf)?;
         let (buf, value) = match code {
             RouteMirroringTlvType::BgpMessage => {
                 let (buf, msg) = parse_into_located_one_input(buf, bgp_ctx)?;
@@ -787,7 +787,7 @@ impl<'a>
                 ),
             ));
         }
-        Ok((reminder, value))
+        Ok((remainder, value))
     }
 }
 
@@ -835,7 +835,7 @@ impl<'a> ReadablePdu<'a, LocatedTerminationInformationParsingError<'a>> for Term
         let (buf, code) =
             nom::combinator::map_res(be_u16, TerminationInformationTlvType::try_from)(buf)?;
         let (_, length): (_, u16) = nom::combinator::peek(be_u16)(buf)?;
-        let (reminder, buf) = nom::multi::length_data(be_u16)(buf)?;
+        let (remainder, buf) = nom::multi::length_data(be_u16)(buf)?;
         let (buf, value) = match code {
             TerminationInformationTlvType::String => {
                 let (buf, str) =
@@ -878,7 +878,7 @@ impl<'a> ReadablePdu<'a, LocatedTerminationInformationParsingError<'a>> for Term
                 ),
             ));
         }
-        Ok((reminder, value))
+        Ok((remainder, value))
     }
 }
 
@@ -942,7 +942,7 @@ impl<'a> ReadablePdu<'a, LocatedStatisticsCounterParsingError<'a>> for Statistic
     ) -> IResult<Span<'a>, Self, LocatedStatisticsCounterParsingError<'a>> {
         let (buf, code) = be_u16(buf)?;
         let (buf, length) = nom::combinator::peek(be_u16)(buf)?;
-        let (reminder, buf) = nom::multi::length_data(be_u16)(buf)?;
+        let (remainder, buf) = nom::multi::length_data(be_u16)(buf)?;
         let (buf, counter) = match BmpStatisticsType::try_from(code) {
             Ok(code) => match code {
                 BmpStatisticsType::NumberOfPrefixesRejectedByInboundPolicy => {
@@ -1131,6 +1131,6 @@ impl<'a> ReadablePdu<'a, LocatedStatisticsCounterParsingError<'a>> for Statistic
                 StatisticsCounterParsingError::NomError(ErrorKind::NonEmpty),
             )));
         }
-        Ok((reminder, counter))
+        Ok((remainder, counter))
     }
 }

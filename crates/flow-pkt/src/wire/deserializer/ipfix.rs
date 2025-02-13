@@ -93,7 +93,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedIpfixPacketParsin
                 IpfixPacketParsingError::InvalidLength(length),
             )));
         }
-        let (reminder, buf) = nom::bytes::complete::take(length - 4)(buf)?;
+        let (remainder, buf) = nom::bytes::complete::take(length - 4)(buf)?;
         let (buf, export_time) = be_u32(buf)?;
         let export_time = match Utc.timestamp_opt(export_time as i64, 0) {
             LocalResult::Single(time) => time,
@@ -120,7 +120,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedIpfixPacketParsin
             buf = tmp;
         }
         Ok((
-            reminder,
+            remainder,
             IpfixPacket::new(export_time, sequence_number, observation_domain_id, payload),
         ))
     }
@@ -192,7 +192,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                 Ok(length)
             }
         })(buf)?;
-        let (reminder, mut buf) = nom::bytes::complete::take(length - 4)(buf)?;
+        let (remainder, mut buf) = nom::bytes::complete::take(length - 4)(buf)?;
         let set = match id {
             IPFIX_TEMPLATE_SET_ID => {
                 let mut templates = Vec::new();
@@ -290,7 +290,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                 }
             }
         };
-        Ok((reminder, set))
+        Ok((remainder, set))
     }
 }
 
