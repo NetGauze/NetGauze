@@ -445,13 +445,13 @@ fn parse_bgp_message_length_and_type(
 
     // Only read the subset that is defined by the length
     // Check the message size before doing any math on it
-    let reminder_result = nom::bytes::complete::take::<
+    let remainder_result = nom::bytes::complete::take::<
         u16,
         Span<'_>,
         LocatedBgpMessageParsingError<'_>,
     >(length - 18)(buf);
-    let (reminder_buf, buf) = match reminder_result {
-        Ok((reminder_buf, buf)) => (reminder_buf, buf),
+    let (remainder_buf, buf) = match remainder_result {
+        Ok((remainder_buf, buf)) => (remainder_buf, buf),
         Err(_) => {
             return Err(nom::Err::Error(
                 LocatedBgpMessageOpenAndLengthParsingError::new(
@@ -476,7 +476,7 @@ fn parse_bgp_message_length_and_type(
         }
         BgpMessageType::Update | BgpMessageType::Notification | BgpMessageType::RouteRefresh => {}
     }
-    Ok((buf, (length, message_type, reminder_buf)))
+    Ok((buf, (length, message_type, remainder_buf)))
 }
 
 impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpMessageParsingError<'a>>
@@ -496,7 +496,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpMessagePa
 
         // Parse both length and type together, since we need to do input validation on
         // the length based on the type of the message
-        let (buf, (_, message_type, reminder_buf)) = match parse_bgp_message_length_and_type(buf) {
+        let (buf, (_, message_type, remainder_buf)) = match parse_bgp_message_length_and_type(buf) {
             Ok(value) => value,
             Err(err) => return Err(into_located_bgp_message_parsing_error(err)),
         };
@@ -527,7 +527,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BgpParsingContext, LocatedBgpMessagePa
                 BgpMessageParsingError::NomError(ErrorKind::NonEmpty),
             )));
         }
-        Ok((reminder_buf, msg))
+        Ok((remainder_buf, msg))
     }
 }
 

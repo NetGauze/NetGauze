@@ -202,7 +202,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                 Ok(length)
             }
         })(buf)?;
-        let (reminder, mut buf) = nom::bytes::complete::take(length - 4)(buf)?;
+        let (remainder, mut buf) = nom::bytes::complete::take(length - 4)(buf)?;
         let set = match id {
             NETFLOW_TEMPLATE_SET_ID => {
                 let mut templates = Vec::new();
@@ -284,7 +284,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                 }
             }
         };
-        Ok((reminder, set))
+        Ok((remainder, set))
     }
 }
 

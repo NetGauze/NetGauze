@@ -228,7 +228,7 @@ impl<'a>
         let (prefix_buf, rd) = parse_into_located(prefix_buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
-        let reminder_prefix_len = match prefix_len.checked_sub(read_prefix) {
+        let remainder_prefix_len = match prefix_len.checked_sub(read_prefix) {
             None => {
                 return Err(nom::Err::Error(
                     LocatedIpv4MplsVpnUnicastAddressParsingError::new(
@@ -239,10 +239,10 @@ impl<'a>
             }
             Some(val) => val,
         };
-        let (reminder, network) =
-            parse_into_located_two_inputs(prefix_buf, reminder_prefix_len, input)?;
+        let (remainder, network) =
+            parse_into_located_two_inputs(prefix_buf, remainder_prefix_len, input)?;
         // Check all the bytes specified by the prefix length are consumed
-        if !reminder.is_empty() {
+        if !remainder.is_empty() {
             return Err(nom::Err::Error(
                 LocatedIpv4MplsVpnUnicastAddressParsingError::new(
                     input,
@@ -304,7 +304,7 @@ impl<'a>
         let (prefix_buf, rd) = parse_into_located(prefix_buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
-        let reminder_prefix_len = match prefix_len.checked_sub(read_prefix) {
+        let remainder_prefix_len = match prefix_len.checked_sub(read_prefix) {
             None => {
                 return Err(nom::Err::Error(
                     LocatedIpv6MplsVpnUnicastAddressParsingError::new(
@@ -315,10 +315,10 @@ impl<'a>
             }
             Some(val) => val,
         };
-        let (reminder, network) =
-            parse_into_located_two_inputs(prefix_buf, reminder_prefix_len, input)?;
+        let (remainder, network) =
+            parse_into_located_two_inputs(prefix_buf, remainder_prefix_len, input)?;
         // Check all the bytes specified by the prefix length are consumed
-        if !reminder.is_empty() {
+        if !remainder.is_empty() {
             return Err(nom::Err::Error(
                 LocatedIpv6MplsVpnUnicastAddressParsingError::new(
                     input,
