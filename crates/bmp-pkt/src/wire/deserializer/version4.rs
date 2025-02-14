@@ -196,7 +196,7 @@ impl<'a>
             match bgp_pdu {
                 Some(bgp_pdu) => {
                     let (_, bgp_pdu): (_, BgpMessage) =
-                        parse_into_located_one_input(bgp_pdu, &mut *bgp_ctx)?;
+                        parse_into_located_one_input(bgp_pdu, &mut ctx_clone)?;
                     (buf, bgp_pdu, tlvs)
                 }
                 None => {

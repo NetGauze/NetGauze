@@ -13,9 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::wire::deserializer::version4::{
+    BmpV4MessageValueParsingError, BmpV4RouteMonitoringMessageParsingError,
+};
+use crate::{
+    iana::*,
+    version4::{
+        BmpV4PeerDownTlv, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
+        BmpV4RouteMonitoringTlvValue, BMPV4_TLV_GROUP_GBIT,
+    },
+    wire::{deserializer::*, serializer::*},
+    *,
+};
 #[cfg(not(feature = "fuzz"))]
 use chrono::TimeZone;
 use ipnet::Ipv4Net;
+use netgauze_bgp_pkt::capabilities::{AddPathAddressFamily, AddPathCapability};
+use netgauze_bgp_pkt::wire::deserializer::update::BgpUpdateMessageParsingError;
+use netgauze_bgp_pkt::wire::deserializer::Ipv4PrefixParsingError;
 use netgauze_bgp_pkt::{
     capabilities::{
         BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
@@ -45,17 +60,8 @@ use netgauze_parse_utils::{
     Span,
 };
 use nom::error::ErrorKind;
+use std::collections::HashMap;
 use std::{net::Ipv6Addr, str::FromStr};
-
-use crate::{
-    iana::*,
-    version4::{
-        BmpV4PeerDownTlv, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
-        BmpV4RouteMonitoringTlvValue, BMPV4_TLV_GROUP_GBIT,
-    },
-    wire::{deserializer::*, serializer::*},
-    *,
-};
 
 #[cfg(feature = "codec")]
 mod pcap_tests;
@@ -1844,6 +1850,195 @@ fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingErr
 
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_v4_route_monitoring_with_stateless_parsing() -> Result<(), BmpMessageWritingError> {
+    let good_wire: [u8; 120] = [
+        4, 0, 0, 0, 120, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192,
+        0, 2, 52, 0, 1, 0, 0, 192, 0, 2, 52, 100, 145, 166, 162, 0, 13, 81, 82, 0, 1, 0, 6, 0, 0,
+        69, 4, 0, 1, 1, 3, 0, 2, 0, 54, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 0, 54, 2, 0, 0, 0, 22, 64, 1, 1, 0, 80, 2, 0, 14, 2, 3, 0, 1,
+        0, 56, 0, 1, 0, 0, 0, 1, 0, 19, 0, 0, 0, 69, 32, 198, 51, 100, 19,
+    ];
+
+    let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
+        BmpV4RouteMonitoringMessage::build(
+            PeerHeader::new(
+                BmpPeerType::GlobalInstancePeer {
+                    ipv6: false,
+                    post_policy: true,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                None,
+                Some(IpAddr::V4(Ipv4Addr::from_str("192.0.2.52").unwrap())),
+                65536,
+                Ipv4Addr::new(192, 0, 2, 52),
+                Some(Utc.timestamp_opt(1687266978, 872786000).unwrap()),
+            ),
+            BgpMessage::Update(BgpUpdateMessage::new(
+                vec![],
+                vec![
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::Origin(Origin::IGP),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        true,
+                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                            As4PathSegment::new(
+                                AsPathSegmentType::AsSequence,
+                                vec![65592, 65536, 65555],
+                            ),
+                        ])),
+                    )
+                    .unwrap(),
+                ],
+                vec![Ipv4UnicastAddress::new(
+                    Some(69),
+                    Ipv4Unicast::from_net(
+                        Ipv4Net::new(Ipv4Addr::from_str("198.51.100.19").unwrap(), 32).unwrap(),
+                    )
+                    .unwrap(),
+                )],
+            )),
+            vec![BmpV4RouteMonitoringTlv::build(
+                0,
+                BmpV4RouteMonitoringTlvValue::StatelessParsing(BgpCapability::AddPath(
+                    AddPathCapability::new(vec![AddPathAddressFamily::new(
+                        AddressType::Ipv4Unicast,
+                        true,
+                        true,
+                    )]),
+                )),
+            )
+            .unwrap()],
+        )
+        .unwrap(),
+    ));
+
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMessageWritingError> {
+    let good_wire: [u8; 108] = [
+        4, 0, 0, 0, 108, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192,
+        0, 2, 52, 0, 1, 0, 0, 192, 0, 2, 52, 100, 145, 166, 162, 0, 13, 81, 82, 0, 2, 0, 54, 0, 0,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 54, 2,
+        0, 0, 0, 22, 64, 1, 1, 0, 80, 2, 0, 14, 2, 3, 0, 1, 0, 56, 0, 1, 0, 0, 0, 1, 0, 19, 0, 0,
+        0, 69, 32, 198, 51, 100, 19,
+    ];
+
+    let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
+        BmpV4RouteMonitoringMessage::build(
+            PeerHeader::new(
+                BmpPeerType::GlobalInstancePeer {
+                    ipv6: false,
+                    post_policy: true,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                None,
+                Some(IpAddr::V4(Ipv4Addr::from_str("192.0.2.52").unwrap())),
+                65536,
+                Ipv4Addr::new(192, 0, 2, 52),
+                Some(Utc.timestamp_opt(1687266978, 872786000).unwrap()),
+            ),
+            BgpMessage::Update(BgpUpdateMessage::new(
+                vec![],
+                vec![
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::Origin(Origin::IGP),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        true,
+                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![
+                            As4PathSegment::new(
+                                AsPathSegmentType::AsSequence,
+                                vec![65592, 65536, 65555],
+                            ),
+                        ])),
+                    )
+                    .unwrap(),
+                ],
+                vec![Ipv4UnicastAddress::new(
+                    Some(69),
+                    Ipv4Unicast::from_net(
+                        Ipv4Net::new(Ipv4Addr::from_str("198.51.100.19").unwrap(), 32).unwrap(),
+                    )
+                    .unwrap(),
+                )],
+            )),
+            vec![],
+        )
+        .unwrap(),
+    ));
+
+    let error = LocatedBmpMessageParsingError::new(
+        unsafe { Span::new_from_raw_offset(102, &good_wire[102..]) },
+        BmpMessageParsingError::BmpV4MessageValueError(
+            BmpV4MessageValueParsingError::RouteMonitoringMessageError(
+                BmpV4RouteMonitoringMessageParsingError::BgpMessage(
+                    BgpMessageParsingError::BgpUpdateMessageParsingError(
+                        BgpUpdateMessageParsingError::Ipv4PrefixError(
+                            Ipv4PrefixParsingError::InvalidIpv4PrefixLen(69),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    );
+
+    let mut no_context = Default::default();
+    test_parse_error_with_one_input::<
+        BmpMessage,
+        &mut BmpParsingContext,
+        LocatedBmpMessageParsingError<'_>,
+    >(&good_wire, &mut no_context, &error);
+
+    let mut good_context = BmpParsingContext::default();
+    let per_peer_header = match &good {
+        BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(BmpV4RouteMonitoringMessage {
+            peer_header,
+            ..
+        })) => peer_header,
+        _ => unreachable!(),
+    };
+
+    good_context.add_peer(
+        PeerKey::from_peer_header(per_peer_header),
+        BgpParsingContext::new(
+            true,
+            Default::default(),
+            HashMap::from([(AddressType::Ipv4Unicast, true)]),
+            true,
+            true,
+            true,
+            true,
+        ),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, &mut good_context, &good);
     Ok(())
 }
 

@@ -15,7 +15,7 @@
 
 //! Deserializer library for BMP's wire protocol
 
-mod version4;
+pub mod version4;
 
 use crate::wire::deserializer::version4::LocatedBmpV4MessageValueParsingError;
 use chrono::LocalResult;
