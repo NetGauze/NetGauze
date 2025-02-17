@@ -86,13 +86,11 @@ impl HttpPublisherStats {
 /// Message representation to be sent to Feldera
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Message<T: Clone> {
-    insert {
-        ts: String,
-        peer_src: String,
-        writer_id: String,
-        payload: T,
-    },
+pub struct Message<T: Clone> {
+    pub ts: String,
+    pub peer_src: String,
+    pub writer_id: String,
+    pub payload: T,
 }
 
 struct HttpPublisherActor<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> {
