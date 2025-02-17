@@ -37,17 +37,41 @@ impl FlowInfo {
             FlowInfo::NetFlowV9(pkt) => pkt
                 .flatten()
                 .into_iter()
-                .map(FlatFlowInfo::NetFlowV9)
+                .map(|x| FlatFlowInfo::new(Some(x), None))
                 .collect(),
-            FlowInfo::IPFIX(pkt) => pkt.flatten().into_iter().map(FlatFlowInfo::IPFIX).collect(),
+            FlowInfo::IPFIX(pkt) => pkt
+                .flatten()
+                .into_iter()
+                .map(|x| FlatFlowInfo::new(None, Some(x)))
+                .collect(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum FlatFlowInfo {
-    NetFlowV9(netflow::FlatNetFlowV9Packet),
-    IPFIX(ipfix::FlatIpfixPacket),
+pub struct FlatFlowInfo {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    netflow_v9: Option<netflow::FlatNetFlowV9Packet>,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    ipfix: Option<ipfix::FlatIpfixPacket>,
+}
+
+impl FlatFlowInfo {
+    pub const fn new(
+        netflow_v9: Option<netflow::FlatNetFlowV9Packet>,
+        ipfix: Option<ipfix::FlatIpfixPacket>,
+    ) -> Self {
+        Self { netflow_v9, ipfix }
+    }
+
+    pub const fn netflow_v9(&self) -> Option<&netflow::FlatNetFlowV9Packet> {
+        self.netflow_v9.as_ref()
+    }
+
+    pub const fn ipfix(&self) -> Option<&ipfix::FlatIpfixPacket> {
+        self.ipfix.as_ref()
+    }
 }
 
 /// Errors when crafting a new Set
@@ -170,7 +194,7 @@ fn arbitrary_datetime(
 mod tests {
     use super::*;
     use crate::{
-        ipfix::{FlatIpfixPacket, IpfixPacket},
+        ipfix::{FlatDataSet, FlatIpfixPacket, IpfixPacket},
         netflow::{FlatNetFlowV9Packet, NetFlowV9Packet},
     };
     use chrono::{TimeZone, Utc};
@@ -242,24 +266,38 @@ mod tests {
         };
 
         let expected = vec![
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-                0,
-                0,
-                ipfix::FlatSet::Data {
-                    id: DataSetId::new(400).unwrap(),
-                    record: Box::new(ipfix::FlatDataRecord::new(scope_fields1, fields1)),
-                },
-            )),
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-                0,
-                0,
-                ipfix::FlatSet::Data {
-                    id: DataSetId::new(400).unwrap(),
-                    record: Box::new(ipfix::FlatDataRecord::new(scope_fields2, fields2)),
-                },
-            )),
+            FlatFlowInfo::new(
+                None,
+                Some(FlatIpfixPacket::new(
+                    Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+                    0,
+                    0,
+                    ipfix::FlatSet::new(
+                        None,
+                        None,
+                        Some(FlatDataSet::new(
+                            DataSetId::new(400).unwrap(),
+                            ipfix::FlatDataRecord::new(scope_fields1, fields1),
+                        )),
+                    ),
+                )),
+            ),
+            FlatFlowInfo::new(
+                None,
+                Some(FlatIpfixPacket::new(
+                    Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+                    0,
+                    0,
+                    ipfix::FlatSet::new(
+                        None,
+                        None,
+                        Some(FlatDataSet::new(
+                            DataSetId::new(400).unwrap(),
+                            ipfix::FlatDataRecord::new(scope_fields2, fields2),
+                        )),
+                    ),
+                )),
+            ),
         ];
         assert_eq!(expected, flattened);
     }
@@ -330,32 +368,38 @@ mod tests {
             ..Default::default()
         };
 
-        let expected1 = FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-            1000,
-            Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-            0,
-            0,
-            netflow::FlatSet::Data {
-                id: DataSetId::new(400).unwrap(),
-                record: Box::new(netflow::FlatDataRecord::new(
-                    scope_fields1.clone(),
-                    fields1.clone(),
-                )),
-            },
-        ));
-        let expected2 = FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-            1000,
-            Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-            0,
-            0,
-            netflow::FlatSet::Data {
-                id: DataSetId::new(400).unwrap(),
-                record: Box::new(netflow::FlatDataRecord::new(
-                    scope_fields2.clone(),
-                    fields2.clone(),
-                )),
-            },
-        ));
+        let expected1 = FlatFlowInfo::new(
+            Some(FlatNetFlowV9Packet::new(
+                1000,
+                Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+                0,
+                0,
+                netflow::FlatSet::Data {
+                    id: DataSetId::new(400).unwrap(),
+                    record: Box::new(netflow::FlatDataRecord::new(
+                        scope_fields1.clone(),
+                        fields1.clone(),
+                    )),
+                },
+            )),
+            None,
+        );
+        let expected2 = FlatFlowInfo::new(
+            Some(FlatNetFlowV9Packet::new(
+                1000,
+                Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+                0,
+                0,
+                netflow::FlatSet::Data {
+                    id: DataSetId::new(400).unwrap(),
+                    record: Box::new(netflow::FlatDataRecord::new(
+                        scope_fields2.clone(),
+                        fields2.clone(),
+                    )),
+                },
+            )),
+            None,
+        );
 
         let expected = vec![expected1, expected2];
         assert_eq!(expected, flattened);
@@ -399,27 +443,36 @@ mod tests {
 
         let flattened = template.flatten();
         let expected = vec![
-            FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-                120,
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                netflow::FlatSet::Template(template_record1),
-            )),
-            FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-                120,
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                netflow::FlatSet::Template(template_record2),
-            )),
-            FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-                120,
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                netflow::FlatSet::OptionsTemplate(options_template_record1),
-            )),
+            FlatFlowInfo::new(
+                Some(FlatNetFlowV9Packet::new(
+                    120,
+                    Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
+                    10,
+                    20,
+                    netflow::FlatSet::Template(template_record1),
+                )),
+                None,
+            ),
+            FlatFlowInfo::new(
+                Some(FlatNetFlowV9Packet::new(
+                    120,
+                    Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
+                    10,
+                    20,
+                    netflow::FlatSet::Template(template_record2),
+                )),
+                None,
+            ),
+            FlatFlowInfo::new(
+                Some(FlatNetFlowV9Packet::new(
+                    120,
+                    Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
+                    10,
+                    20,
+                    netflow::FlatSet::OptionsTemplate(options_template_record1),
+                )),
+                None,
+            ),
         ];
         assert_eq!(flattened, expected);
     }
@@ -461,24 +514,33 @@ mod tests {
 
         let flattened = template.flatten();
         let expected = vec![
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                ipfix::FlatSet::Template(template_record1),
-            )),
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                ipfix::FlatSet::Template(template_record2),
-            )),
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                ipfix::FlatSet::OptionsTemplate(options_template_record1),
-            )),
+            FlatFlowInfo::new(
+                None,
+                Some(FlatIpfixPacket::new(
+                    Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
+                    10,
+                    20,
+                    ipfix::FlatSet::new(Some(template_record1), None, None),
+                )),
+            ),
+            FlatFlowInfo::new(
+                None,
+                Some(FlatIpfixPacket::new(
+                    Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
+                    10,
+                    20,
+                    ipfix::FlatSet::new(Some(template_record2), None, None),
+                )),
+            ),
+            FlatFlowInfo::new(
+                None,
+                Some(FlatIpfixPacket::new(
+                    Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
+                    10,
+                    20,
+                    ipfix::FlatSet::new(None, Some(options_template_record1), None),
+                )),
+            ),
         ];
         assert_eq!(flattened, expected);
     }

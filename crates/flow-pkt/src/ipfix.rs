@@ -210,15 +210,18 @@ impl Set {
 
     pub fn flatten(self) -> Vec<FlatSet> {
         match self {
-            Self::Template(values) => values.into_iter().map(FlatSet::Template).collect(),
-            Self::OptionsTemplate(values) => {
-                values.into_iter().map(FlatSet::OptionsTemplate).collect()
-            }
+            Self::Template(values) => values
+                .into_iter()
+                .map(|x| FlatSet::new(Some(x), None, None))
+                .collect(),
+            Self::OptionsTemplate(values) => values
+                .into_iter()
+                .map(|x| FlatSet::new(None, Some(x), None))
+                .collect(),
             Self::Data { id, records } => records
                 .into_iter()
-                .map(|record| FlatSet::Data {
-                    id,
-                    record: Box::new(record.flatten()),
+                .map(|record| {
+                    FlatSet::new(None, None, Some(FlatDataSet::new(id, record.flatten())))
                 })
                 .collect(),
         }
@@ -227,22 +230,60 @@ impl Set {
 
 /// A version of [Set] that contain only one record
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum FlatSet {
-    Template(TemplateRecord),
-    OptionsTemplate(OptionsTemplateRecord),
-    Data {
-        id: DataSetId,
-        record: Box<FlatDataRecord>,
-    },
+pub struct FlatSet {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    template: Option<TemplateRecord>,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    options_template: Option<OptionsTemplateRecord>,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    data: Option<FlatDataSet>,
 }
 
 impl FlatSet {
-    pub const fn id(&self) -> u16 {
-        match self {
-            Self::Template(_) => IPFIX_TEMPLATE_SET_ID,
-            Self::OptionsTemplate(_) => IPFIX_OPTIONS_TEMPLATE_SET_ID,
-            Self::Data { id, record: _ } => id.0,
+    pub const fn new(
+        template: Option<TemplateRecord>,
+        options_template: Option<OptionsTemplateRecord>,
+        data: Option<FlatDataSet>,
+    ) -> Self {
+        Self {
+            template,
+            options_template,
+            data,
         }
+    }
+
+    pub const fn template(&self) -> Option<&TemplateRecord> {
+        self.template.as_ref()
+    }
+
+    pub const fn options_template(&self) -> Option<&OptionsTemplateRecord> {
+        self.options_template.as_ref()
+    }
+
+    pub const fn data(&self) -> Option<&FlatDataSet> {
+        self.data.as_ref()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FlatDataSet {
+    id: DataSetId,
+    record: FlatDataRecord,
+}
+
+impl FlatDataSet {
+    pub const fn new(id: DataSetId, record: FlatDataRecord) -> Self {
+        Self { id, record }
+    }
+
+    pub const fn id(&self) -> DataSetId {
+        self.id
+    }
+
+    pub const fn record(&self) -> &FlatDataRecord {
+        &self.record
     }
 }
 
@@ -530,9 +571,9 @@ mod tests {
             flat_packets[0].observation_domain_id(),
             observation_domain_id
         );
-        assert_eq!(flat_packets[0].set().id(), IPFIX_TEMPLATE_SET_ID);
-        assert_eq!(flat_packets[1].set().id(), IPFIX_OPTIONS_TEMPLATE_SET_ID);
-        assert_eq!(flat_packets[2].set().id(), 256);
+        assert!(flat_packets[0].set.template().is_some());
+        assert!(flat_packets[1].set.options_template().is_some());
+        assert!(flat_packets[2].set.data().is_some());
     }
 
     #[test]
@@ -663,15 +704,16 @@ mod tests {
         );
         let flat_data = data.clone().flatten();
         let sets = [
-            FlatSet::Template(template.clone()),
-            FlatSet::OptionsTemplate(options_template.clone()),
-            FlatSet::Data {
-                id: DataSetId::new(256).unwrap(),
-                record: Box::new(flat_data),
-            },
+            FlatSet::new(Some(template.clone()), None, None),
+            FlatSet::new(None, Some(options_template.clone()), None),
+            FlatSet::new(
+                None,
+                None,
+                Some(FlatDataSet::new(DataSetId::new(256).unwrap(), flat_data)),
+            ),
         ];
-        assert_eq!(sets[0].id(), IPFIX_TEMPLATE_SET_ID);
-        assert_eq!(sets[1].id(), IPFIX_OPTIONS_TEMPLATE_SET_ID);
-        assert_eq!(sets[2].id(), 256);
+        assert!(sets[0].template().is_some());
+        assert!(sets[1].options_template().is_some());
+        assert!(sets[2].data().is_some());
     }
 }
