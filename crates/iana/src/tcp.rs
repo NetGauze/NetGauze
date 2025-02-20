@@ -157,32 +157,8 @@ impl BitOrAssign for TCPHeaderFlags {
 
 impl Display for TCPHeaderFlags {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut flags = Vec::new();
-        if self.FIN {
-            flags.push("FIN");
-        }
-        if self.SYN {
-            flags.push("SYN");
-        }
-        if self.RST {
-            flags.push("RST");
-        }
-        if self.PSH {
-            flags.push("PSH");
-        }
-        if self.ACK {
-            flags.push("ACK");
-        }
-        if self.URG {
-            flags.push("URG");
-        }
-        if self.ECE {
-            flags.push("ECE");
-        }
-        if self.CWR {
-            flags.push("CWR");
-        }
-        write!(f, "{:?}", flags)
+        let flags = self.to_vec();
+        write!(f, "[{}]", flags.join(", "))
     }
 }
 
@@ -357,16 +333,16 @@ mod tests {
     #[test]
     fn test_display() {
         let flags = TCPHeaderFlags {
-            FIN: true,
-            SYN: true,
-            RST: true,
-            PSH: false,
-            ACK: false,
-            URG: false,
-            ECE: true,
-            CWR: false,
+            FIN: false,
+            SYN: false,
+            RST: false,
+            PSH: true,
+            ACK: true,
+            URG: true,
+            ECE: false,
+            CWR: true,
         };
-        assert_eq!(format!("{}", flags), "[\"FIN\", \"SYN\", \"RST\", \"ECE\"]");
+        assert_eq!(format!("{}", flags), "[PSH, ACK, URG, CWR]");
     }
 
     #[test]
