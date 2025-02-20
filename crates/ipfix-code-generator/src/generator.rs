@@ -2476,6 +2476,52 @@ pub(crate) fn generate_ie_ser_main(
     ret
 }
 
+/// Generates `get(&self, ie: IE) -> Vec<Field>`  for `Fields`
+pub fn impl_get_field(
+    iana_ies: &Vec<InformationElement>,
+    vendors: &Vec<(String, String, u32)>,
+) -> String {
+    let mut ret = String::new();
+    ret.push_str("    pub fn get(&self, ie: IE) -> Vec<Field> {\n");
+    ret.push_str("        match ie {\n");
+    if !vendors.is_empty() {
+        ret.push_str("            IE::Unknown { .. } => Vec::with_capacity(0),\n");
+    }
+    for (name, pkg, _) in vendors {
+        ret.push_str(format!("            IE::{name}(vendor_ie) => {{\n").as_str());
+        ret.push_str(format!("                if let Some(value) = &self.{pkg} {{\n").as_str());
+        ret.push_str(format!("                    value.get(vendor_ie).into_iter().map(Field::{name}).collect()\n").as_str());
+        ret.push_str("                } else {\n");
+        ret.push_str("                     Vec::with_capacity(0)\n");
+        ret.push_str("                }\n");
+        ret.push_str("            }\n");
+    }
+    for ie in iana_ies {
+        ret.push_str(format!("            IE::{} => {{\n", ie.name).as_str());
+        ret.push_str(
+            format!(
+                "                if let Some(values) = &self.{name} {{\n",
+                name = ie.name
+            )
+            .as_str(),
+        );
+        ret.push_str(
+            format!(
+                "                    values.iter().cloned().map(Field::{name}).collect()\n",
+                name = ie.name
+            )
+            .as_str(),
+        );
+        ret.push_str("                } else {\n");
+        ret.push_str("                    Vec::with_capacity(0)\n");
+        ret.push_str("                }\n");
+        ret.push_str("            }\n");
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret
+}
+
 pub fn generate_flat_ie_struct(
     iana_ies: &Vec<InformationElement>,
     vendors: &Vec<(String, String, u32)>,
@@ -2553,5 +2599,10 @@ pub fn generate_flat_ie_struct(
     ret.push_str("        out\n");
     ret.push_str("    }\n");
     ret.push_str("}\n\n");
+
+    ret.push_str("impl Fields {\n");
+    ret.push_str(impl_get_field(iana_ies, vendors).as_str());
+    ret.push_str("}\n\n");
+
     ret
 }
