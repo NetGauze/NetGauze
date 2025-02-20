@@ -543,6 +543,13 @@ fn generate_ie_field_enum_for_ie(
     ret.push_str("        }\n\n");
     ret.push_str("    }\n\n");
     ret.push_str("}\n\n");
+
+    ret.push_str("#[derive(Debug, Clone, strum_macros::Display)]\n");
+    ret.push_str("pub enum FieldConversionError {\n");
+    ret.push_str("    InvalidType,\n");
+    ret.push_str("}\n\n");
+    ret.push_str("impl std::error::Error for FieldConversionError {}\n\n");
+    ret.push_str(generate_into_for_field(iana_ies, vendors).as_str());
     ret
 }
 
@@ -1655,6 +1662,99 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     ret.push_str("        }\n\n");
     ret.push_str("    }\n\n");
     ret.push_str("}\n\n");
+
+    ret.push_str(generate_into_for_field(ies, &vec![]).as_str());
+
+    ret
+}
+
+/// Generates `impl TryInto<NativeRustType> for Field` to convert any field to
+/// its native rust type Additionally for fields that could be represented as
+/// String, a TryInto is generated Some special formatting is applied for
+/// MacAddress to make it human-readable.
+pub fn generate_into_for_field(
+    ies: &Vec<InformationElement>,
+    vendors: &Vec<(String, String, u32)>,
+) -> String {
+    let mut ret = String::new();
+    // note this list is the inverse of what is defined in `get_rust_type`
+    let rust_converted_types = [
+        "u8",
+        "u16",
+        "u32",
+        "u64",
+        "i8",
+        "i16",
+        "i32",
+        "i64",
+        "f32",
+        "f64",
+        "bool",
+        "super::MacAddress",
+        "String",
+        "chrono::DateTime<chrono::Utc>",
+        "std::net::Ipv4Addr",
+        "std::net::Ipv6Addr",
+        "Vec<u8>",
+        "[u8; 32]",
+    ];
+    for convert_rust_type in rust_converted_types {
+        ret.push_str(format!("impl TryInto<{convert_rust_type}> for Field {{\n").as_str());
+        ret.push_str("    type Error = crate::FieldConversionError;\n\n");
+        ret.push_str(
+            format!("    fn try_into(self) -> Result<{convert_rust_type}, Self::Error> {{\n")
+                .as_str(),
+        );
+        ret.push_str("        match self {\n");
+        if !vendors.is_empty() {
+            // only IANA have unknown, thus we check vendor is not configured
+            ret.push_str("            Self::Unknown{ .. } => Err(Self::Error::InvalidType),\n");
+        }
+        for (name, _pkg, _) in vendors {
+            ret.push_str(
+                format!("            Self::{name}(value) => value.try_into(),\n").as_str(),
+            );
+        }
+        for ie in ies {
+            let ie_rust_type = get_rust_type(&ie.data_type);
+            if ie_rust_type == convert_rust_type
+                && ie.subregistry.is_none()
+                && ie.name != "tcpControlBits"
+            {
+                // Native type converstion
+                ret.push_str(
+                    format!("            Self::{}(value) => Ok(value),\n", ie.name).as_str(),
+                );
+            } else if convert_rust_type == "String"
+                && ie_rust_type != "Vec<u8>"
+                && ie_rust_type != "[u8; 32]"
+                && ie_rust_type != "super::MacAddress"
+            {
+                // Convert to using the defined Display implementation of the method
+                ret.push_str(
+                    format!(
+                        "            Self::{}(value) => Ok(format!(\"{{value}}\")),\n",
+                        ie.name
+                    )
+                    .as_str(),
+                );
+            } else if convert_rust_type == "String" && ie_rust_type == "super::MacAddress" {
+                // convert MacAddresses to human-readable string
+                ret.push_str(format!("            Self::{}(value) => Ok(value.iter().map(|x| format!(\"{{x:x}}\")).collect::<Vec<_>>().join(\":\").to_string()),\n", ie.name).as_str());
+            } else {
+                ret.push_str(
+                    format!(
+                        "            Self::{}(_) => Err(Self::Error::InvalidType),\n",
+                        ie.name
+                    )
+                    .as_str(),
+                );
+            }
+        }
+        ret.push_str("        }\n");
+        ret.push_str("    }\n");
+        ret.push_str("}\n\n");
+    }
     ret
 }
 
