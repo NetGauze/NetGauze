@@ -342,7 +342,7 @@ mod tests {
             ECE: false,
             CWR: true,
         };
-        assert_eq!(format!("{}", flags), "[PSH, ACK, URG, CWR]");
+        assert_eq!(format!("{flags}"), "[PSH, ACK, URG, CWR]");
     }
 
     #[test]
