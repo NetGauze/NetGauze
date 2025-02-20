@@ -28,15 +28,19 @@
 //! println!("{}", flags_json);
 //! // output: {"FIN":true,"SYN":true,"RST":true,"PSH":false,"ACK":false,"URG":false,"ECE":true,"CWR":false}
 //! let value2: u8 = u8::from(flags);
-//!   
+//!
 //! assert_eq!(value, value2);
 //! ```
 
 use serde::{Deserialize, Serialize};
+use std::{
+    fmt::{Display, Formatter},
+    ops::{BitOr, BitOrAssign},
+};
 
 /// TCP Header Flags registered at IANA
 /// [TCP Parameters](https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xml)
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Hash, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, Hash, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TCPHeaderFlags {
@@ -89,6 +93,72 @@ impl TCPHeaderFlags {
             ECE,
             CWR,
         }
+    }
+
+    pub fn to_vec(&self) -> Vec<String> {
+        let mut flags = Vec::new();
+        if self.FIN {
+            flags.push("FIN".to_string());
+        }
+        if self.SYN {
+            flags.push("SYN".to_string());
+        }
+        if self.RST {
+            flags.push("RST".to_string());
+        }
+        if self.PSH {
+            flags.push("PSH".to_string());
+        }
+        if self.ACK {
+            flags.push("ACK".to_string());
+        }
+        if self.URG {
+            flags.push("URG".to_string());
+        }
+        if self.ECE {
+            flags.push("ECE".to_string());
+        }
+        if self.CWR {
+            flags.push("CWR".to_string());
+        }
+        flags
+    }
+}
+
+impl BitOr for TCPHeaderFlags {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        TCPHeaderFlags {
+            FIN: self.FIN | rhs.FIN,
+            SYN: self.SYN | rhs.SYN,
+            RST: self.RST | rhs.RST,
+            PSH: self.PSH | rhs.PSH,
+            ACK: self.ACK | rhs.ACK,
+            URG: self.URG | rhs.URG,
+            ECE: self.ECE | rhs.ECE,
+            CWR: self.CWR | rhs.CWR,
+        }
+    }
+}
+
+impl BitOrAssign for TCPHeaderFlags {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.FIN |= rhs.FIN;
+        self.SYN |= rhs.SYN;
+        self.RST |= rhs.RST;
+        self.PSH |= rhs.PSH;
+        self.ACK |= rhs.ACK;
+        self.URG |= rhs.URG;
+        self.ECE |= rhs.ECE;
+        self.CWR |= rhs.CWR;
+    }
+}
+
+impl Display for TCPHeaderFlags {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let flags = self.to_vec();
+        write!(f, "[{}]", flags.join(", "))
     }
 }
 
@@ -218,5 +288,81 @@ mod tests {
 
         let value2: u8 = flags.into();
         assert_eq!(value, value2);
+    }
+
+    #[test]
+    fn test_bitor() {
+        let flags1 = TCPHeaderFlags {
+            FIN: true,
+            SYN: false,
+            RST: false,
+            PSH: false,
+            ACK: false,
+            URG: true,
+            ECE: false,
+            CWR: false,
+        };
+        let mut flags2 = TCPHeaderFlags {
+            FIN: false,
+            SYN: true,
+            RST: false,
+            PSH: false,
+            ACK: false,
+            URG: false,
+            ECE: false,
+            CWR: false,
+        };
+        let flags3 = flags1 | flags2;
+        assert_eq!(
+            flags3,
+            TCPHeaderFlags {
+                FIN: true,
+                SYN: true,
+                RST: false,
+                PSH: false,
+                ACK: false,
+                URG: true,
+                ECE: false,
+                CWR: false,
+            }
+        );
+        flags2 |= flags1;
+        assert_eq!(flags2, flags3)
+    }
+
+    #[test]
+    fn test_display() {
+        let flags = TCPHeaderFlags {
+            FIN: false,
+            SYN: false,
+            RST: false,
+            PSH: true,
+            ACK: true,
+            URG: true,
+            ECE: false,
+            CWR: true,
+        };
+        assert_eq!(format!("{}", flags), "[PSH, ACK, URG, CWR]");
+    }
+
+    #[test]
+    fn test_to_vec() {
+        let flags = TCPHeaderFlags {
+            FIN: true,
+            SYN: true,
+            RST: true,
+            PSH: false,
+            ACK: false,
+            URG: false,
+            ECE: true,
+            CWR: false,
+        };
+        let expected = vec![
+            "FIN".to_string(),
+            "SYN".to_string(),
+            "RST".to_string(),
+            "ECE".to_string(),
+        ];
+        assert_eq!(flags.to_vec(), expected);
     }
 }
