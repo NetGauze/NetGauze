@@ -1702,7 +1702,7 @@ pub(crate) fn generate_ie_values(
             Some(InformationElementSubRegistry::ValueNameDescRegistry(_))
         );
         let gen_derive = generate_derive(
-            false,
+            true,
             strum_macros,
             rust_type != "Vec<u8>" && rust_type != "String",
             rust_type != "f32" && rust_type != "f64",
