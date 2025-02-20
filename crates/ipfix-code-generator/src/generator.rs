@@ -28,10 +28,10 @@ pub fn generate_derive(
 ) -> String {
     let mut base = "".to_string();
     if num_enum {
-        base.push_str("strum_macros::Display,");
+        base.push_str("strum_macros::Display, ");
     }
     if from_repr {
-        base.push_str("strum_macros::FromRepr,");
+        base.push_str("strum_macros::FromRepr, ");
     }
     if copy {
         base.push_str("Copy, ");
