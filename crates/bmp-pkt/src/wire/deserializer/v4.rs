@@ -1,23 +1,55 @@
+// Copyright (C) 2022-present The NetGauze Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use crate::{
     iana::{BmpMessageType, UndefinedBmpMessageType},
-    version4::{
+    v4::{
         BmpV4MessageValue, BmpV4PeerDownTlv, BmpV4RouteMonitoringError,
         BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvError,
         BmpV4RouteMonitoringTlvType, BmpV4RouteMonitoringTlvValue,
     },
-    wire::deserializer::*,
+    wire::deserializer::{
+        v3::{
+            InitiationMessageParsingError, PeerDownNotificationMessageParsingError,
+            PeerHeaderParsingError, PeerUpNotificationMessageParsingError,
+            RouteMirroringMessageParsingError, StatisticsReportMessageParsingError,
+            TerminationMessageParsingError,
+        },
+        *,
+    },
     PeerHeader, PeerKey,
 };
-use netgauze_bgp_pkt::wire::deserializer::{
-    capabilities::{BgpCapabilityParsingError, LocatedBgpCapabilityParsingError},
-    read_tlv_header_t16_l16, BgpMessageParsingError,
+use netgauze_bgp_pkt::{
+    wire::deserializer::{
+        capabilities::{BgpCapabilityParsingError, LocatedBgpCapabilityParsingError},
+        read_tlv_header_t16_l16, BgpMessageParsingError,
+    },
+    BgpMessage,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, ReadablePduWithOneInput, Span,
+    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located, ReadablePdu,
+    ReadablePduWithOneInput, Span,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::{error::ErrorKind, number::complete::be_u8, IResult};
+use nom::{
+    error::{ErrorKind, FromExternalError},
+    number::complete::{be_u16, be_u8},
+    IResult,
+};
 use serde::{Deserialize, Serialize};
+use std::string::FromUtf8Error;
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpV4MessageValueParsingError {
@@ -27,18 +59,27 @@ pub enum BmpV4MessageValueParsingError {
     RouteMonitoringMessageError(
         #[from_located(module = "self")] BmpV4RouteMonitoringMessageParsingError,
     ),
-    InitiationMessageError(#[from_located(module = "self")] InitiationMessageParsingError),
+    InitiationMessageError(
+        #[from_located(module = "crate::wire::deserializer::v3")] InitiationMessageParsingError,
+    ),
     PeerUpNotificationMessageError(
-        #[from_located(module = "self")] PeerUpNotificationMessageParsingError,
+        #[from_located(module = "crate::wire::deserializer::v3")]
+        PeerUpNotificationMessageParsingError,
     ),
     PeerDownNotificationMessageError(
-        #[from_located(module = "self")] PeerDownNotificationMessageParsingError,
+        #[from_located(module = "crate::wire::deserializer::v3")]
+        PeerDownNotificationMessageParsingError,
     ),
     PeerDownNotificationTlvError(#[from_located(module = "self")] BmpV4PeerDownTlvParsingError),
-    RouteMirroringMessageError(#[from_located(module = "self")] RouteMirroringMessageParsingError),
-    TerminationMessageError(#[from_located(module = "self")] TerminationMessageParsingError),
+    RouteMirroringMessageError(
+        #[from_located(module = "crate::wire::deserializer::v3")] RouteMirroringMessageParsingError,
+    ),
+    TerminationMessageError(
+        #[from_located(module = "crate::wire::deserializer::v3")] TerminationMessageParsingError,
+    ),
     StatisticsReportMessageError(
-        #[from_located(module = "self")] StatisticsReportMessageParsingError,
+        #[from_located(module = "crate::wire::deserializer::v3")]
+        StatisticsReportMessageParsingError,
     ),
 }
 
@@ -129,7 +170,7 @@ pub enum BmpV4RouteMonitoringMessageParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     RouteMonitoringMessage(BmpV4RouteMonitoringError),
-    PeerHeader(#[from_located(module = "self")] PeerHeaderParsingError),
+    PeerHeader(#[from_located(module = "crate::wire::deserializer::v3")] PeerHeaderParsingError),
     BgpMessage(
         #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
     ),

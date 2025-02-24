@@ -146,6 +146,7 @@ where
 mod tests {
     use super::*;
     use futures::StreamExt;
+    use netgauze_bmp_pkt::v3::*;
     use netgauze_bmp_pkt::{
         codec::{BmpCodec, BmpCodecDecoderError},
         iana::UndefinedBmpVersion,
