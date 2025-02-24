@@ -25,7 +25,7 @@ use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
 use std::collections::HashSet;
 
-use crate::{version4::BmpV4MessageValue, wire::deserializer::BmpParsingContext};
+use crate::{v4::BmpV4MessageValue, wire::deserializer::BmpParsingContext};
 use netgauze_bgp_pkt::capabilities::{AddPathCapability, MultipleLabel};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 use nom::Needed;
@@ -254,7 +254,10 @@ impl Decoder for BmpCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::*;
+    use crate::{
+        v3::{InitiationInformation, PeerDownNotificationReason, TerminationInformation},
+        *,
+    };
     use netgauze_bgp_pkt::{
         capabilities::{
             ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
