@@ -19,10 +19,19 @@ use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info};
 
+const fn default_flatten() -> bool {
+    false
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HttpPublisherEndpoint {
     pub url: String,
     pub writer_id: String,
+
+    /// if true then [netgauze_flow_pkt::FlatFlowInfo] is used,
+    /// otherwise [netgauze_flow_pkt::FlowInfo] is used.
+    #[serde(default = "default_flatten")]
+    pub flatten: bool,
 
     // Min number of messages to send in each HTTP request
     pub batch_size: usize,

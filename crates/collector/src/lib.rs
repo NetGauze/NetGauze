@@ -48,7 +48,7 @@ pub async fn init_flow_collection(
 
             match &endpoint {
                 PublisherEndpoint::Http(config) => {
-                    let flatten = publisher_config.flatten;
+                    let flatten = config.flatten;
                     let flat_converter = |request: Arc<FlowRequest>, writer_id: String| {
                         let (socket, pkt) = request.as_ref();
                         let flattened: Vec<Message<FlatFlowInfo>> = pkt
