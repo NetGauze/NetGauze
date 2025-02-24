@@ -14,17 +14,16 @@
 // limitations under the License.
 
 use figment::{
-    providers::{Env, Format},
+    providers::{Env, Format, Yaml},
     Figment,
 };
-
-use figment::providers::Yaml;
+use futures::Future;
 use netgauze_collector::{
     config::{CollectorConfig, TelemetryConfig},
-    init_flow_collection,
+    init_flow_collection, init_udp_notif_collection,
 };
 use opentelemetry::global;
-use std::{env, path::PathBuf, str::FromStr};
+use std::{env, path::PathBuf, pin::Pin, str::FromStr};
 use tracing::{info, Level};
 
 fn init_open_telemetry(
@@ -97,10 +96,23 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     }
     runtime_builder.enable_all();
     let runtime = runtime_builder.build()?;
+
     runtime.block_on(async move {
         init_open_telemetry(&config.telemetry)?;
         let meter = global::meter_provider().meter("netgauze");
-        let flow_handle = init_flow_collection(config.flow.clone(), meter);
+        let mut handles = vec![];
+
+        if let Some(flow_config) = config.flow {
+            let flow_handle: Pin<Box<dyn Future<Output = Result<(), anyhow::Error>>>> =
+                Box::pin(init_flow_collection(flow_config, meter.clone()));
+            handles.push(flow_handle);
+        }
+
+        if let Some(udp_notif_config) = config.udp_notif {
+            let udp_notif_handle: Pin<Box<dyn Future<Output = Result<(), anyhow::Error>>>> =
+                Box::pin(init_udp_notif_collection(udp_notif_config, meter.clone()));
+            handles.push(udp_notif_handle);
+        }
 
         // // Purge old entries periodically
         // let purge_timeout = config.flow.template_cache_purge_timeout;
@@ -122,10 +134,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
             _ = tokio::signal::ctrl_c() => {
                 info!("Termination signal received, gracefully shutting down actors");
             }
-            _ = flow_handle => {
-                info!("Flow collection and publishing is terminated, shutting down the collector");
+            _ = futures::future::try_join_all(handles) => {
+                info!("collection and publishing is terminated, shutting down the collector");
             }
         }
+
         Ok::<(), Box<dyn std::error::Error + Send + Sync + 'static>>(())
     })
 }

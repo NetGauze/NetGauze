@@ -14,7 +14,8 @@
 // limitations under the License.
 
 use crate::http::HttpPublisherEndpoint;
-use netgauze_flow_service::flow_supervisor::{BindingAddress, SupervisorConfig};
+use netgauze_flow_service::flow_supervisor;
+use netgauze_udp_notif_service::supervisor as udp_notif_supervisor;
 use serde_with::serde_as;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 
@@ -44,7 +45,8 @@ pub struct CollectorConfig {
     pub runtime: RuntimeConfig,
     pub logging: LoggingConfig,
     pub telemetry: TelemetryConfig,
-    pub flow: FlowConfig,
+    pub flow: Option<FlowConfig>,
+    pub udp_notif: Option<UdpNotifConfig>,
 }
 
 #[derive(Debug, Default, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -97,8 +99,33 @@ pub struct FlowConfig {
 }
 
 impl FlowConfig {
-    pub fn supervisor_config(&self) -> SupervisorConfig {
-        SupervisorConfig {
+    pub fn supervisor_config(&self) -> flow_supervisor::SupervisorConfig {
+        flow_supervisor::SupervisorConfig {
+            binding_addresses: self.listeners.iter().cloned().map(|x| x.into()).collect(),
+            subscriber_timeout: self.subscriber_timeout,
+            cmd_buffer_size: self.cmd_buffer_size,
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct UdpNotifConfig {
+    #[serde(default = "default_subscriber_timeout_duration")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub subscriber_timeout: Duration,
+
+    #[serde(default = "default_cmd_size_buffer")]
+    pub cmd_buffer_size: usize,
+
+    pub listeners: Vec<Binding>,
+
+    pub publishers: HashMap<String, PublisherConfig>,
+}
+
+impl UdpNotifConfig {
+    pub fn supervisor_config(&self) -> udp_notif_supervisor::SupervisorConfig {
+        udp_notif_supervisor::SupervisorConfig {
             binding_addresses: self.listeners.iter().cloned().map(|x| x.into()).collect(),
             subscriber_timeout: self.subscriber_timeout,
             cmd_buffer_size: self.cmd_buffer_size,
@@ -115,9 +142,19 @@ pub struct Binding {
     pub workers: usize,
 }
 
-impl From<Binding> for BindingAddress {
+impl From<Binding> for flow_supervisor::BindingAddress {
     fn from(value: Binding) -> Self {
-        BindingAddress {
+        flow_supervisor::BindingAddress {
+            socket_addr: value.address,
+            num_workers: value.workers,
+            interface: value.interface,
+        }
+    }
+}
+
+impl From<Binding> for udp_notif_supervisor::BindingAddress {
+    fn from(value: Binding) -> Self {
+        udp_notif_supervisor::BindingAddress {
             socket_addr: value.address,
             num_workers: value.workers,
             interface: value.interface,
