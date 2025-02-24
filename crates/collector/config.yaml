@@ -42,3 +42,33 @@ flow:
 #        url: http://10.212.242.69:8080/ingress/flows?format=json
 #        writer_id: writer1
 
+udp_notif:
+  subscriber_timeout: 100
+  listeners:
+    # NetGauze can listen to multiple addresses/interfaces at the same time
+    - address: 0.0.0.0:10000
+      # Optionally Bind to an interface/VRF
+#     interface: eth0
+      # Optionally, number of I/O tasks per address/interface, default is 1
+      workers: 2
+    # more interfaces/ip ares possible
+#    - address: '[::1]:2713'
+#      workers: 2
+
+  # Multiple publishers can be defined.
+  # A packet is copied for each publisher group, and load-balancing is defined between endpoints in the same group.
+  publishers:
+    group1:
+      buffer_size: 1000
+      endpoints:
+        http1: !Http
+          url: http://10.212.242.69:8080/v0/pipelines/vmware/ingress/udp_notif?format=json&array=true
+          writer_id: writer1
+          batch_size: 300
+          #http2: !Http
+          #url: http://10.212.242.69:8080/ingress/udp_notif?format=json
+          #writer_id: writer2
+#    group2:
+#      kafka: !Kakfa
+#        url: http://10.212.242.69:8080/ingress/udp_notif?format=json
+#        writer_id: writer1
