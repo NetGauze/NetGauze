@@ -40,8 +40,8 @@ use tracing::{error, info, warn};
 /// Operations to update or delete enrichment data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EnrichmentOperation {
-    Upsert(IpAddr, indexmap::IndexMap<String, String>),
-    Delete(IpAddr),
+    Upsert(u32, IpAddr, HashMap<String, String>),
+    Delete(u32),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -67,13 +67,13 @@ impl std::fmt::Display for FlowEnrichmentActorError {
 impl std::error::Error for FlowEnrichmentActorError {}
 
 struct FlowEnrichment {
-    labels: HashMap<IpAddr, indexmap::IndexMap<String, String>>,
+    labels: HashMap<IpAddr, (u32, HashMap<String, String>)>,
     writer_id: String,
     cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
     enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
     agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
     enriched_tx: async_channel::Sender<EnrichedFlow>,
-    default_labels: indexmap::IndexMap<String, String>,
+    default_labels: (u32, HashMap<String, String>),
 }
 
 impl FlowEnrichment {
@@ -84,9 +84,13 @@ impl FlowEnrichment {
         agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
         enriched_tx: async_channel::Sender<EnrichedFlow>,
     ) -> Self {
-        let mut default_labels = indexmap::IndexMap::new();
-        default_labels.insert("pkey".to_string(), "unknown".to_string());
-        default_labels.insert("nkey".to_string(), "unknown".to_string());
+        let default_labels = (
+            0,
+            HashMap::from([
+                ("pkey".to_string(), "unknown".to_string()),
+                ("nkey".to_string(), "unknown".to_string()),
+            ]),
+        );
         Self {
             writer_id,
             labels: HashMap::new(),
@@ -100,17 +104,26 @@ impl FlowEnrichment {
 
     fn apply_enrichment(&mut self, op: EnrichmentOperation) {
         match op {
-            EnrichmentOperation::Upsert(ip, enrichment) => {
-                self.labels.insert(ip, enrichment);
+            EnrichmentOperation::Upsert(id, ip, enrichment) => {
+                self.labels.insert(ip, (id, enrichment));
             }
-            EnrichmentOperation::Delete(ip) => {
-                self.labels.remove(&ip);
+            EnrichmentOperation::Delete(id) => {
+                let mut to_remove = None;
+                for (ip, (i, _)) in self.labels.iter() {
+                    if id == *i {
+                        to_remove = Some(*ip);
+                        break;
+                    }
+                }
+                if let Some(ip) = to_remove {
+                    self.labels.remove(&ip);
+                }
             }
         }
     }
 
     fn enrich(&self, window: Window, peer: SocketAddr, flow: FlatFlowInfo) -> EnrichedFlow {
-        let labels = self.labels.get(&peer.ip()).unwrap_or(&self.default_labels);
+        let (_, labels) = self.labels.get(&peer.ip()).unwrap_or(&self.default_labels);
         let (window_start, window_end) = window;
         let ts = chrono::Utc::now();
         EnrichedFlow {

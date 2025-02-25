@@ -24,7 +24,7 @@ use netgauze_flow_pkt::{
     FlatFlowInfo,
 };
 use serde::{Deserialize, Serialize};
-use std::net::IpAddr;
+use std::{collections::HashMap, net::IpAddr};
 
 /// A struct representing an enriched flow record with additional metadata
 ///
@@ -36,7 +36,7 @@ use std::net::IpAddr;
 /// * Flow data - The raw aggregated flat flow record information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrichedFlow {
-    pub labels: indexmap::IndexMap<String, String>,
+    pub labels: HashMap<String, String>,
     pub peer_src: IpAddr,
     pub peer_port: u16,
     pub writer_id: String,
