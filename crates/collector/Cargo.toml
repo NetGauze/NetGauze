@@ -45,6 +45,9 @@ opentelemetry-otlp = { workspace = true, features = [
     "tonic",
 ] }
 tonic = { workspace = true }
+apache-avro = { workspace = true }
+indexmap = { workspace = true, features = ["serde"] }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true, default-features = false, features = [
@@ -52,4 +55,3 @@ chrono = { workspace = true, default-features = false, features = [
     "clock",
 ] }
 tracing-subscriber = { workspace = true }
-serde_json = { workspace = true }

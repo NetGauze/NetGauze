@@ -25,6 +25,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 pub mod config;
+pub mod flow;
 pub mod http;
 
 pub async fn init_flow_collection(

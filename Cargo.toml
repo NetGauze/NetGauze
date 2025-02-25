@@ -83,3 +83,5 @@ opentelemetry-otlp = { version = "0.27" }
 tonic = { version = "0.12" }
 anyhow = { version = "1" }
 serde_with = { version = "3.11" }
+apache-avro = { version = "0.17" }
+indexmap = { version = "2.7" }
