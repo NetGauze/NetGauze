@@ -15,12 +15,13 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 use crate::{
     ie::{Field, Fields},
-    DataSetId, FieldSpecifier,
+    DataSetId, FieldSpecifier, IE,
 };
+use netgauze_analytics::flow::AggrOp;
 
 pub const IPFIX_VERSION: u16 = 10;
 
@@ -138,7 +139,7 @@ impl IpfixPacket {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FlatIpfixPacket {
     export_time: DateTime<Utc>,
     sequence_number: u32,
@@ -175,6 +176,21 @@ impl FlatIpfixPacket {
 
     pub const fn set(&self) -> &FlatSet {
         &self.set
+    }
+
+    pub fn ipfix_h_default_aggr(&mut self, incoming: &FlatIpfixPacket) {
+        self.export_time = std::cmp::max(self.export_time, incoming.export_time);
+        self.sequence_number = std::cmp::max(self.sequence_number, incoming.sequence_number);
+        self.observation_domain_id = incoming.observation_domain_id;
+        self.set.flatset_h_default_aggr(&incoming.set);
+    }
+
+    pub fn extract_as_key_str(&self, ie: &IE, indices: &Option<Vec<usize>>) -> String {
+        self.set.extract_as_key_str(ie, indices)
+    }
+
+    pub fn reduce(&mut self, incoming: &FlatIpfixPacket, transform: &BTreeMap<IE, AggrOp>) {
+        self.set.reduce(&incoming.set, transform);
     }
 }
 
@@ -236,12 +252,57 @@ pub enum FlatSet {
     },
 }
 
+impl Default for FlatSet {
+  fn default() -> Self {
+      FlatSet::Data {
+          id: DataSetId(0),
+          record: Box::new(FlatDataRecord::default()),
+      }
+  }
+}
+
 impl FlatSet {
     pub const fn id(&self) -> u16 {
         match self {
             Self::Template(_) => IPFIX_TEMPLATE_SET_ID,
             Self::OptionsTemplate(_) => IPFIX_OPTIONS_TEMPLATE_SET_ID,
             Self::Data { id, record: _ } => id.0,
+        }
+    }
+
+    fn flatset_h_default_aggr(&mut self, incoming: &FlatSet) {
+        match self {
+            FlatSet::Data { id, .. } => {
+                if let FlatSet::Data {
+                    id: incoming_id, ..
+                } = incoming
+                {
+                    *id = *incoming_id;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn extract_as_key_str(&self, ie: &IE, indices: &Option<Vec<usize>>) -> String {
+        match self {
+            FlatSet::Data { record, .. } => record.extract_as_key_str(ie, indices),
+            _ => "None".to_string(), // TODO: think about handling this case
+        }
+    }
+
+    fn reduce(&mut self, incoming: &FlatSet, transform: &BTreeMap<IE, AggrOp>) {
+        match self {
+            FlatSet::Data { record, .. } => {
+                if let FlatSet::Data {
+                    record: incoming_record,
+                    ..
+                } = incoming
+                {
+                    record.reduce(incoming_record, transform)
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -422,7 +483,7 @@ impl DataRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FlatDataRecord {
     scope_fields: Fields,
     fields: Fields,
@@ -442,6 +503,14 @@ impl FlatDataRecord {
 
     pub const fn fields(&self) -> &Fields {
         &self.fields
+    }
+
+    fn extract_as_key_str(&self, ie: &IE, indices: &Option<Vec<usize>>) -> String {
+        self.fields.extract_as_key_str(ie, indices)
+    }
+
+    fn reduce(&mut self, incoming: &FlatDataRecord, transform: &BTreeMap<IE, AggrOp>) {
+        self.fields.reduce(&incoming.fields, transform);
     }
 }
 

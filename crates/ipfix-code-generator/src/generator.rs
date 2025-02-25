@@ -16,6 +16,7 @@
 //! Generate Rust code for the given Netflow/IPFIX definitions
 use crate::{
     generator_sub_registries::*, InformationElement, InformationElementSubRegistry, SimpleRegistry,
+    generator_aggregation::*,
     Xref,
 };
 
@@ -25,6 +26,7 @@ pub fn generate_derive(
     copy: bool,
     eq: bool,
     hash: bool,
+    ord: bool,
 ) -> String {
     let mut base = "".to_string();
     if num_enum {
@@ -41,6 +43,9 @@ pub fn generate_derive(
     }
     if hash {
         base.push_str("Hash, ");
+    }
+    if ord {
+        base.push_str("PartialOrd, Ord, ");
     }
     base.push_str("Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize");
     format!("#[derive({base})]\n")
@@ -76,7 +81,7 @@ pub(crate) fn generate_ie_data_type(data_types: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementDataType {\n");
     for x in data_types {
@@ -94,7 +99,7 @@ pub(crate) fn generate_ie_units(entries: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementUnits {\n");
     for entry in entries {
@@ -123,7 +128,7 @@ pub(crate) fn generate_ie_semantics(data_types: &[SimpleRegistry]) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementSemantics {\n");
     for x in data_types {
@@ -236,7 +241,7 @@ fn generate_impl_ie_template_for_ie(ie: &Vec<InformationElement>) -> String {
 
 fn generate_from_for_ie() -> String {
     let mut ret = String::new();
-    ret.push_str(generate_derive(false, false, true, true, true).as_str());
+    ret.push_str(generate_derive(false, false, true, true, true, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub struct UndefinedIE(pub u16);\n\n");
 
@@ -266,7 +271,7 @@ pub(crate) fn generate_information_element_ids(ie: &Vec<InformationElement>) -> 
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u16)]\n");
-    ret.push_str(generate_derive(true, true, true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IE {\n");
     for ie in ie {
@@ -294,7 +299,7 @@ pub(crate) fn generate_ie_status() -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     ret.push_str("#[repr(u8)]\n");
-    ret.push_str(generate_derive(true, true, true, true, true).as_str());
+    ret.push_str(generate_derive(true, true, true, true, true, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum InformationElementStatus {\n");
     ret.push_str("    current = 0,\n");
@@ -497,7 +502,7 @@ fn generate_ie_field_enum_for_ie(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(generate_derive(true, false, false, false, false).as_str());
+    ret.push_str(generate_derive(true, false, false, false, false, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     ret.push_str("    Unknown{pen: u32, id: u16, value: Vec<u8>},\n");
@@ -559,7 +564,7 @@ pub(crate) fn generate_ie_ids(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(generate_derive(true, false, true, true, true).as_str());
+    ret.push_str(generate_derive(true, false, true, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IE {\n");
     ret.push_str("    Unknown{pen: u32, id: u16},\n");
@@ -580,7 +585,7 @@ pub(crate) fn generate_ie_ids(
     }
     ret.push_str("}\n\n");
 
-    ret.push_str(generate_derive(false, false, true, true, true).as_str());
+    ret.push_str(generate_derive(false, false, true, true, true, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum IEError {\n");
     ret.push_str("    UndefinedIANAIE(u16),\n");
@@ -1638,7 +1643,7 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     let not_eq = ies
         .iter()
         .any(|x| get_rust_type(&x.data_type) == "f32" || get_rust_type(&x.data_type) == "f64");
-    ret.push_str(generate_derive(true, false, !not_copy, !not_eq, !not_eq).as_str());
+    ret.push_str(generate_derive(true, false, !not_copy, !not_eq, !not_eq, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     for ie in ies {
@@ -1758,7 +1763,7 @@ pub fn generate_into_for_field(
     ret
 }
 
-fn get_rust_type(data_type: &str) -> String {
+pub fn get_rust_type(data_type: &str) -> String {
     let rust_type = match data_type {
         "octetArray" => "Vec<u8>",
         "unsigned8" => "u8",
@@ -1807,6 +1812,7 @@ pub(crate) fn generate_ie_values(
             rust_type != "Vec<u8>" && rust_type != "String",
             rust_type != "f32" && rust_type != "f64",
             rust_type != "f32" && rust_type != "f64",
+            false
         );
 
         if let Some(ie_subregistry) = &ie.subregistry {
@@ -2528,7 +2534,7 @@ pub fn generate_flat_ie_struct(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_snake_case)]\n");
-    ret.push_str(generate_derive(false, false, false, false, false).as_str());
+    ret.push_str(generate_derive(false, false, false, false, false, false).as_str());
     ret.push_str("#[derive(Default)]\n");
     ret.push_str("pub struct Fields {\n");
     // TODO: Handle unknown fields
@@ -2593,6 +2599,7 @@ pub fn generate_flat_ie_struct(
     }
     ret.push_str("            }\n");
     ret.push_str("        }\n");
+
     for (_name, pkg, _) in vendors {
         ret.push_str(format!("        out.{pkg} = if {pkg}_fields.is_empty() {{ None }} else {{ Some({pkg}_fields.into()) }};\n").as_str());
     }
@@ -2601,7 +2608,11 @@ pub fn generate_flat_ie_struct(
     ret.push_str("}\n\n");
 
     ret.push_str("impl Fields {\n");
+
     ret.push_str(impl_get_field(iana_ies, vendors).as_str());
+    ret.push_str(impl_extract_as_key_str().as_str());
+    ret.push_str(impl_reduce(iana_ies, vendors).as_str());
+
     ret.push_str("}\n\n");
 
     ret
