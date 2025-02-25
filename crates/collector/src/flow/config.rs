@@ -89,14 +89,18 @@ impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
             let value = field_config.avro_value(&enriched_flow.flow)?;
             if name.starts_with("custom_primitives.") {
                 let name = name.trim_start_matches("custom_primitives.").to_string();
-                custom_primitives.insert(name, value.unwrap());
+                if let Some(value) = value {
+                    custom_primitives.insert(name, value);
+                }
             } else {
                 let value = if field_config.is_nullable() {
                     value
                         .map(|x| apache_avro::types::Value::Union(1, Box::new(x)))
                         .unwrap_or(apache_avro::types::Value::Null)
+                } else if let Some(value) = value {
+                    value
                 } else {
-                    value.unwrap()
+                    return Err(FunctionError::FieldIsNull(name.to_string()));
                 };
                 fields.push((name.clone(), value));
             }
@@ -418,6 +422,7 @@ pub enum FunctionError {
     FieldConversionError(FieldConversionError),
     FieldIndexNotFound(usize),
     UnexpectedField(ie::Field),
+    FieldIsNull(String),
 }
 
 impl From<FieldConversionError> for FunctionError {
@@ -432,6 +437,7 @@ impl std::fmt::Display for FunctionError {
             Self::FieldConversionError(err) => write!(f, "Field Conversion Error: {err}"),
             Self::FieldIndexNotFound(index) => write!(f, "Field Index Not Found: {index}"),
             Self::UnexpectedField(field) => write!(f, "Unexpected field: {field}"),
+            Self::FieldIsNull(name) => write!(f, "field is null {name}"),
         }
     }
 }
