@@ -50,13 +50,17 @@ pub fn reduce_misc_vec<T: Copy>(lhs: &mut Option<Vec<T>>, rhs: &Option<Vec<T>>, 
 }
 
 #[inline]
-pub fn reduce_misc_vec_clone<T: Clone>(lhs: &mut Option<Vec<T>>, rhs: &Option<Vec<T>>, op: &AggrOp) {
+pub fn reduce_misc_vec_clone<T: Clone>(
+    lhs: &mut Option<Vec<T>>,
+    rhs: &Option<Vec<T>>,
+    op: &AggrOp,
+) {
     match op {
         AggrOp::Key(indices) => set_field_vec_clone(lhs, rhs, indices),
-        AggrOp::Add => {},
-        AggrOp::Min => {},
-        AggrOp::Max => {},
-        AggrOp::BoolMapOr => {},
+        AggrOp::Add => {}
+        AggrOp::Min => {}
+        AggrOp::Max => {}
+        AggrOp::BoolMapOr => {}
     }
 }
 
@@ -83,7 +87,10 @@ pub fn set_field_vec<T: Copy>(
 
 #[inline]
 pub fn set_field_vec_clone<T: Clone>(
-    lhs: &mut Option<Vec<T>>, rhs: &Option<Vec<T>>, indices: &Option<Vec<usize>>) {
+    lhs: &mut Option<Vec<T>>,
+    rhs: &Option<Vec<T>>,
+    indices: &Option<Vec<usize>>,
+) {
     if let Some(idxs) = indices {
         if let Some(rhs_vec) = rhs {
             let res: Vec<T> = idxs
@@ -98,7 +105,10 @@ pub fn set_field_vec_clone<T: Clone>(
 }
 
 #[inline]
-pub fn addup_num_vec<T: Copy + std::ops::AddAssign>(lhs: &mut Option<Vec<T>>, rhs: &Option<Vec<T>>) {
+pub fn addup_num_vec<T: Copy + std::ops::AddAssign>(
+    lhs: &mut Option<Vec<T>>,
+    rhs: &Option<Vec<T>>,
+) {
     match (lhs.as_mut(), rhs) {
         (None, _) => *lhs = rhs.clone(),
         (Some(_), None) => {
@@ -162,7 +172,10 @@ pub fn maxup_num_vec<T: Copy + std::cmp::Ord>(lhs: &mut Option<Vec<T>>, rhs: &Op
 }
 
 #[inline]
-pub fn bmoup_map_vec<T: Copy + std::ops::BitOrAssign>(lhs: &mut Option<Vec<T>>, rhs: &Option<Vec<T>>) {
+pub fn bmoup_map_vec<T: Copy + std::ops::BitOrAssign>(
+    lhs: &mut Option<Vec<T>>,
+    rhs: &Option<Vec<T>>,
+) {
     match (lhs.as_mut(), rhs) {
         (None, _) => *lhs = rhs.clone(),
         (Some(_), None) => {

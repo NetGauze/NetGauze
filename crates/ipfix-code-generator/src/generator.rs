@@ -15,9 +15,8 @@
 
 //! Generate Rust code for the given Netflow/IPFIX definitions
 use crate::{
-    generator_sub_registries::*, InformationElement, InformationElementSubRegistry, SimpleRegistry,
-    generator_aggregation::*,
-    Xref,
+    generator_aggregation::*, generator_sub_registries::*, InformationElement,
+    InformationElementSubRegistry, SimpleRegistry, Xref,
 };
 
 pub fn generate_derive(
@@ -1812,7 +1811,7 @@ pub(crate) fn generate_ie_values(
             rust_type != "Vec<u8>" && rust_type != "String",
             rust_type != "f32" && rust_type != "f64",
             rust_type != "f32" && rust_type != "f64",
-            false
+            false,
         );
 
         if let Some(ie_subregistry) = &ie.subregistry {

@@ -15,7 +15,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     ie::{Field, Fields},
@@ -253,12 +253,12 @@ pub enum FlatSet {
 }
 
 impl Default for FlatSet {
-  fn default() -> Self {
-      FlatSet::Data {
-          id: DataSetId(0),
-          record: Box::new(FlatDataRecord::default()),
-      }
-  }
+    fn default() -> Self {
+        FlatSet::Data {
+            id: DataSetId(0),
+            record: Box::new(FlatDataRecord::default()),
+        }
+    }
 }
 
 impl FlatSet {

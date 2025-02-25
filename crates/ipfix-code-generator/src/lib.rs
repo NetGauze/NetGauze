@@ -25,8 +25,8 @@ use thiserror::Error;
 use xml_parsers::sub_registries::parse_subregistry;
 
 mod generator;
-mod generator_sub_registries;
 mod generator_aggregation;
+mod generator_sub_registries;
 
 pub mod xml_parsers {
     pub mod ipfix;
