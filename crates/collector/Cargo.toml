@@ -14,6 +14,7 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
+netgauze-analytics = { workspace = true }
 netgauze-flow-service = { workspace = true }
 netgauze-flow-pkt = { workspace = true, features = ["codec"] }
 netgauze-udp-notif-service = { workspace = true }
