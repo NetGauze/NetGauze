@@ -42,7 +42,7 @@ flow:
       endpoints:
         full: !FlowKafkaAvro
           topic: flow
-          schema_registry_url: http://localhost:8088/
+          schema_registry_url: http://localhost:8088
           producer_config:
             bootstrap.servers: localhost:29092
             message.timeout.ms: "60000"
