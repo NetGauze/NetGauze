@@ -18,28 +18,32 @@ netgauze-flow-service = { workspace = true }
 netgauze-flow-pkt = { workspace = true, features = ["codec"] }
 netgauze-udp-notif-service = { workspace = true }
 tokio = { workspace = true, features = ["full", "tracing", "rt-multi-thread"] }
-tokio-util = { workspace = true, features = ["full", "tracing"] }
-bytes = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
-socket2 = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 async-channel = { workspace = true }
 figment = { version = "0.10", features = ["toml", "yaml", "env"] }
-clap = { version = "4.5", features = ["derive"] }
-serde_yaml = "0.9"
 serde_with = { version = "3.11", features = ["default"] }
 reqwest = { workspace = true, features = ["http2", "json", "stream"] }
 chrono = { workspace = true, default-features = true }
 tracing-subscriber = { workspace = true }
 anyhow = { version = "1" }
 opentelemetry = { version = "0.27.1", features = ["metrics", "trace", "logs"] }
-opentelemetry_sdk = { version = "0.27.1", features = ["metrics", "trace", "logs", "rt-tokio"] }
-opentelemetry-otlp = { version = "0.27.0", features = ["metrics", "trace", "logs", "tonic"] }
-opentelemetry-prometheus = { version = "0.27.0" }
+opentelemetry_sdk = { version = "0.27.1", features = [
+    "metrics",
+    "trace",
+    "logs",
+    "rt-tokio",
+] }
+opentelemetry-otlp = { version = "0.27.0", features = [
+    "metrics",
+    "trace",
+    "logs",
+    "tonic",
+] }
 tonic = "0.12.3"
 
 [dev-dependencies]
@@ -48,5 +52,4 @@ chrono = { workspace = true, default-features = false, features = [
     "clock",
 ] }
 tracing-subscriber = { workspace = true }
-tracing-test = { version = "0.2" }
 serde_json = { workspace = true }
