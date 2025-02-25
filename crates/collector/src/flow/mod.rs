@@ -15,6 +15,7 @@
 
 pub mod aggregation;
 pub mod config;
+pub mod enrichment;
 
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
 use netgauze_flow_pkt::{
