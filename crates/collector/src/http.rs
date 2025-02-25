@@ -185,7 +185,7 @@ impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, 
             })
     }
 
-    async fn run(mut self) -> Result<String, reqwest::Error> {
+    async fn run(mut self) -> anyhow::Result<String> {
         loop {
             tokio::select! {
                 biased;
@@ -287,7 +287,7 @@ impl HttpPublisherActorHandle {
         converter: F,
         msg_recv: async_channel::Receiver<Arc<T>>,
         meter: opentelemetry::metrics::Meter,
-    ) -> Result<(JoinHandle<Result<String, reqwest::Error>>, Self), reqwest::Error> {
+    ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), reqwest::Error> {
         let client = HttpPublisherActorHandle::create_http_client(&config)?;
         let stats = HttpPublisherStats::new(meter);
         let (cmd_tx, cmd_rx) = mpsc::channel(100);
