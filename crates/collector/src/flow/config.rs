@@ -30,7 +30,7 @@ use crate::{
     flow::{EnrichedFlow, RawValue},
     publishers::kafka_avro::{AvroConverter, KafkaAvroPublisherActorError},
 };
-use apache_avro::types::ValueKind as AvroValueKind;
+use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
 use netgauze_flow_pkt::{
     ie,
     ie::{FieldConversionError, InformationElementDataType, InformationElementTemplate, IE},
@@ -72,7 +72,17 @@ impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
         );
         // TODO: add fields extracted from the Enriched metadata
         schema.push_str(format!("{:indent$}\"fields\": [\n", "", indent = indent).as_str());
-        let fields_schema = Self::get_fields(&self.fields, 4);
+        let label = r#"    {"name": "label", "type": {"type": "map", "values": "string"}}"#;
+        let stamp_inserted = r#"    {"name": "stamp_inserted", "type": ["null", "string"]}"#;
+        let stamp_updated = r#"    {"name": "stamp_updated", "type": ["null", "string"]}"#;
+        let peer_ip_src = r#"    {"name": "peer_ip_src", "type": "string"}"#;
+        let mut fields_schema = vec![
+            label.to_string(),
+            stamp_inserted.to_string(),
+            stamp_updated.to_string(),
+            peer_ip_src.to_string(),
+        ];
+        fields_schema.extend(Self::get_fields(&self.fields, 4));
         schema.push_str(format!("{}\n", fields_schema.join(",\n")).as_str());
         schema.push_str(format!("{:indent$}]\n", "").as_str());
         schema.push('}');
@@ -83,7 +93,40 @@ impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
         &self,
         enriched_flow: EnrichedFlow,
     ) -> Result<apache_avro::types::Value, FunctionError> {
-        let mut fields = vec![];
+        let mut fields = vec![
+            (
+                "label".to_string(),
+                AvroValue::Map(
+                    enriched_flow
+                        .labels
+                        .into_iter()
+                        .map(|(k, v)| (k, AvroValue::String(v)))
+                        .collect(),
+                ),
+            ),
+            (
+                "stamp_inserted".to_string(),
+                AvroValue::Union(
+                    1,
+                    Box::new(AvroValue::String(
+                        enriched_flow.window_start.timestamp().to_string(),
+                    )),
+                ),
+            ),
+            (
+                "stamp_updated".to_string(),
+                AvroValue::Union(
+                    1,
+                    Box::new(AvroValue::String(
+                        enriched_flow.window_end.timestamp().to_string(),
+                    )),
+                ),
+            ),
+            (
+                "peer_ip_src".to_string(),
+                AvroValue::String(enriched_flow.peer_src.to_string()),
+            ),
+        ];
         let mut custom_primitives = indexmap::IndexMap::new();
         for (name, field_config) in &self.fields {
             let value = field_config.avro_value(&enriched_flow.flow)?;
