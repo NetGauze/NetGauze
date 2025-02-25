@@ -22,8 +22,9 @@ pub mod netflow;
 pub mod wire;
 
 use crate::ie::*;
+use netgauze_analytics::flow::AggrOp;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+use std::{collections::BTreeMap, ops::Deref};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FlowInfo {
@@ -48,6 +49,37 @@ impl FlowInfo {
 pub enum FlatFlowInfo {
     NetFlowV9(netflow::FlatNetFlowV9Packet),
     IPFIX(ipfix::FlatIpfixPacket),
+}
+
+impl FlatFlowInfo {
+    pub fn flow_h_default_aggr(&mut self, incoming: &FlatFlowInfo) {
+        match self {
+            FlatFlowInfo::IPFIX(packet) => {
+                if let FlatFlowInfo::IPFIX(incoming_packet) = incoming {
+                    packet.ipfix_h_default_aggr(incoming_packet);
+                }
+            }
+            FlatFlowInfo::NetFlowV9(_) => todo!(),
+        }
+    }
+
+    pub fn extract_as_key_str(&self, ie: &IE, indices: &Option<Vec<usize>>) -> String {
+        match self {
+            FlatFlowInfo::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
+            FlatFlowInfo::NetFlowV9(_) => todo!(),
+        }
+    }
+
+    pub fn reduce(&mut self, incoming: &FlatFlowInfo, transform: &BTreeMap<IE, AggrOp>) {
+        match self {
+            FlatFlowInfo::IPFIX(packet) => {
+                if let FlatFlowInfo::IPFIX(incoming_packet) = incoming {
+                    packet.reduce(incoming_packet, transform);
+                }
+            }
+            FlatFlowInfo::NetFlowV9(_) => todo!(),
+        }
+    }
 }
 
 /// Errors when crafting a new Set
