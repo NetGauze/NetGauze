@@ -14,3 +14,4 @@
 // limitations under the License.
 
 pub mod http;
+pub mod kafka_avro;

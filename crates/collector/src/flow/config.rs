@@ -26,7 +26,10 @@
 //! Flow records can be transformed into AVRO or JSON formats with customizable
 //! field selection, renaming, and type conversions.
 
-use crate::flow::{EnrichedFlow, RawValue};
+use crate::{
+    flow::{EnrichedFlow, RawValue},
+    publishers::kafka_avro::{AvroConverter, KafkaAvroPublisherActorError},
+};
 use apache_avro::types::ValueKind as AvroValueKind;
 use netgauze_flow_pkt::{
     ie,
@@ -57,8 +60,10 @@ impl FlowOutputConfig {
         }
         fields_schema
     }
+}
 
-    pub fn get_avro_schema(&self) -> String {
+impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
+    fn get_avro_schema(&self) -> String {
         let indent = 2usize;
         let mut schema = "{\n".to_string();
         schema.push_str(format!("{:indent$}\"type\": \"record\",\n", "", indent = indent).as_str());
@@ -74,7 +79,7 @@ impl FlowOutputConfig {
         schema
     }
 
-    pub fn get_avro_value(
+    fn get_avro_value(
         &self,
         enriched_flow: EnrichedFlow,
     ) -> Result<apache_avro::types::Value, FunctionError> {
@@ -432,6 +437,12 @@ impl std::fmt::Display for FunctionError {
 }
 
 impl std::error::Error for FunctionError {}
+
+impl From<FunctionError> for KafkaAvroPublisherActorError {
+    fn from(value: FunctionError) -> Self {
+        Self::TransformationError(value.to_string())
+    }
+}
 
 /// Field transformation functions
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
