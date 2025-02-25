@@ -39,7 +39,7 @@ pub(crate) const fn default_buffer_size() -> usize {
     1_000
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CollectorConfig {
     #[serde(default)]
     pub runtime: RuntimeConfig,
@@ -49,13 +49,13 @@ pub struct CollectorConfig {
     pub udp_notif: Option<UdpNotifConfig>,
 }
 
-#[derive(Debug, Default, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RuntimeConfig {
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub threads: Option<usize>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LoggingConfig {
     pub level: String,
 }
@@ -68,7 +68,7 @@ impl Default for LoggingConfig {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TelemetryConfig {
     pub url: String,
 }
@@ -80,7 +80,7 @@ impl TelemetryConfig {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FlowConfig {
     #[serde(default = "default_subscriber_timeout_duration")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
@@ -109,7 +109,7 @@ impl FlowConfig {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UdpNotifConfig {
     #[serde(default = "default_subscriber_timeout_duration")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
@@ -133,7 +133,7 @@ impl UdpNotifConfig {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Binding {
     pub address: SocketAddr,
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
@@ -162,14 +162,14 @@ impl From<Binding> for udp_notif_supervisor::BindingAddress {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PublisherConfig {
     #[serde(default = "default_buffer_size")]
     pub buffer_size: usize,
     pub endpoints: HashMap<String, PublisherEndpoint>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublisherEndpoint {
     Http(HttpPublisherEndpoint),
 }
