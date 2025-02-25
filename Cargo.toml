@@ -85,3 +85,5 @@ anyhow = { version = "1" }
 serde_with = { version = "3.11" }
 apache-avro = { version = "0.17" }
 indexmap = { version = "2.7" }
+schema_registry_converter = { version = "4.2" }
+rdkafka = { version = "0.37" }
