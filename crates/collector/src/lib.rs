@@ -15,7 +15,7 @@
 
 use crate::{
     config::{FlowConfig, PublisherEndpoint, UdpNotifConfig},
-    http::{HttpPublisherActorHandle, Message},
+    publishers::http::{HttpPublisherActorHandle, Message},
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
@@ -26,7 +26,7 @@ use tracing::{info, warn};
 
 pub mod config;
 pub mod flow;
-pub mod http;
+pub mod publishers;
 
 pub async fn init_flow_collection(
     flow_config: FlowConfig,
