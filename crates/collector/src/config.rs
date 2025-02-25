@@ -13,7 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::publishers::http::HttpPublisherEndpoint;
+use crate::{
+    flow::config::FlowOutputConfig,
+    publishers::{http::HttpPublisherEndpoint, kafka_avro::KafkaConfig},
+};
 use netgauze_flow_service::flow_supervisor;
 use netgauze_udp_notif_service::supervisor as udp_notif_supervisor;
 use serde_with::serde_as;
@@ -172,4 +175,5 @@ pub struct PublisherConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublisherEndpoint {
     Http(HttpPublisherEndpoint),
+    FlowKafkaAvro(KafkaConfig<FlowOutputConfig>),
 }

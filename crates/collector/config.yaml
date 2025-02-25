@@ -37,10 +37,39 @@ flow:
           #http2: !Http
           #url: http://10.212.242.69:8080/ingress/flows?format=json
           #writer_id: writer2
-#    group2:
-#      kafka: !Kakfa
-#        url: http://10.212.242.69:8080/ingress/flows?format=json
-#        writer_id: writer1
+    group2:
+      buffer_size: 1000
+      endpoints:
+        full: !FlowKafkaAvro
+          topic: flow
+          schema_registry_url: http://localhost:8088/
+          producer_config:
+            bootstrap.servers: localhost:29092
+            message.timeout.ms: "60000"
+            queue.buffering.max.messages: "1000"
+          writer_id: writer1
+          avro_converter:
+            fields:
+              octets:
+                select: !Single
+                  ie: octetDeltaCount
+                  index: 0
+              packets:
+                select: !Coalesce
+                  ies:
+                    - ie: packetDeltaCount
+                      index: 1
+                    - ie: packetDeltaCount
+                      index: 0
+                default: !String '1000'
+                transform: String
+              custom_primitives.flow_direction:
+                select: !Single
+                  ie: !VMWare flowDirection
+                  index: 0
+                transform: !Rename
+                  ingress: i
+                  egress: e
 
 udp_notif:
   subscriber_timeout: 100
