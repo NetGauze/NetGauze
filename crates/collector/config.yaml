@@ -39,6 +39,13 @@ flow:
           #writer_id: writer2
     group2:
       buffer_size: 1000
+      sonata_enrichment:
+        topic: sonata
+        consumer_config:
+          bootstrap.servers: localhost:29092
+          group.id: test
+          enable.auto.commit: "false"
+          auto.offset.reset: earliest
       endpoints:
         full: !FlowKafkaAvro
           topic: flow

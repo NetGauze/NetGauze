@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    flow::config::FlowOutputConfig,
+    flow::{config::FlowOutputConfig, sonata::KafkaConsumerConfig},
     publishers::{http::HttpPublisherEndpoint, kafka_avro::KafkaConfig},
 };
 use netgauze_flow_service::flow_supervisor;
@@ -169,6 +169,10 @@ impl From<Binding> for udp_notif_supervisor::BindingAddress {
 pub struct PublisherConfig {
     #[serde(default = "default_buffer_size")]
     pub buffer_size: usize,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub sonata_enrichment: Option<KafkaConsumerConfig>,
+
     pub endpoints: HashMap<String, PublisherEndpoint>,
 }
 
