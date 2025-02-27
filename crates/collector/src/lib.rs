@@ -15,7 +15,7 @@
 
 use crate::{
     config::{FlowConfig, PublisherEndpoint, UdpNotifConfig},
-    flow::enrichment::FlowEnrichmentActorHandle,
+    flow::{enrichment::FlowEnrichmentActorHandle, sonata::SonataActorHandle},
     publishers::{
         http::{HttpPublisherActorHandle, Message},
         kafka_avro::KafkaAvroPublisherActorHandle,
@@ -44,6 +44,7 @@ pub async fn init_flow_collection(
     let mut agg_handles = Vec::new();
     let mut enrichment_handles = Vec::new();
     let mut kafka_handles = Vec::new();
+    let mut sonata_handles = Vec::new();
     let mut join_set = FuturesUnordered::new();
     for (group_name, publisher_config) in flow_config.publishers {
         info!("Starting publishers group '{group_name}'");
@@ -52,7 +53,6 @@ pub async fn init_flow_collection(
             .await?;
         for (endpoint_name, endpoint) in publisher_config.endpoints {
             info!("Creating publisher '{endpoint_name}'");
-
             match &endpoint {
                 PublisherEndpoint::Http(config) => {
                     let flatten = config.flatten;
@@ -113,6 +113,14 @@ pub async fn init_flow_collection(
                     let enriched_rx = enrichment_handle.subscribe();
                     let (kafka_join, kafka_handle) =
                         KafkaAvroPublisherActorHandle::from_config(config.clone(), enriched_rx)?;
+                    if let Some(kafka_consumer) = publisher_config.sonata_enrichment.as_ref() {
+                        let (sonata_join, sonata_handle) = SonataActorHandle::new(
+                            kafka_consumer.clone(),
+                            enrichment_handle.clone(),
+                        )?;
+                        join_set.push(sonata_join);
+                        sonata_handles.push(sonata_handle);
+                    }
                     join_set.push(agg_join);
                     join_set.push(enrichment_join);
                     join_set.push(kafka_join);
@@ -156,6 +164,9 @@ pub async fn init_flow_collection(
                 }
             }
             for handler in kafka_handles {
+                let _ = handler.shutdown().await;
+            }
+            for handler in sonata_handles {
                 let _ = handler.shutdown().await;
             }
             Ok(())

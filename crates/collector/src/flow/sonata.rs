@@ -1,0 +1,306 @@
+// Copyright (C) 2025-present The NetGauze Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use crate::flow::enrichment::{EnrichmentOperation, FlowEnrichmentActorHandle};
+use rdkafka::{
+    config::ClientConfig,
+    consumer::{
+        stream_consumer::StreamConsumer, BaseConsumer, Consumer, ConsumerContext, Rebalance,
+    },
+    error::{KafkaError, KafkaResult},
+    message::BorrowedMessage,
+    ClientContext, Message, TopicPartitionList,
+};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, net::IpAddr, str::Utf8Error};
+use tokio::{sync::mpsc, task::JoinHandle};
+use tracing::{debug, error, info, warn};
+
+// A context can be used to change the behavior of producers and consumers by
+// adding callbacks that will be executed by librdkafka.
+// This particular context sets up custom callbacks to log rebalancing events.
+struct CosmoSonataContext;
+
+impl ClientContext for CosmoSonataContext {}
+
+impl ConsumerContext for CosmoSonataContext {
+    fn pre_rebalance(&self, _: &BaseConsumer<Self>, rebalance: &Rebalance<'_>) {
+        info!("Pre rebalance {:?}", rebalance);
+    }
+
+    fn post_rebalance(&self, _: &BaseConsumer<Self>, rebalance: &Rebalance<'_>) {
+        info!("Post rebalance {:?}", rebalance);
+    }
+
+    fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
+        info!("Committing offsets: {:?}", result);
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum SonataOperation {
+    #[serde(rename = "insert")]
+    Insert,
+
+    #[serde(rename = "update")]
+    Update,
+
+    #[serde(rename = "delete")]
+    Delete,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SonataData {
+    pub operation: SonataOperation,
+    pub id_node: u32,
+    pub node: Option<SonataNode>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SonataNode {
+    pub hostname: String,
+    #[serde(rename = "loopbackAddress")]
+    pub loopback_address: IpAddr,
+
+    pub platform: SonataPlatform,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct SonataPlatform {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct KafkaConsumerConfig {
+    /// Output topic
+    pub topic: String,
+    /// Key/Value producer configs a defined in librdkafka
+    pub consumer_config: HashMap<String, String>,
+}
+
+#[derive(Debug)]
+pub enum SonataActorError {
+    KafkaError(KafkaError),
+    Utf8Error(Utf8Error),
+    JsonError(serde_json::Error),
+}
+
+impl std::fmt::Display for SonataActorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::KafkaError(e) => write!(f, "Kafka error: {e}"),
+            SonataActorError::Utf8Error(err) => write!(f, "UTF8 Error: {err}"),
+            SonataActorError::JsonError(err) => write!(f, "JSON serde Error: {err}"),
+        }
+    }
+}
+
+impl std::error::Error for SonataActorError {}
+
+impl From<Utf8Error> for SonataActorError {
+    fn from(err: Utf8Error) -> Self {
+        SonataActorError::Utf8Error(err)
+    }
+}
+
+#[derive(Debug)]
+enum SonataActorCommand {
+    Shutdown,
+}
+
+struct SonataActor {
+    cmd_rx: mpsc::Receiver<SonataActorCommand>,
+    enrichment_handle: FlowEnrichmentActorHandle,
+    consumer: StreamConsumer<CosmoSonataContext>,
+}
+
+impl SonataActor {
+    fn from_config(
+        config: KafkaConsumerConfig,
+        cmd_rx: mpsc::Receiver<SonataActorCommand>,
+        enrichment_handle: FlowEnrichmentActorHandle,
+    ) -> Result<Self, SonataActorError> {
+        let mut client_conf = ClientConfig::new();
+        for (k, v) in config.consumer_config {
+            client_conf.set(k, v);
+        }
+        let consumer: StreamConsumer<CosmoSonataContext> =
+            match client_conf.create_with_context(CosmoSonataContext) {
+                Ok(consumer) => consumer,
+                Err(err) => {
+                    error!("Failed to create consumer: {}", err);
+                    return Err(SonataActorError::KafkaError(err));
+                }
+            };
+
+        if let Err(err) = consumer.subscribe(&[config.topic.as_str()]) {
+            error!("Failed to subscribe to topic `{}`: {}", config.topic, err);
+            return Err(SonataActorError::KafkaError(err));
+        }
+
+        Ok(Self {
+            cmd_rx,
+            enrichment_handle,
+            consumer,
+        })
+    }
+
+    async fn handle_kafka_msg(&self, msg: BorrowedMessage<'_>) {
+        // Deserialize the str payload as a SonataData struct
+        let sonata_data = match msg.payload() {
+            Some(p) => match serde_json::from_slice::<SonataData>(p) {
+                Ok(data) => data,
+                Err(err) => {
+                    warn!("Malformed sonata payload: {err}");
+                    return;
+                }
+            },
+            None => {
+                warn!("Empty sonata payload");
+                return;
+            }
+        };
+
+        let op = match sonata_data.operation {
+            SonataOperation::Insert | SonataOperation::Update => {
+                if let Some(node) = sonata_data.node {
+                    let labels = HashMap::from([
+                        ("nkey".to_string(), node.hostname),
+                        ("pkey".to_string(), node.platform.name),
+                    ]);
+                    EnrichmentOperation::Upsert(sonata_data.id_node, node.loopback_address, labels)
+                } else {
+                    warn!(
+                        "Invalid sonata node upsert operation without a node value: {:?}",
+                        msg.payload_view::<str>()
+                    );
+                    return;
+                }
+            }
+            SonataOperation::Delete => EnrichmentOperation::Delete(sonata_data.id_node),
+        };
+        debug!("Sonata Enrichment Operation: {op:?}");
+        if let Err(err) = self.enrichment_handle.update_enrichment(op).await {
+            warn!("Failed to update enrichment operation: {err}");
+        }
+    }
+
+    async fn run(mut self) -> anyhow::Result<String> {
+        info!("Starting SonataActor");
+        loop {
+            tokio::select! {
+                cmd = self.cmd_rx.recv() => {
+                    eprintln!("In sonata: {cmd:?}");
+                    return match cmd {
+                        Some(SonataActorCommand::Shutdown) => {
+                            info!("Sonata actor shutting down");
+                            Ok("Sonata actor terminated after a shutdown command".to_string())
+                        }
+                        None => {
+                            info!("Sonata actor terminated due to empty command channel");
+                            Ok("Sonata actor terminated due to empty command channel".to_string())
+                        }
+                    }
+                }
+                msg = self.consumer.recv() => {
+                    match msg {
+                        Ok(msg) => {
+                            self.handle_kafka_msg(msg).await;
+                        }
+                        Err(err) => {
+                            error!("Failed to receive message: {err}");
+                            return Err(anyhow::Error::from(err))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SonataActorHandleError {
+    SendError,
+}
+
+#[derive(Debug)]
+pub struct SonataActorHandle {
+    cmd_send: mpsc::Sender<SonataActorCommand>,
+}
+
+impl SonataActorHandle {
+    pub fn new(
+        consumer_config: KafkaConsumerConfig,
+        enrichment_handle: FlowEnrichmentActorHandle,
+    ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), SonataActorError> {
+        let (cmd_send, cmd_rx) = mpsc::channel::<SonataActorCommand>(1);
+        let actor = SonataActor::from_config(consumer_config, cmd_rx, enrichment_handle)?;
+        let join_handle = tokio::spawn(actor.run());
+        Ok((join_handle, SonataActorHandle { cmd_send }))
+    }
+
+    pub async fn shutdown(&self) -> Result<(), SonataActorHandleError> {
+        self.cmd_send
+            .send(SonataActorCommand::Shutdown)
+            .await
+            .map_err(|_| SonataActorHandleError::SendError)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    #[test]
+    fn test_serialization() {
+        let insert = r#"{"operation": "insert", "id_node": 13244, "node": {"hostname": "test-node", "loopbackAddress": "1.1.1.1", "managementAddress": "1.1.1.1", "function": null, "serviceId": null, "customField": null, "nameDaisyServiceTemplate": "migr_bgp_flow2rd_md5", "idNode": "dsy-nod-13244", "idPlatform": "dsy-plt-115", "isDeployed": false, "lastUpdate": "2025-02-20T16:00:53", "platform": {"name": "DAISY-PE", "contactEmail": "Daisy.Telemetry@swisscom.com", "agileOrgUrl": "https://agileorg.scapp.swisscom.com/organisation/10069/overview", "idPlatform": "dsy-plt-115"}}}"#;
+        let update = r#"{"operation": "update", "id_node": 13244, "node": {"hostname": "test-node", "loopbackAddress": "1.1.1.2", "managementAddress": "1.1.1.1", "function": null, "serviceId": null, "customField": null, "nameDaisyServiceTemplate": "migr_bgp_flow2rd_md5", "idNode": "dsy-nod-13244", "idPlatform": "dsy-plt-115", "isDeployed": false, "lastUpdate": "2025-02-20T16:03:14", "platform": {"name": "DAISY-PE", "contactEmail": "Daisy.Telemetry@swisscom.com", "agileOrgUrl": "https://agileorg.scapp.swisscom.com/organisation/10069/overview", "idPlatform": "dsy-plt-115"}}}"#;
+        let delete = r#"{"operation": "delete", "id_node": 13244, "node": null}"#;
+        let insert_data = serde_json::from_str::<SonataData>(insert).unwrap();
+        let update_data = serde_json::from_str::<SonataData>(update).unwrap();
+        let delete_data = serde_json::from_str::<SonataData>(delete).unwrap();
+
+        let expected_insert = SonataData {
+            operation: SonataOperation::Insert,
+            id_node: 13244,
+            node: Some(SonataNode {
+                hostname: "test-node".to_string(),
+                loopback_address: IpAddr::from_str("1.1.1.1").unwrap(),
+                platform: SonataPlatform {
+                    name: "DAISY-PE".to_string(),
+                },
+            }),
+        };
+        let expected_update = SonataData {
+            operation: SonataOperation::Update,
+            id_node: 13244,
+            node: Some(SonataNode {
+                hostname: "test-node".to_string(),
+                loopback_address: IpAddr::from_str("1.1.1.2").unwrap(),
+                platform: SonataPlatform {
+                    name: "DAISY-PE".to_string(),
+                },
+            }),
+        };
+        let expected_delete = SonataData {
+            operation: SonataOperation::Delete,
+            id_node: 13244,
+            node: None,
+        };
+        assert_eq!(insert_data, expected_insert);
+        assert_eq!(update_data, expected_update);
+        assert_eq!(delete_data, expected_delete);
+    }
+}
