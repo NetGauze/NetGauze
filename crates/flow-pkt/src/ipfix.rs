@@ -14,14 +14,15 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use crate::{
     ie::{Field, Fields},
     DataSetId, FieldSpecifier, IE,
 };
-use netgauze_analytics::flow::AggrOp;
+use netgauze_analytics::flow::{AggrOp, AggregationError};
 
 pub const IPFIX_VERSION: u16 = 10;
 
@@ -178,19 +179,20 @@ impl FlatIpfixPacket {
         &self.set
     }
 
-    pub fn ipfix_h_default_aggr(&mut self, incoming: &FlatIpfixPacket) {
-        self.export_time = std::cmp::max(self.export_time, incoming.export_time);
-        self.sequence_number = std::cmp::max(self.sequence_number, incoming.sequence_number);
-        self.observation_domain_id = incoming.observation_domain_id;
-        self.set.flatset_h_default_aggr(&incoming.set);
-    }
-
-    pub fn extract_as_key_str(&self, ie: &IE, indices: &Option<Vec<usize>>) -> String {
+    pub fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
         self.set.extract_as_key_str(ie, indices)
     }
 
-    pub fn reduce(&mut self, incoming: &FlatIpfixPacket, transform: &BTreeMap<IE, AggrOp>) {
-        self.set.reduce(&incoming.set, transform);
+    pub fn reduce(
+        &mut self,
+        incoming: &FlatIpfixPacket,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        self.set.reduce(&incoming.set, transform)
     }
 }
 
@@ -270,28 +272,22 @@ impl FlatSet {
         }
     }
 
-    fn flatset_h_default_aggr(&mut self, incoming: &FlatSet) {
-        match self {
-            FlatSet::Data { id, .. } => {
-                if let FlatSet::Data {
-                    id: incoming_id, ..
-                } = incoming
-                {
-                    *id = *incoming_id;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn extract_as_key_str(&self, ie: &IE, indices: &Option<Vec<usize>>) -> String {
+    fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
         match self {
             FlatSet::Data { record, .. } => record.extract_as_key_str(ie, indices),
-            _ => "None".to_string(), // TODO: think about handling this case
+            _ => Err(AggregationError::FlatSetIsNotData),
         }
     }
 
-    fn reduce(&mut self, incoming: &FlatSet, transform: &BTreeMap<IE, AggrOp>) {
+    fn reduce(
+        &mut self,
+        incoming: &FlatSet,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
         match self {
             FlatSet::Data { record, .. } => {
                 if let FlatSet::Data {
@@ -300,9 +296,11 @@ impl FlatSet {
                 } = incoming
                 {
                     record.reduce(incoming_record, transform)
+                } else {
+                    Err(AggregationError::FlatSetIsNotData)
                 }
             }
-            _ => {}
+            _ => Err(AggregationError::FlatSetIsNotData),
         }
     }
 }
@@ -505,12 +503,20 @@ impl FlatDataRecord {
         &self.fields
     }
 
-    fn extract_as_key_str(&self, ie: &IE, indices: &Option<Vec<usize>>) -> String {
+    fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
         self.fields.extract_as_key_str(ie, indices)
     }
 
-    fn reduce(&mut self, incoming: &FlatDataRecord, transform: &BTreeMap<IE, AggrOp>) {
-        self.fields.reduce(&incoming.fields, transform);
+    fn reduce(
+        &mut self,
+        incoming: &FlatDataRecord,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        self.fields.reduce(&incoming.fields, transform)
     }
 }
 

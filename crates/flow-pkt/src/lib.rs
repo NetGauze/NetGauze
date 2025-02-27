@@ -22,9 +22,10 @@ pub mod netflow;
 pub mod wire;
 
 use crate::ie::*;
-use netgauze_analytics::flow::AggrOp;
+use indexmap::IndexMap;
+use netgauze_analytics::flow::{AggrOp, AggregationError};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, ops::Deref};
+use std::ops::Deref;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FlowInfo {
@@ -52,32 +53,31 @@ pub enum FlatFlowInfo {
 }
 
 impl FlatFlowInfo {
-    pub fn flow_h_default_aggr(&mut self, incoming: &FlatFlowInfo) {
-        match self {
-            FlatFlowInfo::IPFIX(packet) => {
-                if let FlatFlowInfo::IPFIX(incoming_packet) = incoming {
-                    packet.ipfix_h_default_aggr(incoming_packet);
-                }
-            }
-            FlatFlowInfo::NetFlowV9(_) => todo!(),
-        }
-    }
-
-    pub fn extract_as_key_str(&self, ie: &IE, indices: &Option<Vec<usize>>) -> String {
+    pub fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
         match self {
             FlatFlowInfo::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
-            FlatFlowInfo::NetFlowV9(_) => todo!(),
+            FlatFlowInfo::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
         }
     }
 
-    pub fn reduce(&mut self, incoming: &FlatFlowInfo, transform: &BTreeMap<IE, AggrOp>) {
+    pub fn reduce(
+        &mut self,
+        incoming: &FlatFlowInfo,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
         match self {
             FlatFlowInfo::IPFIX(packet) => {
                 if let FlatFlowInfo::IPFIX(incoming_packet) = incoming {
-                    packet.reduce(incoming_packet, transform);
+                    packet.reduce(incoming_packet, transform)
+                } else {
+                    Err(AggregationError::FlatFlowInfoNFv9NotSupported)
                 }
             }
-            FlatFlowInfo::NetFlowV9(_) => todo!(),
+            FlatFlowInfo::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
         }
     }
 }

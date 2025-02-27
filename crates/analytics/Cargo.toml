@@ -16,3 +16,4 @@ categories = ["algorithms", "data-structures"]
 [dependencies]
 either = {workspace = true}
 chrono = {workspace = true}
+strum_macros = { workspace = true }
