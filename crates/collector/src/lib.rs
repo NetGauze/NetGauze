@@ -111,8 +111,11 @@ pub async fn init_flow_collection(
                         agg_handle.subscribe(),
                     );
                     let enriched_rx = enrichment_handle.subscribe();
-                    let (kafka_join, kafka_handle) =
-                        KafkaAvroPublisherActorHandle::from_config(config.clone(), enriched_rx)?;
+                    let (kafka_join, kafka_handle) = KafkaAvroPublisherActorHandle::from_config(
+                        config.clone(),
+                        enriched_rx,
+                        either::Left(meter.clone()),
+                    )?;
                     if let Some(kafka_consumer) = publisher_config.sonata_enrichment.as_ref() {
                         let (sonata_join, sonata_handle) = SonataActorHandle::new(
                             kafka_consumer.clone(),

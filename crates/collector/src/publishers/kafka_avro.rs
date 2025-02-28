@@ -86,6 +86,48 @@ impl From<SRCError> for KafkaAvroPublisherActorError {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct KafkaAvroPublisherStats {
+    received: opentelemetry::metrics::Counter<u64>,
+    sent: opentelemetry::metrics::Counter<u64>,
+    error_avro_convert: opentelemetry::metrics::Counter<u64>,
+    error_avro_encode: opentelemetry::metrics::Counter<u64>,
+    error_send: opentelemetry::metrics::Counter<u64>,
+}
+
+impl KafkaAvroPublisherStats {
+    pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
+        let received = meter
+            .u64_counter("netgauze.collector.kafka.avro.received")
+            .with_description("Received messages from upstream producer")
+            .build();
+        let sent = meter
+            .u64_counter("netgauze.collector.kafka.avro.sent")
+            .with_description("Number of messages successfully sent to Kafka")
+            .build();
+        let error_avro_convert = meter
+            .u64_counter("netgauze.collector.kafka.avro.error_avro_convert")
+            .with_description("Error converting message into a AVRO value")
+            .build();
+        let error_avro_encode = meter
+            .u64_counter("netgauze.collector.kafka.avro.error_avro_encode")
+            .with_description("Error encoding message into AVRO binary array")
+            .build();
+        let error_send = meter
+            .u64_counter("netgauze.collector.kafka.avro.error_send")
+            .with_description("Error sending message to Kafka")
+            .build();
+
+        Self {
+            received,
+            sent,
+            error_avro_convert,
+            error_avro_encode,
+            error_send,
+        }
+    }
+}
+
 pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, C: AvroConverter<T, E>> {
     cmd_rx: mpsc::Receiver<KafkaAvroPublisherActorCommand>,
 
@@ -103,6 +145,8 @@ pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, C: AvroConverter
 
     msg_recv: async_channel::Receiver<T>,
 
+    stats: KafkaAvroPublisherStats,
+
     /// Rust magic for holding types and T, E
     pub _phantom: PhantomData<(T, E)>,
 }
@@ -117,6 +161,7 @@ where
         cmd_rx: mpsc::Receiver<KafkaAvroPublisherActorCommand>,
         config: KafkaConfig<C>,
         msg_recv: async_channel::Receiver<T>,
+        stats: KafkaAvroPublisherStats,
     ) -> Result<Self, KafkaAvroPublisherActorError> {
         let mut producer_config = ClientConfig::new();
         for (k, v) in &config.producer_config {
@@ -158,6 +203,7 @@ where
             producer,
             avro_encoder,
             msg_recv,
+            stats,
             _phantom: PhantomData,
         })
     }
@@ -167,6 +213,13 @@ where
             Ok(avro_value) => avro_value,
             Err(err) => {
                 error!("Error getting avro value: {err}");
+                self.stats.error_avro_convert.add(
+                    1,
+                    &[opentelemetry::KeyValue::new(
+                        "netgauze.kafka.avro.convert.error.msg",
+                        err.to_string(),
+                    )],
+                );
                 return Err(err)?;
             }
         };
@@ -185,6 +238,13 @@ where
             Ok(result) => result,
             Err(err) => {
                 error!("Error encoding avro value: {err}");
+                self.stats.error_avro_encode.add(
+                    1,
+                    &[opentelemetry::KeyValue::new(
+                        "netgauze.kafka.avro.encode.error.msg",
+                        err.to_string(),
+                    )],
+                );
                 return Err(err)?;
             }
         };
@@ -203,7 +263,16 @@ where
             .await
         {
             error!("Error sending avro value: {err}");
+            self.stats.error_send.add(
+                1,
+                &[opentelemetry::KeyValue::new(
+                    "netgauze.kafka.sent.error.msg",
+                    err.to_string(),
+                )],
+            );
             return Err(KafkaAvroPublisherActorError::KafkaError(err));
+        } else {
+            self.stats.sent.add(1, &[]);
         };
         Ok(())
     }
@@ -230,6 +299,7 @@ where
                 msg = self.msg_recv.recv() =>{
                     match msg{
                         Ok(msg) => {
+                            self.stats.received.add(1, &[]);
                             if let Err(err) = self.send(msg).await {
                                 error!("Error sending message to Kafka: {err}");
                             }
@@ -274,9 +344,14 @@ where
     pub fn from_config(
         config: KafkaConfig<C>,
         msg_recv: async_channel::Receiver<T>,
+        stats: either::Either<opentelemetry::metrics::Meter, KafkaAvroPublisherStats>,
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaAvroPublisherActorError> {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);
-        let actor = KafkaAvroPublisherActor::from_config(cmd_rx, config, msg_recv)?;
+        let stats = match stats {
+            either::Either::Left(meter) => KafkaAvroPublisherStats::new(meter),
+            either::Either::Right(stats) => stats,
+        };
+        let actor = KafkaAvroPublisherActor::from_config(cmd_rx, config, msg_recv, stats)?;
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
             cmd_tx,
