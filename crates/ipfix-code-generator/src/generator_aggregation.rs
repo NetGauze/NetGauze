@@ -58,8 +58,6 @@ pub fn impl_reduce(
     ret.push_str("            match ie {\n");
 
     if !vendors.is_empty() {
-        // ret.push_str("                IE::Unknown { .. } =>
-        // Err(netgauze_analytics::flow::AggregationError::UnknownIE),\n");
         ret.push_str("                IE::Unknown { .. } => {},\n");
     }
     // TODO: maybe revisit thinking about structure of Transform
@@ -82,11 +80,7 @@ pub fn impl_reduce(
         );
         ret.push_str("                            \n");
         ret.push_str("                            vendor_fields.reduce(vendor_incoming_fields, &vendor_transform)?\n");
-        // ret.push_str("                        } else {\n");
-        // ret.push_str("                            Ok(())?\n");
         ret.push_str("                        }\n");
-        // ret.push_str("                    } else {\n");
-        // ret.push_str("                        Ok(())?\n");
         ret.push_str("                    }\n");
         ret.push_str("                }\n");
     }

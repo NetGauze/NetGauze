@@ -29,7 +29,6 @@ pub enum AggrOp {
 pub enum AggregationError {
     FlatSetIsNotData,
     FlatFlowInfoNFv9NotSupported,
-    UnknownIE,
     OperationNotSupported,
 }
 
