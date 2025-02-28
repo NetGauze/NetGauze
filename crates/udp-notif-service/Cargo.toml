@@ -30,7 +30,6 @@ tokio-util = { workspace = true, features = ["full", "tracing"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
-chrono = { workspace = true, default-features = false, features = ["std", "clock"] }
 tracing-subscriber = { workspace = true }
-tracing-test = { version = "0.2" }
+tracing-test = { workspace = true }
 serde_json = { workspace = true }

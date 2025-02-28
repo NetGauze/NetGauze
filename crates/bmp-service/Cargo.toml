@@ -14,30 +14,22 @@ keywords = ["bmp", "bgp", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-netgauze-iana = { workspace = true }
-netgauze-bmp-pkt = { workspace = true , features = ["serde", "codec"] }
-netgauze-bgp-pkt = { workspace = true , features = ["serde"] }
-netgauze-parse-utils = { workspace = true }
+netgauze-bmp-pkt = { workspace = true, features = ["serde", "codec"] }
 
-nom = { workspace = true }
-byteorder = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true, features = ["codec"] }
 futures = { workspace = true }
 futures-util = { workspace = true }
 futures-core = { workspace = true }
-bytes = { workspace = true }
 pin-project = { workspace = true }
 tokio-stream = { workspace = true, features = ["net"] }
 tower = { workspace = true, features = ["full"] }
 tower-service = { workspace = true }
-tower-layer = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }
-chrono = { workspace = true, default-features = false, features = ["std"] }
 rand = { workspace = true }
 tracing-subscriber = { workspace = true }
 serde_json = { workspace = true }

@@ -21,12 +21,11 @@ name = "tests"
 path = "tests/tests.rs"
 
 [dependencies]
-syn = { version = "2.0", features = ["full", "extra-traits"] }
-quote = "1.0"
-proc-macro2 = "1.0"
+syn = { workspace = true, features = ["full", "extra-traits"] }
+quote = { workspace = true }
 
 [dev-dependencies]
-trybuild = { version = "1.0", features = ["diff"] }
 netgauze-parse-utils = { workspace = true }
-netgauze-locate = { workspace = true  }
+netgauze-locate = { workspace = true }
 nom = { workspace = true }
+trybuild = { workspace = true, features = ["diff"] }

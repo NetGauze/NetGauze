@@ -19,7 +19,4 @@ roxmltree = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-regex = "1.10"
-
-[dev-dependencies]
-serde_json = { workspace = true }
+regex = { workspace = true }

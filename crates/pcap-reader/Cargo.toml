@@ -15,9 +15,4 @@ categories = ["network-programming", "parsing"]
 
 [dependencies]
 pcap-parser = { workspace = true, features = ["data"] }
-pdu = "1.4"
-
-[dev-dependencies]
-serde_json = { workspace = true }
-bytes = { workspace = true }
-tokio-util = { workspace = true, features = ["codec"] }
+pdu = { workspace = true }

@@ -14,23 +14,21 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 # Specify the files to include in the crate
 include = [
-  "registry/**", # Specify entire folders if needed
+    "registry/**", # Specify entire folders if needed
 ]
 
 [dependencies]
-netgauze-locate = { workspace = true , optional = true }
+netgauze-locate = { workspace = true, optional = true }
 netgauze-parse-utils = { workspace = true, optional = true }
-netgauze-serde-macros = { workspace = true , optional = true }
+netgauze-serde-macros = { workspace = true, optional = true }
 netgauze-iana = { workspace = true }
 netgauze-analytics = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-ipnet = { workspace = true, features = ["serde"] }
-lazy_static = { workspace = true }
 chrono = { workspace = true, default-features = false, features = [
-  "std",
-  "serde",
+    "std",
+    "serde",
 ] }
 nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
@@ -40,16 +38,16 @@ tokio-util = { workspace = true, features = ["codec"], optional = true }
 bytes = { workspace = true, optional = true }
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
-indexmap = {workspace = true}
+indexmap = { workspace = true }
 
 [features]
 default = ["serde"]
 serde = [
-  "nom",
-  "byteorder",
-  "netgauze-locate",
-  "netgauze-parse-utils",
-  "netgauze-serde-macros",
+    "nom",
+    "byteorder",
+    "netgauze-locate",
+    "netgauze-parse-utils",
+    "netgauze-serde-macros",
 ]
 codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
@@ -64,8 +62,6 @@ rstest = { workspace = true }
 pcap-parser = { workspace = true, features = ["data"] }
 
 [build-dependencies]
-reqwest = { workspace = true, features = ["blocking"] }
-roxmltree = { workspace = true }
 netgauze-ipfix-code-generator = { workspace = true }
 
 [[bench]]
