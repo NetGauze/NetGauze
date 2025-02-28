@@ -25,4 +25,7 @@ syn = { workspace = true, features = ["full", "extra-traits"] }
 quote = { workspace = true }
 
 [dev-dependencies]
+netgauze-parse-utils = { workspace = true }
+netgauze-locate = { workspace = true }
+nom = { workspace = true }
 trybuild = { workspace = true, features = ["diff"] }
