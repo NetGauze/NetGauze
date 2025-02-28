@@ -66,6 +66,41 @@ impl std::fmt::Display for FlowEnrichmentActorError {
 
 impl std::error::Error for FlowEnrichmentActorError {}
 
+#[derive(Debug, Clone)]
+pub struct FlowEnrichmentStats {
+    pub received_flows: opentelemetry::metrics::Counter<u64>,
+    pub received_enrichment_ops: opentelemetry::metrics::Counter<u64>,
+    pub sent: opentelemetry::metrics::Counter<u64>,
+    pub send_error: opentelemetry::metrics::Counter<u64>,
+}
+
+impl FlowEnrichmentStats {
+    pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
+        let received_flows = meter
+            .u64_counter("netgauze.collector.flows.enrichment.received.flows")
+            .with_description("Number of flatten flows received for enrichment")
+            .build();
+        let received_enrichment_ops = meter
+            .u64_counter("netgauze.collector.flows.enrichment.received.enrichment.operations")
+            .with_description("Number of enrichment updates received from SONTA")
+            .build();
+        let sent = meter
+            .u64_counter("netgauze.collector.flows.enrichment.sent")
+            .with_description("Number of enriched flows successfully sent upstream")
+            .build();
+        let send_error = meter
+            .u64_counter("netgauze.collector.flows.enrichment.sent.error")
+            .with_description("Number of enrichment updates sent upstream error")
+            .build();
+        Self {
+            received_flows,
+            received_enrichment_ops,
+            sent,
+            send_error,
+        }
+    }
+}
+
 struct FlowEnrichment {
     labels: HashMap<IpAddr, (u32, HashMap<String, String>)>,
     writer_id: String,
@@ -74,6 +109,7 @@ struct FlowEnrichment {
     agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
     enriched_tx: async_channel::Sender<EnrichedFlow>,
     default_labels: (u32, HashMap<String, String>),
+    stats: FlowEnrichmentStats,
 }
 
 impl FlowEnrichment {
@@ -83,6 +119,7 @@ impl FlowEnrichment {
         enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
         agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
         enriched_tx: async_channel::Sender<EnrichedFlow>,
+        stats: FlowEnrichmentStats,
     ) -> Self {
         let default_labels = (
             0,
@@ -99,6 +136,7 @@ impl FlowEnrichment {
             agg_rx,
             enriched_tx,
             default_labels,
+            stats,
         }
     }
 
@@ -157,6 +195,7 @@ impl FlowEnrichment {
                 enrichment = self.enrichment_rx.recv() => {
                     match enrichment {
                         Ok(op) => {
+                            self.stats.received_enrichment_ops.add(1, &[]);
                             self.apply_enrichment(op);
                         }
                         Err(err) => {
@@ -168,9 +207,23 @@ impl FlowEnrichment {
                 flow = self.agg_rx.recv() => {
                     match flow {
                         Ok((window, (peer, flat_flow))) => {
+                            let peer_tags = [
+                                opentelemetry::KeyValue::new(
+                                    "network.peer.address",
+                                    format!("{}", peer.ip()),
+                                ),
+                                opentelemetry::KeyValue::new(
+                                    "network.peer.port",
+                                    opentelemetry::Value::I64(peer.port().into()),
+                                ),
+                            ];
+                            self.stats.received_flows.add(1, &peer_tags);
                             let enriched = self.enrich(window, peer, flat_flow);
                             if let Err(err) = self.enriched_tx.send(enriched).await {
                                 error!("FlowEnrichment send error: {err}");
+                                 self.stats.send_error.add(1, &peer_tags);
+                            } else {
+                                 self.stats.sent.add(1, &peer_tags);
                             }
                         }
                         Err(err) => {
@@ -212,11 +265,23 @@ impl FlowEnrichmentActorHandle {
         writer_id: String,
         buffer_size: usize,
         agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
+        stats: either::Either<opentelemetry::metrics::Meter, FlowEnrichmentStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
         let (enrichment_tx, enrichment_rx) = async_channel::bounded(buffer_size);
         let (enriched_tx, enriched_rx) = async_channel::bounded(buffer_size);
-        let actor = FlowEnrichment::new(writer_id, cmd_recv, enrichment_rx, agg_rx, enriched_tx);
+        let stats = match stats {
+            either::Either::Left(meter) => FlowEnrichmentStats::new(meter),
+            either::Either::Right(stats) => stats,
+        };
+        let actor = FlowEnrichment::new(
+            writer_id,
+            cmd_recv,
+            enrichment_rx,
+            agg_rx,
+            enriched_tx,
+            stats,
+        );
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
             cmd_send,

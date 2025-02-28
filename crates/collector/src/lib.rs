@@ -109,6 +109,7 @@ pub async fn init_flow_collection(
                         config.writer_id.clone(),
                         publisher_config.buffer_size,
                         agg_handle.subscribe(),
+                        either::Left(meter.clone()),
                     );
                     let enriched_rx = enrichment_handle.subscribe();
                     let (kafka_join, kafka_handle) = KafkaAvroPublisherActorHandle::from_config(
