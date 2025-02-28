@@ -120,6 +120,7 @@ pub async fn init_flow_collection(
                         let (sonata_join, sonata_handle) = SonataActorHandle::new(
                             kafka_consumer.clone(),
                             enrichment_handle.clone(),
+                            either::Left(meter.clone()),
                         )?;
                         join_set.push(sonata_join);
                         sonata_handles.push(sonata_handle);
