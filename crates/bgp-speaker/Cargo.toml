@@ -14,24 +14,22 @@ keywords = ["bgp", "protocol"]
 categories = ["network-programming"]
 
 [dependencies]
-netgauze-bgp-pkt = { workspace = true , features = ["codec"] }
+netgauze-bgp-pkt = { workspace = true, features = ["codec"] }
 netgauze-iana = { workspace = true }
-netgauze-locate = { workspace = true  }
 netgauze-parse-utils = { workspace = true }
-byteorder = { workspace = true }
-chrono = { workspace = true, default-features = false, features = ["std", "clock"] }
+chrono = { workspace = true, default-features = false, features = [
+    "std",
+    "clock",
+] }
 
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true, features = ["codec"] }
 futures = { workspace = true }
 futures-util = { workspace = true }
 futures-core = { workspace = true }
-bytes = { workspace = true }
 pin-project = { workspace = true }
 tokio-stream = { workspace = true, features = ["net"] }
 log = { workspace = true }
-nom = { workspace = true }
-ipnet = { workspace = true }
 rand = { workspace = true, features = ["small_rng"] }
 strum_macros = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -46,4 +44,4 @@ fuzz = ["arbitrary", "arbitrary_ext"]
 tokio-test = { workspace = true }
 env_logger = "0.11"
 test-log = "0.2"
-clap = {  workspace = true, features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
