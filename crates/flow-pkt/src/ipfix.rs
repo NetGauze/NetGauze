@@ -14,13 +14,15 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::{
     ie::{Field, Fields},
-    DataSetId, FieldSpecifier,
+    DataSetId, FieldSpecifier, IE,
 };
+use netgauze_analytics::flow::{AggrOp, AggregationError};
 
 pub const IPFIX_VERSION: u16 = 10;
 
@@ -138,7 +140,7 @@ impl IpfixPacket {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FlatIpfixPacket {
     export_time: DateTime<Utc>,
     sequence_number: u32,
@@ -175,6 +177,22 @@ impl FlatIpfixPacket {
 
     pub const fn set(&self) -> &FlatSet {
         &self.set
+    }
+
+    pub fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
+        self.set.extract_as_key_str(ie, indices)
+    }
+
+    pub fn reduce(
+        &mut self,
+        incoming: &FlatIpfixPacket,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        self.set.reduce(&incoming.set, transform)
     }
 }
 
@@ -236,12 +254,53 @@ pub enum FlatSet {
     },
 }
 
+impl Default for FlatSet {
+    fn default() -> Self {
+        FlatSet::Data {
+            id: DataSetId(0),
+            record: Box::new(FlatDataRecord::default()),
+        }
+    }
+}
+
 impl FlatSet {
     pub const fn id(&self) -> u16 {
         match self {
             Self::Template(_) => IPFIX_TEMPLATE_SET_ID,
             Self::OptionsTemplate(_) => IPFIX_OPTIONS_TEMPLATE_SET_ID,
             Self::Data { id, record: _ } => id.0,
+        }
+    }
+
+    fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
+        match self {
+            FlatSet::Data { record, .. } => record.extract_as_key_str(ie, indices),
+            _ => Err(AggregationError::FlatSetIsNotData),
+        }
+    }
+
+    fn reduce(
+        &mut self,
+        incoming: &FlatSet,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        match self {
+            FlatSet::Data { record, .. } => {
+                if let FlatSet::Data {
+                    record: incoming_record,
+                    ..
+                } = incoming
+                {
+                    record.reduce(incoming_record, transform)
+                } else {
+                    Err(AggregationError::FlatSetIsNotData)
+                }
+            }
+            _ => Err(AggregationError::FlatSetIsNotData),
         }
     }
 }
@@ -422,7 +481,7 @@ impl DataRecord {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FlatDataRecord {
     scope_fields: Fields,
     fields: Fields,
@@ -442,6 +501,22 @@ impl FlatDataRecord {
 
     pub const fn fields(&self) -> &Fields {
         &self.fields
+    }
+
+    fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
+        self.fields.extract_as_key_str(ie, indices)
+    }
+
+    fn reduce(
+        &mut self,
+        incoming: &FlatDataRecord,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        self.fields.reduce(&incoming.fields, transform)
     }
 }
 

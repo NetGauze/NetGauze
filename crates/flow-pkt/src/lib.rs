@@ -22,6 +22,8 @@ pub mod netflow;
 pub mod wire;
 
 use crate::ie::*;
+use indexmap::IndexMap;
+use netgauze_analytics::flow::{AggrOp, AggregationError};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
@@ -48,6 +50,36 @@ impl FlowInfo {
 pub enum FlatFlowInfo {
     NetFlowV9(netflow::FlatNetFlowV9Packet),
     IPFIX(ipfix::FlatIpfixPacket),
+}
+
+impl FlatFlowInfo {
+    pub fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
+        match self {
+            FlatFlowInfo::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
+            FlatFlowInfo::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+        }
+    }
+
+    pub fn reduce(
+        &mut self,
+        incoming: &FlatFlowInfo,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        match self {
+            FlatFlowInfo::IPFIX(packet) => {
+                if let FlatFlowInfo::IPFIX(incoming_packet) = incoming {
+                    packet.reduce(incoming_packet, transform)
+                } else {
+                    Err(AggregationError::FlatFlowInfoNFv9NotSupported)
+                }
+            }
+            FlatFlowInfo::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+        }
+    }
 }
 
 /// Errors when crafting a new Set
