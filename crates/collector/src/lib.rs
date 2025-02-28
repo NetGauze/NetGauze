@@ -15,7 +15,11 @@
 
 use crate::{
     config::{FlowConfig, PublisherEndpoint, UdpNotifConfig},
-    http::{HttpPublisherActorHandle, Message},
+    flow::{enrichment::FlowEnrichmentActorHandle, sonata::SonataActorHandle},
+    publishers::{
+        http::{HttpPublisherActorHandle, Message},
+        kafka_avro::KafkaAvroPublisherActorHandle,
+    },
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
@@ -25,7 +29,8 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 pub mod config;
-pub mod http;
+pub mod flow;
+pub mod publishers;
 
 pub async fn init_flow_collection(
     flow_config: FlowConfig,
@@ -35,8 +40,12 @@ pub async fn init_flow_collection(
 
     let (supervisor_join_handle, supervisor_handle) =
         FlowCollectorsSupervisorActorHandle::new(supervisor_config, meter.clone()).await;
-    let mut http_handlers = Vec::new();
-    let mut http_join_set = FuturesUnordered::new();
+    let mut http_handles = Vec::new();
+    let mut agg_handles = Vec::new();
+    let mut enrichment_handles = Vec::new();
+    let mut kafka_handles = Vec::new();
+    let mut sonata_handles = Vec::new();
+    let mut join_set = FuturesUnordered::new();
     for (group_name, publisher_config) in flow_config.publishers {
         info!("Starting publishers group '{group_name}'");
         let (flow_recv, _) = supervisor_handle
@@ -44,7 +53,6 @@ pub async fn init_flow_collection(
             .await?;
         for (endpoint_name, endpoint) in publisher_config.endpoints {
             info!("Creating publisher '{endpoint_name}'");
-
             match &endpoint {
                 PublisherEndpoint::Http(config) => {
                     let flatten = config.flatten;
@@ -89,8 +97,36 @@ pub async fn init_flow_collection(
                             meter.clone(),
                         )?
                     };
-                    http_join_set.push(http_join);
-                    http_handlers.push(http_handler);
+                    join_set.push(http_join);
+                    http_handles.push(http_handler);
+                }
+                PublisherEndpoint::FlowKafkaAvro(config) => {
+                    let (agg_join, agg_handle) = flow::aggregation::AggregationActorHandle::new(
+                        publisher_config.buffer_size,
+                        flow_recv.clone(),
+                    );
+                    let (enrichment_join, enrichment_handle) = FlowEnrichmentActorHandle::new(
+                        config.writer_id.clone(),
+                        publisher_config.buffer_size,
+                        agg_handle.subscribe(),
+                    );
+                    let enriched_rx = enrichment_handle.subscribe();
+                    let (kafka_join, kafka_handle) =
+                        KafkaAvroPublisherActorHandle::from_config(config.clone(), enriched_rx)?;
+                    if let Some(kafka_consumer) = publisher_config.sonata_enrichment.as_ref() {
+                        let (sonata_join, sonata_handle) = SonataActorHandle::new(
+                            kafka_consumer.clone(),
+                            enrichment_handle.clone(),
+                        )?;
+                        join_set.push(sonata_join);
+                        sonata_handles.push(sonata_handle);
+                    }
+                    join_set.push(agg_join);
+                    join_set.push(enrichment_join);
+                    join_set.push(kafka_join);
+                    agg_handles.push(agg_handle);
+                    enrichment_handles.push(enrichment_handle);
+                    kafka_handles.push(kafka_handle);
                 }
             }
         }
@@ -98,7 +134,7 @@ pub async fn init_flow_collection(
     let ret = tokio::select! {
         _ = supervisor_join_handle => {
             info!("Flow supervisor exited, shutting down all publishers");
-           for handler in http_handlers {
+            for handler in http_handles {
                 let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handler.shutdown()).await;
                 if shutdown_result.is_err() {
                     warn!("Timeout shutting down flow http publisher {}", handler.name())
@@ -109,10 +145,16 @@ pub async fn init_flow_collection(
             }
             Ok(())
         },
-        _ = http_join_set.next() => {
+        _ = join_set.next() => {
             warn!("Flow http publisher exited, shutting down flow collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
-            for handler in http_handlers {
+            for handler in agg_handles {
+                let _ = handler.shutdown().await;
+            }
+            for handler in enrichment_handles {
+                let _ = handler.shutdown().await;
+            }
+            for handler in http_handles {
                 let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handler.shutdown()).await;
                 if shutdown_result.is_err() {
                     warn!("Timeout shutting down flow http publisher {}", handler.name())
@@ -120,6 +162,12 @@ pub async fn init_flow_collection(
                 if let Ok(Err(err)) = shutdown_result {
                     warn!("Error in shutting down flow http publisher {}: {err}", handler.name())
                 }
+            }
+            for handler in kafka_handles {
+                let _ = handler.shutdown().await;
+            }
+            for handler in sonata_handles {
+                let _ = handler.shutdown().await;
             }
             Ok(())
         }
@@ -161,6 +209,9 @@ pub async fn init_udp_notif_collection(
                     )?;
                     http_join_set.push(http_join);
                     http_handlers.push(http_handler);
+                }
+                PublisherEndpoint::FlowKafkaAvro(_) => {
+                    unimplemented!("Kafka Avro publisher not supported yet for UDP Notif");
                 }
             }
         }
