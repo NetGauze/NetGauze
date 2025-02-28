@@ -525,6 +525,7 @@ mod tests {
     use super::*;
     use crate::ie;
     use chrono::TimeZone;
+    use netgauze_iana::tcp::TCPHeaderFlags;
 
     #[test]
     fn test_ipfix_packet() {
@@ -748,5 +749,106 @@ mod tests {
         assert_eq!(sets[0].id(), IPFIX_TEMPLATE_SET_ID);
         assert_eq!(sets[1].id(), IPFIX_OPTIONS_TEMPLATE_SET_ID);
         assert_eq!(sets[2].id(), 256);
+    }
+
+    #[test]
+    fn test_flat_ipfix_packet_reduce() {
+        let export_time = Utc.with_ymd_and_hms(2025, 2, 28, 10, 0, 0).unwrap();
+        let sequence_number = 0;
+        let observation_domain_id = 0;
+
+        let mut packet1 = FlatIpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            FlatSet::Data {
+                id: DataSetId::new(256).unwrap(),
+                record: Box::new(FlatDataRecord::new(
+                    Fields::default(),
+                    Fields {
+                        octetDeltaCount: Some(vec![100]),
+                        minimumTTL: Some(vec![64]),
+                        maximumTTL: Some(vec![128]),
+                        tcpControlBits: Some(vec![TCPHeaderFlags::new(true, false, false, true, false, false, false, false)]),
+                        ..Default::default()
+                    },
+                )),
+            },
+        );
+
+        let packet2 = FlatIpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            FlatSet::Data {
+                id: DataSetId::new(256).unwrap(),
+                record: Box::new(FlatDataRecord::new(
+                    Fields::default(),
+                    Fields {
+                        octetDeltaCount: Some(vec![200]),
+                        minimumTTL: Some(vec![100]),
+                        maximumTTL: Some(vec![230]),
+                        tcpControlBits: Some(vec![TCPHeaderFlags::new(false, false, false, false, true, false, false, true)]),
+                        ..Default::default()
+                    },
+                )),
+            },
+        );
+
+        let mut transform = IndexMap::new();
+        transform.insert(ie::IE::octetDeltaCount, AggrOp::Add);
+        transform.insert(ie::IE::minimumTTL, AggrOp::Min);
+        transform.insert(ie::IE::maximumTTL, AggrOp::Max);
+        transform.insert(ie::IE::tcpControlBits, AggrOp::BoolMapOr);
+
+        packet1.reduce(&packet2, &transform).unwrap();
+
+        if let FlatSet::Data { record, .. } = packet1.set() {
+            assert_eq!(record.fields().octetDeltaCount, Some(vec![300]));
+            assert_eq!(record.fields().minimumTTL, Some(vec![64]));
+            assert_eq!(record.fields().maximumTTL, Some(vec![230]));
+            assert_eq!(record.fields().tcpControlBits, Some(vec![TCPHeaderFlags::new(true, false, false, true, true, false, false, true)]));
+        } else {
+            panic!("Expected FlatSet::Data");
+        }
+    }
+
+    #[test]
+    fn test_extract_as_key_str() {
+        let export_time = Utc.with_ymd_and_hms(2025, 2, 28, 10, 0, 0).unwrap();
+        let sequence_number = 0;
+        let observation_domain_id = 0;
+
+        let packet = FlatIpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            FlatSet::Data {
+                id: DataSetId::new(256).unwrap(),
+                record: Box::new(FlatDataRecord::new(
+                    Fields::default(),
+                    Fields {
+                        exporterIPv6Address: Some(vec![std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 1),
+                                                       std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 2),
+                                                       std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 3)],),
+                        ..Default::default()
+                    },
+                )),
+            },
+        );
+
+        let key_str = packet.extract_as_key_str(&ie::IE::exporterIPv6Address, &Some(vec![0, 2, 3])).unwrap();
+        assert_eq!(key_str, "cafe::1,cafe::3,None");
+
+        let non_data_packet = FlatIpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            FlatSet::Template(TemplateRecord::new(256, vec![])),
+        );
+
+        let result = non_data_packet.extract_as_key_str(&ie::IE::exporterIPv6Address, &None);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AggregationError::FlatSetIsNotData));
     }
 }
