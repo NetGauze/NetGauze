@@ -115,6 +115,45 @@ impl From<Utf8Error> for SonataActorError {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SonataStats {
+    received: opentelemetry::metrics::Counter<u64>,
+    json_decoding_error: opentelemetry::metrics::Counter<u64>,
+    invalid_operation: opentelemetry::metrics::Counter<u64>,
+    send_error: opentelemetry::metrics::Counter<u64>,
+}
+
+impl SonataStats {
+    pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
+        let received = meter
+            .u64_counter("netgauze.collector.flows.sonata.received")
+            .with_description("Received messages from Kafka topic")
+            .build();
+        let json_decoding_error = meter
+            .u64_counter("netgauze.collector.flows.sonata.json_decoding_error")
+            .with_description("Number of messages encountered JSON decoding errors")
+            .build();
+        let invalid_operation = meter
+            .u64_counter("netgauze.collector.flows.sonata.invalid_operation")
+            .with_description(
+                "Number of messages SONATA messages successfully decoded but invalid semantically",
+            )
+            .build();
+        let send_error = meter
+            .u64_counter("netgauze.collector.flows.sonata.send_error")
+            .with_description(
+                "Error sending the SONTA enrichment operation to the enrichment actor",
+            )
+            .build();
+        Self {
+            received,
+            json_decoding_error,
+            invalid_operation,
+            send_error,
+        }
+    }
+}
+
 #[derive(Debug)]
 enum SonataActorCommand {
     Shutdown,
@@ -124,6 +163,7 @@ struct SonataActor {
     cmd_rx: mpsc::Receiver<SonataActorCommand>,
     enrichment_handle: FlowEnrichmentActorHandle,
     consumer: StreamConsumer<CosmoSonataContext>,
+    stats: SonataStats,
 }
 
 impl SonataActor {
@@ -131,6 +171,7 @@ impl SonataActor {
         config: KafkaConsumerConfig,
         cmd_rx: mpsc::Receiver<SonataActorCommand>,
         enrichment_handle: FlowEnrichmentActorHandle,
+        stats: SonataStats,
     ) -> Result<Self, SonataActorError> {
         let mut client_conf = ClientConfig::new();
         for (k, v) in config.consumer_config {
@@ -154,6 +195,7 @@ impl SonataActor {
             cmd_rx,
             enrichment_handle,
             consumer,
+            stats,
         })
     }
 
@@ -163,6 +205,13 @@ impl SonataActor {
             Some(p) => match serde_json::from_slice::<SonataData>(p) {
                 Ok(data) => data,
                 Err(err) => {
+                    self.stats.json_decoding_error.add(
+                        1,
+                        &[opentelemetry::KeyValue::new(
+                            "netgauze.kafka.sonata.json.err",
+                            err.to_string(),
+                        )],
+                    );
                     warn!("Malformed sonata payload: {err}");
                     return;
                 }
@@ -186,6 +235,13 @@ impl SonataActor {
                         "Invalid sonata node upsert operation without a node value: {:?}",
                         msg.payload_view::<str>()
                     );
+                    self.stats.invalid_operation.add(
+                        1,
+                        &[opentelemetry::KeyValue::new(
+                            "netgauze.kafka.sonata.operation.err",
+                            "upsert operation without a node value".to_string(),
+                        )],
+                    );
                     return;
                 }
             }
@@ -194,6 +250,13 @@ impl SonataActor {
         debug!("Sonata Enrichment Operation: {op:?}");
         if let Err(err) = self.enrichment_handle.update_enrichment(op).await {
             warn!("Failed to update enrichment operation: {err}");
+            self.stats.send_error.add(
+                1,
+                &[opentelemetry::KeyValue::new(
+                    "netgauze.kafka.sonata.send.err",
+                    err.to_string(),
+                )],
+            );
         }
     }
 
@@ -215,6 +278,7 @@ impl SonataActor {
                     }
                 }
                 msg = self.consumer.recv() => {
+                    self.stats.received.add(1, &[]);
                     match msg {
                         Ok(msg) => {
                             self.handle_kafka_msg(msg).await;
@@ -244,9 +308,14 @@ impl SonataActorHandle {
     pub fn new(
         consumer_config: KafkaConsumerConfig,
         enrichment_handle: FlowEnrichmentActorHandle,
+        stats: either::Either<opentelemetry::metrics::Meter, SonataStats>,
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), SonataActorError> {
         let (cmd_send, cmd_rx) = mpsc::channel::<SonataActorCommand>(1);
-        let actor = SonataActor::from_config(consumer_config, cmd_rx, enrichment_handle)?;
+        let stats = match stats {
+            either::Left(meter) => SonataStats::new(meter),
+            either::Right(stats) => stats,
+        };
+        let actor = SonataActor::from_config(consumer_config, cmd_rx, enrichment_handle, stats)?;
         let join_handle = tokio::spawn(actor.run());
         Ok((join_handle, SonataActorHandle { cmd_send }))
     }
