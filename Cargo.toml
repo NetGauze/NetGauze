@@ -69,7 +69,7 @@ reqwest = { version = "0.12" }
 roxmltree = "0.20"
 arbitrary = { version = "1" }
 arbitrary_ext = { version = "0.3" }
-rstest = "0.24"
+rstest = "0.25"
 pcap-parser = { version = "0.16" }
 clap = { version = "4.5" }
 socket2 = { version = "0.5" }
