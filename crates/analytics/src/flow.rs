@@ -13,10 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use strum_macros::Display;
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub enum AggrOp {
     Key(Option<Vec<usize>>),
     Add,

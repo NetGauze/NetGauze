@@ -769,7 +769,9 @@ mod tests {
                         octetDeltaCount: Some(vec![100]),
                         minimumTTL: Some(vec![64]),
                         maximumTTL: Some(vec![128]),
-                        tcpControlBits: Some(vec![TCPHeaderFlags::new(true, false, false, true, false, false, false, false)]),
+                        tcpControlBits: Some(vec![TCPHeaderFlags::new(
+                            true, false, false, true, false, false, false, false,
+                        )]),
                         ..Default::default()
                     },
                 )),
@@ -788,7 +790,9 @@ mod tests {
                         octetDeltaCount: Some(vec![200]),
                         minimumTTL: Some(vec![100]),
                         maximumTTL: Some(vec![230]),
-                        tcpControlBits: Some(vec![TCPHeaderFlags::new(false, false, false, false, true, false, false, true)]),
+                        tcpControlBits: Some(vec![TCPHeaderFlags::new(
+                            false, false, false, false, true, false, false, true,
+                        )]),
                         ..Default::default()
                     },
                 )),
@@ -807,7 +811,12 @@ mod tests {
             assert_eq!(record.fields().octetDeltaCount, Some(vec![300]));
             assert_eq!(record.fields().minimumTTL, Some(vec![64]));
             assert_eq!(record.fields().maximumTTL, Some(vec![230]));
-            assert_eq!(record.fields().tcpControlBits, Some(vec![TCPHeaderFlags::new(true, false, false, true, true, false, false, true)]));
+            assert_eq!(
+                record.fields().tcpControlBits,
+                Some(vec![TCPHeaderFlags::new(
+                    true, false, false, true, true, false, false, true
+                )])
+            );
         } else {
             panic!("Expected FlatSet::Data");
         }
@@ -828,16 +837,20 @@ mod tests {
                 record: Box::new(FlatDataRecord::new(
                     Fields::default(),
                     Fields {
-                        exporterIPv6Address: Some(vec![std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 1),
-                                                       std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 2),
-                                                       std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 3)],),
+                        exporterIPv6Address: Some(vec![
+                            std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 1),
+                            std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 2),
+                            std::net::Ipv6Addr::new(0xcafe, 0, 0, 0, 0, 0, 0, 3),
+                        ]),
                         ..Default::default()
                     },
                 )),
             },
         );
 
-        let key_str = packet.extract_as_key_str(&ie::IE::exporterIPv6Address, &Some(vec![0, 2, 3])).unwrap();
+        let key_str = packet
+            .extract_as_key_str(&ie::IE::exporterIPv6Address, &Some(vec![0, 2, 3]))
+            .unwrap();
         assert_eq!(key_str, "cafe::1,cafe::3,None");
 
         let non_data_packet = FlatIpfixPacket::new(
@@ -849,6 +862,9 @@ mod tests {
 
         let result = non_data_packet.extract_as_key_str(&ie::IE::exporterIPv6Address, &None);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AggregationError::FlatSetIsNotData));
+        assert!(matches!(
+            result.unwrap_err(),
+            AggregationError::FlatSetIsNotData
+        ));
     }
 }

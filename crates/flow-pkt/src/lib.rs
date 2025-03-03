@@ -53,6 +53,13 @@ pub enum FlatFlowInfo {
 }
 
 impl FlatFlowInfo {
+    pub fn export_time(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            FlatFlowInfo::IPFIX(packet) => packet.export_time(),
+            FlatFlowInfo::NetFlowV9(packet) => packet.unix_time(),
+        }
+    }
+
     pub fn extract_as_key_str(
         &self,
         ie: &IE,
