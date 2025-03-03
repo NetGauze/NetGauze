@@ -343,9 +343,9 @@ pub struct WindowedAggregationStreamAdaptor<
 
 impl<
         Key: Eq + Hash + Clone,
-        Input: Unpin,
+        Input,
         AggInit: Clone,
-        AggValue: Unpin,
+        AggValue,
         AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
         I: Stream<Item = Input>,
     > WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
@@ -373,7 +373,7 @@ impl<
         Input: TimeSeriesData<Key> + Unpin,
         AggInit: Clone + Unpin,
         AggValue: Unpin,
-        AggregatorImpl: Aggregator<AggInit, Input, AggValue> + Unpin,
+        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
         I: Stream<Item = Input>,
     > Stream
     for WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
@@ -426,8 +426,8 @@ pub trait AggregationWindowStreamExt<
     Key: Eq + Hash + Clone + Unpin,
     Input: TimeSeriesData<Key> + Unpin,
     AggInit: Clone + Unpin,
-    AggValue: Unpin,
-    AggregatorImpl: Aggregator<AggInit, Input, AggValue> + Unpin,
+    AggValue,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
 >: Stream<Item = Input>
 {
     fn window_aggregate(
@@ -448,8 +448,8 @@ impl<
         Key: Eq + Hash + Clone + Unpin,
         Input: TimeSeriesData<Key> + Unpin,
         AggInit: Clone + Unpin,
-        AggValue: Unpin,
-        AggregatorImpl: Aggregator<AggInit, Input, AggValue> + Unpin,
+        AggValue,
+        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
         I: Stream<Item = Input>,
     > AggregationWindowStreamExt<Key, Input, AggInit, AggValue, AggregatorImpl> for I
 {
