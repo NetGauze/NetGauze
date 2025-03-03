@@ -49,10 +49,14 @@
 //! ```
 
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
+use futures_core::Stream;
+use pin_project::pin_project;
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     hash::Hash,
     marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
     time::Duration,
 };
 
@@ -312,6 +316,142 @@ impl<
         AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
         I: Iterator<Item = Input>,
     > AggregationWindowingExt<Key, Input, AggInit, AggValue, AggregatorImpl> for I
+{
+}
+
+#[pin_project]
+pub struct WindowedAggregationStreamAdaptor<
+    Key,
+    Input,
+    AggInit: Clone,
+    AggValue,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
+    I: Stream<Item = Input>,
+> {
+    #[pin]
+    source: I,
+    #[pin]
+    aggregator: WindowAggregator<Key, AggInit, AggregatorImpl>,
+    #[pin]
+    buffer: VecDeque<(Window, AggValue)>,
+    #[pin]
+    late_buffer: VecDeque<Input>,
+    /// _agg_fn is not needed per-say, but it makes rust typing much easier
+    _agg_fn: AggregatorImpl,
+    _phantom: PhantomData<(Key, AggInit)>,
+}
+
+impl<
+        Key: Eq + Hash + Clone,
+        Input: Unpin,
+        AggInit: Clone,
+        AggValue: Unpin,
+        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
+        I: Stream<Item = Input>,
+    > WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
+{
+    pub fn new(
+        source: I,
+        duration: Duration,
+        lateness: Duration,
+        agg_init: AggInit,
+        agg_fn: AggregatorImpl,
+    ) -> Self {
+        Self {
+            source,
+            aggregator: WindowAggregator::new(duration, lateness, agg_init),
+            buffer: VecDeque::new(),
+            late_buffer: VecDeque::new(),
+            _agg_fn: agg_fn,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<
+        Key: Eq + Hash + Clone + Unpin,
+        Input: TimeSeriesData<Key> + Unpin,
+        AggInit: Clone + Unpin,
+        AggValue: Unpin,
+        AggregatorImpl: Aggregator<AggInit, Input, AggValue> + Unpin,
+        I: Stream<Item = Input>,
+    > Stream
+    for WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
+{
+    type Item = either::Either<(Window, AggValue), Input>;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        loop {
+            // First, return any buffered results
+            if let Some(late) = this.late_buffer.pop_front() {
+                return Poll::Ready(Some(either::Right(late)));
+            }
+            if let Some(agg_value) = this.buffer.pop_front() {
+                return Poll::Ready(Some(either::Left(agg_value)));
+            }
+            // Get next item from source
+            match this.source.as_mut().poll_next(cx) {
+                Poll::Ready(Some(item)) => {
+                    // Process the item and collect any completed windows
+                    let (results, late) = this.aggregator.process_item(item);
+                    this.buffer.extend(results);
+                    this.late_buffer.extend(late);
+                    // If we have late data or results, return the first one
+                    if let Some(late) = this.late_buffer.pop_front() {
+                        return Poll::Ready(Some(either::Right(late)));
+                    }
+                    if let Some(agg_value) = this.buffer.pop_front() {
+                        return Poll::Ready(Some(either::Left(agg_value)));
+                    }
+                }
+                Poll::Ready(None) => {
+                    // Source is exhausted, flush remaining windows
+                    if this.buffer.is_empty() {
+                        this.buffer.extend(this.aggregator.flush());
+                    }
+                    if let Some(late) = this.late_buffer.pop_front() {
+                        return Poll::Ready(Some(either::Right(late)));
+                    }
+                    if let Some(agg_value) = this.buffer.pop_front() {
+                        return Poll::Ready(Some(either::Left(agg_value)));
+                    }
+                }
+                Poll::Pending => return Poll::Pending,
+            }
+        }
+    }
+}
+
+pub trait AggregationWindowStreamExt<
+    Key: Eq + Hash + Clone + Unpin,
+    Input: TimeSeriesData<Key> + Unpin,
+    AggInit: Clone + Unpin,
+    AggValue: Unpin,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue> + Unpin,
+>: Stream<Item = Input>
+{
+    fn window_aggregate(
+        self,
+        window_duration: Duration,
+        lateness: Duration,
+        agg_init: AggInit,
+        agg_fn: AggregatorImpl,
+    ) -> WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, Self>
+    where
+        Self: Sized,
+    {
+        WindowedAggregationStreamAdaptor::new(self, window_duration, lateness, agg_init, agg_fn)
+    }
+}
+
+impl<
+        Key: Eq + Hash + Clone + Unpin,
+        Input: TimeSeriesData<Key> + Unpin,
+        AggInit: Clone + Unpin,
+        AggValue: Unpin,
+        AggregatorImpl: Aggregator<AggInit, Input, AggValue> + Unpin,
+        I: Stream<Item = Input>,
+    > AggregationWindowStreamExt<Key, Input, AggInit, AggValue, AggregatorImpl> for I
 {
 }
 
