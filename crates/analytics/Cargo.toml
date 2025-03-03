@@ -17,7 +17,7 @@ categories = ["algorithms", "data-structures"]
 either = { workspace = true }
 chrono = { workspace = true }
 strum_macros = { workspace = true }
-serde ={ workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 futures-core = { workspace = true }
 pin-project = { workspace = true }
