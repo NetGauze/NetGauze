@@ -28,6 +28,8 @@ strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["full", "tracing"] }
 tokio-util = { workspace = true, features = ["full", "tracing"] }
 tracing = { workspace = true }
+opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
+either = { workspace = true }
 
 [dev-dependencies]
 tracing-subscriber = { workspace = true }
