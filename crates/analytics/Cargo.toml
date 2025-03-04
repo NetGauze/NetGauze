@@ -21,3 +21,6 @@ serde = { workspace = true, features = ["derive"] }
 futures = { workspace = true }
 futures-core = { workspace = true }
 pin-project = { workspace = true }
+
+[dev-dependencies]
+tokio = {workspace = true, features = ["full"]}

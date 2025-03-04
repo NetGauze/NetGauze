@@ -415,6 +415,7 @@ impl<
                     if let Some(agg_value) = this.buffer.pop_front() {
                         return Poll::Ready(Some(either::Left(agg_value)));
                     }
+                    return Poll::Ready(None);
                 }
                 Poll::Pending => return Poll::Pending,
             }
@@ -459,6 +460,7 @@ impl<
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use futures::{stream, StreamExt};
     use std::ops::Add;
 
     // Test item that can be time-windowed
@@ -496,8 +498,9 @@ mod tests {
         }
     }
 
-    fn get_test_input() -> Vec<TestItem> {
-        vec![
+    #[allow(clippy::type_complexity)]
+    fn get_test_input() -> (Vec<TestItem>, Vec<either::Either<(Window, i32), TestItem>>) {
+        let input = vec![
             TestItem {
                 key: "key1".to_string(),
                 ts: Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
@@ -535,70 +538,7 @@ mod tests {
                 ts: Utc.with_ymd_and_hms(2025, 1, 1, 0, 3, 10).unwrap(),
                 value: 5,
             },
-        ]
-    }
-
-    #[test]
-    fn test_window_aggregator() {
-        let mut window_aggregator = WindowAggregator::<String, (), TestAggregator>::new(
-            Duration::from_secs(60),
-            Duration::from_secs(10),
-            (),
-        );
-        let items = get_test_input();
-        // Note this doesn't include the final event since the window doesn't close
-        // without a new event with a timestamp greater than the current time + lateness
-        let expected_results = vec![
-            (
-                (
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 1, 0).unwrap(),
-                ),
-                3, // The sum of values at 2025-01-01:00:00:00 2025-01-01:00:00:55
-            ),
-            (
-                (
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 1, 0).unwrap(),
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 2, 0).unwrap(),
-                ),
-                7, // The sum of values at 2025-01-01:00:01:00 2025-01-01:00:01:30
-            ),
-            (
-                (
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 2, 0).unwrap(),
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 3, 0).unwrap(),
-                ),
-                5, // The sum of values at 2025-01-01:00:02:10
-            ),
         ];
-        let expected_flushed_results = vec![(
-            (
-                Utc.with_ymd_and_hms(2025, 1, 1, 0, 3, 0).unwrap(),
-                Utc.with_ymd_and_hms(2025, 1, 1, 0, 4, 0).unwrap(),
-            ),
-            5, // The sum of values at 2025-01-01:00:03:10
-        )];
-        let expected_late = vec![TestItem {
-            key: "key1".to_string(),
-            ts: Utc.with_ymd_and_hms(2025, 1, 1, 0, 1, 40).unwrap(),
-            value: 5,
-        }];
-        let mut results = vec![];
-        let mut late_values = vec![];
-        for item in items {
-            let (processed, late) = window_aggregator.process_item(item);
-            results.extend(processed);
-            late_values.extend(late);
-        }
-        let flushed: Vec<_> = window_aggregator.flush().collect();
-        assert_eq!(results, expected_results);
-        assert_eq!(flushed, expected_flushed_results);
-        assert_eq!(late_values, expected_late);
-    }
-
-    #[test]
-    fn test_window_aggregator_iterator() {
-        let items = get_test_input();
         let expected_results_with_late = vec![
             either::Left((
                 (
@@ -635,36 +575,56 @@ mod tests {
                 5, // The sum of values at 2025-01-01:00:03:10
             )),
         ];
-        let expected_results_without_late = vec![
-            (
-                (
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap(),
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 1, 0).unwrap(),
-                ),
-                3, // The sum of values at 2025-01-01:00:00:00 2025-01-01:00:00:55
-            ),
-            (
-                (
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 1, 0).unwrap(),
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 2, 0).unwrap(),
-                ),
-                7, // The sum of values at 2025-01-01:00:01:00 2025-01-01:00:01:30
-            ),
-            (
-                (
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 2, 0).unwrap(),
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 3, 0).unwrap(),
-                ),
-                5, // The sum of values at 2025-01-01:00:02:10
-            ),
-            (
-                (
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 3, 0).unwrap(),
-                    Utc.with_ymd_and_hms(2025, 1, 1, 0, 4, 0).unwrap(),
-                ),
-                5, // The sum of values at 2025-01-01:00:03:10
-            ),
-        ];
+        (input, expected_results_with_late)
+    }
+
+    #[test]
+    fn test_window_aggregator() {
+        let mut window_aggregator = WindowAggregator::<String, (), TestAggregator>::new(
+            Duration::from_secs(60),
+            Duration::from_secs(10),
+            (),
+        );
+        let (items, expected_results) = get_test_input();
+        // Note this doesn't include the final event since the window doesn't close
+        // without a new event with a timestamp greater than the current time + lateness
+        let expected_on_time: Vec<_> = expected_results[0..expected_results.len() - 1]
+            .iter()
+            .cloned()
+            .flat_map(|i| i.left())
+            .collect();
+        let expected_flush: Vec<_> = expected_results
+            [expected_results.len() - 1..expected_results.len()]
+            .iter()
+            .cloned()
+            .flat_map(|i| i.left())
+            .collect();
+        let expected_late: Vec<_> = expected_results
+            .iter()
+            .cloned()
+            .flat_map(|i| i.right())
+            .collect();
+        let mut results = vec![];
+        let mut late_values = vec![];
+        for item in items {
+            let (processed, late) = window_aggregator.process_item(item);
+            results.extend(processed);
+            late_values.extend(late);
+        }
+        let flushed: Vec<_> = window_aggregator.flush().collect();
+        assert_eq!(results, expected_on_time);
+        assert_eq!(flushed, expected_flush);
+        assert_eq!(late_values, expected_late);
+    }
+
+    #[test]
+    fn test_window_aggregator_iterator() {
+        let (items, expected_results) = get_test_input();
+        let expected_on_time: Vec<_> = expected_results
+            .iter()
+            .cloned()
+            .flat_map(|i| i.left())
+            .collect();
         let results_with_late: Vec<_> = items
             .clone()
             .into_iter()
@@ -686,8 +646,43 @@ mod tests {
             )
             .filter_map(|x| x.left())
             .collect();
-        assert_eq!(results_with_late, expected_results_with_late);
-        assert_eq!(results_without_late, expected_results_without_late);
+        assert_eq!(results_with_late, expected_results);
+        assert_eq!(results_without_late, expected_on_time);
+    }
+
+    #[tokio::test]
+    async fn test_window_aggregator_stream() {
+        let (items, expected_results) = get_test_input();
+        let expected_on_time: Vec<_> = expected_results
+            .iter()
+            .cloned()
+            .flat_map(|i| i.left())
+            .collect();
+        let results_with_late: Vec<_> = stream::iter(items.clone())
+            .window_aggregate(
+                Duration::from_secs(60),
+                Duration::from_secs(10),
+                (),
+                TestAggregator::init(()),
+            )
+            .collect()
+            .await;
+        // we can also look only at the successful items
+        let results_without_late: Vec<_> = stream::iter(items)
+            .window_aggregate(
+                Duration::from_secs(60),
+                Duration::from_secs(10),
+                (),
+                TestAggregator::init(()),
+            )
+            .flat_map(move |x| match x {
+                either::Left(l) => stream::iter(vec![l]),
+                either::Right(_) => stream::iter(vec![]),
+            })
+            .collect()
+            .await;
+        assert_eq!(results_with_late, expected_results);
+        assert_eq!(results_without_late, expected_on_time);
     }
 
     #[test]
