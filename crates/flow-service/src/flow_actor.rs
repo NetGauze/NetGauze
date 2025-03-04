@@ -270,13 +270,13 @@ impl FlowCollectorActorStats {
         let received = meter
             .u64_counter("netgauze.flow.decoder.received")
             .with_description(
-                "Number successfully received and decoded flow packets from the network",
+                "Number successfully received (before decoding) flow packets from the network",
             )
             .build();
         let decoded = meter
             .u64_counter("netgauze.flow.decoder.decoded")
             .with_description(
-                "Number successfully received (before decoding) flow packets from the network",
+                "Number successfully received and decoded flow packets from the network",
             )
             .build();
         let malformed = meter
