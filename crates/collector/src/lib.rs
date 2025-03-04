@@ -186,7 +186,7 @@ pub async fn init_udp_notif_collection(
 ) -> anyhow::Result<()> {
     let supervisor_config = udp_notif_config.supervisor_config();
     let (supervisor_join_handle, supervisor_handle) =
-        UdpNotifSupervisorHandle::new(supervisor_config).await;
+        UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;
     let mut http_handlers = Vec::new();
     let mut http_join_set = FuturesUnordered::new();
     for (group_name, publisher_config) in udp_notif_config.publishers {
