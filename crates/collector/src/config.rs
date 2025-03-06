@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    flow::{config::FlowOutputConfig, sonata::KafkaConsumerConfig},
+    flow::{aggregation::AggregationConfig, config::FlowOutputConfig, sonata::KafkaConsumerConfig},
     publishers::{http::HttpPublisherEndpoint, kafka_avro::KafkaConfig},
 };
 use netgauze_flow_service::flow_supervisor;
@@ -179,5 +179,5 @@ pub struct PublisherConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublisherEndpoint {
     Http(HttpPublisherEndpoint),
-    FlowKafkaAvro(KafkaConfig<FlowOutputConfig>),
+    FlowKafkaAvro(KafkaConfig<AggregationConfig, FlowOutputConfig>),
 }

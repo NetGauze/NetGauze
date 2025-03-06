@@ -103,7 +103,9 @@ pub async fn init_flow_collection(
                 PublisherEndpoint::FlowKafkaAvro(config) => {
                     let (agg_join, agg_handle) = flow::aggregation::AggregationActorHandle::new(
                         publisher_config.buffer_size,
+                        config.aggregation.clone(),
                         flow_recv.clone(),
+                        either::Left(meter.clone()),
                     );
                     let (enrichment_join, enrichment_handle) = FlowEnrichmentActorHandle::new(
                         config.writer_id.clone(),
