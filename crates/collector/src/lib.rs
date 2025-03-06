@@ -48,8 +48,8 @@ pub async fn init_flow_collection(
     let mut join_set = FuturesUnordered::new();
     for (group_name, publisher_config) in flow_config.publishers {
         info!("Starting publishers group '{group_name}'");
-        let (flow_recv, _) = supervisor_handle
-            .subscribe(publisher_config.buffer_size)
+        let (flow_recvs, _) = supervisor_handle
+            .subscribe_shards(8, publisher_config.buffer_size)
             .await?;
         for (endpoint_name, endpoint) in publisher_config.endpoints {
             info!("Creating publisher '{endpoint_name}'");
@@ -80,58 +80,65 @@ pub async fn init_flow_collection(
                         };
                         vec![ret]
                     };
-                    let (http_join, http_handler) = if flatten {
-                        HttpPublisherActorHandle::new(
-                            endpoint_name.clone(),
-                            config.clone(),
-                            flat_converter,
-                            flow_recv.clone(),
-                            meter.clone(),
-                        )?
-                    } else {
-                        HttpPublisherActorHandle::new(
-                            endpoint_name.clone(),
-                            config.clone(),
-                            converter,
-                            flow_recv.clone(),
-                            meter.clone(),
-                        )?
-                    };
-                    join_set.push(http_join);
-                    http_handles.push(http_handler);
+                    for flow_recv in &flow_recvs {
+                        let (http_join, http_handler) = if flatten {
+                            HttpPublisherActorHandle::new(
+                                endpoint_name.clone(),
+                                config.clone(),
+                                flat_converter,
+                                flow_recv.clone(),
+                                meter.clone(),
+                            )?
+                        } else {
+                            HttpPublisherActorHandle::new(
+                                endpoint_name.clone(),
+                                config.clone(),
+                                converter,
+                                flow_recv.clone(),
+                                meter.clone(),
+                            )?
+                        };
+                        join_set.push(http_join);
+                        http_handles.push(http_handler);
+                    }
                 }
                 PublisherEndpoint::FlowKafkaAvro(config) => {
-                    let (agg_join, agg_handle) = flow::aggregation::AggregationActorHandle::new(
-                        publisher_config.buffer_size,
-                        flow_recv.clone(),
-                    );
-                    let (enrichment_join, enrichment_handle) = FlowEnrichmentActorHandle::new(
-                        config.writer_id.clone(),
-                        publisher_config.buffer_size,
-                        agg_handle.subscribe(),
-                        either::Left(meter.clone()),
-                    );
-                    let enriched_rx = enrichment_handle.subscribe();
-                    let (kafka_join, kafka_handle) = KafkaAvroPublisherActorHandle::from_config(
-                        config.clone(),
-                        enriched_rx,
-                        either::Left(meter.clone()),
-                    )?;
-                    if let Some(kafka_consumer) = publisher_config.sonata_enrichment.as_ref() {
-                        let (sonata_join, sonata_handle) = SonataActorHandle::new(
-                            kafka_consumer.clone(),
-                            enrichment_handle.clone(),
+                    for flow_recv in &flow_recvs {
+                        let (agg_join, agg_handle) = flow::aggregation::AggregationActorHandle::new(
+                            publisher_config.buffer_size,
+                            config.aggregation.clone(),
+                            flow_recv.clone(),
                             either::Left(meter.clone()),
-                        )?;
-                        join_set.push(sonata_join);
-                        sonata_handles.push(sonata_handle);
+                        );
+                        let (enrichment_join, enrichment_handle) = FlowEnrichmentActorHandle::new(
+                            config.writer_id.clone(),
+                            publisher_config.buffer_size,
+                            agg_handle.subscribe(),
+                            either::Left(meter.clone()),
+                        );
+                        let enriched_rx = enrichment_handle.subscribe();
+                        let (kafka_join, kafka_handle) =
+                            KafkaAvroPublisherActorHandle::from_config(
+                                config.clone(),
+                                enriched_rx,
+                                either::Left(meter.clone()),
+                            )?;
+                        if let Some(kafka_consumer) = publisher_config.sonata_enrichment.as_ref() {
+                            let (sonata_join, sonata_handle) = SonataActorHandle::new(
+                                kafka_consumer.clone(),
+                                enrichment_handle.clone(),
+                                either::Left(meter.clone()),
+                            )?;
+                            join_set.push(sonata_join);
+                            sonata_handles.push(sonata_handle);
+                        }
+                        join_set.push(agg_join);
+                        join_set.push(enrichment_join);
+                        join_set.push(kafka_join);
+                        agg_handles.push(agg_handle);
+                        enrichment_handles.push(enrichment_handle);
+                        kafka_handles.push(kafka_handle);
                     }
-                    join_set.push(agg_join);
-                    join_set.push(enrichment_join);
-                    join_set.push(kafka_join);
-                    agg_handles.push(agg_handle);
-                    enrichment_handles.push(enrichment_handle);
-                    kafka_handles.push(kafka_handle);
                 }
             }
         }
