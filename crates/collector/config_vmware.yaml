@@ -1,0 +1,288 @@
+runtime:
+  # Total number of OS threads used allocated for NetGauze.
+  # If not specified, the number of threads will equal the number of CPU cores.
+  threads: 24
+
+logging:
+  level: info
+
+telemetry:
+  url: http://localhost:4317/v1/metrics
+
+flow:
+  subscriber_timeout: 100
+  template_cache_purge_timeout: 360
+  listeners:
+    # NetGauze can listen to multiple addresses/interfaces at the same time
+    - address: 0.0.0.0:9991
+      # Optionally Bind to an interface/VRF
+      interface: trex1
+      # Optionally, number of I/O tasks per address/interface, default is 1
+      workers: 8
+
+  # Multiple publishers can be defined.
+  # A packet is copied for each publisher group, and load-balancing is defined between endpoints in the same group.
+  publishers:
+    group1:
+      buffer_size: 50000
+      sonata_enrichment:
+        topic: sonata
+        consumer_config:
+          bootstrap.servers: localhost:49092
+          group.id: test
+          enable.auto.commit: "false"
+          auto.offset.reset: earliest
+      endpoints:
+        full: !FlowKafkaAvro
+          topic: flow-avro-raw
+          schema_registry_url: http://localhost:48081
+          producer_config:
+            # librdkafka configuration
+            bootstrap.servers: localhost:49092
+            compression.type: snappy
+            batch.size: "50000"
+            batch.num.messages: "1000000"
+            message.max.bytes: "5242880"
+            message.timeout.ms: "60000"
+            queue.buffering.max.messages: "800000"
+            linger.ms: "50"
+          writer_id: writer1
+          aggregation:
+            window_duration:
+              secs: 60
+              nanos: 0
+            lateness:
+              secs: 10
+              nanos: 0
+            transform:
+              # Key Fields
+              sourceIPv4Address: !Key
+              destinationIPv4Address: !Key
+              sourceIPv6Address: !Key
+              destinationIPv6Address: !Key
+              protocolIdentifier: !Key
+              sourceTransportPort: !Key
+              destinationTransportPort: !Key
+              ingressInterface: !Key
+              egressInterface: !Key
+              forwardingStatus: !Key
+              flowDirection: !Key
+              ipClassOfService: !Key
+              flowEndReason: !Key
+              sourceMacAddress: !Key
+              destinationMacAddress: !Key
+              ethernetType: !Key
+              layer2SegmentId: !Key
+              icmpTypeIPv4: !Key
+              icmpTypeIPv6: !Key
+              !VMWare tenantSourceIPv4: !Key
+              !VMWare tenantDestIPv4: !Key
+              !VMWare tenantSourcePort: !Key
+              !VMWare tenantDestPort: !Key
+              !VMWare tenantProtocol: !Key
+              !VMWare flowDirection: !Key
+              !VMWare ingressInterfaceAttr: !Key
+              !VMWare egressInterfaceAttr: !Key
+              !VMWare vxlanExportRole: !Key
+              !VMWare virtualObsID: !Key
+              !VMWare vmUuid: !Key
+              # Group-by Fields
+              octetDeltaCount: !Add
+              packetDeltaCount: !Add
+              deltaFlowCount: !Add
+              tcpControlBits: !BoolMapOr
+              minimumTTL: !Min
+              maximumTTL: !Max
+          avro_converter:
+            fields:
+              # Key Fields
+              ip_src:
+                select: !Coalesce
+                  ies:
+                    - ie: sourceIPv4Address
+                      index: 0
+                    - ie: sourceIPv6Address
+                      index: 0
+                transform: String
+              ip_dst:
+                select: !Coalesce
+                  ies:
+                    - ie: destinationIPv4Address
+                      index: 0
+                    - ie: destinationIPv6Address
+                      index: 0
+                transform: String
+              ip_proto:
+                select: !Single
+                  ie: protocolIdentifier
+                  index: 0
+                transform: String
+              src_port:
+                select: !Single
+                  ie: sourceTransportPort
+                  index: 0
+              dst_port:
+                select: !Single
+                  ie: destinationTransportPort
+                  index: 0
+              in_iface:
+                select: !Single
+                  ie: ingressInterface
+                  index: 0
+              out_iface:
+                select: !Single
+                  ie: egressInterface
+                  index: 0
+              forwarding_status:
+                select: !Single
+                  ie: forwardingStatus
+                  index: 0
+                transform: String
+              sampling_direction:
+                select: !Single
+                  ie: flowDirection
+                  index: 0
+                transform: !Rename
+                  ingress: i
+                  egress: e
+              tos:
+                select: !Single
+                  ie: ipClassOfService
+                  index: 0
+                default: !U8 0
+              flowEndReason:
+                select: !Single
+                  ie: flowEndReason
+                  index: 0
+                transform: String
+              mac_src:
+                select: !Single
+                  ie: sourceMacAddress
+                  index: 0
+                transform: String
+                default: !String "00:00:00:00:00:00"
+              mac_dst:
+                select: !Single
+                  ie: destinationMacAddress
+                  index: 0
+                transform: String
+                default: !String "00:00:00:00:00:00"
+              etype:
+                select: !Single
+                  ie: ethernetType
+                  index: 0
+                default: !U16 0
+              vxlan:
+                select: !Single
+                  ie: layer2SegmentId
+                  index: 0
+                default: !U64 0
+              custom_primitives.ipttlmin:
+                select: !Single
+                  ie: minimumTTL
+                  index: 0
+                transform: String
+                default: !String ''
+              custom_primitives.ipttlmax:
+                select: !Single
+                  ie: maximumTTL
+                  index: 0
+                transform: String
+                default: !String ''
+              custom_primitives.icmptypeipv4:
+                select: !Single
+                  ie: icmpTypeIPv4
+                  index: 0
+                transform: String
+                default: !String '0'
+              custom_primitives.icmptypeipv6:
+                select: !Single
+                  ie: icmpTypeIPv6
+                  index: 0
+                transform: String
+                default: !String '0'
+              custom_primitives.tenantsourceipv4:
+                select: !Single
+                  ie: !VMWare tenantSourceIPv4
+                  index: 0
+                transform: String
+                default: !String '0.0.0.0'
+              custom_primitives.tenantdestipv4:
+                select: !Single
+                  ie: !VMWare tenantDestIPv4
+                  index: 0
+                transform: String
+                default: !String '0.0.0.0'
+              custom_primitives.tenantsourceport:
+                select: !Single
+                  ie: !VMWare tenantSourcePort
+                  index: 0
+                transform: String
+                default: !String '0'
+              custom_primitives.tenantdestport:
+                select: !Single
+                  ie: !VMWare tenantDestPort
+                  index: 0
+                transform: String
+                default: !String '0'
+              custom_primitives.tenantprotocol:
+                select: !Single
+                  ie: !VMWare tenantProtocol
+                  index: 0
+                transform: String
+                default: !String ''
+              custom_primitives.sampling_direction:
+                select: !Single
+                  ie: !VMWare flowDirection
+                  index: 0
+                transform: !Rename
+                  ingress: i
+                  egress: e
+              custom_primitives.ingressinterfaceattr:
+                select: !Single
+                  ie: !VMWare ingressInterfaceAttr
+                  index: 0
+                transform: String
+                default: !String '0'
+              custom_primitives.egressinterfaceattr:
+                select: !Single
+                  ie: !VMWare egressInterfaceAttr
+                  index: 0
+                transform: String
+                default: !String '0'
+              custom_primitives.vxlanexportrole:
+                select: !Single
+                  ie: !VMWare vxlanExportRole
+                  index: 0
+                transform: String
+                default: !String ''
+              custom_primitives.virtualobsid:
+                select: !Single
+                  ie: !VMWare virtualObsID
+                  index: 0
+                transform: String
+                default: !String ''
+              custom_primitives.vmuuid:
+                select: !Single
+                  ie: !VMWare vmUuid
+                  index: 0
+                transform: String
+                default: !String ''
+              # Group-by Fields
+              bytes:
+                select: !Single
+                  ie: octetDeltaCount
+                  index: 0
+              packets:
+                select: !Single
+                  ie: packetDeltaCount
+                  index: 0
+              flows:
+                select: !Single
+                  ie: deltaFlowCount
+                  index: 0
+              tcp_flags:
+                select: !Single
+                  ie: tcpControlBits
+                  index: 0
+                transform: String

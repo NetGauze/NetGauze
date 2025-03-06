@@ -13,17 +13,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use figment::{
-    providers::{Env, Format, Yaml},
-    Figment,
-};
+// use figment::{
+//     providers::{Env, Format, Yaml},
+//     Figment,
+// };
 use futures::Future;
 use netgauze_collector::{
     config::{CollectorConfig, TelemetryConfig},
     init_flow_collection, init_udp_notif_collection,
 };
 use opentelemetry::global;
-use std::{env, path::PathBuf, pin::Pin, str::FromStr};
+use serde_yaml::from_reader;
+use std::{env, fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr};
 use tracing::{info, Level};
 
 fn init_open_telemetry(
@@ -77,11 +78,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
         return Err(format!("Usage: {} <config-file>", args[0]).into());
     }
     let config_file = PathBuf::from(&args[1]);
-    let config: CollectorConfig = match Figment::new()
-        .merge(Yaml::file(config_file))
-        .merge(Env::prefixed("NG_"))
-        .extract()
-    {
+    let file = File::open(&config_file)?;
+    let reader = BufReader::new(file);
+    let config: CollectorConfig = match from_reader(reader) {
         Ok(config) => config,
         Err(err) => {
             return Err(format!("Parsing config file failed: {err}").into());

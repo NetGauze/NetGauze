@@ -49,8 +49,10 @@ apache-avro = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
 serde_json = { workspace = true }
 schema_registry_converter = { workspace = true, features = ["avro"] }
-rdkafka = { workspace = true, features = ["tokio", "cmake-build"] }
-either = {workspace = true }
+rdkafka = { workspace = true, features = ["tokio", "cmake-build", "ssl"] }
+either = { workspace = true }
+pin-utils = { workspace = true }
+serde_yaml = { workspace = true }
 
 [dev-dependencies]
 chrono = { workspace = true, default-features = false, features = [
