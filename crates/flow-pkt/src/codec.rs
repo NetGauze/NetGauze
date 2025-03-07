@@ -81,7 +81,7 @@ impl std::fmt::Display for FlowInfoCodecDecoderError {
 /// [`FlowInfo`] is either IPFIX or Netflow V9 packet.
 /// This struct keep track of the decode process, and keep a cache of the
 /// templates sent by client.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FlowInfoCodec {
     /// Helper to track in the decoder if we are inside a message or not
     netflow_v9_templates_map: netflow::TemplatesMap,
