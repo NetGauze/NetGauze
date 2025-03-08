@@ -14,10 +14,11 @@
 // limitations under the License.
 
 use rdkafka::{
-    config::ClientConfig,
-    error::KafkaError,
-    producer::{FutureProducer, FutureRecord, Producer},
-    util::Timeout,
+    config::{ClientConfig, FromClientConfigAndContext},
+    error::{KafkaError, RDKafkaErrorCode},
+    message::DeliveryResult,
+    producer::{BaseRecord, NoCustomPartitioner, Producer, ProducerContext, ThreadedProducer},
+    ClientContext,
 };
 use schema_registry_converter::{
     async_impl::{avro::AvroEncoder, schema_registry::SrSettings},
@@ -27,7 +28,9 @@ use schema_registry_converter::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, marker::PhantomData, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
+
+const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 
 pub trait AvroConverter<T, E: std::error::Error> {
     fn get_avro_schema(&self) -> String;
@@ -90,6 +93,7 @@ impl From<SRCError> for KafkaAvroPublisherActorError {
 pub struct KafkaAvroPublisherStats {
     received: opentelemetry::metrics::Counter<u64>,
     sent: opentelemetry::metrics::Counter<u64>,
+    send_retries: opentelemetry::metrics::Counter<u64>,
     error_avro_convert: opentelemetry::metrics::Counter<u64>,
     error_avro_encode: opentelemetry::metrics::Counter<u64>,
     error_send: opentelemetry::metrics::Counter<u64>,
@@ -104,6 +108,10 @@ impl KafkaAvroPublisherStats {
         let sent = meter
             .u64_counter("netgauze.collector.kafka.avro.sent")
             .with_description("Number of messages successfully sent to Kafka")
+            .build();
+        let send_retries = meter
+            .u64_counter("netgauze.collector.kafka.avro.send.retries")
+            .with_description("Number of send retries to Kafka due to full queue in librdkafka")
             .build();
         let error_avro_convert = meter
             .u64_counter("netgauze.collector.kafka.avro.error_avro_convert")
@@ -121,9 +129,30 @@ impl KafkaAvroPublisherStats {
         Self {
             received,
             sent,
+            send_retries,
             error_avro_convert,
             error_avro_encode,
             error_send,
+        }
+    }
+}
+
+/// Producer context with tracing logs enabled
+#[derive(Clone)]
+pub struct LoggingProducerContext;
+
+impl ClientContext for LoggingProducerContext {}
+impl ProducerContext<NoCustomPartitioner> for LoggingProducerContext {
+    type DeliveryOpaque = ();
+
+    fn delivery(&self, delivery_result: &DeliveryResult<'_>, _: Self::DeliveryOpaque) {
+        match delivery_result {
+            Ok(_) => {
+                debug!("Message delivered successfully to kafka");
+            }
+            Err((err, _)) => {
+                warn!("Failed to deliver message to kafka: {err}");
+            }
         }
     }
 }
@@ -138,7 +167,7 @@ pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, C: AvroConverter
     supplied_schema: SuppliedSchema,
 
     //// librdkafka producer
-    producer: FutureProducer,
+    producer: ThreadedProducer<LoggingProducerContext>,
 
     /// Encoding to avro
     avro_encoder: AvroEncoder<'a>,
@@ -167,13 +196,17 @@ where
         for (k, v) in &config.producer_config {
             producer_config.set(k.as_str(), v.as_str());
         }
-        let producer: FutureProducer = match producer_config.create() {
-            Ok(p) => p,
-            Err(err) => {
-                error!("Failed to create Kafka producer: {err}");
-                return Err(err)?;
-            }
-        };
+        let producer: ThreadedProducer<LoggingProducerContext> =
+            match ThreadedProducer::from_config_and_context(
+                &producer_config,
+                LoggingProducerContext,
+            ) {
+                Ok(p) => p,
+                Err(err) => {
+                    error!("Failed to create Kafka producer: {err}");
+                    return Err(err)?;
+                }
+            };
         let sr_settings = SrSettings::new(config.schema_registry_url.clone());
         let avro_encoder = AvroEncoder::new(sr_settings.clone());
         let schema_str = config.avro_converter.get_avro_schema();
@@ -249,32 +282,50 @@ where
             }
         };
 
-        let fr: FutureRecord<'_, Vec<u8>, Vec<u8>> = FutureRecord {
-            topic: self.config.topic.as_str(),
-            partition: None,
-            payload: Some(&encoded),
-            key: None,
-            timestamp: None,
-            headers: None,
-        };
-        if let Err((err, _)) = self
-            .producer
-            .send(fr, Timeout::After(Duration::from_secs(1)))
-            .await
-        {
-            error!("Error sending avro value: {err}");
-            self.stats.error_send.add(
-                1,
-                &[opentelemetry::KeyValue::new(
-                    "netgauze.kafka.sent.error.msg",
-                    err.to_string(),
-                )],
-            );
-            return Err(KafkaAvroPublisherActorError::KafkaError(err));
-        } else {
-            self.stats.sent.add(1, &[]);
-        };
-        Ok(())
+        let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> =
+            BaseRecord::to(self.config.topic.as_str()).payload(&encoded);
+        let mut polling_interval = Duration::from_micros(10);
+        loop {
+            match self.producer.send(record) {
+                Ok(_) => {
+                    self.stats.sent.add(1, &[]);
+                    return Ok(());
+                }
+                Err((err, rec)) => match err {
+                    KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
+                        // Exponential backoff when the librdkafka is full
+                        if polling_interval > MAX_POLLING_INTERVAL {
+                            error!("Kafka polling interval exceeded, dropping record");
+                            self.stats.error_send.add(
+                                1,
+                                &[opentelemetry::KeyValue::new(
+                                    "netgauze.kafka.sent.error.msg",
+                                    err.to_string(),
+                                )],
+                            );
+                            return Err(KafkaAvroPublisherActorError::KafkaError(err));
+                        }
+                        debug!("Kafka message queue is full, sleeping for {polling_interval:?}");
+                        self.stats.send_retries.add(1, &[]);
+                        tokio::time::sleep(polling_interval).await;
+                        polling_interval *= 2;
+                        record = rec;
+                        continue;
+                    }
+                    err => {
+                        error!("Error sending message: {err}");
+                        self.stats.error_send.add(
+                            1,
+                            &[opentelemetry::KeyValue::new(
+                                "netgauze.kafka.sent.error.msg",
+                                err.to_string(),
+                            )],
+                        );
+                        return Err(KafkaAvroPublisherActorError::KafkaError(err));
+                    }
+                },
+            }
+        }
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
