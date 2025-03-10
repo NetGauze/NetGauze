@@ -121,6 +121,7 @@ use futures_util::{stream::SplitSink, StreamExt};
 use netgauze_flow_pkt::{codec::FlowInfoCodec, ipfix, netflow};
 use std::{
     collections::HashMap,
+    hash::{Hash, Hasher},
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
@@ -149,7 +150,8 @@ pub(crate) enum FlowCollectorActorCommand {
     /// Command to shut down the actor.
     Shutdown(mpsc::Sender<ActorId>),
     /// Command to subscribe to flow packets.
-    Subscribe(mpsc::Sender<Subscription>, FlowSender),
+    /// Use multiple-senders for sharding by source IP address
+    Subscribe(mpsc::Sender<Subscription>, Vec<FlowSender>),
     Unsubscribe(SubscriberId, mpsc::Sender<Option<Subscription>>),
     PurgeUnusedPeers(Duration, mpsc::Sender<Vec<SocketAddr>>),
     PurgePeer(SocketAddr, mpsc::Sender<Option<ActorId>>),
@@ -247,7 +249,7 @@ struct FlowCollectorActor {
     next_subscriber_id: SubscriberId,
     // TODO: in future allow subscribers to subscribe to a subset of events (i.e., specific peers
     //       or specific record types)
-    subscribers: HashMap<SubscriberId, FlowSender>,
+    subscribers: HashMap<SubscriberId, Vec<FlowSender>>,
     /// Timeout for sending a [FlowInfo] pkt to a subscriber before dropping it.
     subscriber_timeout: Duration,
     peers_usage: HashMap<SocketAddr, PeerUsage>,
@@ -488,7 +490,7 @@ impl FlowCollectorActor {
             usage.current_count += 1;
             // Clean closed subscribers
             self.subscribers.retain(|id, tx| {
-                if tx.is_closed() {
+                if tx.iter().all(|x| x.is_closed()) {
                     info!("[Actor {actor_id}-{socket_addr}] Subscriber {id} is closed, removing it from the list");
                     false
                 } else {
@@ -505,7 +507,15 @@ impl FlowCollectorActor {
             debug!("[Actor {actor_id}-{socket_addr}] Sending flow packet received from {peer} to a total of {} subscribers", self.subscribers.len());
             let mut send_handlers = vec![];
             let flow_request = Arc::new((peer, pkt));
-            for (id, tx) in &self.subscribers {
+            for (id, senders) in &self.subscribers {
+                let tx = if senders.len() == 1 {
+                    senders[0].clone()
+                } else {
+                    let mut hasher = std::hash::DefaultHasher::default();
+                    peer.ip().hash(&mut hasher);
+                    let key = hasher.finish() as usize;
+                    senders[key % senders.len()].clone()
+                };
                 // We fire and all the send operations to the subscribers
                 // in parallel
                 // TODO: if there's only one subscriber avoid clone
@@ -514,7 +524,7 @@ impl FlowCollectorActor {
                     socket_addr,
                     flow_request.clone(),
                     *id,
-                    tx.clone(),
+                    tx,
                     self.subscriber_timeout,
                     self.stats.subscriber_sent.clone(),
                     self.stats.subscriber_dropped.clone(),
@@ -538,7 +548,7 @@ impl FlowCollectorActor {
     async fn handle_subscribe(
         &mut self,
         tx: mpsc::Sender<Subscription>,
-        pkt_tx: FlowSender,
+        pkt_tx: Vec<FlowSender>,
     ) -> bool {
         let id = self.next_subscriber_id;
         self.next_subscriber_id += 1;
@@ -972,9 +982,41 @@ impl FlowCollectorActorHandle {
         Ok((pkt_rx, subscriptions))
     }
 
+    pub async fn subscribe_shards(
+        &self,
+        num_workers: usize,
+        buffer_size: usize,
+    ) -> Result<(Vec<FlowReceiver>, Vec<Subscription>), FlowCollectorActorHandleError> {
+        let mut pkt_tx = Vec::with_capacity(num_workers);
+        let mut pkt_rx = Vec::with_capacity(num_workers);
+        for _ in 0..num_workers {
+            let (tx, rx) = create_flow_channel(buffer_size);
+            pkt_tx.push(tx);
+            pkt_rx.push(rx);
+        }
+        let subscriptions = self.subscribe_shards_tx(pkt_tx).await?;
+        Ok((pkt_rx, subscriptions))
+    }
+
     pub async fn subscribe_tx(
         &self,
         pkt_tx: FlowSender,
+    ) -> Result<Vec<Subscription>, FlowCollectorActorHandleError> {
+        let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
+        self.cmd_tx
+            .send(FlowCollectorActorCommand::Subscribe(tx, vec![pkt_tx]))
+            .await
+            .map_err(|_| FlowCollectorActorHandleError::SendError)?;
+        let mut subscriptions = vec![];
+        while let Some(subscription) = rx.recv().await {
+            subscriptions.push(subscription);
+        }
+        Ok(subscriptions)
+    }
+
+    pub async fn subscribe_shards_tx(
+        &self,
+        pkt_tx: Vec<FlowSender>,
     ) -> Result<Vec<Subscription>, FlowCollectorActorHandleError> {
         let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
         self.cmd_tx
@@ -1195,6 +1237,22 @@ mod tests {
 
         // Subscribe
         let (_pkt_rx, subscriptions) = handle.subscribe(10).await.unwrap();
+        assert_eq!(subscriptions.len(), 1);
+
+        // Unsubscribe
+        let subscription_id = subscriptions[0].id;
+        let unsubscribed = handle.unsubscribe(subscription_id).await.unwrap();
+        assert_eq!(unsubscribed.len(), 1);
+        assert_eq!(unsubscribed[0].id, subscription_id);
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_subscribe_shards_unsubscribe() {
+        let (_, handle, _join_handle) = setup_actor().await;
+
+        // Subscribe
+        let (_pkt_rx, subscriptions) = handle.subscribe_shards(2, 10).await.unwrap();
         assert_eq!(subscriptions.len(), 1);
 
         // Unsubscribe
