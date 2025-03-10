@@ -362,9 +362,50 @@ impl FlowCollectorsSupervisorActorHandle {
         Ok((pkt_rx, subscriptions))
     }
 
+    pub async fn subscribe_shards(
+        &self,
+        num_workers: usize,
+        buffer_size: usize,
+    ) -> Result<(Vec<FlowReceiver>, Vec<Subscription>), FlowCollectorsSupervisorActorHandleError>
+    {
+        trace!("[SupervisorHandle] Sending new subscription request to supervisor");
+        let mut pkt_tx = Vec::with_capacity(num_workers);
+        let mut pkt_rx = Vec::with_capacity(num_workers);
+        for _ in 0..num_workers {
+            let (tx, rx) = create_flow_channel(buffer_size);
+            pkt_tx.push(tx);
+            pkt_rx.push(rx);
+        }
+        let subscriptions = self.subscribe_shards_tx(pkt_tx).await?;
+        Ok((pkt_rx, subscriptions))
+    }
+
     pub async fn subscribe_tx(
         &self,
         pkt_tx: FlowSender,
+    ) -> Result<Vec<Subscription>, FlowCollectorsSupervisorActorHandleError> {
+        trace!("[SupervisorHandle] Sending new subscription with pre-created channel request to supervisor");
+        let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
+        if let Err(err) = self
+            .cmd_tx
+            .send(FlowCollectorsSupervisorActorCommand::FlowActorCommand(
+                FlowCollectorActorCommand::Subscribe(tx, vec![pkt_tx]),
+            ))
+            .await
+        {
+            error!("[SupervisorHandle] Error sending subscription request: {err:?}");
+            return Err(FlowCollectorsSupervisorActorHandleError::SendError);
+        }
+        let mut subscriptions = vec![];
+        while let Some(subscription) = rx.recv().await {
+            subscriptions.push(subscription);
+        }
+        Ok(subscriptions)
+    }
+
+    pub async fn subscribe_shards_tx(
+        &self,
+        pkt_tx: Vec<FlowSender>,
     ) -> Result<Vec<Subscription>, FlowCollectorsSupervisorActorHandleError> {
         trace!("[SupervisorHandle] Sending new subscription with pre-created channel request to supervisor");
         let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
