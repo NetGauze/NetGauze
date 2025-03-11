@@ -171,14 +171,16 @@ pub struct PublisherConfig {
     pub buffer_size: usize,
 
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub aggregation: Option<AggregationConfig>,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub sonata_enrichment: Option<KafkaConsumerConfig>,
 
     pub endpoints: HashMap<String, PublisherEndpoint>,
-    // TODO: move aggregation configuration at this level
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublisherEndpoint {
     Http(HttpPublisherEndpoint),
-    FlowKafkaAvro(KafkaConfig<AggregationConfig, FlowOutputConfig>),
+    FlowKafkaAvro(KafkaConfig<FlowOutputConfig>),
 }

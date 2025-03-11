@@ -30,11 +30,7 @@ use either::Either;
 use futures::stream::{self, StreamExt};
 use indexmap::IndexMap;
 use netgauze_analytics::{aggregation::*, flow::*};
-use netgauze_flow_pkt::{
-    ie::{self, *},
-    ipfix::FlatSet,
-    FlatFlowInfo,
-};
+use netgauze_flow_pkt::{ie, ipfix::FlatSet, FlatFlowInfo};
 use netgauze_flow_service::FlowRequest;
 use opentelemetry::metrics::{Counter, Meter};
 use pin_utils::pin_mut;
@@ -46,7 +42,7 @@ use std::{
     time::Duration,
 };
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 #[derive(Debug, Clone)]
 pub struct AggregationStats {
@@ -54,6 +50,7 @@ pub struct AggregationStats {
     pub aggregated_messages: Counter<u64>,
     pub late_messages: Counter<u64>,
     pub sent_messages: Counter<u64>,
+    pub send_timeout: Counter<u64>,
     pub send_error: Counter<u64>,
 }
 
@@ -75,6 +72,12 @@ impl AggregationStats {
             .u64_counter("netgauze.collector.flows.aggregation.sent.messages")
             .with_description("Number of aggregated messages successfully sent upstream")
             .build();
+        let send_timeout = meter
+            .u64_counter("netgauze.collector.flows.aggregation.send.timeout")
+            .with_description(
+                "Number aggregated messages timed out and dropped while sending to upstream",
+            )
+            .build();
         let send_error = meter
             .u64_counter("netgauze.collector.flows.aggregation.send.error")
             .with_description("Number aggregated messages sent upstream error")
@@ -84,6 +87,7 @@ impl AggregationStats {
             aggregated_messages,
             late_messages,
             sent_messages,
+            send_timeout,
             send_error,
         }
     }
@@ -91,6 +95,7 @@ impl AggregationStats {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AggregationConfig {
+    pub workers: usize,
     pub window_duration: Duration,
     pub lateness: Duration,
     pub transform: IndexMap<ie::IE, AggrOp>,
@@ -99,6 +104,7 @@ pub struct AggregationConfig {
 impl Default for AggregationConfig {
     fn default() -> Self {
         AggregationConfig {
+            workers: 1,
             window_duration: Duration::from_secs(60),
             lateness: Duration::from_secs(10),
             transform: IndexMap::new(),
@@ -130,7 +136,7 @@ impl From<(SocketAddr, FlatFlowInfo)> for InputMessage {
 impl InputMessage {
     fn extract_as_key_str(
         &self,
-        ie: &IE,
+        ie: &ie::IE,
         indices: &Option<Vec<usize>>,
     ) -> Result<String, AggregationError> {
         self.flow.extract_as_key_str(ie, indices)
@@ -138,7 +144,7 @@ impl InputMessage {
     fn reduce(
         &mut self,
         incoming: &InputMessage,
-        transform: &IndexMap<IE, AggrOp>,
+        transform: &IndexMap<ie::IE, AggrOp>,
     ) -> Result<(), AggregationError> {
         self.flow.reduce(&incoming.flow, transform)
     }
@@ -224,6 +230,7 @@ struct AggregationActor {
     tx: async_channel::Sender<(Window, (SocketAddr, FlatFlowInfo))>,
     config: AggregationConfig,
     stats: AggregationStats,
+    shard_id: usize,
 }
 
 impl AggregationActor {
@@ -233,6 +240,7 @@ impl AggregationActor {
         tx: async_channel::Sender<(Window, (SocketAddr, FlatFlowInfo))>,
         config: AggregationConfig,
         stats: AggregationStats,
+        shard_id: usize,
     ) -> Self {
         Self {
             cmd_recv,
@@ -240,16 +248,22 @@ impl AggregationActor {
             tx,
             config,
             stats,
+            shard_id,
         }
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
+        let stats = self.stats.clone();
         let agg = self
             .rx
             .flat_map(move |req| {
                 let (peer, flow) = req.as_ref().clone();
 
-                let peer_tags = [
+                let tags = [
+                    opentelemetry::KeyValue::new(
+                        "shard_id",
+                        opentelemetry::Value::I64(self.shard_id as i64),
+                    ),
                     opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
                     opentelemetry::KeyValue::new(
                         "network.peer.port",
@@ -257,7 +271,7 @@ impl AggregationActor {
                     ),
                 ];
 
-                self.stats.received_messages.add(1, &peer_tags);
+                stats.received_messages.add(1, &tags);
 
                 stream::iter(
                     flow.flatten()
@@ -300,31 +314,53 @@ impl AggregationActor {
                 result = agg.next() => {
                     match result {
                         Some(Either::Left(((window_start, window_end), cache))) => {
-                            for (_key, message) in cache {
-
-                                let peer_tags = [
-                                    opentelemetry::KeyValue::new(
-                                        "network.peer.address",
-                                        format!("{}", message.peer.ip()),
-                                    ),
-                                    opentelemetry::KeyValue::new(
-                                        "network.peer.port",
-                                        opentelemetry::Value::I64(message.peer.port().into()),
-                                    ),
-                                ];
-                                self.stats.aggregated_messages.add(1, &peer_tags);
-
-                                if let Err(err) = self.tx.send(((window_start, window_end), (message.peer, message.flow))).await {
-                                    error!("Flow Aggregation send error: {err}");
-                                    self.stats.send_error.add(1, &peer_tags);
-                                } else {
-                                    self.stats.sent_messages.add(1, &peer_tags);
+                            let stats = self.stats.clone();
+                            let tx = self.tx.clone();
+                            tokio::spawn(async move {
+                                for (_key, message) in cache {
+                                    let tags = [
+                                        opentelemetry::KeyValue::new("shard_id", opentelemetry::Value::I64(self.shard_id as i64)),
+                                        opentelemetry::KeyValue::new(
+                                            "network.peer.address",
+                                            format!("{}", message.peer.ip()),
+                                        ),
+                                        opentelemetry::KeyValue::new(
+                                            "network.peer.port",
+                                            opentelemetry::Value::I64(message.peer.port().into()),
+                                        ),
+                                    ];
+                                    stats.aggregated_messages.add(1, &tags);
+                                    let send_closure = tx.send(((window_start, window_end), (message.peer, message.flow)));
+                                    match tokio::time::timeout(Duration::from_secs(1), send_closure).await {
+                                        Ok(Ok(_)) => stats.sent_messages.add(1, &tags),
+                                        Ok(Err(err)) => {
+                                            error!("AggregationActor send error: {err}");
+                                            stats.send_error.add(1, &tags);
+                                        }
+                                        Err(_) => {
+                                            debug!("AggregationActor send timeout");
+                                            stats.send_timeout.add(1, &tags)
+                                        }
+                                    }
                                 }
-                            }
+                            });
                         }
-                        Some(Either::Right(_)) => {
-                            self.stats.late_messages.add(1, &[]);
-                            debug!("Late messages: discarding");
+
+                        Some(Either::Right(message)) => {
+                            let tags = [
+                                opentelemetry::KeyValue::new("shard_id", opentelemetry::Value::I64(self.shard_id as i64)),
+                                opentelemetry::KeyValue::new(
+                                    "network.peer.address",
+                                    format!("{}", message.peer.ip()),
+                                ),
+                                opentelemetry::KeyValue::new(
+                                    "network.peer.port",
+                                    opentelemetry::Value::I64(message.peer.port().into()),
+                                ),
+                            ];
+
+                            self.stats.late_messages.add(1, &tags);
+                            trace!("Late messages: discarding");
                         }
                         None => {
                             info!("Aggregation channel closed, shutting down AggregationActor");
@@ -352,15 +388,16 @@ impl AggregationActorHandle {
         buffer_size: usize,
         config: AggregationConfig,
         flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
-        stats: either::Either<opentelemetry::metrics::Meter, AggregationStats>,
+        stats: Either<opentelemetry::metrics::Meter, AggregationStats>,
+        shard_id: usize,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
         let (tx, rx) = async_channel::bounded(buffer_size);
         let stats = match stats {
-            either::Either::Left(meter) => AggregationStats::new(meter),
-            either::Either::Right(stats) => stats,
+            Either::Left(meter) => AggregationStats::new(meter),
+            Either::Right(stats) => stats,
         };
-        let actor = AggregationActor::new(cmd_recv, flow_rx, tx, config, stats);
+        let actor = AggregationActor::new(cmd_recv, flow_rx, tx, config, stats, shard_id);
         let join_handle = tokio::spawn(actor.run());
         let handle = Self { cmd_send, rx };
         (join_handle, handle)

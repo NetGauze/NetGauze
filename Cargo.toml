@@ -90,6 +90,6 @@ syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = { version = "1.0" }
 trybuild = { version = "1.0" }
 regex = { version = "1.10" }
-pdu = {version = "1.4"}
-pin-utils = {version = "0.1"}
+pdu = { version = "1.4" }
+pin-utils = { version = "0.1" }
 serde_yaml = { version = "0.9" }

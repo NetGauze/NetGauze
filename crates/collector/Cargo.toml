@@ -26,7 +26,6 @@ futures-util = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 async-channel = { workspace = true }
-figment = { workspace = true, features = ["toml", "yaml", "env"] }
 serde_with = { workspace = true, features = ["default"] }
 reqwest = { workspace = true, features = ["http2", "json", "stream"] }
 chrono = { workspace = true, default-features = true }
@@ -49,10 +48,16 @@ apache-avro = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
 serde_json = { workspace = true }
 schema_registry_converter = { workspace = true, features = ["avro"] }
-rdkafka = { workspace = true, features = ["tokio", "cmake-build", "ssl"] }
 either = { workspace = true }
 pin-utils = { workspace = true }
 serde_yaml = { workspace = true }
+
+[target.'cfg(target_env = "msvc")'.dependencies]
+rdkafka = { workspace = true, features = ["tokio", "cmake-build"] }
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = { version = "0.6", features = ["unprefixed_malloc_on_supported_platforms"] }
+rdkafka = { workspace = true, features = ["tokio", "cmake-build", "ssl"] }
 
 [dev-dependencies]
 chrono = { workspace = true, default-features = false, features = [
@@ -60,3 +65,7 @@ chrono = { workspace = true, default-features = false, features = [
     "clock",
 ] }
 tracing-subscriber = { workspace = true }
+
+[profile.release]
+codegen-units = 1
+lto = false

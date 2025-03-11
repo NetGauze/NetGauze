@@ -38,14 +38,13 @@ pub trait AvroConverter<T, E: std::error::Error> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KafkaConfig<A, C> {
+pub struct KafkaConfig<C> {
     /// Output topic
     pub topic: String,
     /// Key/Value producer configs a defined in librdkafka
     pub producer_config: HashMap<String, String>,
     pub schema_registry_url: String,
     pub writer_id: String,
-    pub aggregation: A,
     pub avro_converter: C,
 }
 
@@ -158,11 +157,11 @@ impl ProducerContext<NoCustomPartitioner> for LoggingProducerContext {
     }
 }
 
-pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, A, C: AvroConverter<T, E>> {
+pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, C: AvroConverter<T, E>> {
     cmd_rx: mpsc::Receiver<KafkaAvroPublisherActorCommand>,
 
     /// Configured kafka options
-    config: KafkaConfig<A, C>,
+    config: KafkaConfig<C>,
 
     /// Schema used for AVRO records by this producer
     supplied_schema: SuppliedSchema,
@@ -181,7 +180,7 @@ pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, A, C: AvroConver
     pub _phantom: PhantomData<(T, E)>,
 }
 
-impl<T, E, A, C> KafkaAvroPublisherActor<'_, T, E, A, C>
+impl<T, E, C> KafkaAvroPublisherActor<'_, T, E, C>
 where
     E: std::error::Error,
     C: AvroConverter<T, E>,
@@ -189,7 +188,7 @@ where
 {
     pub fn from_config(
         cmd_rx: mpsc::Receiver<KafkaAvroPublisherActorCommand>,
-        config: KafkaConfig<A, C>,
+        config: KafkaConfig<C>,
         msg_recv: async_channel::Receiver<T>,
         stats: KafkaAvroPublisherStats,
     ) -> Result<Self, KafkaAvroPublisherActorError> {
@@ -257,28 +256,6 @@ where
                 return Err(err)?;
             }
         };
-
-        // Log the avro value and schema for debugging TODO: remove this
-        //   info!("Avro value: {:?}", avro_value);
-        //   info!("Avro schema: {}", self.supplied_schema.schema);
-
-        //   // Validate the avro value against the schema
-        //   let schema = match
-        // apache_avro::schema::Schema::parse_str(&self.supplied_schema.schema) {
-        //     Ok(schema) => schema,
-        //     Err(err) => {
-        //         error!("Error parsing schema: {err}");
-        //         return Err(KafkaAvroPublisherActorError::AvroError(err));
-        //     }
-        // };
-
-        // // Use validate to check if the avro value matches the schema
-        // if !avro_value.validate(&schema) {
-        //     error!("Avro value does not match schema");
-        //     return Err(KafkaAvroPublisherActorError::TransformationError(
-        //         "Value does not match schema".to_string(),
-        //     ));
-        // }
 
         // TODO: make subject name strategy configurable
         let encoded = match self
@@ -400,26 +377,24 @@ pub enum KafkaAvroPublisherActorCommand {
 }
 
 #[derive(Debug)]
-pub struct KafkaAvroPublisherActorHandle<T, E, A, C>
+pub struct KafkaAvroPublisherActorHandle<T, E, C>
 where
     E: std::error::Error,
-    A: std::default::Default,
     C: AvroConverter<T, E>,
 {
     cmd_tx: mpsc::Sender<KafkaAvroPublisherActorCommand>,
-    _phantom: PhantomData<(T, E, A, C)>,
+    _phantom: PhantomData<(T, E, C)>,
 }
 
-impl<T, E, A, C> KafkaAvroPublisherActorHandle<T, E, A, C>
+impl<T, E, C> KafkaAvroPublisherActorHandle<T, E, C>
 where
     T: Send + 'static,
     E: std::error::Error + Send + 'static,
-    A: std::default::Default + Send + 'static, // is his correct?
     C: AvroConverter<T, E> + Send + 'static,
     KafkaAvroPublisherActorError: From<E>,
 {
     pub fn from_config(
-        config: KafkaConfig<A, C>,
+        config: KafkaConfig<C>,
         msg_recv: async_channel::Receiver<T>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaAvroPublisherStats>,
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaAvroPublisherActorError> {

@@ -25,6 +25,53 @@ flow:
   publishers:
     group1:
       buffer_size: 50000
+      aggregation:
+        workers: 8
+        window_duration:
+          secs: 60
+          nanos: 0
+        lateness:
+          secs: 10
+          nanos: 0
+        transform:
+          # Key Fields
+          sourceIPv4Address: !Key
+          destinationIPv4Address: !Key
+          sourceIPv6Address: !Key
+          destinationIPv6Address: !Key
+          protocolIdentifier: !Key
+          sourceTransportPort: !Key
+          destinationTransportPort: !Key
+          ingressInterface: !Key
+          egressInterface: !Key
+          forwardingStatus: !Key
+          flowDirection: !Key
+          ipClassOfService: !Key
+          flowEndReason: !Key
+          sourceMacAddress: !Key
+          destinationMacAddress: !Key
+          ethernetType: !Key
+          layer2SegmentId: !Key
+          icmpTypeIPv4: !Key
+          icmpTypeIPv6: !Key
+          !VMWare tenantSourceIPv4: !Key
+          !VMWare tenantDestIPv4: !Key
+          !VMWare tenantSourcePort: !Key
+          !VMWare tenantDestPort: !Key
+          !VMWare tenantProtocol: !Key
+          !VMWare flowDirection: !Key
+          !VMWare ingressInterfaceAttr: !Key
+          !VMWare egressInterfaceAttr: !Key
+          !VMWare vxlanExportRole: !Key
+          !VMWare virtualObsID: !Key
+          !VMWare vmUuid: !Key
+          # Group-by Fields
+          octetDeltaCount: !Add
+          packetDeltaCount: !Add
+          deltaFlowCount: !Add
+          tcpControlBits: !BoolMapOr
+          minimumTTL: !Min
+          maximumTTL: !Max
       sonata_enrichment:
         topic: sonata
         consumer_config:
@@ -47,52 +94,6 @@ flow:
             queue.buffering.max.messages: "800000"
             linger.ms: "50"
           writer_id: writer1
-          aggregation:
-            window_duration:
-              secs: 60
-              nanos: 0
-            lateness:
-              secs: 10
-              nanos: 0
-            transform:
-              # Key Fields
-              sourceIPv4Address: !Key
-              destinationIPv4Address: !Key
-              sourceIPv6Address: !Key
-              destinationIPv6Address: !Key
-              protocolIdentifier: !Key
-              sourceTransportPort: !Key
-              destinationTransportPort: !Key
-              ingressInterface: !Key
-              egressInterface: !Key
-              forwardingStatus: !Key
-              flowDirection: !Key
-              ipClassOfService: !Key
-              flowEndReason: !Key
-              sourceMacAddress: !Key
-              destinationMacAddress: !Key
-              ethernetType: !Key
-              layer2SegmentId: !Key
-              icmpTypeIPv4: !Key
-              icmpTypeIPv6: !Key
-              !VMWare tenantSourceIPv4: !Key
-              !VMWare tenantDestIPv4: !Key
-              !VMWare tenantSourcePort: !Key
-              !VMWare tenantDestPort: !Key
-              !VMWare tenantProtocol: !Key
-              !VMWare flowDirection: !Key
-              !VMWare ingressInterfaceAttr: !Key
-              !VMWare egressInterfaceAttr: !Key
-              !VMWare vxlanExportRole: !Key
-              !VMWare virtualObsID: !Key
-              !VMWare vmUuid: !Key
-              # Group-by Fields
-              octetDeltaCount: !Add
-              packetDeltaCount: !Add
-              deltaFlowCount: !Add
-              tcpControlBits: !BoolMapOr
-              minimumTTL: !Min
-              maximumTTL: !Max
           avro_converter:
             fields:
               # Key Fields
