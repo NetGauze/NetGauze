@@ -13,10 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// use figment::{
-//     providers::{Env, Format, Yaml},
-//     Figment,
-// };
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 use futures::Future;
 use netgauze_collector::{
     config::{CollectorConfig, TelemetryConfig},
@@ -46,7 +46,7 @@ fn init_open_telemetry(
         exporter,
         opentelemetry_sdk::runtime::Tokio,
     )
-    .with_interval(Duration::from_secs(60))
+    .with_interval(Duration::from_secs(60)) // TODO: make configurable in collector config
     .with_timeout(Duration::from_secs(10))
     .build();
 
