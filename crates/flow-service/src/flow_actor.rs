@@ -131,7 +131,7 @@ use tokio_util::{
     codec::{BytesCodec, Decoder},
     udp::UdpFramed,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 /// Represents the IDs of templates received from a specific peer.
 #[derive(Clone, Debug)]
@@ -369,9 +369,10 @@ impl FlowCollectorActor {
                 Some((addr, pkt))
             }
             Ok(None) => {
-                debug!(
+                trace!(
                     "[Actor {}-{}] Needs more data to decode the packet",
-                    self.actor_id, self.socket_addr
+                    self.actor_id,
+                    self.socket_addr
                 );
                 None
             }
@@ -397,9 +398,10 @@ impl FlowCollectorActor {
                         ),
                     ],
                 );
-                warn!(
+                trace!(
                     "[Actor {}-{}] Dropping packet due to an error in decoding packet: {err:?}",
-                    self.actor_id, self.socket_addr
+                    self.actor_id,
+                    self.socket_addr
                 );
                 None
             }
@@ -435,7 +437,7 @@ impl FlowCollectorActor {
             }
             match tx.send(ref_clone).await {
                 Ok(_) => {
-                    debug!("[Actor {actor_id}-{socket_addr}] Sent flow flow to subscriber: {id}");
+                    trace!("[Actor {actor_id}-{socket_addr}] Sent flow flow to subscriber: {id}");
                     sent_counter.add(1,&[
                         opentelemetry::KeyValue::new("network.peer.address", format!("{}", socket_addr.ip())),
                         opentelemetry::KeyValue::new("network.peer.port", opentelemetry::Value::I64(socket_addr.port().into())),
@@ -504,7 +506,7 @@ impl FlowCollectorActor {
                     format!("{actor_id}"),
                 )],
             );
-            debug!("[Actor {actor_id}-{socket_addr}] Sending flow packet received from {peer} to a total of {} subscribers", self.subscribers.len());
+            trace!("[Actor {actor_id}-{socket_addr}] Sending flow packet received from {peer} to a total of {} subscribers", self.subscribers.len());
             let mut send_handlers = vec![];
             let flow_request = Arc::new((peer, pkt));
             for (id, senders) in &self.subscribers {
