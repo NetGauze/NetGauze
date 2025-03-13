@@ -39,7 +39,7 @@ pub async fn init_flow_collection(
     let supervisor_config = flow_config.supervisor_config();
 
     let (supervisor_join_handle, supervisor_handle) =
-        FlowCollectorsSupervisorActorHandle::new(supervisor_config, meter.clone()).await;
+        FlowCollectorsSupervisorActorHandle::new(supervisor_config, meter.clone()).await?;
     let mut http_handles = Vec::new();
     let mut agg_handles = Vec::new();
     let mut enrichment_handles = Vec::new();

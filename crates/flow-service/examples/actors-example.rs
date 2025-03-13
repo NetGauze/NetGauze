@@ -46,7 +46,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
             config,
             opentelemetry::global::meter("example"),
         )
-        .await;
+        .await?;
         let (pkt_rx, subscriptions) = handler.subscribe(10).await?;
         for subscription in &subscriptions {
             info!("Subscribed to {:?}", subscription);
