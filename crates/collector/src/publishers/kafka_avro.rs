@@ -27,6 +27,7 @@ use schema_registry_converter::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, marker::PhantomData, time::Duration};
+use schema_registry_converter::avro_common::get_supplied_schema;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
 
@@ -217,13 +218,7 @@ where
                 return Err(err)?;
             }
         };
-        let supplied_schema = SuppliedSchema {
-            name: parse_schema.name().map(|x| x.to_string()),
-            schema_type: SchemaType::Avro,
-            schema: schema_str,
-            references: vec![],
-        };
-
+        let supplied_schema = get_supplied_schema(&parse_schema);
         info!(
             "Starting Kafka AVRO publisher to topic: `{}` with schema: `{}`",
             config.topic,
