@@ -21,13 +21,16 @@ use rdkafka::{
     ClientContext,
 };
 use schema_registry_converter::{
-    async_impl::{avro::AvroEncoder, schema_registry::SrSettings},
+    async_impl::{
+        avro::AvroEncoder,
+        schema_registry::{post_schema, SrSettings},
+    },
+    avro_common::get_supplied_schema,
     error::SRCError,
-    schema_registry_common::{SchemaType, SubjectNameStrategy, SuppliedSchema},
+    schema_registry_common::{SubjectNameStrategy, SuppliedSchema},
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, marker::PhantomData, time::Duration};
-use schema_registry_converter::avro_common::get_supplied_schema;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
 
@@ -187,7 +190,7 @@ where
     C: AvroConverter<T, E>,
     KafkaAvroPublisherActorError: From<E>,
 {
-    pub fn from_config(
+    pub async fn from_config(
         cmd_rx: mpsc::Receiver<KafkaAvroPublisherActorCommand>,
         config: KafkaConfig<C>,
         msg_recv: async_channel::Receiver<T>,
@@ -223,6 +226,33 @@ where
             "Starting Kafka AVRO publisher to topic: `{}` with schema: `{}`",
             config.topic,
             parse_schema.canonical_form()
+        );
+
+        let subject_strategy = SubjectNameStrategy::TopicRecordNameStrategyWithSchema(
+            config.topic.clone(),
+            supplied_schema.clone(),
+        );
+        let subject = match subject_strategy.get_subject() {
+            Ok(subject) => subject,
+            Err(err) => {
+                error!("Error getting a subject {err}");
+                return Err(err)?;
+            }
+        };
+        let registered_schema =
+            match post_schema(&sr_settings, subject.clone(), supplied_schema.clone()).await {
+                Ok(schema) => schema,
+                Err(err) => {
+                    error!(
+                        "Registering schema in schema registery {}: {err}",
+                        config.schema_registry_url
+                    );
+                    return Err(err)?;
+                }
+            };
+        info!(
+            "Registered schema with subject {subject} and id {}",
+            registered_schema.id
         );
         Ok(Self {
             cmd_rx,
@@ -388,7 +418,7 @@ where
     C: AvroConverter<T, E> + Send + 'static,
     KafkaAvroPublisherActorError: From<E>,
 {
-    pub fn from_config(
+    pub async fn from_config(
         config: KafkaConfig<C>,
         msg_recv: async_channel::Receiver<T>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaAvroPublisherStats>,
@@ -398,7 +428,7 @@ where
             either::Either::Left(meter) => KafkaAvroPublisherStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor = KafkaAvroPublisherActor::from_config(cmd_rx, config, msg_recv, stats)?;
+        let actor = KafkaAvroPublisherActor::from_config(cmd_rx, config, msg_recv, stats).await?;
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
             cmd_tx,
