@@ -196,24 +196,29 @@ where
         msg_recv: async_channel::Receiver<T>,
         stats: KafkaAvroPublisherStats,
     ) -> Result<Self, KafkaAvroPublisherActorError> {
-        let mut producer_config = ClientConfig::new();
-        for (k, v) in &config.producer_config {
-            producer_config.set(k.as_str(), v.as_str());
-        }
-        let producer: ThreadedProducer<LoggingProducerContext> =
-            match ThreadedProducer::from_config_and_context(
-                &producer_config,
-                LoggingProducerContext,
-            ) {
-                Ok(p) => p,
-                Err(err) => {
-                    error!("Failed to create Kafka producer: {err}");
-                    return Err(err)?;
-                }
-            };
+        let producer = Self::get_producer(&config)?;
         let sr_settings = SrSettings::new(config.schema_registry_url.clone());
         let avro_encoder = AvroEncoder::new(sr_settings.clone());
         let schema_str = config.avro_converter.get_avro_schema();
+        let supplied_schema =
+            Self::get_schema(config.topic.clone(), schema_str, sr_settings).await?;
+        Ok(Self {
+            cmd_rx,
+            config,
+            supplied_schema,
+            producer,
+            avro_encoder,
+            msg_recv,
+            stats,
+            _phantom: PhantomData,
+        })
+    }
+
+    async fn get_schema(
+        topic: String,
+        schema_str: String,
+        sr_settings: SrSettings,
+    ) -> Result<SuppliedSchema, KafkaAvroPublisherActorError> {
         let parse_schema = match apache_avro::schema::Schema::parse_str(&schema_str) {
             Ok(schema) => schema,
             Err(err) => {
@@ -223,15 +228,12 @@ where
         };
         let supplied_schema = get_supplied_schema(&parse_schema);
         info!(
-            "Starting Kafka AVRO publisher to topic: `{}` with schema: `{}`",
-            config.topic,
+            "Starting Kafka AVRO publisher to topic: `{topic}` with schema: `{}`",
             parse_schema.canonical_form()
         );
 
-        let subject_strategy = SubjectNameStrategy::TopicRecordNameStrategyWithSchema(
-            config.topic.clone(),
-            supplied_schema.clone(),
-        );
+        let subject_strategy =
+            SubjectNameStrategy::TopicRecordNameStrategyWithSchema(topic, supplied_schema.clone());
         let subject = match subject_strategy.get_subject() {
             Ok(subject) => subject,
             Err(err) => {
@@ -243,10 +245,7 @@ where
             match post_schema(&sr_settings, subject.clone(), supplied_schema.clone()).await {
                 Ok(schema) => schema,
                 Err(err) => {
-                    error!(
-                        "Registering schema in schema registery {}: {err}",
-                        config.schema_registry_url
-                    );
+                    error!("Registering schema in schema registry {err}");
                     return Err(err)?;
                 }
             };
@@ -254,16 +253,23 @@ where
             "Registered schema with subject {subject} and id {}",
             registered_schema.id
         );
-        Ok(Self {
-            cmd_rx,
-            config,
-            supplied_schema,
-            producer,
-            avro_encoder,
-            msg_recv,
-            stats,
-            _phantom: PhantomData,
-        })
+        Ok(supplied_schema)
+    }
+
+    pub fn get_producer(
+        config: &KafkaConfig<C>,
+    ) -> Result<ThreadedProducer<LoggingProducerContext>, KafkaAvroPublisherActorError> {
+        let mut producer_config = ClientConfig::new();
+        for (k, v) in &config.producer_config {
+            producer_config.set(k.as_str(), v.as_str());
+        }
+        match ThreadedProducer::from_config_and_context(&producer_config, LoggingProducerContext) {
+            Ok(p) => Ok(p),
+            Err(err) => {
+                error!("Failed to create Kafka producer: {err}");
+                Err(err)?
+            }
+        }
     }
 
     pub async fn send(&mut self, input: T) -> Result<(), KafkaAvroPublisherActorError> {
