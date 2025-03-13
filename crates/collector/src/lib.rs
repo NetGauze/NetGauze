@@ -137,7 +137,8 @@ pub async fn init_flow_collection(
                                     config.clone(),
                                     enriched_rx,
                                     either::Left(meter.clone()),
-                                )?;
+                                )
+                                .await?;
                             if let Some(kafka_consumer) =
                                 publisher_config.sonata_enrichment.as_ref()
                             {
