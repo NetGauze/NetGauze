@@ -815,11 +815,19 @@ impl FlowCollectorActor {
     async fn run(mut self) -> Result<(ActorId, SocketAddr), FlowCollectorActorError> {
         let actor_id = self.actor_id;
         let socket_addr = self.socket_addr;
-        info!("[Actor {actor_id}-{socket_addr}] Spawning Actor and binding UDP listener",);
-        let socket = crate::new_udp_reuse_port(self.socket_addr, self.interface_bind.clone())
-            .map_err(|err| {
-                FlowCollectorActorError::SocketBindError(self.actor_id, socket_addr, err)
-            })?;
+        info!("[Actor {actor_id}-{socket_addr}] Spawning Actor and binding UDP listener");
+        let socket = match crate::new_udp_reuse_port(self.socket_addr, self.interface_bind.clone())
+        {
+            Ok(socket) => socket,
+            Err(err) => {
+                error!("[Actor {actor_id}-{socket_addr}] Error creating UDP socket: {err}");
+                return Err(FlowCollectorActorError::SocketBindError(
+                    self.actor_id,
+                    socket_addr,
+                    err,
+                ));
+            }
+        };
         // Get the local address of the socket, handy in cases where the port is 0
         self.socket_addr = socket.local_addr().map_err(|err| {
             FlowCollectorActorError::GetLocalAddressError(self.actor_id, socket_addr, err)
