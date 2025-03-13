@@ -76,11 +76,13 @@ impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
         let stamp_inserted = r#"    {"name": "stamp_inserted", "type": ["null", "string"]}"#;
         let stamp_updated = r#"    {"name": "stamp_updated", "type": ["null", "string"]}"#;
         let peer_ip_src = r#"    {"name": "peer_ip_src", "type": "string"}"#;
+        let writer_id = r#"    {"name": "writer_id", "type": "string"}"#;
         let mut fields_schema = vec![
             label.to_string(),
             stamp_inserted.to_string(),
             stamp_updated.to_string(),
             peer_ip_src.to_string(),
+            writer_id.to_string(),
         ];
         fields_schema.extend(Self::get_fields(&self.fields, 4));
         schema.push_str(format!("{}\n", fields_schema.join(",\n")).as_str());
@@ -125,6 +127,10 @@ impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
             (
                 "peer_ip_src".to_string(),
                 AvroValue::String(enriched_flow.peer_src.to_string()),
+            ),
+            (
+                "writer_id".to_string(),
+                AvroValue::String(enriched_flow.writer_id.to_string()),
             ),
         ];
         let mut custom_primitives = indexmap::IndexMap::new();
