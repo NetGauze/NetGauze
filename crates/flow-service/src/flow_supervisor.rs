@@ -255,6 +255,7 @@ impl FlowCollectorsSupervisorActor {
 
 #[derive(Debug)]
 pub enum FlowCollectorsSupervisorActorHandleError {
+    NoListenerStarted,
     SendError,
     ReceiveError,
 }
@@ -262,6 +263,7 @@ pub enum FlowCollectorsSupervisorActorHandleError {
 impl std::fmt::Display for FlowCollectorsSupervisorActorHandleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
+            Self::NoListenerStarted => write!(f, "No flow actor started successfully"),
             Self::SendError => write!(f, "Error sending command to supervisor actor"),
             Self::ReceiveError => {
                 write!(f, "Error receiving response from supervisor actor")
@@ -270,18 +272,7 @@ impl std::fmt::Display for FlowCollectorsSupervisorActorHandleError {
     }
 }
 
-impl std::error::Error for FlowCollectorsSupervisorActorHandleError {
-    fn description(&self) -> &str {
-        match *self {
-            Self::SendError => "Error sending command to supervisor actor",
-            Self::ReceiveError => "Error receiving response from supervisor actor",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        None
-    }
-}
+impl std::error::Error for FlowCollectorsSupervisorActorHandleError {}
 
 /// Handle to interact with the `FlowCollectorsSupervisorActor`
 #[derive(Debug, Clone)]
@@ -294,7 +285,10 @@ impl FlowCollectorsSupervisorActorHandle {
     pub async fn new(
         config: SupervisorConfig,
         meter: opentelemetry::metrics::Meter,
-    ) -> (JoinHandle<()>, FlowCollectorsSupervisorActorHandle) {
+    ) -> Result<
+        (JoinHandle<()>, FlowCollectorsSupervisorActorHandle),
+        FlowCollectorsSupervisorActorHandleError,
+    > {
         let mut next_actor_id = 0;
         let mut actor_handlers = HashMap::new();
         let mut actors_join = vec![];
@@ -326,6 +320,10 @@ impl FlowCollectorsSupervisorActorHandle {
                 }
             }
         }
+        if actors_join.is_empty() {
+            error!("[SupervisorHandle] There are no actors to run, shutting down");
+            return Err(FlowCollectorsSupervisorActorHandleError::NoListenerStarted);
+        }
         let (tx, rx) = mpsc::channel(100);
         let supervisor = FlowCollectorsSupervisorActor::new(actor_handlers);
         let handle = FlowCollectorsSupervisorActorHandle {
@@ -334,7 +332,7 @@ impl FlowCollectorsSupervisorActorHandle {
         };
 
         let join_handle = tokio::spawn(async move { supervisor.run(actors_join, rx).await });
-        (join_handle, handle)
+        Ok((join_handle, handle))
     }
 
     pub async fn shutdown(&self) -> Result<(), FlowCollectorsSupervisorActorHandleError> {
@@ -662,7 +660,9 @@ mod test {
     async fn test_supervisor_creation() {
         let config = create_test_config();
         let meter = opentelemetry::global::meter("test-meter");
-        let (join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
+        let (join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter)
+            .await
+            .expect("failed to create supervisor actor");
 
         assert!(!join_handle.is_finished());
 
@@ -684,7 +684,9 @@ mod test {
     async fn test_supervisor_subscribe_unsubscribe() {
         let config = create_test_config();
         let meter = opentelemetry::global::meter("test-meter");
-        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter)
+            .await
+            .expect("failed to create supervisor actor");
 
         // Subscribe
         let (pkt_rx, subscriptions) = handle.subscribe(10).await.expect("Failed to subscribe");
@@ -714,7 +716,9 @@ mod test {
     async fn test_supervisor_purge_unused_peers() {
         let config = create_test_config();
         let meter = opentelemetry::global::meter("test-meter");
-        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter)
+            .await
+            .expect("failed to create supervisor actor");
 
         // Purge unused peers (should be none at this point)
         let purged_peers = handle
@@ -767,7 +771,9 @@ mod test {
     async fn test_supervisor_get_peer_templates() {
         let config = create_test_config();
         let meter = opentelemetry::global::meter("test-meter");
-        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter)
+            .await
+            .expect("failed to create supervisor actor");
 
         // Get local addresses that the flow actors are listening on
         let local_addrs = handle
@@ -838,7 +844,9 @@ mod test {
     async fn test_supervisor_get_peer_template_ids() {
         let config = create_test_config();
         let meter = opentelemetry::global::meter("test-meter");
-        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter).await;
+        let (_join_handle, handle) = FlowCollectorsSupervisorActorHandle::new(config, meter)
+            .await
+            .expect("failed to create supervisor actor");
 
         // Get local addresses that the flow actors are listening on
         let local_addrs = handle
