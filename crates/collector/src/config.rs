@@ -34,6 +34,14 @@ pub(crate) const fn default_subscriber_timeout_duration() -> Duration {
     SUBSCRIBER_TIMEOUT_DURATION_DEFAULT
 }
 
+pub(crate) const fn default_telemetry_timeout() -> Duration {
+    Duration::from_secs(5)
+}
+
+pub(crate) const fn default_telemetry_interval() -> Duration {
+    Duration::from_secs(60)
+}
+
 pub(crate) const fn default_cmd_size_buffer() -> usize {
     100
 }
@@ -71,9 +79,27 @@ impl Default for LoggingConfig {
     }
 }
 
+#[serde_as]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TelemetryConfig {
     pub url: String,
+
+    /// Metrics exporter GRPC timeout
+    #[serde(default = "default_telemetry_timeout")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub exporter_timeout: Duration,
+
+    /// Configures the intervening time between exports for a
+    /// [opentelemetry_sdk::metrics::PeriodicReader]
+    #[serde(default = "default_telemetry_interval")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub reader_interval: Duration,
+
+    /// Configures the time a [opentelemetry_sdk::metrics::PeriodicReader] waits
+    /// for an export to complete before canceling it.
+    #[serde(default = "default_telemetry_timeout")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub reader_timeout: Duration,
 }
 
 impl TelemetryConfig {
