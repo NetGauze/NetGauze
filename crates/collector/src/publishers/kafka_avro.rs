@@ -196,12 +196,12 @@ where
         msg_recv: async_channel::Receiver<T>,
         stats: KafkaAvroPublisherStats,
     ) -> Result<Self, KafkaAvroPublisherActorError> {
-        let producer = Self::get_producer(&config)?;
         let sr_settings = SrSettings::new(config.schema_registry_url.clone());
         let avro_encoder = AvroEncoder::new(sr_settings.clone());
         let schema_str = config.avro_converter.get_avro_schema();
         let supplied_schema =
             Self::get_schema(config.topic.clone(), schema_str, sr_settings).await?;
+        let producer = Self::get_producer(&config)?;
         Ok(Self {
             cmd_rx,
             config,
@@ -241,18 +241,19 @@ where
                 return Err(err)?;
             }
         };
-        let registered_schema =
-            match post_schema(&sr_settings, subject.clone(), supplied_schema.clone()).await {
-                Ok(schema) => schema,
-                Err(err) => {
-                    error!("Registering schema in schema registry {err}");
-                    return Err(err)?;
-                }
-            };
-        info!(
-            "Registered schema with subject {subject} and id {}",
-            registered_schema.id
-        );
+        info!("Registering schema with schema registry");
+        match post_schema(&sr_settings, subject.clone(), supplied_schema.clone()).await {
+            Ok(schema) => {
+                info!(
+                    "Registered schema with subject {subject} and id {}",
+                    schema.id
+                );
+            }
+            Err(err) => {
+                error!("Registering schema in schema registry {err}");
+                return Err(err)?;
+            }
+        }
         Ok(supplied_schema)
     }
 
