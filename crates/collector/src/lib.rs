@@ -139,17 +139,7 @@ pub async fn init_flow_collection(
                                     either::Left(meter.clone()),
                                 )
                                 .await?;
-                            if let Some(kafka_consumer) =
-                                publisher_config.sonata_enrichment.as_ref()
-                            {
-                                let (sonata_join, sonata_handle) = SonataActorHandle::new(
-                                    kafka_consumer.clone(),
-                                    enrichment_handle.clone(),
-                                    either::Left(meter.clone()),
-                                )?;
-                                join_set.push(sonata_join);
-                                sonata_handles.push(sonata_handle);
-                            }
+
                             join_set.push(agg_join);
                             join_set.push(enrichment_join);
                             join_set.push(kafka_join);
@@ -157,6 +147,15 @@ pub async fn init_flow_collection(
                             enrichment_handles.push(enrichment_handle);
                             kafka_handles.push(kafka_handle);
                         }
+                    }
+                    if let Some(kafka_consumer) = publisher_config.sonata_enrichment.as_ref() {
+                        let (sonata_join, sonata_handle) = SonataActorHandle::new(
+                            kafka_consumer.clone(),
+                            enrichment_handles.clone(),
+                            either::Left(meter.clone()),
+                        )?;
+                        join_set.push(sonata_join);
+                        sonata_handles.push(sonata_handle);
                     }
                 }
             }
