@@ -26,7 +26,7 @@ use rdkafka::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::IpAddr, str::Utf8Error};
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 // A context can be used to change the behavior of producers and consumers by
 // adding callbacks that will be executed by librdkafka.
@@ -222,7 +222,7 @@ impl SonataActor {
             }
         };
 
-        info!("Got Sonata message: {:?}", sonata_data);
+        trace!("Got Sonata message: {:?}", sonata_data);
         let op = match sonata_data.operation {
             SonataOperation::Insert | SonataOperation::Update => {
                 if let Some(node) = sonata_data.node {
