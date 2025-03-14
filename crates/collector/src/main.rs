@@ -33,21 +33,20 @@ fn init_open_telemetry(
     use opentelemetry::{global, KeyValue};
     use opentelemetry_otlp::{Protocol, WithExportConfig};
     use opentelemetry_sdk::Resource;
-    use std::time::Duration;
 
     let exporter = opentelemetry_otlp::MetricExporter::builder()
         .with_tonic()
         .with_endpoint(config.url())
         .with_protocol(Protocol::Grpc)
-        .with_timeout(Duration::from_secs(3))
+        .with_timeout(config.exporter_timeout)
         .build()?;
 
     let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(
         exporter,
         opentelemetry_sdk::runtime::Tokio,
     )
-    .with_interval(Duration::from_secs(60)) // TODO: make configurable in collector config
-    .with_timeout(Duration::from_secs(10))
+    .with_interval(config.reader_interval)
+    .with_timeout(config.reader_timeout)
     .build();
 
     let provider = opentelemetry_sdk::metrics::SdkMeterProvider::builder()
