@@ -161,7 +161,7 @@ enum SonataActorCommand {
 
 struct SonataActor {
     cmd_rx: mpsc::Receiver<SonataActorCommand>,
-    enrichment_handle: FlowEnrichmentActorHandle,
+    enrichment_handles: Vec<FlowEnrichmentActorHandle>,
     consumer: StreamConsumer<CosmoSonataContext>,
     stats: SonataStats,
 }
@@ -170,7 +170,7 @@ impl SonataActor {
     fn from_config(
         config: KafkaConsumerConfig,
         cmd_rx: mpsc::Receiver<SonataActorCommand>,
-        enrichment_handle: FlowEnrichmentActorHandle,
+        enrichment_handles: Vec<FlowEnrichmentActorHandle>,
         stats: SonataStats,
     ) -> Result<Self, SonataActorError> {
         let mut client_conf = ClientConfig::new();
@@ -193,7 +193,7 @@ impl SonataActor {
 
         Ok(Self {
             cmd_rx,
-            enrichment_handle,
+            enrichment_handles,
             consumer,
             stats,
         })
@@ -222,6 +222,7 @@ impl SonataActor {
             }
         };
 
+        info!("Got Sonata message: {:?}", sonata_data);
         let op = match sonata_data.operation {
             SonataOperation::Insert | SonataOperation::Update => {
                 if let Some(node) = sonata_data.node {
@@ -248,15 +249,17 @@ impl SonataActor {
             SonataOperation::Delete => EnrichmentOperation::Delete(sonata_data.id_node),
         };
         debug!("Sonata Enrichment Operation: {op:?}");
-        if let Err(err) = self.enrichment_handle.update_enrichment(op).await {
-            warn!("Failed to update enrichment operation: {err}");
-            self.stats.send_error.add(
-                1,
-                &[opentelemetry::KeyValue::new(
-                    "netgauze.kafka.sonata.send.err",
-                    err.to_string(),
-                )],
-            );
+        for handle in &self.enrichment_handles {
+            if let Err(err) = handle.update_enrichment(op.clone()).await {
+                warn!("Failed to update enrichment operation: {err}");
+                self.stats.send_error.add(
+                    1,
+                    &[opentelemetry::KeyValue::new(
+                        "netgauze.kafka.sonata.send.err",
+                        err.to_string(),
+                    )],
+                );
+            }
         }
     }
 
@@ -265,7 +268,6 @@ impl SonataActor {
         loop {
             tokio::select! {
                 cmd = self.cmd_rx.recv() => {
-                    eprintln!("In sonata: {cmd:?}");
                     return match cmd {
                         Some(SonataActorCommand::Shutdown) => {
                             info!("Sonata actor shutting down");
@@ -307,7 +309,7 @@ pub struct SonataActorHandle {
 impl SonataActorHandle {
     pub fn new(
         consumer_config: KafkaConsumerConfig,
-        enrichment_handle: FlowEnrichmentActorHandle,
+        enrichment_handles: Vec<FlowEnrichmentActorHandle>,
         stats: either::Either<opentelemetry::metrics::Meter, SonataStats>,
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), SonataActorError> {
         let (cmd_send, cmd_rx) = mpsc::channel::<SonataActorCommand>(1);
@@ -315,7 +317,7 @@ impl SonataActorHandle {
             either::Left(meter) => SonataStats::new(meter),
             either::Right(stats) => stats,
         };
-        let actor = SonataActor::from_config(consumer_config, cmd_rx, enrichment_handle, stats)?;
+        let actor = SonataActor::from_config(consumer_config, cmd_rx, enrichment_handles, stats)?;
         let join_handle = tokio::spawn(actor.run());
         Ok((join_handle, SonataActorHandle { cmd_send }))
     }
