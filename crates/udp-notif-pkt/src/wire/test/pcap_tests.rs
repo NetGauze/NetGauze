@@ -76,8 +76,9 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
         let lines = reader.lines();
         (None, Some(lines))
     };
-    let pcap_reader = Box::new(LegacyPcapReader::new(165536, pcap_file).unwrap());
-    let iter = PcapIter::new(pcap_reader);
+    let pcap_reader =
+        LegacyPcapReader::new(165536, pcap_file).expect("Couldn't create pcap reader");
+    let iter = PcapIter::new(Box::new(pcap_reader));
     let mut peers = HashMap::new();
     for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
         // The filter for 161 is included because n7-sa1_yang-push.pcap have some snmp
@@ -115,6 +116,14 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                                     "payload".to_string(),
                                     Value::String(payload.to_string()),
                                 );
+                            }
+                        }
+                        MediaType::YangDataCbor => {
+                            let payload: Value =
+                                ciborium::de::from_reader(std::io::Cursor::new(msg.payload()))
+                                    .expect("Couldn't deserialize CBOR payload into a CBOR object");
+                            if let Value::Object(ref mut val) = &mut value {
+                                val.insert("payload".to_string(), payload);
                             }
                         }
                         _ => {}

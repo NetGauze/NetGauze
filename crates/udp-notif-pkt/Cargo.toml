@@ -30,7 +30,7 @@ arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
 
 [features]
-default = ["serde"]
+default = ["serde", "codec"]
 serde = ["nom", "byteorder", "netgauze-locate", "netgauze-parse-utils", "netgauze-serde-macros"]
 codec = ["tokio-util"]
 fuzz = ["arbitrary", "arbitrary_ext"]
@@ -41,3 +41,4 @@ netgauze-parse-utils = { workspace = true, features = ["test-helpers"] }
 serde_json = { workspace = true }
 rstest = { workspace = true }
 pcap-parser = { workspace = true, features = ["data"] }
+ciborium = { workspace = true }
