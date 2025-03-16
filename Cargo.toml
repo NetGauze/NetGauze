@@ -93,3 +93,4 @@ regex = { version = "1.10" }
 pdu = { version = "1.4" }
 pin-utils = { version = "0.1" }
 serde_yaml = { version = "0.9" }
+ciborium = { version = "0.2" }
