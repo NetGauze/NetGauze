@@ -87,17 +87,19 @@ impl Iterator for PcapIter<'_> {
                 Ok((offset, block)) => {
                     match block {
                         PcapBlockOwned::Legacy(legacy_packet) => {
+                            let link_type = self.link_types[0];
                             let packet_data = data::get_packetdata(
                                 legacy_packet.data,
-                                Linktype::ETHERNET,
+                                link_type,
                                 legacy_packet.caplen as usize,
                             );
                             let result = PcapIter::parse_packet(packet_data);
                             self.reader.consume(offset);
                             return result;
                         }
-                        PcapBlockOwned::LegacyHeader(_) => {
+                        PcapBlockOwned::LegacyHeader(header) => {
                             self.reader.consume(offset);
+                            self.link_types.push(header.network);
                             continue;
                         }
                         PcapBlockOwned::NG(Block::InterfaceDescription(description)) => {
@@ -150,10 +152,17 @@ impl<'a> PcapIter<'a> {
         match data {
             None => None,
             Some(PacketData::L2(l2_pkt)) => Self::parse_ethernet(l2_pkt),
-            Some(PacketData::L3(_, _)) => unimplemented!("Only Ethernet packets are supported"),
+            Some(PacketData::L3(ether_type, data)) => {
+                match ether_type {
+                    // See for ethernet numbers https://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml
+                    0x0800 => Self::parse_ipv4(Ipv4Pdu::new(data).expect("Invalid IPv4")),
+                    0x86DD => Self::parse_ipv6(Ipv6Pdu::new(data).expect("Invalid IPv6")),
+                    _ => unimplemented!("Only IPv4 and IPv6 packets are supported"),
+                }
+            }
             Some(PacketData::L4(_, _)) => unimplemented!("Only Ethernet packets are supported"),
             Some(PacketData::Unsupported(_)) => {
-                unimplemented!("Only Ethernet packets are supported")
+                unimplemented!("Only Ethernet and L3 packets are supported")
             }
         }
     }
