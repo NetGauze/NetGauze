@@ -52,7 +52,20 @@ impl FlowOutputConfig {
             if field.contains("custom_primitives.") {
                 custom_primitives = true;
             } else {
-                fields_schema.push(format!("{:indent$}{}", "", config.get_record_schema(field)));
+                fields_schema.push(format!(
+                    "{:indent$}{}",
+                    "",
+                    config.get_record_schema(
+                        field,
+                        if config.transform == FieldTransformFunction::StringArray
+                            || config.transform == FieldTransformFunction::MplsIndex
+                        {
+                            Some(AvroValueKind::String)
+                        } else {
+                            None
+                        }
+                    )
+                ));
             }
         }
         if custom_primitives {
@@ -179,15 +192,41 @@ pub struct FieldConfig {
 }
 
 impl FieldConfig {
-    pub fn get_record_schema(&self, name: &str) -> String {
+    pub fn get_record_schema(&self, name: &str, inner_val: Option<AvroValueKind>) -> String {
         let mut schema = "{ ".to_string();
         schema.push_str(format!("\"name\": \"{name}\", ").as_str());
         if self.is_nullable() {
-            schema.push_str(
-                format!("\"type\": [\"null\", \"{:?}\"] ", self.avro_type())
+            if self.avro_type() == AvroValueKind::Array {
+                if let Some(inner_val) = inner_val {
+                    schema.push_str(
+                        format!(
+                            "\"type\": [\"null\", {{\"type\": \"{:?}\", \"items\": \"{:?}\"}}] ",
+                            self.avro_type(),
+                            inner_val
+                        )
+                        .to_lowercase()
+                        .as_str(),
+                    );
+                }
+            } else {
+                schema.push_str(
+                    format!("\"type\": [\"null\", \"{:?}\"] ", self.avro_type())
+                        .to_lowercase()
+                        .as_str(),
+                );
+            }
+        } else if self.avro_type() == AvroValueKind::Array {
+            if let Some(inner_val) = inner_val {
+                schema.push_str(
+                    format!(
+                        "\"type\": {{\"type\": \"{:?}\", \"items\": \"{:?}\"}} ",
+                        self.avro_type(),
+                        inner_val
+                    )
                     .to_lowercase()
                     .as_str(),
-            );
+                );
+            }
         } else {
             schema.push_str(
                 format!("\"type\": \"{:?}\" ", self.avro_type())
@@ -198,6 +237,7 @@ impl FieldConfig {
         schema.push('}');
         schema
     }
+
     pub fn is_nullable(&self) -> bool {
         self.select.is_nullable() && self.default.is_none()
     }
@@ -500,7 +540,7 @@ impl From<FunctionError> for KafkaAvroPublisherActorError {
 }
 
 /// Field transformation functions
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub enum FieldTransformFunction {
     /// No transformation is applied
     #[default]
@@ -515,6 +555,9 @@ pub enum FieldTransformFunction {
 
     /// Index MPLS labels
     MplsIndex,
+
+    /// Generic String Array
+    StringArray,
 }
 
 impl FieldTransformFunction {
@@ -528,6 +571,7 @@ impl FieldTransformFunction {
             Self::String => AvroValueKind::String,
             Self::Rename(_) => AvroValueKind::String,
             Self::MplsIndex => AvroValueKind::Array,
+            Self::StringArray => AvroValueKind::Array,
         }
     }
 
@@ -587,6 +631,13 @@ impl FieldTransformFunction {
                     }
                 }
                 Ok(Some(RawValue::StringArray(ret)))
+            }
+            Self::StringArray => {
+                if let Some(field) = field.pop() {
+                    Ok(Some(RawValue::StringArray(field.try_into()?)))
+                } else {
+                    Ok(None)
+                }
             }
         }
     }

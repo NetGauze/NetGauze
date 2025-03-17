@@ -1701,6 +1701,7 @@ pub fn generate_into_for_field(
         "std::net::Ipv6Addr",
         "Vec<u8>",
         "[u8; 32]",
+        "Vec<String>",
     ];
     for convert_rust_type in rust_converted_types {
         ret.push_str(format!("impl TryInto<{convert_rust_type}> for Field {{\n").as_str());
@@ -1750,6 +1751,14 @@ pub fn generate_into_for_field(
             } else if convert_rust_type == "String" && ie.name == "virtualObsID" {
                 // trim trailing null chars from virtualObsID
                 ret.push_str(format!("            Self::{}(value) => Ok(value.trim_end_matches(char::from(0)).to_string()),\n", ie.name).as_str());
+            } else if convert_rust_type == "Vec<String>" && ie.name == "tcpControlBits" {
+                ret.push_str(
+                    format!(
+                        "            Self::{}(value) => Ok(value.to_vec()),\n",
+                        ie.name
+                    )
+                    .as_str(),
+                );
             } else {
                 ret.push_str(
                     format!(
