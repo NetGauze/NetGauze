@@ -8,6 +8,9 @@ logging:
 
 telemetry:
   url: http://localhost:4317/v1/metrics
+  exporter_timeout: 3000
+  reader_interval: 60000
+  reader_timeout: 3000
 
 flow:
   subscriber_timeout: 100
@@ -261,7 +264,7 @@ flow:
                 select: !Single
                   ie: !VMWare virtualObsID
                   index: 0
-                transform: String
+                transform: TrimmedString
                 default: !String ''
               custom_primitives.vmuuid:
                 select: !Single
@@ -286,4 +289,5 @@ flow:
                 select: !Single
                   ie: tcpControlBits
                   index: 0
-                transform: String
+                transform: StringArray
+                default: !StringArray []

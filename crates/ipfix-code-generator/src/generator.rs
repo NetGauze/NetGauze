@@ -1725,7 +1725,6 @@ pub fn generate_into_for_field(
             if ie_rust_type == convert_rust_type
                 && ie.subregistry.is_none()
                 && ie.name != "tcpControlBits"
-                && ie.name != "virtualObsID"
             {
                 // Native type converstion
                 ret.push_str(
@@ -1735,7 +1734,6 @@ pub fn generate_into_for_field(
                 && ie_rust_type != "Vec<u8>"
                 && ie_rust_type != "[u8; 32]"
                 && ie_rust_type != "super::MacAddress"
-                && ie.name != "virtualObsID"
             {
                 // Convert to using the defined Display implementation of the method
                 ret.push_str(
@@ -1748,9 +1746,6 @@ pub fn generate_into_for_field(
             } else if convert_rust_type == "String" && ie_rust_type == "super::MacAddress" {
                 // convert MacAddresses to human-readable string
                 ret.push_str(format!("            Self::{}(value) => Ok(value.iter().map(|x| format!(\"{{x:x}}\")).collect::<Vec<_>>().join(\":\").to_string()),\n", ie.name).as_str());
-            } else if convert_rust_type == "String" && ie.name == "virtualObsID" {
-                // trim trailing null chars from virtualObsID
-                ret.push_str(format!("            Self::{}(value) => Ok(value.trim_end_matches(char::from(0)).to_string()),\n", ie.name).as_str());
             } else if convert_rust_type == "Vec<String>" && ie.name == "tcpControlBits" {
                 ret.push_str(
                     format!(
