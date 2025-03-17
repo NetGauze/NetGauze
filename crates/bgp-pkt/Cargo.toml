@@ -18,7 +18,7 @@ netgauze-iana = { workspace = true }
 netgauze-locate = { workspace = true, optional = true }
 netgauze-parse-utils = { workspace = true, optional = true }
 netgauze-serde-macros = { workspace = true, optional = true }
-ipnet = { workspace = true }
+ipnet = { workspace = true, features = ["serde"] }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
