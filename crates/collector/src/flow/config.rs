@@ -549,6 +549,9 @@ pub enum FieldTransformFunction {
     /// Convert the value into a string
     String,
 
+    /// Convert the value into a string and trim trailing null characters
+    TrimmedString,
+
     /// Convert the value to string and rename.
     /// If no key is given for the rename, then the name is passed as is
     Rename(indexmap::IndexMap<String, String>),
@@ -569,6 +572,7 @@ impl FieldTransformFunction {
         match self {
             Self::Identity => identity_type,
             Self::String => AvroValueKind::String,
+            Self::TrimmedString => AvroValueKind::String,
             Self::Rename(_) => AvroValueKind::String,
             Self::MplsIndex => AvroValueKind::Array,
             Self::StringArray => AvroValueKind::Array,
@@ -586,6 +590,15 @@ impl FieldTransformFunction {
             Self::String => {
                 if let Some(field) = field.pop() {
                     Ok(Some(RawValue::String(field.try_into()?)))
+                } else {
+                    Ok(None)
+                }
+            }
+            Self::TrimmedString => {
+                if let Some(field) = field.pop() {
+                    let original: String = field.try_into()?;
+                    let trimmed = original.trim_end_matches(char::from(0)).to_string();
+                    Ok(Some(RawValue::String(trimmed)))
                 } else {
                     Ok(None)
                 }
