@@ -610,10 +610,7 @@ impl DataRecord {
     }
 
     pub fn flatten(self) -> FlatDataRecord {
-        FlatDataRecord::new(
-            self.scope_fields.to_vec().into(),
-            self.fields.to_vec().into(),
-        )
+        FlatDataRecord::new(self.scope_fields.into(), self.fields.into())
     }
 }
 

@@ -283,8 +283,8 @@ impl Set {
                 .map(|record| FlatSet::Data {
                     id,
                     record: Box::new(FlatDataRecord::new(
-                        record.scope_fields.to_vec().into(),
-                        record.fields.to_vec().into(),
+                        record.scope_fields.into(),
+                        record.fields.into(),
                     )),
                 })
                 .collect(),
@@ -301,10 +301,7 @@ impl Set {
                 .map(|record| {
                     FlatDataSet::new(
                         id,
-                        FlatDataRecord::new(
-                            record.scope_fields.to_vec().into(),
-                            record.fields.to_vec().into(),
-                        ),
+                        FlatDataRecord::new(record.scope_fields.into(), record.fields.into()),
                     )
                 })
                 .collect(),
@@ -504,8 +501,8 @@ pub struct ScopeFields {
     pub template: Option<Vec<Template>>,
 }
 
-impl From<Vec<ScopeField>> for ScopeFields {
-    fn from(fields: Vec<ScopeField>) -> Self {
+impl From<Box<[ScopeField]>> for ScopeFields {
+    fn from(fields: Box<[ScopeField]>) -> Self {
         let mut out = ScopeFields::default();
         for field in fields {
             match field {
@@ -677,13 +674,13 @@ mod tests {
 
     #[test]
     fn test_scope_fields_from() {
-        let fields = vec![
+        let fields: Box<[ScopeField]> = Box::new([
             ScopeField::System(System(1)),
             ScopeField::Interface(Interface(2)),
             ScopeField::LineCard(LineCard(3)),
             ScopeField::Cache(Cache(Box::new([1, 2, 3]))),
             ScopeField::Template(Template(Box::new([1, 2, 3]))),
-        ];
+        ]);
         let scope_fields = ScopeFields::from(fields);
         assert_eq!(scope_fields.system.unwrap().len(), 1);
         assert_eq!(scope_fields.interface.unwrap().len(), 1);
