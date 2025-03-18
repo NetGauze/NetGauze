@@ -34,7 +34,7 @@ use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
 use netgauze_flow_pkt::{
     ie,
     ie::{FieldConversionError, InformationElementDataType, InformationElementTemplate, IE},
-    ipfix, netflow, FlatFlowInfo,
+    FlatFlowDataInfo,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -176,10 +176,10 @@ impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
 }
 
 /// Configure how fields are selected and what transformations are applied for
-/// each IE in the [FlatFlowInfo]
+/// each IE in the [FlatFlowDataInfo]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldConfig {
-    /// Select one more [IE] fields from [FlatFlowInfo]
+    /// Select one more [IE] fields from [FlatFlowDataInfo]
     select: FieldSelectFunction,
 
     /// Set a default value if the selected field is null
@@ -248,7 +248,7 @@ impl FieldConfig {
 
     pub fn avro_value(
         &self,
-        flow: &FlatFlowInfo,
+        flow: &FlatFlowDataInfo,
     ) -> Result<Option<apache_avro::types::Value>, FunctionError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
@@ -261,7 +261,7 @@ impl FieldConfig {
 
     pub fn json_value(
         &self,
-        flow: &FlatFlowInfo,
+        flow: &FlatFlowDataInfo,
     ) -> Result<Option<serde_json::Value>, FunctionError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
@@ -273,7 +273,7 @@ impl FieldConfig {
     }
 }
 
-/// Select a field from [FlatFlowInfo]
+/// Select a field from [FlatFlowDataInfo]
 pub trait FieldSelect {
     /// Return true if a field can be a null value
     fn is_nullable(&self) -> bool;
@@ -285,7 +285,7 @@ pub trait FieldSelect {
     fn avro_type(&self) -> AvroValueKind;
 
     /// Select a value from the given flow
-    fn apply(&self, flow: &FlatFlowInfo) -> Option<Vec<ie::Field>>;
+    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>>;
 }
 
 /// An enum for all supported Field selection functions
@@ -312,7 +312,7 @@ impl FieldSelect for FieldSelectFunction {
             FieldSelectFunction::Mpls(f) => f.avro_type(),
         }
     }
-    fn apply(&self, flow: &FlatFlowInfo) -> Option<Vec<ie::Field>> {
+    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
         match self {
             FieldSelectFunction::Single(single) => single.apply(flow),
             FieldSelectFunction::Coalesce(coalesce) => coalesce.apply(flow),
@@ -327,7 +327,7 @@ const fn default_field_index() -> usize {
     0
 }
 
-/// Selects a single field from [FlatFlowInfo]
+/// Selects a single field from [FlatFlowDataInfo]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SingleFieldSelect {
     pub ie: IE,
@@ -344,28 +344,24 @@ impl FieldSelect for SingleFieldSelect {
         ie_avro_type(self.ie)
     }
 
-    fn apply(&self, flow: &FlatFlowInfo) -> Option<Vec<ie::Field>> {
+    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
         match flow {
-            FlatFlowInfo::NetFlowV9(packet) => match packet.set() {
-                netflow::FlatSet::Template(_) => None,
-                netflow::FlatSet::OptionsTemplate(_) => None,
-                netflow::FlatSet::Data { id: _id, record } => record
-                    .fields()
-                    .get(self.ie)
-                    .get(self.index)
-                    .cloned()
-                    .map(|x| vec![x]),
-            },
-            FlatFlowInfo::IPFIX(packet) => match packet.set() {
-                ipfix::FlatSet::Template(_) => None,
-                ipfix::FlatSet::OptionsTemplate(_) => None,
-                ipfix::FlatSet::Data { id: _id, record } => record
-                    .fields()
-                    .get(self.ie)
-                    .get(self.index)
-                    .cloned()
-                    .map(|x| vec![x]),
-            },
+            FlatFlowDataInfo::NetFlowV9(packet) => packet
+                .set()
+                .record()
+                .fields()
+                .get(self.ie)
+                .get(self.index)
+                .cloned()
+                .map(|x| vec![x]),
+            FlatFlowDataInfo::IPFIX(packet) => packet
+                .set()
+                .record()
+                .fields()
+                .get(self.ie)
+                .get(self.index)
+                .cloned()
+                .map(|x| vec![x]),
         }
     }
 }
@@ -395,32 +391,24 @@ impl FieldSelect for CoalesceFieldSelect {
         }
     }
 
-    fn apply(&self, flow: &FlatFlowInfo) -> Option<Vec<ie::Field>> {
+    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
         match flow {
-            FlatFlowInfo::NetFlowV9(packet) => match packet.set() {
-                netflow::FlatSet::Template(_) => None,
-                netflow::FlatSet::OptionsTemplate(_) => None,
-                netflow::FlatSet::Data { id: _id, record: _ } => {
-                    for single in &self.ies {
-                        if let Some(field) = single.apply(flow) {
-                            return Some(field.clone());
-                        }
+            FlatFlowDataInfo::NetFlowV9(_) => {
+                for single in &self.ies {
+                    if let Some(field) = single.apply(flow) {
+                        return Some(field.clone());
                     }
-                    None
                 }
-            },
-            FlatFlowInfo::IPFIX(packet) => match packet.set() {
-                ipfix::FlatSet::Template(_) => None,
-                ipfix::FlatSet::OptionsTemplate(_) => None,
-                ipfix::FlatSet::Data { id: _id, record: _ } => {
-                    for single in &self.ies {
-                        if let Some(field) = single.apply(flow) {
-                            return Some(field.clone());
-                        }
+                None
+            }
+            FlatFlowDataInfo::IPFIX(_) => {
+                for single in &self.ies {
+                    if let Some(field) = single.apply(flow) {
+                        return Some(field.clone());
                     }
-                    None
                 }
-            },
+                None
+            }
         }
     }
 }
@@ -440,38 +428,30 @@ impl FieldSelect for MultiSelect {
         AvroValueKind::Array
     }
 
-    fn apply(&self, flow: &FlatFlowInfo) -> Option<Vec<ie::Field>> {
+    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
         match flow {
-            FlatFlowInfo::NetFlowV9(packet) => match packet.set() {
-                netflow::FlatSet::Template(_) => None,
-                netflow::FlatSet::OptionsTemplate(_) => None,
-                netflow::FlatSet::Data { id: _id, record: _ } => {
-                    let mut ret = vec![];
-                    for single in &self.ies {
-                        if let Some(field) = single.apply(flow) {
-                            for f in field {
-                                ret.push(f);
-                            }
+            FlatFlowDataInfo::NetFlowV9(_) => {
+                let mut ret = vec![];
+                for single in &self.ies {
+                    if let Some(field) = single.apply(flow) {
+                        for f in field {
+                            ret.push(f);
                         }
                     }
-                    Some(ret)
                 }
-            },
-            FlatFlowInfo::IPFIX(packet) => match packet.set() {
-                ipfix::FlatSet::Template(_) => None,
-                ipfix::FlatSet::OptionsTemplate(_) => None,
-                ipfix::FlatSet::Data { id: _id, record: _ } => {
-                    let mut ret = vec![];
-                    for single in &self.ies {
-                        if let Some(field) = single.apply(flow) {
-                            for f in field {
-                                ret.push(f);
-                            }
+                Some(ret)
+            }
+            FlatFlowDataInfo::IPFIX(_) => {
+                let mut ret = vec![];
+                for single in &self.ies {
+                    if let Some(field) = single.apply(flow) {
+                        for f in field {
+                            ret.push(f);
                         }
                     }
-                    Some(ret)
                 }
-            },
+                Some(ret)
+            }
         }
     }
 }

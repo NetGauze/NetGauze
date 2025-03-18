@@ -22,7 +22,7 @@ use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
 use netgauze_flow_pkt::{
     ie,
     ie::{HasIE, InformationElementDataType, InformationElementTemplate},
-    FlatFlowInfo,
+    FlatFlowDataInfo,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::IpAddr};
@@ -44,7 +44,7 @@ pub struct EnrichedFlow {
     pub ts: chrono::DateTime<chrono::Utc>,
     pub window_start: chrono::DateTime<chrono::Utc>,
     pub window_end: chrono::DateTime<chrono::Utc>,
-    pub flow: FlatFlowInfo,
+    pub flow: FlatFlowDataInfo,
 }
 
 /// The supported subset of AVRO values
