@@ -138,6 +138,22 @@ impl IpfixPacket {
             })
             .collect()
     }
+
+    pub fn flatten_data(self) -> Vec<FlatIpfixDataPacket> {
+        let export_time = self.export_time;
+        let sequence_number = self.sequence_number;
+        let observation_domain_id = self.observation_domain_id;
+        self.sets
+            .into_iter()
+            .flat_map(|set| set.flatten_data())
+            .map(|set| FlatIpfixDataPacket {
+                export_time,
+                sequence_number,
+                observation_domain_id,
+                set,
+            })
+            .collect()
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -196,6 +212,63 @@ impl FlatIpfixPacket {
     }
 }
 
+/// Data only IPFIX packet, without any templates or options template
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FlatIpfixDataPacket {
+    export_time: DateTime<Utc>,
+    sequence_number: u32,
+    observation_domain_id: u32,
+    set: FlatDataSet,
+}
+
+impl FlatIpfixDataPacket {
+    pub const fn new(
+        export_time: DateTime<Utc>,
+        sequence_number: u32,
+        observation_domain_id: u32,
+        set: FlatDataSet,
+    ) -> Self {
+        Self {
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            set,
+        }
+    }
+
+    pub const fn export_time(&self) -> DateTime<Utc> {
+        self.export_time
+    }
+
+    pub const fn sequence_number(&self) -> u32 {
+        self.sequence_number
+    }
+
+    pub const fn observation_domain_id(&self) -> u32 {
+        self.observation_domain_id
+    }
+
+    pub const fn set(&self) -> &FlatDataSet {
+        &self.set
+    }
+
+    pub fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
+        self.set.extract_as_key_str(ie, indices)
+    }
+
+    pub fn reduce(
+        &mut self,
+        incoming: &FlatIpfixDataPacket,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        self.set.reduce(&incoming.set, transform)
+    }
+}
+
 /// Every Set contains a common header. The Sets can be any of these three
 /// possible types: Data Set, Template Set, or Options Template Set.
 ///
@@ -238,6 +311,19 @@ impl Set {
                     id,
                     record: Box::new(record.flatten()),
                 })
+                .collect(),
+        }
+    }
+
+    pub fn flatten_data(self) -> Vec<FlatDataSet> {
+        match self {
+            Self::Template(_) => vec![],
+            Self::OptionsTemplate(_) => {
+                vec![]
+            }
+            Self::Data { id, records } => records
+                .into_iter()
+                .map(|record| FlatDataSet::new(id, record.flatten()))
                 .collect(),
         }
     }
@@ -302,6 +388,51 @@ impl FlatSet {
             }
             _ => Err(AggregationError::FlatSetIsNotData),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FlatDataSet {
+    id: DataSetId,
+    record: FlatDataRecord,
+}
+
+impl Default for FlatDataSet {
+    fn default() -> Self {
+        Self {
+            id: DataSetId(0),
+            record: FlatDataRecord::default(),
+        }
+    }
+}
+
+impl FlatDataSet {
+    pub const fn new(id: DataSetId, record: FlatDataRecord) -> Self {
+        Self { id, record }
+    }
+
+    pub const fn id(&self) -> u16 {
+        self.id.0
+    }
+
+    pub const fn record(&self) -> &FlatDataRecord {
+        &self.record
+    }
+
+    fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
+        self.record.extract_as_key_str(ie, indices)
+    }
+
+    fn reduce(
+        &mut self,
+        incoming: &FlatDataSet,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        self.record.reduce(&incoming.record, transform)
     }
 }
 

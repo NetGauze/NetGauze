@@ -133,6 +133,24 @@ impl NetFlowV9Packet {
             })
             .collect()
     }
+
+    pub fn flatten_data(self) -> Vec<FlatNetFlowV9DataPacket> {
+        let sys_up_time = self.sys_up_time;
+        let unix_time = self.unix_time;
+        let sequence_number = self.sequence_number;
+        let source_id = self.source_id;
+        self.sets
+            .into_iter()
+            .flat_map(|set| set.flatten_data())
+            .map(|set| FlatNetFlowV9DataPacket {
+                sys_up_time,
+                unix_time,
+                sequence_number,
+                source_id,
+                set,
+            })
+            .collect()
+    }
 }
 
 /// Flattened version of [NetFlowV9Packet]
@@ -183,6 +201,54 @@ impl FlatNetFlowV9Packet {
     }
 }
 
+/// Flattened data only version of [NetFlowV9Packet]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FlatNetFlowV9DataPacket {
+    sys_up_time: u32,
+    unix_time: DateTime<Utc>,
+    sequence_number: u32,
+    source_id: u32,
+    set: FlatDataSet,
+}
+
+impl FlatNetFlowV9DataPacket {
+    pub fn new(
+        sys_up_time: u32,
+        unix_time: DateTime<Utc>,
+        sequence_number: u32,
+        source_id: u32,
+        set: FlatDataSet,
+    ) -> Self {
+        Self {
+            sys_up_time,
+            unix_time,
+            sequence_number,
+            source_id,
+            set,
+        }
+    }
+
+    pub const fn sys_up_time(&self) -> u32 {
+        self.sys_up_time
+    }
+
+    pub const fn unix_time(&self) -> DateTime<Utc> {
+        self.unix_time
+    }
+
+    pub const fn sequence_number(&self) -> u32 {
+        self.sequence_number
+    }
+
+    pub const fn source_id(&self) -> u32 {
+        self.source_id
+    }
+
+    pub const fn set(&self) -> &FlatDataSet {
+        &self.set
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Set {
@@ -221,6 +287,24 @@ impl Set {
                 .collect(),
         }
     }
+
+    pub fn flatten_data(self) -> Vec<FlatDataSet> {
+        match self {
+            Self::Template(_) => vec![],
+            Self::OptionsTemplate(_) => {
+                vec![]
+            }
+            Self::Data { id, records } => records
+                .into_iter()
+                .map(|record| {
+                    FlatDataSet::new(
+                        id,
+                        FlatDataRecord::new(record.scope_fields.into(), record.fields.into()),
+                    )
+                })
+                .collect(),
+        }
+    }
 }
 
 /// Flattened version of [Set]
@@ -241,6 +325,27 @@ impl FlatSet {
             Self::OptionsTemplate(_) => NETFLOW_OPTIONS_TEMPLATE_SET_ID,
             Self::Data { id, record: _ } => id.0,
         }
+    }
+}
+
+/// Flattened Data only version of [Set] without any templates or options
+/// template
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FlatDataSet {
+    id: DataSetId,
+    record: FlatDataRecord,
+}
+
+impl FlatDataSet {
+    pub const fn new(id: DataSetId, record: FlatDataRecord) -> Self {
+        Self { id, record }
+    }
+    pub const fn id(&self) -> u16 {
+        self.id.0
+    }
+
+    pub const fn record(&self) -> &FlatDataRecord {
+        &self.record
     }
 }
 

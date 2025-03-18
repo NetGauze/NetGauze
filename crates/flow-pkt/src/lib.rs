@@ -44,6 +44,21 @@ impl FlowInfo {
             FlowInfo::IPFIX(pkt) => pkt.flatten().into_iter().map(FlatFlowInfo::IPFIX).collect(),
         }
     }
+
+    pub fn flatten_data(self) -> Vec<FlatFlowDataInfo> {
+        match self {
+            Self::NetFlowV9(pkt) => pkt
+                .flatten_data()
+                .into_iter()
+                .map(|x| FlatFlowDataInfo::NetFlowV9(Box::new(x)))
+                .collect(),
+            Self::IPFIX(pkt) => pkt
+                .flatten_data()
+                .into_iter()
+                .map(|x| FlatFlowDataInfo::IPFIX(Box::new(x)))
+                .collect(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,8 +70,8 @@ pub enum FlatFlowInfo {
 impl FlatFlowInfo {
     pub fn export_time(&self) -> chrono::DateTime<chrono::Utc> {
         match self {
-            FlatFlowInfo::IPFIX(packet) => packet.export_time(),
-            FlatFlowInfo::NetFlowV9(packet) => packet.unix_time(),
+            Self::IPFIX(packet) => packet.export_time(),
+            Self::NetFlowV9(packet) => packet.unix_time(),
         }
     }
 
@@ -66,8 +81,8 @@ impl FlatFlowInfo {
         indices: &Option<Vec<usize>>,
     ) -> Result<String, AggregationError> {
         match self {
-            FlatFlowInfo::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
-            FlatFlowInfo::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+            Self::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
+            Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
         }
     }
 
@@ -77,14 +92,58 @@ impl FlatFlowInfo {
         transform: &IndexMap<IE, AggrOp>,
     ) -> Result<(), AggregationError> {
         match self {
-            FlatFlowInfo::IPFIX(packet) => {
-                if let FlatFlowInfo::IPFIX(incoming_packet) = incoming {
+            Self::IPFIX(packet) => {
+                if let Self::IPFIX(incoming_packet) = incoming {
                     packet.reduce(incoming_packet, transform)
                 } else {
                     Err(AggregationError::FlatFlowInfoNFv9NotSupported)
                 }
             }
-            FlatFlowInfo::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+            Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+        }
+    }
+}
+
+/// A version of FlatFlowInfo with data only
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FlatFlowDataInfo {
+    NetFlowV9(Box<netflow::FlatNetFlowV9DataPacket>),
+    IPFIX(Box<ipfix::FlatIpfixDataPacket>),
+}
+
+impl FlatFlowDataInfo {
+    pub fn export_time(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            Self::IPFIX(packet) => packet.export_time(),
+            Self::NetFlowV9(packet) => packet.unix_time(),
+        }
+    }
+
+    pub fn extract_as_key_str(
+        &self,
+        ie: &IE,
+        indices: &Option<Vec<usize>>,
+    ) -> Result<String, AggregationError> {
+        match self {
+            Self::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
+            Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+        }
+    }
+
+    pub fn reduce(
+        &mut self,
+        incoming: &FlatFlowDataInfo,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        match self {
+            Self::IPFIX(packet) => {
+                if let Self::IPFIX(incoming_packet) = incoming {
+                    packet.reduce(incoming_packet, transform)
+                } else {
+                    Err(AggregationError::FlatFlowInfoNFv9NotSupported)
+                }
+            }
+            Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
         }
     }
 }
