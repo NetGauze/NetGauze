@@ -514,7 +514,7 @@ fn generate_ie_field_enum_for_ie(
                 format!("    {}(netgauze_iana::tcp::TCPHeaderFlags),\n", ie.name).as_str(),
             );
         } else {
-            let rust_type = get_rust_type(&ie.data_type);
+            let rust_type = get_rust_type(&ie.data_type, &ie.name);
             let field_type = if ie.subregistry.is_some() {
                 ie.name.clone()
             } else {
@@ -1119,10 +1119,30 @@ fn generate_vec_u8_deserializer(ie_name: &String) -> String {
     ret
 }
 
+fn generate_mpls_deserializer(ie_name: &String) -> String {
+    let mut ret = String::new();
+    ret.push_str("                if length != 3 {\n");
+    ret.push_str(format!("                    return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
+    ret.push_str("                };\n");
+    ret.push_str("                let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;\n");
+    ret.push_str(
+        format!("                (buf, Field::{ie_name}([value[0], value[1], value[2]]))\n")
+            .as_str(),
+    );
+    ret.push_str("            }\n");
+    ret
+}
+
 fn generate_ie_deserializer(data_type: &str, ie_name: &String, enum_subreg: bool) -> String {
     let mut ret = String::new();
     let gen = match data_type {
-        "octetArray" => generate_vec_u8_deserializer(ie_name),
+        "octetArray" => {
+            if is_mpls_type(ie_name) {
+                generate_mpls_deserializer(ie_name)
+            } else {
+                generate_vec_u8_deserializer(ie_name)
+            }
+        }
         "unsigned8" => generate_u8_deserializer(ie_name, enum_subreg),
         "unsigned16" => generate_u16_deserializer(ie_name, enum_subreg),
         "unsigned32" => generate_u32_deserializer(ie_name, enum_subreg),
@@ -1638,16 +1658,18 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     let not_copy = ies.iter().any(|x| {
-        get_rust_type(&x.data_type) == "Box<[u8]>" || get_rust_type(&x.data_type) == "Box<str>"
+        get_rust_type(&x.data_type, &x.name) == "Box<[u8]>"
+            || get_rust_type(&x.data_type, &x.name) == "Box<str>"
     });
-    let not_eq = ies
-        .iter()
-        .any(|x| get_rust_type(&x.data_type) == "f32" || get_rust_type(&x.data_type) == "f64");
+    let not_eq = ies.iter().any(|x| {
+        get_rust_type(&x.data_type, &x.name) == "f32"
+            || get_rust_type(&x.data_type, &x.name) == "f64"
+    });
     ret.push_str(generate_derive(true, false, !not_copy, !not_eq, !not_eq, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     for ie in ies {
-        let rust_type = get_rust_type(&ie.data_type);
+        let rust_type = get_rust_type(&ie.data_type, &ie.name);
         let field_type = if ie.subregistry.is_some() {
             ie.name.clone()
         } else {
@@ -1722,7 +1744,7 @@ pub fn generate_into_for_field(
             );
         }
         for ie in ies {
-            let ie_rust_type = get_rust_type(&ie.data_type);
+            let ie_rust_type = get_rust_type(&ie.data_type, &ie.name);
             if ie_rust_type == convert_rust_type
                 && ie.subregistry.is_none()
                 && ie.name != "tcpControlBits"
@@ -1733,6 +1755,7 @@ pub fn generate_into_for_field(
                 );
             } else if convert_rust_type == "String"
                 && ie_rust_type != "Box<[u8]>"
+                && ie_rust_type != "[u8; 3]"
                 && ie_rust_type != "Box<[u8; 32]>"
                 && ie_rust_type != "super::MacAddress"
             {
@@ -1755,6 +1778,8 @@ pub fn generate_into_for_field(
                     )
                     .as_str(),
                 );
+            } else if convert_rust_type == "String" && is_mpls_type(&ie.name) {
+                ret.push_str(format!("            Self::{}(value) => Ok(u32::from_be_bytes([0, value[0], value[1], value[2]]).to_string()),\n", ie.name).as_str());
             } else {
                 ret.push_str(
                     format!(
@@ -1772,7 +1797,7 @@ pub fn generate_into_for_field(
     ret
 }
 
-pub fn get_rust_type(data_type: &str) -> String {
+pub fn get_rust_type(data_type: &str, ie_name: &str) -> String {
     let rust_type = match data_type {
         "octetArray" => "Box<[u8]>",
         "unsigned8" => "u8",
@@ -1798,7 +1823,15 @@ pub fn get_rust_type(data_type: &str) -> String {
         "unsigned256" => "Box<[u8; 32]>",
         other => todo!("Implement rust data type conversion for {}", other),
     };
-    rust_type.to_string()
+    if is_mpls_type(ie_name) {
+        "[u8; 3]".to_string()
+    } else {
+        rust_type.to_string()
+    }
+}
+
+fn is_mpls_type(ie_name: &str) -> bool {
+    ie_name.eq("mplsTopLabelStackSection") || ie_name.starts_with("mplsLabelStackSection")
 }
 
 pub(crate) fn generate_ie_values(
@@ -1807,7 +1840,7 @@ pub(crate) fn generate_ie_values(
 ) -> String {
     let mut ret = String::new();
     for ie in ies {
-        let rust_type = get_rust_type(&ie.data_type);
+        let rust_type = get_rust_type(&ie.data_type, &ie.name);
 
         // Check if we have an InformationElementSubRegistry and is of type
         // ValueNameDescRegistry
@@ -2555,7 +2588,7 @@ pub fn generate_flat_ie_struct(
         let field_type = if ie.name == "tcpControlBits" {
             "netgauze_iana::tcp::TCPHeaderFlags".to_string()
         } else {
-            let rust_type = get_rust_type(&ie.data_type);
+            let rust_type = get_rust_type(&ie.data_type, &ie.name);
             if ie.subregistry.is_some() {
                 ie.name.clone()
             } else {
