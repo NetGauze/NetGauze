@@ -200,6 +200,8 @@ impl SonataActor {
     }
 
     async fn handle_kafka_msg(&self, msg: BorrowedMessage<'_>) {
+        let partition = msg.partition();
+        let offset = msg.offset();
         // Deserialize the str payload as a SonataData struct
         let sonata_data = match msg.payload() {
             Some(p) => match serde_json::from_slice::<SonataData>(p) {
@@ -212,17 +214,19 @@ impl SonataActor {
                             err.to_string(),
                         )],
                     );
-                    warn!("Malformed sonata payload: {err}");
+                    warn!("Malformed JSON payload at partition {partition} and offset {offset}: {err}");
                     return;
                 }
             },
             None => {
-                warn!("Empty sonata payload");
+                warn!("Empty sonata payload at partition {partition} and offset {offset}");
                 return;
             }
         };
 
-        trace!("Got Sonata message: {:?}", sonata_data);
+        trace!(
+            "Got Sonata message from partition {partition} and offset {offset}: {sonata_data:?}"
+        );
         let op = match sonata_data.operation {
             SonataOperation::Insert | SonataOperation::Update => {
                 if let Some(node) = sonata_data.node {
