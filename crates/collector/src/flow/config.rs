@@ -598,7 +598,7 @@ impl FieldTransformFunction {
             Self::MplsIndex => {
                 let mut ret = vec![];
                 for field in field {
-                    fn format_mpls(num: u8, v: Vec<u8>) -> String {
+                    fn format_mpls(num: u8, v: &[u8]) -> String {
                         format!(
                             "{num}-{}",
                             u32::from_be_bytes([
@@ -610,16 +610,16 @@ impl FieldTransformFunction {
                         )
                     }
                     match field {
-                        ie::Field::mplsLabelStackSection(v) => ret.push(format_mpls(1, v)),
-                        ie::Field::mplsLabelStackSection2(v) => ret.push(format_mpls(2, v)),
-                        ie::Field::mplsLabelStackSection3(v) => ret.push(format_mpls(3, v)),
-                        ie::Field::mplsLabelStackSection4(v) => ret.push(format_mpls(4, v)),
-                        ie::Field::mplsLabelStackSection5(v) => ret.push(format_mpls(5, v)),
-                        ie::Field::mplsLabelStackSection6(v) => ret.push(format_mpls(6, v)),
-                        ie::Field::mplsLabelStackSection7(v) => ret.push(format_mpls(7, v)),
-                        ie::Field::mplsLabelStackSection8(v) => ret.push(format_mpls(8, v)),
-                        ie::Field::mplsLabelStackSection9(v) => ret.push(format_mpls(9, v)),
-                        ie::Field::mplsLabelStackSection10(v) => ret.push(format_mpls(10, v)),
+                        ie::Field::mplsLabelStackSection(v) => ret.push(format_mpls(1, &v)),
+                        ie::Field::mplsLabelStackSection2(v) => ret.push(format_mpls(2, &v)),
+                        ie::Field::mplsLabelStackSection3(v) => ret.push(format_mpls(3, &v)),
+                        ie::Field::mplsLabelStackSection4(v) => ret.push(format_mpls(4, &v)),
+                        ie::Field::mplsLabelStackSection5(v) => ret.push(format_mpls(5, &v)),
+                        ie::Field::mplsLabelStackSection6(v) => ret.push(format_mpls(6, &v)),
+                        ie::Field::mplsLabelStackSection7(v) => ret.push(format_mpls(7, &v)),
+                        ie::Field::mplsLabelStackSection8(v) => ret.push(format_mpls(8, &v)),
+                        ie::Field::mplsLabelStackSection9(v) => ret.push(format_mpls(9, &v)),
+                        ie::Field::mplsLabelStackSection10(v) => ret.push(format_mpls(10, &v)),
                         _ => return Err(FunctionError::UnexpectedField(field)),
                     }
                 }

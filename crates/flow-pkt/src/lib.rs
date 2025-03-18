@@ -280,34 +280,31 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
             0,
             0,
-            vec![ipfix::Set::Data {
+            Box::new([ipfix::Set::Data {
                 id: DataSetId::new(400).unwrap(),
-                records: vec![
+                records: Box::new([
                     ipfix::DataRecord::new(
-                        vec![Field::egressVRFID(10)],
-                        vec![
+                        Box::new([Field::egressVRFID(10)]),
+                        Box::new([
                             Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
                             Field::octetDeltaCount(1200),
                             Field::VMWare(vmware::Field::flowDirection(
                                 vmware::flowDirection::ingress,
                             )),
-                        ],
+                        ]),
                     ),
                     ipfix::DataRecord::new(
-                        vec![
-                            Field::egressVRFID(30),
-                            Field::interfaceName("eth0".to_string()),
-                        ],
-                        vec![
+                        Box::new([Field::egressVRFID(30), Field::interfaceName("eth0".into())]),
+                        Box::new([
                             Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 2)),
                             Field::packetDeltaCount(1),
                             Field::VMWare(vmware::Field::flowDirection(
                                 vmware::flowDirection::egress,
                             )),
-                        ],
+                        ]),
                     ),
-                ],
-            }],
+                ]),
+            }]),
         );
         let flow = FlowInfo::IPFIX(ipfix_data);
         let flattened = flow.flatten();
@@ -369,34 +366,34 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
             0,
             0,
-            vec![netflow::Set::Data {
+            Box::new([netflow::Set::Data {
                 id: DataSetId::new(400).unwrap(),
-                records: vec![
+                records: Box::new([
                     netflow::DataRecord::new(
-                        vec![netflow::ScopeField::Interface(netflow::Interface(100))],
-                        vec![
+                        Box::new([netflow::ScopeField::Interface(netflow::Interface(100))]),
+                        Box::new([
                             Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
                             Field::octetDeltaCount(1200),
                             Field::VMWare(vmware::Field::flowDirection(
                                 vmware::flowDirection::ingress,
                             )),
-                        ],
+                        ]),
                     ),
                     netflow::DataRecord::new(
-                        vec![
+                        Box::new([
                             netflow::ScopeField::System(netflow::System(1)),
                             netflow::ScopeField::Interface(netflow::Interface(200)),
-                        ],
-                        vec![
+                        ]),
+                        Box::new([
                             Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 2)),
                             Field::packetDeltaCount(1),
                             Field::VMWare(vmware::Field::flowDirection(
                                 vmware::flowDirection::egress,
                             )),
-                        ],
+                        ]),
                     ),
-                ],
-            }],
+                ]),
+            }]),
         );
         let flow = FlowInfo::NetFlowV9(data);
         let flattened = flow.flatten();
@@ -463,35 +460,38 @@ mod tests {
     fn test_netflow_template() {
         let template_record1 = netflow::TemplateRecord::new(
             400,
-            vec![
+            Box::new([
                 FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
-            ],
+            ]),
         );
         let template_record2 = netflow::TemplateRecord::new(
             401,
-            vec![FieldSpecifier::new(IE::srhIPv6ActiveSegmentType, 1).unwrap()],
+            Box::new([FieldSpecifier::new(IE::srhIPv6ActiveSegmentType, 1).unwrap()]),
         );
         let options_template_record1 = netflow::OptionsTemplateRecord::new(
             1,
-            vec![
+            Box::new([
                 netflow::ScopeFieldSpecifier::new(netflow::ScopeIE::System, 4),
                 netflow::ScopeFieldSpecifier::new(netflow::ScopeIE::Interface, 4),
-            ],
-            vec![
+            ]),
+            Box::new([
                 FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
-            ],
+            ]),
         );
         let netflow_template = NetFlowV9Packet::new(
             120,
             Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
             10,
             20,
-            vec![
-                netflow::Set::Template(vec![template_record1.clone(), template_record2.clone()]),
-                netflow::Set::OptionsTemplate(vec![options_template_record1.clone()]),
-            ],
+            Box::new([
+                netflow::Set::Template(Box::new([
+                    template_record1.clone(),
+                    template_record2.clone(),
+                ])),
+                netflow::Set::OptionsTemplate(Box::new([options_template_record1.clone()])),
+            ]),
         );
         let template = FlowInfo::NetFlowV9(netflow_template);
 
@@ -526,34 +526,37 @@ mod tests {
     fn test_ipfix_template() {
         let template_record1 = ipfix::TemplateRecord::new(
             400,
-            vec![
+            Box::new([
                 FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
-            ],
+            ]),
         );
         let template_record2 = ipfix::TemplateRecord::new(
             401,
-            vec![FieldSpecifier::new(IE::srhIPv6ActiveSegmentType, 1).unwrap()],
+            Box::new([FieldSpecifier::new(IE::srhIPv6ActiveSegmentType, 1).unwrap()]),
         );
         let options_template_record1 = ipfix::OptionsTemplateRecord::new(
             1,
-            vec![
+            Box::new([
                 FieldSpecifier::new(IE::VRFname, 10).unwrap(),
                 FieldSpecifier::new(IE::ipv4Options, 1).unwrap(),
-            ],
-            vec![
+            ]),
+            Box::new([
                 FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
-            ],
+            ]),
         );
         let ipfix_template = IpfixPacket::new(
             Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
             10,
             20,
-            vec![
-                ipfix::Set::Template(vec![template_record1.clone(), template_record2.clone()]),
-                ipfix::Set::OptionsTemplate(vec![options_template_record1.clone()]),
-            ],
+            Box::new([
+                ipfix::Set::Template(Box::new([
+                    template_record1.clone(),
+                    template_record2.clone(),
+                ])),
+                ipfix::Set::OptionsTemplate(Box::new([options_template_record1.clone()])),
+            ]),
         );
         let template = FlowInfo::IPFIX(ipfix_template);
 

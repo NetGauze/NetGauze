@@ -14,15 +14,15 @@ fn main() {
         Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 0).unwrap(),
         3812,
         0,
-        vec![Set::Template(vec![TemplateRecord::new(
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
             307,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
-            ],
-        )])],
+            ]),
+        )]))]),
     );
 
     println!(
@@ -48,18 +48,18 @@ fn main() {
         Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 1).unwrap(),
         3812,
         0,
-        vec![Set::Data {
+        Box::new([Set::Data {
             id: DataSetId::new(307).unwrap(),
-            records: vec![DataRecord::new(
-                vec![],
-                vec![
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
                     ie::Field::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1)),
                     ie::Field::destinationIPv4Address(Ipv4Addr::new(50, 0, 71, 1)),
                     ie::Field::octetDeltaCount(1312),
                     ie::Field::packetDeltaCount(9),
-                ],
-            )],
-        }],
+                ]),
+            )]),
+        }]),
     );
 
     println!(

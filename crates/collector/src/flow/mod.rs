@@ -143,7 +143,9 @@ impl From<ie::Field> for RawValue {
     fn from(val: ie::Field) -> Self {
         let cloned = val.clone();
         let converted = match val.ie().data_type() {
-            InformationElementDataType::octetArray => val.try_into().map(RawValue::Bytes),
+            InformationElementDataType::octetArray => val
+                .try_into()
+                .map(|x: Box<[u8]>| RawValue::Bytes(x.to_vec())),
             InformationElementDataType::unsigned8 => val.try_into().map(RawValue::U8),
             InformationElementDataType::unsigned16 => val.try_into().map(RawValue::U16),
             InformationElementDataType::unsigned32 => val.try_into().map(RawValue::U32),
@@ -166,10 +168,18 @@ impl From<ie::Field> for RawValue {
             }
             InformationElementDataType::ipv4Address => val.try_into().map(RawValue::String),
             InformationElementDataType::ipv6Address => val.try_into().map(RawValue::String),
-            InformationElementDataType::basicList => val.try_into().map(RawValue::Bytes),
-            InformationElementDataType::subTemplateList => val.try_into().map(RawValue::Bytes),
-            InformationElementDataType::subTemplateMultiList => val.try_into().map(RawValue::Bytes),
-            InformationElementDataType::unsigned256 => val.try_into().map(RawValue::Bytes),
+            InformationElementDataType::basicList => val
+                .try_into()
+                .map(|x: Box<[u8]>| RawValue::Bytes(x.to_vec())),
+            InformationElementDataType::subTemplateList => val
+                .try_into()
+                .map(|x: Box<[u8]>| RawValue::Bytes(x.to_vec())),
+            InformationElementDataType::subTemplateMultiList => val
+                .try_into()
+                .map(|x: Box<[u8]>| RawValue::Bytes(x.to_vec())),
+            InformationElementDataType::unsigned256 => val
+                .try_into()
+                .map(|x: Box<[u8; 32]>| RawValue::Bytes(x.to_vec())),
         };
         match converted {
             Ok(v) => v,

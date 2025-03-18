@@ -504,7 +504,7 @@ fn generate_ie_field_enum_for_ie(
     ret.push_str(generate_derive(true, false, false, false, false, false).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
-    ret.push_str("    Unknown{pen: u32, id: u16, value: Vec<u8>},\n");
+    ret.push_str("    Unknown{pen: u32, id: u16, value: Box<[u8]>},\n");
     for (name, pkg, _) in vendors {
         ret.push_str(format!("    {name}({pkg}::Field),\n").as_str());
     }
@@ -835,7 +835,8 @@ fn generate_u256_deserializer(ie_name: &String, enum_subreg: bool) -> String {
         );
     } else {
         ret.push_str(
-            format!("                (buf.slice(len..), Field::{ie_name}(ret))\n").as_str(),
+            format!("                (buf.slice(len..), Field::{ie_name}(Box::new(ret)))\n")
+                .as_str(),
         );
     }
 
@@ -1005,11 +1006,9 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     ret.push_str("                    };\n");
     ret.push_str("                    let (buf, value) = nom::combinator::map_res(nom::bytes::complete::take(variable_length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
     ret.push_str("                        let result = ::std::str::from_utf8(&str_buf);\n");
-    ret.push_str("                        result.map(|x| x.to_string())\n");
+    ret.push_str("                        result.map(|x| x.into())\n");
     ret.push_str("                    })(buf)?;\n");
-    ret.push_str(
-        format!("                    (buf,  Field::{ie_name}(value.to_string()))\n").as_str(),
-    );
+    ret.push_str(format!("                    (buf,  Field::{ie_name}(value))\n").as_str());
     ret.push_str("                } else {\n");
     ret.push_str("                    let (buf, value) =\n");
     ret.push_str("                        nom::combinator::map_res(nom::bytes::complete::take(length), |str_buf: netgauze_parse_utils::Span<'_>| {\n");
@@ -1018,7 +1017,7 @@ fn generate_string_deserializer(ie_name: &String) -> String {
     ret.push_str("                                .position(|&c| c == b'\0')\n");
     ret.push_str("                                .unwrap_or(str_buf.len());\n");
     ret.push_str("                            let result = ::std::str::from_utf8(&str_buf[..nul_range_end]);\n", );
-    ret.push_str("                            result.map(|x| x.to_string())\n");
+    ret.push_str("                            result.map(|x| x.into())\n");
     ret.push_str("                        })(buf)?;\n");
     ret.push_str(format!("                    (buf,  Field::{ie_name}(value))\n").as_str());
     ret.push_str("                }\n");
@@ -1113,7 +1112,9 @@ fn generate_date_time_micro(ie_name: &String) -> String {
 fn generate_vec_u8_deserializer(ie_name: &String) -> String {
     let mut ret = String::new();
     ret.push_str("                let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;\n");
-    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str(
+        format!("                (buf, Field::{ie_name}(value.into_boxed_slice()))\n").as_str(),
+    );
     ret.push_str("            }\n");
     ret
 }
@@ -1637,7 +1638,7 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     let not_copy = ies.iter().any(|x| {
-        get_rust_type(&x.data_type) == "Vec<u8>" || get_rust_type(&x.data_type) == "String"
+        get_rust_type(&x.data_type) == "Box<[u8]>" || get_rust_type(&x.data_type) == "Box<str>"
     });
     let not_eq = ies
         .iter()
@@ -1699,8 +1700,8 @@ pub fn generate_into_for_field(
         "chrono::DateTime<chrono::Utc>",
         "std::net::Ipv4Addr",
         "std::net::Ipv6Addr",
-        "Vec<u8>",
-        "[u8; 32]",
+        "Box<[u8]>",
+        "Box<[u8; 32]>",
         "Vec<String>",
     ];
     for convert_rust_type in rust_converted_types {
@@ -1731,8 +1732,8 @@ pub fn generate_into_for_field(
                     format!("            Self::{}(value) => Ok(value),\n", ie.name).as_str(),
                 );
             } else if convert_rust_type == "String"
-                && ie_rust_type != "Vec<u8>"
-                && ie_rust_type != "[u8; 32]"
+                && ie_rust_type != "Box<[u8]>"
+                && ie_rust_type != "Box<[u8; 32]>"
                 && ie_rust_type != "super::MacAddress"
             {
                 // Convert to using the defined Display implementation of the method
@@ -1773,7 +1774,7 @@ pub fn generate_into_for_field(
 
 pub fn get_rust_type(data_type: &str) -> String {
     let rust_type = match data_type {
-        "octetArray" => "Vec<u8>",
+        "octetArray" => "Box<[u8]>",
         "unsigned8" => "u8",
         "unsigned16" => "u16",
         "unsigned32" => "u32",
@@ -1786,15 +1787,15 @@ pub fn get_rust_type(data_type: &str) -> String {
         "float64" => "f64",
         "boolean" => "bool",
         "macAddress" => "super::MacAddress",
-        "string" => "String",
+        "string" => "Box<str>",
         "dateTimeSeconds"
         | "dateTimeMilliseconds"
         | "dateTimeMicroseconds"
         | "dateTimeNanoseconds" => "chrono::DateTime<chrono::Utc>",
         "ipv4Address" => "std::net::Ipv4Addr",
         "ipv6Address" => "std::net::Ipv6Addr",
-        "basicList" | "subTemplateList" | "subTemplateMultiList" => "Vec<u8>",
-        "unsigned256" => "[u8; 32]",
+        "basicList" | "subTemplateList" | "subTemplateMultiList" => "Box<[u8]>",
+        "unsigned256" => "Box<[u8; 32]>",
         other => todo!("Implement rust data type conversion for {}", other),
     };
     rust_type.to_string()
@@ -1817,7 +1818,7 @@ pub(crate) fn generate_ie_values(
         let gen_derive = generate_derive(
             true,
             strum_macros,
-            rust_type != "Vec<u8>" && rust_type != "String",
+            rust_type != "Box<[u8]>" && rust_type != "Box<str>",
             rust_type != "f32" && rust_type != "f64",
             rust_type != "f32" && rust_type != "f64",
             false,
@@ -2220,7 +2221,7 @@ pub(crate) fn generate_ie_ser_main(
         ret.push_str(format!("            Self::{}(value) => {{\n", ie.name).as_str());
         match ie.data_type.as_str() {
             "octetArray" => {
-                ret.push_str("                writer.write_all(value)?\n");
+                ret.push_str("                writer.write_all(value.as_ref())?\n");
             }
             "unsigned8" => {
                 if ie.subregistry.is_some() {
@@ -2477,7 +2478,7 @@ pub(crate) fn generate_ie_ser_main(
                 ret.push_str("                writer.write_all(value)?\n");
             }
             "unsigned256" => {
-                ret.push_str("                writer.write_all(value)?\n");
+                ret.push_str("                writer.write_all(value.as_ref())?\n");
             }
             ty => todo!("Unsupported serialization for type: {}", ty),
         }
@@ -2546,7 +2547,7 @@ pub fn generate_flat_ie_struct(
     ret.push_str("#[derive(Default)]\n");
     ret.push_str("pub struct Fields {\n");
     // TODO: Handle unknown fields
-    //ret.push_str("    Unknown{pen: u32, id: u16, value: Vec<u8>},\n");
+    //ret.push_str("    Unknown{pen: u32, id: u16, value: Box<[u8]>},\n");
     for (_name, pkg, _) in vendors {
         ret.push_str(format!("    pub {pkg}: Option<{pkg}::Fields>,\n").as_str());
     }
