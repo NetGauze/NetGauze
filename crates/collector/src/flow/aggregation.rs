@@ -30,7 +30,7 @@ use either::Either;
 use futures::stream::{self, StreamExt};
 use indexmap::IndexMap;
 use netgauze_analytics::{aggregation::*, flow::*};
-use netgauze_flow_pkt::{ie, ipfix::FlatSet, FlatFlowInfo};
+use netgauze_flow_pkt::{ie, FlatFlowDataInfo};
 use netgauze_flow_service::FlowRequest;
 use opentelemetry::metrics::{Counter, Meter};
 use pin_utils::pin_mut;
@@ -115,7 +115,7 @@ impl Default for AggregationConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InputMessage {
     pub peer: SocketAddr,
-    pub flow: FlatFlowInfo,
+    pub flow: FlatFlowDataInfo,
 }
 
 impl TimeSeriesData<String> for InputMessage {
@@ -127,8 +127,8 @@ impl TimeSeriesData<String> for InputMessage {
     }
 }
 
-impl From<(SocketAddr, FlatFlowInfo)> for InputMessage {
-    fn from((peer, flow): (SocketAddr, FlatFlowInfo)) -> Self {
+impl From<(SocketAddr, FlatFlowDataInfo)> for InputMessage {
+    fn from((peer, flow): (SocketAddr, FlatFlowDataInfo)) -> Self {
         Self { peer, flow }
     }
 }
@@ -227,7 +227,7 @@ impl std::fmt::Display for FlowAggregationActorError {
 struct AggregationActor {
     cmd_recv: mpsc::Receiver<AggregationCommand>,
     rx: async_channel::Receiver<Arc<FlowRequest>>,
-    tx: async_channel::Sender<(Window, (SocketAddr, FlatFlowInfo))>,
+    tx: async_channel::Sender<(Window, (SocketAddr, FlatFlowDataInfo))>,
     config: AggregationConfig,
     stats: AggregationStats,
     shard_id: usize,
@@ -237,7 +237,7 @@ impl AggregationActor {
     fn new(
         cmd_recv: mpsc::Receiver<AggregationCommand>,
         rx: async_channel::Receiver<Arc<FlowRequest>>,
-        tx: async_channel::Sender<(Window, (SocketAddr, FlatFlowInfo))>,
+        tx: async_channel::Sender<(Window, (SocketAddr, FlatFlowDataInfo))>,
         config: AggregationConfig,
         stats: AggregationStats,
         shard_id: usize,
@@ -274,16 +274,13 @@ impl AggregationActor {
                 stats.received_messages.add(1, &tags);
 
                 stream::iter(
-                    flow.flatten()
+                    flow.flatten_data()
                         .into_iter()
                         .filter(|flow| match flow {
-                            FlatFlowInfo::IPFIX(packet) => match packet.set() {
-                                FlatSet::Data { record, .. } => {
-                                    // Exclude records without octetDeltaCount (e.g. option records)
-                                    record.fields().octetDeltaCount.is_some()
-                                }
-                                _ => false,
-                            },
+                            FlatFlowDataInfo::IPFIX(packet) => {
+                                // Exclude records without octetDeltaCount (e.g. option records)
+                                packet.set().record().fields().octetDeltaCount.is_some()
+                            }
                             _ => false,
                         })
                         .map(move |x| InputMessage::from((peer, x))),
@@ -380,7 +377,7 @@ pub enum AggregationActorHandleError {
 #[derive(Debug)]
 pub struct AggregationActorHandle {
     cmd_send: mpsc::Sender<AggregationCommand>,
-    rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
+    rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))>,
 }
 
 impl AggregationActorHandle {
@@ -410,7 +407,7 @@ impl AggregationActorHandle {
             .map_err(|_| AggregationActorHandleError::SendError)
     }
 
-    pub fn subscribe(&self) -> async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))> {
+    pub fn subscribe(&self) -> async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))> {
         self.rx.clone()
     }
 }

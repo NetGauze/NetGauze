@@ -28,7 +28,7 @@
 
 use crate::flow::EnrichedFlow;
 use netgauze_analytics::aggregation::Window;
-use netgauze_flow_pkt::FlatFlowInfo;
+use netgauze_flow_pkt::FlatFlowDataInfo;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -106,7 +106,7 @@ struct FlowEnrichment {
     writer_id: String,
     cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
     enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-    agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
+    agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))>,
     enriched_tx: async_channel::Sender<EnrichedFlow>,
     default_labels: (u32, HashMap<String, String>),
     stats: FlowEnrichmentStats,
@@ -117,7 +117,7 @@ impl FlowEnrichment {
         writer_id: String,
         cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
         enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
+        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))>,
         enriched_tx: async_channel::Sender<EnrichedFlow>,
         stats: FlowEnrichmentStats,
     ) -> Self {
@@ -160,7 +160,7 @@ impl FlowEnrichment {
         }
     }
 
-    fn enrich(&self, window: Window, peer: SocketAddr, flow: FlatFlowInfo) -> EnrichedFlow {
+    fn enrich(&self, window: Window, peer: SocketAddr, flow: FlatFlowDataInfo) -> EnrichedFlow {
         let (_, labels) = self.labels.get(&peer.ip()).unwrap_or(&self.default_labels);
         let (window_start, window_end) = window;
         let ts = chrono::Utc::now();
@@ -264,7 +264,7 @@ impl FlowEnrichmentActorHandle {
     pub fn new(
         writer_id: String,
         buffer_size: usize,
-        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowInfo))>,
+        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))>,
         stats: either::Either<opentelemetry::metrics::Meter, FlowEnrichmentStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
