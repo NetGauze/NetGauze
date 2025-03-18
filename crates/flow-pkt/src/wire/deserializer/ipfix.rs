@@ -252,9 +252,9 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         SetParsingError::NoTemplateDefinedFor(id),
                     )));
                 };
-                let (scope_field_specs, field_specs) = template;
                 // since we could have vlen fields, we can only state a min_record_len here
-                let min_record_length = scope_field_specs
+                let min_record_length = template
+                    .scope_fields_specs
                     .iter()
                     .map(|x| {
                         if x.length() == 65535 {
@@ -264,7 +264,8 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         }
                     })
                     .sum::<usize>()
-                    + field_specs
+                    + template
+                        .fields_specs
                         .iter()
                         .map(|x| {
                             if x.length() == 65535 {
@@ -390,7 +391,13 @@ impl<'a>
             fields.push(field);
             buf = t;
         }
-        templates_map.insert(template_id, (scope_fields.clone(), fields.clone()));
+        templates_map.insert(
+            template_id,
+            DecodingTemplate {
+                scope_fields_specs: scope_fields.clone().into_boxed_slice(),
+                fields_specs: fields.clone().into_boxed_slice(),
+            },
+        );
         Ok((
             buf,
             OptionsTemplateRecord::new(
@@ -431,18 +438,18 @@ impl<'a> ReadablePduWithOneInput<'a, &DecodingTemplate, LocatedDataRecordParsing
         field_specifiers: &DecodingTemplate,
     ) -> IResult<Span<'a>, Self, LocatedDataRecordParsingError<'a>> {
         let mut buf = buf;
-        let (scope_fields_specs, field_specs) = field_specifiers;
-
-        let mut scope_fields = Vec::<crate::ie::Field>::with_capacity(scope_fields_specs.len());
-        for spec in scope_fields_specs {
+        let mut scope_fields =
+            Vec::<crate::ie::Field>::with_capacity(field_specifiers.scope_fields_specs.len());
+        for spec in &field_specifiers.scope_fields_specs {
             let (t, scope_field) =
                 parse_into_located_two_inputs(buf, &spec.element_id(), spec.length)?;
             buf = t;
             scope_fields.push(scope_field);
         }
 
-        let mut fields = Vec::<crate::ie::Field>::with_capacity(field_specs.len());
-        for spec in field_specs {
+        let mut fields =
+            Vec::<crate::ie::Field>::with_capacity(field_specifiers.fields_specs.len());
+        for spec in &field_specifiers.fields_specs {
             let (t, field) = parse_into_located_two_inputs(buf, &spec.element_id(), spec.length)?;
             buf = t;
             fields.push(field);
@@ -508,7 +515,13 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedTemplateRecordPar
             fields.push(field);
             buf = t;
         }
-        templates_map.insert(template_id, (vec![], fields.clone()));
+        templates_map.insert(
+            template_id,
+            DecodingTemplate {
+                scope_fields_specs: Box::new([]),
+                fields_specs: fields.clone().into_boxed_slice(),
+            },
+        );
         Ok((
             buf,
             TemplateRecord::new(template_id, fields.into_boxed_slice()),

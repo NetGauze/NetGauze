@@ -260,12 +260,13 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         SetParsingError::NoTemplateDefinedFor(id),
                     )));
                 };
-                let (scope_field_specs, field_specs) = template;
-                let record_length = scope_field_specs
+                let record_length = template
+                    .scope_fields_specs
                     .iter()
                     .map(|x| x.length() as usize)
                     .sum::<usize>()
-                    + field_specs
+                    + template
+                        .fields_specs
                         .iter()
                         .map(|x| x.length() as usize)
                         .sum::<usize>();
@@ -382,7 +383,13 @@ impl<'a>
         for a in &options_fields {
             fields.push(a.clone());
         }
-        templates_map.insert(template_id, (scope_fields.clone(), fields.clone()));
+        templates_map.insert(
+            template_id,
+            DecodingTemplate {
+                scope_fields_specs: scope_fields.clone().into_boxed_slice(),
+                fields_specs: fields.clone().into_boxed_slice(),
+            },
+        );
         Ok((
             buf,
             OptionsTemplateRecord::new(
@@ -448,7 +455,13 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedTemplateRecordPar
             fields.push(field);
             buf = t;
         }
-        templates_map.insert(template_id, (vec![], fields.clone()));
+        templates_map.insert(
+            template_id,
+            DecodingTemplate {
+                scope_fields_specs: Box::new([]),
+                fields_specs: fields.clone().into_boxed_slice(),
+            },
+        );
         Ok((
             buf,
             TemplateRecord::new(template_id, fields.into_boxed_slice()),
@@ -536,21 +549,21 @@ impl<'a> ReadablePduWithOneInput<'a, &DecodingTemplate, LocatedDataRecordParsing
 {
     fn from_wire(
         buf: Span<'a>,
-        field_specifiers: &DecodingTemplate,
+        decoding_template: &DecodingTemplate,
     ) -> IResult<Span<'a>, Self, LocatedDataRecordParsingError<'a>> {
         let mut buf = buf;
-        let (scope_fields_specs, field_specs) = field_specifiers;
-
-        let mut scope_fields = Vec::<ScopeField>::with_capacity(scope_fields_specs.len());
-        for spec in scope_fields_specs {
+        let mut scope_fields =
+            Vec::<ScopeField>::with_capacity(decoding_template.scope_fields_specs.len());
+        for spec in &decoding_template.scope_fields_specs {
             let (t, scope_field) =
                 parse_into_located_two_inputs(buf, &spec.element_id(), spec.length())?;
             buf = t;
             scope_fields.push(scope_field);
         }
 
-        let mut fields = Vec::<crate::ie::Field>::with_capacity(field_specs.len());
-        for spec in field_specs {
+        let mut fields =
+            Vec::<crate::ie::Field>::with_capacity(decoding_template.fields_specs.len());
+        for spec in &decoding_template.fields_specs {
             let (t, field) = parse_into_located_two_inputs(buf, &spec.element_id(), spec.length)?;
             buf = t;
             fields.push(field);

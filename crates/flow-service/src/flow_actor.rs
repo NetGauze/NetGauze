@@ -1502,7 +1502,13 @@ mod tests {
                                 assert!(netflow_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     netflow_templates.get(&template.id()),
-                                    Some(&(vec![], template.field_specifiers().to_vec()))
+                                    Some(&netflow::DecodingTemplate {
+                                        scope_fields_specs: Box::new([]),
+                                        fields_specs: template
+                                            .field_specifiers()
+                                            .to_vec()
+                                            .into_boxed_slice()
+                                    })
                                 );
                             }
                         }
@@ -1511,7 +1517,13 @@ mod tests {
                                 assert!(netflow_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     netflow_templates.get(&template.id()),
-                                    Some(&(template.scope_field_specifiers().to_vec(), vec![]))
+                                    Some(&netflow::DecodingTemplate {
+                                        scope_fields_specs: template
+                                            .scope_field_specifiers()
+                                            .to_vec()
+                                            .into_boxed_slice(),
+                                        fields_specs: Box::new([])
+                                    })
                                 );
                             }
                         }
@@ -1527,7 +1539,13 @@ mod tests {
                                 assert!(ipfix_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     ipfix_templates.get(&template.id()),
-                                    Some(&(vec![], template.field_specifiers().to_vec()))
+                                    Some(&ipfix::DecodingTemplate {
+                                        scope_fields_specs: Box::new([]),
+                                        fields_specs: template
+                                            .field_specifiers()
+                                            .to_vec()
+                                            .into_boxed_slice()
+                                    })
                                 );
                             }
                         }
@@ -1536,7 +1554,13 @@ mod tests {
                                 assert!(ipfix_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     ipfix_templates.get(&template.id()),
-                                    Some(&(template.scope_field_specifiers().to_vec(), vec![]))
+                                    Some(&ipfix::DecodingTemplate {
+                                        scope_fields_specs: Box::new([]),
+                                        fields_specs: template
+                                            .field_specifiers()
+                                            .to_vec()
+                                            .into_boxed_slice()
+                                    })
                                 );
                             }
                         }

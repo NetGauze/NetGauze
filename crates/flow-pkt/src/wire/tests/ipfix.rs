@@ -232,7 +232,10 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
         FieldSpecifier::new(ie::IE::flowStartMilliseconds, 8).unwrap(),
         FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
     ];
-    let fields = (vec![], f.clone());
+    let fields = DecodingTemplate {
+        scope_fields_specs: Box::new([]),
+        fields_specs: f.clone().into_boxed_slice(),
+    };
     let mut templates_map = HashMap::from([(307, fields)]);
     let good = IpfixPacket::new(
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
