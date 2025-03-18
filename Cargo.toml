@@ -53,11 +53,9 @@ tokio-stream = { version = "0.1" }
 tokio-test = "0.4"
 tower = { version = "0.5" }
 tower-service = "0.3"
-tower-layer = "0.3"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 bytes = "1.7"
-lazy_static = "1.5"
 rand = "0.9"
 ipnet = { version = "2.9" }
 strum = "0.27"
@@ -65,7 +63,7 @@ strum_macros = "0.27"
 serde = { version = "1.0" }
 serde_json = "1"
 nom = { version = "7.1" }
-reqwest = { version = "0.12", default-features=false }
+reqwest = { version = "0.12", default-features = false }
 roxmltree = "0.20"
 arbitrary = { version = "1" }
 arbitrary_ext = { version = "0.3" }
@@ -77,15 +75,13 @@ either = { version = "1.13" }
 opentelemetry = { version = "0.27" }
 opentelemetry_sdk = { version = "0.27" }
 opentelemetry-otlp = { version = "0.27" }
-tonic = { version = "0.12" }
 anyhow = { version = "1" }
 serde_with = { version = "3.11" }
 indexmap = { version = "2.7" }
 apache-avro = { version = "0.17" }
-schema_registry_converter = { version = "4.2", default-features=false }
-rdkafka = { version = "0.37", default-features=false }
+schema_registry_converter = { version = "4.2", default-features = false }
+rdkafka = { version = "0.37", default-features = false }
 tracing-test = { version = "0.2" }
-figment = { version = "0.10" }
 syn = { version = "2.0" }
 quote = { version = "1.0" }
 trybuild = { version = "1.0" }
