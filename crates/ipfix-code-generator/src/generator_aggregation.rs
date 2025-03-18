@@ -97,7 +97,7 @@ pub fn impl_reduce(
             ret.push_str(format!("                IE::{} => {{\n", ie.name).as_str());
             ret.push_str(format!("                    netgauze_analytics::flow::reduce_num(&mut self.{}, &incoming.{}, op)?\n", ie.name, ie.name).as_str());
             ret.push_str("                }\n");
-        } else if ["Vec<u8>", "String"].contains(&rust_type.as_str()) {
+        } else if ["Box<[u8]>", "Box<[u8; 32]>", "Box<str>"].contains(&rust_type.as_str()) {
             ret.push_str(format!("                IE::{} => {{\n", ie.name).as_str());
             ret.push_str(format!("                    netgauze_analytics::flow::reduce_misc_clone(&mut self.{}, &incoming.{}, op)?\n", ie.name, ie.name).as_str());
             ret.push_str("                }\n");

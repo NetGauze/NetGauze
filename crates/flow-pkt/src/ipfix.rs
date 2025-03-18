@@ -70,7 +70,7 @@ pub struct IpfixPacket {
     export_time: DateTime<Utc>,
     sequence_number: u32,
     observation_domain_id: u32,
-    sets: Vec<Set>,
+    sets: Box<[Set]>,
 }
 
 impl IpfixPacket {
@@ -78,7 +78,7 @@ impl IpfixPacket {
         export_time: DateTime<Utc>,
         sequence_number: u32,
         observation_domain_id: u32,
-        sets: Vec<Set>,
+        sets: Box<[Set]>,
     ) -> Self {
         Self {
             version: IPFIX_VERSION,
@@ -119,7 +119,7 @@ impl IpfixPacket {
     }
 
     /// The IPFIX payload is a vector of [Set].
-    pub const fn sets(&self) -> &Vec<Set> {
+    pub const fn sets(&self) -> &[Set] {
         &self.sets
     }
 
@@ -127,8 +127,7 @@ impl IpfixPacket {
         let export_time = self.export_time;
         let sequence_number = self.sequence_number;
         let observation_domain_id = self.observation_domain_id;
-        self.sets
-            .into_iter()
+        IntoIterator::into_iter(self.sets)
             .flat_map(|set| set.flatten())
             .map(|set| FlatIpfixPacket {
                 export_time,
@@ -143,8 +142,7 @@ impl IpfixPacket {
         let export_time = self.export_time;
         let sequence_number = self.sequence_number;
         let observation_domain_id = self.observation_domain_id;
-        self.sets
-            .into_iter()
+        IntoIterator::into_iter(self.sets)
             .flat_map(|set| set.flatten_data())
             .map(|set| FlatIpfixDataPacket {
                 export_time,
@@ -282,11 +280,11 @@ impl FlatIpfixDataPacket {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Set {
-    Template(Vec<TemplateRecord>),
-    OptionsTemplate(Vec<OptionsTemplateRecord>),
+    Template(Box<[TemplateRecord]>),
+    OptionsTemplate(Box<[OptionsTemplateRecord]>),
     Data {
         id: DataSetId,
-        records: Vec<DataRecord>,
+        records: Box<[DataRecord]>,
     },
 }
 
@@ -301,12 +299,13 @@ impl Set {
 
     pub fn flatten(self) -> Vec<FlatSet> {
         match self {
-            Self::Template(values) => values.into_iter().map(FlatSet::Template).collect(),
-            Self::OptionsTemplate(values) => {
-                values.into_iter().map(FlatSet::OptionsTemplate).collect()
-            }
-            Self::Data { id, records } => records
-                .into_iter()
+            Self::Template(values) => IntoIterator::into_iter(values)
+                .map(FlatSet::Template)
+                .collect(),
+            Self::OptionsTemplate(values) => IntoIterator::into_iter(values)
+                .map(FlatSet::OptionsTemplate)
+                .collect(),
+            Self::Data { id, records } => IntoIterator::into_iter(records)
                 .map(|record| FlatSet::Data {
                     id,
                     record: Box::new(record.flatten()),
@@ -321,8 +320,7 @@ impl Set {
             Self::OptionsTemplate(_) => {
                 vec![]
             }
-            Self::Data { id, records } => records
-                .into_iter()
+            Self::Data { id, records } => IntoIterator::into_iter(records)
                 .map(|record| FlatDataSet::new(id, record.flatten()))
                 .collect(),
         }
@@ -467,11 +465,11 @@ impl FlatDataSet {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TemplateRecord {
     id: u16,
-    field_specifiers: Vec<FieldSpecifier>,
+    field_specifiers: Box<[FieldSpecifier]>,
 }
 
 impl TemplateRecord {
-    pub const fn new(id: u16, field_specifiers: Vec<FieldSpecifier>) -> Self {
+    pub const fn new(id: u16, field_specifiers: Box<[FieldSpecifier]>) -> Self {
         Self {
             id,
             field_specifiers,
@@ -486,7 +484,7 @@ impl TemplateRecord {
     }
 
     /// List of [`FieldSpecifier`] defined in the template.
-    pub const fn field_specifiers(&self) -> &Vec<FieldSpecifier> {
+    pub const fn field_specifiers(&self) -> &[FieldSpecifier] {
         &self.field_specifiers
     }
 }
@@ -554,15 +552,15 @@ impl TemplateRecord {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct OptionsTemplateRecord {
     id: u16,
-    scope_field_specifiers: Vec<FieldSpecifier>,
-    field_specifiers: Vec<FieldSpecifier>,
+    scope_field_specifiers: Box<[FieldSpecifier]>,
+    field_specifiers: Box<[FieldSpecifier]>,
 }
 
 impl OptionsTemplateRecord {
     pub const fn new(
         id: u16,
-        scope_field_specifiers: Vec<FieldSpecifier>,
-        field_specifiers: Vec<FieldSpecifier>,
+        scope_field_specifiers: Box<[FieldSpecifier]>,
+        field_specifiers: Box<[FieldSpecifier]>,
     ) -> Self {
         Self {
             id,
@@ -575,11 +573,11 @@ impl OptionsTemplateRecord {
         self.id
     }
 
-    pub const fn scope_field_specifiers(&self) -> &Vec<FieldSpecifier> {
+    pub const fn scope_field_specifiers(&self) -> &[FieldSpecifier] {
         &self.scope_field_specifiers
     }
 
-    pub const fn field_specifiers(&self) -> &Vec<FieldSpecifier> {
+    pub const fn field_specifiers(&self) -> &[FieldSpecifier] {
         &self.field_specifiers
     }
 }
@@ -587,28 +585,31 @@ impl OptionsTemplateRecord {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataRecord {
-    scope_fields: Vec<Field>,
-    fields: Vec<Field>,
+    scope_fields: Box<[Field]>,
+    fields: Box<[Field]>,
 }
 
 impl DataRecord {
-    pub const fn new(scope_fields: Vec<Field>, fields: Vec<Field>) -> Self {
+    pub const fn new(scope_fields: Box<[Field]>, fields: Box<[Field]>) -> Self {
         Self {
             scope_fields,
             fields,
         }
     }
 
-    pub const fn scope_fields(&self) -> &Vec<Field> {
+    pub const fn scope_fields(&self) -> &[Field] {
         &self.scope_fields
     }
 
-    pub const fn fields(&self) -> &Vec<Field> {
+    pub const fn fields(&self) -> &[Field] {
         &self.fields
     }
 
     pub fn flatten(self) -> FlatDataRecord {
-        FlatDataRecord::new(self.scope_fields.into(), self.fields.into())
+        FlatDataRecord::new(
+            self.scope_fields.to_vec().into(),
+            self.fields.to_vec().into(),
+        )
     }
 }
 
@@ -663,32 +664,32 @@ mod tests {
         let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
         let sequence_number = 0;
         let observation_domain_id = 0;
-        let sets = vec![
-            Set::Template(vec![TemplateRecord::new(
+        let sets = [
+            Set::Template(Box::new([TemplateRecord::new(
                 256,
-                vec![
+                Box::new([
                     FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                     FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
-                ],
-            )]),
-            Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
+                ]),
+            )])),
+            Set::OptionsTemplate(Box::new([OptionsTemplateRecord::new(
                 258,
-                vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
-                vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
-            )]),
+                Box::new([FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]),
+                Box::new([FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]),
+            )])),
             Set::Data {
                 id: DataSetId::new(256).unwrap(),
-                records: vec![DataRecord::new(
-                    vec![Field::octetDeltaCount(189)],
-                    vec![Field::tcpDestinationPort(8080)],
-                )],
+                records: Box::new([DataRecord::new(
+                    Box::new([Field::octetDeltaCount(189)]),
+                    Box::new([Field::tcpDestinationPort(8080)]),
+                )]),
             },
         ];
         let packet = IpfixPacket::new(
             export_time,
             sequence_number,
             observation_domain_id,
-            sets.clone(),
+            Box::new(sets.clone()),
         );
         assert_eq!(packet.version(), IPFIX_VERSION);
         assert_eq!(packet.export_time(), export_time);
@@ -702,27 +703,27 @@ mod tests {
         let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
         let sequence_number = 0;
         let observation_domain_id = 0;
-        let sets = vec![
-            Set::Template(vec![TemplateRecord::new(
+        let sets = Box::new([
+            Set::Template(Box::new([TemplateRecord::new(
                 256,
-                vec![
+                Box::new([
                     FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                     FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
-                ],
-            )]),
-            Set::OptionsTemplate(vec![OptionsTemplateRecord::new(
+                ]),
+            )])),
+            Set::OptionsTemplate(Box::new([OptionsTemplateRecord::new(
                 258,
-                vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
-                vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
-            )]),
+                Box::new([FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]),
+                Box::new([FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]),
+            )])),
             Set::Data {
                 id: DataSetId::new(256).unwrap(),
-                records: vec![DataRecord::new(
-                    vec![Field::octetDeltaCount(189)],
-                    vec![Field::tcpDestinationPort(8080)],
-                )],
+                records: Box::new([DataRecord::new(
+                    Box::new([Field::octetDeltaCount(189)]),
+                    Box::new([Field::tcpDestinationPort(8080)]),
+                )]),
             },
-        ];
+        ]);
         let packet = IpfixPacket::new(
             export_time,
             sequence_number,
@@ -746,15 +747,15 @@ mod tests {
     fn test_template_record() {
         let template = TemplateRecord::new(
             256,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
-            ],
+            ]),
         );
         assert_eq!(template.id(), 256);
         assert_eq!(
             template.field_specifiers(),
-            &vec![
+            &[
                 FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
             ]
@@ -765,35 +766,35 @@ mod tests {
     fn test_options_template_record() {
         let template = OptionsTemplateRecord::new(
             258,
-            vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
-            vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
+            Box::new([FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]),
+            Box::new([FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]),
         );
         assert_eq!(template.id(), 258);
         assert_eq!(
             template.scope_field_specifiers(),
-            &vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]
+            &[FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]
         );
         assert_eq!(
             template.field_specifiers(),
-            &vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]
+            &[FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]
         );
     }
 
     #[test]
     fn test_data_record() {
         let record = DataRecord::new(
-            vec![Field::octetDeltaCount(189)],
-            vec![Field::tcpDestinationPort(8080)],
+            Box::new([Field::octetDeltaCount(189)]),
+            Box::new([Field::tcpDestinationPort(8080)]),
         );
-        assert_eq!(record.scope_fields(), &vec![Field::octetDeltaCount(189)]);
-        assert_eq!(record.fields(), &vec![Field::tcpDestinationPort(8080)]);
+        assert_eq!(record.scope_fields(), &[Field::octetDeltaCount(189)]);
+        assert_eq!(record.fields(), &[Field::tcpDestinationPort(8080)]);
     }
 
     #[test]
     fn test_flat_data_record() {
         let record = FlatDataRecord::new(
             Fields {
-                interfaceName: Some(vec!["eth0".to_string()]),
+                interfaceName: Some(vec!["eth0".into()]),
                 ..Default::default()
             },
             Fields {
@@ -805,7 +806,7 @@ mod tests {
         assert_eq!(
             record.scope_fields(),
             &Fields {
-                interfaceName: Some(vec!["eth0".to_string()]),
+                interfaceName: Some(vec!["eth0".into()]),
                 ..Default::default()
             }
         );
@@ -823,26 +824,26 @@ mod tests {
     fn test_set() {
         let template = TemplateRecord::new(
             256,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
-            ],
+            ]),
         );
         let options_template = OptionsTemplateRecord::new(
             258,
-            vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
-            vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
+            Box::new([FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]),
+            Box::new([FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]),
         );
         let data = DataRecord::new(
-            vec![Field::octetDeltaCount(189)],
-            vec![Field::tcpDestinationPort(8080)],
+            Box::new([Field::octetDeltaCount(189)]),
+            Box::new([Field::tcpDestinationPort(8080)]),
         );
         let sets = [
-            Set::Template(vec![template.clone()]),
-            Set::OptionsTemplate(vec![options_template.clone()]),
+            Set::Template(Box::new([template.clone()])),
+            Set::OptionsTemplate(Box::new([options_template.clone()])),
             Set::Data {
                 id: DataSetId::new(256).unwrap(),
-                records: vec![data.clone()],
+                records: Box::new([data.clone()]),
             },
         ];
         assert_eq!(sets[0].id(), IPFIX_TEMPLATE_SET_ID);
@@ -854,19 +855,19 @@ mod tests {
     fn test_flat_set() {
         let template = TemplateRecord::new(
             256,
-            vec![
+            Box::new([
                 FieldSpecifier::new(ie::IE::octetDeltaCount, 4).unwrap(),
                 FieldSpecifier::new(ie::IE::tcpDestinationPort, 2).unwrap(),
-            ],
+            ]),
         );
         let options_template = OptionsTemplateRecord::new(
             258,
-            vec![FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()],
-            vec![FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()],
+            Box::new([FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]),
+            Box::new([FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]),
         );
         let data = DataRecord::new(
-            vec![Field::octetDeltaCount(189)],
-            vec![Field::tcpDestinationPort(8080)],
+            Box::new([Field::octetDeltaCount(189)]),
+            Box::new([Field::tcpDestinationPort(8080)]),
         );
         let flat_data = data.clone().flatten();
         let sets = [
@@ -988,7 +989,7 @@ mod tests {
             export_time,
             sequence_number,
             observation_domain_id,
-            FlatSet::Template(TemplateRecord::new(256, vec![])),
+            FlatSet::Template(TemplateRecord::new(256, Box::new([]))),
         );
 
         let result = non_data_packet.extract_as_key_str(&ie::IE::exporterIPv6Address, &None);
