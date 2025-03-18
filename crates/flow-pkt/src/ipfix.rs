@@ -33,7 +33,11 @@ pub(crate) const IPFIX_TEMPLATE_SET_ID: u16 = 2;
 pub(crate) const IPFIX_OPTIONS_TEMPLATE_SET_ID: u16 = 3;
 
 /// Simpler template that is used to decode data records
-pub type DecodingTemplate = (Vec<FieldSpecifier>, Vec<FieldSpecifier>);
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct DecodingTemplate {
+    pub scope_fields_specs: Box<[FieldSpecifier]>,
+    pub fields_specs: Box<[FieldSpecifier]>,
+}
 
 /// Cache to store templates needed for decoding data packets
 pub type TemplatesMap = HashMap<u16, DecodingTemplate>;

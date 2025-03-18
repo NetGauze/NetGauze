@@ -368,12 +368,13 @@ impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> 
         let (scope_lens, field_lens) = match decoding_template {
             None => (None, None),
             Some(template) => {
-                let (scope_fields_spec, fields_spec) = template;
-                let scope_lens = scope_fields_spec
+                let scope_lens = template
+                    .scope_fields_specs
                     .iter()
                     .map(|x| x.length() as usize)
                     .sum::<usize>();
-                let fields_lens = fields_spec
+                let fields_lens = template
+                    .fields_specs
                     .iter()
                     .map(|x| x.length() as usize)
                     .sum::<usize>();
@@ -403,13 +404,12 @@ impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> 
         let written = match decoding_template {
             None => None,
             Some(template) => {
-                let (scope_fields_spec, fields_spec) = template;
                 for (index, record) in self.scope_fields().iter().enumerate() {
-                    let field_length = scope_fields_spec.get(index).map(|x| x.length());
+                    let field_length = template.scope_fields_specs.get(index).map(|x| x.length());
                     record.write(writer, field_length)?;
                 }
                 for (index, record) in self.fields().iter().enumerate() {
-                    let field_length = fields_spec.get(index).map(|x| x.length());
+                    let field_length = template.fields_specs.get(index).map(|x| x.length());
                     record.write(writer, field_length)?;
                 }
                 Some(())

@@ -92,7 +92,7 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf7, 0x29, 0x01, 0xbb, 0x11, 0x00, 0x04,
     ];
 
-    let fields = vec![
+    let fields = [
         FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
         FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
         FieldSpecifier::new(ie::IE::flowEndSysUpTime, 4).unwrap(),
@@ -108,7 +108,11 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
         FieldSpecifier::new(ie::IE::ipVersion, 1).unwrap(),
     ];
 
-    let mut templates_map = HashMap::from([(1024, (vec![], fields.clone()))]);
+    let decoding_template = DecodingTemplate {
+        scope_fields_specs: Box::new([]),
+        fields_specs: Box::new(fields),
+    };
+    let mut templates_map = HashMap::from([(1024, decoding_template)]);
 
     let good = NetFlowV9Packet::new(
         458441,
@@ -230,7 +234,7 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
         0x00,
     ];
 
-    let field_specifiers = vec![
+    let field_specifiers = [
         FieldSpecifier::new(ie::IE::mplsTopLabelStackSection, 3).unwrap(),
         FieldSpecifier::new(ie::IE::mplsLabelStackSection2, 3).unwrap(),
         FieldSpecifier::new(ie::IE::mplsLabelStackSection3, 3).unwrap(),
@@ -264,8 +268,11 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
         FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap(),
     ];
 
-    let fields = (vec![], field_specifiers.clone());
-    let mut templates_map = HashMap::from([(313, fields)]);
+    let decoding_template = DecodingTemplate {
+        scope_fields_specs: Box::new([]),
+        fields_specs: Box::new(field_specifiers),
+    };
+    let mut templates_map = HashMap::from([(313, decoding_template)]);
 
     let good = NetFlowV9Packet::new(
         201984782,

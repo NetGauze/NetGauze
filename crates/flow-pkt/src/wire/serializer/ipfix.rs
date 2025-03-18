@@ -222,14 +222,13 @@ impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> 
                 (scope_fields, data_fields)
             }
             Some(template) => {
-                let (scope_fields_spec, fields_spec) = template;
                 let scope_lens = self
                     .scope_fields()
                     .iter()
                     .enumerate()
                     .map(|(index, record)| {
                         {
-                            scope_fields_spec.get(index).map(|x| {
+                            template.scope_fields_specs.get(index).map(|x| {
                                 if x.length() == u16::MAX {
                                     record.len(Some(x.length()))
                                 } else {
@@ -246,7 +245,7 @@ impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> 
                     .enumerate()
                     .map(|(index, record)| {
                         {
-                            fields_spec.get(index).map(|x| {
+                            template.fields_specs.get(index).map(|x| {
                                 if x.length() == u16::MAX {
                                     record.len(Some(x.length()))
                                 } else {
@@ -278,12 +277,14 @@ impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> 
                 }
             }
             Some(template) => {
-                let (scope_fields_spec, fields_spec) = template;
                 for (index, record) in self.scope_fields().iter().enumerate() {
-                    record.write(writer, scope_fields_spec.get(index).map(|x| x.length))?;
+                    record.write(
+                        writer,
+                        template.scope_fields_specs.get(index).map(|x| x.length),
+                    )?;
                 }
                 for (index, record) in self.fields().iter().enumerate() {
-                    record.write(writer, fields_spec.get(index).map(|x| x.length))?;
+                    record.write(writer, template.fields_specs.get(index).map(|x| x.length))?;
                 }
             }
         };
