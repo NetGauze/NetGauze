@@ -85,7 +85,7 @@ pub fn impl_reduce(
         ret.push_str("                }\n");
     }
     for ie in iana_ies {
-        let rust_type = get_rust_type(&ie.data_type);
+        let rust_type = get_rust_type(&ie.data_type, &ie.name);
         if ie.name == "tcpControlBits" {
             ret.push_str("                IE::tcpControlBits => {\n");
             ret.push_str("                    netgauze_analytics::flow::reduce_boolmap(&mut self.tcpControlBits, &incoming.tcpControlBits, op)?\n");
