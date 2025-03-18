@@ -1,3 +1,8 @@
-Cloned from the crate [`nom_locate`](https://github.com/fflorent/nom_locate) but with the omission of computing
-the line & column number since we don't care about them in binary protocols,
-and they do make using the `LocateSpan` slower.
+# NetGauze collector daemon
+
+Work in progress for telemetry collection. Currently supports:
+
+1. IPFIX and NetFlow v9
+2. UDP Notif
+
+With publisher towards Kafka and HTTP endpoints.
