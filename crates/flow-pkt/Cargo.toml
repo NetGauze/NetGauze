@@ -14,7 +14,13 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 # Specify the files to include in the crate
 include = [
-    "registry/**", # Specify entire folders if needed
+    "**/*.rs",
+    "README.md",
+    "LICENSE",
+    "build.rs",
+    "benches/*.rs",
+    "examples/*.rs",
+    "registry/**",
 ]
 
 [dependencies]
