@@ -3,7 +3,7 @@
 <?xml-model href="protocol-numbers.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
 <registry xmlns="http://www.iana.org/assignments" id="protocol-numbers">
   <title>Protocol Numbers</title>
-  <updated>2024-10-24</updated>
+  <updated>2025-01-08</updated>
   <registry id="protocol-numbers-1">
     <title>Assigned Internet Protocol Numbers</title>
     <xref type="rfc" data="rfc5237"/><xref type="rfc" data="rfc7045"/>
@@ -807,7 +807,7 @@ University of California at Berkeley, June 1986.</xref>
       <name>SM (deprecated)</name>
       <description>Simple Multicast Protocol</description>
       <xref type="person" data="Jon_Crowcroft"/>
-      <xref type="draft" data="draft-perlman-simple-multicast"/>
+      <xref type="draft" data="draft-perlman-simple-multicast-03"/>
     </record>
     <record date="1999-08">
       <value>123</value>
@@ -952,8 +952,15 @@ University of California at Berkeley, June 1986.</xref>
         <xref type="uri" data="https://github.com/PlatformLab/HomaModule">HomaModule</xref>
         <xref type="person" data="John_Ousterhout"/>
     </record>
+    <record date="2025-01-08">
+      <value>147</value>
+      <name>BIT-EMU</name>
+      <description>Bit-stream Emulation</description>
+      <ipv6>Y</ipv6>
+      <xref type="draft" data="RFC-ietf-pals-ple-14"/>
+    </record>
     <record date="1995-06">
-      <value>147-252</value>
+      <value>148-252</value>
       <description>Unassigned</description>
       <xref type="person" data="Internet_Assigned_Numbers_Authority"/>
     </record>
