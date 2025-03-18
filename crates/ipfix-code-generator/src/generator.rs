@@ -2567,8 +2567,8 @@ pub fn generate_flat_ie_struct(
     }
     ret.push_str("}\n\n");
 
-    ret.push_str("impl From<Vec<Field>> for Fields {\n");
-    ret.push_str("    fn from(fields: Vec<Field>) -> Self {\n");
+    ret.push_str("impl From<Box<[Field]>> for Fields {\n");
+    ret.push_str("    fn from(fields: Box<[Field]>) -> Self {\n");
     ret.push_str("        let mut out = Fields::default();\n");
     for (_name, pkg, _) in vendors {
         ret.push_str(format!("        let mut {pkg}_fields = vec![];\n").as_str());
@@ -2610,7 +2610,7 @@ pub fn generate_flat_ie_struct(
     ret.push_str("        }\n");
 
     for (_name, pkg, _) in vendors {
-        ret.push_str(format!("        out.{pkg} = if {pkg}_fields.is_empty() {{ None }} else {{ Some({pkg}_fields.into()) }};\n").as_str());
+        ret.push_str(format!("        out.{pkg} = if {pkg}_fields.is_empty() {{ None }} else {{ Some({pkg}_fields.into_boxed_slice().into()) }};\n").as_str());
     }
     ret.push_str("        out\n");
     ret.push_str("    }\n");
