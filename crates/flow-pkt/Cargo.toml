@@ -29,6 +29,7 @@ netgauze-parse-utils = { workspace = true, optional = true }
 netgauze-serde-macros = { workspace = true, optional = true }
 netgauze-iana = { workspace = true }
 netgauze-analytics = { workspace = true }
+expand-enum = { git = "https://github.com/NetGauze/expand-enum.git" }
 serde = { workspace = true, features = ["derive"] }
 strum = { workspace = true }
 strum_macros = { workspace = true }

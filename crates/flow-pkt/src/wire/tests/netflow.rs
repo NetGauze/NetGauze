@@ -710,7 +710,7 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
                     ie::Field::classificationEngineId(ie::classificationEngineId::ETHERTYPE),
                     ie::Field::flowEndReason(ie::flowEndReason::lackofresources),
                     ie::Field::natOriginatingAddressRealm(
-                        ie::natOriginatingAddressRealm::Unassigned(15),
+                        ie::natOriginatingAddressRealm::Unassigned15,
                     ),
                     ie::Field::firewallEvent(ie::firewallEvent::FlowDeleted),
                     ie::Field::biflowDirection(ie::biflowDirection::perimeter),

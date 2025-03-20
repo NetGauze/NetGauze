@@ -23,11 +23,12 @@ use crate::{
 pub fn generate_subregistry_enum_and_impl(
     ie_name: &String,
     rust_type: &String,
+    header: &str,
     ie_subregistry: &[InformationElementSubRegistry],
 ) -> String {
     let mut ret = String::new();
 
-    ret.push_str(generate_enum(ie_name, rust_type, ie_subregistry).as_str());
+    ret.push_str(generate_enum(ie_name, header, rust_type, ie_subregistry).as_str());
     ret.push_str(generate_from_impl_for_rust_type(ie_name, rust_type, ie_subregistry).as_str());
     ret.push_str(generate_from_impl_for_enum_type(ie_name, rust_type, ie_subregistry).as_str());
 
@@ -45,8 +46,7 @@ pub fn generate_subregistry_enum_and_impl(
                 rust_type != "f32" && rust_type != "f64",
                 false,
             );
-            ret.push_str(gen_derive.as_str());
-            ret.push_str(generate_enum(&enum_name, rust_type, &rec.reason_code_reg).as_str());
+            ret.push_str(generate_enum(&enum_name, gen_derive.as_str(), rust_type, &rec.reason_code_reg).as_str());
             ret.push_str(
                 generate_from_impl_for_rust_type(&enum_name, rust_type, &rec.reason_code_reg)
                     .as_str(),
@@ -81,11 +81,62 @@ pub fn generate_desc_and_refs_common(rec: &dyn SubRegistry) -> String {
 /// Generate Enum Type for Subregistry
 pub fn generate_enum(
     enum_name: &String,
+    header: &str,
     rust_type: &String,
     registry: &[InformationElementSubRegistry],
 ) -> String {
     let mut ret = String::new();
-    ret.push_str(format!("#[repr({rust_type})]\n").as_str());
+    let all_value = registry.iter().all(|x| matches!(x, InformationElementSubRegistry::ValueNameDescRegistry(_)));
+    if rust_type == "u8" && all_value {
+        ret.push_str("expand_enum::expand_enum!{ \n");
+        for line in header.lines() {
+            ret.push_str("    ");
+            ret.push_str(line);
+            ret.push('\n');
+        }
+
+        ret.push_str(format!("    #[repr({rust_type})]\n").as_str());
+        ret.push_str("    #[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
+        ret.push_str(format!("    pub enum {enum_name} {{\n").as_str());
+
+        for rec in registry {
+            match rec {
+                InformationElementSubRegistry::ValueNameDescRegistry(rec) => {
+                    //ret.push_str(generate_desc_and_refs_common(rec).as_str());
+                    for line in generate_desc_and_refs_common(rec).lines() {
+                        ret.push_str("    ");
+                        ret.push_str(line);
+                        ret.push('\n');
+                    }
+                    ret.push_str(format!("        {} = {},\n", rec.name, rec.value).as_str());
+                }
+                _ => unreachable!()
+            }
+        }
+        ret.push_str("        #[other]\n");
+        ret.push_str(format!("        Unassigned({rust_type}),\n").as_str());
+        ret.push_str("    }\n\n");
+        ret.push_str("}\n");
+        return ret;
+    }
+    ret.push_str(header);
+    let mut native_type = false;
+    for v in registry {
+        match v {
+            InformationElementSubRegistry::ValueNameDescRegistry(_) => {
+                native_type = true
+            }
+            InformationElementSubRegistry::ReasonCodeNestedRegistry(_) => {
+                native_type = false;
+                break
+            }
+        }
+
+    }
+    if native_type {
+        assert_ne!(enum_name, "forwardingStatusUnknownReason");
+        ret.push_str(format!("#[repr({rust_type})]\n").as_str());
+    }
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str(format!("pub enum {enum_name} {{\n").as_str());
 
@@ -115,6 +166,9 @@ pub fn generate_from_impl_for_rust_type(
     registry: &[InformationElementSubRegistry],
 ) -> String {
     let mut ret = String::new();
+    if rust_type == "u8" && registry.iter().all(|x| matches!(x, InformationElementSubRegistry::ValueNameDescRegistry(_))) {
+        return ret
+    }
     ret.push_str(format!("impl From<{enum_name}> for {rust_type} {{\n").as_str());
     ret.push_str(format!("    fn from(value: {enum_name}) -> Self {{\n").as_str());
     ret.push_str("        match value {\n");
@@ -155,6 +209,9 @@ pub fn generate_from_impl_for_enum_type(
     registry: &[InformationElementSubRegistry],
 ) -> String {
     let mut ret = String::new();
+    if rust_type == "u8" && registry.iter().all(|x| matches!(x, InformationElementSubRegistry::ValueNameDescRegistry(_))) {
+        return ret
+    }
     ret.push_str(format!("impl From<{}> for {} {{\n", &rust_type, enum_name).as_str());
     ret.push_str(format!("    fn from(value: {rust_type}) -> Self {{\n").as_str());
 

@@ -1858,10 +1858,11 @@ pub(crate) fn generate_ie_values(
         );
 
         if let Some(ie_subregistry) = &ie.subregistry {
-            ret.push_str("#[allow(non_camel_case_types)]\n");
-            ret.push_str(gen_derive.as_str());
+
+            let mut header = "#[allow(non_camel_case_types)]\n".to_string();
+            header.push_str(gen_derive.as_str());
             ret.push_str(
-                generate_subregistry_enum_and_impl(&ie.name, &rust_type, ie_subregistry).as_str(),
+                generate_subregistry_enum_and_impl(&ie.name, &rust_type, &header, ie_subregistry).as_str(),
             );
             match &vendor_name {
                 None => {
