@@ -22,10 +22,12 @@ use regex::Regex;
 use roxmltree::Node;
 
 const MAX_WORDS_NAME: usize = 10;
+const MAX_CHARS_DISPLAY_NAME: usize = 50;
 
 /// Subregistry Trait with getter functions for common values
 pub trait SubRegistry {
     fn name(&self) -> &str;
+    fn display_name(&self) -> &str;
     fn description(&self) -> &str;
     fn comments(&self) -> &Option<String>;
     fn parameters(&self) -> &Option<String>;
@@ -35,6 +37,10 @@ pub trait SubRegistry {
 impl SubRegistry for ValueNameDescRegistry {
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn display_name(&self) -> &str {
+        &self.display_name
     }
 
     fn description(&self) -> &str {
@@ -57,6 +63,10 @@ impl SubRegistry for ValueNameDescRegistry {
 impl SubRegistry for ReasonCodeNestedRegistry {
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn display_name(&self) -> &str {
+        &self.display_name
     }
 
     fn description(&self) -> &str {
@@ -156,9 +166,13 @@ pub fn parse_val_name_desc_u8_registry(node: &Node<'_, '_>) -> (u16, Vec<ValueNa
             continue;
         }
 
-        // Populate name, description
-        // If name not there, take it from the description
+        // Populate name, display_name, and description
+        // - name is always a usable enum variant type name (if not there in the
+        //   registry, take it from the description)
+        // - display_name matches the IANA registry name (apart from when name is
+        //   populated from description field)
         let mut name: String;
+        let mut display_name: String;
         let description: String;
         if let Some(Ok(value)) = value {
             if value == u8::MAX {
@@ -167,6 +181,8 @@ pub fn parse_val_name_desc_u8_registry(node: &Node<'_, '_>) -> (u16, Vec<ValueNa
             }
 
             if let Some(name_parsed) = name_parsed {
+                display_name = name_parsed.clone();
+
                 (_, name) = xml_string_to_enum_type(&name_parsed);
                 if let Some(desc_parsed) = description_parsed {
                     description = desc_parsed;
@@ -180,9 +196,15 @@ pub fn parse_val_name_desc_u8_registry(node: &Node<'_, '_>) -> (u16, Vec<ValueNa
                 (desc_words_amount, desc_parsed) = xml_string_to_enum_type(&desc_parsed);
 
                 if desc_words_amount < MAX_WORDS_NAME {
+                    display_name = desc_parsed.clone();
                     name = desc_parsed;
                 } else {
+                    display_name = format!("Value{value}");
                     name = format!("Value{value}");
+                }
+
+                if description.len() < MAX_CHARS_DISPLAY_NAME {
+                    display_name = description.clone();
                 }
             } else {
                 log::info!("Skipping sub-registry: missing both name and description!");
@@ -201,6 +223,7 @@ pub fn parse_val_name_desc_u8_registry(node: &Node<'_, '_>) -> (u16, Vec<ValueNa
             ret.push(ValueNameDescRegistry {
                 value,
                 name,
+                display_name,
                 description,
                 comments,
                 parameters,
@@ -229,6 +252,7 @@ pub fn parse_reason_code_nested_u8_registry_2bit(
             ReasonCodeNestedRegistry {
                 value: subreg.value << 6,
                 name: SubRegistry::name(subreg).to_string(),
+                display_name: SubRegistry::display_name(subreg).to_string(),
                 description: SubRegistry::description(subreg).to_string(),
                 comments: SubRegistry::comments(subreg).to_owned(),
                 parameters: SubRegistry::parameters(subreg).to_owned(),

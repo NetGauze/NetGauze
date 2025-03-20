@@ -87,6 +87,7 @@ pub enum InformationElementSubRegistry {
 pub struct ValueNameDescRegistry {
     pub value: u8,
     pub name: String,
+    pub display_name: String,
     pub description: String,
     pub comments: Option<String>,
     pub parameters: Option<String>,
@@ -99,6 +100,7 @@ pub struct ValueNameDescRegistry {
 pub struct ReasonCodeNestedRegistry {
     pub value: u8,
     pub name: String,
+    pub display_name: String,
     pub description: String,
     pub comments: Option<String>,
     pub parameters: Option<String>,
