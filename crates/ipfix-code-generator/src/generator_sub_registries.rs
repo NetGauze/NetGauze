@@ -93,10 +93,16 @@ pub fn generate_enum(
         match rec {
             InformationElementSubRegistry::ValueNameDescRegistry(rec) => {
                 ret.push_str(generate_desc_and_refs_common(rec).as_str());
+                ret.push_str(
+                    format!("    #[strum(to_string = \"{}\")]\n", rec.display_name).as_str(),
+                );
                 ret.push_str(format!("    {} = {},\n", rec.name, rec.value).as_str());
             }
             InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) => {
                 ret.push_str(generate_desc_and_refs_common(rec).as_str());
+                ret.push_str(
+                    format!("    #[strum(to_string = \"{} {{0}}\")]\n", rec.display_name).as_str(),
+                );
                 ret.push_str(
                     format!("    {}({}{}Reason),\n", rec.name, enum_name, rec.name).as_str(),
                 );
