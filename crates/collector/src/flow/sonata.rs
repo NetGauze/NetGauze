@@ -19,7 +19,7 @@ use rdkafka::{
     consumer::{
         stream_consumer::StreamConsumer, BaseConsumer, Consumer, ConsumerContext, Rebalance,
     },
-    error::{KafkaError, KafkaResult},
+    error::{KafkaError, KafkaResult, RDKafkaErrorCode},
     message::BorrowedMessage,
     ClientContext, Message, TopicPartitionList,
 };
@@ -290,8 +290,23 @@ impl SonataActor {
                             self.handle_kafka_msg(msg).await;
                         }
                         Err(err) => {
-                            error!("Failed to receive message: {err}");
-                            return Err(anyhow::Error::from(err))
+                            match err {
+                                KafkaError::MessageConsumption(RDKafkaErrorCode::AllBrokersDown) => {
+                                    error!("Sonata message consumer has all brokers down, shutting down: {err}");
+                                    return Err(anyhow::Error::from(err))
+                                }
+                                KafkaError::MessageConsumption(RDKafkaErrorCode::UnknownTopicOrPartition) => {
+                                    error!("Sonata topic doesn't exist, shutting down: {err}");
+                                    return Err(anyhow::Error::from(err))
+                                }
+                                KafkaError::MessageConsumptionFatal(err) => {
+                                    error!("Sonata message consumer has received fatal consumption error, shutting down: {err}");
+                                    return Err(anyhow::Error::from(err))
+                                }
+                                err => {
+                                     warn!("Failed to receive Sonata message, ignoring error: {err}");
+                                }
+                            }
                         }
                     }
                 }
