@@ -34,6 +34,7 @@ pub(crate) const NETFLOW_OPTIONS_TEMPLATE_SET_ID: u16 = 1;
 
 /// Simpler template that is used to decode data records
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DecodingTemplate {
     pub scope_fields_specs: Box<[ScopeFieldSpecifier]>,
     pub fields_specs: Box<[FieldSpecifier]>,
