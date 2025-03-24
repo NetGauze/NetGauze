@@ -85,7 +85,12 @@ pub fn generate_enum(
     registry: &[InformationElementSubRegistry],
 ) -> String {
     let mut ret = String::new();
-    ret.push_str(format!("#[repr({rust_type})]\n").as_str());
+    let unit_type = registry
+        .iter()
+        .any(|x| matches!(x, InformationElementSubRegistry::ValueNameDescRegistry(_)));
+    if unit_type {
+        ret.push_str(format!("#[repr({rust_type})]\n").as_str());
+    }
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str(format!("pub enum {enum_name} {{\n").as_str());
 
