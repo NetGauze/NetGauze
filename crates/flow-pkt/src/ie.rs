@@ -104,7 +104,7 @@ pub enum InformationElementDataType {
     /// [RFC7011](https://datatracker.ietf.org/doc/html/rfc7011)
     subTemplateMultiList = 22,
 
-    /// [RFC-ietf-opsawg-ipfix-tcpo-v6eh-18](https://datatracker.ietf.org/doc/draft-ietf-opsawg-ipfix-tcpo-v6eh/18/)
+    /// [RFC9740](https://datatracker.ietf.org/doc/html/rfc9740)
     unsigned256 = 23,
 }
 
