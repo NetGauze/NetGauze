@@ -69,8 +69,8 @@ pub type TemplatesMap = HashMap<u16, DecodingTemplate>;
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[repr(C, align(8))]
 pub struct NetFlowV9Packet {
-    version: u16,
     sys_up_time: u32,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_datetime))]
     unix_time: DateTime<Utc>,
@@ -88,7 +88,6 @@ impl NetFlowV9Packet {
         sets: Box<[Set]>,
     ) -> Self {
         Self {
-            version: NETFLOW_V9_VERSION,
             sys_up_time,
             unix_time,
             sequence_number,
@@ -98,7 +97,7 @@ impl NetFlowV9Packet {
     }
 
     pub const fn version(&self) -> u16 {
-        self.version
+        NETFLOW_V9_VERSION
     }
 
     pub const fn sys_up_time(&self) -> u32 {

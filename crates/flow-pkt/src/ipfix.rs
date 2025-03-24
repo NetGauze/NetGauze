@@ -70,7 +70,6 @@ pub type TemplatesMap = HashMap<u16, DecodingTemplate>;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct IpfixPacket {
-    version: u16,
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_datetime))]
     export_time: DateTime<Utc>,
     sequence_number: u32,
@@ -86,7 +85,6 @@ impl IpfixPacket {
         sets: Box<[Set]>,
     ) -> Self {
         Self {
-            version: IPFIX_VERSION,
             export_time,
             sequence_number,
             observation_domain_id,
@@ -96,7 +94,7 @@ impl IpfixPacket {
 
     /// IPFIX Protocol version
     pub const fn version(&self) -> u16 {
-        self.version
+        IPFIX_VERSION
     }
 
     /// Time at which the IPFIX Message Header leaves the Exporter.
