@@ -290,10 +290,10 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                 }
 
                 // We can safely unwrap DataSetId here since we already checked the range
-                Set::Data {
-                    id: DataSetId::new(id).unwrap(),
-                    records: records.into_boxed_slice(),
-                }
+                Set::Data(Data::new(
+                    DataSetId::new(id).unwrap(),
+                    records.into_boxed_slice(),
+                ))
             }
         };
         Ok((remainder, set))

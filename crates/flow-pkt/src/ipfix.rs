@@ -270,6 +270,37 @@ impl FlatIpfixDataPacket {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct Data {
+    id: DataSetId,
+    records: Box<[DataRecord]>,
+}
+
+impl Data {
+    pub const fn new(id: DataSetId, records: Box<[DataRecord]>) -> Self {
+        Self { id, records }
+    }
+
+    pub const fn id(&self) -> DataSetId {
+        self.id
+    }
+
+    pub const fn records(&self) -> &[DataRecord] {
+        &self.records
+    }
+
+    pub fn into_records(self) -> Box<[DataRecord]> {
+        self.records
+    }
+}
+
+impl From<Data> for Box<[DataRecord]> {
+    fn from(data: Data) -> Self {
+        data.into_records()
+    }
+}
+
 /// Every Set contains a common header. The Sets can be any of these three
 /// possible types: Data Set, Template Set, or Options Template Set.
 ///
@@ -285,10 +316,7 @@ impl FlatIpfixDataPacket {
 pub enum Set {
     Template(Box<[TemplateRecord]>),
     OptionsTemplate(Box<[OptionsTemplateRecord]>),
-    Data {
-        id: DataSetId,
-        records: Box<[DataRecord]>,
-    },
+    Data(Data),
 }
 
 impl Set {
@@ -296,7 +324,7 @@ impl Set {
         match self {
             Self::Template(_) => IPFIX_TEMPLATE_SET_ID,
             Self::OptionsTemplate(_) => IPFIX_OPTIONS_TEMPLATE_SET_ID,
-            Self::Data { id, records: _ } => id.0,
+            Self::Data(val) => val.id.0,
         }
     }
 
@@ -308,12 +336,15 @@ impl Set {
             Self::OptionsTemplate(values) => IntoIterator::into_iter(values)
                 .map(FlatSet::OptionsTemplate)
                 .collect(),
-            Self::Data { id, records } => IntoIterator::into_iter(records)
-                .map(|record| FlatSet::Data {
-                    id,
-                    record: Box::new(record.flatten()),
-                })
-                .collect(),
+            Self::Data(data) => {
+                let id = data.id;
+                IntoIterator::into_iter(data.into_records())
+                    .map(|record| FlatSet::Data {
+                        id,
+                        record: Box::new(record.flatten()),
+                    })
+                    .collect()
+            }
         }
     }
 
@@ -323,9 +354,12 @@ impl Set {
             Self::OptionsTemplate(_) => {
                 vec![]
             }
-            Self::Data { id, records } => IntoIterator::into_iter(records)
-                .map(|record| FlatDataSet::new(id, record.flatten()))
-                .collect(),
+            Self::Data(data) => {
+                let id = data.id;
+                IntoIterator::into_iter(data.into_records())
+                    .map(|record| FlatDataSet::new(id, record.flatten()))
+                    .collect()
+            }
         }
     }
 }
@@ -677,13 +711,13 @@ mod tests {
                 Box::new([FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]),
                 Box::new([FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]),
             )])),
-            Set::Data {
-                id: DataSetId::new(256).unwrap(),
-                records: Box::new([DataRecord::new(
+            Set::Data(Data::new(
+                DataSetId::new(256).unwrap(),
+                Box::new([DataRecord::new(
                     Box::new([Field::octetDeltaCount(189)]),
                     Box::new([Field::tcpDestinationPort(8080)]),
                 )]),
-            },
+            )),
         ];
         let packet = IpfixPacket::new(
             export_time,
@@ -716,13 +750,13 @@ mod tests {
                 Box::new([FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap()]),
                 Box::new([FieldSpecifier::new(ie::IE::interfaceName, 255).unwrap()]),
             )])),
-            Set::Data {
-                id: DataSetId::new(256).unwrap(),
-                records: Box::new([DataRecord::new(
+            Set::Data(Data::new(
+                DataSetId::new(256).unwrap(),
+                Box::new([DataRecord::new(
                     Box::new([Field::octetDeltaCount(189)]),
                     Box::new([Field::tcpDestinationPort(8080)]),
                 )]),
-            },
+            )),
         ]);
         let packet = IpfixPacket::new(
             export_time,
@@ -841,10 +875,10 @@ mod tests {
         let sets = [
             Set::Template(Box::new([template.clone()])),
             Set::OptionsTemplate(Box::new([options_template.clone()])),
-            Set::Data {
-                id: DataSetId::new(256).unwrap(),
-                records: Box::new([data.clone()]),
-            },
+            Set::Data(Data::new(
+                DataSetId::new(256).unwrap(),
+                Box::new([data.clone()]),
+            )),
         ];
         assert_eq!(sets[0].id(), IPFIX_TEMPLATE_SET_ID);
         assert_eq!(sets[1].id(), IPFIX_OPTIONS_TEMPLATE_SET_ID);

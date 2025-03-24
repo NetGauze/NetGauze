@@ -280,9 +280,9 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
             0,
             0,
-            Box::new([ipfix::Set::Data {
-                id: DataSetId::new(400).unwrap(),
-                records: Box::new([
+            Box::new([ipfix::Set::Data(ipfix::Data::new(
+                DataSetId::new(400).unwrap(),
+                Box::new([
                     ipfix::DataRecord::new(
                         Box::new([Field::egressVRFID(10)]),
                         Box::new([
@@ -304,7 +304,7 @@ mod tests {
                         ]),
                     ),
                 ]),
-            }]),
+            ))]),
         );
         let flow = FlowInfo::IPFIX(ipfix_data);
         let flattened = flow.flatten();
@@ -366,9 +366,9 @@ mod tests {
             Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
             0,
             0,
-            Box::new([netflow::Set::Data {
-                id: DataSetId::new(400).unwrap(),
-                records: Box::new([
+            Box::new([netflow::Set::Data(netflow::Data::new(
+                DataSetId::new(400).unwrap(),
+                Box::new([
                     netflow::DataRecord::new(
                         Box::new([netflow::ScopeField::Interface(netflow::Interface(100))]),
                         Box::new([
@@ -393,7 +393,7 @@ mod tests {
                         ]),
                     ),
                 ]),
-            }]),
+            ))]),
         );
         let flow = FlowInfo::NetFlowV9(data);
         let flattened = flow.flatten();

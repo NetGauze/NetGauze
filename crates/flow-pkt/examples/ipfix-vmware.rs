@@ -73,9 +73,9 @@ fn main() {
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        Box::new([Set::Data {
-            id: DataSetId::new(400).unwrap(),
-            records: Box::new([DataRecord::new(
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(400).unwrap(),
+            Box::new([DataRecord::new(
                 Box::new([]),
                 Box::new([
                     ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
@@ -104,7 +104,7 @@ fn main() {
                     )),
                 ]),
             )]),
-        }]),
+        ))]),
     );
 
     println!(

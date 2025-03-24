@@ -119,9 +119,9 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
         Utc.with_ymd_and_hms(2017, 7, 25, 12, 50, 1).unwrap(),
         1,
         0,
-        Box::new([Set::Data {
-            id: DataSetId::new(1024).unwrap(),
-            records: Box::new([
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(1024).unwrap(),
+            Box::new([
                 DataRecord::new(
                     Box::new([]),
                     Box::new([
@@ -203,7 +203,7 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
                     ]),
                 ),
             ]),
-        }]),
+        ))]),
     );
 
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
@@ -279,9 +279,9 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
         Utc.with_ymd_and_hms(2023, 1, 28, 15, 56, 9).unwrap(),
         14925203,
         2081,
-        Box::new([Set::Data {
-            id: DataSetId::new(313).unwrap(),
-            records: Box::new([
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(313).unwrap(),
+            Box::new([
                 DataRecord::new(
                     Box::new([]),
                     Box::new([
@@ -363,7 +363,7 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
                     ]),
                 ),
             ]),
-        }]),
+        ))]),
     );
 
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
@@ -690,9 +690,9 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
         Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
         1,
         0,
-        Box::new([Set::Data {
-            id: DataSetId::new(400).unwrap(),
-            records: Box::new([DataRecord::new(
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(400).unwrap(),
+            Box::new([DataRecord::new(
                 Box::new([]),
                 Box::new([
                     ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
@@ -738,7 +738,7 @@ fn test_with_iana_subregs() -> Result<(), NetFlowV9WritingError> {
                     ),
                 ]),
             )]),
-        }]),
+        ))]),
     );
 
     let mut templates_map = HashMap::new();

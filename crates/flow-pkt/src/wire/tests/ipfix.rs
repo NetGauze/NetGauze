@@ -241,9 +241,9 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
         3812,
         0,
-        Box::new([Set::Data {
-            id: DataSetId::new(307).unwrap(),
-            records: Box::new([DataRecord::new(
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(307).unwrap(),
+            Box::new([DataRecord::new(
                 Box::new([]),
                 Box::new([
                     ie::Field::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1)),
@@ -283,7 +283,7 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
                     ),
                 ]),
             )]),
-        }]),
+        ))]),
     );
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
     test_write_with_one_input(&good, Some(&templates_map), &good_wire)?;
@@ -560,9 +560,9 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2023, 12, 22, 15, 18, 53).unwrap(),
         118278,
         33312,
-        Box::new([Set::Data {
-            id: DataSetId::new(257).unwrap(),
-            records: Box::new([DataRecord::new(
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(257).unwrap(),
+            Box::new([DataRecord::new(
                 Box::new([ie::Field::selectorId(1)]),
                 Box::new([
                     ie::Field::samplingPacketInterval(1),
@@ -573,7 +573,7 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::selectorName("NETFLOW-SAMPLER-MAP".into()),
                 ]),
             )]),
-        }]),
+        ))]),
     );
 
     let mut templates_map = HashMap::new();
@@ -634,9 +634,9 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        Box::new([Set::Data {
-            id: DataSetId::new(400).unwrap(),
-            records: Box::new([DataRecord::new(
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(400).unwrap(),
+            Box::new([DataRecord::new(
                 Box::new([]),
                 Box::new([
                     ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
@@ -657,7 +657,7 @@ fn test_with_nokia_pen_fields() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::packetDeltaCount(1),
                 ]),
             )]),
-        }]),
+        ))]),
     );
 
     let mut templates_map = HashMap::new();
@@ -731,9 +731,9 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        Box::new([Set::Data {
-            id: DataSetId::new(400).unwrap(),
-            records: Box::new([DataRecord::new(
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(400).unwrap(),
+            Box::new([DataRecord::new(
                 Box::new([]),
                 Box::new([
                     ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
@@ -766,7 +766,7 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
                     )),
                 ]),
             )]),
-        }]),
+        ))]),
     );
 
     let mut templates_map = HashMap::new();
@@ -841,9 +841,9 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
         Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
         0,
         0,
-        Box::new([Set::Data {
-            id: DataSetId::new(400).unwrap(),
-            records: Box::new([DataRecord::new(
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(400).unwrap(),
+            Box::new([DataRecord::new(
                 Box::new([]),
                 Box::new([
                     ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
@@ -889,7 +889,7 @@ fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
                     ),
                 ]),
             )]),
-        }]),
+        ))]),
     );
 
     let mut templates_map = HashMap::new();

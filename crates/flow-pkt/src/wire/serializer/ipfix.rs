@@ -302,9 +302,9 @@ fn calculate_set_size_with_padding(
         + match set {
             Set::Template(records) => records.iter().map(|x| x.len()).sum::<usize>(),
             Set::OptionsTemplate(records) => records.iter().map(|x| x.len()).sum::<usize>(),
-            Set::Data { id: _, records } => {
+            Set::Data(data) => {
                 let decoding_template = templates_map.and_then(|x| x.get(&set.id()));
-                records
+                data.records()
                     .iter()
                     .map(|x| x.len(decoding_template))
                     .sum::<usize>()
@@ -374,11 +374,11 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, SetWritingError> for Set {
                     record.write(writer)?;
                 }
             }
-            Self::Data { id, records } => {
-                writer.write_u16::<NetworkEndian>(id.id())?;
+            Self::Data(data) => {
+                writer.write_u16::<NetworkEndian>(data.id().0)?;
                 writer.write_u16::<NetworkEndian>(length)?;
                 let decoding_template = templates_map.and_then(|x| x.get(&self.id()));
-                for record in records {
+                for record in data.records() {
                     record.write(writer, decoding_template)?;
                 }
             }

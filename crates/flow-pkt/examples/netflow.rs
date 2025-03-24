@@ -51,9 +51,9 @@ fn main() {
         Utc.with_ymd_and_hms(2023, 3, 4, 12, 0, 1).unwrap(),
         3812,
         0,
-        Box::new([Set::Data {
-            id: DataSetId::new(307).unwrap(),
-            records: Box::new([DataRecord::new(
+        Box::new([Set::Data(Data::new(
+            DataSetId::new(307).unwrap(),
+            Box::new([DataRecord::new(
                 Box::new([]),
                 Box::new([
                     ie::Field::sourceIPv4Address(Ipv4Addr::new(70, 1, 115, 1)),
@@ -62,7 +62,7 @@ fn main() {
                     ie::Field::packetDeltaCount(9),
                 ]),
             )]),
-        }]),
+        ))]),
     );
 
     println!(

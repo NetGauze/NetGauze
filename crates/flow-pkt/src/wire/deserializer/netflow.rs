@@ -118,14 +118,14 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedNetFlowV9PacketPa
             match set {
                 Set::Template(_) => i -= 1,
                 Set::OptionsTemplate(_) => i -= 1,
-                Set::Data { id: _, ref records } => {
-                    if records.len() > i {
+                Set::Data(ref data) => {
+                    if data.records().len() > i {
                         return Err(nom::Err::Error(LocatedNetFlowV9PacketParsingError::new(
                             input,
                             NetFlowV9PacketParsingError::InvalidCount(count),
                         )));
                     }
-                    i -= records.len()
+                    i -= data.records().len()
                 }
             }
             payload.push(set);
@@ -285,10 +285,10 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                 // buf could be a non zero value for padding
                 check_padding_value(buf)?;
                 // We can safely unwrap DataSetId here since we already checked the range
-                Set::Data {
-                    id: DataSetId::new(id).unwrap(),
-                    records: records.into_boxed_slice(),
-                }
+                Set::Data(Data::new(
+                    DataSetId::new(id).unwrap(),
+                    records.into_boxed_slice(),
+                ))
             }
         };
         Ok((remainder, set))

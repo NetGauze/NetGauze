@@ -253,13 +253,41 @@ impl FlatNetFlowV9DataPacket {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct Data {
+    id: DataSetId,
+    records: Box<[DataRecord]>,
+}
+
+impl Data {
+    pub const fn new(id: DataSetId, records: Box<[DataRecord]>) -> Self {
+        Self { id, records }
+    }
+
+    pub const fn id(&self) -> DataSetId {
+        self.id
+    }
+
+    pub const fn records(&self) -> &[DataRecord] {
+        &self.records
+    }
+
+    pub fn into_records(self) -> Box<[DataRecord]> {
+        self.records
+    }
+}
+
+impl From<Data> for Box<[DataRecord]> {
+    fn from(data: Data) -> Self {
+        data.into_records()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum Set {
     Template(Box<[TemplateRecord]>),
     OptionsTemplate(Box<[OptionsTemplateRecord]>),
-    Data {
-        id: DataSetId,
-        records: Box<[DataRecord]>,
-    },
+    Data(Data),
 }
 
 impl Set {
@@ -267,7 +295,7 @@ impl Set {
         match self {
             Self::Template(_) => NETFLOW_TEMPLATE_SET_ID,
             Self::OptionsTemplate(_) => NETFLOW_OPTIONS_TEMPLATE_SET_ID,
-            Self::Data { id, records: _ } => id.0,
+            Self::Data(data) => data.id().0,
         }
     }
 
@@ -279,15 +307,18 @@ impl Set {
             Self::OptionsTemplate(values) => IntoIterator::into_iter(values)
                 .map(FlatSet::OptionsTemplate)
                 .collect(),
-            Self::Data { id, records } => IntoIterator::into_iter(records)
-                .map(|record| FlatSet::Data {
-                    id,
-                    record: Box::new(FlatDataRecord::new(
-                        record.scope_fields.into(),
-                        record.fields.into(),
-                    )),
-                })
-                .collect(),
+            Self::Data(data) => {
+                let id = data.id();
+                IntoIterator::into_iter(data.into_records())
+                    .map(|record| FlatSet::Data {
+                        id,
+                        record: Box::new(FlatDataRecord::new(
+                            record.scope_fields.into(),
+                            record.fields.into(),
+                        )),
+                    })
+                    .collect()
+            }
         }
     }
 
@@ -297,14 +328,17 @@ impl Set {
             Self::OptionsTemplate(_) => {
                 vec![]
             }
-            Self::Data { id, records } => IntoIterator::into_iter(records)
-                .map(|record| {
-                    FlatDataSet::new(
-                        id,
-                        FlatDataRecord::new(record.scope_fields.into(), record.fields.into()),
-                    )
-                })
-                .collect(),
+            Self::Data(data) => {
+                let id = data.id();
+                IntoIterator::into_iter(data.into_records())
+                    .map(|record| {
+                        FlatDataSet::new(
+                            id,
+                            FlatDataRecord::new(record.scope_fields.into(), record.fields.into()),
+                        )
+                    })
+                    .collect()
+            }
         }
     }
 }
@@ -825,13 +859,13 @@ mod tests {
         let unix_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
         let sequence_number = 0;
         let source_id = 0;
-        let set = Set::Data {
-            id: DataSetId(0),
-            records: Box::new([DataRecord::new(
+        let set = Set::Data(Data::new(
+            DataSetId(0),
+            Box::new([DataRecord::new(
                 Box::new([ScopeField::System(System(1))]),
                 Box::new([Field::octetDeltaCount(1000)]),
             )]),
-        };
+        ));
         let packet = NetFlowV9Packet::new(
             sys_up_time,
             unix_time,
