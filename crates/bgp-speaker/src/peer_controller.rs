@@ -172,27 +172,15 @@ impl<
         match bgp_event {
             Ok(event) => {
                 if let Err(err) = rec_tx.send(Ok((fsm_state, event))) {
-                    log::error!(
-                        "[{}][{}] Couldn't send BGP event message, terminating the connection: {err:?}",
-                        peer_key,
-                        fsm_state,
-                    );
+                    log::error!("[{peer_key}][{fsm_state}] Couldn't send BGP event message, terminating the connection: {err:?}");
                     return Err(());
                 }
                 Ok(())
             }
             Err(err) => {
-                log::error!(
-                    "[{}][{}] Terminating Peer due to error in handling BgpEvent: {err}",
-                    peer_key,
-                    fsm_state,
-                );
+                log::error!("[{peer_key}][{fsm_state}] Terminating Peer due to error in handling BgpEvent: {err}");
                 if let Err(err) = rec_tx.send(Err(err)) {
-                    log::error!(
-                        "[{}][{}] Couldn't report error in handling BgpEvent: {err:?}",
-                        peer_key,
-                        fsm_state,
-                    );
+                    log::error!("[{peer_key}][{fsm_state}] Couldn't report error in handling BgpEvent: {err:?}");
                     return Err(());
                 }
                 Err(())
