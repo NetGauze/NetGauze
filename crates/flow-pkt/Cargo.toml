@@ -45,9 +45,12 @@ bytes = { workspace = true, optional = true }
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
 indexmap = { workspace = true }
+datafusion = { version = "46", features = ["default", "serde", "avro"], optional = true }
+arrow_convert = { path ="/Users/taaahel1/repos/arrow-convert/arrow_convert", features = ["derive", "rust_decimal"], optional = true }
+arrow = {version = "54", features = ["default", "canonical_extension_types"], optional = true}
 
 [features]
-default = ["serde"]
+default = ["serde", "arrow-serde"]
 serde = [
     "nom",
     "byteorder",
@@ -59,6 +62,7 @@ codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext"]
 iana-upstream-build = ["serde"]
+arrow-serde = ["datafusion", "arrow_convert", "arrow"]
 
 [dev-dependencies]
 netgauze-pcap-reader = { workspace = true }

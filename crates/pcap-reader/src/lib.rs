@@ -64,13 +64,13 @@ pub enum TransportProtocol {
 }
 
 /// Iterator over pcap files
-pub struct PcapIter<'a> {
-    reader: Box<dyn PcapReaderIterator + 'a>,
+pub struct PcapIter<T: PcapReaderIterator + Send + Sync> {
+    reader: T,
     link_types: Vec<Linktype>,
 }
 
-impl<'a> PcapIter<'a> {
-    pub const fn new(reader: Box<dyn PcapReaderIterator + 'a>) -> Self {
+impl<T: PcapReaderIterator + Send + Sync> PcapIter<T> {
+    pub const fn new(reader: T) -> Self {
         Self {
             reader,
             link_types: vec![],
@@ -78,7 +78,7 @@ impl<'a> PcapIter<'a> {
     }
 }
 
-impl Iterator for PcapIter<'_> {
+impl<T: PcapReaderIterator + Send + Sync> Iterator for PcapIter<T> {
     type Item = (IpAddr, u16, IpAddr, u16, TransportProtocol, Vec<u8>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -93,7 +93,7 @@ impl Iterator for PcapIter<'_> {
                                 link_type,
                                 legacy_packet.caplen as usize,
                             );
-                            let result = PcapIter::parse_packet(packet_data);
+                            let result = PcapIter::<T>::parse_packet(packet_data);
                             self.reader.consume(offset);
                             return result;
                         }
@@ -115,7 +115,7 @@ impl Iterator for PcapIter<'_> {
                                 link_type,
                                 packet.caplen as usize,
                             );
-                            let result = PcapIter::parse_packet(packet_data);
+                            let result = PcapIter::<T>::parse_packet(packet_data);
                             self.reader.consume(offset);
                             return result;
                         }
@@ -145,9 +145,9 @@ impl Iterator for PcapIter<'_> {
     }
 }
 
-impl<'a> PcapIter<'a> {
+impl<T: PcapReaderIterator + Send + Sync> PcapIter<T> {
     fn parse_packet(
-        data: Option<PacketData<'a>>,
+        data: Option<PacketData<'_>>,
     ) -> Option<(IpAddr, u16, IpAddr, u16, TransportProtocol, Vec<u8>)> {
         match data {
             None => None,
@@ -168,7 +168,7 @@ impl<'a> PcapIter<'a> {
     }
 
     fn parse_ethernet(
-        l2_pkt: &'a [u8],
+        l2_pkt: &[u8],
     ) -> Option<(IpAddr, u16, IpAddr, u16, TransportProtocol, Vec<u8>)> {
         pdu::EthernetPdu::new(l2_pkt)
             .map(|eth_pdu| match eth_pdu.inner() {

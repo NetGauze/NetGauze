@@ -21,6 +21,7 @@ pub mod netflow;
 #[cfg(feature = "serde")]
 pub mod wire;
 
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use crate::ie::*;
 use indexmap::IndexMap;
 use netgauze_analytics::flow::{AggrOp, AggregationError};
@@ -179,6 +180,7 @@ impl std::error::Error for FieldSpecifierError {}
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct FieldSpecifier {
     element_id: IE,
@@ -222,6 +224,7 @@ impl std::fmt::Display for DataSetIdError {
 impl std::error::Error for DataSetIdError {}
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataSetId(u16);
 
@@ -263,6 +266,55 @@ fn arbitrary_datetime(
         }
     }
 }
+
+#[cfg(feature = "arrow-serde")]
+use arrow::array::ArrayBuilder;
+
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
+#[arrow_field(type = "dense")]
+pub enum Value {
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U256(Box<[u8; 32]>),
+    F32(f32),
+    F64(f64),
+    String(String),
+    Bool(bool),
+    OctetArray(Vec<u8>),
+    IPv4(Ipv4Addr),
+    IPv6(Ipv6Addr),
+    IpAddr(IpAddr),
+    DateTime(chrono::DateTime<chrono::Utc>),
+    MacAddress(MacAddress),
+    MplsLabel([u8; 3]),
+}
+
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
+pub struct IEValue {
+    pub ie: u16,
+    pub pen: u32,
+}
+
+
+#[cfg(feature = "arrow-serde")]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
+pub struct IEField {
+    ie: IE,
+    value: Value
+}
+
 
 #[cfg(test)]
 mod tests {

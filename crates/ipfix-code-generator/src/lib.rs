@@ -422,6 +422,7 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
     let iana_ipfix_ie_node = find_node_by_id(&iana_ipfix_root, ID_IE).unwrap();
     let iana_ie_parsed = parse_information_elements(&iana_ipfix_ie_node, 0, ext_subregs);
 
+
     let mut vendors = vec![];
     for vendor in &config.vendors {
         vendors.push((vendor.name.clone(), vendor.mod_name.clone(), vendor.pen));

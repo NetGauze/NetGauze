@@ -361,6 +361,39 @@ fn generate_ie_try_from_pen_code(
     ret.push_str("       }\n");
     ret.push_str("   }\n");
     ret.push_str("}\n\n");
+
+
+
+    ret.push_str("impl From<crate::IEValue> for IE {\n");
+    ret.push_str("    fn from(val: crate::IEValue) -> Self {\n");
+    ret.push_str("        let (pen, code) = (val.pen, val.ie);\n");
+    ret.push_str("        match pen {\n");
+    ret.push_str("            0 => {\n");
+    ret.push_str("                match code {\n");
+    for ie in iana_ies {
+        ret.push_str(
+            format!(
+                "                    {} =>  IE::{},\n",
+                ie.element_id, ie.name
+            )
+                .as_str(),
+        );
+    }
+    ret.push_str("                    _ =>  IE::Unknown{pen, id: code},\n");
+    ret.push_str("                }\n");
+    ret.push_str("            }\n");
+    for (name, pkg, pen) in name_prefixes {
+        ret.push_str(format!("            {pen} => {{\n").as_str());
+        ret.push_str(format!("                match {pkg}::IE::try_from(code) {{\n").as_str());
+        ret.push_str(format!("                    Ok(ie) => Self::{name}(ie),\n").as_str());
+        ret.push_str("                    Err(_err) => IE::Unknown{pen, id: code},\n");
+        ret.push_str("                }\n");
+        ret.push_str("            }\n");
+    }
+    ret.push_str("           _ => IE::Unknown{pen, id: code},\n");
+    ret.push_str("       }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
     ret
 }
 
@@ -554,6 +587,177 @@ fn generate_ie_field_enum_for_ie(
     ret.push_str("}\n\n");
     ret.push_str("impl std::error::Error for FieldConversionError {}\n\n");
     ret.push_str(generate_into_for_field(iana_ies, vendors).as_str());
+
+
+    ret.push_str("impl arrow_convert::field::ArrowField for Field {\n");
+    ret.push_str("    type Type = Self;\n\n");
+    ret.push_str("    fn data_type() -> arrow::datatypes::DataType {\n");
+    ret.push_str("        <crate::IEField as arrow_convert::field::ArrowField >::data_type()\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n");
+
+    ret.push_str("impl arrow_convert::serialize::ArrowSerialize for Field {\n");
+    ret.push_str("    type ArrayBuilderType = <crate::IEField as arrow_convert::serialize::ArrowSerialize>::ArrayBuilderType;\n\n");
+    ret.push_str("    fn new_array() -> Self::ArrayBuilderType {\n");
+    ret.push_str("        Self::ArrayBuilderType::default()\n");
+    ret.push_str("    }\n\n");
+    ret.push_str("    fn arrow_serialize(v: &Self, array: &mut Self::ArrayBuilderType) -> arrow::error::Result<()> {\n");
+    ret.push_str("        let val: crate::IEField = (v.clone()).into();\n");
+    ret.push_str("        array.try_push(Some(val))\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl arrow_convert::field::ArrowEnableVecForType for Field {}\n\n");
+
+    ret.push_str("impl arrow_convert::deserialize::ArrowDeserialize for Field {\n");
+    ret.push_str("    type ArrayType = crate::IEFieldArray;\n");
+    ret.push_str("    #[inline]\n");
+    ret.push_str("    fn arrow_deserialize<'a>(v: Option<crate::IEField>) -> Option<Self> {\n");
+    ret.push_str("        v.map(|x| x.into())\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+
+    ret.push_str("impl From<Field> for crate::IEField {\n");
+    ret.push_str("    fn from(val: Field) -> Self {\n");
+    ret.push_str("        match val {\n");
+    for (name, _pkg, _) in vendors {
+        ret.push_str(format!("            Field::{name}(x) =>crate::IEField {{ie: IE::{name}(x.ie()), value: x.value()}},\n").as_str());
+    }
+    for ie in iana_ies {
+        ret.push_str(format!("            Field::{}(_) => crate::IEField {{ie: val.ie(), value: val.value()}},\n", ie.name).as_str());
+    }
+    ret.push_str("         _ => todo!()\n");
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl From<crate::IEField> for Field {\n");
+    ret.push_str("    fn from(val: crate::IEField) -> Self {\n");
+    ret.push_str("         todo!()\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+
+    ret.push_str("impl Field {\n");
+    ret.push_str("    /// Get the [IE] element for a given field\n");
+    ret.push_str("    pub const fn ie(&self) -> IE {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::Unknown{pen, id, ..} => IE::Unknown{pen: *pen, id: *id},\n");
+    for (name, _pkg, _) in vendors {
+        ret.push_str(format!("            Self::{name}(v) => IE::{name}(v.ie()),\n").as_str());
+    }
+    for ie in iana_ies {
+        ret.push_str(format!("            Self::{}(_) => IE::{},\n", ie.name, ie.name).as_str());
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n\n");
+
+    ret.push_str("    pub fn value(self) -> crate::Value {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::Unknown{value: v, ..} => crate::Value::OctetArray(v.to_vec()),\n");
+    for (name, _pkg, _) in vendors {
+        ret.push_str(format!("            Self::{name}(v) => v.value(),\n").as_str());
+    }
+    for ie in iana_ies {
+        match ie.data_type.as_str() {
+            "octetArray" => {
+                if ie.name.starts_with("mplsLabelStackSection") || ie.name == "mplsTopLabelStackSection" {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::MplsLabel(v),\n", ie.name).as_str());
+                } else {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::OctetArray(v.to_vec()),\n", ie.name).as_str());
+                }
+            }
+            "unsigned8" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U8(v.into()),\n", ie.name).as_str());
+                } else {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U8(v),\n", ie.name).as_str());
+                }
+            }
+            "unsigned16" => {
+                if ie.subregistry.is_some() || ie.name == "tcpControlBits" {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U16(v.into()),\n", ie.name).as_str());
+                } else {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U16(v),\n", ie.name).as_str());
+                }
+            }
+            "unsigned32" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U32(v.into()),\n", ie.name).as_str());
+                } else {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U32(v),\n", ie.name).as_str());
+                }
+            }
+            "unsigned64" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::U64(v),\n", ie.name).as_str());
+            }
+            "signed8" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::I8(v),\n", ie.name).as_str());
+            }
+            "signed16" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::I16(v),\n", ie.name).as_str());
+            }
+            "signed32" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::I32(v),\n", ie.name).as_str());
+            }
+            "signed64" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::I64(v),\n", ie.name).as_str());
+            }
+            "float32" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::F32(v),\n", ie.name).as_str());
+            }
+            "float64" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::F64(v),\n", ie.name).as_str());
+            }
+            "boolean" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::Bool(v),\n", ie.name).as_str());
+            }
+            "macAddress" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::MacAddress(v),\n", ie.name).as_str());
+
+            }
+            "string" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::String(v.into()),\n", ie.name).as_str());
+            }
+            "dateTimeSeconds" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::DateTime(v),\n", ie.name).as_str());
+            }
+            "dateTimeMilliseconds" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::DateTime(v),\n", ie.name).as_str());
+            }
+            "dateTimeMicroseconds" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::DateTime(v),\n", ie.name).as_str());
+            }
+            "dateTimeNanoseconds" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::DateTime(v),\n", ie.name).as_str());
+            }
+            "ipv4Address" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::IPv4(v),\n", ie.name).as_str());
+            }
+            "ipv6Address" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::IPv6(v),\n", ie.name).as_str());
+            }
+            "basicList" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::OctetArray(v.to_vec()),\n", ie.name).as_str());
+            }
+            "subTemplateList" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::OctetArray(v.to_vec()),\n", ie.name).as_str());
+            }
+            "subTemplateMultiList" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::OctetArray(v.to_vec()),\n", ie.name).as_str());
+            }
+            "unsigned256" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::U256(v),\n", ie.name).as_str());
+            }
+            ty => todo!("Unsupported value for type: {}", ty),
+        }
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+
     ret
 }
 
@@ -613,6 +817,48 @@ pub(crate) fn generate_ie_ids(
     ret.push_str(generate_ie_template_trait_for_main(iana_ies, vendors).as_str());
     ret.push_str(generate_ie_field_enum_for_ie(iana_ies, vendors).as_str());
 
+
+    ret.push_str("impl From<IE> for crate::IEValue {\n");
+    ret.push_str("     fn from(ie: IE) -> Self {\n");
+    ret.push_str("         Self {\n");
+    ret.push_str("             ie: ie.id(),\n");
+    ret.push_str("             pen: ie.pen(),\n");
+    ret.push_str("         }\n");
+    ret.push_str("     }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str(r#"#[cfg(feature = "arrow-serde")]"#);
+    ret.push_str("\nimpl arrow_convert::field::ArrowField for IE {\n");
+    ret.push_str("    type Type = Self;\n\n");
+    ret.push_str("    fn data_type() -> arrow::datatypes::DataType {\n");
+    ret.push_str("        <crate::IEValue as arrow_convert::field::ArrowField>::data_type()\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl arrow_convert::serialize::ArrowSerialize for IE {\n");
+    ret.push_str("    type ArrayBuilderType = <crate::IEValue as arrow_convert::serialize::ArrowSerialize>::ArrayBuilderType;\n\n");
+    ret.push_str("    fn new_array() -> Self::ArrayBuilderType {\n");
+    ret.push_str("        Self::ArrayBuilderType::default()\n");
+    ret.push_str("    }\n");
+
+    ret.push_str("    fn arrow_serialize(v: &Self, array: &mut Self::ArrayBuilderType) -> arrow::error::Result<()> {\n");
+    ret.push_str("        let c: crate::IEValue = crate::IEValue {\n");
+    ret.push_str("            ie: v.id(),\n");
+    ret.push_str("            pen: v.pen(),\n");
+    ret.push_str("        };\n");
+    ret.push_str("        array.try_push(Some(c))\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl arrow_convert::field::ArrowEnableVecForType for IE {}\n\n");
+
+    ret.push_str("impl arrow_convert::deserialize::ArrowDeserialize for IE {\n");
+    ret.push_str("    type ArrayType = crate::IEValueArray;\n");
+    ret.push_str("    #[inline]\n");
+    ret.push_str("    fn arrow_deserialize<'a>(v: Option<crate::IEValue>) -> Option<Self> {\n");
+    ret.push_str("        v.map(|x| x.into())\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
     ret
 }
 
@@ -1686,8 +1932,107 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     for ie in ies {
         ret.push_str(format!("            Self::{}(_) => IE::{},\n", ie.name, ie.name).as_str());
     }
-    ret.push_str("        }\n\n");
+    ret.push_str("        }\n");
     ret.push_str("    }\n\n");
+
+    ret.push_str("    pub fn value(self) -> crate::Value {\n");
+    ret.push_str("        match self {\n");
+    for ie in ies {
+        match ie.data_type.as_str() {
+            "octetArray" => {
+                if ie.name.starts_with("mplsLabelStackSection") || ie.name == "mplsTopLabelStackSection" {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::MplsLabel(v),\n", ie.name).as_str());
+                } else {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::OctetArray(v.to_vec()),\n", ie.name).as_str());
+                }
+            }
+            "unsigned8" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U8(v.into()),\n", ie.name).as_str());
+                } else {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U8(v),\n", ie.name).as_str());
+                }
+            }
+            "unsigned16" => {
+                if ie.subregistry.is_some() || ie.name == "tcpControlBits" {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U16(v.into()),\n", ie.name).as_str());
+                } else {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U16(v),\n", ie.name).as_str());
+                }
+            }
+            "unsigned32" => {
+                if ie.subregistry.is_some() {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U32(v.into()),\n", ie.name).as_str());
+                } else {
+                    ret.push_str(format!("            Self::{}(v) => crate::Value::U32(v),\n", ie.name).as_str());
+                }
+            }
+            "unsigned64" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::U64(v),\n", ie.name).as_str());
+            }
+            "signed8" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::I8(v),\n", ie.name).as_str());
+            }
+            "signed16" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::I16(v),\n", ie.name).as_str());
+            }
+            "signed32" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::I32(v),\n", ie.name).as_str());
+            }
+            "signed64" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::I64(v),\n", ie.name).as_str());
+            }
+            "float32" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::F32(v),\n", ie.name).as_str());
+            }
+            "float64" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::F64(v),\n", ie.name).as_str());
+            }
+            "boolean" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::Bool(v),\n", ie.name).as_str());
+            }
+            "macAddress" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::MacAddress(v),\n", ie.name).as_str());
+
+            }
+            "string" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::String(v.into()),\n", ie.name).as_str());
+            }
+            "dateTimeSeconds" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::DateTime(v),\n", ie.name).as_str());
+            }
+            "dateTimeMilliseconds" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::DateTime(v),\n", ie.name).as_str());
+            }
+            "dateTimeMicroseconds" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::DateTime(v),\n", ie.name).as_str());
+            }
+            "dateTimeNanoseconds" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::DateTime(v),\n", ie.name).as_str());
+            }
+            "ipv4Address" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::IPv4(v),\n", ie.name).as_str());
+            }
+            "ipv6Address" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::IPv6(v),\n", ie.name).as_str());
+            }
+            "basicList" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::OctetArray(v.to_vec()),\n", ie.name).as_str());
+            }
+            "subTemplateList" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::OctetArray(v.to_vec()),\n", ie.name).as_str());
+            }
+            "subTemplateMultiList" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::OctetArray(v.to_vec()),\n", ie.name).as_str());
+            }
+            "unsigned256" => {
+                ret.push_str(format!("            Self::{}(v) => crate::Value::U256(v),\n", ie.name).as_str());
+            }
+            ty => todo!("Unsupported value for type: {}", ty),
+        }
+    }
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
     ret.push_str("}\n\n");
 
     ret.push_str(generate_into_for_field(ies, &vec![]).as_str());

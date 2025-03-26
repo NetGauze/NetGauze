@@ -23,6 +23,9 @@ use crate::{
     DataSetId, FieldSpecifier, IE,
 };
 use netgauze_analytics::flow::{AggrOp, AggregationError};
+#[cfg(feature = "arrow-serde")]
+use arrow::array::ArrayBuilder;
+
 
 pub const IPFIX_VERSION: u16 = 10;
 
@@ -68,6 +71,7 @@ pub type TemplatesMap = HashMap<u16, DecodingTemplate>;
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct IpfixPacket {
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_datetime))]
@@ -271,6 +275,7 @@ impl FlatIpfixDataPacket {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct Data {
     id: DataSetId,
@@ -312,7 +317,9 @@ impl From<Data> for Box<[DataRecord]> {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[arrow_field(type = "dense")]
 pub enum Set {
     Template(Box<[TemplateRecord]>),
     OptionsTemplate(Box<[OptionsTemplateRecord]>),
@@ -499,6 +506,7 @@ impl FlatDataSet {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TemplateRecord {
     id: u16,
@@ -586,6 +594,7 @@ impl TemplateRecord {
 /// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct OptionsTemplateRecord {
     id: u16,
@@ -620,6 +629,7 @@ impl OptionsTemplateRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "arrow-serde", derive(arrow_convert::ArrowField, arrow_convert::ArrowSerialize, arrow_convert::ArrowDeserialize))]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataRecord {
     scope_fields: Box<[Field]>,
