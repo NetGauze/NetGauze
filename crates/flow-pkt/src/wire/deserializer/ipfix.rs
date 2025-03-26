@@ -244,7 +244,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
             }
             // We don't need to check for valid Set ID again, since we already checked
             id => {
-                let template = if let Some(fields) = templates_map.get(&id) {
+                let template = if let Some(fields) = templates_map.get_mut(&id) {
                     fields
                 } else {
                     return Err(nom::Err::Error(LocatedSetParsingError::new(
@@ -277,12 +277,15 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         .sum::<usize>();
 
                 let mut records = Vec::new();
+
                 while buf.len() >= min_record_length && min_record_length > 0 {
+                    let read_template: &DecodingTemplate = template;
                     let (t, record): (Span<'_>, DataRecord) =
-                        parse_into_located_one_input(buf, template)?;
+                        parse_into_located_one_input(buf, read_template)?;
                     buf = t;
                     records.push(record);
                 }
+                template.increment_processed_count();
                 // buf could be a non zero value for padding
                 while buf.len() > 0 && nom::combinator::peek(be_u8)(buf)?.1 == 0 {
                     let (t, _) = be_u8(buf)?;
@@ -393,10 +396,10 @@ impl<'a>
         }
         templates_map.insert(
             template_id,
-            DecodingTemplate {
-                scope_fields_specs: scope_fields.clone().into_boxed_slice(),
-                fields_specs: fields.clone().into_boxed_slice(),
-            },
+            DecodingTemplate::new(
+                scope_fields.clone().into_boxed_slice(),
+                fields.clone().into_boxed_slice(),
+            ),
         );
         Ok((
             buf,
@@ -454,6 +457,7 @@ impl<'a> ReadablePduWithOneInput<'a, &DecodingTemplate, LocatedDataRecordParsing
             buf = t;
             fields.push(field);
         }
+
         Ok((
             buf,
             DataRecord::new(scope_fields.into_boxed_slice(), fields.into_boxed_slice()),
@@ -517,10 +521,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedTemplateRecordPar
         }
         templates_map.insert(
             template_id,
-            DecodingTemplate {
-                scope_fields_specs: Box::new([]),
-                fields_specs: fields.clone().into_boxed_slice(),
-            },
+            DecodingTemplate::new(Box::new([]), fields.clone().into_boxed_slice()),
         );
         Ok((
             buf,

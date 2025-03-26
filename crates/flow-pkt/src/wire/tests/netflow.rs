@@ -108,10 +108,7 @@ fn test_netflow9_data_record() -> Result<(), NetFlowV9WritingError> {
         FieldSpecifier::new(ie::IE::ipVersion, 1).unwrap(),
     ];
 
-    let decoding_template = DecodingTemplate {
-        scope_fields_specs: Box::new([]),
-        fields_specs: Box::new(fields),
-    };
+    let decoding_template = DecodingTemplate::new(Box::new([]), Box::new(fields));
     let mut templates_map = HashMap::from([(1024, decoding_template)]);
 
     let good = NetFlowV9Packet::new(
@@ -268,11 +265,9 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
         FieldSpecifier::new(ie::IE::egressVRFID, 4).unwrap(),
     ];
 
-    let decoding_template = DecodingTemplate {
-        scope_fields_specs: Box::new([]),
-        fields_specs: Box::new(field_specifiers),
-    };
-    let mut templates_map = HashMap::from([(313, decoding_template)]);
+    let decoding_template = DecodingTemplate::new(Box::new([]), Box::new(field_specifiers));
+    let template_id = 313;
+    let mut templates_map = HashMap::from([(template_id, decoding_template)]);
 
     let good = NetFlowV9Packet::new(
         201984782,
@@ -280,7 +275,7 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
         14925203,
         2081,
         Box::new([Set::Data {
-            id: DataSetId::new(313).unwrap(),
+            id: DataSetId::new(template_id).unwrap(),
             records: Box::new([
                 DataRecord::new(
                     Box::new([]),
@@ -367,6 +362,10 @@ fn test_data_packet() -> Result<(), NetFlowV9WritingError> {
     );
 
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    assert_eq!(
+        templates_map.get(&template_id).unwrap().processed_count(),
+        2
+    );
     test_write_with_two_inputs(&good, Some(&templates_map), true, &good_wire)?;
     Ok(())
 }

@@ -38,6 +38,39 @@ pub(crate) const IPFIX_OPTIONS_TEMPLATE_SET_ID: u16 = 3;
 pub struct DecodingTemplate {
     pub scope_fields_specs: Box<[FieldSpecifier]>,
     pub fields_specs: Box<[FieldSpecifier]>,
+
+    /// Number of Data Records processed using this template
+    pub processed_count: u64,
+}
+
+impl DecodingTemplate {
+    pub const fn new(
+        scope_fields_specs: Box<[FieldSpecifier]>,
+        fields_specs: Box<[FieldSpecifier]>,
+    ) -> Self {
+        Self {
+            scope_fields_specs,
+            fields_specs,
+            processed_count: 0,
+        }
+    }
+
+    /// Increment Data Record count by one
+    pub const fn increment_processed_count(&mut self) {
+        self.processed_count = self.processed_count.wrapping_add(1);
+    }
+
+    /// Get the current processed Data Record count
+    pub const fn processed_count(&self) -> u64 {
+        self.processed_count
+    }
+
+    /// Get the current processed Data Record count and reset the value to zero
+    pub const fn reset_processed_count(&mut self) -> u64 {
+        let prev = self.processed_count;
+        self.processed_count = 0;
+        prev
+    }
 }
 
 /// Cache to store templates needed for decoding data packets
