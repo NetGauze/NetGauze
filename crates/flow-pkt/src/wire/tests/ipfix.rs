@@ -232,17 +232,15 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
         FieldSpecifier::new(ie::IE::flowStartMilliseconds, 8).unwrap(),
         FieldSpecifier::new(ie::IE::flowEndMilliseconds, 8).unwrap(),
     ];
-    let fields = DecodingTemplate {
-        scope_fields_specs: Box::new([]),
-        fields_specs: f.clone().into_boxed_slice(),
-    };
-    let mut templates_map = HashMap::from([(307, fields)]);
+    let template_id = 307;
+    let fields = DecodingTemplate::new(Box::new([]), f.clone().into_boxed_slice());
+    let mut templates_map = HashMap::from([(template_id, fields)]);
     let good = IpfixPacket::new(
         Utc.with_ymd_and_hms(2016, 11, 29, 20, 8, 57).unwrap(),
         3812,
         0,
         Box::new([Set::Data {
-            id: DataSetId::new(307).unwrap(),
+            id: DataSetId::new(template_id).unwrap(),
             records: Box::new([DataRecord::new(
                 Box::new([]),
                 Box::new([
@@ -286,6 +284,7 @@ fn test_data_packet() -> Result<(), IpfixPacketWritingError> {
         }]),
     );
     test_parsed_completely_with_one_input(&good_wire, &mut templates_map, &good);
+    assert_eq!(templates_map.get(&template_id).unwrap().processed_count, 1);
     test_write_with_one_input(&good, Some(&templates_map), &good_wire)?;
     Ok(())
 }

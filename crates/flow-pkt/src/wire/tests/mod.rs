@@ -303,13 +303,13 @@ fn test_data_record_value() -> Result<(), DataRecordWritingError> {
         ]),
     );
 
-    let fields = DecodingTemplate {
-        scope_fields_specs: Box::new([]),
-        fields_specs: Box::new([
+    let fields = DecodingTemplate::new(
+        Box::new([]),
+        Box::new([
             FieldSpecifier::new(ie::IE::sourceMacAddress, 6).unwrap(),
             FieldSpecifier::new(ie::IE::destinationMacAddress, 6).unwrap(),
         ]),
-    };
+    );
     test_parsed_completely_with_one_input::<
         DataRecord,
         &DecodingTemplate,

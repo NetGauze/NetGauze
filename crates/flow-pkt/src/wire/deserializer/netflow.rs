@@ -252,7 +252,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
             }
             // We don't need to check for valid Set ID again, since we already checked
             id => {
-                let template = if let Some(fields) = templates_map.get(&id) {
+                let template = if let Some(fields) = templates_map.get_mut(&id) {
                     fields
                 } else {
                     return Err(nom::Err::Error(LocatedSetParsingError::new(
@@ -274,7 +274,9 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                     let count = buf.len() / record_length;
                     let mut records = Vec::with_capacity(count);
                     while buf.len() >= record_length {
-                        let (t, record) = parse_into_located_one_input(buf, template)?;
+                        let read_template: &DecodingTemplate = template;
+                        let (t, record) = parse_into_located_one_input(buf, read_template)?;
+                        template.increment_processed_count();
                         buf = t;
                         records.push(record);
                     }
@@ -385,10 +387,10 @@ impl<'a>
         }
         templates_map.insert(
             template_id,
-            DecodingTemplate {
-                scope_fields_specs: scope_fields.clone().into_boxed_slice(),
-                fields_specs: fields.clone().into_boxed_slice(),
-            },
+            DecodingTemplate::new(
+                scope_fields.clone().into_boxed_slice(),
+                fields.clone().into_boxed_slice(),
+            ),
         );
         Ok((
             buf,
@@ -457,10 +459,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedTemplateRecordPar
         }
         templates_map.insert(
             template_id,
-            DecodingTemplate {
-                scope_fields_specs: Box::new([]),
-                fields_specs: fields.clone().into_boxed_slice(),
-            },
+            DecodingTemplate::new(Box::new([]), fields.clone().into_boxed_slice()),
         );
         Ok((
             buf,

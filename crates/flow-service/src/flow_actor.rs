@@ -267,6 +267,7 @@ pub struct FlowCollectorActorStats {
     subscriber_dropped: opentelemetry::metrics::Counter<u64>,
     templates_v9: opentelemetry::metrics::Gauge<u64>,
     templates_v10: opentelemetry::metrics::Gauge<u64>,
+    templates_usage: opentelemetry::metrics::Counter<u64>,
 }
 
 impl FlowCollectorActorStats {
@@ -306,12 +307,16 @@ impl FlowCollectorActorStats {
             )
             .build();
         let templates_v9 = meter
-            .u64_gauge("netgauze.flow.decoder.templates")
+            .u64_gauge("netgauze.flow.decoder.templates.v9")
             .with_description("Number of templates received for NETFLOW v9")
             .build();
         let templates_v10 = meter
-            .u64_gauge("netgauze.flow.decoder.templates")
+            .u64_gauge("netgauze.flow.decoder.templates.v10")
             .with_description("Number of templates received for IPFIX v10")
+            .build();
+        let templates_usage = meter
+            .u64_counter("netgauze.flow.decoder.templates.usage")
+            .with_description("Number successfully Data records processed by a given template")
             .build();
         Self {
             received,
@@ -322,6 +327,7 @@ impl FlowCollectorActorStats {
             subscriber_dropped,
             templates_v9,
             templates_v10,
+            templates_usage,
         }
     }
 }
@@ -357,7 +363,7 @@ impl FlowCollectorActor {
         // If we haven't seen the client before, create a new FlowInfoCodec for it.
         // FlowInfoCodec handles the decoding/encoding of packets and caches
         // the templates learned from the client
-        let attrs = [
+        let mut attrs = vec![
             opentelemetry::KeyValue::new("netgauze.flow.actor", format!("{}", self.actor_id)),
             opentelemetry::KeyValue::new("network.peer.address", format!("{}", addr.ip())),
             opentelemetry::KeyValue::new(
@@ -372,6 +378,26 @@ impl FlowCollectorActor {
                 self.stats.decoded.add(1, &attrs);
                 let templates_v9_count = codec.netflow_templates_map().len();
                 let templates_v10_count = codec.ipfix_templates_map().len();
+                for (template_id, v) in codec.netflow_templates_map_mut().iter_mut() {
+                    attrs.push(opentelemetry::KeyValue::new(
+                        "network.peer.template_id",
+                        opentelemetry::Value::I64((*template_id).into()),
+                    ));
+                    self.stats
+                        .templates_usage
+                        .add(v.reset_processed_count(), &attrs);
+                    attrs.pop();
+                }
+                for (template_id, v) in codec.ipfix_templates_map_mut().iter_mut() {
+                    attrs.push(opentelemetry::KeyValue::new(
+                        "network.peer.template_id",
+                        opentelemetry::Value::I64((*template_id).into()),
+                    ));
+                    self.stats
+                        .templates_usage
+                        .add(v.reset_processed_count(), &attrs);
+                    attrs.pop();
+                }
                 self.stats
                     .templates_v9
                     .record(templates_v9_count as u64, &attrs);
@@ -389,27 +415,12 @@ impl FlowCollectorActor {
                 None
             }
             Err(err) => {
-                self.stats.malformed.add(
-                    1,
-                    &[
-                        opentelemetry::KeyValue::new(
-                            "netgauze.flow.actor",
-                            format!("{}", self.actor_id),
-                        ),
-                        opentelemetry::KeyValue::new(
-                            "network.peer.address",
-                            format!("{}", addr.ip()),
-                        ),
-                        opentelemetry::KeyValue::new(
-                            "network.peer.port",
-                            opentelemetry::Value::I64(addr.port().into()),
-                        ),
-                        opentelemetry::KeyValue::new(
-                            "netgauze.flow.decoding.error.msg",
-                            opentelemetry::Value::String(err.to_string().into()),
-                        ),
-                    ],
-                );
+                attrs.push(opentelemetry::KeyValue::new(
+                    "netgauze.flow.decoding.error.msg",
+                    opentelemetry::Value::String(err.to_string().into()),
+                ));
+                self.stats.malformed.add(1, &attrs);
+                attrs.pop();
                 trace!(
                     "[Actor {}-{}] Dropping packet due to an error in decoding packet: {err:?}",
                     self.actor_id,
@@ -1514,13 +1525,10 @@ mod tests {
                                 assert!(netflow_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     netflow_templates.get(&template.id()),
-                                    Some(&netflow::DecodingTemplate {
-                                        scope_fields_specs: Box::new([]),
-                                        fields_specs: template
-                                            .field_specifiers()
-                                            .to_vec()
-                                            .into_boxed_slice()
-                                    })
+                                    Some(&netflow::DecodingTemplate::new(
+                                        Box::new([]),
+                                        template.field_specifiers().to_vec().into_boxed_slice()
+                                    ))
                                 );
                             }
                         }
@@ -1529,13 +1537,13 @@ mod tests {
                                 assert!(netflow_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     netflow_templates.get(&template.id()),
-                                    Some(&netflow::DecodingTemplate {
-                                        scope_fields_specs: template
+                                    Some(&netflow::DecodingTemplate::new(
+                                        template
                                             .scope_field_specifiers()
                                             .to_vec()
                                             .into_boxed_slice(),
-                                        fields_specs: Box::new([])
-                                    })
+                                        Box::new([])
+                                    ))
                                 );
                             }
                         }
@@ -1551,13 +1559,10 @@ mod tests {
                                 assert!(ipfix_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     ipfix_templates.get(&template.id()),
-                                    Some(&ipfix::DecodingTemplate {
-                                        scope_fields_specs: Box::new([]),
-                                        fields_specs: template
-                                            .field_specifiers()
-                                            .to_vec()
-                                            .into_boxed_slice()
-                                    })
+                                    Some(&ipfix::DecodingTemplate::new(
+                                        Box::new([]),
+                                        template.field_specifiers().to_vec().into_boxed_slice()
+                                    ))
                                 );
                             }
                         }
@@ -1566,13 +1571,10 @@ mod tests {
                                 assert!(ipfix_templates.contains_key(&template.id()));
                                 assert_eq!(
                                     ipfix_templates.get(&template.id()),
-                                    Some(&ipfix::DecodingTemplate {
-                                        scope_fields_specs: Box::new([]),
-                                        fields_specs: template
-                                            .field_specifiers()
-                                            .to_vec()
-                                            .into_boxed_slice()
-                                    })
+                                    Some(&ipfix::DecodingTemplate::new(
+                                        Box::new([]),
+                                        template.field_specifiers().to_vec().into_boxed_slice()
+                                    ))
                                 );
                             }
                         }
