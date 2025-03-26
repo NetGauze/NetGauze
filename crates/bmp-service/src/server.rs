@@ -175,14 +175,12 @@ mod tests {
         time::Duration,
     };
 
+    use super::*;
     use futures_util::SinkExt;
+    use netgauze_bmp_pkt::v3::{BmpMessageValue, InitiationMessage};
     use rand::Rng;
     use tokio::task::JoinHandle;
     use tower::{service_fn, ServiceBuilder};
-
-    use netgauze_bmp_pkt::{BmpMessageValue, InitiationMessage};
-
-    use super::*;
 
     #[tokio::test]
     async fn test_start() {
