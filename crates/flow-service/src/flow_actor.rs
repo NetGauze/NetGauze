@@ -265,6 +265,8 @@ pub struct FlowCollectorActorStats {
     subscribers: opentelemetry::metrics::Gauge<u64>,
     subscriber_sent: opentelemetry::metrics::Counter<u64>,
     subscriber_dropped: opentelemetry::metrics::Counter<u64>,
+    templates_v9: opentelemetry::metrics::Gauge<u64>,
+    templates_v10: opentelemetry::metrics::Gauge<u64>,
 }
 
 impl FlowCollectorActorStats {
@@ -303,7 +305,14 @@ impl FlowCollectorActorStats {
                 "Number successfully received flow but dropped before sending to the subscribers",
             )
             .build();
-
+        let templates_v9 = meter
+            .u64_gauge("netgauze.flow.decoder.templates")
+            .with_description("Number of templates received for NETFLOW v9")
+            .build();
+        let templates_v10 = meter
+            .u64_gauge("netgauze.flow.decoder.templates")
+            .with_description("Number of templates received for IPFIX v10")
+            .build();
         Self {
             received,
             decoded,
@@ -311,6 +320,8 @@ impl FlowCollectorActorStats {
             subscribers,
             subscriber_sent,
             subscriber_dropped,
+            templates_v9,
+            templates_v10,
         }
     }
 }
@@ -346,26 +357,27 @@ impl FlowCollectorActor {
         // If we haven't seen the client before, create a new FlowInfoCodec for it.
         // FlowInfoCodec handles the decoding/encoding of packets and caches
         // the templates learned from the client
-        let result = self.clients.entry(addr).or_default().decode(&mut buf);
+        let attrs = [
+            opentelemetry::KeyValue::new("netgauze.flow.actor", format!("{}", self.actor_id)),
+            opentelemetry::KeyValue::new("network.peer.address", format!("{}", addr.ip())),
+            opentelemetry::KeyValue::new(
+                "network.peer.port",
+                opentelemetry::Value::I64(addr.port().into()),
+            ),
+        ];
+        let codec = self.clients.entry(addr).or_default();
+        let result = codec.decode(&mut buf);
         match result {
             Ok(Some(pkt)) => {
-                self.stats.decoded.add(
-                    1,
-                    &[
-                        opentelemetry::KeyValue::new(
-                            "netgauze.flow.actor",
-                            format!("{}", self.actor_id),
-                        ),
-                        opentelemetry::KeyValue::new(
-                            "network.peer.address",
-                            format!("{}", addr.ip()),
-                        ),
-                        opentelemetry::KeyValue::new(
-                            "network.peer.port",
-                            opentelemetry::Value::I64(addr.port().into()),
-                        ),
-                    ],
-                );
+                self.stats.decoded.add(1, &attrs);
+                let templates_v9_count = codec.netflow_templates_map().len();
+                let templates_v10_count = codec.ipfix_templates_map().len();
+                self.stats
+                    .templates_v9
+                    .record(templates_v9_count as u64, &attrs);
+                self.stats
+                    .templates_v10
+                    .record(templates_v10_count as u64, &attrs);
                 Some((addr, pkt))
             }
             Ok(None) => {
