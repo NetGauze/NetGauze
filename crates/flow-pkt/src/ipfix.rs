@@ -13,16 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
 use crate::{
-    ie::{Field, Fields},
+    ie::{Field, Fields, HasIE},
     DataSetId, FieldSpecifier, IE,
 };
+use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
 use netgauze_analytics::flow::{AggrOp, AggregationError};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub const IPFIX_VERSION: u16 = 10;
 
@@ -190,6 +189,142 @@ impl IpfixPacket {
             })
             .collect()
     }
+
+    pub fn reduce_ipfix(
+        &mut self,
+        second: IpfixPacket,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        self.export_time = self.export_time.min(second.export_time);
+        self.sequence_number = self.sequence_number.min(second.sequence_number);
+        self.observation_domain_id = self.observation_domain_id.min(second.observation_domain_id);
+        //let mut data_sets = Vec::with_capacity(self.sets().len() +
+        // second.sets().len()); let data_sets: IndexMap<Box<[Option<&Field>]>,
+        // (DataSetId, &mut DataRecord)> = second
+        let mut inserted = IndexMap::new();
+        // let data_sets : IndexMap<_, _>= self
+        //     .sets
+        //     .iter()
+        //     .enumerate()
+        //     .filter(|(_, set)| matches!(set, Set::Data {..}))
+        //     .flat_map(|(set_idx, set)| {
+        //         if let Set::Data { id, records } = set {
+        //             records
+        //                 .iter()
+        //                 .enumerate()
+        //                 .map(move |(record_idx, record)| {
+        //                     let key = record.extract_key_fields(keys);
+        //                     (key, (*id, set_idx, record_idx))
+        //                 })
+        //         } else {
+        //             unreachable!()
+        //         }
+        //     })
+        //     .collect();
+        let mut data_sets = IndexMap::new();
+        for (set_idx, set) in self.sets.iter().enumerate() {
+            if let Set::Data { id, records } = set {
+                for (record_idx, record) in records.iter().enumerate() {
+                    let key = record.extract_key_fields(keys);
+                    data_sets.insert(key, (*id, set_idx, record_idx));
+                }
+            }
+        }
+
+        for set in second.sets {
+            if let Set::Data {
+                id,
+                records: second_records,
+            } = set
+            {
+                for value in second_records {
+                    let key = value.extract_key_fields(keys);
+                    if let Some((_, set_idx, record_idx)) = data_sets.get(&key) {
+                        if let Set::Data { id: _id, records } = &mut self.sets[*set_idx] {
+                            records[*record_idx]
+                                .reduce(&value, transform)
+                                .expect("failed to reduce IPFIX packet");
+                        }
+                    } else {
+                        let entry = inserted
+                            .entry(key)
+                            .or_insert((id, DataRecord::new(Box::new([]), Box::new([]))));
+                        entry.1.reduce(&value, transform).expect("failed to reduce");
+                    }
+                }
+            }
+        }
+        if !inserted.is_empty() {
+            let mut tmp = self.sets.clone().into_vec();
+            for (id, record) in inserted.into_values() {
+                tmp.push(Set::Data {
+                    id,
+                    records: Box::new([record]),
+                })
+            }
+            self.sets = tmp.into_boxed_slice();
+        }
+
+        // second.sets
+        //     .iter()
+        //     .filter(|set| matches!(set, Set::Data {..}))
+        //     .flat_map(|set| {
+        //         if let Set::Data { id, records } = set {
+        //             records.iter().map(move |record| {
+        //                 (record.extract_key_fields(keys), (id, record))
+        //             })
+        //         } else {
+        //             unreachable!()
+        //         }
+        //     })
+        //     .for_each(|(key, (id, value))| {
+        //     if let Some((_, set_idx, record_idx)) = data_sets.get(&key) {
+        //         if let Set::Data {id, records } = &mut self.sets[*set_idx] {
+        //             records[*record_idx].reduce(&value, transform).expect("failed to
+        // reduce IPFIX packet");         }
+        //     } else {
+        //         inserted.push((id, value));
+        //     }
+        // });
+        // for set in self.sets.iter_mut() {
+        //     if let Set::Data { id, records } = set {
+        //         data_sets.push((id, records));
+        //     }
+        // }
+        // // let mut binding = second.sets;
+        // for set in binding.iter_mut() {
+        //     if let Set::Data { id, records } = set {
+        //         data_sets.push((id, records));
+        //     }
+        // }
+
+        // let mut index: IndexMap<Box<[Option<&Field>]>, DataRecord> = IndexMap::new();
+        // for (id, records) in IntoIterator::into_iter(data_sets) {
+        //     for record in IntoIterator::into_iter(records) {
+        //         let key = record.extract_key_fields(keys);
+        //         match index.get_mut(&key) {
+        //             Some(r) => {
+        //                 r.reduce(&record, transform)?;
+        //             }
+        //             None => {
+        //                 index.insert(key, record.clone());
+        //             }
+        //         }
+        //     }
+        // }
+        // let data_records: Box<[DataRecord]> = index
+        //     .into_iter()
+        //     .map(|(_, v)| v)
+        //     .collect::<Vec<_>>()
+        //     .into_boxed_slice();
+        // let sets = Box::new([Set::Data {
+        //     id: DataSetId::new(256).unwrap(),
+        //     records: data_records,
+        // }]);
+        // self.sets = sets;
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -237,6 +372,13 @@ impl FlatIpfixPacket {
         indices: &Option<Vec<usize>>,
     ) -> Result<String, AggregationError> {
         self.set.extract_as_key_str(ie, indices)
+    }
+
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<Field>]> {
+        self.set.extract_key_fields(keys)
     }
 
     pub fn reduce(
@@ -294,6 +436,13 @@ impl FlatIpfixDataPacket {
         indices: &Option<Vec<usize>>,
     ) -> Result<String, AggregationError> {
         self.set.extract_as_key_str(ie, indices)
+    }
+
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<Field>]> {
+        self.set.extract_key_fields(keys)
     }
 
     pub fn reduce(
@@ -405,6 +554,16 @@ impl FlatSet {
         }
     }
 
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<Field>]> {
+        match self {
+            FlatSet::Data { record, .. } => record.extract_key_fields(keys),
+            _ => panic!("extract_key_fields only support data"),
+        }
+    }
+
     fn reduce(
         &mut self,
         incoming: &FlatSet,
@@ -461,6 +620,13 @@ impl FlatDataSet {
         indices: &Option<Vec<usize>>,
     ) -> Result<String, AggregationError> {
         self.record.extract_as_key_str(ie, indices)
+    }
+
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<Field>]> {
+        self.record.extract_key_fields(keys)
     }
 
     fn reduce(
@@ -646,6 +812,137 @@ impl DataRecord {
     pub fn flatten(self) -> FlatDataRecord {
         FlatDataRecord::new(self.scope_fields.into(), self.fields.into())
     }
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<Field>]> {
+        let mut ret = Vec::with_capacity(keys.len());
+        let mut seen = HashMap::new();
+        for field in &self.fields {
+            if let Some(indices) = keys.get(&field.ie()) {
+                match indices {
+                    None => {
+                        ret.push(Some(field.clone()));
+                    }
+                    Some(indices) => {
+                        let last = match seen.get_mut(&field.ie()) {
+                            None => {
+                                seen.insert(field.ie(), 0usize);
+                                0
+                            }
+                            Some(i) => {
+                                *i += 1;
+                                *i
+                            }
+                        };
+                        if indices.contains(&last) {
+                            ret.push(Some(field.clone()));
+                        } else {
+                            ret.push(None);
+                        }
+                        //let entry = seen.entry(field.ie()).or_insert_with();
+
+                        ret.push(None);
+                    }
+                }
+            }
+        }
+        ret.into_boxed_slice()
+        // let mut indexed: IndexMap<IE, Vec<&Field>> = IndexMap::new();
+        // for field in &self.fields {
+        //     indexed
+        //         .entry(field.ie())
+        //         .or_insert(Vec::with_capacity(1))
+        //         .push(field);
+        // }
+        // keys.iter()
+        //     .map(|(ie, indices)| {
+        //         indexed
+        //             .get(ie)
+        //             .and_then(|fields| {
+        //                 if let Some(indices) = indices {
+        //                     fields.get(indices[0]).cloned()
+        //                 } else {
+        //                     fields.first().cloned()
+        //                 }
+        //             })
+        //             .cloned()
+        //     })
+        //     .collect::<Vec<_>>()
+        //     .into_boxed_slice()
+    }
+
+    pub fn reduce(
+        &mut self,
+        incoming: &DataRecord,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        let mut fields = HashMap::with_capacity(self.fields.len());
+        let mut incoming_fields = HashMap::with_capacity(incoming.fields.len());
+        self.fields.iter_mut().for_each(|field| {
+            fields
+                .entry(field.ie())
+                .or_insert(Vec::with_capacity(1))
+                .push(field)
+        });
+        incoming.fields.iter().for_each(|field| {
+            incoming_fields
+                .entry(field.ie())
+                .or_insert(Vec::with_capacity(1))
+                .push(field)
+        });
+        let mut additional_fields = vec![];
+        //let mut removed_fields = HashSet::new();
+        for (ie, op) in transform {
+            let (fields, incoming_fields) = match (fields.get_mut(ie), incoming_fields.get(ie)) {
+                (Some(fields), Some(incoming_fields)) => (fields, incoming_fields),
+                (Some(_fields), None) => {
+                    // if let Some(field) = fields.first() {
+                    //     assert_ne!(ie, &IE::tcpControlBits, "");
+                    //     removed_fields.insert(field.ie());
+                    // }
+                    continue;
+                }
+                (None, Some(incoming_fields)) => {
+                    additional_fields.extend(incoming_fields.iter().cloned().cloned());
+                    continue;
+                }
+                (None, None) => continue,
+            };
+
+            match op {
+                AggrOp::Key(_indices) => {}
+                AggrOp::Add => fields
+                    .iter_mut()
+                    .zip(incoming_fields)
+                    .for_each(|(x, y)| (*(*x)).add_field(y).expect("FAILED TO ADD")),
+                AggrOp::Min => fields
+                    .iter_mut()
+                    .zip(incoming_fields)
+                    .for_each(|(x, y)| (*(*x)).min_field(y).expect("FAILED TO MIN")),
+                AggrOp::Max => fields
+                    .iter_mut()
+                    .zip(incoming_fields)
+                    .for_each(|(x, y)| (*(*x)).max_field(y).expect("FAILED TO MAX")),
+                AggrOp::BoolMapOr => fields
+                    .iter_mut()
+                    .zip(incoming_fields)
+                    .for_each(|(x, y)| (*(*x)).bitmap_or_field(y).expect("FAILED TO MAX")),
+            }
+        }
+        if !additional_fields.is_empty() {
+            let mut tmp = self
+                .fields
+                .to_vec()
+                // .into_iter()
+                // .filter(|x| !removed_fields.contains(&x.ie()))
+                // .collect::<Vec<_>>()
+                ;
+            tmp.extend(additional_fields);
+            self.fields = tmp.into_boxed_slice();
+        }
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -678,6 +975,25 @@ impl FlatDataRecord {
         self.fields.extract_as_key_str(ie, indices)
     }
 
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<Field>]> {
+        let mut ret = Vec::with_capacity(keys.len());
+        for (ie, indices) in keys {
+            let field_vec = self.fields.get(*ie);
+            if let Some(indices) = indices {
+                for i in indices {
+                    let f = field_vec.get(*i).cloned();
+                    ret.push(f);
+                }
+            } else {
+                ret.extend(field_vec.into_iter().map(Some));
+            }
+        }
+        ret.into_boxed_slice()
+    }
+
     fn reduce(
         &mut self,
         incoming: &FlatDataRecord,
@@ -693,6 +1009,7 @@ mod tests {
     use crate::ie;
     use chrono::TimeZone;
     use netgauze_iana::tcp::TCPHeaderFlags;
+    use std::net::Ipv4Addr;
 
     #[test]
     fn test_ipfix_packet() {
@@ -1033,5 +1350,164 @@ mod tests {
             result.unwrap_err(),
             AggregationError::FlatSetIsNotData
         ));
+    }
+
+    #[test]
+    fn test_ipfix_packet_reduce() {
+        let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
+        let sequence_number = 0;
+        let observation_domain_id = 0;
+        let mut packet0 = IpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            Box::new([]),
+        );
+        let packet1 = IpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            Box::new([
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([
+                            Field::sourceIPv4Address(Ipv4Addr::new(127, 0, 0, 1)),
+                            Field::octetDeltaCount(100),
+                            Field::tcpControlBits(TCPHeaderFlags::from(0xa5u8)),
+                        ]),
+                    )]),
+                },
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([
+                            Field::sourceIPv4Address(Ipv4Addr::new(127, 0, 0, 2)),
+                            Field::octetDeltaCount(50),
+                        ]),
+                    )]),
+                },
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([
+                            Field::sourceIPv4Address(Ipv4Addr::new(127, 0, 0, 1)),
+                            Field::octetDeltaCount(200),
+                        ]),
+                    )]),
+                },
+            ]),
+        );
+        let packet2 = IpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            Box::new([
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([Field::octetDeltaCount(60)]),
+                    )]),
+                },
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([
+                            Field::sourceIPv4Address(Ipv4Addr::new(127, 0, 0, 1)),
+                            Field::octetDeltaCount(100),
+                            Field::tcpControlBits(TCPHeaderFlags::from(0x5au8)),
+                        ]),
+                    )]),
+                },
+            ]),
+        );
+        let expected0 = IpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            Box::new([
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([
+                            Field::sourceIPv4Address(Ipv4Addr::new(127, 0, 0, 1)),
+                            Field::octetDeltaCount(300),
+                            Field::tcpControlBits(TCPHeaderFlags::from(0xa5u8)),
+                        ]),
+                    )]),
+                },
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([
+                            Field::sourceIPv4Address(Ipv4Addr::new(127, 0, 0, 2)),
+                            Field::octetDeltaCount(50),
+                        ]),
+                    )]),
+                },
+            ]),
+        );
+        let expected1 = IpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain_id,
+            Box::new([
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([
+                            Field::sourceIPv4Address(Ipv4Addr::new(127, 0, 0, 1)),
+                            Field::octetDeltaCount(400),
+                            Field::tcpControlBits(TCPHeaderFlags::from(0xffu8)),
+                        ]),
+                    )]),
+                },
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([
+                            Field::sourceIPv4Address(Ipv4Addr::new(127, 0, 0, 2)),
+                            Field::octetDeltaCount(50),
+                        ]),
+                    )]),
+                },
+                Set::Data {
+                    id: DataSetId::new(256).unwrap(),
+                    records: Box::new([DataRecord::new(
+                        Box::new([]),
+                        Box::new([Field::octetDeltaCount(60)]),
+                    )]),
+                },
+            ]),
+        );
+        let mut transform = IndexMap::new();
+        transform.insert(ie::IE::sourceIPv4Address, AggrOp::Key(None));
+        transform.insert(ie::IE::octetDeltaCount, AggrOp::Add);
+        transform.insert(ie::IE::tcpControlBits, AggrOp::BoolMapOr);
+        packet0
+            .reduce_ipfix(
+                packet1.clone(),
+                &IndexMap::from([(IE::sourceIPv4Address, None)]),
+                &transform,
+            )
+            .expect("reduce");
+        assert_eq!(packet0, expected0);
+        packet0
+            .reduce_ipfix(
+                packet2.clone(),
+                &IndexMap::from([(IE::sourceIPv4Address, None)]),
+                &transform,
+            )
+            .expect("reduce");
+        assert_eq!(packet0, expected1);
     }
 }

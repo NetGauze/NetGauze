@@ -554,6 +554,146 @@ fn generate_ie_field_enum_for_ie(
     ret.push_str("}\n\n");
     ret.push_str("impl std::error::Error for FieldConversionError {}\n\n");
     ret.push_str(generate_into_for_field(iana_ies, vendors).as_str());
+
+    ret.push_str("#[derive(Debug, Clone)]\n");
+    ret.push_str("pub enum FieldOperationError {\n");
+    ret.push_str("    InapplicableAdd(IE, IE),\n");
+    ret.push_str("    InapplicableMin(IE, IE),\n");
+    ret.push_str("    InapplicableMax(IE, IE),\n");
+    ret.push_str("    InapplicableBitMapOr(IE, IE),\n");
+    ret.push_str("}\n\n");
+    ret.push_str("impl std::fmt::Display for FieldOperationError {\n");
+    ret.push_str("    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n");
+    ret.push_str("        match self {\n");
+    ret.push_str("            Self::InapplicableAdd(ie1, ie2) => write!(f, \"cannot add two IEs {ie1} and {ie2}\"),\n");
+    ret.push_str("            Self::InapplicableMin(ie1, ie2) => write!(f, \"cannot compute the min of IEs {ie1} and {ie2}\"),\n");
+    ret.push_str("            Self::InapplicableMax(ie1, ie2) => write!(f, \"cannot compute the max of IEs {ie1} and {ie2}\"),\n");
+    ret.push_str("            Self::InapplicableBitMapOr(ie1, ie2) => write!(f, \"cannot compute the bit map or of IEs {ie1} and {ie2}\"),\n");
+    ret.push_str("        }\n");
+    ret.push_str("    }\n");
+    ret.push_str("}\n\n");
+
+    ret.push_str("impl std::error::Error for FieldOperationError {}\n\n");
+
+    ret.push_str("impl Field {\n");
+    ret.push_str(
+        "    pub fn add_field(&mut self, incoming: &Field) -> Result<(), FieldOperationError>  {\n",
+    );
+    ret.push_str("        match (self, incoming) {\n");
+    for (name, _pkg, _) in vendors {
+        ret.push_str(
+            format!("            (Self::{name}(v1), Self::{name}(v2)) => v1.add_field(v2)?,\n")
+                .as_str(),
+        );
+    }
+    for ie in iana_ies {
+        if (ie.data_type.starts_with("unsigned")
+            || ie.data_type.starts_with("signed")
+            || ie.data_type.starts_with("float"))
+            & ie.subregistry.is_none()
+            & (ie.data_type != "unsigned256")
+            && (ie.name != "tcpControlBits")
+        {
+            ret.push_str(
+                format!(
+                    "            (Self::{ie_name}(v1), Self::{ie_name}(v2)) => *v1 += v2,\n",
+                    ie_name = ie.name
+                )
+                .as_str(),
+            );
+        } else {
+            ret.push_str(format!("            (Self::{ie_name}(_), Self::{ie_name}(_)) => return Err(FieldOperationError::InapplicableAdd(IE::{ie_name}, IE::{ie_name})),\n", ie_name = ie.name).as_str());
+        }
+    }
+    ret.push_str("            _ => todo!()");
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n\n");
+    ret.push_str("    pub fn min_field(&mut self, incoming: &Field) -> Result<(), crate::FieldOperationError>  {\n");
+    ret.push_str("        match (self, incoming) {\n");
+    for (name, _pkg, _) in vendors {
+        ret.push_str(
+            format!("            (Self::{name}(v1), Self::{name}(v2)) => v1.min_field(v2)?,\n")
+                .as_str(),
+        );
+    }
+    for ie in iana_ies {
+        if (ie.data_type.starts_with("unsigned")
+            || ie.data_type.starts_with("signed")
+            || ie.data_type.starts_with("float"))
+            & ie.subregistry.is_none()
+            & (ie.data_type != "unsigned256")
+            && (ie.name != "tcpControlBits")
+        {
+            ret.push_str(format!("            (Self::{ie_name}(v1), Self::{ie_name}(v2)) => *v1 = (*v1).min(*v2),\n", ie_name = ie.name).as_str());
+        } else {
+            ret.push_str(format!("            (Self::{ie_name}(_), Self::{ie_name}(_)) => return Err(crate::FieldOperationError::InapplicableMin(IE::{ie_name}, IE::{ie_name})),\n", ie_name = ie.name).as_str());
+        }
+    }
+    ret.push_str("            (f1, f2) => return Err(crate::FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),\n");
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n\n");
+
+    ret.push_str("    pub fn max_field(&mut self, incoming: &Field) -> Result<(), crate::FieldOperationError>  {\n");
+    ret.push_str("        match (self, incoming) {\n");
+    for (name, _pkg, _) in vendors {
+        ret.push_str(
+            format!("            (Self::{name}(v1), Self::{name}(v2)) => v1.min_field(v2)?,\n")
+                .as_str(),
+        );
+    }
+    for ie in iana_ies {
+        if (ie.data_type.starts_with("unsigned")
+            || ie.data_type.starts_with("signed")
+            || ie.data_type.starts_with("float"))
+            & ie.subregistry.is_none()
+            & (ie.data_type != "unsigned256")
+            && (ie.name != "tcpControlBits")
+        {
+            ret.push_str(format!("            (Self::{ie_name}(v1), Self::{ie_name}(v2)) => *v1 = (*v1).max(*v2),\n", ie_name = ie.name).as_str());
+        } else {
+            ret.push_str(format!("            (Self::{ie_name}(_), Self::{ie_name}(_)) => return Err(crate::FieldOperationError::InapplicableMax(IE::{ie_name}, IE::{ie_name})),\n", ie_name = ie.name).as_str());
+        }
+    }
+    ret.push_str("            (f1, f2) => return Err(crate::FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),\n");
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n");
+
+    ret.push_str("    pub fn bitmap_or_field(&mut self, incoming: &Field) -> Result<(), crate::FieldOperationError>  {\n");
+    ret.push_str("        match (self, incoming) {\n");
+    for (name, _pkg, _) in vendors {
+        ret.push_str(
+            format!(
+                "            (Self::{name}(v1), Self::{name}(v2)) => v1.bitmap_or_field(v2)?,\n"
+            )
+            .as_str(),
+        );
+    }
+    for ie in iana_ies {
+        if (ie.data_type.starts_with("unsigned") || ie.data_type.starts_with("signed"))
+            & ie.subregistry.is_none()
+            & (ie.data_type != "unsigned256")
+        {
+            ret.push_str(
+                format!(
+                    "            (Self::{ie_name}(v1), Self::{ie_name}(v2)) => *v1 |= *v2,\n",
+                    ie_name = ie.name
+                )
+                .as_str(),
+            );
+        } else {
+            ret.push_str(format!("            (Self::{ie_name}(_), Self::{ie_name}(_)) => return Err(crate::FieldOperationError::InapplicableBitMapOr(IE::{ie_name}, IE::{ie_name})),\n", ie_name = ie.name).as_str());
+        }
+    }
+    ret.push_str("            (f1, f2) => return Err(crate::FieldOperationError::InapplicableBitMapOr(f1.ie(), f2.ie())),\n");
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n");
+
+    ret.push_str("}\n\n");
+
     ret
 }
 
@@ -1654,7 +1794,7 @@ pub(crate) fn generate_pkg_ie_serializers(
     ret
 }
 
-pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
+pub(crate) fn generate_fields_enum(pkg_name: &str, ies: &Vec<InformationElement>) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
     let not_copy = ies.iter().any(|x| {
@@ -1684,6 +1824,96 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
     }
     ret.push_str("        }\n\n");
     ret.push_str("    }\n\n");
+
+    ret.push_str("    pub fn add_field(&mut self, incoming: &Field) -> Result<(), crate::FieldOperationError>  {\n");
+    ret.push_str("        match (self, incoming) {\n");
+    for ie in ies {
+        if (ie.data_type.starts_with("unsigned")
+            || ie.data_type.starts_with("signed")
+            || ie.data_type.starts_with("float"))
+            & ie.subregistry.is_none()
+            & (ie.data_type != "unsigned256")
+            && (ie.name != "tcpControlBits")
+        {
+            ret.push_str(
+                format!(
+                    "            (Self::{ie_name}(v1), Self::{ie_name}(v2)) => *v1 += v2,\n",
+                    ie_name = ie.name
+                )
+                .as_str(),
+            );
+        } else {
+            ret.push_str(format!("            (Self::{ie_name}(_), Self::{ie_name}(_)) => return Err(crate::FieldOperationError::InapplicableAdd(crate::ie::IE::{pkg_name}(IE::{ie_name}), crate::ie::IE::{pkg_name}(IE::{ie_name}))),\n", ie_name = ie.name).as_str());
+        }
+    }
+    ret.push_str(format!("            (f1, f2) => return Err(crate::FieldOperationError::InapplicableAdd(crate::ie::IE::{pkg_name}(f1.ie()), crate::ie::IE::{pkg_name}(f2.ie()))),\n").as_str());
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n\n");
+
+    ret.push_str("    pub fn min_field(&mut self, incoming: &Field) -> Result<(), crate::FieldOperationError>  {\n");
+    ret.push_str("        match (self, incoming) {\n");
+    for ie in ies {
+        if (ie.data_type.starts_with("unsigned")
+            || ie.data_type.starts_with("signed")
+            || ie.data_type.starts_with("float"))
+            & ie.subregistry.is_none()
+            & (ie.data_type != "unsigned256")
+            && (ie.name != "tcpControlBits")
+        {
+            ret.push_str(format!("            (Self::{ie_name}(v1), Self::{ie_name}(v2)) => *v1 = (*v1).min(*v2),\n", ie_name = ie.name).as_str());
+        } else {
+            ret.push_str(format!("            (Self::{ie_name}(_), Self::{ie_name}(_)) => return Err(crate::FieldOperationError::InapplicableMin(crate::ie::IE::{pkg_name}(IE::{ie_name}), crate::ie::IE::{pkg_name}(IE::{ie_name}))),\n", ie_name = ie.name).as_str());
+        }
+    }
+    ret.push_str(format!("            (f1, f2) => return Err(crate::FieldOperationError::InapplicableMin(crate::ie::IE::{pkg_name}(f1.ie()), crate::ie::IE::{pkg_name}(f2.ie()))),\n").as_str());
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n\n");
+
+    ret.push_str("    pub fn max_field(&mut self, incoming: &Field) -> Result<(), crate::FieldOperationError>  {\n");
+    ret.push_str("        match (self, incoming) {\n");
+    for ie in ies {
+        if (ie.data_type.starts_with("unsigned")
+            || ie.data_type.starts_with("signed")
+            || ie.data_type.starts_with("float"))
+            & ie.subregistry.is_none()
+            & (ie.data_type != "unsigned256")
+            && (ie.name != "tcpControlBits")
+        {
+            ret.push_str(format!("            (Self::{ie_name}(v1), Self::{ie_name}(v2)) => *v1 = (*v1).max(*v2),\n", ie_name = ie.name).as_str());
+        } else {
+            ret.push_str(format!("            (Self::{ie_name}(_), Self::{ie_name}(_)) => return Err(crate::FieldOperationError::InapplicableMax(crate::ie::IE::{pkg_name}(IE::{ie_name}), crate::ie::IE::{pkg_name}(IE::{ie_name}))),\n", ie_name = ie.name).as_str());
+        }
+    }
+    ret.push_str(format!("            (f1, f2) => return Err(crate::FieldOperationError::InapplicableMax(crate::ie::IE::{pkg_name}(f1.ie()), crate::ie::IE::{pkg_name}(f2.ie()))),\n").as_str());
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n");
+
+    ret.push_str("    pub fn bitmap_or_field(&mut self, incoming: &Field) -> Result<(), crate::FieldOperationError>  {\n");
+    ret.push_str("        match (self, incoming) {\n");
+    for ie in ies {
+        if (ie.data_type.starts_with("unsigned") || ie.data_type.starts_with("signed"))
+            & ie.subregistry.is_none()
+            & (ie.data_type != "unsigned256")
+        {
+            ret.push_str(
+                format!(
+                    "            (Self::{ie_name}(v1), Self::{ie_name}(v2)) => *v1 |= *v2,\n",
+                    ie_name = ie.name
+                )
+                .as_str(),
+            );
+        } else {
+            ret.push_str(format!("            (Self::{ie_name}(_), Self::{ie_name}(_)) => return Err(crate::FieldOperationError::InapplicableBitMapOr(crate::ie::IE::{pkg_name}(IE::{ie_name}), crate::ie::IE::{pkg_name}(IE::{ie_name}))),\n", ie_name = ie.name).as_str());
+        }
+    }
+    ret.push_str(format!("            (f1, f2) => return Err(crate::FieldOperationError::InapplicableBitMapOr(crate::ie::IE::{pkg_name}(f1.ie()), crate::ie::IE::{pkg_name}(f2.ie()))),\n").as_str());
+    ret.push_str("        }\n");
+    ret.push_str("        Ok(())\n");
+    ret.push_str("    }\n");
+
     ret.push_str("}\n\n");
 
     ret.push_str(generate_into_for_field(ies, &vec![]).as_str());

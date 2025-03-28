@@ -26,6 +26,7 @@
 //!   and processing flow requests
 //! - `AggregationActorHandle` - Handle used to control the aggregation actor
 
+use crate::flow::agg2::{FlowAggregator2, InputMessage2};
 use either::Either;
 use futures::stream::{self, StreamExt};
 use indexmap::IndexMap;
@@ -140,6 +141,13 @@ impl InputMessage {
         indices: &Option<Vec<usize>>,
     ) -> Result<String, AggregationError> {
         self.flow.extract_as_key_str(ie, indices)
+    }
+
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<ie::IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<ie::Field>]> {
+        self.flow.extract_key_fields(keys)
     }
 
     pub fn reduce(
@@ -274,24 +282,13 @@ impl AggregationActor {
 
                 stats.received_messages.add(1, &tags);
 
-                stream::iter(
-                    flow.flatten_data()
-                        .into_iter()
-                        .filter(|flow| match flow {
-                            FlatFlowDataInfo::IPFIX(packet) => {
-                                // Exclude records without octetDeltaCount (e.g. option records)
-                                packet.set().record().fields().octetDeltaCount.is_some()
-                            }
-                            _ => false,
-                        })
-                        .map(move |x| InputMessage::from((peer, x))),
-                )
+                stream::iter(vec![InputMessage2::from((peer, flow))].into_iter())
             })
             .window_aggregate(
                 self.config.window_duration,
                 self.config.lateness,
-                (HashMap::new(), self.config.clone()),
-                FlowAggregator::init((HashMap::new(), self.config)),
+                (InputMessage2::default(), self.config.clone()),
+                FlowAggregator2::init((InputMessage2::default(), self.config)),
             );
         pin_mut!(agg);
 
@@ -315,21 +312,21 @@ impl AggregationActor {
                             let stats = self.stats.clone();
                             let tx = self.tx.clone();
                             tokio::spawn(async move {
-                                for (_key, message) in cache {
                                     let tags = [
                                         opentelemetry::KeyValue::new("shard_id", opentelemetry::Value::I64(self.shard_id as i64)),
                                         opentelemetry::KeyValue::new(
                                             "network.peer.address",
-                                            format!("{}", message.peer.ip()),
+                                            format!("{}", cache.peer.ip()),
                                         ),
                                         opentelemetry::KeyValue::new(
                                             "network.peer.port",
-                                            opentelemetry::Value::I64(message.peer.port().into()),
+                                            opentelemetry::Value::I64(cache.peer.port().into()),
                                         ),
                                     ];
                                     stats.aggregated_messages.add(1, &tags);
-                                    let send_closure = tx.send(((window_start, window_end), (message.peer, message.flow)));
-                                    match tokio::time::timeout(Duration::from_secs(1), send_closure).await {
+                                    for flow in cache.flow.flatten_data() {
+                                        let send_closure = tx.send(((window_start, window_end), (cache.peer, flow)));
+                                        match tokio::time::timeout(Duration::from_secs(1), send_closure).await {
                                         Ok(Ok(_)) => stats.sent_messages.add(1, &tags),
                                         Ok(Err(err)) => {
                                             error!("AggregationActor send error: {err}");
@@ -340,7 +337,7 @@ impl AggregationActor {
                                             stats.send_timeout.add(1, &tags)
                                         }
                                     }
-                                }
+                                    }
                             });
                         }
 

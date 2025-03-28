@@ -34,6 +34,13 @@ pub enum FlowInfo {
 }
 
 impl FlowInfo {
+    pub fn export_time(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            Self::IPFIX(packet) => packet.export_time(),
+            Self::NetFlowV9(packet) => packet.unix_time(),
+        }
+    }
+
     pub fn flatten(self) -> Vec<FlatFlowInfo> {
         match self {
             FlowInfo::NetFlowV9(pkt) => pkt
@@ -57,6 +64,21 @@ impl FlowInfo {
                 .into_iter()
                 .map(|x| FlatFlowDataInfo::IPFIX(Box::new(x)))
                 .collect(),
+        }
+    }
+
+    pub fn reduce(
+        &mut self,
+        second: FlowInfo,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        match (self, second) {
+            (FlowInfo::IPFIX(first), FlowInfo::IPFIX(second)) => {
+                first.reduce_ipfix(second, keys, transform)?;
+                Ok(())
+            }
+            _ => todo!(),
         }
     }
 }
@@ -83,6 +105,16 @@ impl FlatFlowInfo {
         match self {
             Self::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
             Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+        }
+    }
+
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<Field>]> {
+        match self {
+            Self::IPFIX(packet) => packet.extract_key_fields(keys),
+            Self::NetFlowV9(_) => panic!("netflow is not supported"),
         }
     }
 
@@ -127,6 +159,16 @@ impl FlatFlowDataInfo {
         match self {
             Self::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
             Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+        }
+    }
+
+    pub fn extract_key_fields(
+        &self,
+        keys: &IndexMap<IE, Option<Vec<usize>>>,
+    ) -> Box<[Option<Field>]> {
+        match self {
+            Self::IPFIX(packet) => packet.extract_key_fields(keys),
+            Self::NetFlowV9(_) => panic!("netflow is not supported"),
         }
     }
 
