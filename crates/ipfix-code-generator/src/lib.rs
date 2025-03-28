@@ -343,7 +343,7 @@ fn generate_vendor_ie(
     output.push_str("\n\n");
 
     output.push_str(generate_ie_values(&ie_parsed, Some(config.name().clone())).as_str());
-    output.push_str(generate_fields_enum(&ie_parsed).as_str());
+    output.push_str(generate_fields_enum(&config.name(), &ie_parsed).as_str());
 
     output.push_str(generate_flat_ie_struct(&ie_parsed, &vec![]).as_str());
 

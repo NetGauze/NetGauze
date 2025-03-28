@@ -25,7 +25,7 @@ use crate::ie::*;
 use indexmap::IndexMap;
 use netgauze_analytics::flow::{AggrOp, AggregationError};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FlowInfo {
@@ -34,6 +34,13 @@ pub enum FlowInfo {
 }
 
 impl FlowInfo {
+    pub fn export_time(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            Self::IPFIX(packet) => packet.export_time(),
+            Self::NetFlowV9(packet) => packet.unix_time(),
+        }
+    }
+
     pub fn flatten(self) -> Vec<FlatFlowInfo> {
         match self {
             FlowInfo::NetFlowV9(pkt) => pkt
@@ -57,6 +64,31 @@ impl FlowInfo {
                 .into_iter()
                 .map(|x| FlatFlowDataInfo::IPFIX(Box::new(x)))
                 .collect(),
+        }
+    }
+
+    pub fn reduce(
+        &mut self,
+        second: FlowInfo,
+        transform: &IndexMap<IE, AggrOp>,
+    ) -> Result<(), AggregationError> {
+        match (self, second) {
+            (FlowInfo::IPFIX(first), FlowInfo::IPFIX(second)) => {
+                let keys = transform
+                    .iter()
+                    .map(|(k, v)| {
+                        if let AggrOp::Key(indices) = v {
+                            Some((k.clone(), indices.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten()
+                    .collect::<IndexMap<_, _>>();
+                first.reduce_ipfix(second, &keys, transform)?;
+                Ok(())
+            }
+            _ => todo!(),
         }
     }
 }
