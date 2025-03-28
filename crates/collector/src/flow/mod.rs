@@ -154,8 +154,12 @@ impl From<ie::Field> for RawValue {
             InformationElementDataType::signed16 => val.try_into().map(RawValue::I16),
             InformationElementDataType::signed32 => val.try_into().map(RawValue::I32),
             InformationElementDataType::signed64 => val.try_into().map(RawValue::I64),
-            InformationElementDataType::float32 => val.try_into().map(RawValue::F32),
-            InformationElementDataType::float64 => val.try_into().map(RawValue::F64),
+            InformationElementDataType::float32 => val
+                .try_into()
+                .map(|x: ordered_float::OrderedFloat<f32>| RawValue::F32(x.0)),
+            InformationElementDataType::float64 => val
+                .try_into()
+                .map(|x: ordered_float::OrderedFloat<f64>| RawValue::F64(x.0)),
             InformationElementDataType::boolean => val.try_into().map(RawValue::Boolean),
             InformationElementDataType::macAddress => val.try_into().map(RawValue::String),
             InformationElementDataType::string => val.try_into().map(RawValue::String),

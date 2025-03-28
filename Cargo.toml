@@ -90,3 +90,4 @@ pdu = { version = "1.4" }
 pin-utils = { version = "0.1" }
 serde_yaml = { version = "0.9" }
 ciborium = { version = "0.2" }
+ordered-float = { version = "5.0", default-features = false }

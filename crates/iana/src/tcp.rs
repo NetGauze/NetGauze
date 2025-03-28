@@ -40,7 +40,9 @@ use std::{
 
 /// TCP Header Flags registered at IANA
 /// [TCP Parameters](https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xml)
-#[derive(PartialEq, Eq, Clone, Copy, Debug, Default, Hash, Serialize, Deserialize)]
+#[derive(
+    PartialEq, Eq, Clone, Copy, Debug, Default, Hash, Ord, PartialOrd, Serialize, Deserialize,
+)]
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct TCPHeaderFlags {

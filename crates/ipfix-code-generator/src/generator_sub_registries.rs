@@ -41,9 +41,9 @@ pub fn generate_subregistry_enum_and_impl(
                 true,
                 false,
                 rust_type != "Vec<u8>" && rust_type != "String",
-                rust_type != "f32" && rust_type != "f64",
-                rust_type != "f32" && rust_type != "f64",
-                false,
+                true,
+                true,
+                true,
             );
             ret.push_str(gen_derive.as_str());
             ret.push_str(generate_enum(&enum_name, rust_type, &rec.reason_code_reg).as_str());
