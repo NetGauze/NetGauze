@@ -72,7 +72,7 @@ pcap-parser = { version = "0.16" }
 clap = { version = "4.5" }
 socket2 = { version = "0.5" }
 either = { version = "1.13" }
-opentelemetry = { version = "0.27" }
+opentelemetry = { version = "0.28" }
 opentelemetry_sdk = { version = "0.27" }
 opentelemetry-otlp = { version = "0.27" }
 anyhow = { version = "1" }
