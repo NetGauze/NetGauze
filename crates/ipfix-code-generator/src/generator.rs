@@ -501,7 +501,7 @@ fn generate_ie_field_enum_for_ie(
 ) -> String {
     let mut ret = String::new();
     ret.push_str("#[allow(non_camel_case_types)]\n");
-    ret.push_str(generate_derive(true, false, false, false, false, false).as_str());
+    ret.push_str(generate_derive(true, false, false, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     ret.push_str("    Unknown{pen: u32, id: u16, value: Box<[u8]>},\n");
@@ -929,7 +929,7 @@ fn generate_f32_deserializer(ie_name: &String) -> String {
     ret.push_str("                    1 => nom::number::complete::be_f32(buf)?,\n");
     ret.push_str(format!("                    _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
     ret.push_str("                };\n");
-    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str(format!("                (buf, Field::{ie_name}(value.into()))\n").as_str());
     ret.push_str("            }\n");
     ret
 }
@@ -940,7 +940,7 @@ fn generate_f64_deserializer(ie_name: &String) -> String {
     ret.push_str("                    1 => nom::number::complete::be_f64(buf)?,\n");
     ret.push_str(format!("                    _ => return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{{ie_name: \"{ie_name}\".to_string(), length}})))\n").as_str());
     ret.push_str("                };\n");
-    ret.push_str(format!("                (buf, Field::{ie_name}(value))\n").as_str());
+    ret.push_str(format!("                (buf, Field::{ie_name}(value.into()))\n").as_str());
     ret.push_str("            }\n");
     ret
 }
@@ -1533,7 +1533,7 @@ pub(crate) fn generate_pkg_ie_serializers(
                 if ie.subregistry.is_some() {
                     ret.push_str("                let value = f32::from(*value);\n");
                 } else {
-                    ret.push_str("                let value = *value;\n");
+                    ret.push_str("                let value = value.0;\n");
                 }
                 ret.push_str("                match length {\n");
                 ret.push_str("                    None => writer.write_f32::<byteorder::NetworkEndian>(value)?,\n");
@@ -1553,9 +1553,9 @@ pub(crate) fn generate_pkg_ie_serializers(
             }
             "float64" => {
                 if ie.subregistry.is_some() {
-                    ret.push_str("                let value = f64::from(*value);\n");
+                    ret.push_str("                let value = f64::from(value.0);\n");
                 } else {
-                    ret.push_str("                let value = *value;\n");
+                    ret.push_str("                let value = value.0;\n");
                 }
                 ret.push_str("                match length {\n");
                 ret.push_str("                    None => writer.write_f64::<byteorder::NetworkEndian>(value)?,\n");
@@ -1661,11 +1661,7 @@ pub(crate) fn generate_fields_enum(ies: &Vec<InformationElement>) -> String {
         get_rust_type(&x.data_type, &x.name) == "Box<[u8]>"
             || get_rust_type(&x.data_type, &x.name) == "Box<str>"
     });
-    let not_eq = ies.iter().any(|x| {
-        get_rust_type(&x.data_type, &x.name) == "f32"
-            || get_rust_type(&x.data_type, &x.name) == "f64"
-    });
-    ret.push_str(generate_derive(true, false, !not_copy, !not_eq, !not_eq, false).as_str());
+    ret.push_str(generate_derive(true, false, !not_copy, true, true, true).as_str());
     ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
     ret.push_str("pub enum Field {\n");
     for ie in ies {
@@ -1714,8 +1710,8 @@ pub fn generate_into_for_field(
         "i16",
         "i32",
         "i64",
-        "f32",
-        "f64",
+        "ordered_float::OrderedFloat<f32>",
+        "ordered_float::OrderedFloat<f64>",
         "bool",
         "super::MacAddress",
         "String",
@@ -1808,8 +1804,8 @@ pub fn get_rust_type(data_type: &str, ie_name: &str) -> String {
         "signed16" => "i16",
         "signed32" => "i32",
         "signed64" => "i64",
-        "float32" => "f32",
-        "float64" => "f64",
+        "float32" => "ordered_float::OrderedFloat<f32>",
+        "float64" => "ordered_float::OrderedFloat<f64>",
         "boolean" => "bool",
         "macAddress" => "super::MacAddress",
         "string" => "Box<str>",
@@ -1852,9 +1848,9 @@ pub(crate) fn generate_ie_values(
             true,
             strum_macros,
             rust_type != "Box<[u8]>" && rust_type != "Box<str>",
-            rust_type != "f32" && rust_type != "f64",
-            rust_type != "f32" && rust_type != "f64",
-            false,
+            true,
+            true,
+            true,
         );
 
         if let Some(ie_subregistry) = &ie.subregistry {
@@ -2408,7 +2404,7 @@ pub(crate) fn generate_ie_ser_main(
                 if ie.subregistry.is_some() {
                     ret.push_str("                let value = f32::from(*value);\n");
                 } else {
-                    ret.push_str("                let value = *value;\n");
+                    ret.push_str("                let value = value.0;\n");
                 }
                 ret.push_str("                match length {\n");
                 ret.push_str("                    None => writer.write_f32::<byteorder::NetworkEndian>(value)?,\n");
@@ -2430,7 +2426,7 @@ pub(crate) fn generate_ie_ser_main(
                 if ie.subregistry.is_some() {
                     ret.push_str("                let value = f64::from(*value);\n");
                 } else {
-                    ret.push_str("                let value = *value;\n");
+                    ret.push_str("                let value = value.0;\n");
                 }
                 ret.push_str("                match length {\n");
                 ret.push_str("                    None => writer.write_f64::<byteorder::NetworkEndian>(value)?,\n");
