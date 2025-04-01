@@ -226,7 +226,6 @@ impl std::fmt::Display for Ipv4Unicast {
 /// Raised when the network is not a unicast range
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-
 pub struct InvalidIpv4UnicastNetwork(
     #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_ipv4net))] pub Ipv4Net,
 );
