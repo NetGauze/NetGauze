@@ -134,14 +134,15 @@ impl From<(SocketAddr, FlatFlowDataInfo)> for InputMessage {
 }
 
 impl InputMessage {
-    fn extract_as_key_str(
+    pub fn extract_as_key_str(
         &self,
         ie: &ie::IE,
         indices: &Option<Vec<usize>>,
     ) -> Result<String, AggregationError> {
         self.flow.extract_as_key_str(ie, indices)
     }
-    fn reduce(
+
+    pub fn reduce(
         &mut self,
         incoming: &InputMessage,
         transform: &IndexMap<ie::IE, AggrOp>,
