@@ -14,230 +14,274 @@
 // limitations under the License.
 
 use crate::{
-    generator::{generate_derive, generate_xref_link},
-    xml_parsers::sub_registries::SubRegistry,
+    generator::generate_xref_link, xml_parsers::sub_registries::SubRegistry,
     InformationElementSubRegistry,
 };
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::quote;
 
 /// Generate code (enum and implementations) for IE Subregistries
 pub fn generate_subregistry_enum_and_impl(
     ie_name: &String,
     rust_type: &String,
     ie_subregistry: &[InformationElementSubRegistry],
-) -> String {
-    let mut ret = String::new();
-
-    ret.push_str(generate_enum(ie_name, rust_type, ie_subregistry).as_str());
-    ret.push_str(generate_from_impl_for_rust_type(ie_name, rust_type, ie_subregistry).as_str());
-    ret.push_str(generate_from_impl_for_enum_type(ie_name, rust_type, ie_subregistry).as_str());
+) -> TokenStream {
+    let mut tokens = TokenStream::new();
+    tokens.extend(generate_enum(ie_name, rust_type, ie_subregistry));
+    tokens.extend(generate_from_impl_for_rust_type(
+        ie_name,
+        rust_type,
+        ie_subregistry,
+    ));
+    tokens.extend(generate_from_impl_for_enum_type(
+        ie_name,
+        rust_type,
+        ie_subregistry,
+    ));
 
     // Add structs and type converters for reason-code registries
     for rec in ie_subregistry {
         if let InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) = rec {
             let enum_name = format!("{}{}Reason", ie_name, rec.name);
-            ret.push_str("#[allow(non_camel_case_types)]\n");
-
-            let gen_derive = generate_derive(
-                true,
-                false,
-                rust_type != "Vec<u8>" && rust_type != "String",
-                true,
-                true,
-                true,
-            );
-            ret.push_str(gen_derive.as_str());
-            ret.push_str(generate_enum(&enum_name, rust_type, &rec.reason_code_reg).as_str());
-            ret.push_str(
-                generate_from_impl_for_rust_type(&enum_name, rust_type, &rec.reason_code_reg)
-                    .as_str(),
-            );
-            ret.push_str(
-                generate_from_impl_for_enum_type(&enum_name, rust_type, &rec.reason_code_reg)
-                    .as_str(),
-            );
+            let derive = if rust_type != "Vec<u8>" && rust_type != "String" {
+                quote! { #[derive(strum_macros::Display, Copy, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)] }
+            } else {
+                quote! { #[derive(strum_macros::Display, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)] }
+            };
+            let header = quote! {
+                #[allow(non_camel_case_types)]
+                #derive
+            };
+            tokens.extend(header);
+            tokens.extend(generate_enum(&enum_name, rust_type, &rec.reason_code_reg));
+            tokens.extend(generate_from_impl_for_rust_type(
+                &enum_name,
+                rust_type,
+                &rec.reason_code_reg,
+            ));
+            tokens.extend(generate_from_impl_for_enum_type(
+                &enum_name,
+                rust_type,
+                &rec.reason_code_reg,
+            ));
         }
     }
-    ret
+    tokens
 }
 
 /// Generate Description and Ref for a given Subregistry
-pub fn generate_desc_and_refs_common(rec: &dyn SubRegistry) -> String {
-    let mut ret = String::new();
-    for line in SubRegistry::description(rec).split('\n') {
-        ret.push_str(format!("    /// {}\n", line.trim()).as_str());
+pub fn generate_desc_and_refs_common(rec: &dyn SubRegistry) -> TokenStream {
+    let mut doc_comments = Vec::new();
+    for line in SubRegistry::description(rec).lines() {
+        let line = format!(" {}", line.trim());
+        doc_comments.push(quote! { #[doc = #line] });
     }
     if !SubRegistry::description(rec).is_empty() && !SubRegistry::xrefs(rec).is_empty() {
-        ret.push_str("    ///\n");
+        let empty = "";
+        doc_comments.push(quote! { #[doc = #empty] });
     }
     for xref in SubRegistry::xrefs(rec)
         .iter()
         .filter_map(generate_xref_link)
     {
-        ret.push_str(format!("    /// Reference: {xref}\n").as_str());
+        let ref_link = format!(" Reference: {xref}");
+        doc_comments.push(quote! { #[doc = #ref_link] });
     }
-    ret
+    quote! {
+        #(#doc_comments)*
+    }
 }
 
 /// Generate Enum Type for Subregistry
 pub fn generate_enum(
-    enum_name: &String,
-    rust_type: &String,
+    enum_name: &str,
+    rust_type: &str,
     registry: &[InformationElementSubRegistry],
-) -> String {
-    let mut ret = String::new();
+) -> TokenStream {
+    let ty = syn::parse_str::<syn::Type>(rust_type).unwrap();
     let unit_type = registry
         .iter()
         .any(|x| matches!(x, InformationElementSubRegistry::ValueNameDescRegistry(_)));
-    if unit_type {
-        ret.push_str(format!("#[repr({rust_type})]\n").as_str());
-    }
-    ret.push_str("#[cfg_attr(feature = \"fuzz\", derive(arbitrary::Arbitrary))]\n");
-    ret.push_str(format!("pub enum {enum_name} {{\n").as_str());
-
-    for rec in registry {
-        match rec {
-            InformationElementSubRegistry::ValueNameDescRegistry(rec) => {
-                ret.push_str(generate_desc_and_refs_common(rec).as_str());
-                ret.push_str(
-                    format!("    #[strum(to_string = \"{}\")]\n", rec.display_name).as_str(),
-                );
-                ret.push_str(format!("    {} = {},\n", rec.name, rec.value).as_str());
-            }
-            InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) => {
-                ret.push_str(generate_desc_and_refs_common(rec).as_str());
-                ret.push_str(
-                    format!("    #[strum(to_string = \"{} {{0}}\")]\n", rec.display_name).as_str(),
-                );
-                ret.push_str(
-                    format!("    {}({}{}Reason),\n", rec.name, enum_name, rec.name).as_str(),
-                );
+    let unit_type = if unit_type {
+        quote! { #[repr(#ty)] }
+    } else {
+        quote! {}
+    };
+    let variants = registry.iter().map(|rec| match rec {
+        InformationElementSubRegistry::ValueNameDescRegistry(rec) => {
+            let doc = generate_desc_and_refs_common(rec);
+            let display_name = &rec.display_name;
+            let name = Ident::new(&rec.name, Span::call_site());
+            let value = get_quote_value(rust_type, rec.value);
+            quote! {
+                #doc
+                #[strum(to_string = #display_name)]
+                #name = #value
             }
         }
+        InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) => {
+            let doc = generate_desc_and_refs_common(rec);
+            let display_name = format!("{} {{0}}", &rec.display_name);
+            let name = Ident::new(&rec.name, Span::call_site());
+            let reason = Ident::new(&format!("{enum_name}{}Reason", rec.name), Span::call_site());
+            quote! {
+                #doc
+                #[strum(to_string = #display_name)]
+                #name(#reason)
+            }
+        }
+    });
+    let enum_name_ident = Ident::new(enum_name, Span::call_site());
+    quote! {
+        #unit_type
+        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+        pub enum #enum_name_ident {
+            #(#variants,)*
+            Unassigned(#ty)
+        }
     }
-    ret.push_str(format!("    Unassigned({rust_type}),\n").as_str());
-    ret.push_str("}\n\n");
-    ret
+}
+
+fn get_quote_value(rust_type: &str, value: u8) -> TokenStream {
+    match rust_type {
+        "u8" => {
+            let v = value;
+            quote! { #v }
+        }
+        "u16" => {
+            let v = value as u16;
+            quote! { #v }
+        }
+        "u32" => {
+            let v = value as u32;
+            quote! { #v }
+        }
+        "u64" => {
+            let v = value as u64;
+            quote! { #v }
+        }
+        "i8" => {
+            let v = value as i8;
+            quote! { #v }
+        }
+        "i16" => {
+            let v = value as i16;
+            quote! { #v }
+        }
+        "i32" => {
+            let v = value as i32;
+            quote! { #v }
+        }
+        "i64" => {
+            let v = value as i64;
+            quote! { #v }
+        }
+        _ => panic!("Not supported"),
+    }
 }
 
 /// Generate From trait implementation from subregistry to rust_type
 pub fn generate_from_impl_for_rust_type(
-    enum_name: &String,
-    rust_type: &String,
+    enum_name: &str,
+    rust_type: &str,
     registry: &[InformationElementSubRegistry],
-) -> String {
-    let mut ret = String::new();
-    ret.push_str(format!("impl From<{enum_name}> for {rust_type} {{\n").as_str());
-    ret.push_str(format!("    fn from(value: {enum_name}) -> Self {{\n").as_str());
-    ret.push_str("        match value {\n");
+) -> TokenStream {
+    let enum_name = Ident::new(enum_name, Span::call_site());
+    let ty = syn::parse_str::<syn::Type>(rust_type).unwrap();
+    let recs = registry.iter().map(|rec| match rec {
+        InformationElementSubRegistry::ValueNameDescRegistry(rec) => {
+            let value = get_quote_value(rust_type, rec.value);
+            let rec = Ident::new(&rec.name, Span::call_site());
+            quote! { #enum_name::#rec => #value}
+        }
+        InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) => {
+            let rec = Ident::new(&rec.name, Span::call_site());
+            quote! { #enum_name::#rec(x) => #ty::from(x)}
+        }
+    });
 
-    for rec in registry {
-        match rec {
-            InformationElementSubRegistry::ValueNameDescRegistry(rec) => {
-                ret.push_str(
-                    format!(
-                        "            {}::{} => {},\n",
-                        enum_name, rec.name, rec.value
-                    )
-                    .as_str(),
-                );
-            }
-            InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) => {
-                ret.push_str(
-                    format!(
-                        "            {}::{}(x) => {}::from(x),\n",
-                        enum_name, rec.name, rust_type
-                    )
-                    .as_str(),
-                );
+    quote! {
+        impl From<#enum_name> for #ty {
+            fn from(value: #enum_name) -> Self {
+                match value {
+                    #(#recs,)*
+                    #enum_name::Unassigned(x) => x,
+                }
             }
         }
     }
-    ret.push_str(format!("            {enum_name}::Unassigned(x) => x,\n").as_str());
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-    ret
 }
 
 /// Generate From trait implementation from rust_type to subregistry
 pub fn generate_from_impl_for_enum_type(
-    enum_name: &String,
-    rust_type: &String,
+    enum_name: &str,
+    rust_type: &str,
     registry: &[InformationElementSubRegistry],
-) -> String {
-    let mut ret = String::new();
-    ret.push_str(format!("impl From<{}> for {} {{\n", &rust_type, enum_name).as_str());
-    ret.push_str(format!("    fn from(value: {rust_type}) -> Self {{\n").as_str());
-
-    if let Some(first) = registry.first() {
-        if let InformationElementSubRegistry::ValueNameDescRegistry(_) = first {
-            ret.push_str("        match value {\n");
+) -> TokenStream {
+    let ty = syn::parse_str::<syn::Type>(rust_type).unwrap();
+    let enum_name = Ident::new(enum_name, Span::call_site());
+    let inner = if registry.is_empty() {
+        quote! {
+            let x = value;
+            #enum_name::Unassigned(x)
         }
-    } else {
-        // Empty registry
-        ret.push_str("        let x = value;\n");
-    }
-
-    for (idx, rec) in registry.iter().enumerate() {
-        match rec {
-            InformationElementSubRegistry::ValueNameDescRegistry(rec) => {
-                ret.push_str(
-                    format!(
-                        "            {} => {}::{},\n",
-                        rec.value, enum_name, rec.name
-                    )
-                    .as_str(),
-                );
-            }
-            InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) => {
-                if idx == 0 {
-                    ret.push_str(
-                        format!(
-                            "            if ({}..={}).contains(&value) {{\n",
-                            64 * idx,
-                            64 * (idx + 1) - 1
-                        )
-                        .as_str(),
-                    );
-                } else {
-                    ret.push_str(
-                        format!(
-                            "            else if ({}..={}).contains(&value) {{\n",
-                            64 * idx,
-                            64 * (idx + 1) - 1
-                        )
-                        .as_str(),
-                    );
-                }
-                ret.push_str(
-                    format!(
-                        "                {}::{}({}{}Reason::from(value))\n",
-                        enum_name, rec.name, enum_name, rec.name
-                    )
-                    .as_str(),
-                );
-                ret.push_str("            }\n");
+    } else if matches!(
+        registry.first(),
+        Some(InformationElementSubRegistry::ValueNameDescRegistry(_))
+    ) {
+        let variants = registry
+            .iter()
+            .filter_map(|x| match x {
+                InformationElementSubRegistry::ValueNameDescRegistry(rec) => Some(rec),
+                _ => None,
+            })
+            .map(|rec| {
+                let value = get_quote_value(rust_type, rec.value);
+                let name = Ident::new(&rec.name, Span::call_site());
+                quote! { #value => #enum_name::#name }
+            });
+        quote! {
+            match value {
+                #(#variants,)*
+                x => #enum_name::Unassigned(x)
             }
         }
-    }
-
-    if let Some(first) = registry.first() {
-        match first {
-            InformationElementSubRegistry::ValueNameDescRegistry(_) => {
-                ret.push_str(format!("            x => {enum_name}::Unassigned(x),\n").as_str());
-                ret.push_str("        }\n");
-            }
-            InformationElementSubRegistry::ReasonCodeNestedRegistry(_) => {
-                ret.push_str("            else {\n");
-                ret.push_str(format!("                {enum_name}::Unassigned(value)\n").as_str());
-                ret.push_str("            }\n");
+    } else if matches!(
+        registry.first(),
+        Some(InformationElementSubRegistry::ReasonCodeNestedRegistry(_))
+    ) {
+        let variants = registry
+            .iter()
+            .filter_map(|x| match x {
+                InformationElementSubRegistry::ReasonCodeNestedRegistry(rec) => Some(rec),
+                _ => None,
+            })
+            .enumerate()
+            .map(|(idx, rec)| {
+                let start = 64 * idx;
+                let end = 64 * (idx + 1) - 1;
+                let start = syn::Lit::Int(syn::LitInt::new(&format!("{start}"), Span::call_site()));
+                let end = syn::Lit::Int(syn::LitInt::new(&format!("{end}"), Span::call_site()));
+                let name = Ident::new(&rec.name, Span::call_site());
+                let reason =
+                    Ident::new(&format!("{enum_name}{}Reason", rec.name), Span::call_site());
+                quote! { (#start..=#end) => #enum_name::#name(#reason::from(value)) }
+            });
+        quote! {
+            match value {
+                #(#variants,)*
+                x => #enum_name::Unassigned(x)
             }
         }
     } else {
-        // Empty registry
-        ret.push_str(format!("        {enum_name}::Unassigned(x)\n").as_str());
-    }
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-    ret
+        panic!("Not supported");
+    };
+    let code = quote! {
+        impl From<#ty> for #enum_name {
+            fn from(value: #ty) -> Self {
+                #inner
+            }
+        }
+    };
+    code
 }

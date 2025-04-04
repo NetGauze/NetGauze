@@ -20,6 +20,8 @@ use crate::{
         xml_common::find_node_by_id,
     },
 };
+use proc_macro2::{Ident, Span, TokenStream};
+use quote::quote;
 use std::{collections::HashMap, ffi::OsString, fs, path::Path};
 use thiserror::Error;
 use xml_parsers::sub_registries::parse_subregistry;
@@ -338,14 +340,14 @@ fn generate_vendor_ie(
     let deser_generated = generate_pkg_ie_deserializers(config.mod_name.as_str(), &ie_parsed);
     let ser_generated = generate_pkg_ie_serializers(config.mod_name.as_str(), &ie_parsed);
 
-    let mut output = String::new();
-    output.push_str(ie_generated.as_str());
+    let mut tokens = TokenStream::new();
+    tokens.extend(ie_generated);
+    tokens.extend(generate_ie_values(&ie_parsed, Some(config.name().clone())));
+    tokens.extend(generate_fields_enum(&ie_parsed));
+
+    let mut output = format_tokens(tokens);
     output.push_str("\n\n");
-
-    output.push_str(generate_ie_values(&ie_parsed, Some(config.name().clone())).as_str());
-    output.push_str(generate_fields_enum(&ie_parsed).as_str());
-
-    output.push_str(generate_flat_ie_struct(&ie_parsed, &vec![]).as_str());
+    output.push_str(generate_flat_ie_struct(&ie_parsed, &[]).as_str());
 
     let dest_path = Path::new(&out_dir).join(format!(
         "{}_{}",
@@ -357,13 +359,13 @@ fn generate_vendor_ie(
         "{}_{}",
         config.mod_name, GENERATED_VENDOR_DESER_SUFFIX
     ));
-    fs::write(deser_dest_path, deser_generated)?;
+    fs::write(deser_dest_path, format_tokens(deser_generated))?;
 
     let ser_dest_path = Path::new(&out_dir).join(format!(
         "{}_{}",
         config.mod_name, GENERATED_VENDOR_SER_SUFFIX
     ));
-    fs::write(ser_dest_path, ser_generated)?;
+    fs::write(ser_dest_path, format_tokens(ser_generated))?;
 
     Ok(())
 }
@@ -387,9 +389,9 @@ pub enum GenerateError {
 }
 
 pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError> {
-    let mut ie_output = String::new();
-    ie_output.push_str(generate_common_types().as_str());
-    ie_output.push_str(generate_ie_status().as_str());
+    let mut tokens = TokenStream::new();
+    tokens.extend(generate_common_types());
+    tokens.extend(generate_ie_status());
 
     // Start parsing the IANA registry
     let ipfix_xml_string = get_string_source(&config.iana.source)?;
@@ -398,10 +400,8 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
 
     let (_data_types_parsed, semantics_parsed, units_parsed) =
         parse_iana_common_values(&iana_ipfix_root);
-    let semantics_generated = generate_ie_semantics(&semantics_parsed);
-    let units_generated = generate_ie_units(&units_parsed);
-    ie_output.push_str(semantics_generated.as_str());
-    ie_output.push_str(units_generated.as_str());
+    tokens.extend(generate_ie_semantics(&semantics_parsed));
+    tokens.extend(generate_ie_units(&units_parsed));
 
     // Parse any external sub-registries provided:
     let mut ext_subregs: HashMap<u16, Vec<InformationElementSubRegistry>> = HashMap::new();
@@ -429,55 +429,42 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
     }
 
     // Generate IANA IE and reference to vendor specific IEs
-    ie_output.push_str(generate_ie_ids(&iana_ie_parsed, &vendors).as_str());
-    ie_output.push_str(generate_ie_values(&iana_ie_parsed, None).as_str());
+    tokens.extend(generate_ie_ids(&iana_ie_parsed, &vendors));
+    tokens.extend(generate_ie_values(&iana_ie_parsed, None));
 
-    let mut ie_deser = String::new();
-    let mut ie_ser = String::new();
-    ie_deser.push_str("use crate::ie::*;\n\n");
-    ie_ser.push_str("use crate::ie::*;\n\n");
+    let mut ie_deser = quote! { use crate::ie::*; };
+    let mut ie_ser = quote! { use crate::ie::*; };
 
     for vendor in &config.vendors {
-        ie_output.push_str(
-            format!(
-                "pub mod {} {{include!(concat!(env!(\"OUT_DIR\"), \"/{}_{}\"));}}\n\n",
-                vendor.mod_name(),
-                vendor.mod_name(),
-                GENERATED_VENDOR_MAIN_SUFFIX
-            )
-            .as_str(),
-        );
-        ie_deser.push_str(
-            format!(
-                "pub mod {} {{include!(concat!(env!(\"OUT_DIR\"), \"/{}_{}\"));}}\n\n",
-                vendor.mod_name(),
-                vendor.mod_name(),
-                GENERATED_VENDOR_DESER_SUFFIX
-            )
-            .as_str(),
-        );
-        ie_ser.push_str(
-            format!(
-                "pub mod {} {{include!(concat!(env!(\"OUT_DIR\"), \"/{}_{}\"));}}\n\n",
-                vendor.mod_name(),
-                vendor.mod_name(),
-                GENERATED_VENDOR_SER_SUFFIX
-            )
-            .as_str(),
-        );
+        let vendor_mod = vendor.mod_name();
+        let vendor_ident = Ident::new(vendor.mod_name(), Span::call_site());
+        let main_name = format!("/{vendor_mod}_{GENERATED_VENDOR_MAIN_SUFFIX}");
+        tokens.extend(quote! {
+            pub mod #vendor_ident { include!(concat!(env!("OUT_DIR"), #main_name)); }
+        });
+        let deser_name = format!("/{vendor_mod}_{GENERATED_VENDOR_DESER_SUFFIX}");
+        ie_deser.extend(quote! {
+            pub mod #vendor_ident {include!(concat!(env!("OUT_DIR"), #deser_name)); }
+        });
+        let ser_name = format!("/{vendor_mod}_{GENERATED_VENDOR_SER_SUFFIX}");
+        ie_ser.extend(quote! {
+            pub mod #vendor_ident {include!(concat!(env!("OUT_DIR"), #ser_name)); }
+        });
     }
 
+    let mut ie_output = String::new();
+    ie_output.push_str(format_tokens(tokens).as_str());
     ie_output.push_str(generate_flat_ie_struct(&iana_ie_parsed, &vendors).as_str());
-    ie_deser.push_str(generate_ie_deser_main(&iana_ie_parsed, &vendors).as_str());
-    ie_ser.push_str(generate_ie_ser_main(&iana_ie_parsed, &vendors).as_str());
+    ie_deser.extend(generate_ie_deser_main(&iana_ie_parsed, &vendors));
+    ie_ser.extend(generate_ie_ser_main(&iana_ie_parsed, &vendors));
 
     let ie_dest_path = Path::new(&out_dir).join("ie_generated.rs");
     fs::write(ie_dest_path, ie_output)?;
 
     let ie_deser_dest_path = Path::new(&out_dir).join("ie_deser_generated.rs");
-    fs::write(ie_deser_dest_path, ie_deser)?;
+    fs::write(ie_deser_dest_path, format_tokens(ie_deser))?;
 
     let ie_ser_dest_path = Path::new(&out_dir).join("ie_ser_generated.rs");
-    fs::write(ie_ser_dest_path, ie_ser)?;
+    fs::write(ie_ser_dest_path, format_tokens(ie_ser))?;
     Ok(())
 }

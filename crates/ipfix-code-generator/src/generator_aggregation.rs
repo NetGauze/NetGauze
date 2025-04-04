@@ -47,10 +47,7 @@ pub fn impl_extract_as_key_str() -> String {
 /// Generates `reduce(&mut self, incoming: &Fields, transform:
 /// &indexmap::IndexMap<IE, netgauze_analytics::flow::AggrOp>)` for
 /// `Fields`
-pub fn impl_reduce(
-    iana_ies: &Vec<InformationElement>,
-    vendors: &Vec<(String, String, u32)>,
-) -> String {
+pub fn impl_reduce(iana_ies: &[InformationElement], vendors: &[(String, String, u32)]) -> String {
     let mut ret = String::new();
 
     ret.push_str("    pub fn reduce(&mut self, incoming: &Fields, transform: &indexmap::IndexMap<IE, netgauze_analytics::flow::AggrOp>) -> Result<(), netgauze_analytics::flow::AggregationError> {\n");
