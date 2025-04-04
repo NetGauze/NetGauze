@@ -177,9 +177,10 @@ flow:
                   index: 0
                 default: !U16 0
               vxlan:
-                select: !Single
+                select: !Layer2SegmentId
                   ie: layer2SegmentId
                   index: 0
+                  encap_type: !VxLAN
                 default: !U64 0
               custom_primitives.ipttlmin:
                 select: !Single
