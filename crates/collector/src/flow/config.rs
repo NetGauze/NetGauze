@@ -294,6 +294,7 @@ pub enum FieldSelectFunction {
     Single(SingleFieldSelect),
     Coalesce(CoalesceFieldSelect),
     Mpls(MultiSelect),
+    Layer2SegmentId(Layer2SegmentIdFieldSelect),
 }
 
 impl FieldSelect for FieldSelectFunction {
@@ -302,6 +303,7 @@ impl FieldSelect for FieldSelectFunction {
             FieldSelectFunction::Single(f) => f.is_nullable(),
             FieldSelectFunction::Coalesce(f) => f.is_nullable(),
             FieldSelectFunction::Mpls(f) => f.is_nullable(),
+            FieldSelectFunction::Layer2SegmentId(f) => f.is_nullable(),
         }
     }
 
@@ -310,6 +312,7 @@ impl FieldSelect for FieldSelectFunction {
             FieldSelectFunction::Single(f) => f.avro_type(),
             FieldSelectFunction::Coalesce(f) => f.avro_type(),
             FieldSelectFunction::Mpls(f) => f.avro_type(),
+            FieldSelectFunction::Layer2SegmentId(f) => f.avro_type(),
         }
     }
     fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
@@ -317,6 +320,7 @@ impl FieldSelect for FieldSelectFunction {
             FieldSelectFunction::Single(single) => single.apply(flow),
             FieldSelectFunction::Coalesce(coalesce) => coalesce.apply(flow),
             FieldSelectFunction::Mpls(coalesce) => coalesce.apply(flow),
+            FieldSelectFunction::Layer2SegmentId(single) => single.apply(flow),
         }
     }
 }
@@ -452,6 +456,105 @@ impl FieldSelect for MultiSelect {
                 }
                 Some(ret)
             }
+        }
+    }
+}
+
+// Layer 2 Segment ID (IE351) Encapsulation Types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum Layer2SegmentId {
+    VxLAN = 0x01,
+    NVGRE = 0x02,
+    Unassigned(u8),
+}
+impl From<&Layer2SegmentId> for u8 {
+    fn from(segment_id: &Layer2SegmentId) -> Self {
+        match segment_id {
+            Layer2SegmentId::VxLAN => 0x01,
+            Layer2SegmentId::NVGRE => 0x02,
+            Layer2SegmentId::Unassigned(value) => *value,
+        }
+    }
+}
+impl Layer2SegmentId {
+    pub fn get_mask(&self) -> u64 {
+        match self {
+            // VxLAN Network Identifier (VNI) is a 24-bit identifier
+            //
+            // Reference: [RFC 7348](https://www.iana.org/go/rfc7348)
+            Layer2SegmentId::VxLAN => 0x0000_00FF_FFFF,
+            // NVGRE Tenant Network Identifier (TNI) is a 24-bit identifier
+            //
+            // Reference: [RFC 7637](https://www.iana.org/go/rfc7637)
+            Layer2SegmentId::NVGRE => 0x0000_00FF_FFFF,
+            Layer2SegmentId::Unassigned(_) => 0x00FF_FFFF_FFFF,
+        }
+    }
+}
+
+// Special select for Layer 2 Segment ID
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Layer2SegmentIdFieldSelect {
+    pub ie: IE,
+    #[serde(default = "default_field_index")]
+    pub index: usize,
+    pub encap_type: Layer2SegmentId,
+}
+
+impl FieldSelect for Layer2SegmentIdFieldSelect {
+    fn is_nullable(&self) -> bool {
+        true
+    }
+
+    fn avro_type(&self) -> AvroValueKind {
+        AvroValueKind::Long
+    }
+
+    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
+        match flow {
+            FlatFlowDataInfo::NetFlowV9(packet) => packet
+                .set()
+                .record()
+                .fields()
+                .get(self.ie)
+                .get(self.index)
+                .cloned()
+                .and_then(|x| {
+                    if let ie::Field::layer2SegmentId(id) = x {
+                        // check if the first byte matches the provided encap_type
+                        if (id >> 56) as u8 == u8::from(&self.encap_type) {
+                            Some(vec![ie::Field::layer2SegmentId(
+                                id & self.encap_type.get_mask(),
+                            )])
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }),
+            FlatFlowDataInfo::IPFIX(packet) => packet
+                .set()
+                .record()
+                .fields()
+                .get(self.ie)
+                .get(self.index)
+                .cloned()
+                .and_then(|x| {
+                    if let ie::Field::layer2SegmentId(id) = x {
+                        // check if the first byte matches the provided encap_type
+                        if (id >> 56) as u8 == u8::from(&self.encap_type) {
+                            Some(vec![ie::Field::layer2SegmentId(
+                                id & self.encap_type.get_mask(),
+                            )])
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }),
         }
     }
 }
