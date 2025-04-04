@@ -25,6 +25,7 @@ use std::{collections::HashMap, net::Ipv4Addr};
 
 use crate::{
     ie,
+    ie::Field,
     ipfix::*,
     wire::{
         deserializer::{ie as ie_desr, ipfix::*},
@@ -95,6 +96,33 @@ fn test_u8_value() -> Result<(), ie_ser::FieldWritingError> {
         &value_wire,
         &ie::IE::protocolIdentifier,
         2,
+        nom::Err::Error(invalid_length),
+    );
+    test_write_with_one_input(&value, None, &value_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_f64_value() -> Result<(), ie_ser::FieldWritingError> {
+    let value_wire = [64, 94, 217, 153, 153, 153, 153, 154];
+    let value = Field::samplingProbability(ordered_float::OrderedFloat::from(123.4));
+    let invalid_length = ie_desr::LocatedFieldParsingError::new(
+        Span::new(&value_wire),
+        ie_desr::FieldParsingError::InvalidLength {
+            ie_name: "samplingProbability".to_string(),
+            length: 4,
+        },
+    );
+    test_parsed_completely_with_two_inputs(&value_wire, &ie::IE::samplingProbability, 8u16, &value);
+    test_parse_error_with_two_inputs::<
+        ie::Field,
+        &ie::IE,
+        u16,
+        ie_desr::LocatedFieldParsingError<'_>,
+    >(
+        &value_wire,
+        &ie::IE::samplingProbability,
+        4,
         nom::Err::Error(invalid_length),
     );
     test_write_with_one_input(&value, None, &value_wire)?;
