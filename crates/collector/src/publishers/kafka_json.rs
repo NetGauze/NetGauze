@@ -196,43 +196,49 @@ impl KafkaJsonPublisherActor {
         })
     }
 
-    fn decode_msg(msg: &UdpNotifPacket) -> Result<String, KafkaJsonPublisherActorError> {
+    fn decode_msg(&self, msg: &UdpNotifPacket) -> Result<Vec<u8>, KafkaJsonPublisherActorError> {
         let mut value = serde_json::to_value(msg)?;
-        // Convert when possible inner payload into human-readable format
-        match msg.media_type() {
-            MediaType::YangDataJson => {
-                let payload = serde_json::from_slice(msg.payload())?;
-                if let serde_json::Value::Object(ref mut val) = &mut value {
-                    val.insert("payload".to_string(), payload);
+        if let serde_json::Value::Object(ref mut val) = &mut value {
+            // Add the writer ID to the message
+            val.insert(
+                "writer_id".to_string(),
+                serde_json::Value::String(self.config.writer_id.to_string()),
+            );
+            // Convert inner payload into human-readable format when possible
+            match msg.media_type() {
+                MediaType::YangDataJson => {
+                    // Deserialize the payload into a JSON object
+                    val.insert(
+                        "payload".to_string(),
+                        serde_json::from_slice(msg.payload())?,
+                    );
                 }
-            }
-            MediaType::YangDataXml => {
-                let payload =
-                    std::str::from_utf8(msg.payload()).expect("Couldn't deserialize XML payload");
-                if let serde_json::Value::Object(ref mut val) = &mut value {
+                MediaType::YangDataXml => {
+                    let payload = std::str::from_utf8(msg.payload())
+                        .expect("Couldn't deserialize XML payload");
                     val.insert(
                         "payload".to_string(),
                         serde_json::Value::String(payload.to_string()),
                     );
                 }
-            }
-            MediaType::YangDataCbor => {
-                let payload =
-                    std::str::from_utf8(msg.payload()).expect("Couldn't deserialize CBOR payload");
-                if let serde_json::Value::Object(ref mut val) = &mut value {
+                MediaType::YangDataCbor => {
+                    let payload = std::str::from_utf8(msg.payload())
+                        .expect("Couldn't deserialize CBOR payload");
                     val.insert(
                         "payload".to_string(),
                         serde_json::Value::String(payload.to_string()),
                     );
                 }
+                _ => {
+                    panic!("Unsupported media type: {:?}", msg.media_type());
+                }
             }
-            _ => {}
         }
-        Ok(serde_json::to_string(&value)?)
+        Ok(serde_json::to_vec(&value)?)
     }
 
     async fn send(&mut self, input: UdpNotifPacket) -> Result<(), KafkaJsonPublisherActorError> {
-        let encoded = Self::decode_msg(&input)?.into_bytes();
+        let encoded = self.decode_msg(&input)?;
         let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> =
             BaseRecord::to(self.config.topic.as_str()).payload(&encoded);
         let mut polling_interval = Duration::from_micros(10);
