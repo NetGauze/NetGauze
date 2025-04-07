@@ -13,13 +13,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: tenantProtocol
+                    ESXi IPFIX Templates: tenantProtocol
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>tenantSourceIPv4</name>
@@ -30,13 +31,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: tenantSourceIPv4
+                    ESXi IPFIX Templates: tenantSourceIPv4
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>tenantDestIPv4</name>
@@ -47,13 +49,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: tenantDestIPv4
+                    ESXi IPFIX Templates: tenantDestIPv4
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>tenantSourceIPv6</name>
@@ -64,13 +67,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: tenantSourceIPv6
+                    ESXi IPFIX Templates: tenantSourceIPv6
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>tenantDestIPv6</name>
@@ -81,13 +85,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: tenantDestIPv6
+                    ESXi IPFIX Templates: tenantDestIPv6
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>tenantSourcePort</name>
@@ -98,13 +103,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: tenantSourcePort
+                    ESXi IPFIX Templates: tenantSourcePort
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>tenantDestPort</name>
@@ -115,13 +121,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: tenantDestPort
+                    ESXi IPFIX Templates: tenantDestPort
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>egressInterfaceAttr</name>
@@ -132,13 +139,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: egressInterfaceAttr
+                    ESXi IPFIX Templates: egressInterfaceAttr
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>vxlanExportRole</name>
@@ -149,13 +157,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: vxlanExportRole
+                    ESXi IPFIX Templates: vxlanExportRole
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>ingressInterfaceAttr</name>
@@ -166,13 +175,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: ingressInterfaceAttr
+                    ESXi IPFIX Templates: ingressInterfaceAttr
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>virtualObsID</name>
@@ -183,13 +193,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Logical Swith: virtualObsID
+                    ESXi IPFIX Templates: virtualObsID
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>ruleId</name>
@@ -200,13 +211,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: ruleId
+                    firewall Rule Id - Enterprise specific IE.
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>vmUuid</name>
@@ -217,13 +229,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: vmUuid
+                    VMware NSX 4.2 - Distributed Firewall: vmUuid
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>vnicIndex</name>
@@ -234,13 +247,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: vnicIndex
+                    VMware NSX 4.2 - Distributed Firewall: vnicIndex
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>sessionFlags</name>
@@ -251,13 +265,16 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: sessionFlags
+                    Session Flags - Enterprise specific IE. Valid values are:
+                    - 0 - unknown
+                    - 0x1 - established
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>flowDirection</name>
@@ -268,13 +285,17 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: flowDirection
+                    Flow Direction- Enterprise specific IE. Valid values are:
+                    0 - unknown
+                    1 - forward
+                    2 - reverse
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>algControlFlowId</name>
@@ -285,13 +306,16 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: algControlFlowId
+                    ALG Control Flow ID - Enterprise specific IE. Valid values are:
+                    - 0
+                    - flowId of ALG control flow
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>algType</name>
@@ -302,13 +326,20 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: algType
+                    ALG Control Flow ID - Enterprise specific IE. Valid values are:
+                    0 - none
+                    1 - FTP
+                    2 - Oracle
+                    3 - SUNRPC
+                    4 - DCERPC
+                    5 - TFTP
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>algFlowType</name>
@@ -319,47 +350,51 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: algFlowType
+                    ALG Control Flow ID - Enterprise specific IE. Valid values are:
+                    0 - none
+                    1 - control flow
+                    2 - data flow
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>averageLatency</name>
             <dataType>unsigned32</dataType>
-            <dataTypeSemantics>identifier</dataTypeSemantics>
             <elementId>958</elementId>
             <applicability>data</applicability>
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: averageLatency
+                    Average TCP Latency - Enterprise specific IE.
                 </paragraph>
             </description>
-            <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <units>microseconds</units>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>retransmissionCount</name>
             <dataType>unsigned32</dataType>
-            <dataTypeSemantics>identifier</dataTypeSemantics>
             <elementId>959</elementId>
             <applicability>data</applicability>
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: retransmissionCount
+                    VMware NSX 4.2 - Distributed Firewall: retransmissionCount
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>vifUuid</name>
@@ -370,13 +405,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: vifUuid
+                    VIF UUID - Enterprise specific IE. Uniquely identifies the VIF (octet array of 16).
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
         <record>
             <name>vifId</name>
@@ -387,13 +423,14 @@
             <status>current</status>
             <description>
                 <paragraph>
-                    NSX-T-Data-Center 3.2 - Distributed Firewall: vifId
+                    VIF ID - Enterprise specific IE. Uniquely identifies the VIF (char string format UTF-8).
                 </paragraph>
             </description>
             <units></units>
-            <xref type="html" data="https://docs.vmware.com/en/VMware-NSX-T-Data-Center/3.2/administration/GUID-F7304386-EFAE-4479-9E3B-251519969D4C.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates.html"/>
+            <xref type="html" data="https://techdocs.broadcom.com/us/en/vmware-cis/nsx/vmware-nsx/4-2/administration-guide/network-monitoring/advanced-monitoring-tools/configure-ipfix/esxi-ipfix-templates/esxi-distributed-firewall-ipfix-templates.html"/>
             <revision>0</revision>
-            <date>2019-06-27</date>
+            <date>2025-04-02</date>
         </record>
     </registry>
 </registry>
