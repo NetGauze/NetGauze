@@ -268,10 +268,12 @@ fn arbitrary_datetime(
 mod tests {
     use super::*;
     use crate::{
+        ie::protocolIdentifier,
         ipfix::{FlatIpfixPacket, IpfixPacket},
         netflow::{FlatNetFlowV9Packet, NetFlowV9Packet},
     };
     use chrono::{TimeZone, Utc};
+    use netgauze_iana::tcp::TCPHeaderFlags;
     use std::net::Ipv4Addr;
 
     #[test]
@@ -582,5 +584,355 @@ mod tests {
             )),
         ];
         assert_eq!(flattened, expected);
+    }
+
+    #[test]
+    fn test_supports_arithmetic() {
+        // octetArray doesn't support arithmetic operations
+        assert!(!IE::mplsLabelStackSection.supports_arithmetic_ops());
+        assert!(!IE::paddingOctets.supports_arithmetic_ops());
+        // number types (except unsigned256) supports arithmetic ops,
+        assert!(IE::destinationIPv4PrefixLength.supports_arithmetic_ops());
+        assert!(IE::flowActiveTimeout.supports_arithmetic_ops());
+        assert!(IE::distinctCountOfSourceIPv4Address.supports_arithmetic_ops());
+        assert!(IE::postMCastPacketDeltaCount.supports_arithmetic_ops());
+        assert!(!IE::ipv6ExtensionHeadersFull.supports_arithmetic_ops());
+        assert!(IE::mibObjectValueInteger.supports_arithmetic_ops());
+        assert!(IE::absoluteError.supports_arithmetic_ops());
+        // numbers that are identifiers, flags, or have subregistries don't support
+        // arithmetic ops
+        assert!(!IE::ipClassOfService.supports_arithmetic_ops());
+        assert!(!IE::egressInterface.supports_arithmetic_ops());
+        assert!(!IE::forwardingStatus.supports_arithmetic_ops());
+        // Bool doesn't support arithmetic ops
+        assert!(!IE::dataRecordsReliability.supports_arithmetic_ops());
+        // Time doesn't support arithmetic ops
+        assert!(!IE::observationTimeSeconds.supports_arithmetic_ops());
+        assert!(!IE::observationTimeMilliseconds.supports_arithmetic_ops());
+        assert!(!IE::observationTimeNanoseconds.supports_arithmetic_ops());
+        assert!(!IE::observationTimeMicroseconds.supports_arithmetic_ops());
+        // IP addresses don't support arithmetic ops
+        assert!(!IE::sourceIPv4Address.supports_arithmetic_ops());
+        assert!(!IE::sourceIPv6Address.supports_arithmetic_ops());
+        // List doesn't support arithmetic ops
+        assert!(!IE::bgpSourceCommunityList.supports_arithmetic_ops());
+        assert!(!IE::ipv6ExtensionHeaderTypeCountList.supports_arithmetic_ops());
+        assert!(!IE::subTemplateMultiList.supports_arithmetic_ops());
+    }
+
+    #[test]
+    fn test_supports_bitwise_ops() {
+        // octetArray supports bitwise operations
+        assert!(IE::mplsLabelStackSection.supports_bitwise_ops());
+        assert!(IE::paddingOctets.supports_bitwise_ops());
+        // number types (including unsigned256) supports bitwise ops,
+        assert!(IE::destinationIPv4PrefixLength.supports_bitwise_ops());
+        assert!(IE::flowActiveTimeout.supports_bitwise_ops());
+        assert!(IE::distinctCountOfSourceIPv4Address.supports_bitwise_ops());
+        assert!(IE::postMCastPacketDeltaCount.supports_bitwise_ops());
+        assert!(IE::ipv6ExtensionHeadersFull.supports_bitwise_ops());
+        assert!(IE::mibObjectValueInteger.supports_bitwise_ops());
+        // numbers that are identifiers, flags, or have subregistries support bitwise
+        // ops
+        assert!(IE::ipClassOfService.supports_bitwise_ops());
+        assert!(IE::egressInterface.supports_bitwise_ops());
+        assert!(IE::forwardingStatus.supports_bitwise_ops());
+        // Bool doesn't support bitwise ops
+        assert!(IE::dataRecordsReliability.supports_bitwise_ops());
+        // Time doesn't support bitwise ops
+        assert!(!IE::observationTimeSeconds.supports_bitwise_ops());
+        assert!(!IE::observationTimeMilliseconds.supports_bitwise_ops());
+        assert!(!IE::observationTimeNanoseconds.supports_bitwise_ops());
+        assert!(!IE::observationTimeMicroseconds.supports_bitwise_ops());
+        // IP addresses support bitwise ops
+        assert!(IE::sourceIPv4Address.supports_bitwise_ops());
+        assert!(IE::sourceIPv6Address.supports_bitwise_ops());
+    }
+
+    #[test]
+    fn test_supports_comparison_ops() {
+        // octetArray doesn't support comparison operations
+        assert!(!IE::mplsLabelStackSection.supports_comparison_ops());
+        assert!(!IE::paddingOctets.supports_comparison_ops());
+        // number types (excluding unsigned256) supports comparison ops,
+        assert!(IE::destinationIPv4PrefixLength.supports_comparison_ops());
+        assert!(IE::flowActiveTimeout.supports_comparison_ops());
+        assert!(IE::distinctCountOfSourceIPv4Address.supports_comparison_ops());
+        assert!(IE::postMCastPacketDeltaCount.supports_comparison_ops());
+        assert!(!IE::ipv6ExtensionHeadersFull.supports_comparison_ops());
+        assert!(IE::mibObjectValueInteger.supports_comparison_ops());
+        // numbers that are identifiers, flags, or have subregistries support comparison
+        // ops
+        assert!(IE::ipClassOfService.supports_comparison_ops());
+        assert!(IE::egressInterface.supports_comparison_ops());
+        assert!(IE::forwardingStatus.supports_comparison_ops());
+        // Bool doesn't support comparison ops
+        assert!(!IE::dataRecordsReliability.supports_comparison_ops());
+        // Time supports comparison ops
+        assert!(IE::observationTimeSeconds.supports_comparison_ops());
+        assert!(IE::observationTimeMilliseconds.supports_comparison_ops());
+        assert!(IE::observationTimeNanoseconds.supports_comparison_ops());
+        assert!(IE::observationTimeMicroseconds.supports_comparison_ops());
+        // IP addresses support comparison ops
+        assert!(IE::sourceIPv4Address.supports_comparison_ops());
+        assert!(IE::sourceIPv6Address.supports_comparison_ops());
+    }
+
+    #[test]
+    fn test_field_add() {
+        let mut octet1 = Field::octetDeltaCount(100);
+        let octet2 = Field::octetDeltaCount(200);
+        let packet1 = Field::packetDeltaCount(300);
+
+        let result_err1 = octet1.add_field(&packet1);
+        let result_err2 = octet1.add_assign_field(&packet1);
+        let result = octet1.add_field(&octet2).expect("add field");
+        octet1
+            .add_assign_field(&octet2)
+            .expect("add field mut failed");
+        let expected = Field::octetDeltaCount(300);
+        let expected_err = Some(FieldOperationError::InapplicableAdd(
+            IE::octetDeltaCount,
+            IE::packetDeltaCount,
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(octet1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_field_min() {
+        let mut field1 = Field::octetDeltaCount(100);
+        let field2 = Field::octetDeltaCount(200);
+        let packet1 = Field::packetDeltaCount(300);
+
+        let result_err1 = field1.min_field(&packet1);
+        let result_err2 = field1.min_assign_field(&packet1);
+        let result = field1.min_field(&field2).expect("min field");
+        field1
+            .min_assign_field(&field2)
+            .expect("min field mut failed");
+        let expected = Field::octetDeltaCount(100);
+        let expected_err = Some(FieldOperationError::InapplicableMin(
+            IE::octetDeltaCount,
+            IE::packetDeltaCount,
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_field_max() {
+        let mut field1 = Field::octetDeltaCount(100);
+        let field2 = Field::octetDeltaCount(200);
+        let packet1 = Field::packetDeltaCount(300);
+
+        let result_err1 = field1.max_field(&packet1);
+        let result_err2 = field1.max_assign_field(&packet1);
+        let result = field1.max_field(&field2).expect("max field");
+        field1
+            .max_assign_field(&field2)
+            .expect("max field mut failed");
+        let expected = Field::octetDeltaCount(200);
+        let expected_err = Some(FieldOperationError::InapplicableMax(
+            IE::octetDeltaCount,
+            IE::packetDeltaCount,
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_field_bitwise_or() {
+        let mut field1 = Field::octetDeltaCount(100);
+        let field2 = Field::octetDeltaCount(200);
+        let packet1 = Field::packetDeltaCount(300);
+
+        let result_err1 = field1.bitwise_or_field(&packet1);
+        let result_err2 = field1.bitwise_or_assign_field(&packet1);
+        let result = field1.bitwise_or_field(&field2).expect("bitwise or field");
+        field1
+            .bitwise_or_assign_field(&field2)
+            .expect("bitwise or field mut failed");
+        let expected = Field::octetDeltaCount(236);
+        let expected_err = Some(FieldOperationError::InapplicableBitwise(
+            IE::octetDeltaCount,
+            IE::packetDeltaCount,
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_field_bitwise_or_tcp_control_bits() {
+        let mut field1 = Field::tcpControlBits(TCPHeaderFlags::from(0x01u8));
+        let field2 = Field::tcpControlBits(TCPHeaderFlags::from(0x02u8));
+        let packet1 = Field::packetDeltaCount(300);
+
+        let result_err1 = field1.bitwise_or_field(&packet1);
+        let result_err2 = field1.bitwise_or_assign_field(&packet1);
+        let result = field1.bitwise_or_field(&field2).expect("bitwise or field");
+        field1
+            .bitwise_or_assign_field(&field2)
+            .expect("bitwise or field mut failed");
+        let expected = Field::tcpControlBits(TCPHeaderFlags::from(0x03u8));
+        let expected_err = Some(FieldOperationError::InapplicableBitwise(
+            IE::tcpControlBits,
+            IE::packetDeltaCount,
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_field_bitwise_or_protocol_identifier() {
+        let mut field1 = Field::protocolIdentifier(protocolIdentifier::ICMP);
+        let field2 = Field::protocolIdentifier(protocolIdentifier::IGMP);
+        let packet1 = Field::packetDeltaCount(300);
+
+        let result_err1 = field1.bitwise_or_field(&packet1);
+        let result_err2 = field1.bitwise_or_assign_field(&packet1);
+        let result = field1.bitwise_or_field(&field2).expect("bitwise or field");
+        field1
+            .bitwise_or_assign_field(&field2)
+            .expect("bitwise or field mut failed");
+        let expected = Field::protocolIdentifier(protocolIdentifier::from(0x03u8));
+        let expected_err = Some(FieldOperationError::InapplicableBitwise(
+            IE::protocolIdentifier,
+            IE::packetDeltaCount,
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_vmware_ops() {
+        let mut vendor_field1 = vmware::Field::averageLatency(100);
+        let vendor_field2 = vmware::Field::averageLatency(200);
+        let vendor_other_field = vmware::Field::algControlFlowId(123);
+
+        let result_err1 = vendor_field1.add_field(&vendor_other_field);
+        let result_err2 = vendor_field1.add_assign_field(&vendor_other_field);
+        let result = vendor_field1.add_field(&vendor_field2).expect("add field");
+        vendor_field1
+            .add_assign_field(&vendor_field2)
+            .expect("add field");
+        let expected = vmware::Field::averageLatency(300);
+        let expected_err = Some(vmware::FieldOperationError::InapplicableAdd(
+            vmware::IE::averageLatency,
+            vmware::IE::algControlFlowId,
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(vendor_field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_vendor_field_add() {
+        let mut field1 = Field::VMWare(vmware::Field::averageLatency(100));
+        let field2 = Field::VMWare(vmware::Field::averageLatency(200));
+        let other_field = Field::VMWare(vmware::Field::algControlFlowId(123));
+
+        let result_err1 = field1.add_field(&other_field);
+        let result_err2 = field1.add_assign_field(&other_field);
+        let result = field1.add_field(&field2).expect("add field");
+        field1.add_assign_field(&field2).expect("add field");
+        let expected = Field::VMWare(vmware::Field::averageLatency(300));
+        let expected_err = Some(FieldOperationError::InapplicableAdd(
+            IE::VMWare(vmware::IE::averageLatency),
+            IE::VMWare(vmware::IE::algControlFlowId),
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_vendor_field_min() {
+        let mut field1 = Field::VMWare(vmware::Field::averageLatency(100));
+        let field2 = Field::VMWare(vmware::Field::averageLatency(200));
+        let other_field = Field::VMWare(vmware::Field::algControlFlowId(123));
+
+        let result_err1 = field1.min_field(&other_field);
+        let result_err2 = field1.min_assign_field(&other_field);
+        let result = field1.min_field(&field2).expect("min field");
+        field1.min_assign_field(&field2).expect("min field");
+        let expected = Field::VMWare(vmware::Field::averageLatency(100));
+        let expected_err = Some(FieldOperationError::InapplicableMin(
+            IE::VMWare(vmware::IE::averageLatency),
+            IE::VMWare(vmware::IE::algControlFlowId),
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_vendor_field_max() {
+        let mut field1 = Field::VMWare(vmware::Field::averageLatency(100));
+        let field2 = Field::VMWare(vmware::Field::averageLatency(200));
+        let other_field = Field::VMWare(vmware::Field::algControlFlowId(123));
+
+        let result_err1 = field1.max_field(&other_field);
+        let result_err2 = field1.max_assign_field(&other_field);
+        let result = field1.max_field(&field2).expect("max field");
+        field1.max_assign_field(&field2).expect("max field");
+        let expected = Field::VMWare(vmware::Field::averageLatency(200));
+        let expected_err = Some(FieldOperationError::InapplicableMax(
+            IE::VMWare(vmware::IE::averageLatency),
+            IE::VMWare(vmware::IE::algControlFlowId),
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
+    }
+
+    #[test]
+    fn test_vendor_field_bitwise_or() {
+        let mut field1 = Field::VMWare(vmware::Field::algControlFlowId(100));
+        let field2 = Field::VMWare(vmware::Field::algControlFlowId(200));
+        let other_field = Field::VMWare(vmware::Field::averageLatency(123));
+
+        let result_err1 = field1.bitwise_or_field(&other_field);
+        let result_err2 = field1.bitwise_or_field(&other_field);
+        let result = field1.bitwise_or_field(&field2).expect("bitwise or field");
+        field1
+            .bitwise_or_assign_field(&field2)
+            .expect("bitwise or field");
+        let expected = Field::VMWare(vmware::Field::algControlFlowId(236));
+        let expected_err = Some(FieldOperationError::InapplicableBitwise(
+            IE::VMWare(vmware::IE::algControlFlowId),
+            IE::VMWare(vmware::IE::averageLatency),
+        ));
+
+        assert_eq!(result, expected);
+        assert_eq!(field1, expected);
+        assert_eq!(result_err1.err(), expected_err);
+        assert_eq!(result_err2.err(), expected_err);
     }
 }

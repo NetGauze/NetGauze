@@ -335,7 +335,7 @@ fn generate_vendor_ie(
     let ipfix_ie_node = find_node_by_id(&ipfix_root, ID_IE).unwrap();
     let ie_parsed = parse_information_elements(&ipfix_ie_node, config.pen, ext_subregs);
 
-    let ie_generated = generate_information_element_ids(&ie_parsed);
+    let ie_generated = generate_information_element_ids(&config.name, &ie_parsed);
 
     let deser_generated = generate_pkg_ie_deserializers(config.mod_name.as_str(), &ie_parsed);
     let ser_generated = generate_pkg_ie_serializers(config.mod_name.as_str(), &ie_parsed);

@@ -257,7 +257,8 @@ fn generate_impl_ie_template_for_ie(ie: &[InformationElement]) -> TokenStream {
     }
 }
 
-fn generate_from_for_ie() -> TokenStream {
+fn generate_from_for_ie(vendor_name: &str) -> TokenStream {
+    let ident = Ident::new(vendor_name, Span::call_site());
     quote! {
         #[derive(Copy, Eq, Hash, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -268,6 +269,7 @@ fn generate_from_for_ie() -> TokenStream {
                 value as u16
             }
         }
+
         impl TryFrom<u16> for IE {
             type Error = UndefinedIE;
 
@@ -280,12 +282,21 @@ fn generate_from_for_ie() -> TokenStream {
                }
             }
         }
+
+        impl From<IE> for crate::IE {
+            fn from(value: IE) -> crate::IE {
+                crate::IE::#ident(value)
+            }
+        }
     }
 }
 
 /// Generate an enum of InformationElementIDs.
 /// different names spaces; i.e. IANA vs enterprise space.
-pub(crate) fn generate_information_element_ids(ie: &[InformationElement]) -> TokenStream {
+pub(crate) fn generate_information_element_ids(
+    vendor_name: &str,
+    ie: &[InformationElement],
+) -> TokenStream {
     let ie_variants = ie.iter().map(|ie| {
         let ie_name = Ident::new(ie.name.as_str(), Span::call_site());
         let ie_value = ie.element_id;
@@ -309,6 +320,11 @@ pub(crate) fn generate_information_element_ids(ie: &[InformationElement]) -> Tok
         }
     });
 
+    let if_has_subregistry_variants = ie.iter().map(|ie| {
+        let ie_name = Ident::new(ie.name.as_str(), Span::call_site());
+        let has_subreg = ie.subregistry.is_some();
+        quote! { Self::#ie_name => #has_subreg }
+    });
     let mut tokens = quote! {
         #[allow(non_camel_case_types)]
         #[repr(u16)]
@@ -317,10 +333,18 @@ pub(crate) fn generate_information_element_ids(ie: &[InformationElement]) -> Tok
         pub enum IE {
             #(#ie_variants,)*
         }
+
+        impl IE {
+             pub const fn has_registry(&self) -> bool {
+                match self {
+                    #(#if_has_subregistry_variants,)*
+                }
+            }
+        }
     };
 
     tokens.extend(generate_impl_ie_template_for_ie(ie));
-    tokens.extend(generate_from_for_ie());
+    tokens.extend(generate_from_for_ie(vendor_name));
     tokens
 }
 
@@ -543,6 +567,57 @@ fn generate_ie_template_trait_for_main(
     }
 }
 
+fn is_numeric(ie: &InformationElement) -> bool {
+    if ie.data_type == "unsigned256" {
+        return false;
+    }
+    if ie.data_type_semantics == Some("identifier".to_string()) {
+        return false;
+    }
+    if ie.data_type_semantics == Some("flags".to_string()) {
+        return false;
+    }
+    if ie.subregistry.is_some() {
+        return false;
+    }
+    ie.data_type.starts_with("signed")
+        || ie.data_type.starts_with("unsigned")
+        || ie.data_type.starts_with("float")
+}
+
+fn is_comparable(ie: &InformationElement) -> bool {
+    if [
+        "string",
+        "octetArray",
+        "basicList",
+        "subTemplateList",
+        "subTemplateMultiList",
+        "unsigned256",
+    ]
+    .contains(&ie.data_type.as_str())
+    {
+        return false;
+    }
+    true
+}
+
+fn is_bitwise(ie: &InformationElement) -> bool {
+    if [
+        "string",
+        "float32",
+        "float64",
+        "basicList",
+        "subTemplateList",
+        "subTemplateMultiList",
+    ]
+    .contains(&ie.data_type.as_str())
+        | ie.data_type.starts_with("dateTime")
+    {
+        return false;
+    }
+    true
+}
+
 fn generate_ie_field_enum_for_ie(
     iana_ies: &[InformationElement],
     vendors: &[(String, String, u32)],
@@ -604,6 +679,77 @@ fn generate_ie_field_enum_for_ie(
 
     let into_for_field = generate_into_for_field(iana_ies, vendors);
 
+    let vendor_add_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! { (Self::#name(lhs), Self::#name(rhs)) => Ok(Self::#name(lhs.add_field(rhs)?)) }
+    });
+
+    let vendor_add_assign_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! {
+            (Self::#name(lhs), Self::#name(rhs)) => {
+                lhs.add_assign_field(rhs)?;
+                Ok(())
+            }
+        }
+    });
+
+    let vendor_bitwise_or_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! { (Self::#name(lhs), Self::#name(rhs)) => Ok(Self::#name(lhs.bitwise_or_field(rhs)?)) }
+    });
+
+    let vendor_bitwise_or_assign_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! {
+            (Self::#name(lhs), Self::#name(rhs)) => {
+                lhs.bitwise_or_assign_field(rhs)?;
+                Ok(())
+            }
+        }
+    });
+
+    let vendor_min_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! { (Self::#name(lhs), Self::#name(rhs)) => Ok(Self::#name(lhs.min_field(rhs)?)) }
+    });
+
+    let vendor_min_assign_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! {
+            (Self::#name(lhs), Self::#name(rhs)) => {
+                lhs.min_assign_field(rhs)?;
+                Ok(())
+            }
+        }
+    });
+
+    let vendor_max_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! { (Self::#name(lhs), Self::#name(rhs)) => Ok(Self::#name(lhs.max_field(rhs)?)) }
+    });
+
+    let vendor_max_assign_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! {
+            (Self::#name(lhs), Self::#name(rhs)) => {
+                lhs.max_assign_field(rhs)?;
+                Ok(())
+            }
+        }
+    });
+
+    let OperationVariants {
+        ie_add_variants,
+        ie_add_assign_variants,
+        ie_min_variants,
+        ie_min_assign_variants,
+        ie_max_variants,
+        ie_max_assign_variants,
+        ie_bitwise_or_variants,
+        ie_bitwise_or_assign_variants,
+    } = field_operations_variants(iana_ies);
+
     quote! {
         #[allow(non_camel_case_types)]
         #[derive(strum_macros::Display, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -613,8 +759,6 @@ fn generate_ie_field_enum_for_ie(
             #(#vendor_variants,)*
             #(#iana_variants,)*
         }
-
-
         impl HasIE for Field {
             /// Get the [IE] element for a given field
             fn ie(&self) -> IE {
@@ -633,6 +777,301 @@ fn generate_ie_field_enum_for_ie(
         impl std::error::Error for FieldConversionError {}
 
         #into_for_field
+
+        #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
+        pub enum FieldOperationError {
+            InapplicableAdd(IE, IE),
+            InapplicableMin(IE, IE),
+            InapplicableMax(IE, IE),
+            InapplicableBitwise(IE, IE),
+        }
+        impl std::error::Error for FieldOperationError {}
+
+        impl Field {
+            /// Arithmetic addition operation of two fields and produce a field with the new value
+            pub fn add_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                match (self, rhs) {
+                    #(#vendor_add_variants,)*
+                    #(#ie_add_variants,)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableAdd(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// The addition assignment operation += of two fields
+            pub fn add_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                match (self, rhs) {
+                    #(#vendor_add_assign_variants)*
+                    #(#ie_add_assign_variants)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableAdd(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Bitwise OR operation of two fields and produce a field with the new value
+             pub fn bitwise_or_field(&self, other: &Field) -> Result<Field, FieldOperationError> {
+                match (self, other) {
+                    #(#vendor_bitwise_or_variants,)*
+                    #(#ie_bitwise_or_variants,)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableBitwise(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// The bitwise OR assignment operation |= of two fields
+            pub fn bitwise_or_assign_field(&mut self, other: &Field) -> Result<(), FieldOperationError> {
+                match (self, other) {
+                    #(#vendor_bitwise_or_assign_variants)*
+                    #(#ie_bitwise_or_assign_variants)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableBitwise(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Returns a new field with the minimum of the two fields
+            pub fn min_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                match (self, rhs) {
+                    #(#vendor_min_variants,)*
+                    #(#ie_min_variants,)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Assign the field's value to be minimum of the two fields
+            pub fn min_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                match (self, rhs) {
+                    #(#vendor_min_assign_variants)*
+                    #(#ie_min_assign_variants)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Returns a new field with the maximum of the two fields
+            pub fn max_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                match (self, rhs) {
+                    #(#vendor_max_variants,)*
+                    #(#ie_max_variants,)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Assign the field's value to be maximum of the two fields
+            pub fn max_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                match (self, rhs) {
+                    #(#vendor_max_assign_variants)*
+                    #(#ie_max_assign_variants)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),
+                }
+            }
+        }
+    }
+}
+
+struct OperationVariants {
+    ie_add_variants: Vec<TokenStream>,
+    ie_add_assign_variants: Vec<TokenStream>,
+    ie_min_variants: Vec<TokenStream>,
+    ie_min_assign_variants: Vec<TokenStream>,
+    ie_max_variants: Vec<TokenStream>,
+    ie_max_assign_variants: Vec<TokenStream>,
+    ie_bitwise_or_variants: Vec<TokenStream>,
+    ie_bitwise_or_assign_variants: Vec<TokenStream>,
+}
+fn field_operations_variants(iana_ies: &[InformationElement]) -> OperationVariants {
+    let ie_add_variants = iana_ies
+        .iter()
+        .flat_map(|ie| {
+            let name = Ident::new(&ie.name, Span::call_site());
+            if is_numeric(ie) {
+                Some(
+                    quote! { (Self::#name(lhs), Self::#name(rhs)) => Ok(Self::#name(*lhs + *rhs)) },
+                )
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let ie_add_assign_variants = iana_ies
+        .iter()
+        .flat_map(|ie| {
+            let name = Ident::new(&ie.name, Span::call_site());
+            if is_numeric(ie) {
+                Some(quote! {
+                    (Self::#name(lhs), Self::#name(rhs)) => {
+                        *lhs += *rhs; Ok(())
+                    }
+                })
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let ie_min_variants = iana_ies.iter().flat_map(|ie| {
+        let name = Ident::new(&ie.name, Span::call_site());
+        if is_comparable(ie) {
+            Some(quote! { (Self::#name(lhs), Self::#name(rhs)) => Ok(Self::#name(*lhs.min(rhs))) })
+        } else {
+            None
+        }
+    }).collect::<Vec<_>>();
+
+    let ie_min_assign_variants = iana_ies
+        .iter()
+        .flat_map(|ie| {
+            let name = Ident::new(&ie.name, Span::call_site());
+            if is_comparable(ie) {
+                Some(quote! {
+                    (Self::#name(v1), Self::#name(v2)) => {
+                        *v1 = (*v1).min(*v2);
+                        Ok(())
+                    }
+                })
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let ie_max_variants = iana_ies
+        .iter()
+        .flat_map(|ie| {
+            let name = Ident::new(&ie.name, Span::call_site());
+            if is_comparable(ie) {
+                Some(quote! { (Self::#name(v1), Self::#name(v2)) => Ok(Self::#name(*v1.max(v2))) })
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let ie_max_assign_variants = iana_ies
+        .iter()
+        .flat_map(|ie| {
+            let name = Ident::new(&ie.name, Span::call_site());
+            if is_comparable(ie) {
+                Some(quote! {
+                    (Self::#name(v1), Self::#name(v2)) => {
+                        *v1 = (*v1).max(*v2);
+                        Ok(())
+                    }
+                })
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let ie_bitwise_or_variants = iana_ies.iter().flat_map(|ie| {
+        let name = Ident::new(&ie.name, Span::call_site());
+        if is_bitwise(ie) {
+            let rust_type = get_rust_type(&ie.data_type, &ie.name);
+            match ie.data_type.as_str() {
+                "octetArray" if rust_type == "[u8; 3]" => {
+                    Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                            let mut result = [0u8; 3];
+                             lhs.iter().zip(rhs.iter()).enumerate().for_each(|(i, (&val1, &val2))| {
+                                result[i] = val1 | val2;
+                            });
+                            Ok(Self::#name(result))
+                        }
+                    })
+                }
+                "octetArray" => {
+                    Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                            let v = lhs.iter().zip(rhs.iter()).map(|(a, b)| *a | *b).collect::<Vec<_>>().into_boxed_slice();
+                            Ok(Self::#name(v))
+                        }
+                    })
+                }
+                "unsigned256" => {
+                    Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                            let mut result = [0u8; 32];
+                             lhs.iter().zip(rhs.iter()).enumerate().for_each(|(i, (&val1, &val2))| {
+                                result[i] = val1 | val2;
+                            });
+                            Ok(Self::#name(Box::new(result)))
+                        }
+                    })
+                }
+                "macAddress" => {
+                    Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                            let mut result = [0u8; 6];
+                             lhs.iter().zip(rhs.iter()).enumerate().for_each(|(i, (&val1, &val2))| {
+                                result[i] = val1 | val2;
+                            });
+                            Ok(Self::#name(result))
+                        }
+                    })
+                }
+                _ => Some(quote! { (Self::#name(lhs), Self::#name(rhs)) => Ok(Self::#name(*lhs | *rhs)) })
+            }
+        } else {
+            None
+        }
+    }).collect::<Vec<_>>();
+
+    let ie_bitwise_or_assign_variants = iana_ies
+        .iter()
+        .flat_map(|ie| {
+            let name = Ident::new(&ie.name, Span::call_site());
+            if is_bitwise(ie) {
+                let rust_type = get_rust_type(&ie.data_type, &ie.name);
+                match ie.data_type.as_str() {
+                    "octetArray" if rust_type == "[u8; 3]" => Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                            lhs.iter_mut().zip(rhs.iter()).for_each(|(val1, val2)| {
+                                *val1 |= val2;
+                            });
+                            Ok(())
+                        }
+                    }),
+                    "octetArray" => Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                             lhs.iter_mut().zip(rhs.iter()).for_each(|(val1, val2)| {
+                                *val1 |= val2;
+                            });
+                            Ok(())
+                        }
+                    }),
+                    "unsigned256" => Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                             lhs.iter_mut().zip(rhs.iter()).for_each(|(val1, val2)| {
+                                *val1 |= val2;
+                            });
+                            Ok(())
+                        }
+                    }),
+                    "macAddress" => Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                             lhs.iter_mut().zip(rhs.iter()).for_each(|(val1, val2)| {
+                                *val1 |= val2;
+                            });
+                            Ok(())
+                        }
+                    }),
+                    _ => Some(quote! {
+                        (Self::#name(lhs), Self::#name(rhs)) => {
+                            *lhs |= *rhs;
+                            Ok(())
+                        }
+                    }),
+                }
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    OperationVariants {
+        ie_add_variants,
+        ie_add_assign_variants,
+        ie_min_variants,
+        ie_min_assign_variants,
+        ie_max_variants,
+        ie_max_assign_variants,
+        ie_bitwise_or_variants,
+        ie_bitwise_or_assign_variants,
     }
 }
 
@@ -678,6 +1117,18 @@ pub(crate) fn generate_ie_ids(
         let msg = format!("invalid {pkg} IE {{}}");
         quote! {  Self::#name(e) => write!(f, #msg, e.0) }
     });
+
+    let vendor_has_subregistry_variants = vendors.iter().map(|(name, _, _)| {
+        let name = Ident::new(name, Span::call_site());
+        quote! { Self::#name(v) => v.has_registry() }
+    });
+
+    let iana_has_subregistry_variants = iana_ies.iter().map(|ie| {
+        let ie_name = Ident::new(ie.name.as_str(), Span::call_site());
+        let has_subreg = ie.subregistry.is_some();
+        quote! { Self::#ie_name => #has_subreg }
+    });
+
     let mut code = quote! {
         #[allow(non_camel_case_types)]
         #[derive(strum_macros::Display, Copy, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -686,6 +1137,117 @@ pub(crate) fn generate_ie_ids(
             Unknown{pen: u32, id: u16},
             #(#vendor_ie_variants,)*
             #(#iana_ie_variants,)*
+        }
+
+        impl IE {
+            pub const fn has_registry(&self) -> bool {
+                match self {
+                    Self::Unknown{..} => false,
+                    #(#vendor_has_subregistry_variants,)*
+                    #(#iana_has_subregistry_variants,)*
+                }
+            }
+
+            /// True if the Field of this IE element supports arithmetic operations: +, -, *, /.
+            pub fn supports_arithmetic_ops(&self) -> bool {
+                match self.semantics() {
+                    Some(InformationElementSemantics::identifier) | Some(InformationElementSemantics::flags) => return false,
+                    _ => {}
+                }
+                if self.has_registry() {
+                    return false;
+                }
+                match self.data_type() {
+                    InformationElementDataType::octetArray => false,
+                    InformationElementDataType::signed8 => true,
+                    InformationElementDataType::signed16 => true,
+                    InformationElementDataType::signed32 => true,
+                    InformationElementDataType::signed64 => true,
+                    InformationElementDataType::unsigned8 => true,
+                    InformationElementDataType::unsigned16 => true,
+                    InformationElementDataType::unsigned32 => true,
+                    InformationElementDataType::unsigned64 => true,
+                    InformationElementDataType::float32 => true,
+                    InformationElementDataType::float64 => true,
+                    InformationElementDataType::boolean => false,
+                    InformationElementDataType::macAddress => false,
+                    InformationElementDataType::string => false,
+                    InformationElementDataType::dateTimeSeconds => false,
+                    InformationElementDataType::dateTimeMilliseconds => false,
+                    InformationElementDataType::dateTimeMicroseconds => false,
+                    InformationElementDataType::dateTimeNanoseconds => false,
+                    InformationElementDataType::ipv4Address => false,
+                    InformationElementDataType::ipv6Address => false,
+                    InformationElementDataType::basicList => false,
+                    InformationElementDataType::subTemplateList => false,
+                    InformationElementDataType::subTemplateMultiList => false,
+                    InformationElementDataType::unsigned256 => {
+                        // Currently unsigned256 are used only as identifiers
+                        // hence, the arithmetics ops are not implemented
+                        false
+                    },
+                }
+            }
+
+            /// True if the Field of this IE element supports comparison operations: min, max.
+            pub fn supports_comparison_ops(&self) -> bool {
+                match self.data_type() {
+                    InformationElementDataType::octetArray => false,
+                    InformationElementDataType::signed8 => true,
+                    InformationElementDataType::signed16 => true,
+                    InformationElementDataType::signed32 => true,
+                    InformationElementDataType::signed64 => true,
+                    InformationElementDataType::unsigned8 => true,
+                    InformationElementDataType::unsigned16 => true,
+                    InformationElementDataType::unsigned32 => true,
+                    InformationElementDataType::unsigned64 => true,
+                    InformationElementDataType::float32 => true,
+                    InformationElementDataType::float64 => true,
+                    InformationElementDataType::boolean => false,
+                    InformationElementDataType::macAddress => false,
+                    InformationElementDataType::string => false,
+                    InformationElementDataType::dateTimeSeconds => true,
+                    InformationElementDataType::dateTimeMilliseconds => true,
+                    InformationElementDataType::dateTimeMicroseconds => true,
+                    InformationElementDataType::dateTimeNanoseconds => true,
+                    InformationElementDataType::ipv4Address => true,
+                    InformationElementDataType::ipv6Address => true,
+                    InformationElementDataType::basicList => true,
+                    InformationElementDataType::subTemplateList => true,
+                    InformationElementDataType::subTemplateMultiList => true,
+                    InformationElementDataType::unsigned256 => false,
+                }
+            }
+
+            /// True if the Field of this IE element supports bitwise operations: OR, AND, XOR.
+            pub fn supports_bitwise_ops(&self) -> bool {
+                match self.data_type() {
+                    InformationElementDataType::octetArray => true,
+                    InformationElementDataType::signed8 => true,
+                    InformationElementDataType::signed16 => true,
+                    InformationElementDataType::signed32 => true,
+                    InformationElementDataType::signed64 => true,
+                    InformationElementDataType::unsigned8 => true,
+                    InformationElementDataType::unsigned16 => true,
+                    InformationElementDataType::unsigned32 => true,
+                    InformationElementDataType::unsigned64 => true,
+                    InformationElementDataType::float32 => false,
+                    InformationElementDataType::float64 => false,
+                    InformationElementDataType::boolean => true,
+                    InformationElementDataType::macAddress => true,
+                    InformationElementDataType::string => false,
+                    InformationElementDataType::dateTimeSeconds => false,
+                    InformationElementDataType::dateTimeMilliseconds => false,
+                    InformationElementDataType::dateTimeMicroseconds => false,
+                    InformationElementDataType::dateTimeNanoseconds => false,
+                    InformationElementDataType::ipv4Address => true,
+                    InformationElementDataType::ipv6Address => true,
+                    InformationElementDataType::basicList => false,
+                    InformationElementDataType::subTemplateList => false,
+                    InformationElementDataType::subTemplateMultiList => false,
+                    InformationElementDataType::unsigned256 => true,
+                }
+            }
         }
 
         #[derive(Copy, Eq, Hash, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -1827,7 +2389,39 @@ pub(crate) fn generate_fields_enum(ies: &[InformationElement]) -> TokenStream {
     });
 
     let converters = generate_into_for_field(ies, &[]);
+    let OperationVariants {
+        ie_add_variants,
+        ie_add_assign_variants,
+        ie_min_variants,
+        ie_min_assign_variants,
+        ie_max_variants,
+        ie_max_assign_variants,
+        ie_bitwise_or_variants,
+        ie_bitwise_or_assign_variants,
+    } = field_operations_variants(ies);
+
     quote! {
+        #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
+        pub enum FieldOperationError {
+            InapplicableAdd(IE, IE),
+            InapplicableMin(IE, IE),
+            InapplicableMax(IE, IE),
+            InapplicableBitwise(IE, IE),
+        }
+        impl std::error::Error for FieldOperationError {}
+
+        impl From<FieldOperationError> for crate::FieldOperationError {
+            fn from(value: FieldOperationError) -> crate::FieldOperationError {
+                match value {
+                    FieldOperationError::InapplicableAdd(lhs, rhs) => crate::FieldOperationError::InapplicableAdd(lhs.into(), rhs.into()),
+                    FieldOperationError::InapplicableMin(lhs, rhs) => crate::FieldOperationError::InapplicableMin(lhs.into(), rhs.into()),
+                    FieldOperationError::InapplicableMax(lhs, rhs) => crate::FieldOperationError::InapplicableMax(lhs.into(), rhs.into()),
+                    FieldOperationError::InapplicableBitwise(lhs, rhs) => crate::FieldOperationError::InapplicableBitwise(lhs.into(), rhs.into()),
+                }
+            }
+        }
+
+
         #[allow(non_camel_case_types)]
         #[derive(strum_macros::Display, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
@@ -1840,6 +2434,78 @@ pub(crate) fn generate_fields_enum(ies: &[InformationElement]) -> TokenStream {
             pub const fn ie(&self) -> IE {
                 match self {
                     #(#ie_variants,)*
+                }
+            }
+
+            /// Arithmetic addition operation of two fields and produce a field with the new value
+            pub fn add_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                #[allow(clippy::match_single_binding)]
+                match (self, rhs) {
+                    #(#ie_add_variants,)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableAdd(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// The addition assignment operation += of two fields
+            pub fn add_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                #[allow(clippy::match_single_binding)]
+                match (self, rhs) {
+                    #(#ie_add_assign_variants)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableAdd(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Bitwise OR operation of two fields and produce a field with the new value
+             pub fn bitwise_or_field(&self, other: &Field) -> Result<Field, FieldOperationError> {
+                #[allow(clippy::match_single_binding)]
+                match (self, other) {
+                    #(#ie_bitwise_or_variants,)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableBitwise(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// The bitwise OR assignment operation |= of two fields
+            pub fn bitwise_or_assign_field(&mut self, other: &Field) -> Result<(), FieldOperationError> {
+                #[allow(clippy::match_single_binding)]
+                match (self, other) {
+                    #(#ie_bitwise_or_assign_variants)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableBitwise(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Returns a new field with the minimum of the two fields
+            pub fn min_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                #[allow(clippy::match_single_binding)]
+                match (self, rhs) {
+                    #(#ie_min_variants,)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Assign the field's value to be minimum of the two fields
+            pub fn min_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                #[allow(clippy::match_single_binding)]
+                match (self, rhs) {
+                    #(#ie_min_assign_variants)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Returns a new field with the maximum of the two fields
+            pub fn max_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                #[allow(clippy::match_single_binding)]
+                match (self, rhs) {
+                    #(#ie_max_variants,)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),
+                }
+            }
+
+            /// Assign the field's value to be maximum of the two fields
+            pub fn max_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                #[allow(clippy::match_single_binding)]
+                match (self, rhs) {
+                    #(#ie_max_assign_variants)*
+                    (f1, f2) => Err(FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),
                 }
             }
         }

@@ -282,6 +282,23 @@ pub fn generate_from_impl_for_enum_type(
                 #inner
             }
         }
+
+        impl std::ops::BitOr<#enum_name> for #enum_name {
+            type Output = #enum_name;
+            fn bitor(self, rhs: #enum_name) -> Self::Output {
+                let a: #ty = self.into();
+                let b: #ty = rhs.into();
+                Self::from(a | b)
+            }
+        }
+
+        impl std::ops::BitOrAssign<#enum_name> for #enum_name {
+            fn bitor_assign(&mut self, rhs: #enum_name) {
+                let a: #ty = (*self).into();
+                let b: #ty = rhs.into();
+                *self = Self::from(a | b)
+            }
+        }
     };
     code
 }
