@@ -197,7 +197,22 @@ impl KafkaJsonPublisherActor {
     }
 
     fn decode_msg(&self, msg: &UdpNotifPacket) -> Result<Vec<u8>, KafkaJsonPublisherActorError> {
-        let mut value = serde_json::to_value(msg)?;
+        let mut value = match serde_json::to_value(msg) {
+            Ok(value) => value,
+            Err(err) => {
+                error!("Error decoding message to JSON: {err}");
+                self.stats.error_decode.add(
+                    1,
+                    &[opentelemetry::KeyValue::new(
+                        "netgauze.json.decode.error.msg",
+                        err.to_string(),
+                    )],
+                );
+                return Err(KafkaJsonPublisherActorError::SerializationError(
+                    err.to_string(),
+                ));
+            }
+        };
         if let serde_json::Value::Object(ref mut val) = &mut value {
             // Add the writer ID to the message
             val.insert(
@@ -208,10 +223,24 @@ impl KafkaJsonPublisherActor {
             match msg.media_type() {
                 MediaType::YangDataJson => {
                     // Deserialize the payload into a JSON object
-                    val.insert(
-                        "payload".to_string(),
-                        serde_json::from_slice(msg.payload())?,
-                    );
+                    match serde_json::from_slice(msg.payload()) {
+                        Ok(payload) => {
+                            val.insert("payload".to_string(), payload);
+                        }
+                        Err(err) => {
+                            error!("Error deserializing JSON payload: {err}");
+                            self.stats.error_decode.add(
+                                1,
+                                &[opentelemetry::KeyValue::new(
+                                    "netgauze.json.decode.error.msg",
+                                    err.to_string(),
+                                )],
+                            );
+                            return Err(KafkaJsonPublisherActorError::SerializationError(
+                                err.to_string(),
+                            ));
+                        }
+                    }
                 }
                 MediaType::YangDataXml => {
                     let payload = std::str::from_utf8(msg.payload())
@@ -230,7 +259,16 @@ impl KafkaJsonPublisherActor {
                     );
                 }
                 _ => {
-                    panic!("Unsupported media type: {:?}", msg.media_type());
+                    let err_msg = format!("Unsupported media type: {:?}", msg.media_type());
+                    error!("{err_msg}");
+                    self.stats.error_decode.add(
+                        1,
+                        &[opentelemetry::KeyValue::new(
+                            "netgauze.json.decode.error.msg",
+                            err_msg.to_string(),
+                        )],
+                    );
+                    return Err(KafkaJsonPublisherActorError::SerializationError(err_msg));
                 }
             }
         }
