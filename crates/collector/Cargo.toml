@@ -48,18 +48,14 @@ apache-avro = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
 serde_json = { workspace = true }
 schema_registry_converter = { workspace = true, default-features = false, features = ["avro", "futures", "rustls_tls"] }
+rdkafka = { workspace = true, features = ["tokio", "cmake-build", "ssl-vendored"] }
 either = { workspace = true }
 pin-utils = { workspace = true }
 serde_yaml = { workspace = true }
 ordered-float = { workspace = true }
 
-
-[target.'cfg(target_env = "msvc")'.dependencies]
-rdkafka = { workspace = true, features = ["tokio", "cmake-build"] }
-
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = ["unprefixed_malloc_on_supported_platforms"] }
-rdkafka = { workspace = true, features = ["tokio", "cmake-build", "ssl", "ssl-vendored", "curl-static", "libz-static"] }
 
 [dev-dependencies]
 chrono = { workspace = true, default-features = false, features = [
