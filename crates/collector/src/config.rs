@@ -15,7 +15,7 @@
 
 use crate::{
     flow::{aggregation::AggregationConfig, config::FlowOutputConfig, sonata::KafkaConsumerConfig},
-    publishers::{http::HttpPublisherEndpoint, kafka_avro::KafkaConfig},
+    publishers::{http::HttpPublisherEndpoint, kafka_avro, kafka_json},
 };
 use netgauze_flow_service::flow_supervisor;
 use netgauze_udp_notif_service::supervisor as udp_notif_supervisor;
@@ -208,5 +208,6 @@ pub struct PublisherConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublisherEndpoint {
     Http(HttpPublisherEndpoint),
-    FlowKafkaAvro(KafkaConfig<FlowOutputConfig>),
+    KafkaJson(kafka_json::KafkaConfig),
+    FlowKafkaAvro(kafka_avro::KafkaConfig<FlowOutputConfig>),
 }

@@ -13,14 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    config::{FlowConfig, PublisherEndpoint, UdpNotifConfig},
-    flow::{enrichment::FlowEnrichmentActorHandle, sonata::SonataActorHandle},
-    publishers::{
-        http::{HttpPublisherActorHandle, Message},
-        kafka_avro::KafkaAvroPublisherActorHandle,
-    },
-};
+use crate::config::{FlowConfig, UdpNotifConfig};
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
 use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
@@ -36,6 +29,14 @@ pub async fn init_flow_collection(
     flow_config: FlowConfig,
     meter: opentelemetry::metrics::Meter,
 ) -> anyhow::Result<()> {
+    use crate::{
+        config::PublisherEndpoint,
+        flow::{enrichment::FlowEnrichmentActorHandle, sonata::SonataActorHandle},
+        publishers::{
+            http::{HttpPublisherActorHandle, Message},
+            kafka_avro::KafkaAvroPublisherActorHandle,
+        },
+    };
     let supervisor_config = flow_config.supervisor_config();
 
     let (supervisor_join_handle, supervisor_handle) =
@@ -158,6 +159,11 @@ pub async fn init_flow_collection(
                         sonata_handles.push(sonata_handle);
                     }
                 }
+                PublisherEndpoint::KafkaJson(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Kafka JSON publisher not yet supported for Flow"
+                    ));
+                }
             }
         }
     }
@@ -209,11 +215,19 @@ pub async fn init_udp_notif_collection(
     udp_notif_config: UdpNotifConfig,
     meter: opentelemetry::metrics::Meter,
 ) -> anyhow::Result<()> {
+    use crate::{
+        config::PublisherEndpoint,
+        publishers::{
+            http::{HttpPublisherActorHandle, Message},
+            kafka_json::KafkaJsonPublisherActorHandle,
+        },
+    };
     let supervisor_config = udp_notif_config.supervisor_config();
     let (supervisor_join_handle, supervisor_handle) =
         UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;
+    let mut join_set = FuturesUnordered::new();
     let mut http_handlers = Vec::new();
-    let mut http_join_set = FuturesUnordered::new();
+    let mut kafka_handles = Vec::new();
     for (group_name, publisher_config) in udp_notif_config.publishers {
         info!("Starting publishers group '{group_name}'");
         let (udp_notif_recv, _) = supervisor_handle
@@ -237,11 +251,31 @@ pub async fn init_udp_notif_collection(
                         udp_notif_recv.clone(),
                         meter.clone(),
                     )?;
-                    http_join_set.push(http_join);
+                    join_set.push(http_join);
                     http_handlers.push(http_handler);
                 }
+                PublisherEndpoint::KafkaJson(config) => {
+                    let hdl = KafkaJsonPublisherActorHandle::from_config(
+                        config.clone(),
+                        udp_notif_recv.clone(),
+                        either::Left(meter.clone()),
+                    );
+                    match hdl {
+                        Ok((kafka_join, kafka_handle)) => {
+                            join_set.push(kafka_join);
+                            kafka_handles.push(kafka_handle);
+                        }
+                        Err(err) => {
+                            return Err(anyhow::anyhow!(
+                                "Error creating KafkaJsonPublisherActorHandle: {err}"
+                            ));
+                        }
+                    }
+                }
                 PublisherEndpoint::FlowKafkaAvro(_) => {
-                    unimplemented!("Kafka Avro publisher not supported yet for UDP Notif");
+                    return Err(anyhow::anyhow!(
+                        "Kafka Avro publisher not yet supported for UDP Notif"
+                    ));
                 }
             }
         }
@@ -260,7 +294,7 @@ pub async fn init_udp_notif_collection(
             }
             Ok(())
         },
-        _ = http_join_set.next() => {
+        _ = join_set.next() => {
             warn!("udp-notif http publisher exited, shutting down udp-notif collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
             for handler in http_handlers {
