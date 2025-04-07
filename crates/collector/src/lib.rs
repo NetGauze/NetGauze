@@ -13,7 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::config::{FlowConfig, UdpNotifConfig};
+use crate::{
+    config::{FlowConfig, PublisherEndpoint, UdpNotifConfig},
+    flow::{enrichment::FlowEnrichmentActorHandle, sonata::SonataActorHandle},
+    publishers::{
+        http::{HttpPublisherActorHandle, Message},
+        kafka_avro::KafkaAvroPublisherActorHandle,
+        kafka_json::KafkaJsonPublisherActorHandle,
+    },
+};
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
 use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
@@ -29,14 +37,6 @@ pub async fn init_flow_collection(
     flow_config: FlowConfig,
     meter: opentelemetry::metrics::Meter,
 ) -> anyhow::Result<()> {
-    use crate::{
-        config::PublisherEndpoint,
-        flow::{enrichment::FlowEnrichmentActorHandle, sonata::SonataActorHandle},
-        publishers::{
-            http::{HttpPublisherActorHandle, Message},
-            kafka_avro::KafkaAvroPublisherActorHandle,
-        },
-    };
     let supervisor_config = flow_config.supervisor_config();
 
     let (supervisor_join_handle, supervisor_handle) =
@@ -215,13 +215,6 @@ pub async fn init_udp_notif_collection(
     udp_notif_config: UdpNotifConfig,
     meter: opentelemetry::metrics::Meter,
 ) -> anyhow::Result<()> {
-    use crate::{
-        config::PublisherEndpoint,
-        publishers::{
-            http::{HttpPublisherActorHandle, Message},
-            kafka_json::KafkaJsonPublisherActorHandle,
-        },
-    };
     let supervisor_config = udp_notif_config.supervisor_config();
     let (supervisor_join_handle, supervisor_handle) =
         UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;

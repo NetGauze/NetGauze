@@ -13,27 +13,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use netgauze_udp_notif_pkt::UdpNotifPacket;
+use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
 use rdkafka::{
-    config::ClientConfig,
-    error::KafkaError,
-    producer::{FutureProducer, FutureRecord, Producer},
-    util::Timeout,
+    config::{ClientConfig, FromClientConfigAndContext},
+    error::{KafkaError, RDKafkaErrorCode},
+    message::DeliveryResult,
+    producer::{BaseRecord, NoCustomPartitioner, Producer, ProducerContext, ThreadedProducer},
+    ClientContext,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
+
+const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 
 // --- config ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KafkaConfig {
     /// Output topic
-    pub topic: String,
+    topic: String,
     /// Key/Value producer configs are defined in librdkafka
-    pub producer_config: HashMap<String, String>,
-    pub writer_id: String,
+    producer_config: HashMap<String, String>,
+    writer_id: String,
 }
 
 // --- telemetry ---
@@ -43,12 +46,13 @@ pub struct KafkaConfig {
 pub struct KafkaJsonPublisherStats {
     received: opentelemetry::metrics::Counter<u64>,
     sent: opentelemetry::metrics::Counter<u64>,
+    send_retries: opentelemetry::metrics::Counter<u64>,
     error_decode: opentelemetry::metrics::Counter<u64>,
     error_send: opentelemetry::metrics::Counter<u64>,
 }
 
 impl KafkaJsonPublisherStats {
-    pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
+    fn new(meter: opentelemetry::metrics::Meter) -> Self {
         let received = meter
             .u64_counter("netgauze.collector.kafka.json.received")
             .with_description("Received messages from upstream producer")
@@ -56,6 +60,10 @@ impl KafkaJsonPublisherStats {
         let sent = meter
             .u64_counter("netgauze.collector.kafka.json.sent")
             .with_description("Number of messages successfully sent to Kafka")
+            .build();
+        let send_retries = meter
+            .u64_counter("netgauze.collector.kafka.json.send.retries")
+            .with_description("Number of send retries to Kafka due to full queue in librdkafka")
             .build();
         let error_decode = meter
             .u64_counter("netgauze.collector.kafka.json.error_decode")
@@ -68,8 +76,32 @@ impl KafkaJsonPublisherStats {
         Self {
             received,
             sent,
+            send_retries,
             error_decode,
             error_send,
+        }
+    }
+}
+
+// --- producer ---
+
+/// Producer context with tracing logs enabled
+#[derive(Clone)]
+struct LoggingProducerContext;
+
+impl ClientContext for LoggingProducerContext {}
+
+impl ProducerContext<NoCustomPartitioner> for LoggingProducerContext {
+    type DeliveryOpaque = ();
+
+    fn delivery(&self, delivery_result: &DeliveryResult<'_>, _: Self::DeliveryOpaque) {
+        match delivery_result {
+            Ok(_) => {
+                debug!("Message delivered successfully to kafka");
+            }
+            Err((err, _)) => {
+                warn!("Failed to deliver message to kafka: {err}");
+            }
         }
     }
 }
@@ -79,7 +111,7 @@ impl KafkaJsonPublisherStats {
 #[derive(Debug)]
 pub enum KafkaJsonPublisherActorError {
     KafkaError(KafkaError),
-    TransformationError(String),
+    SerializationError(String),
     ReceiveErr,
 }
 
@@ -87,7 +119,7 @@ impl std::fmt::Display for KafkaJsonPublisherActorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::KafkaError(e) => write!(f, "Kafka error: {e}"),
-            Self::TransformationError(e) => write!(f, "Transformation error: {e}"),
+            Self::SerializationError(e) => write!(f, "Serialization error: {e}"),
             Self::ReceiveErr => write!(f, "Error receiving messages from upstream producer"),
         }
     }
@@ -101,47 +133,59 @@ impl From<KafkaError> for KafkaJsonPublisherActorError {
     }
 }
 
+impl From<serde_json::Error> for KafkaJsonPublisherActorError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::SerializationError(e.to_string())
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
-pub enum KafkaJsonPublisherActorCommand {
+enum KafkaJsonPublisherActorCommand {
     Shutdown,
 }
 
-pub struct KafkaJsonPublisherActor {
+struct KafkaJsonPublisherActor {
     cmd_rx: mpsc::Receiver<KafkaJsonPublisherActorCommand>,
 
     /// Configured kafka options
     config: KafkaConfig,
 
     //// librdkafka producer
-    producer: FutureProducer,
+    producer: ThreadedProducer<LoggingProducerContext>,
 
-    msg_recv: async_channel::Receiver<
-        std::sync::Arc<(std::net::SocketAddr, netgauze_udp_notif_pkt::UdpNotifPacket)>,
-    >,
+    msg_recv: async_channel::Receiver<std::sync::Arc<(SocketAddr, UdpNotifPacket)>>,
 
     stats: KafkaJsonPublisherStats,
 }
 
 impl KafkaJsonPublisherActor {
-    pub fn from_config(
+    fn get_producer(
+        config: &KafkaConfig,
+    ) -> Result<ThreadedProducer<LoggingProducerContext>, KafkaJsonPublisherActorError> {
+        let mut producer_config = ClientConfig::new();
+        for (k, v) in &config.producer_config {
+            producer_config.set(k.as_str(), v.as_str());
+        }
+        match ThreadedProducer::from_config_and_context(&producer_config, LoggingProducerContext) {
+            Ok(p) => Ok(p),
+            Err(err) => {
+                error!("Failed to create Kafka producer: {err}");
+                Err(err)?
+            }
+        }
+    }
+
+    fn from_config(
         cmd_rx: mpsc::Receiver<KafkaJsonPublisherActorCommand>,
         config: KafkaConfig,
-        msg_recv: async_channel::Receiver<
-            std::sync::Arc<(std::net::SocketAddr, netgauze_udp_notif_pkt::UdpNotifPacket)>,
-        >,
+        msg_recv: async_channel::Receiver<std::sync::Arc<(SocketAddr, UdpNotifPacket)>>,
         stats: KafkaJsonPublisherStats,
     ) -> Result<Self, KafkaJsonPublisherActorError> {
         let mut producer_config = ClientConfig::new();
         for (k, v) in &config.producer_config {
             producer_config.set(k.as_str(), v.as_str());
         }
-        let producer: FutureProducer = match producer_config.create() {
-            Ok(p) => p,
-            Err(err) => {
-                error!("Failed to create Kafka producer: {err}");
-                return Err(err)?;
-            }
-        };
+        let producer = Self::get_producer(&config)?;
         info!("Starting Kafka JSON publisher to topic: `{}`", config.topic);
         Ok(Self {
             cmd_rx,
@@ -152,66 +196,87 @@ impl KafkaJsonPublisherActor {
         })
     }
 
-    fn decode_msg(msg: &netgauze_udp_notif_pkt::UdpNotifPacket) -> String {
-        use netgauze_udp_notif_pkt::MediaType;
-        use serde_json::Value;
-        let mut value = serde_json::to_value(msg).expect("Couldn't decode UDP-Notif message");
+    fn decode_msg(msg: &UdpNotifPacket) -> Result<String, KafkaJsonPublisherActorError> {
+        let mut value = serde_json::to_value(msg)?;
         // Convert when possible inner payload into human-readable format
         match msg.media_type() {
             MediaType::YangDataJson => {
-                let payload = serde_json::from_slice(msg.payload())
-                    .expect("Couldn't deserialize JSON payload");
-                if let Value::Object(ref mut val) = &mut value {
+                let payload = serde_json::from_slice(msg.payload())?;
+                if let serde_json::Value::Object(ref mut val) = &mut value {
                     val.insert("payload".to_string(), payload);
                 }
             }
             MediaType::YangDataXml => {
                 let payload =
                     std::str::from_utf8(msg.payload()).expect("Couldn't deserialize XML payload");
-                if let Value::Object(ref mut val) = &mut value {
-                    val.insert("payload".to_string(), Value::String(payload.to_string()));
+                if let serde_json::Value::Object(ref mut val) = &mut value {
+                    val.insert(
+                        "payload".to_string(),
+                        serde_json::Value::String(payload.to_string()),
+                    );
                 }
             }
             MediaType::YangDataCbor => {
                 let payload =
                     std::str::from_utf8(msg.payload()).expect("Couldn't deserialize CBOR payload");
-                if let Value::Object(ref mut val) = &mut value {
-                    val.insert("payload".to_string(), Value::String(payload.to_string()));
+                if let serde_json::Value::Object(ref mut val) = &mut value {
+                    val.insert(
+                        "payload".to_string(),
+                        serde_json::Value::String(payload.to_string()),
+                    );
                 }
             }
             _ => {}
         }
-        serde_json::to_string(&value).unwrap()
+        Ok(serde_json::to_string(&value)?)
     }
 
     async fn send(&mut self, input: UdpNotifPacket) -> Result<(), KafkaJsonPublisherActorError> {
-        let encoded = Self::decode_msg(&input).into_bytes();
-        let fr: FutureRecord<'_, Vec<u8>, Vec<u8>> = FutureRecord {
-            topic: self.config.topic.as_str(),
-            partition: None,
-            payload: Some(&encoded),
-            key: None,
-            timestamp: None,
-            headers: None,
-        };
-        if let Err((err, _)) = self
-            .producer
-            .send(fr, Timeout::After(Duration::from_secs(1)))
-            .await
-        {
-            error!("Error sending JSON value: {err}");
-            self.stats.error_send.add(
-                1,
-                &[opentelemetry::KeyValue::new(
-                    "netgauze.kafka.sent.error.msg",
-                    err.to_string(),
-                )],
-            );
-            return Err(KafkaJsonPublisherActorError::KafkaError(err));
-        } else {
-            self.stats.sent.add(1, &[]);
-        };
-        Ok(())
+        let encoded = Self::decode_msg(&input)?.into_bytes();
+        let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> =
+            BaseRecord::to(self.config.topic.as_str()).payload(&encoded);
+        let mut polling_interval = Duration::from_micros(10);
+        loop {
+            match self.producer.send(record) {
+                Ok(_) => {
+                    self.stats.sent.add(1, &[]);
+                    return Ok(());
+                }
+                Err((err, rec)) => match err {
+                    KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
+                        // Exponential backoff when the librdkafka is full
+                        if polling_interval > MAX_POLLING_INTERVAL {
+                            error!("Kafka polling interval exceeded, dropping record");
+                            self.stats.error_send.add(
+                                1,
+                                &[opentelemetry::KeyValue::new(
+                                    "netgauze.kafka.sent.error.msg",
+                                    err.to_string(),
+                                )],
+                            );
+                            return Err(KafkaJsonPublisherActorError::KafkaError(err));
+                        }
+                        debug!("Kafka message queue is full, sleeping for {polling_interval:?}");
+                        self.stats.send_retries.add(1, &[]);
+                        tokio::time::sleep(polling_interval).await;
+                        polling_interval *= 2;
+                        record = rec;
+                        continue;
+                    }
+                    err => {
+                        error!("Error sending message: {err}");
+                        self.stats.error_send.add(
+                            1,
+                            &[opentelemetry::KeyValue::new(
+                                "netgauze.kafka.sent.error.msg",
+                                err.to_string(),
+                            )],
+                        );
+                        return Err(KafkaJsonPublisherActorError::KafkaError(err));
+                    }
+                },
+            }
+        }
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
@@ -267,9 +332,7 @@ pub struct KafkaJsonPublisherActorHandle {
 impl KafkaJsonPublisherActorHandle {
     pub fn from_config(
         config: KafkaConfig,
-        msg_recv: async_channel::Receiver<
-            std::sync::Arc<(std::net::SocketAddr, netgauze_udp_notif_pkt::UdpNotifPacket)>,
-        >,
+        msg_recv: async_channel::Receiver<std::sync::Arc<(SocketAddr, UdpNotifPacket)>>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaJsonPublisherStats>,
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaJsonPublisherActorError> {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);
