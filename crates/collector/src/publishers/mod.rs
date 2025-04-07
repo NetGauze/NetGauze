@@ -15,3 +15,4 @@
 
 pub mod http;
 pub mod kafka_avro;
+pub mod kafka_json;

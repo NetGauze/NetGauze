@@ -107,7 +107,13 @@ udp_notif:
           #http2: !Http
           #url: http://10.212.242.69:8080/ingress/udp_notif?format=json
           #writer_id: writer2
-#    group2:
-#      kafka: !Kakfa
-#        url: http://10.212.242.69:8080/ingress/udp_notif?format=json
-#        writer_id: writer1
+    group2:
+      buffer_size: 1000
+      endpoints:
+        full: !KafkaJson
+          topic: udp-notif-json
+          producer_config:
+            bootstrap.servers: localhost:29092
+            message.timeout.ms: "60000"
+            queue.buffering.max.messages: "1000"
+          writer_id: writer1
