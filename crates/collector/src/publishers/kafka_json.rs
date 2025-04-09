@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
-use rdkafka::{
+use netgauze_rdkafka::{
     config::{ClientConfig, FromClientConfigAndContext},
     error::{KafkaError, RDKafkaErrorCode},
     message::DeliveryResult,
     producer::{BaseRecord, NoCustomPartitioner, Producer, ProducerContext, ThreadedProducer},
     ClientContext,
 };
+use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};

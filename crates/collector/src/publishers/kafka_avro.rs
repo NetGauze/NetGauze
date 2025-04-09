@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rdkafka::{
+use netgauze_rdkafka::{
     config::{ClientConfig, FromClientConfigAndContext},
     error::{KafkaError, RDKafkaErrorCode},
     message::DeliveryResult,
