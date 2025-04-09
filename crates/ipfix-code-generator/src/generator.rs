@@ -752,7 +752,7 @@ fn generate_ie_field_enum_for_ie(
 
     quote! {
         #[allow(non_camel_case_types)]
-        #[derive(strum_macros::Display, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+        #[derive(strum_macros::Display, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum Field {
             Unknown{pen: u32, id: u16, value: Vec<u8>},
