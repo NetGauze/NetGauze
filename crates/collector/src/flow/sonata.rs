@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::flow::enrichment::{EnrichmentOperation, FlowEnrichmentActorHandle};
-use rdkafka::{
+use netgauze_rdkafka::{
     config::ClientConfig,
     consumer::{
         stream_consumer::StreamConsumer, BaseConsumer, Consumer, ConsumerContext, Rebalance,

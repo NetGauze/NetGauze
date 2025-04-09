@@ -28,7 +28,12 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 async-channel = { workspace = true }
 serde_with = { workspace = true, features = ["default"] }
-reqwest = { workspace = true, default-features = false, features = ["http2", "json", "stream", "rustls-tls-native-roots"] }
+reqwest = { workspace = true, default-features = false, features = [
+    "http2",
+    "json",
+    "stream",
+    "rustls-tls-native-roots",
+] }
 chrono = { workspace = true, default-features = true }
 tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
@@ -48,15 +53,25 @@ opentelemetry-otlp = { workspace = true, features = [
 apache-avro = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
 serde_json = { workspace = true }
-schema_registry_converter = { workspace = true, default-features = false, features = ["avro", "futures", "rustls_tls"] }
-rdkafka = { workspace = true, features = ["tokio", "cmake-build", "ssl-vendored"] }
+schema_registry_converter = { workspace = true, default-features = false, features = [
+    "avro",
+    "futures",
+    "rustls_tls",
+] }
+netgauze-rdkafka = { workspace = true, features = [
+    "tokio",
+    "cmake-build",
+    "ssl-vendored",
+] }
 either = { workspace = true }
 pin-utils = { workspace = true }
 serde_yaml = { workspace = true }
 ordered-float = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
-tikv-jemallocator = { version = "0.6", features = ["unprefixed_malloc_on_supported_platforms"] }
+tikv-jemallocator = { version = "0.6", features = [
+    "unprefixed_malloc_on_supported_platforms",
+] }
 
 [dev-dependencies]
 chrono = { workspace = true, default-features = false, features = [
