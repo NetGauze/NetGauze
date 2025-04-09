@@ -34,6 +34,27 @@ pub enum FlowInfo {
 }
 
 impl FlowInfo {
+    pub const fn export_time(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            Self::IPFIX(packet) => packet.export_time(),
+            Self::NetFlowV9(packet) => packet.unix_time(),
+        }
+    }
+
+    pub const fn sequence_number(&self) -> u32 {
+        match self {
+            Self::IPFIX(packet) => packet.sequence_number(),
+            Self::NetFlowV9(packet) => packet.sequence_number(),
+        }
+    }
+
+    pub const fn observation_domain_id(&self) -> u32 {
+        match self {
+            Self::IPFIX(packet) => packet.observation_domain_id(),
+            Self::NetFlowV9(packet) => packet.source_id(),
+        }
+    }
+
     pub fn flatten(self) -> Vec<FlatFlowInfo> {
         match self {
             FlowInfo::NetFlowV9(pkt) => pkt
@@ -276,6 +297,47 @@ mod tests {
     use netgauze_iana::tcp::TCPHeaderFlags;
     use std::net::Ipv4Addr;
 
+    #[test]
+    fn test_flow_info_api() {
+        let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
+        let sequence_number = 2;
+        let observation_domain = 100;
+        let ipfix_data = IpfixPacket::new(
+            export_time,
+            sequence_number,
+            observation_domain,
+            Box::new([ipfix::Set::Data {
+                id: DataSetId::new(400).unwrap(),
+                records: Box::new([]),
+            }]),
+        );
+        let netflow_data = NetFlowV9Packet::new(
+            45646,
+            export_time,
+            sequence_number,
+            observation_domain,
+            Box::new([netflow::Set::Data {
+                id: DataSetId::new(400).unwrap(),
+                records: Box::new([]),
+            }]),
+        );
+
+        let flow_ipfix = FlowInfo::IPFIX(ipfix_data.clone());
+        let flow_netflow = FlowInfo::NetFlowV9(netflow_data.clone());
+
+        assert_eq!(ipfix_data.export_time(), export_time);
+        assert_eq!(ipfix_data.sequence_number(), sequence_number);
+        assert_eq!(ipfix_data.observation_domain_id(), observation_domain);
+        assert_eq!(netflow_data.unix_time(), export_time);
+        assert_eq!(netflow_data.sequence_number(), sequence_number);
+        assert_eq!(netflow_data.source_id(), observation_domain);
+        assert_eq!(flow_ipfix.export_time(), export_time);
+        assert_eq!(flow_ipfix.sequence_number(), sequence_number);
+        assert_eq!(flow_ipfix.observation_domain_id(), observation_domain);
+        assert_eq!(flow_netflow.export_time(), export_time);
+        assert_eq!(flow_netflow.sequence_number(), sequence_number);
+        assert_eq!(flow_netflow.observation_domain_id(), observation_domain);
+    }
     #[test]
     fn test_ipfix_data_flatten() {
         let ipfix_data = IpfixPacket::new(
