@@ -100,6 +100,8 @@ pub struct KafkaAvroPublisherStats {
     error_avro_convert: opentelemetry::metrics::Counter<u64>,
     error_avro_encode: opentelemetry::metrics::Counter<u64>,
     error_send: opentelemetry::metrics::Counter<u64>,
+    delivered_messages: opentelemetry::metrics::Counter<u64>,
+    failed_delivery_messages: opentelemetry::metrics::Counter<u64>,
 }
 
 impl KafkaAvroPublisherStats {
@@ -128,6 +130,14 @@ impl KafkaAvroPublisherStats {
             .u64_counter("netgauze.collector.kafka.avro.error_send")
             .with_description("Error sending message to Kafka")
             .build();
+        let delivered_messages = meter
+            .u64_counter("netgauze.collector.kafka.avro.delivered_messages")
+            .with_description("Messages confirmed to be delivered to Kafka")
+            .build();
+        let failed_delivery_messages = meter
+            .u64_counter("netgauze.collector.kafka.avro.failed_delivery_messages")
+            .with_description("Messages failed delivery to Kafka")
+            .build();
 
         Self {
             received,
@@ -136,6 +146,8 @@ impl KafkaAvroPublisherStats {
             error_avro_convert,
             error_avro_encode,
             error_send,
+            delivered_messages,
+            failed_delivery_messages,
         }
     }
 }
@@ -180,7 +192,7 @@ where
         let schema_str = config.avro_converter.get_avro_schema();
         let supplied_schema =
             Self::get_schema(config.topic.clone(), schema_str, sr_settings).await?;
-        let producer = Self::get_producer(&config)?;
+        let producer = Self::get_producer(&stats, &config)?;
         Ok(Self {
             cmd_rx,
             config,
@@ -237,13 +249,19 @@ where
     }
 
     pub fn get_producer(
+        stats: &KafkaAvroPublisherStats,
         config: &KafkaConfig<C>,
     ) -> Result<ThreadedProducer<LoggingProducerContext>, KafkaAvroPublisherActorError> {
         let mut producer_config = ClientConfig::new();
         for (k, v) in &config.producer_config {
             producer_config.set(k.as_str(), v.as_str());
         }
-        match ThreadedProducer::from_config_and_context(&producer_config, LoggingProducerContext) {
+        let producer_context = LoggingProducerContext {
+            telemetry_attributes: Box::new([]),
+            delivered_messages: stats.delivered_messages.clone(),
+            failed_delivery_messages: stats.failed_delivery_messages.clone(),
+        };
+        match ThreadedProducer::from_config_and_context(&producer_config, producer_context) {
             Ok(p) => Ok(p),
             Err(err) => {
                 error!("Failed to create Kafka producer: {err}");
