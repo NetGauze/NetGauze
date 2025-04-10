@@ -103,7 +103,7 @@ pub enum KafkaJsonPublisherActorError<E: std::error::Error> {
     /// Error serializing incoming messages into [serde_json::Value]
     SerializationError(E),
 
-    /// Error encoding [serde_json::Value] into Vec<u8> to send to kafka
+    /// Error encoding [serde_json::Value] into `Vec<u8>` to send to kafka
     EncodingError(serde_json::Error),
 
     /// Error receiving incoming messages from input async_channel
