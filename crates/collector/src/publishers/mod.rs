@@ -13,6 +13,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use netgauze_rdkafka::{
+    message::DeliveryResult,
+    producer::{NoCustomPartitioner, ProducerContext},
+    ClientContext,
+};
+use tracing::{trace, warn};
+
 pub mod http;
 pub mod kafka_avro;
 pub mod kafka_json;
+
+/// Producer context with tracing logs enabled
+#[derive(Clone)]
+pub struct LoggingProducerContext;
+
+impl ClientContext for LoggingProducerContext {}
+impl ProducerContext<NoCustomPartitioner> for LoggingProducerContext {
+    type DeliveryOpaque = ();
+
+    fn delivery(&self, delivery_result: &DeliveryResult<'_>, _: Self::DeliveryOpaque) {
+        match delivery_result {
+            Ok(_) => {
+                trace!("Message delivered successfully to kafka");
+            }
+            Err((err, _)) => {
+                warn!("Failed to deliver message to kafka: {err}");
+            }
+        }
+    }
+}
