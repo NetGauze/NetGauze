@@ -45,7 +45,8 @@ pub async fn init_flow_collection(
     let mut http_handles = Vec::new();
     let mut agg_handles = Vec::new();
     let mut enrichment_handles = Vec::new();
-    let mut kafka_handles = Vec::new();
+    let mut kafka_avro_handles = Vec::new();
+    let mut kafka_json_handles = Vec::new();
     let mut sonata_handles = Vec::new();
     let mut join_set = FuturesUnordered::new();
     for (group_name, publisher_config) in flow_config.publishers {
@@ -147,7 +148,7 @@ pub async fn init_flow_collection(
                             join_set.push(kafka_join);
                             agg_handles.push(agg_handle);
                             enrichment_handles.push(enrichment_handle);
-                            kafka_handles.push(kafka_handle);
+                            kafka_avro_handles.push(kafka_handle);
                         }
                     }
                     if let Some(kafka_consumer) = publisher_config.sonata_enrichment.as_ref() {
@@ -160,10 +161,17 @@ pub async fn init_flow_collection(
                         sonata_handles.push(sonata_handle);
                     }
                 }
-                PublisherEndpoint::KafkaJson(_) => {
-                    return Err(anyhow::anyhow!(
-                        "Kafka JSON publisher not yet supported for Flow"
-                    ));
+                PublisherEndpoint::KafkaJson(config) => {
+                    for flow_recv in &flow_recvs {
+                        let (join_handle, handle) = KafkaJsonPublisherActorHandle::from_config(
+                            serialize_flow,
+                            config.clone(),
+                            flow_recv.clone(),
+                            either::Left(meter.clone()),
+                        )?;
+                        join_set.push(join_handle);
+                        kafka_json_handles.push(handle);
+                    }
                 }
             }
         }
@@ -200,7 +208,7 @@ pub async fn init_flow_collection(
                     warn!("Error in shutting down flow http publisher {}: {err}", handler.name())
                 }
             }
-            for handler in kafka_handles {
+            for handler in kafka_avro_handles {
                 let _ = handler.shutdown().await;
             }
             for handler in sonata_handles {
@@ -370,4 +378,28 @@ fn serialize_udp_notif(
         Some(serde_json::Value::String(peer.ip().to_string())),
         value,
     ))
+}
+
+#[derive(Debug, strum_macros::Display)]
+pub enum FlowSerializationError {
+    SerializationError(serde_json::Error),
+    Utf8Error(Utf8Error),
+}
+
+impl std::error::Error for FlowSerializationError {}
+
+impl From<serde_json::Error> for FlowSerializationError {
+    fn from(err: serde_json::Error) -> Self {
+        FlowSerializationError::SerializationError(err)
+    }
+}
+
+fn serialize_flow(
+    input: Arc<FlowRequest>,
+    _writer_id: String,
+) -> Result<(Option<serde_json::Value>, serde_json::Value), FlowSerializationError> {
+    let (peer, msg) = input.as_ref();
+    let value = serde_json::to_value(msg)?;
+    let key = serde_json::Value::String(peer.ip().to_string());
+    Ok((Some(key), value))
 }
