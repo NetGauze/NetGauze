@@ -319,6 +319,7 @@ pub async fn init_udp_notif_collection(
 pub enum UdpNotifSerializationError {
     SerializationError(serde_json::Error),
     Utf8Error(Utf8Error),
+    CborError(ciborium::de::Error<std::io::Error>),
     UnsupportedMediaType(MediaType),
 }
 
@@ -333,6 +334,12 @@ impl From<serde_json::Error> for UdpNotifSerializationError {
 impl From<Utf8Error> for UdpNotifSerializationError {
     fn from(err: Utf8Error) -> Self {
         UdpNotifSerializationError::Utf8Error(err)
+    }
+}
+
+impl From<ciborium::de::Error<std::io::Error>> for UdpNotifSerializationError {
+    fn from(err: ciborium::de::Error<std::io::Error>) -> Self {
+        UdpNotifSerializationError::CborError(err)
     }
 }
 
@@ -363,11 +370,9 @@ fn serialize_udp_notif(
                 );
             }
             MediaType::YangDataCbor => {
-                let payload = std::str::from_utf8(msg.payload())?;
-                val.insert(
-                    "payload".to_string(),
-                    serde_json::Value::String(payload.to_string()),
-                );
+                let payload: serde_json::Value =
+                    ciborium::de::from_reader(std::io::Cursor::new(msg.payload()))?;
+                val.insert("payload".to_string(), payload);
             }
             media_type => {
                 return Err(UdpNotifSerializationError::UnsupportedMediaType(media_type));
@@ -402,4 +407,188 @@ fn serialize_flow(
     let value = serde_json::to_value(msg)?;
     let key = serde_json::Value::String(peer.ip().to_string());
     Ok((Some(key), value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+    use netgauze_udp_notif_pkt::UdpNotifPacket;
+    use std::{
+        collections::HashMap,
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+    };
+
+    #[test]
+    fn test_serialize_udp_notif_unknown_media_type() {
+        let writer_id = String::from("writer_id");
+        let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let pkt = UdpNotifPacket::new(
+            MediaType::Unknown(0xee),
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            Bytes::from(&[0xffu8, 0xffu8][..]),
+        );
+
+        let request = Arc::new((peer, pkt));
+        let serialized = serialize_udp_notif(request.clone(), writer_id.clone());
+        assert!(matches!(
+            serialized,
+            Err(UdpNotifSerializationError::UnsupportedMediaType(
+                MediaType::Unknown(0xee)
+            ))
+        ));
+    }
+
+    #[test]
+    fn test_serialize_udp_notif_json() {
+        let writer_id = String::from("writer_id");
+        let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let pkt = UdpNotifPacket::new(
+            MediaType::YangDataJson,
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            Bytes::from(r#"{"id": 1}"#),
+        );
+
+        let pkt_invalid_json = UdpNotifPacket::new(
+            MediaType::YangDataJson,
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            Bytes::from(r#"{"id""#),
+        );
+
+        let expected_value = serde_json::json!(
+            {
+                "media_type": "YangDataJson",
+                "message_id": 33554434,
+                "options": {},
+                "payload": {"id": 1},
+                "publisher_id": 16777217,
+                "writer_id": "writer_id"
+            }
+        );
+        let request_invalid = Arc::new((peer, pkt_invalid_json));
+        let request_good = Arc::new((peer, pkt));
+        let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
+        let serialized =
+            serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");
+
+        assert!(matches!(
+            result_invalid,
+            Err(UdpNotifSerializationError::SerializationError(_))
+        ));
+        assert_eq!(
+            serialized,
+            (
+                Some(serde_json::Value::String(peer.ip().to_string())),
+                expected_value
+            )
+        );
+    }
+
+    #[test]
+    fn test_serialize_udp_notif_xml() {
+        let writer_id = String::from("writer_id");
+        let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let pkt = UdpNotifPacket::new(
+            MediaType::YangDataXml,
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            Bytes::from("<id>1</id>"),
+        );
+        let pkt_invalid_utf8 = UdpNotifPacket::new(
+            MediaType::YangDataXml,
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            // A UTF-8 continuation byte (10xxxxxx) without a leading byte
+            Bytes::from(vec![0x80]),
+        );
+
+        let expected_value = serde_json::json!(
+            {
+                "media_type": "YangDataXml",
+                "message_id": 33554434,
+                "options": {},
+                "payload": "<id>1</id>",
+                "publisher_id": 16777217,
+                "writer_id": "writer_id"
+            }
+        );
+
+        let request_invalid = Arc::new((peer, pkt_invalid_utf8));
+        let request_good = Arc::new((peer, pkt));
+        let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
+        let serialized =
+            serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");
+        assert!(matches!(
+            result_invalid,
+            Err(UdpNotifSerializationError::Utf8Error(_))
+        ));
+        assert_eq!(
+            serialized,
+            (
+                Some(serde_json::Value::String(peer.ip().to_string())),
+                expected_value
+            )
+        );
+    }
+
+    #[test]
+    fn test_serialize_udp_notif_cbor() {
+        let writer_id = String::from("writer_id");
+        let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let mut cursor = std::io::Cursor::new(vec![]);
+        ciborium::ser::into_writer(&serde_json::json!({"id": 1}), &mut cursor)
+            .expect("failed to serialize cbor");
+        let payload = cursor.into_inner();
+        let pkt = UdpNotifPacket::new(
+            MediaType::YangDataCbor,
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            Bytes::from(payload),
+        );
+        let pkt_invalid = UdpNotifPacket::new(
+            MediaType::YangDataCbor,
+            0x01000001,
+            0x02000002,
+            HashMap::new(),
+            // Array of length 3, but only contains 2 elements
+            Bytes::from(vec![0x83, 0x01, 0x02]),
+        );
+
+        let expected_value = serde_json::json!(
+            {
+                "media_type": "YangDataCbor",
+                "message_id": 33554434,
+                "options": {},
+                "payload": {"id": 1},
+                "publisher_id": 16777217,
+                "writer_id": "writer_id"
+            }
+        );
+
+        let request_invalid = Arc::new((peer, pkt_invalid));
+        let request_good = Arc::new((peer, pkt));
+        let result_invalid = serialize_udp_notif(request_invalid, writer_id.clone());
+        let serialized =
+            serialize_udp_notif(request_good, writer_id.clone()).expect("failed to serialize json");
+        assert!(matches!(
+            result_invalid,
+            Err(UdpNotifSerializationError::CborError(_))
+        ));
+        assert_eq!(
+            serialized,
+            (
+                Some(serde_json::Value::String(peer.ip().to_string())),
+                expected_value
+            )
+        );
+    }
 }
