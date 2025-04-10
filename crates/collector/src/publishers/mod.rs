@@ -26,9 +26,14 @@ pub mod kafka_json;
 
 /// Producer context with tracing logs enabled
 #[derive(Clone)]
-pub struct LoggingProducerContext;
+pub struct LoggingProducerContext {
+    pub telemetry_attributes: Box<[opentelemetry::KeyValue]>,
+    pub delivered_messages: opentelemetry::metrics::Counter<u64>,
+    pub failed_delivery_messages: opentelemetry::metrics::Counter<u64>,
+}
 
 impl ClientContext for LoggingProducerContext {}
+
 impl ProducerContext<NoCustomPartitioner> for LoggingProducerContext {
     type DeliveryOpaque = ();
 
@@ -36,9 +41,12 @@ impl ProducerContext<NoCustomPartitioner> for LoggingProducerContext {
         match delivery_result {
             Ok(_) => {
                 trace!("Message delivered successfully to kafka");
+                self.delivered_messages.add(1, &self.telemetry_attributes);
             }
             Err((err, _)) => {
                 warn!("Failed to deliver message to kafka: {err}");
+                self.failed_delivery_messages
+                    .add(1, &self.telemetry_attributes)
             }
         }
     }

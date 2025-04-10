@@ -47,6 +47,8 @@ pub struct KafkaJsonPublisherStats {
     send_retries: opentelemetry::metrics::Counter<u64>,
     error_decode: opentelemetry::metrics::Counter<u64>,
     error_send: opentelemetry::metrics::Counter<u64>,
+    delivered_messages: opentelemetry::metrics::Counter<u64>,
+    failed_delivery_messages: opentelemetry::metrics::Counter<u64>,
 }
 
 impl KafkaJsonPublisherStats {
@@ -71,12 +73,22 @@ impl KafkaJsonPublisherStats {
             .u64_counter("netgauze.collector.kafka.json.error_send")
             .with_description("Error sending message to Kafka")
             .build();
+        let delivered_messages = meter
+            .u64_counter("netgauze.collector.kafka.json.delivered_messages")
+            .with_description("Messages confirmed to be delivered to Kafka")
+            .build();
+        let failed_delivery_messages = meter
+            .u64_counter("netgauze.collector.kafka.json.failed_delivery_messages")
+            .with_description("Messages failed delivery to Kafka")
+            .build();
         Self {
             received,
             sent,
             send_retries,
             error_decode,
             error_send,
+            delivered_messages,
+            failed_delivery_messages,
         }
     }
 }
@@ -152,13 +164,19 @@ impl<
     > KafkaJsonPublisherActor<T, F>
 {
     fn get_producer(
+        stats: &KafkaJsonPublisherStats,
         config: &KafkaConfig,
     ) -> Result<ThreadedProducer<LoggingProducerContext>, KafkaJsonPublisherActorError<E>> {
         let mut producer_config = ClientConfig::new();
         for (k, v) in &config.producer_config {
             producer_config.set(k.as_str(), v.as_str());
         }
-        match ThreadedProducer::from_config_and_context(&producer_config, LoggingProducerContext) {
+        let producer_context = LoggingProducerContext {
+            telemetry_attributes: Box::new([]),
+            delivered_messages: stats.delivered_messages.clone(),
+            failed_delivery_messages: stats.failed_delivery_messages.clone(),
+        };
+        match ThreadedProducer::from_config_and_context(&producer_config, producer_context) {
             Ok(p) => Ok(p),
             Err(err) => {
                 error!("Failed to create Kafka producer: {err}");
@@ -178,7 +196,7 @@ impl<
         for (k, v) in &config.producer_config {
             producer_config.set(k.as_str(), v.as_str());
         }
-        let producer = Self::get_producer(&config)?;
+        let producer = Self::get_producer(&stats, &config)?;
         info!("Starting Kafka JSON publisher to topic: `{}`", config.topic);
         Ok(Self {
             serializer,
