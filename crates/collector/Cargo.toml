@@ -67,6 +67,8 @@ either = { workspace = true }
 pin-utils = { workspace = true }
 serde_yaml = { workspace = true }
 ordered-float = { workspace = true }
+ciborium = { workspace = true }
+
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = [
@@ -79,6 +81,7 @@ chrono = { workspace = true, default-features = false, features = [
     "clock",
 ] }
 tracing-subscriber = { workspace = true }
+bytes = { workspace = true }
 
 [profile.release]
 codegen-units = 1
