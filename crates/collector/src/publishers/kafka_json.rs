@@ -20,9 +20,8 @@ use netgauze_rdkafka::{
     producer::{BaseRecord, NoCustomPartitioner, Producer, ProducerContext, ThreadedProducer},
     ClientContext,
 };
-use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
 
@@ -109,33 +108,42 @@ impl ProducerContext<NoCustomPartitioner> for LoggingProducerContext {
 // --- actor ---
 
 #[derive(Debug)]
-pub enum KafkaJsonPublisherActorError {
+pub enum KafkaJsonPublisherActorError<E: std::error::Error> {
+    /// Error communicating with the Kafka brokers
     KafkaError(KafkaError),
-    SerializationError(String),
+
+    /// Error serializing incoming messages into [serde_json::Value]
+    SerializationError(E),
+
+    /// Error encoding [serde_json::Value] into Vec<u8> to send to kafka
+    EncodingError(serde_json::Error),
+
+    /// Error receiving incoming messages from input async_channel
     ReceiveErr,
 }
 
-impl std::fmt::Display for KafkaJsonPublisherActorError {
+impl<E: std::error::Error> std::fmt::Display for KafkaJsonPublisherActorError<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::KafkaError(e) => write!(f, "Kafka error: {e}"),
             Self::SerializationError(e) => write!(f, "Serialization error: {e}"),
+            Self::EncodingError(e) => write!(f, "Encoding error: {e}"),
             Self::ReceiveErr => write!(f, "Error receiving messages from upstream producer"),
         }
     }
 }
 
-impl std::error::Error for KafkaJsonPublisherActorError {}
+impl<E: std::error::Error> std::error::Error for KafkaJsonPublisherActorError<E> {}
 
-impl From<KafkaError> for KafkaJsonPublisherActorError {
+impl<E: std::error::Error> From<KafkaError> for KafkaJsonPublisherActorError<E> {
     fn from(e: KafkaError) -> Self {
         Self::KafkaError(e)
     }
 }
 
-impl From<serde_json::Error> for KafkaJsonPublisherActorError {
+impl<E: std::error::Error> From<serde_json::Error> for KafkaJsonPublisherActorError<E> {
     fn from(e: serde_json::Error) -> Self {
-        Self::SerializationError(e.to_string())
+        Self::EncodingError(e)
     }
 }
 
@@ -144,7 +152,10 @@ enum KafkaJsonPublisherActorCommand {
     Shutdown,
 }
 
-struct KafkaJsonPublisherActor {
+struct KafkaJsonPublisherActor<T, F> {
+    /// Serialize incoming messages into serde_json values
+    serializer: F,
+
     cmd_rx: mpsc::Receiver<KafkaJsonPublisherActorCommand>,
 
     /// Configured kafka options
@@ -153,15 +164,20 @@ struct KafkaJsonPublisherActor {
     //// librdkafka producer
     producer: ThreadedProducer<LoggingProducerContext>,
 
-    msg_recv: async_channel::Receiver<std::sync::Arc<(SocketAddr, UdpNotifPacket)>>,
+    msg_recv: async_channel::Receiver<T>,
 
     stats: KafkaJsonPublisherStats,
 }
 
-impl KafkaJsonPublisherActor {
+impl<
+        T,
+        E: std::error::Error + Send + Sync + 'static,
+        F: Fn(T, String) -> Result<(Option<serde_json::Value>, serde_json::Value), E>,
+    > KafkaJsonPublisherActor<T, F>
+{
     fn get_producer(
         config: &KafkaConfig,
-    ) -> Result<ThreadedProducer<LoggingProducerContext>, KafkaJsonPublisherActorError> {
+    ) -> Result<ThreadedProducer<LoggingProducerContext>, KafkaJsonPublisherActorError<E>> {
         let mut producer_config = ClientConfig::new();
         for (k, v) in &config.producer_config {
             producer_config.set(k.as_str(), v.as_str());
@@ -176,11 +192,12 @@ impl KafkaJsonPublisherActor {
     }
 
     fn from_config(
+        serializer: F,
         cmd_rx: mpsc::Receiver<KafkaJsonPublisherActorCommand>,
         config: KafkaConfig,
-        msg_recv: async_channel::Receiver<std::sync::Arc<(SocketAddr, UdpNotifPacket)>>,
+        msg_recv: async_channel::Receiver<T>,
         stats: KafkaJsonPublisherStats,
-    ) -> Result<Self, KafkaJsonPublisherActorError> {
+    ) -> Result<Self, KafkaJsonPublisherActorError<E>> {
         let mut producer_config = ClientConfig::new();
         for (k, v) in &config.producer_config {
             producer_config.set(k.as_str(), v.as_str());
@@ -188,6 +205,7 @@ impl KafkaJsonPublisherActor {
         let producer = Self::get_producer(&config)?;
         info!("Starting Kafka JSON publisher to topic: `{}`", config.topic);
         Ok(Self {
+            serializer,
             cmd_rx,
             config,
             producer,
@@ -196,11 +214,11 @@ impl KafkaJsonPublisherActor {
         })
     }
 
-    fn decode_msg(&self, msg: &UdpNotifPacket) -> Result<Vec<u8>, KafkaJsonPublisherActorError> {
-        let mut value = match serde_json::to_value(msg) {
-            Ok(value) => value,
+    async fn send(&mut self, input: T) -> Result<(), KafkaJsonPublisherActorError<E>> {
+        let (key, value) = match (self.serializer)(input, self.config.writer_id.clone()) {
+            Ok(result) => result,
             Err(err) => {
-                error!("Error decoding message to JSON: {err}");
+                error!("Error decoding message to JSON value: {err}");
                 self.stats.error_decode.add(
                     1,
                     &[opentelemetry::KeyValue::new(
@@ -208,77 +226,47 @@ impl KafkaJsonPublisherActor {
                         err.to_string(),
                     )],
                 );
-                return Err(KafkaJsonPublisherActorError::SerializationError(
-                    err.to_string(),
-                ));
+                return Err(KafkaJsonPublisherActorError::SerializationError(err));
             }
         };
-        if let serde_json::Value::Object(ref mut val) = &mut value {
-            // Add the writer ID to the message
-            val.insert(
-                "writer_id".to_string(),
-                serde_json::Value::String(self.config.writer_id.to_string()),
-            );
-            // Convert inner payload into human-readable format when possible
-            match msg.media_type() {
-                MediaType::YangDataJson => {
-                    // Deserialize the payload into a JSON object
-                    match serde_json::from_slice(msg.payload()) {
-                        Ok(payload) => {
-                            val.insert("payload".to_string(), payload);
-                        }
-                        Err(err) => {
-                            error!("Error deserializing JSON payload: {err}");
-                            self.stats.error_decode.add(
-                                1,
-                                &[opentelemetry::KeyValue::new(
-                                    "netgauze.json.decode.error.msg",
-                                    err.to_string(),
-                                )],
-                            );
-                            return Err(KafkaJsonPublisherActorError::SerializationError(
-                                err.to_string(),
-                            ));
-                        }
-                    }
-                }
-                MediaType::YangDataXml => {
-                    let payload = std::str::from_utf8(msg.payload())
-                        .expect("Couldn't deserialize XML payload");
-                    val.insert(
-                        "payload".to_string(),
-                        serde_json::Value::String(payload.to_string()),
-                    );
-                }
-                MediaType::YangDataCbor => {
-                    let payload = std::str::from_utf8(msg.payload())
-                        .expect("Couldn't deserialize CBOR payload");
-                    val.insert(
-                        "payload".to_string(),
-                        serde_json::Value::String(payload.to_string()),
-                    );
-                }
-                _ => {
-                    let err_msg = format!("Unsupported media type: {:?}", msg.media_type());
-                    error!("{err_msg}");
+        let encoded_value = match serde_json::to_vec(&value) {
+            Ok(value) => value,
+            Err(err) => {
+                error!("Error encoding serde_json::value for payload into byte array: {err}");
+                self.stats.error_decode.add(
+                    1,
+                    &[opentelemetry::KeyValue::new(
+                        "netgauze.json.decode.error.msg",
+                        err.to_string(),
+                    )],
+                );
+                return Err(KafkaJsonPublisherActorError::EncodingError(err));
+            }
+        };
+        let encoded_key = match key {
+            Some(key) => match serde_json::to_vec(&key) {
+                Ok(value) => Some(value),
+                Err(err) => {
+                    error!("Error encoding serde_json::Value for key into byte array: {err}");
                     self.stats.error_decode.add(
                         1,
                         &[opentelemetry::KeyValue::new(
                             "netgauze.json.decode.error.msg",
-                            err_msg.to_string(),
+                            err.to_string(),
                         )],
                     );
-                    return Err(KafkaJsonPublisherActorError::SerializationError(err_msg));
+                    return Err(KafkaJsonPublisherActorError::EncodingError(err));
                 }
-            }
-        }
-        Ok(serde_json::to_vec(&value)?)
-    }
+            },
+            None => None,
+        };
 
-    async fn send(&mut self, input: UdpNotifPacket) -> Result<(), KafkaJsonPublisherActorError> {
-        let encoded = self.decode_msg(&input)?;
-        let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> =
-            BaseRecord::to(self.config.topic.as_str()).payload(&encoded);
+        let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> = match &encoded_key {
+            Some(key) => BaseRecord::to(self.config.topic.as_str())
+                .payload(&encoded_value)
+                .key(key),
+            None => BaseRecord::to(self.config.topic.as_str()).payload(&encoded_value),
+        };
         let mut polling_interval = Duration::from_micros(10);
         loop {
             match self.producer.send(record) {
@@ -346,13 +334,12 @@ impl KafkaJsonPublisherActor {
                     match msg {
                         Ok(msg) => {
                             self.stats.received.add(1, &[]);
-                            let (_addr, msg) = &*msg;
-                            if let Err(err) = self.send(msg.clone()).await {
+                            if let Err(err) = self.send(msg).await {
                                 error!("Error sending message to Kafka: {err}");
                             }
                         }
                         Err(_) => {
-                            Err(KafkaJsonPublisherActorError::ReceiveErr)?
+                            Err(KafkaJsonPublisherActorError::<E>::ReceiveErr)?
                         }
                     }
                 }
@@ -374,18 +361,23 @@ pub struct KafkaJsonPublisherActorHandle {
 }
 
 impl KafkaJsonPublisherActorHandle {
-    pub fn from_config(
+    pub fn from_config<
+        T: Send + 'static,
+        E: std::error::Error + Send + Sync + 'static,
+        F: Fn(T, String) -> Result<(Option<serde_json::Value>, serde_json::Value), E> + Send + 'static,
+    >(
+        serializer: F,
         config: KafkaConfig,
-        msg_recv: async_channel::Receiver<std::sync::Arc<(SocketAddr, UdpNotifPacket)>>,
+        msg_recv: async_channel::Receiver<T>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaJsonPublisherStats>,
-    ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaJsonPublisherActorError> {
+    ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaJsonPublisherActorError<E>> {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);
         let stats = match stats {
             either::Either::Left(meter) => KafkaJsonPublisherStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor: KafkaJsonPublisherActor =
-            KafkaJsonPublisherActor::from_config(cmd_rx, config, msg_recv, stats)?;
+        let actor =
+            KafkaJsonPublisherActor::from_config(serializer, cmd_rx, config, msg_recv, stats)?;
         let join_handle = tokio::spawn(actor.run());
         let handle = Self { cmd_tx };
         Ok((join_handle, handle))

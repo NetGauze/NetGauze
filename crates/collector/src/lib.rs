@@ -25,8 +25,9 @@ use crate::{
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
 use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
+use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
-use std::sync::Arc;
+use std::{str::Utf8Error, sync::Arc};
 use tracing::{info, warn};
 
 pub mod config;
@@ -249,6 +250,7 @@ pub async fn init_udp_notif_collection(
                 }
                 PublisherEndpoint::KafkaJson(config) => {
                     let hdl = KafkaJsonPublisherActorHandle::from_config(
+                        serialize_udp_notif,
                         config.clone(),
                         udp_notif_recv.clone(),
                         either::Left(meter.clone()),
@@ -303,4 +305,69 @@ pub async fn init_udp_notif_collection(
         }
     };
     ret
+}
+
+#[derive(Debug, strum_macros::Display)]
+pub enum UdpNotifSerializationError {
+    SerializationError(serde_json::Error),
+    Utf8Error(Utf8Error),
+    UnsupportedMediaType(MediaType),
+}
+
+impl std::error::Error for UdpNotifSerializationError {}
+
+impl From<serde_json::Error> for UdpNotifSerializationError {
+    fn from(err: serde_json::Error) -> Self {
+        UdpNotifSerializationError::SerializationError(err)
+    }
+}
+
+impl From<Utf8Error> for UdpNotifSerializationError {
+    fn from(err: Utf8Error) -> Self {
+        UdpNotifSerializationError::Utf8Error(err)
+    }
+}
+
+fn serialize_udp_notif(
+    input: Arc<UdpNotifRequest>,
+    writer_id: String,
+) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
+    let (peer, msg) = input.as_ref();
+    let mut value = serde_json::to_value(msg)?;
+    if let serde_json::Value::Object(ref mut val) = &mut value {
+        // Add the writer ID to the message
+        val.insert(
+            "writer_id".to_string(),
+            serde_json::Value::String(writer_id.to_string()),
+        );
+        // Convert inner payload into human-readable format when possible
+        match msg.media_type() {
+            MediaType::YangDataJson => {
+                // Deserialize the payload into a JSON object
+                let payload = serde_json::from_slice(msg.payload())?;
+                val.insert("payload".to_string(), payload);
+            }
+            MediaType::YangDataXml => {
+                let payload = std::str::from_utf8(msg.payload())?;
+                val.insert(
+                    "payload".to_string(),
+                    serde_json::Value::String(payload.to_string()),
+                );
+            }
+            MediaType::YangDataCbor => {
+                let payload = std::str::from_utf8(msg.payload())?;
+                val.insert(
+                    "payload".to_string(),
+                    serde_json::Value::String(payload.to_string()),
+                );
+            }
+            media_type => {
+                return Err(UdpNotifSerializationError::UnsupportedMediaType(media_type));
+            }
+        }
+    }
+    Ok((
+        Some(serde_json::Value::String(peer.ip().to_string())),
+        value,
+    ))
 }
