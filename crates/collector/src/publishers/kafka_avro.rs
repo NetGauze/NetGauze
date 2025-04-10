@@ -13,12 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::publishers::LoggingProducerContext;
 use netgauze_rdkafka::{
     config::{ClientConfig, FromClientConfigAndContext},
     error::{KafkaError, RDKafkaErrorCode},
-    message::DeliveryResult,
-    producer::{BaseRecord, NoCustomPartitioner, Producer, ProducerContext, ThreadedProducer},
-    ClientContext,
+    producer::{BaseRecord, Producer, ThreadedProducer},
 };
 use schema_registry_converter::{
     async_impl::{
@@ -137,26 +136,6 @@ impl KafkaAvroPublisherStats {
             error_avro_convert,
             error_avro_encode,
             error_send,
-        }
-    }
-}
-
-/// Producer context with tracing logs enabled
-#[derive(Clone)]
-pub struct LoggingProducerContext;
-
-impl ClientContext for LoggingProducerContext {}
-impl ProducerContext<NoCustomPartitioner> for LoggingProducerContext {
-    type DeliveryOpaque = ();
-
-    fn delivery(&self, delivery_result: &DeliveryResult<'_>, _: Self::DeliveryOpaque) {
-        match delivery_result {
-            Ok(_) => {
-                debug!("Message delivered successfully to kafka");
-            }
-            Err((err, _)) => {
-                warn!("Failed to deliver message to kafka: {err}");
-            }
         }
     }
 }
