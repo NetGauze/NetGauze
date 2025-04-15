@@ -78,7 +78,7 @@ opentelemetry-otlp = { version = "0.27" }
 anyhow = { version = "1" }
 serde_with = { version = "3.11" }
 indexmap = { version = "2.7" }
-apache-avro = { version = "0.17" }
+apache-avro = { version = "0.18" }
 schema_registry_converter = { version = "4.2", default-features = false }
 netgauze-rdkafka = { version = "0.37.1", default-features = false }
 tracing-test = { version = "0.2" }
