@@ -203,6 +203,9 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
             /* afi + safi + bool */
             BmpV4RouteMonitoringTlvValue::StatelessParsing(capability) => capability.len(),
             BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => value.len(),
+            BmpV4RouteMonitoringTlvValue::PathMarking(path_marking) => {
+                4 + path_marking.reason_code.map(|_| 2).unwrap_or(0)
+            }
         }
     }
 
@@ -225,6 +228,12 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
                 capability.write(writer)?
             }
             BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => writer.write_all(value)?,
+            BmpV4RouteMonitoringTlvValue::PathMarking(path_marking) => {
+                writer.write_u32::<NetworkEndian>(path_marking.path_status)?;
+                if let Some(reason_code) = path_marking.reason_code {
+                    writer.write_u16::<NetworkEndian>(reason_code as u16)?
+                }
+            }
         }
 
         Ok(())

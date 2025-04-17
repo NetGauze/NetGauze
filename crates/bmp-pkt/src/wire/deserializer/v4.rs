@@ -18,7 +18,7 @@ use crate::{
     v4::{
         BmpV4MessageValue, BmpV4PeerDownTlv, BmpV4RouteMonitoringError,
         BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvError,
-        BmpV4RouteMonitoringTlvType, BmpV4RouteMonitoringTlvValue,
+        BmpV4RouteMonitoringTlvType, BmpV4RouteMonitoringTlvValue, PathMarking, PathMarkingReason,
     },
     wire::deserializer::{
         v3::{
@@ -38,6 +38,7 @@ use netgauze_bgp_pkt::{
     },
     BgpMessage,
 };
+
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_till_empty_into_located, ReadablePdu,
     ReadablePduWithOneInput, Span,
@@ -273,6 +274,7 @@ pub enum BmpV4RouteMonitoringTlvParsingError {
     FromUtf8Error(String),
     BgpCapability(#[from_located(module = "self")] BgpCapabilityParsingError),
     InvalidBmpV4RouteMonitoringTlv(BmpV4RouteMonitoringTlvError),
+    PathMarking(#[from_located(module = "self")] PathMarkingParsingError),
 }
 
 impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
@@ -326,6 +328,10 @@ impl<'a>
                     ctx.update_capabilities(&bgp_capability);
                     BmpV4RouteMonitoringTlvValue::StatelessParsing(bgp_capability)
                 }
+                BmpV4RouteMonitoringTlvType::PathMarking => {
+                    let (_, path_marking) = parse_into_located(data)?;
+                    BmpV4RouteMonitoringTlvValue::PathMarking(path_marking)
+                }
             },
             None => BmpV4RouteMonitoringTlvValue::Unknown {
                 code: tlv_type,
@@ -342,5 +348,53 @@ impl<'a>
                 },
             )),
         }
+    }
+}
+
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize, Eq)]
+pub enum PathMarkingParsingError {
+    #[serde(with = "ErrorKindSerdeDeref")]
+    NomError(#[from_nom] ErrorKind),
+    ReasonCodeBadLength(usize),
+    UnknownPathMarkingReason(u16),
+}
+
+impl<'a> ReadablePdu<'a, LocatedPathMarkingParsingError<'a>> for PathMarking {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedPathMarkingParsingError<'a>>
+    where
+        Self: Sized,
+    {
+        let (data, path_status) = be_u32(buf)?;
+
+        let reason_code_len = data.len();
+        let (data, reason_code) = match reason_code_len {
+            0 => (data, None),
+            2 => {
+                let (data, reason_code) = be_u16(data)?;
+
+                let reason_code = PathMarkingReason::from_repr(reason_code).ok_or_else(|| {
+                    nom::Err::Error(LocatedPathMarkingParsingError::new(
+                        data,
+                        PathMarkingParsingError::UnknownPathMarkingReason(reason_code),
+                    ))
+                })?;
+
+                (data, Some(reason_code))
+            }
+            _ => {
+                return Err(nom::Err::Error(LocatedPathMarkingParsingError::new(
+                    data,
+                    PathMarkingParsingError::ReasonCodeBadLength(reason_code_len),
+                )))
+            }
+        };
+
+        Ok((
+            data,
+            PathMarking {
+                path_status,
+                reason_code,
+            },
+        ))
     }
 }
