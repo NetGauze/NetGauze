@@ -30,7 +30,8 @@ use netgauze_bgp_pkt::{
     capabilities::{AddPathAddressFamily, AddPathCapability, BgpCapability},
     nlri::{Ipv4Unicast, Ipv4UnicastAddress},
     path_attribute::{
-        As4PathSegment, AsPath, AsPathSegmentType, Origin, PathAttribute, PathAttributeValue,
+        As4PathSegment, AsPath, AsPathSegmentType, MultiExitDiscriminator, NextHop, Origin,
+        PathAttribute, PathAttributeValue,
     },
     update::BgpUpdateMessage,
     wire::deserializer::{
@@ -128,6 +129,7 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
     ));
 
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+
     test_write(&good, &good_wire)?;
     Ok(())
 }
@@ -440,6 +442,260 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
                 code: 16,
                 value: vec![0, 1, 2, 3, 4, 5, 6, 7],
             }],
+        )
+        .unwrap(),
+    ));
+
+    let bad_eof = LocatedBmpMessageValueParsingError::new(
+        Span::new(&bad_eof_wire),
+        BmpMessageValueParsingError::NomError(ErrorKind::Eof),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+
+    test_parse_error_with_one_input::<
+        BmpMessageValue,
+        &mut BmpParsingContext,
+        LocatedBmpMessageValueParsingError<'_>,
+    >(&bad_eof_wire, &mut Default::default(), &bad_eof);
+
+    test_write(&good, &good_wire)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_bmp_v4_path_marking() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x04, 0x00, 0x00, 0x00, 0x7e, 0x00, 0x03, 0x00, 0x00, 0x00, 0xfb, 0xf3, 0x00, 0x00, 0x00,
+        0x4a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x38, 0xc0, 0x00, 0x1f, 0x9c, 0x64, 0x91, 0xa6, 0xda, 0x00,
+        0x0d, 0x51, 0x52, 0x00, 0x03, 0x00, 0x03, 0x00, 0x00, 0x43, 0x31, 0x30, 0x00, 0x04, 0x00,
+        0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x02, 0x00, 0x35, 0x00, 0x00, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00,
+        0x35, 0x02, 0x00, 0x00, 0x00, 0x16, 0x40, 0x01, 0x01, 0x00, 0x50, 0x02, 0x00, 0x00, 0x40,
+        0x03, 0x04, 0x00, 0x00, 0x00, 0x00, 0x80, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x18, 0x01, 0x01, 0x01,
+    ];
+
+    let bad_eof_wire = [];
+
+    let good = BmpMessage::V4(BmpMessageValue::RouteMonitoring(
+        RouteMonitoringMessage::build(
+            PeerHeader::new(
+                BmpPeerType::LocRibInstancePeer { filtered: false },
+                Some(RouteDistinguisher::As2Administrator {
+                    asn2: 64499,
+                    number: 74,
+                }),
+                None,
+                65592,
+                Ipv4Addr::new(192, 0, 31, 156),
+                Some(Utc.timestamp_opt(1687267034, 872786000).unwrap()),
+            ),
+            BgpMessage::Update(BgpUpdateMessage::new(
+                vec![],
+                vec![
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::Origin(Origin::IGP),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        true,
+                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::NextHop(NextHop::new(
+                            Ipv4Addr::from_str("0.0.0.0").unwrap(),
+                        )),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        true,
+                        false,
+                        false,
+                        false,
+                        PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(0)),
+                    )
+                    .unwrap(),
+                ],
+                vec![
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("0.0.0.0/0").unwrap()).unwrap(),
+                    ),
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("0.0.0.0/0").unwrap()).unwrap(),
+                    ),
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("0.0.0.0/0").unwrap()).unwrap(),
+                    ),
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("0.0.0.0/0").unwrap()).unwrap(),
+                    ),
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("1.1.1.0/24").unwrap()).unwrap(),
+                    ),
+                ],
+            )),
+            vec![
+                RouteMonitoringTlv::build(
+                    0,
+                    RouteMonitoringTlvValue::VrfTableName("C10".to_string()),
+                )
+                .unwrap(),
+                RouteMonitoringTlv::build(
+                    0,
+                    RouteMonitoringTlvValue::PathMarking(PathMarking {
+                        path_status: PathStatus::Primary | PathStatus::Best,
+                        reason_code: None,
+                    }),
+                )
+                .unwrap(),
+            ],
+        )
+        .unwrap(),
+    ));
+
+    let bad_eof = LocatedBmpMessageValueParsingError::new(
+        Span::new(&bad_eof_wire),
+        BmpMessageValueParsingError::NomError(ErrorKind::Eof),
+    );
+
+    test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
+
+    test_parse_error_with_one_input::<
+        BmpMessageValue,
+        &mut BmpParsingContext,
+        LocatedBmpMessageValueParsingError<'_>,
+    >(&bad_eof_wire, &mut Default::default(), &bad_eof);
+
+    test_write(&good, &good_wire)?;
+
+    Ok(())
+}
+
+#[test]
+fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritingError> {
+    let good_wire = [
+        0x04, 0x00, 0x00, 0x00, 0x80, 0x00, 0x03, 0x00, 0x00, 0x00, 0xfb, 0xf3, 0x00, 0x00, 0x00,
+        0x4a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x38, 0xc0, 0x00, 0x1f, 0x9c, 0x64, 0x91, 0xa6, 0xda, 0x00,
+        0x0d, 0x51, 0x52, 0x00, 0x03, 0x00, 0x03, 0x00, 0x00, 0x43, 0x31, 0x30, 0x00, 0x04, 0x00,
+        0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x02, 0x00, 0x35, 0x00, 0x00,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x00, 0x35, 0x02, 0x00, 0x00, 0x00, 0x16, 0x40, 0x01, 0x01, 0x00, 0x50, 0x02, 0x00,
+        0x00, 0x40, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00, 0x80, 0x04, 0x04, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x18, 0x01, 0x01, 0x01,
+    ];
+
+    let bad_eof_wire = [];
+
+    let good = BmpMessage::V4(BmpMessageValue::RouteMonitoring(
+        RouteMonitoringMessage::build(
+            PeerHeader::new(
+                BmpPeerType::LocRibInstancePeer { filtered: false },
+                Some(RouteDistinguisher::As2Administrator {
+                    asn2: 64499,
+                    number: 74,
+                }),
+                None,
+                65592,
+                Ipv4Addr::new(192, 0, 31, 156),
+                Some(Utc.timestamp_opt(1687267034, 872786000).unwrap()),
+            ),
+            BgpMessage::Update(BgpUpdateMessage::new(
+                vec![],
+                vec![
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::Origin(Origin::IGP),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        true,
+                        PathAttributeValue::AsPath(AsPath::As4PathSegments(vec![])),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        false,
+                        true,
+                        false,
+                        false,
+                        PathAttributeValue::NextHop(NextHop::new(
+                            Ipv4Addr::from_str("0.0.0.0").unwrap(),
+                        )),
+                    )
+                    .unwrap(),
+                    PathAttribute::from(
+                        true,
+                        false,
+                        false,
+                        false,
+                        PathAttributeValue::MultiExitDiscriminator(MultiExitDiscriminator::new(0)),
+                    )
+                    .unwrap(),
+                ],
+                vec![
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("0.0.0.0/0").unwrap()).unwrap(),
+                    ),
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("0.0.0.0/0").unwrap()).unwrap(),
+                    ),
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("0.0.0.0/0").unwrap()).unwrap(),
+                    ),
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("0.0.0.0/0").unwrap()).unwrap(),
+                    ),
+                    Ipv4UnicastAddress::new(
+                        None,
+                        Ipv4Unicast::from_net(Ipv4Net::from_str("1.1.1.0/24").unwrap()).unwrap(),
+                    ),
+                ],
+            )),
+            vec![
+                RouteMonitoringTlv::build(
+                    0,
+                    RouteMonitoringTlvValue::VrfTableName("C10".to_string()),
+                )
+                .unwrap(),
+                RouteMonitoringTlv::build(
+                    0,
+                    RouteMonitoringTlvValue::PathMarking(PathMarking {
+                        path_status: 0 | PathStatus::Invalid,
+                        reason_code: Some(PathMarkingReason::InvalidAsLoop),
+                    }),
+                )
+                .unwrap(),
+            ],
         )
         .unwrap(),
     ));

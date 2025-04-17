@@ -20,6 +20,7 @@ use crate::{
 use either::Either;
 use netgauze_bgp_pkt::{capabilities::BgpCapability, iana::BgpMessageType, BgpMessage};
 use serde::{Deserialize, Serialize};
+use std::ops::BitOr;
 use strum_macros::{Display, FromRepr};
 
 pub const BMPV4_TLV_GROUP_GBIT: u16 = 0x8000;
@@ -130,6 +131,9 @@ impl RouteMonitoringTlv {
             RouteMonitoringTlvValue::StatelessParsing { .. } => {
                 Either::Left(RouteMonitoringTlvType::StatelessParsing)
             }
+            RouteMonitoringTlvValue::PathMarking(..) => {
+                Either::Left(RouteMonitoringTlvType::PathMarking)
+            }
             RouteMonitoringTlvValue::Unknown { code, .. } => Either::Right(code),
         }
     }
@@ -151,6 +155,7 @@ pub enum RouteMonitoringTlvType {
     StatelessParsing = 1,
     BgpUpdatePdu = 2,
     VrfTableName = 3,
+    PathMarking = 4,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -160,7 +165,83 @@ pub enum RouteMonitoringTlvValue {
     VrfTableName(String),
     GroupTlv(Vec<u16>),
     StatelessParsing(BgpCapability),
+    PathMarking(PathMarking),
     Unknown { code: u16, value: Vec<u8> },
+}
+
+/// Path Status TLV
+/// ```text
+/// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+/// +-------------------------------+-------------------------------+
+/// |E|       Type (15 bits)        |       Length (2 octets)       |
+/// +---------------------------------------------------------------+
+/// |        Index (2 octets)       |
+/// +-------------------------------+-------------------------------+
+/// |                      Path Status (4 octets)                   |
+/// +---------------------------------------------------------------+
+/// |                 Reason Code (2 octets, optional)              |
+/// +---------------------------------------------------------------+
+/// ```
+#[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct PathMarking {
+    /// Represented as u32 instead of [PathStatus] since it is a bitflag
+    /// [PathStatus] is just a collection of all possible flags in this bitflag
+    pub path_status: u32,
+    pub reason_code: Option<PathMarkingReason>,
+}
+
+// TODO assign real codes and move to IANA when draft becomes RFC
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, FromRepr, Display)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum PathStatus {
+    Invalid = 0x00000001,
+    Best = 0x00000002,
+    NonSelected = 0x00000004,
+    Primary = 0x00000008,
+    Backup = 0x00000010,
+    NonInstalled = 0x00000020,
+    BestExternal = 0x00000040,
+    AddPath = 0x00000080,
+    FilteredInInboundPolicy = 0x00000100,
+    FilteredInOutboundPolicy = 0x00000200,
+    InvalidRov = 0x00000400,
+    Stale = 0x00000800,
+    Suppressed = 0x00001000,
+}
+
+impl BitOr for PathStatus {
+    type Output = u32;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        self as u32 | rhs as u32
+    }
+}
+
+impl BitOr<PathStatus> for u32 {
+    type Output = u32;
+
+    fn bitor(self, rhs: PathStatus) -> Self::Output {
+        self | rhs as u32
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+#[repr(u16)]
+pub enum PathMarkingReason {
+    InvalidAsLoop = 0x0001,
+    InvalidUnresolvableNexthop = 0x0002,
+    NotPreferredLocalPref = 0x0003,
+    NotPreferredAsPathLength = 0x0004,
+    NotPreferredOrigin = 0x0005,
+    NotPreferredMed = 0x0006,
+    NotPreferredPeerType = 0x0007,
+    NotPreferredIgpCost = 0x0008,
+    NotPreferredRouterId = 0x0009,
+    NotPreferredPeerAddress = 0x000A,
+    NotPreferredAigp = 0x000B,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
