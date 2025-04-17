@@ -18,7 +18,7 @@
 use crate::{
     iana::BmpVersion,
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
-    BmpMessage, BmpMessageValue, PeerKey, PeerUpNotificationMessage,
+    BmpMessage, BmpV3MessageValue, PeerKey, PeerUpNotificationMessage,
 };
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
@@ -155,14 +155,14 @@ impl BmpParsingContext {
 
         match msg {
             BmpMessage::V3(value) => match value {
-                BmpMessageValue::PeerDownNotification(peer_down) => {
+                BmpV3MessageValue::PeerDownNotification(peer_down) => {
                     let peer_key = PeerKey::from_peer_header(peer_down.peer_header());
                     self.remove(&peer_key);
                 }
-                BmpMessageValue::Termination(_) => {
+                BmpV3MessageValue::Termination(_) => {
                     self.clear();
                 }
-                BmpMessageValue::PeerUpNotification(peer_up) => {
+                BmpV3MessageValue::PeerUpNotification(peer_up) => {
                     handle_peer_up(self, peer_up);
                 }
                 _ => {}
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn test_codec() -> Result<(), BmpMessageWritingError> {
-        let msg = BmpMessage::V3(BmpMessageValue::Initiation(InitiationMessage::new(vec![
+        let msg = BmpMessage::V3(BmpV3MessageValue::Initiation(InitiationMessage::new(vec![
             InitiationInformation::SystemDescription("test11".to_string()),
             InitiationInformation::SystemName("PE2".to_string()),
         ])));
@@ -308,7 +308,7 @@ mod tests {
             Some(Utc.timestamp_opt(1664821826, 645593000).unwrap()),
         );
 
-        let peer_up = BmpMessage::V3(BmpMessageValue::PeerUpNotification(
+        let peer_up = BmpMessage::V3(BmpV3MessageValue::PeerUpNotification(
             PeerUpNotificationMessage::build(
                 peer_header.clone(),
                 Some(IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap())),
@@ -389,7 +389,7 @@ mod tests {
             .unwrap(),
         ));
 
-        let peer_down = BmpMessage::V3(BmpMessageValue::PeerDownNotification(
+        let peer_down = BmpMessage::V3(BmpV3MessageValue::PeerDownNotification(
             PeerDownNotificationMessage::build(
                 peer_header.clone(),
                 PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
@@ -397,10 +397,9 @@ mod tests {
             .unwrap(),
         ));
 
-        let terminate =
-            BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
-                TerminationInformation::String("test".to_string()),
-            ])));
+        let terminate = BmpMessage::V3(BmpV3MessageValue::Termination(TerminationMessage::new(
+            vec![TerminationInformation::String("test".to_string())],
+        )));
 
         let mut codec = BmpCodec::default();
         let peer_key = PeerKey::from_peer_header(&peer_header);

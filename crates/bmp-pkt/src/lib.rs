@@ -29,8 +29,9 @@ use crate::iana::{BmpMessageType, BmpPeerTypeCode, BmpVersion};
 
 use crate::{
     v3::{
-        BmpMessageValue, InitiationMessage, PeerDownNotificationMessage, PeerUpNotificationMessage,
-        RouteMirroringMessage, RouteMonitoringMessage, StatisticsReportMessage, TerminationMessage,
+        BmpV3MessageValue, InitiationMessage, PeerDownNotificationMessage,
+        PeerUpNotificationMessage, RouteMirroringMessage, RouteMonitoringMessage,
+        StatisticsReportMessage, TerminationMessage,
     },
     v4::BmpV4MessageValue,
 };
@@ -58,7 +59,7 @@ pub mod wire;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpMessage {
-    V3(BmpMessageValue),
+    V3(BmpV3MessageValue),
     V4(BmpV4MessageValue),
 }
 

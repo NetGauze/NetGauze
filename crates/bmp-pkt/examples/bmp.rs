@@ -12,26 +12,28 @@ use chrono::{TimeZone, Utc};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bmp_pkt::{
     iana::RouteMirroringInformation,
-    v3::{BmpMessageValue, MirroredBgpMessage, RouteMirroringMessage, RouteMirroringValue},
+    v3::{BmpV3MessageValue, MirroredBgpMessage, RouteMirroringMessage, RouteMirroringValue},
     BmpMessage, BmpPeerType, PeerHeader,
 };
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
 
 fn main() {
-    let bmp_msg = BmpMessage::V3(BmpMessageValue::RouteMirroring(RouteMirroringMessage::new(
-        PeerHeader::new(
-            BmpPeerType::LocRibInstancePeer { filtered: false },
-            None,
-            Some(IpAddr::V6(Ipv6Addr::from_str("2001::1").unwrap())),
-            65000,
-            Ipv4Addr::new(172, 10, 0, 1),
-            Some(Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0).unwrap()),
+    let bmp_msg = BmpMessage::V3(BmpV3MessageValue::RouteMirroring(
+        RouteMirroringMessage::new(
+            PeerHeader::new(
+                BmpPeerType::LocRibInstancePeer { filtered: false },
+                None,
+                Some(IpAddr::V6(Ipv6Addr::from_str("2001::1").unwrap())),
+                65000,
+                Ipv4Addr::new(172, 10, 0, 1),
+                Some(Utc.with_ymd_and_hms(2023, 1, 1, 1, 0, 0).unwrap()),
+            ),
+            vec![
+                RouteMirroringValue::Information(RouteMirroringInformation::Experimental65531),
+                RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(BgpMessage::KeepAlive)),
+            ],
         ),
-        vec![
-            RouteMirroringValue::Information(RouteMirroringInformation::Experimental65531),
-            RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(BgpMessage::KeepAlive)),
-        ],
-    )));
+    ));
 
     println!(
         "JSON representation of BMP packet: {}",

@@ -428,7 +428,7 @@ fn test_bmp_value_initiation_message() -> Result<(), BmpMessageValueWritingError
         0x50, 0x45, 0x32,
     ];
 
-    let good = BmpMessageValue::Initiation(InitiationMessage::new(vec![
+    let good = BmpV3MessageValue::Initiation(InitiationMessage::new(vec![
         InitiationInformation::SystemDescription("test11".to_string()),
         InitiationInformation::SystemName("PE2".to_string()),
     ]));
@@ -444,7 +444,7 @@ fn test_bmp_value_initiation_message() -> Result<(), BmpMessageValueWritingError
     );
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_parse_error_with_one_input::<
-        BmpMessageValue,
+        BmpV3MessageValue,
         &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
     >(
@@ -598,7 +598,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
         0xc8, 0xac, 0x10, 0x00, 0x14, 0x63, 0x38, 0xa3, 0xe5, 0x00, 0x0b, 0x62, 0x6c, 0xff,
     ];
 
-    let good = BmpMessageValue::RouteMonitoring(
+    let good = BmpV3MessageValue::RouteMonitoring(
         RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -661,7 +661,7 @@ fn test_bmp_value_route_monitoring() -> Result<(), BmpMessageValueWritingError> 
     );
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_parse_error_with_one_input::<
-        BmpMessageValue,
+        BmpV3MessageValue,
         &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_wire, &mut Default::default(), &bad);
@@ -692,7 +692,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
 
     let bad_wire = [0x03, 0x00, 0x80];
 
-    let good = BmpMessageValue::PeerUpNotification(
+    let good = BmpV3MessageValue::PeerUpNotification(
         PeerUpNotificationMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -797,7 +797,7 @@ fn test_bmp_value_peer_up_notification() -> Result<(), BmpMessageValueWritingErr
     );
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_parse_error_with_one_input::<
-        BmpMessageValue,
+        BmpV3MessageValue,
         &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_wire, &mut Default::default(), &bad);
@@ -822,7 +822,7 @@ fn test_bmp_peer_up_loc_rib_notification() -> Result<(), BmpMessageWritingError>
         0x00, 0x02, 0x00, 0x01,
     ];
 
-    let good = BmpMessage::V3(BmpMessageValue::PeerUpNotification(
+    let good = BmpMessage::V3(BmpV3MessageValue::PeerUpNotification(
         PeerUpNotificationMessage::build(
             PeerHeader::new(
                 BmpPeerType::LocRibInstancePeer { filtered: true },
@@ -1140,7 +1140,7 @@ fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
     ];
     let bad_eof_wire = [];
 
-    let good = BmpMessage::V3(BmpMessageValue::PeerDownNotification(
+    let good = BmpMessage::V3(BmpV3MessageValue::PeerDownNotification(
         PeerDownNotificationMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -1168,7 +1168,7 @@ fn test_bmp_peer_down_notification() -> Result<(), BmpMessageWritingError> {
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
 
     test_parse_error_with_one_input::<
-        BmpMessageValue,
+        BmpV3MessageValue,
         &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_eof_wire, &mut Default::default(), &bad_eof);
@@ -1248,24 +1248,26 @@ fn test_bmp_router_mirroring() -> Result<(), BmpMessageWritingError> {
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x13, 0x04,
     ];
 
-    let good = BmpMessage::V3(BmpMessageValue::RouteMirroring(RouteMirroringMessage::new(
-        PeerHeader::new(
-            BmpPeerType::GlobalInstancePeer {
-                ipv6: false,
-                post_policy: false,
-                asn2: false,
-                adj_rib_out: false,
-            },
-            None,
-            Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
-            200,
-            Ipv4Addr::new(172, 16, 0, 20),
-            Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
+    let good = BmpMessage::V3(BmpV3MessageValue::RouteMirroring(
+        RouteMirroringMessage::new(
+            PeerHeader::new(
+                BmpPeerType::GlobalInstancePeer {
+                    ipv6: false,
+                    post_policy: false,
+                    asn2: false,
+                    adj_rib_out: false,
+                },
+                None,
+                Some(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 20))),
+                200,
+                Ipv4Addr::new(172, 16, 0, 20),
+                Some(Utc.timestamp_opt(1664915595, 285358000).unwrap()),
+            ),
+            vec![RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(
+                BgpMessage::KeepAlive,
+            ))],
         ),
-        vec![RouteMirroringValue::BgpMessage(MirroredBgpMessage::Parsed(
-            BgpMessage::KeepAlive,
-        ))],
-    )));
+    ));
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
 
     test_write(&good, &good_wire)?;
@@ -1322,9 +1324,9 @@ fn test_termination_message() -> Result<(), TerminationMessageWritingError> {
 fn test_bmp_termination() -> Result<(), BmpMessageWritingError> {
     let good_wire = [3, 0, 0, 0, 14, 5, 0, 0, 0, 4, 116, 101, 115, 116];
 
-    let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
-        TerminationInformation::String("test".to_string()),
-    ])));
+    let good = BmpMessage::V3(BmpV3MessageValue::Termination(TerminationMessage::new(
+        vec![TerminationInformation::String("test".to_string())],
+    )));
 
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
@@ -1338,10 +1340,12 @@ fn test_bmp_termination_with_reason() -> Result<(), BmpMessageWritingError> {
         0x67, 0x20, 0x72, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x64, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00,
     ];
 
-    let good = BmpMessage::V3(BmpMessageValue::Termination(TerminationMessage::new(vec![
-        TerminationInformation::String("config removed".to_string()),
-        TerminationInformation::Reason(PeerTerminationCode::AdministrativelyClosed),
-    ])));
+    let good = BmpMessage::V3(BmpV3MessageValue::Termination(TerminationMessage::new(
+        vec![
+            TerminationInformation::String("config removed".to_string()),
+            TerminationInformation::Reason(PeerTerminationCode::AdministrativelyClosed),
+        ],
+    )));
 
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
     test_write(&good, &good_wire)?;
@@ -1360,7 +1364,7 @@ fn test_bmp_statistics_report() -> Result<(), BmpMessageWritingError> {
         0x00, 0x00, 0x00, 0x0b, 0x00, 0x04, 0x00, 0x00, 0x00, 0x06, 0xff, 0xfb, 0x00, 0x04, 0x00,
         0x00, 0x00, 0x00,
     ];
-    let good = BmpMessage::V3(BmpMessageValue::StatisticsReport(
+    let good = BmpMessage::V3(BmpV3MessageValue::StatisticsReport(
         StatisticsReportMessage::new(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -1434,7 +1438,7 @@ fn test_bmp_stats() -> Result<(), BmpMessageWritingError> {
         0x00, 0x00,
     ];
 
-    let good = BmpMessage::V3(BmpMessageValue::StatisticsReport(
+    let good = BmpMessage::V3(BmpV3MessageValue::StatisticsReport(
         StatisticsReportMessage::new(
             PeerHeader::new(
                 BmpPeerType::RdInstancePeer {
@@ -1552,7 +1556,7 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
         0xcb, 0x00, 0x71, 0xfe,
     ];
 
-    let good = BmpMessage::V3(BmpMessageValue::RouteMonitoring(
+    let good = BmpMessage::V3(BmpV3MessageValue::RouteMonitoring(
         RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::LocRibInstancePeer { filtered: true },

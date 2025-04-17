@@ -177,7 +177,7 @@ mod tests {
 
     use super::*;
     use futures_util::SinkExt;
-    use netgauze_bmp_pkt::v3::{BmpMessageValue, InitiationMessage};
+    use netgauze_bmp_pkt::v3::{BmpV3MessageValue, InitiationMessage};
     use rand::Rng;
     use tokio::task::JoinHandle;
     use tower::{service_fn, ServiceBuilder};
@@ -186,7 +186,9 @@ mod tests {
     async fn test_start() {
         let (handle, server, addr) = start_server().await;
         let mut client = connect(addr).await;
-        let msg = BmpMessage::V3(BmpMessageValue::Initiation(InitiationMessage::new(vec![])));
+        let msg = BmpMessage::V3(BmpV3MessageValue::Initiation(InitiationMessage::new(
+            vec![],
+        )));
         client.send(msg).await.unwrap();
         handle.shutdown();
         // yield to let the server handle the shutdown signal
@@ -198,7 +200,9 @@ mod tests {
     async fn test_shutdown() {
         let (handle, server, addr) = start_server().await;
         let mut client = connect(addr).await;
-        let msg = BmpMessage::V3(BmpMessageValue::Initiation(InitiationMessage::new(vec![])));
+        let msg = BmpMessage::V3(BmpV3MessageValue::Initiation(InitiationMessage::new(
+            vec![],
+        )));
         client.send(msg.clone()).await.unwrap();
         handle.shutdown();
         // yield to let the server handle the shutdown signal

@@ -461,7 +461,7 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
 
     test_parse_error_with_one_input::<
-        BmpMessageValue,
+        BmpV3MessageValue,
         &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_eof_wire, &mut Default::default(), &bad_eof);

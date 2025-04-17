@@ -28,7 +28,7 @@ use std::net::IpAddr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpMessageValue {
+pub enum BmpV3MessageValue {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport(StatisticsReportMessage),
     PeerDownNotification(PeerDownNotificationMessage),
@@ -42,7 +42,7 @@ pub enum BmpMessageValue {
     Experimental254(Vec<u8>),
 }
 
-impl BmpMessageValue {
+impl BmpV3MessageValue {
     /// Get IANA type
     pub const fn get_type(&self) -> BmpMessageType {
         match self {

@@ -72,7 +72,7 @@ pub enum BmpMessageValueParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageValueParsingError<'a>>
-    for BmpMessageValue
+    for BmpV3MessageValue
 {
     fn from_wire(
         buf: Span<'a>,
@@ -82,43 +82,43 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageVa
         let (buf, msg) = match msg_type {
             BmpMessageType::RouteMonitoring => {
                 let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpMessageValue::RouteMonitoring(value))
+                (buf, BmpV3MessageValue::RouteMonitoring(value))
             }
             BmpMessageType::StatisticsReport => {
                 let (buf, value) = parse_into_located(buf)?;
-                (buf, BmpMessageValue::StatisticsReport(value))
+                (buf, BmpV3MessageValue::StatisticsReport(value))
             }
             BmpMessageType::PeerDownNotification => {
                 let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpMessageValue::PeerDownNotification(value))
+                (buf, BmpV3MessageValue::PeerDownNotification(value))
             }
             BmpMessageType::PeerUpNotification => {
                 let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpMessageValue::PeerUpNotification(value))
+                (buf, BmpV3MessageValue::PeerUpNotification(value))
             }
             BmpMessageType::Initiation => {
                 let (buf, init) = parse_into_located(buf)?;
-                (buf, BmpMessageValue::Initiation(init))
+                (buf, BmpV3MessageValue::Initiation(init))
             }
             BmpMessageType::Termination => {
                 let (buf, init) = parse_into_located(buf)?;
-                (buf, BmpMessageValue::Termination(init))
+                (buf, BmpV3MessageValue::Termination(init))
             }
             BmpMessageType::RouteMirroring => {
                 let (buf, init) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpMessageValue::RouteMirroring(init))
+                (buf, BmpV3MessageValue::RouteMirroring(init))
             }
             BmpMessageType::Experimental251 => {
-                (buf, BmpMessageValue::Experimental252(buf.to_vec()))
+                (buf, BmpV3MessageValue::Experimental252(buf.to_vec()))
             }
             BmpMessageType::Experimental252 => {
-                (buf, BmpMessageValue::Experimental252(buf.to_vec()))
+                (buf, BmpV3MessageValue::Experimental252(buf.to_vec()))
             }
             BmpMessageType::Experimental253 => {
-                (buf, BmpMessageValue::Experimental253(buf.to_vec()))
+                (buf, BmpV3MessageValue::Experimental253(buf.to_vec()))
             }
             BmpMessageType::Experimental254 => {
-                (buf, BmpMessageValue::Experimental254(buf.to_vec()))
+                (buf, BmpV3MessageValue::Experimental254(buf.to_vec()))
             }
         };
         Ok((buf, msg))
