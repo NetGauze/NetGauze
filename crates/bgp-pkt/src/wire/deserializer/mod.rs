@@ -44,7 +44,7 @@ use netgauze_parse_utils::{
 };
 
 use crate::{
-    capabilities::{AddPathCapability, BgpCapability, MultipleLabel},
+    capabilities::BgpCapability,
     iana::{BgpMessageType, UndefinedBgpMessageType},
     notification::{BgpNotificationMessage, FiniteStateMachineError, MessageHeaderError},
     wire::{
@@ -159,19 +159,6 @@ impl BgpParsingContext {
         &mut self.multiple_labels
     }
 
-    #[inline]
-    pub fn update_multiple_labels<T>(&mut self, multiple_labels: &[T])
-    where
-        T: std::borrow::Borrow<MultipleLabel>,
-    {
-        for multiple_label in multiple_labels {
-            self.multiple_labels_mut().insert(
-                multiple_label.borrow().address_type(),
-                multiple_label.borrow().count(),
-            );
-        }
-    }
-
     pub const fn add_path(&self) -> &HashMap<AddressType, bool> {
         &self.add_path
     }
@@ -181,19 +168,19 @@ impl BgpParsingContext {
     }
 
     #[inline]
-    pub fn update_add_path(&mut self, add_path: &AddPathCapability) {
-        for address_family in add_path.address_families() {
-            self.add_path_mut()
-                .insert(address_family.address_type(), address_family.receive());
-        }
-    }
-
-    #[inline]
     pub fn update_capabilities(&mut self, capability: &BgpCapability) {
         match capability {
-            BgpCapability::AddPath(add_path) => self.update_add_path(add_path),
+            BgpCapability::AddPath(add_path) => {
+                for address_family in add_path.address_families() {
+                    self.add_path_mut()
+                        .insert(address_family.address_type(), address_family.receive());
+                }
+            }
             BgpCapability::MultipleLabels(multiple_labels) => {
-                self.update_multiple_labels(multiple_labels)
+                for multiple_label in multiple_labels {
+                    self.multiple_labels_mut()
+                        .insert(multiple_label.address_type(), multiple_label.count());
+                }
             }
             _ => {}
         }

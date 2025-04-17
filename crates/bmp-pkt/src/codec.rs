@@ -132,9 +132,15 @@ impl BmpParsingContext {
             bgp_ctx.add_path_mut().clear();
             bgp_ctx.multiple_labels_mut().clear();
             for add_path in &common_add_path_caps {
-                bgp_ctx.update_add_path(add_path);
+                bgp_ctx.update_capabilities(&BgpCapability::AddPath((*add_path).clone()))
             }
-            bgp_ctx.update_multiple_labels(&common_multiple_labels_caps);
+            bgp_ctx.update_capabilities(&BgpCapability::MultipleLabels(
+                common_multiple_labels_caps
+                    .iter()
+                    .copied()
+                    .cloned()
+                    .collect(),
+            ));
 
             // Add a key for the BGP Peer of the first router
             let peer_key = PeerKey::new(
@@ -147,10 +153,16 @@ impl BmpParsingContext {
             let bgp_ctx = ctx.entry(peer_key).or_default();
             bgp_ctx.add_path_mut().clear();
             bgp_ctx.multiple_labels_mut().clear();
-            for add_path in common_add_path_caps {
-                bgp_ctx.update_add_path(add_path)
+            for add_path in &common_add_path_caps {
+                bgp_ctx.update_capabilities(&BgpCapability::AddPath((*add_path).clone()))
             }
-            bgp_ctx.update_multiple_labels(&common_multiple_labels_caps)
+            bgp_ctx.update_capabilities(&BgpCapability::MultipleLabels(
+                common_multiple_labels_caps
+                    .iter()
+                    .copied()
+                    .cloned()
+                    .collect(),
+            ));
         }
 
         match msg {
