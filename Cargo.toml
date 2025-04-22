@@ -17,6 +17,7 @@ members = [
     "crates/udp-notif-service",
     "crates/collector",
     "crates/yang-push",
+    "crates/cli-utility-pcap-to-json",
     "fuzz",
 ]
 resolver = "2"
