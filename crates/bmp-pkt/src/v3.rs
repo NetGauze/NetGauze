@@ -233,8 +233,8 @@ pub enum RouteMonitoringMessageError {
 /// Route Monitoring messages are used for initial synchronization of the
 /// ADJ-RIBs-In.  They are also used for ongoing monitoring of the
 /// ADJ-RIB-In state.  Route monitoring messages are state-compressed.
-/// This is all discussed in more detail in Section 5.
-//
+/// This is all discussed in more detail in Section 5 [RFC7854 Section 5](https://www.rfc-editor.org/rfc/rfc7854#section-5)
+///
 /// Following the common BMP header and per-peer header is a BGP Update
 /// PDU.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
