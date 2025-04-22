@@ -1,0 +1,34 @@
+[package]
+name = "netgauze-pcap-decoder"
+version = "0.7.0"
+edition = "2024"
+authors = ["Riccardo Negri <hello@riccardonegri.dev>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+CLI Utility to convert NetFlow, IPFIX, BGP, BMP or UDP-Nofif data from a PCAP file to a JSON Lines file.
+"""
+keywords = ["pcap", "parser", "decoder", "protocol"]
+categories = ["network-programming", "parsing"]
+
+[dependencies]
+netgauze-flow-pkt = { workspace = true, features = ["codec"] }
+netgauze-pcap-reader = { workspace = true }
+netgauze-bmp-pkt = { workspace = true, features = ["codec"] }
+netgauze-bgp-pkt = { workspace = true, features = ["codec"] }
+netgauze-udp-notif-pkt = { workspace = true, features = ["codec"] }
+ciborium = { workspace = true }
+serde = { workspace = true, features = ["derive"] } #  a generic serialization/deserialization framework
+serde_json = { workspace = true, features = ["preserve_order"] }
+pcap-parser = { workspace = true, features = ["data"] }
+bytes = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+clap = { workspace = true, features = ["default", "derive"] }
+
+[dev-dependencies]
+chrono = { workspace = true, default-features = false, features = [
+    "std",
+] }
+tempfile = { workspace = true }
