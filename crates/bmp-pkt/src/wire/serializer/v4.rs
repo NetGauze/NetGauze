@@ -134,7 +134,7 @@ impl WritablePdu<BmpV4RouteMonitoringMessageWritingError> for BmpV4RouteMonitori
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
-            + self.peer_header.len()
+            + self.peer_header().len()
             + self.update_message_tlv().len()
             + self.tlvs().iter().map(|x| x.len()).sum::<usize>()
     }
@@ -143,7 +143,7 @@ impl WritablePdu<BmpV4RouteMonitoringMessageWritingError> for BmpV4RouteMonitori
         &self,
         writer: &mut T,
     ) -> Result<(), BmpV4RouteMonitoringMessageWritingError> {
-        self.peer_header.write(writer)?;
+        self.peer_header().write(writer)?;
         for tlv in self.tlvs() {
             tlv.write(writer)?;
         }
@@ -197,7 +197,7 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
 
     fn len(&self) -> usize {
         match self {
-            BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(update) => update.len(),
+            BmpV4RouteMonitoringTlvValue::BgpUpdate(update) => update.len(),
             BmpV4RouteMonitoringTlvValue::VrfTableName(str) => str.len(),
             BmpV4RouteMonitoringTlvValue::GroupTlv(values) => 2 * values.len(),
             /* afi + safi + bool */
@@ -214,7 +214,7 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
         Self: Sized,
     {
         match self {
-            BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(update) => update.write(writer)?,
+            BmpV4RouteMonitoringTlvValue::BgpUpdate(update) => update.write(writer)?,
             BmpV4RouteMonitoringTlvValue::VrfTableName(str) => writer.write_all(str.as_bytes())?,
             BmpV4RouteMonitoringTlvValue::GroupTlv(values) => {
                 for value in values {

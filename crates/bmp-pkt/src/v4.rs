@@ -110,7 +110,7 @@ impl BmpV4RouteMonitoringTlv {
                     return Err(VrfTableNameStringIsTooLong(len));
                 }
             }
-            BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(update_pdu) => {
+            BmpV4RouteMonitoringTlvValue::BgpUpdate(update_pdu) => {
                 if update_pdu.get_type() != BgpMessageType::Update {
                     return Err(BadBgpMessageType(update_pdu.get_type()));
                 }
@@ -123,7 +123,7 @@ impl BmpV4RouteMonitoringTlv {
 
     pub fn get_type(&self) -> Either<BmpV4RouteMonitoringTlvType, u16> {
         match self.value {
-            BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(_) => {
+            BmpV4RouteMonitoringTlvValue::BgpUpdate(_) => {
                 Either::Left(BmpV4RouteMonitoringTlvType::BgpUpdatePdu)
             }
             BmpV4RouteMonitoringTlvValue::VrfTableName(_) => {
@@ -163,7 +163,7 @@ pub const BMPV4_TLV_GROUP_GBIT: u16 = 0x8000;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpV4RouteMonitoringTlvValue {
-    BgpUpdatePdu(BgpMessage),
+    BgpUpdate(BgpMessage),
     VrfTableName(String),
     GroupTlv(Vec<u16>),
     StatelessParsing(BgpCapability),
@@ -185,14 +185,14 @@ impl From<BmpV4RouteMonitoringTlvError> for BmpV4RouteMonitoringError {
 /// Route Monitoring messages are used for initial synchronization of the
 /// RIBs. They are also used for incremental updates of the RIB state.
 /// Route monitoring messages are state-compressed.
-/// This is all discussed in more detail in Section 5.
+/// This is all discussed in more detail in Section 5 [RFC7854 Section 5](https://www.rfc-editor.org/rfc/rfc7854#section-5).
 ///
 /// Following the common BMP header and per-peer header is a BGP Update
 /// PDU.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct BmpV4RouteMonitoringMessage {
-    pub peer_header: PeerHeader,
+    peer_header: PeerHeader,
     update_pdu: BmpV4RouteMonitoringTlv,
     tlvs: Vec<BmpV4RouteMonitoringTlv>,
 }
@@ -203,10 +203,8 @@ impl BmpV4RouteMonitoringMessage {
         update_pdu: BgpMessage,
         tlvs: Vec<BmpV4RouteMonitoringTlv>,
     ) -> Result<Self, BmpV4RouteMonitoringError> {
-        let update_pdu = BmpV4RouteMonitoringTlv::build(
-            0,
-            BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(update_pdu),
-        )?;
+        let update_pdu =
+            BmpV4RouteMonitoringTlv::build(0, BmpV4RouteMonitoringTlvValue::BgpUpdate(update_pdu))?;
 
         Ok(Self {
             peer_header,
@@ -225,7 +223,7 @@ impl BmpV4RouteMonitoringMessage {
 
     pub fn update_message(&self) -> &BgpMessage {
         match &self.update_pdu.value {
-            BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(update) => update,
+            BmpV4RouteMonitoringTlvValue::BgpUpdate(update) => update,
             _ => {
                 unreachable!("This TLV has to be BgpUpdatePdu (enforced by builder)");
             }

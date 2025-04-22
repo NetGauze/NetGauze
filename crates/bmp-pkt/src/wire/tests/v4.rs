@@ -394,10 +394,7 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
 
     let mut good_context = BmpParsingContext::default();
     let per_peer_header = match &good {
-        BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(BmpV4RouteMonitoringMessage {
-            peer_header,
-            ..
-        })) => peer_header,
+        BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(bmpv4_rm)) => bmpv4_rm.peer_header(),
         _ => unreachable!(),
     };
 

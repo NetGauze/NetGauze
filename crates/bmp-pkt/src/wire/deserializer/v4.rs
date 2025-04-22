@@ -315,7 +315,7 @@ impl<'a>
                 }
                 BmpV4RouteMonitoringTlvType::BgpUpdatePdu => {
                     let (_, pdu) = parse_into_located_one_input(data, ctx)?;
-                    BmpV4RouteMonitoringTlvValue::BgpUpdatePdu(pdu)
+                    BmpV4RouteMonitoringTlvValue::BgpUpdate(pdu)
                 }
                 BmpV4RouteMonitoringTlvType::GroupTlv => {
                     let (_, values) = nom::multi::many0(be_u16)(data)?;
