@@ -7,6 +7,12 @@ use std::{
     net::{IpAddr, SocketAddr},
 };
 
+#[derive(Debug, serde::Serialize)]
+pub struct SerializableInfo<I> {
+    pub(crate) info: I,
+    pub(crate) source_address: SocketAddr,
+}
+
 #[derive(Debug, Serialize)]
 pub enum DecodeOutcome<M, E> {
     Success((SocketAddr, M)),

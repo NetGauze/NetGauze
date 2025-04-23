@@ -1,4 +1,4 @@
-use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
+use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
 use bytes::{Buf, BytesMut};
 use netgauze_bmp_pkt::{
     BmpMessage,
@@ -19,12 +19,6 @@ impl BmpProtocolHandler {
     pub fn new(ports: Vec<u16>) -> Self {
         BmpProtocolHandler { ports }
     }
-}
-
-#[derive(Debug, serde::Serialize)]
-struct SerializableFlowInfo {
-    info: BmpMessage,
-    source_address: SocketAddr,
 }
 
 impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocolHandler {
@@ -71,7 +65,7 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
         match decode_outcome {
             DecodeOutcome::Success(m) => {
                 let (source_address, bmp_message) = m;
-                let serializable_flow = SerializableFlowInfo {
+                let serializable_flow = SerializableInfo {
                     info: bmp_message,
                     source_address,
                 };

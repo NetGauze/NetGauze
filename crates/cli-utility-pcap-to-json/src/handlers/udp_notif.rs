@@ -1,4 +1,4 @@
-use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
+use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
 use bytes::{Buf, BytesMut};
 use netgauze_pcap_reader::TransportProtocol;
 use netgauze_udp_notif_pkt::{
@@ -20,12 +20,6 @@ impl UdpNotifProtocolHandler {
     pub fn new(ports: Vec<u16>) -> Self {
         UdpNotifProtocolHandler { ports }
     }
-}
-
-#[derive(Debug, serde::Serialize)]
-struct SerializableFlowInfo {
-    info: Value,
-    source_address: SocketAddr,
 }
 
 impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
@@ -104,7 +98,7 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                     }
                     _ => {}
                 }
-                let serializable_flow = SerializableFlowInfo {
+                let serializable_flow = SerializableInfo {
                     info: value,
                     source_address,
                 };

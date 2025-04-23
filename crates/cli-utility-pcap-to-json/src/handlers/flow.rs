@@ -1,4 +1,4 @@
-use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
+use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
 use bytes::{Buf, BytesMut};
 use netgauze_flow_pkt::{
     FlowInfo,
@@ -19,12 +19,6 @@ impl FlowProtocolHandler {
     pub fn new(ports: Vec<u16>) -> Self {
         FlowProtocolHandler { ports }
     }
-}
-
-#[derive(Debug, serde::Serialize)]
-struct SerializableFlowInfo {
-    info: FlowInfo,
-    source_address: SocketAddr,
 }
 
 impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for FlowProtocolHandler {
@@ -72,7 +66,7 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
         match decode_outcome {
             DecodeOutcome::Success(m) => {
                 let (source_address, flow_info) = m;
-                let serializable_flow = SerializableFlowInfo {
+                let serializable_flow = SerializableInfo {
                     info: flow_info,
                     source_address,
                 };
