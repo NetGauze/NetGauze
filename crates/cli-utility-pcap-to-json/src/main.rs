@@ -1,92 +1,45 @@
-mod serializer;
-mod parsers;
+mod handlers;
+mod protocol_handler;
 
-use crate::parsers::bmp_parser::parse_bmp_data;
-use crate::parsers::flow_parser::parse_flow_data;
-use bytes::BytesMut;
-use chrono::Utc;
-use clap::Parser;
-use clap::ValueEnum;
-use netgauze_bmp_pkt::BmpMessage;
-use netgauze_bmp_pkt::codec::BmpCodec;
-use netgauze_flow_pkt::codec::FlowInfoCodec;
-use netgauze_flow_service::FlowRequest;
-use netgauze_pcap_reader::PcapIter;
-use pcap_parser::LegacyPcapReader;
-use serde::Serialize;
-use std::{
-    cmp, collections::HashMap, fs::File, ops::Mul, path::PathBuf, sync::Arc, time::Duration,
+use crate::{
+    handlers::{
+        bmp::BmpProtocolHandler, flow::FlowProtocolHandler, udp_notif::UdpNotifProtocolHandler,
+    },
+    protocol_handler::ProtocolHandler,
 };
-use netgauze_udp_notif_pkt::codec::UdpPacketCodec;
-use netgauze_udp_notif_pkt::UdpNotifPacket;
-use crate::parsers::udp_notif_parser::parse_udp_notif_data;
+use clap::{Parser, ValueEnum};
+use netgauze_pcap_reader::PcapIter;
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{BufWriter, Write},
+    net::IpAddr,
+    path::PathBuf,
+};
 
-// Define constants for magic numbers
+// Define constants
 const PCAP_BUFFER_SIZE: usize = 165536;
-const SEND_CHANNEL_BUFFER: usize = 1000;
-const SLEEP_DURATION_INITIAL_MS: u64 = 10;
-const SLEEP_DURATION_MAX_SECS: u64 = 1;
-const DEFAULT_FLOW_PORT_1: u16 = 9991;
-const DEFAULT_FLOW_PORT_2: u16 = 9992;
-const DEFAULT_BMP_PORT: u16 = 1790;
 
-struct Config {
-    flow_port1: u16,
-    flow_port2: u16,
-    bmp_port: u16,
-    input_size: Option<usize>,
-    protocol: ProtocolToParse,
-    pcap_path: PathBuf,
-    output_path: PathBuf,
-}
-
-async fn send_pcap_data(tx: &async_channel::Sender<Arc<PcapData>>, data: PcapData) {
-    let mut sleep_duration = Duration::from_millis(SLEEP_DURATION_INITIAL_MS);
-    while tx.is_full() {
-        tokio::time::sleep(sleep_duration).await;
-        sleep_duration = cmp::max(
-            sleep_duration.mul(2),
-            Duration::from_secs(SLEEP_DURATION_MAX_SECS),
-        );
-    }
-    tx.send(Arc::new(data))
-        .await
-        .expect("Failed to send pcap data");
-}
-
-// TODO try to use generics
-#[derive(Debug, Serialize, Clone)]
-enum PcapData {
-    Flow(FlowRequest),
-    Bmp(BmpMessage),
-    UDPNotif(UdpNotifPacket)
-}
-
-#[derive(Debug, Clone, ValueEnum)]
-pub enum ProtocolToParse {
-    Flow,
-    BMP,
-    UDPNotif,
-}
-
-enum PeerCodec {
-    FlowInfo(FlowInfoCodec),
-    BMP(BmpCodec),
-    UDPNotif(UdpPacketCodec)
-}
-
-async fn load_pcap(config: &Config, tx: async_channel::Sender<Arc<PcapData>>) {
-    let start_time = Utc::now();
-
+fn load_pcap_and_process<M, C, E, H>(
+    config: &Config,
+    handler: &H,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    C: Send + Sync + Default + 'static,
+    M: Send + Sync + 'static,
+    E: Send + Sync + 'static,
+    H: ProtocolHandler<M, C, E>,
+{
     let pcap_file = File::open(config.pcap_path.as_path()).expect("Failed to open pcap file");
-    let pcap_reader = Box::new(LegacyPcapReader::new(PCAP_BUFFER_SIZE, pcap_file).unwrap());
+    let pcap_reader =
+        Box::new(pcap_parser::LegacyPcapReader::new(PCAP_BUFFER_SIZE, pcap_file).unwrap());
 
-    let mut exporter_peers: HashMap<
-        (std::net::IpAddr, u16, std::net::IpAddr, u16),
-        (PeerCodec, BytesMut),
-    > = HashMap::new();
-
+    let mut exporter_peers: HashMap<(IpAddr, u16, IpAddr, u16), (C, bytes::BytesMut)> =
+        HashMap::new();
     let mut packet_counter = 0;
+    let output_file = File::create(config.output_path.as_path())?;
+    let mut writer = BufWriter::new(output_file);
+
     for (src_ip, src_port, dst_ip, dst_port, protocol, packet_data) in PcapIter::new(pcap_reader) {
         packet_counter += 1;
         if let Some(max_packets) = config.input_size {
@@ -96,50 +49,36 @@ async fn load_pcap(config: &Config, tx: async_channel::Sender<Arc<PcapData>>) {
         }
 
         let flow_key = (src_ip, src_port, dst_ip, dst_port);
-        match config.protocol {
-            ProtocolToParse::Flow => {
-                parse_flow_data(
-                    config.flow_port1,
-                    config.flow_port2,
-                    flow_key,
-                    protocol,
-                    &packet_data,
-                    &mut exporter_peers,
-                    &tx,
-                )
-                .await
-            }
-            ProtocolToParse::BMP => {
-                parse_bmp_data(
-                    config.bmp_port,
-                    flow_key,
-                    protocol,
-                    &packet_data,
-                    &mut exporter_peers,
-                    &tx,
-                )
-                .await
-            }
-            ProtocolToParse::UDPNotif => {
-                parse_udp_notif_data(
-                    flow_key,
-                    protocol,
-                    &packet_data,
-                    &mut exporter_peers,
-                    &tx,
-                ).await
-            }
+        if let Some(message) = handler.decode(flow_key, protocol, &packet_data, &mut exporter_peers)
+        {
+            let serialized_data = handler.serialize(message)?;
+            writer.write_all(serialized_data.as_bytes())?;
+            writer.write_all(b"\n")?;
         }
     }
 
-    let end_load_time = Utc::now();
-    let load_duration = end_load_time.signed_duration_since(start_time);
+    writer.flush()?;
     println!(
-        "Read {} packets from {} flow peers in {}",
+        "Read {} packets from {} flow peers",
         packet_counter,
-        exporter_peers.len(),
-        load_duration
+        exporter_peers.len()
     );
+    Ok(())
+}
+
+#[derive(Debug)]
+struct Config {
+    ports: Vec<u16>,
+    input_size: Option<usize>,
+    pcap_path: PathBuf,
+    output_path: PathBuf,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum ProtocolToDecode {
+    Flow,
+    BMP,
+    UDPNotif,
 }
 
 #[derive(Debug, Parser)]
@@ -153,30 +92,21 @@ struct Cli {
     #[clap(short, long)]
     output: String,
 
-    /// Specify the protocol to parse
+    /// Specify the protocol to decode
     #[clap(long, value_enum)]
-    protocol: ProtocolToParse,
+    protocol: ProtocolToDecode,
 
     /// Max number of messages to load from the pcap test file
     /// if not set all messages will be loaded
     #[clap(short, long)]
     input_size: Option<usize>,
 
-    /// Specify the first Flow Service port (default: 9991)
-    #[clap(long, default_value_t = DEFAULT_FLOW_PORT_1)]
-    flow_port1: u16,
-
-    /// Specify the second Flow Service port (default: 9992)
-    #[clap(long, default_value_t = DEFAULT_FLOW_PORT_2)]
-    flow_port2: u16,
-
-    /// Specify the BMP port (default: 1790)
-    #[clap(long, default_value_t = DEFAULT_BMP_PORT)]
-    bmp_port: u16,
+    /// Specify the protocol ports (comma-separated, example: 9991,9992)
+    #[clap(long, value_delimiter = ',', required = true)]
+    ports: Vec<u16>,
 }
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 8)]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let config = Config {
         pcap_path: cli
@@ -188,25 +118,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .parse::<PathBuf>()
             .expect("Failed to parse output path"),
         input_size: cli.input_size,
-        protocol: cli.protocol,
-        flow_port1: cli.flow_port1,
-        flow_port2: cli.flow_port2,
-        bmp_port: cli.bmp_port,
+        ports: cli.ports,
     };
 
-    // TODO print errors for IPFIX in case of decoding issue
+    match cli.protocol {
+        ProtocolToDecode::Flow => {
+            let flow_handler = FlowProtocolHandler::new(config.ports.clone());
+            load_pcap_and_process(&config, &flow_handler)?;
+        }
+        ProtocolToDecode::BMP => {
+            let bmp_handler = BmpProtocolHandler::new(config.ports.clone());
+            load_pcap_and_process(&config, &bmp_handler)?;
+        }
+        ProtocolToDecode::UDPNotif => {
+            let udp_notif_handler = UdpNotifProtocolHandler::new(config.ports.clone());
+            load_pcap_and_process(&config, &udp_notif_handler)?;
+        }
+    }
 
-    // TODO add BGP
-
-    let (tx, rx): (async_channel::Sender<Arc<PcapData>>, _) =
-        async_channel::bounded(SEND_CHANNEL_BUFFER);
-
-    let handle = tokio::spawn(serializer::serialize_data_to_jsonl(
-        rx,
-        config.output_path.clone(),
-    ));
-    load_pcap(&config, tx).await;
-
-    let _ = tokio::join!(handle);
     Ok(())
 }
