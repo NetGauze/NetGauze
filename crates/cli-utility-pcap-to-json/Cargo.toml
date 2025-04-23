@@ -16,21 +16,15 @@ categories = ["network-programming", "parsing"]
 [dependencies]
 netgauze-flow-pkt = { workspace = true }
 netgauze-pcap-reader = { workspace = true }
-netgauze-flow-service = { workspace = true }
 netgauze-bmp-pkt = {workspace = true, features = ["codec"] }
+netgauze-bgp-pkt = {workspace = true, features = ["codec"]}
 netgauze-udp-notif-pkt = { workspace = true, features = ["codec"] }
 ciborium = { workspace = true }
 serde = { workspace = true, features = ["derive"]} #  a generic serialization/deserialization framework
 serde_json = {workspace = true}
-chrono = {workspace = true, default-features = false, features = [
-    "std",
-    "serde",
-    "clock",
-] }
 
 pcap-parser = {workspace = true, features = ["data"]}
 bytes = {workspace = true}
 tokio-util = { workspace = true, features = ["codec"] }
 tokio = {workspace = true, features = ["full", "rt-multi-thread"]}
-async-channel = { workspace = true }
 clap = {workspace = true, features = ["default", "derive"]}

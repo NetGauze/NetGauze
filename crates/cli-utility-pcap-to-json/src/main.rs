@@ -3,7 +3,8 @@ mod protocol_handler;
 
 use crate::{
     handlers::{
-        bmp::BmpProtocolHandler, flow::FlowProtocolHandler, udp_notif::UdpNotifProtocolHandler,
+        bgp::BgpProtocolHandler, bmp::BmpProtocolHandler, flow::FlowProtocolHandler,
+        udp_notif::UdpNotifProtocolHandler,
     },
     protocol_handler::ProtocolHandler,
 };
@@ -76,8 +77,9 @@ struct Config {
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum ProtocolToDecode {
-    Flow,
+    BGP,
     BMP,
+    Flow,
     UDPNotif,
 }
 
@@ -122,13 +124,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     match cli.protocol {
-        ProtocolToDecode::Flow => {
-            let flow_handler = FlowProtocolHandler::new(config.ports.clone());
-            load_pcap_and_process(&config, &flow_handler)?;
+        ProtocolToDecode::BGP => {
+            let bgp_handler = BgpProtocolHandler::new(config.ports.clone());
+            load_pcap_and_process(&config, &bgp_handler)?;
         }
         ProtocolToDecode::BMP => {
             let bmp_handler = BmpProtocolHandler::new(config.ports.clone());
             load_pcap_and_process(&config, &bmp_handler)?;
+        }
+        ProtocolToDecode::Flow => {
+            let flow_handler = FlowProtocolHandler::new(config.ports.clone());
+            load_pcap_and_process(&config, &flow_handler)?;
         }
         ProtocolToDecode::UDPNotif => {
             let udp_notif_handler = UdpNotifProtocolHandler::new(config.ports.clone());
