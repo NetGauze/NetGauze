@@ -21,6 +21,8 @@ use crate::{
         kafka_avro::KafkaAvroPublisherActorHandle,
         kafka_json::KafkaJsonPublisherActorHandle,
     },
+    telemetry::TelemetryMessage,
+    yang_push::*,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
@@ -29,10 +31,12 @@ use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
 use std::{str::Utf8Error, sync::Arc};
 use tracing::{info, warn};
+use yang_push::enrichment::YangPushEnrichmentActorHandle;
 
 pub mod config;
 pub mod flow;
 pub mod publishers;
+pub mod yang_push;
 
 pub async fn init_flow_collection(
     flow_config: FlowConfig,
@@ -95,7 +99,7 @@ pub async fn init_flow_collection(
                         vec![ret]
                     };
                     for flow_recv in &flow_recvs {
-                        let (http_join, http_handler) = if flatten {
+                        let (http_join, http_handle) = if flatten {
                             HttpPublisherActorHandle::new(
                                 endpoint_name.clone(),
                                 config.clone(),
@@ -113,7 +117,7 @@ pub async fn init_flow_collection(
                             )?
                         };
                         join_set.push(http_join);
-                        http_handles.push(http_handler);
+                        http_handles.push(http_handle);
                     }
                 }
                 PublisherEndpoint::FlowKafkaAvro(config) => {
@@ -173,46 +177,60 @@ pub async fn init_flow_collection(
                         kafka_json_handles.push(handle);
                     }
                 }
+                PublisherEndpoint::TelemetryKafkaJson(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Telemetry KafkaJson publisher not yet supported for Flow"
+                    ));
+                }
             }
         }
     }
     let ret = tokio::select! {
         _ = supervisor_join_handle => {
             info!("Flow supervisor exited, shutting down all publishers");
-            for handler in http_handles {
-                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handler.shutdown()).await;
+            for handle in http_handles {
+                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown()).await;
                 if shutdown_result.is_err() {
-                    warn!("Timeout shutting down flow http publisher {}", handler.name())
+                    warn!("Timeout shutting down flow http publisher {}", handle.name())
                 }
                 if let Ok(Err(err)) = shutdown_result {
-                    warn!("Error in shutting down flow http publisher {}: {err}", handler.name())
+                    warn!("Error in shutting down flow http publisher {}: {err}", handle.name())
                 }
+            }
+            for handle in kafka_avro_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_json_handles {
+                let _ = handle.shutdown().await;
             }
             Ok(())
         },
         _ = join_set.next() => {
-            warn!("Flow http publisher exited, shutting down flow collection and publishers");
+            warn!("Flow publisher exited, shutting down flow collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
-            for handler in agg_handles {
-                let _ = handler.shutdown().await;
+            for handle in agg_handles {
+                let _ = handle.shutdown().await;
             }
-            for handler in enrichment_handles {
-                let _ = handler.shutdown().await;
+            for handle in enrichment_handles {
+                let _ = handle.shutdown().await;
             }
-            for handler in http_handles {
-                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handler.shutdown()).await;
+            for handle in http_handles {
+                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown()).await;
                 if shutdown_result.is_err() {
-                    warn!("Timeout shutting down flow http publisher {}", handler.name())
+                    warn!("Timeout shutting down flow http publisher {}", handle.name())
                 }
                 if let Ok(Err(err)) = shutdown_result {
-                    warn!("Error in shutting down flow http publisher {}: {err}", handler.name())
+                    warn!("Error in shutting down flow http publisher {}: {err}", handle.name())
                 }
             }
-            for handler in kafka_avro_handles {
-                let _ = handler.shutdown().await;
+            for handle in kafka_avro_handles {
+                let _ = handle.shutdown().await;
             }
-            for handler in sonata_handles {
-                let _ = handler.shutdown().await;
+            for handle in kafka_json_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in sonata_handles {
+                let _ = handle.shutdown().await;
             }
             Ok(())
         }
@@ -228,7 +246,8 @@ pub async fn init_udp_notif_collection(
     let (supervisor_join_handle, supervisor_handle) =
         UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;
     let mut join_set = FuturesUnordered::new();
-    let mut http_handlers = Vec::new();
+    let mut enrichment_handles = Vec::new();
+    let mut http_handles = Vec::new();
     let mut kafka_handles = Vec::new();
     for (group_name, publisher_config) in udp_notif_config.publishers {
         info!("Starting publishers group '{group_name}'");
@@ -239,7 +258,7 @@ pub async fn init_udp_notif_collection(
             info!("Creating publisher '{endpoint_name}'");
             match &endpoint {
                 PublisherEndpoint::Http(config) => {
-                    let (http_join, http_handler) = HttpPublisherActorHandle::new(
+                    let (http_join, http_handle) = HttpPublisherActorHandle::new(
                         endpoint_name.clone(),
                         config.clone(),
                         |x: Arc<UdpNotifRequest>, writer_id: String| {
@@ -254,7 +273,7 @@ pub async fn init_udp_notif_collection(
                         meter.clone(),
                     )?;
                     join_set.push(http_join);
-                    http_handlers.push(http_handler);
+                    http_handles.push(http_handle);
                 }
                 PublisherEndpoint::KafkaJson(config) => {
                     let hdl = KafkaJsonPublisherActorHandle::from_config(
@@ -277,8 +296,36 @@ pub async fn init_udp_notif_collection(
                 }
                 PublisherEndpoint::FlowKafkaAvro(_) => {
                     return Err(anyhow::anyhow!(
-                        "Kafka Avro publisher not yet supported for UDP Notif"
+                        "Flow Kafka Avro publisher not supported for UDP Notif"
                     ));
+                }
+                PublisherEndpoint::TelemetryKafkaJson(config) => {
+                    let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
+                        publisher_config.buffer_size,
+                        udp_notif_recv.clone(),
+                        either::Left(meter.clone()),
+                    );
+                    join_set.push(enrichment_join);
+                    enrichment_handles.push(enrichment_handle.clone());
+
+                    let enriched_rx = enrichment_handle.subscribe();
+                    let hdl = KafkaJsonPublisherActorHandle::from_config(
+                        serialize_yang_push,
+                        config.clone(),
+                        enriched_rx,
+                        either::Left(meter.clone()),
+                    );
+                    match hdl {
+                        Ok((kafka_join, kafka_handle)) => {
+                            join_set.push(kafka_join);
+                            kafka_handles.push(kafka_handle);
+                        }
+                        Err(err) => {
+                            return Err(anyhow::anyhow!(
+                                "Error creating KafkaJsonPublisherActorHandle: {err}"
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -286,28 +333,37 @@ pub async fn init_udp_notif_collection(
     let ret = tokio::select! {
         _ = supervisor_join_handle => {
             info!("udp-notif supervisor exited, shutting down all publishers");
-           for handler in http_handlers {
-                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handler.shutdown()).await;
+           for handle in http_handles {
+                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown()).await;
                 if shutdown_result.is_err() {
-                    warn!("Timeout shutting down udp-notif http publisher {}", handler.name())
+                    warn!("Timeout shutting down udp-notif http publisher {}", handle.name())
                 }
                 if let Ok(Err(err)) = shutdown_result {
-                    warn!("Error in shutting down udp-notif http publisher {}: {}", handler.name(), err)
+                    warn!("Error in shutting down udp-notif http publisher {}: {}", handle.name(), err)
                 }
+            }
+            for handle in kafka_handles {
+                let _ = handle.shutdown().await;
             }
             Ok(())
         },
         _ = join_set.next() => {
             warn!("udp-notif http publisher exited, shutting down udp-notif collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
-            for handler in http_handlers {
-                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handler.shutdown()).await;
+            for handle in enrichment_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in http_handles {
+                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown()).await;
                 if shutdown_result.is_err() {
-                    warn!("Timeout shutting down udp-notif http publisher {}", handler.name())
+                    warn!("Timeout shutting down udp-notif http publisher {}", handle.name())
                 }
                 if let Ok(Err(err)) = shutdown_result {
-                    warn!("Error in shutting down udp-notif http publisher {}: {}", handler.name(), err)
+                    warn!("Error in shutting down udp-notif http publisher {}: {}", handle.name(), err)
                 }
+            }
+            for handle in kafka_handles {
+                let _ = handle.shutdown().await;
             }
             Ok(())
         }
@@ -383,6 +439,16 @@ fn serialize_udp_notif(
         Some(serde_json::Value::String(peer.ip().to_string())),
         value,
     ))
+}
+
+fn serialize_yang_push(
+    input: TelemetryMessage,
+    _writer_id: String,
+) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
+    let ip = input.data_collection_metadata.remote_address;
+    let value = serde_json::to_value(input)?;
+    let key = serde_json::Value::String(ip.to_string());
+    Ok((Some(key), value))
 }
 
 #[derive(Debug, strum_macros::Display)]
