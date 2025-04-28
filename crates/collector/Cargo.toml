@@ -48,7 +48,7 @@ opentelemetry-otlp = { workspace = true, features = [
     "metrics",
     "trace",
     "logs",
-    "tonic",
+    "grpc-tonic",
 ] }
 apache-avro = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
