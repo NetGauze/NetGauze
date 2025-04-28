@@ -30,7 +30,7 @@ use tracing::{info, Level};
 fn init_open_telemetry(
     config: &TelemetryConfig,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-    use opentelemetry::{global, KeyValue};
+    use opentelemetry::global;
     use opentelemetry_otlp::{Protocol, WithExportConfig};
     use opentelemetry_sdk::Resource;
 
@@ -41,20 +41,14 @@ fn init_open_telemetry(
         .with_timeout(config.exporter_timeout)
         .build()?;
 
-    let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(
-        exporter,
-        opentelemetry_sdk::runtime::Tokio,
-    )
-    .with_interval(config.reader_interval)
-    .with_timeout(config.reader_timeout)
-    .build();
+    let reader = opentelemetry_sdk::metrics::PeriodicReader::builder(exporter)
+        .with_interval(config.reader_interval)
+        .build();
 
+    let resource = Resource::builder().with_service_name("NetGauze").build();
     let provider = opentelemetry_sdk::metrics::SdkMeterProvider::builder()
         .with_reader(reader)
-        .with_resource(Resource::new(vec![KeyValue::new(
-            "service.name",
-            "NetGauze",
-        )]))
+        .with_resource(resource)
         .build();
 
     global::set_meter_provider(provider);
@@ -88,7 +82,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     init_tracing(&config.logging.level);
 
     let mut runtime_builder = tokio::runtime::Builder::new_multi_thread();
-    // If num threads is not configured then the default use all CPU cores is used
+    // If num of threads is not configured then the default use all CPU cores is
+    // used
     if let Some(num_threads) = config.runtime.threads {
         runtime_builder.worker_threads(num_threads);
     }
