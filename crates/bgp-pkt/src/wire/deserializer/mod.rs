@@ -44,6 +44,7 @@ use netgauze_parse_utils::{
 };
 
 use crate::{
+    capabilities::BgpCapability,
     iana::{BgpMessageType, UndefinedBgpMessageType},
     notification::{BgpNotificationMessage, FiniteStateMachineError, MessageHeaderError},
     wire::{
@@ -164,6 +165,25 @@ impl BgpParsingContext {
 
     pub fn add_path_mut(&mut self) -> &mut HashMap<AddressType, bool> {
         &mut self.add_path
+    }
+
+    #[inline]
+    pub fn update_capabilities(&mut self, capability: &BgpCapability) {
+        match capability {
+            BgpCapability::AddPath(add_path) => {
+                for address_family in add_path.address_families() {
+                    self.add_path_mut()
+                        .insert(address_family.address_type(), address_family.receive());
+                }
+            }
+            BgpCapability::MultipleLabels(multiple_labels) => {
+                for multiple_label in multiple_labels {
+                    self.multiple_labels_mut()
+                        .insert(multiple_label.address_type(), multiple_label.count());
+                }
+            }
+            _ => {}
+        }
     }
 
     pub const fn fail_on_non_unicast_withdraw_nlri(&self) -> bool {
