@@ -17,118 +17,47 @@
 
 // TODO: documentation here..
 /// Ref: https://datatracker.ietf.org/doc/html/draft-netana-nmop-message-broker-telemetry-message-00
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;
 
-pub type SubscriptionId = u32;
+use crate::{
+    notification::{Encoding, Transport, UpdateTrigger, YangPushModuleVersion},
+    SubscriptionId,
+};
 
 /// Telemetry Message
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename = "ietf-telemetry-message:notification")]
 #[serde(rename_all = "kebab-case")]
 pub struct TelemetryMessage {
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-    pub notification_protocol: NotificationProtocol,
-    pub notification_encoding: NotificationEncoding,
-    pub notification_transport: NotificationTransport,
+    pub timestamp: chrono::DateTime<Utc>,
+    pub session_protocol: SessionProtocol,
     pub network_node_manifest: Manifest,
     pub data_collection_manifest: Manifest,
-    pub telemetry_notification_metadata: NotificationMetadata,
+    pub telemetry_message_metadata: TelemetryMessageMetadata,
     pub data_collection_metadata: DataCollectionMetadata,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payload: Option<Value>,
 }
 
-/// Notification protocol used to deliver the notification to the data
-/// collection.
+/// Telemetry Session Protocol Type
 #[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
-pub enum NotificationProtocol {
+pub enum SessionProtocol {
+    #[serde(rename = "yp-push")]
+    YangPush,
+
     #[serde(rename = "netconf")]
     Netconf,
 
     #[serde(rename = "restconf")]
     Restconf,
 
-    #[serde(rename = "yp-configured")]
-    YangPushConfigured,
-
-    #[serde(rename = "yp-dynamic")]
-    YangPushDynamic,
-
     #[default]
+    #[serde(other)]
+    #[serde(rename = "unknown")]
     Unknown,
-}
-
-impl NotificationProtocol {
-    pub fn from_string(protocol_str: &str) -> Self {
-        match protocol_str {
-            "netconf" => NotificationProtocol::Netconf,
-            "restconf" => NotificationProtocol::Restconf,
-            "yang-push-configured" => NotificationProtocol::YangPushConfigured,
-            "yang-push-dynamic" => NotificationProtocol::YangPushDynamic,
-            _ => NotificationProtocol::Unknown,
-        }
-    }
-}
-
-/// Notification encoding used to deliver the notification to the data
-/// collection.
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum NotificationEncoding {
-    #[serde(rename = "json")]
-    Json,
-
-    #[serde(rename = "xml")]
-    Xml,
-
-    #[default]
-    Unknown,
-}
-
-impl NotificationEncoding {
-    pub fn from_string(encoding_str: &str) -> Self {
-        match encoding_str {
-            "json" => NotificationEncoding::Json,
-            "ietf-subscribed-notifications:encode-json" => NotificationEncoding::Json,
-            "xml" => NotificationEncoding::Xml,
-            "ietf-subscribed-notifications:encode-xml" => NotificationEncoding::Xml,
-            _ => NotificationEncoding::Unknown,
-        }
-    }
-}
-
-/// Transport protocol used to deliver the notification to the data collection.
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum NotificationTransport {
-    #[serde(rename = "ssh")]
-    SSH,
-
-    #[serde(rename = "http")]
-    HTTP,
-
-    #[serde(rename = "udp-notif")]
-    UDPNotif,
-
-    #[serde(rename = "https-notif")]
-    HTTPSNotif,
-
-    #[default]
-    Unknown,
-}
-
-impl NotificationTransport {
-    pub fn from_string(transport_str: &str) -> Self {
-        match transport_str {
-            "ssh" => NotificationTransport::SSH,
-            "http" => NotificationTransport::HTTP,
-            "udp-notif" => NotificationTransport::UDPNotif,
-            "ietf-udp-notif-transport:udp-notif" => NotificationTransport::UDPNotif,
-            "https-notif" => NotificationTransport::HTTPSNotif,
-            "ietf-https-notif-transport:https-notif" => NotificationTransport::HTTPSNotif,
-            _ => NotificationTransport::Unknown,
-        }
-    }
 }
 
 /// Generic Metadata Manifest
@@ -160,93 +89,56 @@ pub struct Manifest {
 /// Telemetry Notification Metadata
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-pub struct NotificationMetadata {
+pub struct TelemetryMessageMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub event_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub event_time: Option<DateTime<Utc>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub yang_push_subscription: Option<SubscriptionMetadata>,
+    pub yang_push_subscription: Option<YangPushSubscriptionMetadata>,
 }
 
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-pub struct SubscriptionMetadata {
+pub struct YangPushSubscriptionMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<SubscriptionId>,
 
-    pub filters: YangPushFilters,
+    #[serde(flatten)]
+    pub target: YangPushFilter,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stop_time: Option<DateTime<Utc>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transport: Option<Transport>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<Encoding>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
+
+    #[serde(flatten)]
+    pub update_trigger: UpdateTrigger,
+
+    #[serde(rename = "ietf-yang-push-revision:module-version")]
     pub module_version: Vec<YangPushModuleVersion>,
 
+    #[serde(rename = "ietf-yang-push-revision:content-id")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub yang_library_content_id: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-pub struct YangPushFilters {
-    pub stream_filter: Vec<StreamFilter>,
-
-    #[serde(flatten)]
-    pub extra_filters: Value,
-}
-
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "kebab-case")]
-pub struct StreamFilter {
-    pub name: String,
+pub struct YangPushFilter {
+    pub filter_name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_xpath_filter: Option<String>,
+    pub xpath_filter: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub stream_subtree_filter: Option<Value>,
-}
-
-// |  +--ro stream-filter* [name]
-// |     +--ro name                           string
-// |     +--ro (filter-spec)?
-// |        +--:(stream-subtree-filter)
-// |        |  +--ro stream-subtree-filter?   <anydata>
-// |        |          {subtree}?
-// |        +--:(stream-xpath-filter)
-// |           +--ro stream-xpath-filter?     yang:xpath1.0
-
-// rustfmt::skip
-// #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-// pub struct StreamFilter {
-//     #[serde(skip_serializing_if = "Option::is_none")]
-//     pub name: Option<String>,
-
-//     #[serde(flatten)]
-//     pub filter_spec: Option<StreamFilterSpec>,
-// }
-
-// rustfmt::skip
-// #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-// #[serde(untagged)]
-// pub enum StreamFilterSpec {
-//     StreamXpathFilter {
-//         #[serde(rename = "stream-xpath-filter")]
-//         #[serde(skip_serializing_if = "Option::is_none")]
-//         stream_xpath_filter: Option<String>,
-//     },
-//     StreamSubtreeFilter {
-//         #[serde(rename = "stream-subtree-filter")]
-//         #[serde(skip_serializing_if = "Option::is_none")]
-//         stream_subtree_filter: Option<Value>,
-//     },
-// }
-
-#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "kebab-case")]
-pub struct YangPushModuleVersion {
-    pub module_name: String,
-
-    pub revision: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub revision_label: Option<String>,
+    pub subtree_filter: Option<Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -289,19 +181,18 @@ pub enum LabelValue {
 
 #[cfg(test)]
 mod tests {
-    use std::vec;
-
     use super::*;
+    use crate::CentiSeconds;
     use chrono::{TimeZone, Utc};
+    use colored::*;
     use serde_json;
+    use std::vec;
 
     #[test]
     fn test_telemetry_message_serde() {
         let original_message = TelemetryMessage {
             timestamp: Utc.timestamp_millis_opt(0).unwrap(),
-            notification_protocol: NotificationProtocol::YangPushConfigured,
-            notification_encoding: NotificationEncoding::Json,
-            notification_transport: NotificationTransport::UDPNotif,
+            session_protocol: SessionProtocol::YangPush,
             network_node_manifest: Manifest {
                 name: Some("node_id".to_string()),
                 vendor: Some("FRR".to_string()),
@@ -320,41 +211,47 @@ mod tests {
                 os_version: Some("8.10".to_string()),
                 os_type: Some("Rocky Linux".to_string()),
             },
-            telemetry_notification_metadata: NotificationMetadata {
+            telemetry_message_metadata: TelemetryMessageMetadata {
                 event_time: None,
-                yang_push_subscription: Some(SubscriptionMetadata {
+                yang_push_subscription: Some(YangPushSubscriptionMetadata {
                     id: Some(1),
-                    filters: YangPushFilters {
-                        stream_filter: vec![
-                            StreamFilter {
-                                name: "example-stream-subtree-filter".to_string(),
-                                stream_xpath_filter: None,
-                                stream_subtree_filter: Some(serde_json::json!({
-                                    "example": "filter"
-                                })),
-                            },
-                            StreamFilter {
-                                name: "example-stream-xpath-filter".to_string(),
-                                stream_xpath_filter: Some("/example/xpath".to_string()),
-                                stream_subtree_filter: None,
-                            },
-                            StreamFilter {
-                                name: "example-stream-subtree-filter-vec".to_string(),
-                                stream_xpath_filter: None,
-                                stream_subtree_filter: Some(serde_json::json!({
-                                    "example-vec": vec![
-                                        serde_json::json!({"e1": "v1"}),
-                                        serde_json::json!({"e2": "v2"}),
-                                    ]
-                                })),
-                            },
-                            StreamFilter {
-                                name: "example-stream-xpath-filter-null".to_string(),
-                                stream_xpath_filter: None,
-                                stream_subtree_filter: None,
-                            },
-                        ],
-                        extra_filters: serde_json::json!({}),
+                    target: YangPushFilter {
+                        filter_name: "example-subtree-filter-map".to_string(),
+                        xpath_filter: None,
+                        subtree_filter: Some(serde_json::json!({
+                          "example-map": serde_json::json!({
+                              "e1": "v1",
+                              "e2": "v2",
+                          }),
+                        })),
+                    },
+                    // YangPushFilter {
+                    //     name: "example-xpath-filter".to_string(),
+                    //     xpath_filter: Some("/example/xpath".to_string()),
+                    //     subtree_filter: None,
+                    // },
+                    // YangPushFilter {
+                    //     name: "example-subtree-filter-vec".to_string(),
+                    //     xpath_filter: None,
+                    //     subtree_filter: Some(serde_json::json!({
+                    //         "example-vec": vec![
+                    //             serde_json::json!({"e1": "v1"}),
+                    //             serde_json::json!({"e2": "v2"}),
+                    //         ]
+                    //     })),
+                    // },
+                    // YangPushFilter {
+                    //     name: "example-stream-xpath-filter-null".to_string(),
+                    //     xpath_filter: None,
+                    //     subtree_filter: None,
+                    // },
+                    stop_time: None,
+                    transport: Some(Transport::UDPNotif),
+                    encoding: Some(Encoding::Json),
+                    purpose: None,
+                    update_trigger: UpdateTrigger::Periodic {
+                        period: CentiSeconds::new(100),
+                        anchor_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
                     },
                     module_version: vec![YangPushModuleVersion {
                         module_name: "example-module".to_string(),
@@ -391,10 +288,10 @@ mod tests {
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Print the serialized JSON string
-        println!("Serialized JSON: {}", serialized);
+        println!("{}", format!("Serialized JSON: {serialized}").purple());
 
         // Expected JSON string
-        let expected_json = r#"{"timestamp":"1970-01-01T00:00:00Z","notification-protocol":"yp-configured","notification-encoding":"json","notification-transport":"udp-notif","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-notification-metadata":{"yang-push-subscription":{"id":1,"filters":{"stream-filter":[{"name":"example-stream-subtree-filter","stream-subtree-filter":{"example":"filter"}},{"name":"example-stream-xpath-filter","stream-xpath-filter":"/example/xpath"},{"name":"example-stream-subtree-filter-vec","stream-subtree-filter":{"example-vec":[{"e1":"v1"},{"e2":"v2"}]}},{"name":"example-stream-xpath-filter-null"}]},"module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-values":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}"#;
+        let expected_json = r#"{"timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-message-metadata":{"yang-push-subscription":{"id":1,"filter-name":"example-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"encode-json","ietf-yang-push:periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"ietf-yang-push-revision:module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"ietf-yang-push-revision:content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-values":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
@@ -408,7 +305,10 @@ mod tests {
 
         // Serialize again to check if it matches the previous serialization
         let re_serialized = serde_json::to_string(&deserialized).expect("Re-serialization failed");
-        println!("Re-serialized JSON: {}", re_serialized);
+        println!(
+            "{}",
+            format!("Re-serialized JSON: {re_serialized}").purple()
+        );
 
         // Assert that the original and deserialized messages are equal
         assert_eq!(original_message, deserialized);

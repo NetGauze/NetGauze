@@ -17,15 +17,19 @@
 // TODO: also add tests from the pcap that produce enriched telemetrymessages!
 // TODO: add tests for all the match arms and conditions below...
 // TODO: fix error handling / log messages / otel counters...
-
-// TODO: handle subscription terminated which triggers cache removal for the
-// subscription....
 // TODO: implement early return...
 
 use crate::{
-    notification::{Notification, SubscriptionStartedModified, SubscriptionTerminated},
-    yang_push::*,
-    SubscriptionInformation, SubscriptionsCache, UdpNotifPayload,
+    notification::{
+        Notification, NotificationVariant, SubscriptionStartedModified, SubscriptionTerminated,
+        Transport,
+    },
+    telemetry::{
+        DataCollectionMetadata, Label, LabelValue, Manifest, SessionProtocol, TelemetryMessage,
+        YangPushFilter, YangPushSubscriptionMetadata,
+    },
+    yang_push::telemetry::TelemetryMessageMetadata,
+    SubscriptionId, SubscriptionsCache, UdpNotifPayload,
 };
 
 use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
@@ -178,47 +182,44 @@ impl YangPushEnrichmentActor {
     }
 
     fn cache_subscription(&mut self, peer: SocketAddr, sub: &SubscriptionStartedModified) {
-        let transport = match sub.transport() {
-            Some(transport_str) => NotificationTransport::from_string(transport_str),
-            None => NotificationTransport::Unknown,
-        };
+        let filter_name = sub
+            .target()
+            .datastore()
+            .map(|f| f.to_string())
+            .or_else(|| sub.target().stream().map(|f| f.to_string()));
 
-        let encoding = match sub.encoding() {
-            Some(encoding_str) => NotificationEncoding::from_string(encoding_str),
-            None => NotificationEncoding::Unknown,
-        };
-
-        // TODO: should we revert the getter to output &String?
+        // TODO: handle possibility that we have a stream filter!
         let xpath_filter: Option<String> = sub
+            .target()
             .datastore_xpath_filter()
             .map(|f| f.to_string())
-            .or_else(|| sub.stream_xpath_filter().map(|f| f.to_string()));
+            .or_else(|| sub.target().stream_xpath_filter().map(|f| f.to_string()));
 
-        let subscription_metadata = SubscriptionMetadata {
+        let subscription_metadata = YangPushSubscriptionMetadata {
             id: Some(sub.id()),
-            filters: YangPushFilters {
-                stream_filter: vec![StreamFilter {
-                    name: sub.datastore().unwrap_or_default().to_string(), // TODO: check
-                    stream_xpath_filter: xpath_filter,
-                    stream_subtree_filter: None,
-                }],
-                extra_filters: serde_json::json!({}),
+            target: YangPushFilter {
+                filter_name: filter_name.unwrap_or_default().to_string(), /* TODO: check if this
+                                                                           * is correct... */
+                xpath_filter: xpath_filter,
+                subtree_filter: None,
             },
-            module_version: sub.module_version().cloned().unwrap_or_default(), /* TODO: test here
-                                                                                * default... */
+            stop_time: sub.stop_time().cloned(),
+            transport: sub.transport().cloned(),
+            encoding: sub.encoding().cloned(),
+            purpose: sub.purpose().cloned(),
+            update_trigger: sub.update_trigger().clone(),
+            module_version: sub.module_version().cloned().unwrap_or_default(), /* TODO: test here the default... */
             yang_library_content_id: sub.content_id().map(|id| id.to_string()),
+        };
+
+        let telemetry_message_metadata = TelemetryMessageMetadata {
+            event_time: None,
+            yang_push_subscription: Some(subscription_metadata),
         };
 
         let peer_subscriptions = self.subscriptions.entry(peer).or_insert_with(HashMap::new);
 
-        peer_subscriptions.insert(
-            sub.id(),
-            SubscriptionInformation {
-                encoding,
-                transport,
-                subscription_metadata,
-            },
-        );
+        peer_subscriptions.insert(sub.id(), telemetry_message_metadata);
 
         // TEMP DEBUG STATEMENT
         debug!(
@@ -265,39 +266,40 @@ impl YangPushEnrichmentActor {
             .and_then(|subscriptions| subscriptions.get(subscription_id));
 
         if let Some(sub_info) = subscription_information {
-            // Infer Notification from Transport
-            let notification_protocol = match sub_info.transport {
-                NotificationTransport::UDPNotif | NotificationTransport::HTTPSNotif => {
-                    NotificationProtocol::YangPushConfigured
-                }
-                _ => NotificationProtocol::Unknown,
-            };
+            if let Some(yang_push_subscription) = &sub_info.yang_push_subscription {
+                // Infer Notification from Transport
+                let session_protocol = match yang_push_subscription.transport {
+                    Some(Transport::UDPNotif) | Some(Transport::HTTPSNotif) => {
+                        SessionProtocol::YangPush
+                    }
+                    _ => SessionProtocol::Unknown,
+                };
 
-            // Populate metadata in a new TelemetryMessage
-            Ok(TelemetryMessage {
-                timestamp,
-                notification_protocol,
-                notification_encoding: sub_info.encoding.clone(),
-                notification_transport: sub_info.transport.clone(),
-                network_node_manifest: Manifest::default(),
-                data_collection_manifest: self.manifest.clone(),
-                telemetry_notification_metadata: NotificationMetadata {
-                    event_time: None,
-                    yang_push_subscription: Some(sub_info.subscription_metadata.clone()),
-                },
-                data_collection_metadata: DataCollectionMetadata {
-                    remote_address: peer.ip(),
-                    remote_port: Some(peer.port()),
-                    local_address: None,
-                    local_port: None,
-                    labels,
-                },
-                payload: None,
-            })
+                // Populate metadata in a new TelemetryMessage
+                Ok(TelemetryMessage {
+                    timestamp,
+                    session_protocol,
+                    network_node_manifest: Manifest::default(),
+                    data_collection_manifest: self.manifest.clone(),
+                    telemetry_message_metadata: sub_info.clone(),
+                    data_collection_metadata: DataCollectionMetadata {
+                        remote_address: peer.ip(),
+                        remote_port: Some(peer.port()),
+                        local_address: None, //TODO: get from config?
+                        local_port: None,    //TODO: get from config?
+                        labels,
+                    },
+                    payload: None,
+                })
+            } else {
+                // TODO: otel counter
+                warn!("Yang Push subscription metadata is missing");
+                Err(YangPushEnrichmentActorError::YangPushUpdateNoSubscriptionInfo)
+            }
         } else {
             // TODO: otel counter
             warn!("Yang Push update received but no subscription information found in the cache");
-            return Err(YangPushEnrichmentActorError::YangPushUpdateNoSubscriptionInfo);
+            Err(YangPushEnrichmentActorError::YangPushUpdateNoSubscriptionInfo)
         }
     }
 
@@ -386,10 +388,15 @@ impl YangPushEnrichmentActor {
                             self.stats.received_messages.add(1, &peer_tags);
 
                             // Access the notification from the UdpNotifPacket
+                            // TODO: move this to udp-notif-pkt crate
+                            // TODO: this needs to be tested
                             let payload: UdpNotifPayload;
                             match udp_notif_pkt.media_type() {
                                 MediaType::YangDataJson => {
                                     payload = serde_json::from_slice(udp_notif_pkt.payload())?;
+
+                                    // TEMP DEBUG STATEMENT
+                                    // info!("{}", serde_json::to_string(&payload).unwrap().blue());
                                 }
                                 MediaType::YangDataXml => {
                                     let payload_str = std::str::from_utf8(udp_notif_pkt.payload())?;
@@ -431,6 +438,7 @@ impl YangPushEnrichmentActor {
                                   }
                               }
                           } else {
+                              warn!("YangPushEnrichmentActorError: UnknownPayload");
                               Err(YangPushEnrichmentActorError::UnknownPayload)?;
                           }
                         }

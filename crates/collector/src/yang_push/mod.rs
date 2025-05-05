@@ -12,16 +12,15 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-use crate::notification::*; // TODO: restrict to only what is needed
-use crate::telemetry::*; // TODO: restrict to only what is needed
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use notification::Notification;
+use telemetry::TelemetryMessageMetadata;
+
 pub mod enrichment;
 pub mod notification;
-pub mod notification_v2; // Not fully working fine at the moment...
 pub mod telemetry;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,13 +31,32 @@ pub enum UdpNotifPayload {
     Unknown(Bytes),
 }
 
-/// Cache for YangPush subscriptions metadata
-pub type SubscriptionsCache = HashMap<SubscriptionId, SubscriptionInformation>;
+pub type SubscriptionId = u32;
 
-// TODO: simplify cache since we only need the subscription metadata!
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SubscriptionInformation {
-    pub encoding: NotificationEncoding,
-    pub transport: NotificationTransport,
-    pub subscription_metadata: SubscriptionMetadata,
+/// Cache for YangPush subscriptions metadata
+pub type SubscriptionsCache = HashMap<SubscriptionId, TelemetryMessageMetadata>;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CentiSeconds(u32);
+
+impl CentiSeconds {
+    /// Creates a new `CentiSeconds` instance.
+    pub fn new(value: u32) -> Self {
+        CentiSeconds(value)
+    }
+
+    /// Returns the value in centiseconds.
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+
+    /// Converts the centiseconds to milliseconds.
+    pub fn to_milliseconds(&self) -> u32 {
+        self.0 * 10
+    }
+
+    /// Converts the centiseconds to seconds as a floating-point value.
+    pub fn to_seconds(&self) -> f32 {
+        self.0 as f32 / 100.0
+    }
 }
