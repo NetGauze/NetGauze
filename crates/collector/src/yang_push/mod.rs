@@ -49,9 +49,21 @@ impl CentiSeconds {
     pub fn to_milliseconds(&self) -> u32 {
         self.0 * 10
     }
+}
 
-    /// Converts the centiseconds to seconds as a floating-point value.
-    pub fn to_seconds(&self) -> f32 {
-        self.0 as f32 / 100.0
+#[cfg(test)]
+mod tests {
+    use super::CentiSeconds;
+
+    #[test]
+    fn test_new() {
+        let centi = CentiSeconds::new(150);
+        assert_eq!(centi.as_u32(), 150);
+    }
+
+    #[test]
+    fn test_to_milliseconds() {
+        let centi = CentiSeconds::new(123);
+        assert_eq!(centi.to_milliseconds(), 1230);
     }
 }

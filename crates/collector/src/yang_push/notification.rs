@@ -416,8 +416,7 @@ mod tests {
     }
 
     #[test]
-    // #[ignore]
-    fn test_sub_started_serialization() {
+    fn test_sub_started_modified_serde() {
         // Create a SubscriptionStartedModified instance
         let sub_started = SubscriptionStartedModified {
             id: 1,
@@ -460,20 +459,211 @@ mod tests {
         let serialized = serde_json::to_string(&notification).expect("Serialization failed");
 
         // Print the serialized JSON
-        println!("{}", format!("Serialized JSON: {serialized}").yellow());
+        println!("{}", format!("Serialized JSON: {serialized}").purple());
 
         // Deserialize the JSON back to a Notification
         let deserialized: Notification =
             serde_json::from_str(&serialized).expect("Deserialization failed");
 
-        // Serialize again to check if it matches the previous serialization
-        let re_serialized = serde_json::to_string(&deserialized).expect("Re-serialization failed");
-        println!(
-            "{}",
-            format!("Re-serialized JSON: {re_serialized}").yellow()
+        // Assert that the deserialized Notification matches the original
+        assert_eq!(notification, deserialized);
+    }
+
+    #[test]
+    fn test_sub_started_modified_getters() {
+        // Create a Target instance
+        let target = Target {
+            stream: None,
+            stream_subtree_filter: None,
+            stream_xpath_filter: None,
+            replay_start_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
+            datastore: Some("example-datastore".to_string()),
+            datastore_subtree_filter: Some(serde_json::json!({"example-map": "example-value"})),
+            datastore_xpath_filter: Some("/example/datastore/xpath/filter".to_string()),
+        };
+
+        // Target getters
+        assert_eq!(target.stream(), None);
+        assert_eq!(target.stream_subtree_filter(), None);
+        assert_eq!(target.stream_xpath_filter(), None);
+        assert_eq!(
+            target.replay_start_time(),
+            Some(&Utc.timestamp_millis_opt(0).unwrap())
         );
+        assert_eq!(target.datastore(), Some("example-datastore"));
+        assert_eq!(
+            target.datastore_subtree_filter(),
+            Some(&serde_json::json!({"example-map": "example-value"}))
+        );
+        assert_eq!(
+            target.datastore_xpath_filter(),
+            Some("/example/datastore/xpath/filter")
+        );
+
+        // Create a SubscriptionStartedModified instance
+        let sub_started = SubscriptionStartedModified {
+            id: 1,
+            target: target.clone(),
+            encoding: Some(Encoding::Json),
+            transport: Some(Transport::UDPNotif),
+            stop_time: Some(Utc.timestamp_millis_opt(10000).unwrap()),
+            purpose: Some("test-purpose".to_string()),
+            update_trigger: UpdateTrigger::OnChange {
+                dampening_period: Some(CentiSeconds::new(100)),
+                sync_on_start: Some(true),
+                excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
+            },
+            module_version: Some(vec![YangPushModuleVersion {
+                module_name: "example-module".to_string(),
+                revision: "2025-04-25".to_string(),
+                revision_label: None,
+            }]),
+            content_id: Some("content-id".to_string()),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // SubscriptionStartedModified getters
+        assert_eq!(sub_started.id(), 1);
+        assert_eq!(sub_started.target(), &target);
+        assert_eq!(
+            sub_started.stop_time(),
+            Some(&Utc.timestamp_millis_opt(10000).unwrap())
+        );
+        assert_eq!(sub_started.transport(), Some(&Transport::UDPNotif));
+        assert_eq!(sub_started.encoding(), Some(&Encoding::Json));
+        assert_eq!(sub_started.purpose(), Some(&"test-purpose".to_string()));
+        assert_eq!(sub_started.content_id(), Some("content-id"));
+
+        // Create a Notification instance
+        let notification = Notification {
+            event_time: Utc.timestamp_millis_opt(0).unwrap(),
+            node_id: Some("example-node".to_string()),
+            notification: NotificationVariant::SubscriptionStarted(sub_started),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Notification getters
+        assert_eq!(
+            notification.event_time(),
+            &Utc.timestamp_millis_opt(0).unwrap()
+        );
+        assert_eq!(notification.node_id(), Some(&"example-node".to_string()));
+        assert!(matches!(
+            notification.notification(),
+            NotificationVariant::SubscriptionStarted(_)
+        ));
+    }
+
+    #[test]
+    fn test_sub_terminated_serde() {
+        // Create a SubscriptionTerminated instance
+        let sub_terminated = SubscriptionTerminated {
+            id: 1,
+            reason: "some-reason".to_string(),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Create a Notification instance
+        let notification = Notification {
+            event_time: Utc.timestamp_millis_opt(0).unwrap(),
+            node_id: Some("example-node".to_string()),
+            notification: NotificationVariant::SubscriptionTerminated(sub_terminated),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Serialize the Notification to JSON
+        let serialized = serde_json::to_string(&notification).expect("Serialization failed");
+
+        // Print the serialized JSON
+        println!("{}", format!("Serialized JSON: {serialized}").purple());
+
+        // Deserialize the JSON back to a Notification
+        let deserialized: Notification =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
 
         // Assert that the deserialized Notification matches the original
         assert_eq!(notification, deserialized);
+    }
+
+    #[test]
+    fn test_sub_terminated_getters() {
+        // Create a SubscriptionTerminated instance
+        let sub_terminated = SubscriptionTerminated {
+            id: 2462462462,
+            reason: "this-is-the-yang-push-sub-terminated-reason".to_string(),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // SubscriptionTerminated getters
+        assert_eq!(sub_terminated.id(), 2462462462);
+        assert_eq!(
+            sub_terminated.reason(),
+            "this-is-the-yang-push-sub-terminated-reason"
+        );
+    }
+
+    #[test]
+    fn test_yang_push_update_serde() {
+        // Create a YangPushUpdate instance
+        let yang_push_update = YangPushUpdate {
+            id: 1,
+            datastore_contents: serde_json::json!({
+              "layer1": {
+                  "layer2": {
+                      "layer3": {
+                          "key1": "value1",
+                          "key2": 42,
+                          "key3": {
+                              "subkey1": true,
+                              "subkey2": [1, 2, 3],
+                              "subkey3": {
+                                  "deepkey": "deepvalue"
+                              }
+                          }
+                      },
+                      "anotherKey": "anotherValue"
+                  },
+                  "simpleKey": "simpleValue"
+              }
+            }),
+            extra_fields: serde_json::json!({
+                "ietf-distributed-notif:message-publisher-id": 1,
+                "ietf-yp-observation:point-in-time": "current-accounting",
+                "ietf-yp-observation:timestamp": "2025-05-06T00:00:00Z"
+            }),
+        };
+
+        // Create a Notification instance
+        let notification = Notification {
+            event_time: Utc.timestamp_millis_opt(0).unwrap(),
+            node_id: Some("example-node".to_string()),
+            notification: NotificationVariant::YangPushUpdate(yang_push_update),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Serialize the Notification to JSON
+        let serialized = serde_json::to_string(&notification).expect("Serialization failed");
+
+        // Print the serialized JSON
+        println!("{}", format!("Serialized JSON: {serialized}").purple());
+
+        // Deserialize the JSON back to a Notification
+        let deserialized: Notification =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        // Assert that the deserialized Notification matches the original
+        assert_eq!(notification, deserialized);
+    }
+    #[test]
+    fn test_yang_push_update_getter() {
+        // Create a YangPushUpdate instance
+        let yang_push_update = YangPushUpdate {
+            id: 798798779,
+            datastore_contents: serde_json::json!({}),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // YangPushUpdate getters
+        assert_eq!(yang_push_update.id(), 798798779);
     }
 }
