@@ -14,10 +14,8 @@
 // limitations under the License.
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use notification::Notification;
-use telemetry::TelemetryMessageMetadata;
 
 pub mod enrichment;
 pub mod notification;
@@ -32,9 +30,6 @@ pub enum UdpNotifPayload {
 }
 
 pub type SubscriptionId = u32;
-
-/// Cache for YangPush subscriptions metadata
-pub type SubscriptionsCache = HashMap<SubscriptionId, TelemetryMessageMetadata>;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CentiSeconds(u32);

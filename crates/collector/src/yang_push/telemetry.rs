@@ -104,7 +104,7 @@ pub struct YangPushSubscriptionMetadata {
     pub id: Option<SubscriptionId>,
 
     #[serde(flatten)]
-    pub target: YangPushFilter,
+    pub filter: YangPushFilter,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_time: Option<DateTime<Utc>>,
@@ -132,7 +132,11 @@ pub struct YangPushSubscriptionMetadata {
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct YangPushFilter {
-    pub filter_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_stream: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_datastore: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xpath_filter: Option<String>,
@@ -215,8 +219,10 @@ mod tests {
                 event_time: None,
                 yang_push_subscription: Some(YangPushSubscriptionMetadata {
                     id: Some(1),
-                    target: YangPushFilter {
-                        filter_name: "example-subtree-filter-map".to_string(),
+                    // TODO: test more filter possibilities in custom test for YangPushFilter
+                    filter: YangPushFilter {
+                        target_stream: Some("example-stream-subtree-filter-map".to_string()),
+                        target_datastore: None,
                         xpath_filter: None,
                         subtree_filter: Some(serde_json::json!({
                           "example-map": serde_json::json!({
@@ -225,26 +231,6 @@ mod tests {
                           }),
                         })),
                     },
-                    // YangPushFilter {
-                    //     name: "example-xpath-filter".to_string(),
-                    //     xpath_filter: Some("/example/xpath".to_string()),
-                    //     subtree_filter: None,
-                    // },
-                    // YangPushFilter {
-                    //     name: "example-subtree-filter-vec".to_string(),
-                    //     xpath_filter: None,
-                    //     subtree_filter: Some(serde_json::json!({
-                    //         "example-vec": vec![
-                    //             serde_json::json!({"e1": "v1"}),
-                    //             serde_json::json!({"e2": "v2"}),
-                    //         ]
-                    //     })),
-                    // },
-                    // YangPushFilter {
-                    //     name: "example-stream-xpath-filter-null".to_string(),
-                    //     xpath_filter: None,
-                    //     subtree_filter: None,
-                    // },
                     stop_time: None,
                     transport: Some(Transport::UDPNotif),
                     encoding: Some(Encoding::Json),
@@ -291,7 +277,7 @@ mod tests {
         println!("{}", format!("Serialized JSON: {serialized}").purple());
 
         // Expected JSON string
-        let expected_json = r#"{"timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-message-metadata":{"yang-push-subscription":{"id":1,"filter-name":"example-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"encode-json","ietf-yang-push:periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"ietf-yang-push-revision:module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"ietf-yang-push-revision:content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-values":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}"#;
+        let expected_json = r#"{"timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-message-metadata":{"yang-push-subscription":{"id":1,"target-stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"encode-json","ietf-yang-push:periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"ietf-yang-push-revision:module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"ietf-yang-push-revision:content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-values":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
