@@ -93,3 +93,4 @@ ciborium = { version = "0.2" }
 ordered-float = { version = "5.0", default-features = false }
 proc-macro2 = { version = "1.0" }
 prettyplease = { version = "0.2" }
+sysinfo = { version = "0.34" }

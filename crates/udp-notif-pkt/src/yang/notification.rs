@@ -1,0 +1,703 @@
+// Copyright (C) 2025-present The NetGauze Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// TODO: documentation here...
+// TODO: testing: integrate in the pcap_tests (serde with this structs
+// definitions to check if all messages are recomposed the same way after
+// deserialization!)       --> also add a small tests here in the file for
+// this...
+
+/// References:
+/// - https://datatracker.ietf.org/doc/html/rfc8639
+/// - https://datatracker.ietf.org/doc/html/rfc8641
+/// - https://datatracker.ietf.org/doc/html/draft-ietf-netconf-yang-notifications-versioning-08
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+pub type SubscriptionId = u32;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Notification {
+    #[serde(rename = "eventTime")]
+    event_time: DateTime<Utc>,
+
+    #[serde(rename = "ietf-notification-sequencing:sysName")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    node_id: Option<String>,
+
+    #[serde(flatten)]
+    notification: NotificationVariant,
+
+    #[serde(flatten)]
+    extra_fields: Value,
+}
+
+impl Notification {
+    pub fn event_time(&self) -> &DateTime<Utc> {
+        &self.event_time
+    }
+    pub fn node_id(&self) -> Option<&String> {
+        self.node_id.as_ref()
+    }
+    pub fn notification(&self) -> &NotificationVariant {
+        &self.notification
+    }
+}
+
+/// Notification Variants
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NotificationVariant {
+    #[serde(rename = "ietf-subscribed-notifications:subscription-started")]
+    SubscriptionStarted(SubscriptionStartedModified),
+
+    #[serde(rename = "ietf-subscribed-notifications:subscription-modified")]
+    SubscriptionModified(SubscriptionStartedModified),
+
+    #[serde(rename = "ietf-subscribed-notifications:subscription-terminated")]
+    SubscriptionTerminated(SubscriptionTerminated),
+
+    #[serde(rename = "ietf-yang-push:push-update")]
+    YangPushUpdate(YangPushUpdate),
+}
+
+/// Subscription Started and Modified Message
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubscriptionStartedModified {
+    id: SubscriptionId,
+
+    #[serde(flatten)]
+    target: Target,
+
+    #[serde(rename = "stop-time")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stop_time: Option<DateTime<Utc>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    transport: Option<Transport>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    encoding: Option<Encoding>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    purpose: Option<String>,
+
+    #[serde(flatten)]
+    update_trigger: UpdateTrigger,
+
+    #[serde(rename = "ietf-yang-push-revision:module-version")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    module_version: Option<Vec<YangPushModuleVersion>>,
+
+    #[serde(rename = "ietf-yang-push-revision:content-id")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content_id: Option<String>,
+
+    #[serde(flatten)]
+    extra_fields: Value,
+}
+
+impl SubscriptionStartedModified {
+    pub fn id(&self) -> SubscriptionId {
+        self.id
+    }
+    pub fn target(&self) -> &Target {
+        &self.target
+    }
+    pub fn stop_time(&self) -> Option<&DateTime<Utc>> {
+        self.stop_time.as_ref()
+    }
+    pub fn transport(&self) -> Option<&Transport> {
+        self.transport.as_ref()
+    }
+    pub fn encoding(&self) -> Option<&Encoding> {
+        self.encoding.as_ref()
+    }
+    pub fn purpose(&self) -> Option<&String> {
+        self.purpose.as_ref()
+    }
+    pub fn update_trigger(&self) -> &UpdateTrigger {
+        &self.update_trigger
+    }
+    pub fn module_version(&self) -> Option<&Vec<YangPushModuleVersion>> {
+        self.module_version.as_ref()
+    }
+    pub fn content_id(&self) -> Option<&str> {
+        self.content_id.as_deref()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubscriptionTerminated {
+    id: SubscriptionId,
+
+    reason: String,
+
+    #[serde(flatten)]
+    extra_fields: Value,
+}
+
+impl SubscriptionTerminated {
+    pub fn id(&self) -> SubscriptionId {
+        self.id
+    }
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct YangPushUpdate {
+    id: SubscriptionId,
+
+    #[serde(rename = "datastore-contents")]
+    datastore_contents: Value,
+
+    #[serde(flatten)]
+    extra_fields: Value,
+}
+
+impl YangPushUpdate {
+    pub fn id(&self) -> SubscriptionId {
+        self.id
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Target {
+    #[serde(rename = "stream")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream: Option<String>,
+
+    #[serde(rename = "stream-subtree-filter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream_subtree_filter: Option<Value>,
+
+    #[serde(rename = "stream-xpath-filter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream_xpath_filter: Option<String>,
+
+    #[serde(rename = "replay-start-time")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replay_start_time: Option<DateTime<Utc>>,
+
+    #[serde(rename = "ietf-yang-push:datastore")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    datastore: Option<String>,
+
+    #[serde(rename = "datastore-subtree-filter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    datastore_subtree_filter: Option<Value>,
+
+    #[serde(rename = "ietf-yang-push:datastore-xpath-filter")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    datastore_xpath_filter: Option<String>,
+}
+
+impl Target {
+    pub fn stream(&self) -> Option<&str> {
+        self.stream.as_deref()
+    }
+    pub fn stream_subtree_filter(&self) -> Option<&Value> {
+        self.stream_subtree_filter.as_ref()
+    }
+    pub fn stream_xpath_filter(&self) -> Option<&str> {
+        self.stream_xpath_filter.as_deref()
+    }
+    pub fn replay_start_time(&self) -> Option<&DateTime<Utc>> {
+        self.replay_start_time.as_ref()
+    }
+    pub fn datastore(&self) -> Option<&str> {
+        self.datastore.as_deref()
+    }
+    pub fn datastore_subtree_filter(&self) -> Option<&Value> {
+        self.datastore_subtree_filter.as_ref()
+    }
+    pub fn datastore_xpath_filter(&self) -> Option<&str> {
+        self.datastore_xpath_filter.as_deref()
+    }
+}
+
+/// Transport protocol used to deliver the notification message to the data
+/// collection
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Transport {
+    // #[serde(rename = "ssh")]
+    // SSH,
+
+    // #[serde(rename = "http")]
+    // HTTP,
+    #[serde(rename = "ietf-udp-notif-transport:udp-notif")]
+    UDPNotif,
+
+    #[serde(rename = "ietf-https-notif:https")]
+    HTTPSNotif,
+
+    #[default]
+    #[serde(other)]
+    #[serde(rename = "unknown")]
+    Unknown,
+}
+
+// Encoding used for the notification payload
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Encoding {
+    #[serde(rename = "ietf-subscribed-notifications:encode-xml")]
+    #[serde(alias = "encode-xml")]
+    Xml,
+
+    #[serde(rename = "ietf-subscribed-notifications:encode-json")]
+    #[serde(alias = "encode-json")]
+    Json,
+
+    #[serde(rename = "ietf-udp-notif-transport:encode-cbor")]
+    #[serde(alias = "encode-cbor")]
+    Cbor,
+
+    #[default]
+    #[serde(other)]
+    #[serde(rename = "unknown")]
+    Unknown,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum UpdateTrigger {
+    #[serde(rename = "ietf-yang-push:periodic")]
+    #[serde(rename_all = "kebab-case")]
+    Periodic {
+        period: CentiSeconds,
+        anchor_time: Option<DateTime<Utc>>,
+    },
+
+    #[serde(rename = "ietf-yang-push:on-change")]
+    #[serde(rename_all = "kebab-case")]
+    OnChange {
+        dampening_period: Option<CentiSeconds>,
+        sync_on_start: Option<bool>,
+        excluded_change: Option<Vec<ChangeType>>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ChangeType {
+    Create,
+    Delete,
+    Insert,
+    Move,
+    Replace,
+}
+
+#[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub struct YangPushModuleVersion {
+    pub module_name: String,
+
+    pub revision: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision_label: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CentiSeconds(u32);
+
+impl CentiSeconds {
+    /// Creates a new `CentiSeconds` instance.
+    pub fn new(value: u32) -> Self {
+        CentiSeconds(value)
+    }
+
+    /// Returns the value in centiseconds.
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+
+    /// Converts the centiseconds to milliseconds.
+    pub fn to_milliseconds(&self) -> u32 {
+        self.0 * 10
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+    use serde_json;
+
+    #[test]
+    fn test_transport_serialization() {
+        // Test serialization
+        assert_eq!(
+            serde_json::to_string(&Transport::UDPNotif).unwrap(),
+            r#""ietf-udp-notif-transport:udp-notif""#
+        );
+        assert_eq!(
+            serde_json::to_string(&Transport::HTTPSNotif).unwrap(),
+            r#""ietf-https-notif:https""#
+        );
+        assert_eq!(
+            serde_json::to_string(&Transport::Unknown).unwrap(),
+            r#""unknown""#
+        );
+    }
+
+    #[test]
+    fn test_transport_deserialization() {
+        // Test deserialization
+        assert_eq!(
+            serde_json::from_str::<Transport>(r#""ietf-udp-notif-transport:udp-notif""#).unwrap(),
+            Transport::UDPNotif
+        );
+        assert_eq!(
+            serde_json::from_str::<Transport>(r#""ietf-https-notif:https""#).unwrap(),
+            Transport::HTTPSNotif
+        );
+        assert_eq!(
+            serde_json::from_str::<Transport>(r#""unknown""#).unwrap(),
+            Transport::Unknown
+        );
+
+        // Test deserialization of unknown/empty values
+        assert_eq!(
+            serde_json::from_str::<Transport>(r#""unsupported-value""#).unwrap(),
+            Transport::Unknown
+        );
+        assert_eq!(
+            serde_json::from_str::<Transport>(r#""""#).unwrap(),
+            Transport::Unknown
+        );
+    }
+
+    #[test]
+    fn test_encoding_serialization() {
+        // Test serialization
+        assert_eq!(
+            serde_json::to_string(&Encoding::Xml).unwrap(),
+            r#""ietf-subscribed-notifications:encode-xml""#
+        );
+
+        assert_eq!(
+            serde_json::to_string(&Encoding::Json).unwrap(),
+            r#""ietf-subscribed-notifications:encode-json""#
+        );
+
+        assert_eq!(
+            serde_json::to_string(&Encoding::Cbor).unwrap(),
+            r#""ietf-udp-notif-transport:encode-cbor""#
+        );
+        assert_eq!(
+            serde_json::to_string(&Encoding::Unknown).unwrap(),
+            r#""unknown""#
+        );
+    }
+
+    #[test]
+    fn test_encoding_deserialization() {
+        // Test deserialization
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""ietf-subscribed-notifications:encode-xml""#)
+                .unwrap(),
+            Encoding::Xml
+        );
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""encode-xml""#).unwrap(),
+            Encoding::Xml
+        );
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""ietf-subscribed-notifications:encode-json""#)
+                .unwrap(),
+            Encoding::Json
+        );
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""encode-json""#).unwrap(),
+            Encoding::Json
+        );
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""ietf-udp-notif-transport:encode-cbor""#).unwrap(),
+            Encoding::Cbor
+        );
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""encode-cbor""#).unwrap(),
+            Encoding::Cbor
+        );
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""unknown""#).unwrap(),
+            Encoding::Unknown
+        );
+
+        // Test deserialization of unknown/empty values
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""unsupported-value""#).unwrap(),
+            Encoding::Unknown
+        );
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""""#).unwrap(),
+            Encoding::Unknown
+        );
+    }
+
+    #[test]
+    fn test_sub_started_modified_serde() {
+        // Create a SubscriptionStartedModified instance
+        let sub_started = SubscriptionStartedModified {
+            id: 1,
+            target: Target {
+                stream: None,
+                stream_subtree_filter: None,
+                stream_xpath_filter: None,
+                replay_start_time: None,
+                datastore: Some("example-datastore".to_string()),
+                datastore_subtree_filter: None,
+                datastore_xpath_filter: Some("/example/datastore/xpath/filter".to_string()),
+            },
+            encoding: Some(Encoding::Json),
+            transport: Some(Transport::UDPNotif),
+            stop_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
+            purpose: Some("test-purpose".to_string()),
+            update_trigger: UpdateTrigger::OnChange {
+                dampening_period: Some(CentiSeconds::new(100)),
+                sync_on_start: Some(true),
+                excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
+            },
+            module_version: Some(vec![YangPushModuleVersion {
+                module_name: "example-module".to_string(),
+                revision: "2025-04-25".to_string(),
+                revision_label: None,
+            }]),
+            content_id: Some("content-id".to_string()),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Create a Notification instance
+        let notification = Notification {
+            event_time: Utc.timestamp_millis_opt(0).unwrap(),
+            node_id: Some("example-node".to_string()),
+            notification: NotificationVariant::SubscriptionStarted(sub_started),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Serialize the Notification to JSON
+        let serialized = serde_json::to_string(&notification).expect("Serialization failed");
+
+        // Print the serialized JSON
+        println!("{}", format!("Serialized JSON: {serialized}"));
+
+        // Deserialize the JSON back to a Notification
+        let deserialized: Notification =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        // Assert that the deserialized Notification matches the original
+        assert_eq!(notification, deserialized);
+    }
+
+    #[test]
+    fn test_sub_started_modified_getters() {
+        // Create a Target instance
+        let target = Target {
+            stream: None,
+            stream_subtree_filter: None,
+            stream_xpath_filter: None,
+            replay_start_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
+            datastore: Some("example-datastore".to_string()),
+            datastore_subtree_filter: Some(serde_json::json!({"example-map": "example-value"})),
+            datastore_xpath_filter: Some("/example/datastore/xpath/filter".to_string()),
+        };
+
+        // Target getters
+        assert_eq!(target.stream(), None);
+        assert_eq!(target.stream_subtree_filter(), None);
+        assert_eq!(target.stream_xpath_filter(), None);
+        assert_eq!(
+            target.replay_start_time(),
+            Some(&Utc.timestamp_millis_opt(0).unwrap())
+        );
+        assert_eq!(target.datastore(), Some("example-datastore"));
+        assert_eq!(
+            target.datastore_subtree_filter(),
+            Some(&serde_json::json!({"example-map": "example-value"}))
+        );
+        assert_eq!(
+            target.datastore_xpath_filter(),
+            Some("/example/datastore/xpath/filter")
+        );
+
+        // Create a SubscriptionStartedModified instance
+        let sub_started = SubscriptionStartedModified {
+            id: 1,
+            target: target.clone(),
+            encoding: Some(Encoding::Json),
+            transport: Some(Transport::UDPNotif),
+            stop_time: Some(Utc.timestamp_millis_opt(10000).unwrap()),
+            purpose: Some("test-purpose".to_string()),
+            update_trigger: UpdateTrigger::OnChange {
+                dampening_period: Some(CentiSeconds::new(100)),
+                sync_on_start: Some(true),
+                excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
+            },
+            module_version: Some(vec![YangPushModuleVersion {
+                module_name: "example-module".to_string(),
+                revision: "2025-04-25".to_string(),
+                revision_label: None,
+            }]),
+            content_id: Some("content-id".to_string()),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // SubscriptionStartedModified getters
+        assert_eq!(sub_started.id(), 1);
+        assert_eq!(sub_started.target(), &target);
+        assert_eq!(
+            sub_started.stop_time(),
+            Some(&Utc.timestamp_millis_opt(10000).unwrap())
+        );
+        assert_eq!(sub_started.transport(), Some(&Transport::UDPNotif));
+        assert_eq!(sub_started.encoding(), Some(&Encoding::Json));
+        assert_eq!(sub_started.purpose(), Some(&"test-purpose".to_string()));
+        assert_eq!(sub_started.content_id(), Some("content-id"));
+
+        // Create a Notification instance
+        let notification = Notification {
+            event_time: Utc.timestamp_millis_opt(0).unwrap(),
+            node_id: Some("example-node".to_string()),
+            notification: NotificationVariant::SubscriptionStarted(sub_started),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Notification getters
+        assert_eq!(
+            notification.event_time(),
+            &Utc.timestamp_millis_opt(0).unwrap()
+        );
+        assert_eq!(notification.node_id(), Some(&"example-node".to_string()));
+        assert!(matches!(
+            notification.notification(),
+            NotificationVariant::SubscriptionStarted(_)
+        ));
+    }
+
+    #[test]
+    fn test_sub_terminated_serde() {
+        // Create a SubscriptionTerminated instance
+        let sub_terminated = SubscriptionTerminated {
+            id: 1,
+            reason: "some-reason".to_string(),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Create a Notification instance
+        let notification = Notification {
+            event_time: Utc.timestamp_millis_opt(0).unwrap(),
+            node_id: Some("example-node".to_string()),
+            notification: NotificationVariant::SubscriptionTerminated(sub_terminated),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Serialize the Notification to JSON
+        let serialized = serde_json::to_string(&notification).expect("Serialization failed");
+
+        // Print the serialized JSON
+        println!("{}", format!("Serialized JSON: {serialized}"));
+
+        // Deserialize the JSON back to a Notification
+        let deserialized: Notification =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        // Assert that the deserialized Notification matches the original
+        assert_eq!(notification, deserialized);
+    }
+
+    #[test]
+    fn test_sub_terminated_getters() {
+        // Create a SubscriptionTerminated instance
+        let sub_terminated = SubscriptionTerminated {
+            id: 2462462462,
+            reason: "this-is-the-yang-push-sub-terminated-reason".to_string(),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // SubscriptionTerminated getters
+        assert_eq!(sub_terminated.id(), 2462462462);
+        assert_eq!(
+            sub_terminated.reason(),
+            "this-is-the-yang-push-sub-terminated-reason"
+        );
+    }
+
+    #[test]
+    fn test_yang_push_update_serde() {
+        // Create a YangPushUpdate instance
+        let yang_push_update = YangPushUpdate {
+            id: 1,
+            datastore_contents: serde_json::json!({
+              "layer1": {
+                  "layer2": {
+                      "layer3": {
+                          "key1": "value1",
+                          "key2": 42,
+                          "key3": {
+                              "subkey1": true,
+                              "subkey2": [1, 2, 3],
+                              "subkey3": {
+                                  "deepkey": "deepvalue"
+                              }
+                          }
+                      },
+                      "anotherKey": "anotherValue"
+                  },
+                  "simpleKey": "simpleValue"
+              }
+            }),
+            extra_fields: serde_json::json!({
+                "ietf-distributed-notif:message-publisher-id": 1,
+                "ietf-yp-observation:point-in-time": "current-accounting",
+                "ietf-yp-observation:timestamp": "2025-05-06T00:00:00Z"
+            }),
+        };
+
+        // Create a Notification instance
+        let notification = Notification {
+            event_time: Utc.timestamp_millis_opt(0).unwrap(),
+            node_id: Some("example-node".to_string()),
+            notification: NotificationVariant::YangPushUpdate(yang_push_update),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // Serialize the Notification to JSON
+        let serialized = serde_json::to_string(&notification).expect("Serialization failed");
+
+        // Print the serialized JSON
+        println!("{}", format!("Serialized JSON: {serialized}"));
+
+        // Deserialize the JSON back to a Notification
+        let deserialized: Notification =
+            serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        // Assert that the deserialized Notification matches the original
+        assert_eq!(notification, deserialized);
+    }
+    #[test]
+    fn test_yang_push_update_getter() {
+        // Create a YangPushUpdate instance
+        let yang_push_update = YangPushUpdate {
+            id: 798798779,
+            datastore_contents: serde_json::json!({}),
+            extra_fields: serde_json::json!({}),
+        };
+
+        // YangPushUpdate getters
+        assert_eq!(yang_push_update.id(), 798798779);
+    }
+}

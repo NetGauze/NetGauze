@@ -21,6 +21,7 @@ use crate::{
         kafka_avro::KafkaAvroPublisherActorHandle,
         kafka_json::KafkaJsonPublisherActorHandle,
     },
+    yang_push::*,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
@@ -29,10 +30,12 @@ use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
 use std::{str::Utf8Error, sync::Arc};
 use tracing::{info, warn};
+use yang_push::enrichment::YangPushEnrichmentActorHandle;
 
 pub mod config;
 pub mod flow;
 pub mod publishers;
+pub mod yang_push;
 
 pub async fn init_flow_collection(
     flow_config: FlowConfig,
@@ -173,6 +176,11 @@ pub async fn init_flow_collection(
                         kafka_json_handles.push(handle);
                     }
                 }
+                PublisherEndpoint::TelemetryKafkaJson(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Telemetry KafkaJson publisher not yet supported for Flow"
+                    ));
+                }
             }
         }
     }
@@ -228,6 +236,7 @@ pub async fn init_udp_notif_collection(
     let (supervisor_join_handle, supervisor_handle) =
         UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;
     let mut join_set = FuturesUnordered::new();
+    let mut enrichment_handles = Vec::new();
     let mut http_handlers = Vec::new();
     let mut kafka_handles = Vec::new();
     for (group_name, publisher_config) in udp_notif_config.publishers {
@@ -277,12 +286,24 @@ pub async fn init_udp_notif_collection(
                 }
                 PublisherEndpoint::FlowKafkaAvro(_) => {
                     return Err(anyhow::anyhow!(
-                        "Kafka Avro publisher not yet supported for UDP Notif"
+                        "Flow Kafka Avro publisher not supported for UDP Notif"
                     ));
+                }
+                PublisherEndpoint::TelemetryKafkaJson(_config) => {
+                    let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
+                        publisher_config.buffer_size,
+                        udp_notif_recv.clone(),
+                        either::Left(meter.clone()),
+                    );
+                    join_set.push(enrichment_join);
+                    enrichment_handles.push(enrichment_handle);
+
+                    // TODO: pass it to a KafkaJsonPublisherActorHandle
                 }
             }
         }
     }
+    // TODO: fix here, properly shutdown the enrichment handles
     let ret = tokio::select! {
         _ = supervisor_join_handle => {
             info!("udp-notif supervisor exited, shutting down all publishers");

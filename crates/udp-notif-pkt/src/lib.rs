@@ -17,10 +17,14 @@
 pub mod codec;
 #[cfg(feature = "serde")]
 pub mod wire;
+pub mod yang;
 
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
+use strum_macros::Display;
+
+use yang::notification::Notification;
 
 const UDP_NOTIF_VERSION: u8 = 1;
 
@@ -155,4 +159,122 @@ impl UdpNotifPacket {
 pub(crate) fn arbitrary_bytes(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Bytes> {
     let value: Vec<u8> = u.arbitrary()?;
     Ok(Bytes::from(value))
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum UdpNotifPayload {
+    #[serde(rename = "ietf-notification:notification")]
+    Notification(Notification),
+
+    #[serde(untagged)]
+    Unknown(Bytes),
+}
+
+// TODO: keep here or move to a separate file?
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct UdpNotifPacketDecoded {
+    media_type: MediaType,
+    publisher_id: u32,
+    message_id: u32,
+    options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
+    payload: UdpNotifPayload,
+}
+
+impl UdpNotifPacketDecoded {
+    pub const fn new(
+        media_type: MediaType,
+        publisher_id: u32,
+        message_id: u32,
+        options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
+        payload: UdpNotifPayload,
+    ) -> Self {
+        Self {
+            media_type,
+            publisher_id,
+            message_id,
+            options,
+            payload,
+        }
+    }
+    pub const fn version(&self) -> u8 {
+        UDP_NOTIF_VERSION
+    }
+    pub const fn media_type(&self) -> MediaType {
+        self.media_type
+    }
+    pub const fn publisher_id(&self) -> u32 {
+        self.publisher_id
+    }
+    pub const fn message_id(&self) -> u32 {
+        self.message_id
+    }
+    pub const fn options(&self) -> &HashMap<UdpNotifOptionCode, UdpNotifOption> {
+        &self.options
+    }
+    pub const fn payload(&self) -> &UdpNotifPayload {
+        &self.payload
+    }
+}
+
+#[derive(Debug, Display)]
+pub enum ConversionError {
+    InvalidPayload,
+    UnsupportedMediaType(MediaType),
+    JsonError(serde_json::Error),
+    Utf8Error(std::str::Utf8Error),
+    CborError(ciborium::de::Error<std::io::Error>),
+}
+
+impl From<serde_json::Error> for ConversionError {
+    fn from(err: serde_json::Error) -> Self {
+        ConversionError::JsonError(err)
+    }
+}
+
+impl From<std::str::Utf8Error> for ConversionError {
+    fn from(err: std::str::Utf8Error) -> Self {
+        ConversionError::Utf8Error(err)
+    }
+}
+
+impl From<ciborium::de::Error<std::io::Error>> for ConversionError {
+    fn from(err: ciborium::de::Error<std::io::Error>) -> Self {
+        ConversionError::CborError(err)
+    }
+}
+
+impl TryFrom<&UdpNotifPacket> for UdpNotifPacketDecoded {
+    type Error = ConversionError;
+
+    fn try_from(pkt: &UdpNotifPacket) -> Result<Self, ConversionError> {
+        let payload: UdpNotifPayload;
+        match pkt.media_type() {
+            MediaType::YangDataJson => {
+                payload = serde_json::from_slice(pkt.payload())?;
+            }
+            MediaType::YangDataXml => {
+                // TODO: test this (decoding might work, but serialization might not)
+                let payload_str = std::str::from_utf8(pkt.payload())?;
+                payload = serde_json::from_str(payload_str)?; // TODO: use xml
+                                                              // deserializer
+                                                              // serde_xml_rs?
+            }
+            MediaType::YangDataCbor => {
+                payload = ciborium::de::from_reader(std::io::Cursor::new(pkt.payload()))?;
+            }
+            media_type => {
+                //TODO: log payload to trace?
+                payload = UdpNotifPayload::Unknown(pkt.payload().clone());
+                Err(ConversionError::UnsupportedMediaType(media_type))?;
+            }
+        }
+
+        Ok(UdpNotifPacketDecoded {
+            media_type: pkt.media_type,
+            publisher_id: pkt.publisher_id,
+            message_id: pkt.message_id,
+            options: pkt.options.clone(),
+            payload,
+        })
+    }
 }
