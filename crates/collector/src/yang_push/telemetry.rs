@@ -22,9 +22,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;
 
-use crate::{
-    notification::{Encoding, Transport, UpdateTrigger, YangPushModuleVersion},
-    SubscriptionId,
+use netgauze_udp_notif_pkt::yang::notification::{
+    Encoding, SubscriptionId, Transport, UpdateTrigger, YangPushModuleVersion,
 };
 
 /// Telemetry Message
@@ -112,6 +111,8 @@ pub struct YangPushSubscriptionMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transport: Option<Transport>,
 
+    // TODO: here figure out how to serialize to "ietf-subscribed-notifications:encode-json" and
+    // such
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encoding: Option<Encoding>,
 
@@ -121,10 +122,10 @@ pub struct YangPushSubscriptionMetadata {
     #[serde(flatten)]
     pub update_trigger: UpdateTrigger,
 
-    #[serde(rename = "ietf-yang-push-revision:module-version")]
+    // #[serde(rename = "ietf-yang-push-revision:module-version")]
     pub module_version: Vec<YangPushModuleVersion>,
 
-    #[serde(rename = "ietf-yang-push-revision:content-id")]
+    // #[serde(rename = "ietf-yang-push-revision:content-id")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub yang_library_content_id: Option<String>,
 }
@@ -186,9 +187,8 @@ pub enum LabelValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CentiSeconds;
     use chrono::{TimeZone, Utc};
-    use colored::*;
+    use netgauze_udp_notif_pkt::yang::notification::CentiSeconds;
     use serde_json;
     use std::vec;
 
@@ -274,10 +274,10 @@ mod tests {
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Print the serialized JSON string
-        println!("{}", format!("Serialized JSON: {serialized}").purple());
+        println!("{}", format!("Serialized JSON: {serialized}"));
 
         // Expected JSON string
-        let expected_json = r#"{"timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-message-metadata":{"yang-push-subscription":{"id":1,"target-stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"encode-json","ietf-yang-push:periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"ietf-yang-push-revision:module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"ietf-yang-push-revision:content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-values":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}"#;
+        let expected_json = r#"{"timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-message-metadata":{"yang-push-subscription":{"id":1,"target-stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","ietf-yang-push:periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-values":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
@@ -291,10 +291,7 @@ mod tests {
 
         // Serialize again to check if it matches the previous serialization
         let re_serialized = serde_json::to_string(&deserialized).expect("Re-serialization failed");
-        println!(
-            "{}",
-            format!("Re-serialized JSON: {re_serialized}").purple()
-        );
+        println!("{}", format!("Re-serialized JSON: {re_serialized}"));
 
         // Assert that the original and deserialized messages are equal
         assert_eq!(original_message, deserialized);

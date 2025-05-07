@@ -27,7 +27,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{CentiSeconds, SubscriptionId};
+pub type SubscriptionId = u32;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Notification {
@@ -74,10 +74,6 @@ pub enum NotificationVariant {
 }
 
 /// Subscription Started and Modified Message
-/// TODO: we could even use this as cache (setting the extra_fields empty)
-/// --> we might need to create a new struct where we keep all fields apart from
-/// extra_fields     and use this one for the cache (we need to use it to
-/// serialize the sub-started message)
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubscriptionStartedModified {
     id: SubscriptionId,
@@ -258,13 +254,16 @@ pub enum Transport {
 // Encoding used for the notification payload
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Encoding {
-    #[serde(rename = "encode-xml")]
+    #[serde(rename = "ietf-subscribed-notifications:encode-xml")]
+    #[serde(alias = "encode-xml")]
     Xml,
 
-    #[serde(rename = "encode-json")]
+    #[serde(rename = "ietf-subscribed-notifications:encode-json")]
+    #[serde(alias = "encode-json")]
     Json,
 
-    #[serde(rename = "encode-cbor")]
+    #[serde(rename = "ietf-udp-notif-transport:encode-cbor")]
+    #[serde(alias = "encode-cbor")]
     Cbor,
 
     #[default]
@@ -312,11 +311,30 @@ pub struct YangPushModuleVersion {
     pub revision_label: Option<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CentiSeconds(u32);
+
+impl CentiSeconds {
+    /// Creates a new `CentiSeconds` instance.
+    pub fn new(value: u32) -> Self {
+        CentiSeconds(value)
+    }
+
+    /// Returns the value in centiseconds.
+    pub fn as_u32(&self) -> u32 {
+        self.0
+    }
+
+    /// Converts the centiseconds to milliseconds.
+    pub fn to_milliseconds(&self) -> u32 {
+        self.0 * 10
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use colored::*;
     use serde_json;
 
     #[test]
@@ -368,15 +386,17 @@ mod tests {
         // Test serialization
         assert_eq!(
             serde_json::to_string(&Encoding::Xml).unwrap(),
-            r#""encode-xml""#
+            r#""ietf-subscribed-notifications:encode-xml""#
         );
+
         assert_eq!(
             serde_json::to_string(&Encoding::Json).unwrap(),
-            r#""encode-json""#
+            r#""ietf-subscribed-notifications:encode-json""#
         );
+
         assert_eq!(
             serde_json::to_string(&Encoding::Cbor).unwrap(),
-            r#""encode-cbor""#
+            r#""ietf-udp-notif-transport:encode-cbor""#
         );
         assert_eq!(
             serde_json::to_string(&Encoding::Unknown).unwrap(),
@@ -388,12 +408,26 @@ mod tests {
     fn test_encoding_deserialization() {
         // Test deserialization
         assert_eq!(
+            serde_json::from_str::<Encoding>(r#""ietf-subscribed-notifications:encode-xml""#)
+                .unwrap(),
+            Encoding::Xml
+        );
+        assert_eq!(
             serde_json::from_str::<Encoding>(r#""encode-xml""#).unwrap(),
             Encoding::Xml
         );
         assert_eq!(
+            serde_json::from_str::<Encoding>(r#""ietf-subscribed-notifications:encode-json""#)
+                .unwrap(),
+            Encoding::Json
+        );
+        assert_eq!(
             serde_json::from_str::<Encoding>(r#""encode-json""#).unwrap(),
             Encoding::Json
+        );
+        assert_eq!(
+            serde_json::from_str::<Encoding>(r#""ietf-udp-notif-transport:encode-cbor""#).unwrap(),
+            Encoding::Cbor
         );
         assert_eq!(
             serde_json::from_str::<Encoding>(r#""encode-cbor""#).unwrap(),
@@ -459,7 +493,7 @@ mod tests {
         let serialized = serde_json::to_string(&notification).expect("Serialization failed");
 
         // Print the serialized JSON
-        println!("{}", format!("Serialized JSON: {serialized}").purple());
+        println!("{}", format!("Serialized JSON: {serialized}"));
 
         // Deserialize the JSON back to a Notification
         let deserialized: Notification =
@@ -575,7 +609,7 @@ mod tests {
         let serialized = serde_json::to_string(&notification).expect("Serialization failed");
 
         // Print the serialized JSON
-        println!("{}", format!("Serialized JSON: {serialized}").purple());
+        println!("{}", format!("Serialized JSON: {serialized}"));
 
         // Deserialize the JSON back to a Notification
         let deserialized: Notification =
@@ -645,7 +679,7 @@ mod tests {
         let serialized = serde_json::to_string(&notification).expect("Serialization failed");
 
         // Print the serialized JSON
-        println!("{}", format!("Serialized JSON: {serialized}").purple());
+        println!("{}", format!("Serialized JSON: {serialized}"));
 
         // Deserialize the JSON back to a Notification
         let deserialized: Notification =

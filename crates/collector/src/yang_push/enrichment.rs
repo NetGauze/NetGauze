@@ -20,27 +20,29 @@
 // TODO: implement early return...
 
 use crate::{
-    notification::{
-        Notification, NotificationVariant, SubscriptionStartedModified, SubscriptionTerminated,
-        Transport,
-    },
     telemetry::{
         DataCollectionMetadata, Label, LabelValue, Manifest, SessionProtocol, TelemetryMessage,
         YangPushFilter, YangPushSubscriptionMetadata,
     },
     yang_push::telemetry::TelemetryMessageMetadata,
-    SubscriptionId, UdpNotifPayload,
 };
 
-use chrono::Utc;
-use colored::*;
-use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
+use netgauze_udp_notif_pkt::{
+    yang::notification::{
+        Notification, NotificationVariant, SubscriptionId, SubscriptionStartedModified,
+        SubscriptionTerminated, Transport,
+    },
+    MediaType, UdpNotifPacket, UdpNotifPacketDecoded, UdpNotifPayload,
+};
 use serde_json::Value;
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
+
+use chrono::Utc;
+use colored::*;
 use sysinfo::System;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
@@ -401,28 +403,38 @@ impl YangPushEnrichmentActor {
                             // Access the notification from the UdpNotifPacket
                             // TODO: move this to udp-notif-pkt crate
                             // TODO: this needs to be tested
-                            let payload: UdpNotifPayload;
-                            match udp_notif_pkt.media_type() {
-                                MediaType::YangDataJson => {
-                                    payload = serde_json::from_slice(udp_notif_pkt.payload())?;
-                                }
-                                MediaType::YangDataXml => {
-                                    let payload_str = std::str::from_utf8(udp_notif_pkt.payload())?;
-                                    payload = serde_json::from_str(payload_str)?;
-                                }
-                                MediaType::YangDataCbor => {
-                                    payload = ciborium::de::from_reader(std::io::Cursor::new(udp_notif_pkt.payload()))?;
-                                }
-                                media_type => {
-                                    //TODO: log payload to trace?
-                                    payload = UdpNotifPayload::Unknown(udp_notif_pkt.payload().clone());
-                                    Err(YangPushEnrichmentActorError::UnsupportedMediaType(media_type))?;
-                                }
-                            }
+                            // let payload: UdpNotifPayload;
+                            // match udp_notif_pkt.media_type() {
+                            //     MediaType::YangDataJson => {
+                            //         payload = serde_json::from_slice(udp_notif_pkt.payload())?;
+                            //     }
+                            //     MediaType::YangDataXml => {
+                            //         let payload_str = std::str::from_utf8(udp_notif_pkt.payload())?;
+                            //         payload = serde_json::from_str(payload_str)?;
+                            //     }
+                            //     MediaType::YangDataCbor => {
+                            //         payload = ciborium::de::from_reader(std::io::Cursor::new(udp_notif_pkt.payload()))?;
+                            //     }
+                            //     media_type => {
+                            //         //TODO: log payload to trace?
+                            //         payload = UdpNotifPayload::Unknown(udp_notif_pkt.payload().clone());
+                            //         Err(YangPushEnrichmentActorError::UnsupportedMediaType(media_type))?;
+                            //     }
+                            // }
+
+                            // Decode the UdpNotifPacket into UdpNotifPacketDecoded
+                            let udp_notif_pkt_decoded: UdpNotifPacketDecoded = match udp_notif_pkt.try_into() {
+                              Ok(decoded) => decoded,
+                              Err(err) => {
+                                  warn!("Failed to decode UdpNotifPacket: {err}");
+                                  self.stats.enrichment_error.add(1, &peer_tags);
+                                  continue; // Skip processing this message
+                              }
+                            };
 
                             // Process the notification
-                            if let UdpNotifPayload::Notification(notification) = payload {
-                              match self.process_notification(*peer, notification) {
+                            if let UdpNotifPayload::Notification(notification) = udp_notif_pkt_decoded.payload() {
+                              match self.process_notification(*peer, notification.clone()) { // TODO: Check clone here
                                   Ok(telemetry_message) => {
 
                                       // TEMP DEBUG STATEMENT
