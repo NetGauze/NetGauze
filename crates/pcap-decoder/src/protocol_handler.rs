@@ -21,9 +21,7 @@ pub enum DecodeOutcome<M, E> {
 
 pub trait ProtocolHandler<Message, Codec, ErrorMessage>
 where
-    Message: Send + Sync + 'static,
-    Codec: Send + Sync + Default + 'static,
-    ErrorMessage: Send + Sync + 'static,
+    Codec: Default,
 {
     fn decode(
         &self,
@@ -31,7 +29,7 @@ where
         protocol: TransportProtocol,
         packet_data: &[u8],
         exporter_peers: &mut HashMap<
-            (std::net::IpAddr, u16, std::net::IpAddr, u16),
+            (IpAddr, u16, IpAddr, u16),
             (Codec, BytesMut),
         >,
     ) -> Option<DecodeOutcome<Message, ErrorMessage>>;

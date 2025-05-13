@@ -13,7 +13,7 @@ use netgauze_pcap_reader::PcapIter;
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufWriter, Write},
+    io::{self, BufWriter, Write},
     net::IpAddr,
     path::PathBuf,
 };
@@ -26,9 +26,7 @@ fn load_pcap_and_process<M, C, E, H>(
     handler: &H,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
-    C: Send + Sync + Default + 'static,
-    M: Send + Sync + 'static,
-    E: Send + Sync + 'static,
+    C: Default,
     H: ProtocolHandler<M, C, E>,
 {
     let pcap_file = File::open(config.pcap_path.as_path()).expect("Failed to open pcap file");
@@ -38,8 +36,21 @@ where
     let mut exporter_peers: HashMap<(IpAddr, u16, IpAddr, u16), (C, bytes::BytesMut)> =
         HashMap::new();
     let mut packet_counter = 0;
-    let output_file = File::create(config.output_path.as_path())?;
-    let mut writer = BufWriter::new(output_file);
+
+    let mut writer: Box<dyn Write> = if let Some(output_path_ref) = &config.output_path {
+        // If an output path is provided, create/truncate the file and use it
+        let output_file = File::create(output_path_ref).map_err(|e| {
+            format!(
+                "Failed to create output file '{}': {}",
+                output_path_ref.display(),
+                e
+            )
+        })?;
+        Box::new(BufWriter::new(output_file))
+    } else {
+        // If no output path is provided, write to standard output
+        Box::new(BufWriter::new(io::stdout()))
+    };
 
     for (src_ip, src_port, dst_ip, dst_port, protocol, packet_data) in PcapIter::new(pcap_reader) {
         packet_counter += 1;
@@ -72,7 +83,7 @@ struct Config {
     ports: Vec<u16>,
     input_size: Option<usize>,
     pcap_path: PathBuf,
-    output_path: PathBuf,
+    output_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -86,40 +97,38 @@ pub enum ProtocolToDecode {
 #[derive(Debug, Parser)]
 #[command(long_about = None)]
 struct Cli {
-    /// Pcap input test file
-    #[clap(long)]
-    pcap: String,
-
-    /// JSON output file path
+    /// Input PCAP file path
     #[clap(short, long)]
-    output: String,
+    input: String,
+
+    /// JSON Lines output file path, if not specified output will be directed to stdout
+    #[clap(short, long)]
+    output: Option<String>,
 
     /// Specify the protocol to decode
     #[clap(long, value_enum)]
     protocol: ProtocolToDecode,
 
-    /// Max number of messages to load from the pcap test file
-    /// if not set all messages will be loaded
-    #[clap(short, long)]
-    input_size: Option<usize>,
-
-    /// Specify the protocol ports (comma-separated, example: 9991,9992)
+    /// Specify the protocol ports that will be used to filter the PCAP file
+    /// packets (comma-separated, example: 9991,9992)
     #[clap(long, value_delimiter = ',', required = true)]
     ports: Vec<u16>,
+
+    /// Max number of messages to load from the PCAP input file,
+    /// if not set all messages will be loaded
+    #[clap(short = 'c', long)]
+    input_count: Option<usize>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let config = Config {
         pcap_path: cli
-            .pcap
+            .input
             .parse::<PathBuf>()
             .expect("Failed to parse pcap path"),
-        output_path: cli
-            .output
-            .parse::<PathBuf>()
-            .expect("Failed to parse output path"),
-        input_size: cli.input_size,
+        output_path: cli.output.map(PathBuf::from),
+        input_size: cli.input_count,
         ports: cli.ports,
     };
 
