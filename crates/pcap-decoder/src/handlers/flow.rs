@@ -39,10 +39,7 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
             if buffer.has_remaining() {
                 match codec.decode(buffer) {
                     Ok(Some(flow_info)) => {
-                        return Some(DecodeOutcome::Success((
-                            flow_key,
-                            flow_info,
-                        ))); // Return the FlowInfo
+                        return Some(DecodeOutcome::Success((flow_key, flow_info))); // Return the FlowInfo
                     }
                     Ok(None) => {
                         return None;

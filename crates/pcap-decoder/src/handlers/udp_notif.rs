@@ -42,10 +42,7 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
             if buffer.has_remaining() {
                 match codec.decode(buffer) {
                     Ok(Some(udp_notif_packet)) => {
-                        return Some(DecodeOutcome::Success((
-                            flow_key,
-                            udp_notif_packet,
-                        ))); // Return the FlowInfo
+                        return Some(DecodeOutcome::Success((flow_key, udp_notif_packet))); // Return the FlowInfo
                     }
                     Ok(None) => {
                         return None;

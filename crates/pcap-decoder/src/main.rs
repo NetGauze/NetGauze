@@ -101,7 +101,8 @@ struct Cli {
     #[clap(short, long)]
     input: String,
 
-    /// JSON Lines output file path, if not specified output will be directed to stdout
+    /// JSON Lines output file path, if not specified
+    /// output will be directed to stdout
     #[clap(short, long)]
     output: Option<String>,
 

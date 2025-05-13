@@ -39,10 +39,7 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
             if buffer.has_remaining() {
                 match codec.decode(buffer) {
                     Ok(Some(msg)) => {
-                        return Some(DecodeOutcome::Success((
-                            flow_key,
-                            msg,
-                        )));
+                        return Some(DecodeOutcome::Success((flow_key, msg)));
                     }
                     Ok(None) => {
                         // packet is fragmented, need to read the next PDU first before attempting
