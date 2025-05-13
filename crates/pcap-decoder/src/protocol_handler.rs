@@ -9,13 +9,14 @@ use std::{
 
 #[derive(Debug, serde::Serialize)]
 pub struct SerializableInfo<I> {
-    pub(crate) info: I,
     pub(crate) source_address: SocketAddr,
+    pub(crate) destination_address: SocketAddr,
+    pub(crate) info: I,
 }
 
 #[derive(Debug, Serialize)]
 pub enum DecodeOutcome<M, E> {
-    Success((SocketAddr, M)),
+    Success(((IpAddr, u16, IpAddr, u16), M)),
     Error(E),
 }
 

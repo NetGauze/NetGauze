@@ -29,8 +29,6 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
         packet_data: &[u8],
         exporter_peers: &mut HashMap<(IpAddr, u16, IpAddr, u16), (FlowInfoCodec, BytesMut)>,
     ) -> Option<DecodeOutcome<FlowInfo, FlowInfoCodecDecoderError>> {
-        let src_ip: IpAddr = flow_key.0;
-        let src_port: u16 = flow_key.1;
         let dst_port: u16 = flow_key.3;
 
         if protocol == TransportProtocol::UDP && self.ports.contains(&dst_port) {
@@ -42,7 +40,7 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
                 match codec.decode(buffer) {
                     Ok(Some(flow_info)) => {
                         return Some(DecodeOutcome::Success((
-                            SocketAddr::new(src_ip, src_port),
+                            flow_key,
                             flow_info,
                         ))); // Return the FlowInfo
                     }
@@ -65,10 +63,11 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
     ) -> Result<String, std::io::Error> {
         match decode_outcome {
             DecodeOutcome::Success(m) => {
-                let (source_address, flow_info) = m;
+                let (flow_key, flow_info) = m;
                 let serializable_flow = SerializableInfo {
+                    source_address: SocketAddr::new(flow_key.0, flow_key.1),
+                    destination_address: SocketAddr::new(flow_key.2, flow_key.3),
                     info: flow_info,
-                    source_address,
                 };
                 Ok(serde_json::to_string(&serializable_flow)?)
             }

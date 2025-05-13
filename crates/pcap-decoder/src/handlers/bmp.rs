@@ -29,8 +29,6 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
         packet_data: &[u8],
         exporter_peers: &mut HashMap<(IpAddr, u16, IpAddr, u16), (BmpCodec, BytesMut)>,
     ) -> Option<DecodeOutcome<BmpMessage, BmpCodecDecoderError>> {
-        let src_ip: IpAddr = flow_key.0;
-        let src_port: u16 = flow_key.1;
         let dst_port: u16 = flow_key.3;
 
         if protocol == TransportProtocol::TCP && self.ports.contains(&dst_port) {
@@ -42,7 +40,7 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
                 match codec.decode(buffer) {
                     Ok(Some(msg)) => {
                         return Some(DecodeOutcome::Success((
-                            SocketAddr::new(src_ip, src_port),
+                            flow_key,
                             msg,
                         )));
                     }
@@ -64,10 +62,11 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
     ) -> Result<String, std::io::Error> {
         match decode_outcome {
             DecodeOutcome::Success(m) => {
-                let (source_address, bmp_message) = m;
+                let (flow_key, bmp_message) = m;
                 let serializable_flow = SerializableInfo {
+                    source_address: SocketAddr::new(flow_key.0, flow_key.1),
+                    destination_address: SocketAddr::new(flow_key.2, flow_key.3),
                     info: bmp_message,
-                    source_address,
                 };
                 Ok(serde_json::to_string(&serializable_flow)?)
             }

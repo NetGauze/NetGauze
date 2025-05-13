@@ -32,8 +32,6 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
         packet_data: &[u8],
         exporter_peers: &mut HashMap<(IpAddr, u16, IpAddr, u16), (UdpPacketCodec, BytesMut)>,
     ) -> Option<DecodeOutcome<UdpNotifPacket, UdpPacketCodecError>> {
-        let src_ip: IpAddr = flow_key.0;
-        let src_port: u16 = flow_key.1;
         let dst_port: u16 = flow_key.3;
 
         if protocol == TransportProtocol::UDP && self.ports.contains(&dst_port) {
@@ -45,7 +43,7 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                 match codec.decode(buffer) {
                     Ok(Some(udp_notif_packet)) => {
                         return Some(DecodeOutcome::Success((
-                            SocketAddr::new(src_ip, src_port),
+                            flow_key,
                             udp_notif_packet,
                         ))); // Return the FlowInfo
                     }
@@ -68,7 +66,7 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
     ) -> Result<String, std::io::Error> {
         match decode_outcome {
             DecodeOutcome::Success(m) => {
-                let (source_address, udp_notif_packet) = m;
+                let (flow_key, udp_notif_packet) = m;
                 let mut value = serde_json::to_value(&udp_notif_packet)
                     .expect("Couldn't serialize UDP-Notif message to json");
                 // Convert when possible inner payload into human-readable format
@@ -99,8 +97,9 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                     _ => {}
                 }
                 let serializable_flow = SerializableInfo {
+                    source_address: SocketAddr::new(flow_key.0, flow_key.1),
+                    destination_address: SocketAddr::new(flow_key.2, flow_key.3),
                     info: value,
-                    source_address,
                 };
                 Ok(serde_json::to_string(&serializable_flow)?)
             }
