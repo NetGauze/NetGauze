@@ -24,8 +24,56 @@ use netgauze_collector::{
 };
 use opentelemetry::global;
 use serde_yaml::from_reader;
+use shadow_rs::shadow;
 use std::{env, fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr};
 use tracing::{info, Level};
+
+shadow!(build);
+
+fn init_tracing(level: &'_ str) {
+    // Very simple setup at the moment to validate the instrumentation in the code
+    // is working in the future that should be configured automatically based on
+    // configuration options
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(Level::from_str(level).expect("invalid logging level"))
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+}
+
+fn log_info() {
+    info!(
+        r#"
+
+  __/\\\\\_____/\\\__________________________________/\\\\\\\\\\\\___________________________________________________________
+  _\/\\\\\\___\/\\\________________________________/\\\//////////____________________________________________________________
+   _\/\\\/\\\__\/\\\____________________/\\\_______/\\\_______________________________________________________________________
+    _\/\\\//\\\_\/\\\_____/\\\\\\\\___/\\\\\\\\\\\_\/\\\____/\\\\\\\__/\\\\\\\\\_____/\\\____/\\\__/\\\\\\\\\\\_____/\\\\\\\\__
+     _\/\\\\//\\\\/\\\___/\\\/////\\\_\////\\\////__\/\\\___\/////\\\_\////////\\\___\/\\\___\/\\\_\///////\\\/____/\\\/////\\\_
+      _\/\\\_\//\\\/\\\__/\\\\\\\\\\\_____\/\\\______\/\\\_______\/\\\___/\\\\\\\\\\__\/\\\___\/\\\______/\\\/_____/\\\\\\\\\\\__
+       _\/\\\__\//\\\\\\_\//\\///////______\/\\\_/\\__\/\\\_______\/\\\__/\\\/////\\\__\/\\\___\/\\\____/\\\/______\//\\///////___
+        _\/\\\___\//\\\\\__\//\\\\\\\\\\____\//\\\\\___\//\\\\\\\\\\\\/__\//\\\\\\\\/\\_\//\\\\\\\\\___/\\\\\\\\\\\__\//\\\\\\\\\\_
+         _\///_____\/////____\//////////______\/////_____\////////////_____\////////\//___\/////////___\///////////____\//////////__
+
+  "#
+    );
+    info!("==================== Git/Source Control Information ====================");
+    info!("         Package Version:    {}", build::PKG_VERSION);
+    info!("         Commit Hash:        {}", build::COMMIT_HASH);
+    info!("         Commit Date:        {}", build::COMMIT_DATE);
+    info!("         Branch:             {}", build::BRANCH);
+    info!("         Tag:                {}", build::TAG);
+
+    info!("");
+    info!("======================== Build Information =============================");
+    info!("         Build Time:         {}", build::BUILD_TIME);
+    info!("         Rust Build Channel: {}", build::BUILD_RUST_CHANNEL);
+    info!("         Operating System:   {}", build::BUILD_OS);
+    info!("         Rust Channel:       {}", build::RUST_CHANNEL);
+    info!("         Rust Version:       {}", build::RUST_VERSION);
+    info!("         Cargo Version:      {}", build::CARGO_VERSION);
+    info!("========================================================================");
+    info!("");
+}
 
 fn init_open_telemetry(
     config: &TelemetryConfig,
@@ -55,16 +103,6 @@ fn init_open_telemetry(
     Ok(())
 }
 
-fn init_tracing(level: &'_ str) {
-    // Very simple setup at the moment to validate the instrumentation in the code
-    // is working in the future that should be configured automatically based on
-    // configuration options
-    let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_max_level(Level::from_str(level).expect("invalid logging level"))
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-}
-
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
@@ -79,7 +117,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
             return Err(format!("Parsing config file failed: {err}").into());
         }
     };
+
     init_tracing(&config.logging.level);
+    log_info();
 
     let mut runtime_builder = tokio::runtime::Builder::new_multi_thread();
     // If num of threads is not configured then the default use all CPU cores is
