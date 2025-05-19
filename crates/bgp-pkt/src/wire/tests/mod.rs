@@ -1234,7 +1234,10 @@ fn test_bgp_rfc7606_attr() -> Result<(), BgpMessageWritingError> {
     );
     assert_eq!(
         Some(&PathAttributeParsingError::AsPathError(
-            AsPathParsingError::NomError(ErrorKind::Eof)
+            AsPathParsingError::InvalidAsPathLength {
+                expecting: 1020,
+                found: 4
+            }
         )),
         parsing_errors.path_attr_errors().get(1)
     );

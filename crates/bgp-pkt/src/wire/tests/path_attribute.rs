@@ -203,7 +203,10 @@ fn test_as2_path_segment() -> Result<(), AsPathWritingError> {
     );
     let bad_incomplete = LocatedAsPathParsingError::new(
         unsafe { Span::new_from_raw_offset(2, &bad_incomplete_wire[2..]) },
-        AsPathParsingError::NomError(ErrorKind::Eof),
+        AsPathParsingError::InvalidAsPathLength {
+            expecting: 2,
+            found: 1,
+        },
     );
 
     test_parsed_completely(&good_set_wire, &set);

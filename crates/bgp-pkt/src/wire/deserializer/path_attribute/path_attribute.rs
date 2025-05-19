@@ -316,6 +316,11 @@ pub enum AsPathParsingError {
     /// RFC 7606: An AS_PATH is considered malformed, if it has a Path Segment
     /// Length field of zero.
     ZeroSegmentLength,
+    /// Invalid Length
+    InvalidAsPathLength {
+        expecting: usize,
+        found: usize,
+    },
     UndefinedAsPathSegmentType(#[from_external] UndefinedAsPathSegmentType),
 }
 
@@ -353,6 +358,16 @@ impl<'a> ReadablePdu<'a, LocatedAsPathParsingError<'a>> for As2PathSegment {
             )));
         }
         let count = count as usize;
+        let expecting = count * 2;
+        if buf.len() < expecting {
+            return Err(nom::Err::Error(LocatedAsPathParsingError::new(
+                buf,
+                AsPathParsingError::InvalidAsPathLength {
+                    expecting,
+                    found: buf.len(),
+                },
+            )));
+        }
         let (buf, as_numbers) = nom::multi::many_m_n(count, count, be_u16)(buf)?;
         Ok((buf, As2PathSegment::new(segment_type, as_numbers)))
     }
@@ -371,6 +386,16 @@ impl<'a> ReadablePdu<'a, LocatedAsPathParsingError<'a>> for As4PathSegment {
             )));
         }
         let count = count as usize;
+        let expecting = count * 4;
+        if buf.len() < expecting {
+            return Err(nom::Err::Error(LocatedAsPathParsingError::new(
+                buf,
+                AsPathParsingError::InvalidAsPathLength {
+                    expecting,
+                    found: buf.len(),
+                },
+            )));
+        }
         let (buf, as_numbers) = nom::multi::many_m_n(count, count, be_u32)(buf)?;
         Ok((buf, As4PathSegment::new(segment_type, as_numbers)))
     }
