@@ -14,31 +14,26 @@
 // limitations under the License.
 
 use crate::{
-    iana::BmpMessageType,
-    v4::BmpV4RouteMonitoringTlvError::{
-        BadBgpMessageType, BadGroupTlvIndex, VrfTableNameStringIsTooLong,
-    },
-    InitiationMessage, PeerDownNotificationMessage, PeerHeader, PeerUpNotificationMessage,
-    RouteMirroringMessage, StatisticsReportMessage, TerminationMessage,
+    iana::{BmpMessageType, InitiationInformationTlvType},
+    v3, PeerHeader,
 };
 use either::Either;
 use netgauze_bgp_pkt::{capabilities::BgpCapability, iana::BgpMessageType, BgpMessage};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, FromRepr};
 
+pub const BMPV4_TLV_GROUP_GBIT: u16 = 0x8000;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpV4MessageValue {
-    RouteMonitoring(BmpV4RouteMonitoringMessage),
-    StatisticsReport(StatisticsReportMessage),
-    PeerDownNotification {
-        v3_notif: PeerDownNotificationMessage,
-        tlvs: Vec<BmpV4PeerDownTlv>,
-    },
-    PeerUpNotification(PeerUpNotificationMessage),
-    Initiation(InitiationMessage),
-    Termination(TerminationMessage),
-    RouteMirroring(RouteMirroringMessage),
+    RouteMonitoring(RouteMonitoringMessage),
+    StatisticsReport(v3::StatisticsReportMessage),
+    PeerDownNotification(PeerDownNotificationMessage),
+    PeerUpNotification(v3::PeerUpNotificationMessage),
+    Initiation(v3::InitiationMessage),
+    Termination(v3::TerminationMessage),
+    RouteMirroring(v3::RouteMirroringMessage),
     Experimental251(Vec<u8>),
     Experimental252(Vec<u8>),
     Experimental253(Vec<u8>),
@@ -47,20 +42,20 @@ pub enum BmpV4MessageValue {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpV4PeerDownTlv {
+pub enum PeerDownTlv {
     Unknown { code: u16, value: Vec<u8> },
 }
 
-impl BmpV4PeerDownTlv {
-    pub fn code(&self) -> u16 {
+impl PeerDownTlv {
+    pub const fn code(&self) -> u16 {
         match self {
-            BmpV4PeerDownTlv::Unknown { code, .. } => *code,
+            PeerDownTlv::Unknown { code, .. } => *code,
         }
     }
 }
 
 impl BmpV4MessageValue {
-    pub fn get_type(&self) -> BmpMessageType {
+    pub const fn get_type(&self) -> BmpMessageType {
         match self {
             BmpV4MessageValue::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
             BmpV4MessageValue::StatisticsReport(_) => BmpMessageType::StatisticsReport,
@@ -79,40 +74,42 @@ impl BmpV4MessageValue {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct BmpV4RouteMonitoringTlv {
+pub struct RouteMonitoringTlv {
     index: u16,
-    value: BmpV4RouteMonitoringTlvValue,
+    value: RouteMonitoringTlvValue,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpV4RouteMonitoringTlvError {
+pub enum RouteMonitoringTlvError {
     BadGroupTlvIndex(u16),
     BadBgpMessageType(BgpMessageType),
     VrfTableNameStringIsTooLong(usize),
 }
 
-impl BmpV4RouteMonitoringTlv {
+impl RouteMonitoringTlv {
     pub fn build(
         index: u16,
-        value: BmpV4RouteMonitoringTlvValue,
-    ) -> Result<Self, BmpV4RouteMonitoringTlvError> {
+        value: RouteMonitoringTlvValue,
+    ) -> Result<Self, RouteMonitoringTlvError> {
         match &value {
-            BmpV4RouteMonitoringTlvValue::GroupTlv(_) => {
-                if index.leading_ones() == 0 {
+            RouteMonitoringTlvValue::GroupTlv(_) => {
+                if index & BMPV4_TLV_GROUP_GBIT != BMPV4_TLV_GROUP_GBIT {
                     // First bit has to be one (G flag)
-                    return Err(BadGroupTlvIndex(index));
+                    return Err(RouteMonitoringTlvError::BadGroupTlvIndex(index));
                 }
             }
-            BmpV4RouteMonitoringTlvValue::VrfTableName(str) => {
+            RouteMonitoringTlvValue::VrfTableName(str) => {
                 let len = str.len();
                 if len > 255 {
-                    return Err(VrfTableNameStringIsTooLong(len));
+                    return Err(RouteMonitoringTlvError::VrfTableNameStringIsTooLong(len));
                 }
             }
-            BmpV4RouteMonitoringTlvValue::BgpUpdate(update_pdu) => {
+            RouteMonitoringTlvValue::BgpUpdate(update_pdu) => {
                 if update_pdu.get_type() != BgpMessageType::Update {
-                    return Err(BadBgpMessageType(update_pdu.get_type()));
+                    return Err(RouteMonitoringTlvError::BadBgpMessageType(
+                        update_pdu.get_type(),
+                    ));
                 }
             }
             _ => {}
@@ -121,28 +118,26 @@ impl BmpV4RouteMonitoringTlv {
         Ok(Self { index, value })
     }
 
-    pub fn get_type(&self) -> Either<BmpV4RouteMonitoringTlvType, u16> {
+    pub const fn get_type(&self) -> Either<RouteMonitoringTlvType, u16> {
         match self.value {
-            BmpV4RouteMonitoringTlvValue::BgpUpdate(_) => {
-                Either::Left(BmpV4RouteMonitoringTlvType::BgpUpdatePdu)
+            RouteMonitoringTlvValue::BgpUpdate(_) => {
+                Either::Left(RouteMonitoringTlvType::BgpUpdatePdu)
             }
-            BmpV4RouteMonitoringTlvValue::VrfTableName(_) => {
-                Either::Left(BmpV4RouteMonitoringTlvType::VrfTableName)
+            RouteMonitoringTlvValue::VrfTableName(_) => {
+                Either::Left(RouteMonitoringTlvType::VrfTableName)
             }
-            BmpV4RouteMonitoringTlvValue::GroupTlv(_) => {
-                Either::Left(BmpV4RouteMonitoringTlvType::GroupTlv)
+            RouteMonitoringTlvValue::GroupTlv(_) => Either::Left(RouteMonitoringTlvType::GroupTlv),
+            RouteMonitoringTlvValue::StatelessParsing { .. } => {
+                Either::Left(RouteMonitoringTlvType::StatelessParsing)
             }
-            BmpV4RouteMonitoringTlvValue::StatelessParsing { .. } => {
-                Either::Left(BmpV4RouteMonitoringTlvType::StatelessParsing)
-            }
-            BmpV4RouteMonitoringTlvValue::Unknown { code, .. } => Either::Right(code),
+            RouteMonitoringTlvValue::Unknown { code, .. } => Either::Right(code),
         }
     }
-    pub fn index(&self) -> u16 {
+    pub const fn index(&self) -> u16 {
         self.index
     }
 
-    pub fn value(&self) -> &BmpV4RouteMonitoringTlvValue {
+    pub const fn value(&self) -> &RouteMonitoringTlvValue {
         &self.value
     }
 }
@@ -151,18 +146,16 @@ impl BmpV4RouteMonitoringTlv {
 #[repr(u16)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRepr, Display)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpV4RouteMonitoringTlvType {
+pub enum RouteMonitoringTlvType {
     GroupTlv = 0,
     StatelessParsing = 1,
     BgpUpdatePdu = 2,
     VrfTableName = 3,
 }
 
-pub const BMPV4_TLV_GROUP_GBIT: u16 = 0x8000;
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpV4RouteMonitoringTlvValue {
+pub enum RouteMonitoringTlvValue {
     BgpUpdate(BgpMessage),
     VrfTableName(String),
     GroupTlv(Vec<u16>),
@@ -172,12 +165,12 @@ pub enum BmpV4RouteMonitoringTlvValue {
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpV4RouteMonitoringError {
-    TlvError(BmpV4RouteMonitoringTlvError),
+pub enum RouteMonitoringError {
+    TlvError(RouteMonitoringTlvError),
 }
 
-impl From<BmpV4RouteMonitoringTlvError> for BmpV4RouteMonitoringError {
-    fn from(value: BmpV4RouteMonitoringTlvError) -> Self {
+impl From<RouteMonitoringTlvError> for RouteMonitoringError {
+    fn from(value: RouteMonitoringTlvError) -> Self {
         Self::TlvError(value)
     }
 }
@@ -191,20 +184,20 @@ impl From<BmpV4RouteMonitoringTlvError> for BmpV4RouteMonitoringError {
 /// PDU.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct BmpV4RouteMonitoringMessage {
+pub struct RouteMonitoringMessage {
     peer_header: PeerHeader,
-    update_pdu: BmpV4RouteMonitoringTlv,
-    tlvs: Vec<BmpV4RouteMonitoringTlv>,
+    update_pdu: RouteMonitoringTlv,
+    tlvs: Vec<RouteMonitoringTlv>,
 }
 
-impl BmpV4RouteMonitoringMessage {
+impl RouteMonitoringMessage {
     pub fn build(
         peer_header: PeerHeader,
         update_pdu: BgpMessage,
-        tlvs: Vec<BmpV4RouteMonitoringTlv>,
-    ) -> Result<Self, BmpV4RouteMonitoringError> {
+        tlvs: Vec<RouteMonitoringTlv>,
+    ) -> Result<Self, RouteMonitoringError> {
         let update_pdu =
-            BmpV4RouteMonitoringTlv::build(0, BmpV4RouteMonitoringTlvValue::BgpUpdate(update_pdu))?;
+            RouteMonitoringTlv::build(0, RouteMonitoringTlvValue::BgpUpdate(update_pdu))?;
 
         Ok(Self {
             peer_header,
@@ -217,20 +210,83 @@ impl BmpV4RouteMonitoringMessage {
         &self.peer_header
     }
 
-    pub fn update_message_tlv(&self) -> &BmpV4RouteMonitoringTlv {
+    pub const fn update_message_tlv(&self) -> &RouteMonitoringTlv {
         &self.update_pdu
     }
 
     pub fn update_message(&self) -> &BgpMessage {
         match &self.update_pdu.value {
-            BmpV4RouteMonitoringTlvValue::BgpUpdate(update) => update,
+            RouteMonitoringTlvValue::BgpUpdate(update) => update,
             _ => {
                 unreachable!("This TLV has to be BgpUpdatePdu (enforced by builder)");
             }
         }
     }
 
-    pub const fn tlvs(&self) -> &Vec<BmpV4RouteMonitoringTlv> {
+    pub const fn tlvs(&self) -> &Vec<RouteMonitoringTlv> {
+        &self.tlvs
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub struct PeerDownNotificationMessage {
+    peer_header: PeerHeader,
+    reason: v3::PeerDownNotificationReason,
+    tlvs: Vec<PeerDownTlv>,
+}
+
+impl PeerDownNotificationMessage {
+    pub fn build(
+        peer_header: PeerHeader,
+        reason: v3::PeerDownNotificationReason,
+        tlvs: Vec<PeerDownTlv>,
+    ) -> Result<Self, v3::PeerDownNotificationMessageError> {
+        match &reason {
+            v3::PeerDownNotificationReason::LocalSystemClosedNotificationPduFollows(msg)
+            | v3::PeerDownNotificationReason::RemoteSystemClosedNotificationPduFollows(msg) => {
+                if msg.get_type() != BgpMessageType::Notification {
+                    return Err(
+                        v3::PeerDownNotificationMessageError::UnexpectedBgpMessageType(
+                            msg.get_type(),
+                        ),
+                    );
+                }
+            }
+            v3::PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(_) => {}
+            v3::PeerDownNotificationReason::RemoteSystemClosedNoData => {}
+            v3::PeerDownNotificationReason::PeerDeConfigured => {}
+            v3::PeerDownNotificationReason::LocalSystemClosedTlvDataFollows(information) => {
+                if information.get_type() != InitiationInformationTlvType::VrfTableName {
+                    return Err(
+                        v3::PeerDownNotificationMessageError::UnexpectedInitiationInformationTlvType(
+                            information.get_type(),
+                        ),
+                    );
+                }
+            }
+            v3::PeerDownNotificationReason::Experimental251(_) => {}
+            v3::PeerDownNotificationReason::Experimental252(_) => {}
+            v3::PeerDownNotificationReason::Experimental253(_) => {}
+            v3::PeerDownNotificationReason::Experimental254(_) => {}
+        }
+
+        Ok(Self {
+            peer_header,
+            reason,
+            tlvs,
+        })
+    }
+
+    pub const fn peer_header(&self) -> &PeerHeader {
+        &self.peer_header
+    }
+
+    pub const fn reason(&self) -> &v3::PeerDownNotificationReason {
+        &self.reason
+    }
+
+    pub const fn tlvs(&self) -> &Vec<PeerDownTlv> {
         &self.tlvs
     }
 }

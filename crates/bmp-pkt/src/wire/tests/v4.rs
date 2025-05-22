@@ -16,8 +16,8 @@
 use crate::{
     v3::PeerDownNotificationReason,
     v4::{
-        BmpV4PeerDownTlv, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
-        BmpV4RouteMonitoringTlvValue, BMPV4_TLV_GROUP_GBIT,
+        PeerDownTlv, RouteMonitoringMessage, RouteMonitoringTlv, RouteMonitoringTlvValue,
+        BMPV4_TLV_GROUP_GBIT,
     },
     wire::{
         deserializer::{
@@ -68,7 +68,7 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
     ];
 
     let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
-        BmpV4RouteMonitoringMessage::build(
+        RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
                     ipv6: false,
@@ -115,14 +115,14 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
                 )],
             )),
             vec![
-                BmpV4RouteMonitoringTlv::build(
+                RouteMonitoringTlv::build(
                     0,
-                    BmpV4RouteMonitoringTlvValue::VrfTableName("global".to_string()),
+                    RouteMonitoringTlvValue::VrfTableName("global".to_string()),
                 )
                 .unwrap(),
-                BmpV4RouteMonitoringTlv::build(
+                RouteMonitoringTlv::build(
                     0,
-                    BmpV4RouteMonitoringTlvValue::Unknown {
+                    RouteMonitoringTlvValue::Unknown {
                         code: 9,
                         value: vec![0x00, 0x00, 0x00, 0x0a],
                     },
@@ -154,7 +154,7 @@ fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingErr
     ];
 
     let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
-        BmpV4RouteMonitoringMessage::build(
+        RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
                     ipv6: false,
@@ -201,19 +201,19 @@ fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingErr
                 )],
             )),
             vec![
-                BmpV4RouteMonitoringTlv::build(
+                RouteMonitoringTlv::build(
                     BMPV4_TLV_GROUP_GBIT + 1024,
-                    BmpV4RouteMonitoringTlvValue::GroupTlv(vec![1, 2, 3, 4]),
+                    RouteMonitoringTlvValue::GroupTlv(vec![1, 2, 3, 4]),
                 )
                 .unwrap(),
-                BmpV4RouteMonitoringTlv::build(
+                RouteMonitoringTlv::build(
                     0,
-                    BmpV4RouteMonitoringTlvValue::VrfTableName("global".to_string()),
+                    RouteMonitoringTlvValue::VrfTableName("global".to_string()),
                 )
                 .unwrap(),
-                BmpV4RouteMonitoringTlv::build(
+                RouteMonitoringTlv::build(
                     0,
-                    BmpV4RouteMonitoringTlvValue::Unknown {
+                    RouteMonitoringTlvValue::Unknown {
                         code: 9,
                         value: vec![0x00, 0x00, 0x00, 0x0a],
                     },
@@ -240,7 +240,7 @@ fn test_bmp_v4_route_monitoring_with_stateless_parsing() -> Result<(), BmpMessag
     ];
 
     let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
-        BmpV4RouteMonitoringMessage::build(
+        RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
                     ipv6: false,
@@ -287,9 +287,9 @@ fn test_bmp_v4_route_monitoring_with_stateless_parsing() -> Result<(), BmpMessag
                     .unwrap(),
                 )],
             )),
-            vec![BmpV4RouteMonitoringTlv::build(
+            vec![RouteMonitoringTlv::build(
                 0,
-                BmpV4RouteMonitoringTlvValue::StatelessParsing(BgpCapability::AddPath(
+                RouteMonitoringTlvValue::StatelessParsing(BgpCapability::AddPath(
                     AddPathCapability::new(vec![AddPathAddressFamily::new(
                         AddressType::Ipv4Unicast,
                         true,
@@ -318,7 +318,7 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
     ];
 
     let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
-        BmpV4RouteMonitoringMessage::build(
+        RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
                     ipv6: false,
@@ -426,8 +426,8 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
     ];
     let bad_eof_wire = [];
 
-    let good = BmpMessage::V4(BmpV4MessageValue::PeerDownNotification {
-        v3_notif: PeerDownNotificationMessage::build(
+    let good = BmpMessage::V4(BmpV4MessageValue::PeerDownNotification(
+        v4::PeerDownNotificationMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
                     ipv6: true,
@@ -442,13 +442,13 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
                 Some(Utc.timestamp_opt(1664821843, 487907000).unwrap()),
             ),
             PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
+            vec![PeerDownTlv::Unknown {
+                code: 16,
+                value: vec![0, 1, 2, 3, 4, 5, 6, 7],
+            }],
         )
         .unwrap(),
-        tlvs: vec![BmpV4PeerDownTlv::Unknown {
-            code: 16,
-            value: vec![0, 1, 2, 3, 4, 5, 6, 7],
-        }],
-    });
+    ));
 
     let bad_eof = LocatedBmpMessageValueParsingError::new(
         Span::new(&bad_eof_wire),

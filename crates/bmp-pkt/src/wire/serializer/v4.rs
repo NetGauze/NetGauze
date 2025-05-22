@@ -15,14 +15,14 @@
 
 use crate::{
     v4::{
-        BmpV4MessageValue, BmpV4PeerDownTlv, BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv,
-        BmpV4RouteMonitoringTlvValue,
+        BmpV4MessageValue, PeerDownNotificationMessage, PeerDownTlv, RouteMonitoringMessage,
+        RouteMonitoringTlv, RouteMonitoringTlvValue,
     },
     wire::serializer::v3::{
-        InitiationMessageWritingError, PeerDownNotificationMessageWritingError,
-        PeerHeaderWritingError, PeerUpNotificationMessageWritingError,
-        RouteMirroringMessageWritingError, StatisticsReportMessageWritingError,
-        TerminationMessageWritingError,
+        InitiationInformationWritingError, InitiationMessageWritingError,
+        PeerDownNotificationReasonWritingError, PeerHeaderWritingError,
+        PeerUpNotificationMessageWritingError, RouteMirroringMessageWritingError,
+        StatisticsReportMessageWritingError, TerminationMessageWritingError,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
@@ -41,7 +41,7 @@ pub enum BmpV4MessageValueWritingError {
     InitiationMessage(#[from] InitiationMessageWritingError),
     PeerUpNotificationMessage(#[from] PeerUpNotificationMessageWritingError),
     PeerDownNotificationMessage(#[from] PeerDownNotificationMessageWritingError),
-    PeerDownTlvMessage(#[from] BmpV4PeerDownTlvWritingError),
+    PeerDownTlvMessage(#[from] PeerDownTlvWritingError),
     TerminationMessage(#[from] TerminationMessageWritingError),
     StatisticsReportMessage(#[from] StatisticsReportMessageWritingError),
 }
@@ -54,9 +54,7 @@ impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
         let len = match self {
             Self::RouteMonitoring(value) => value.len(),
             Self::StatisticsReport(value) => value.len(),
-            Self::PeerDownNotification { v3_notif, tlvs } => {
-                v3_notif.len() + tlvs.iter().map(|x| x.len()).sum::<usize>()
-            }
+            Self::PeerDownNotification(notif) => notif.len(),
             Self::PeerUpNotification(value) => value.len(),
             Self::Initiation(value) => value.len(),
             Self::Termination(value) => value.len(),
@@ -74,12 +72,7 @@ impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
         match self {
             Self::RouteMonitoring(value) => value.write(writer)?,
             Self::StatisticsReport(value) => value.write(writer)?,
-            Self::PeerDownNotification { v3_notif, tlvs } => {
-                v3_notif.write(writer)?;
-                for tlv in tlvs {
-                    tlv.write(writer)?;
-                }
-            }
+            Self::PeerDownNotification(value) => value.write(writer)?,
             Self::PeerUpNotification(value) => value.write(writer)?,
             Self::Initiation(value) => value.write(writer)?,
             Self::Termination(value) => value.write(writer)?,
@@ -94,28 +87,60 @@ impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BmpV4PeerDownTlvWritingError {
+pub enum PeerDownNotificationMessageWritingError {
+    StdIOError(#[from_std_io_error] String),
+    PeerHeaderError(#[from] PeerHeaderWritingError),
+    InitiationInformationError(#[from] InitiationInformationWritingError),
+    PeerDownNotificationReasonError(#[from] PeerDownNotificationReasonWritingError),
+    PeerDownTlvError(#[from] PeerDownTlvWritingError),
+}
+
+impl WritablePdu<PeerDownNotificationMessageWritingError> for PeerDownNotificationMessage {
+    const BASE_LENGTH: usize = 0;
+
+    fn len(&self) -> usize {
+        Self::BASE_LENGTH
+            + self.peer_header().len()
+            + self.reason().len()
+            + self.tlvs().iter().map(|x| x.len()).sum::<usize>()
+    }
+
+    fn write<T: Write>(
+        &self,
+        writer: &mut T,
+    ) -> Result<(), PeerDownNotificationMessageWritingError> {
+        self.peer_header().write(writer)?;
+        self.reason().write(writer)?;
+        for tlv in self.tlvs() {
+            tlv.write(writer)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(WritingError, Eq, PartialEq, Clone, Debug)]
+pub enum PeerDownTlvWritingError {
     StdIOError(#[from_std_io_error] String),
 }
 
-impl WritablePdu<BmpV4PeerDownTlvWritingError> for BmpV4PeerDownTlv {
+impl WritablePdu<PeerDownTlvWritingError> for PeerDownTlv {
     const BASE_LENGTH: usize = 2 + 2; /* type + length */
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
             + match self {
-                BmpV4PeerDownTlv::Unknown { value, .. } => value.len(),
+                PeerDownTlv::Unknown { value, .. } => value.len(),
             }
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpV4PeerDownTlvWritingError>
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), PeerDownTlvWritingError>
     where
         Self: Sized,
     {
         write_tlv_header_t16_l16(writer, self.code(), self.len() as u16)?;
 
         match self {
-            BmpV4PeerDownTlv::Unknown { value, .. } => writer.write_all(value)?,
+            PeerDownTlv::Unknown { value, .. } => writer.write_all(value)?,
         }
 
         Ok(())
@@ -129,7 +154,7 @@ pub enum BmpV4RouteMonitoringMessageWritingError {
     TlvV4(#[from] BmpV4RouteMonitoringTlvWritingError),
 }
 
-impl WritablePdu<BmpV4RouteMonitoringMessageWritingError> for BmpV4RouteMonitoringMessage {
+impl WritablePdu<BmpV4RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -160,7 +185,7 @@ pub enum BmpV4RouteMonitoringTlvWritingError {
     BmpV4RouteMonitoringTlvValueError(#[from] BmpV4RouteMonitoringTlvValueWritingError),
 }
 
-impl WritablePdu<BmpV4RouteMonitoringTlvWritingError> for BmpV4RouteMonitoringTlv {
+impl WritablePdu<BmpV4RouteMonitoringTlvWritingError> for RouteMonitoringTlv {
     const BASE_LENGTH: usize = 2 + 2 + 2; /* type + length + index */
 
     fn len(&self) -> usize {
@@ -192,17 +217,17 @@ pub enum BmpV4RouteMonitoringTlvValueWritingError {
     BgpCapability(#[from] BGPCapabilityWritingError),
 }
 
-impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitoringTlvValue {
+impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for RouteMonitoringTlvValue {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
         match self {
-            BmpV4RouteMonitoringTlvValue::BgpUpdate(update) => update.len(),
-            BmpV4RouteMonitoringTlvValue::VrfTableName(str) => str.len(),
-            BmpV4RouteMonitoringTlvValue::GroupTlv(values) => 2 * values.len(),
+            RouteMonitoringTlvValue::BgpUpdate(update) => update.len(),
+            RouteMonitoringTlvValue::VrfTableName(str) => str.len(),
+            RouteMonitoringTlvValue::GroupTlv(values) => 2 * values.len(),
             /* afi + safi + bool */
-            BmpV4RouteMonitoringTlvValue::StatelessParsing(capability) => capability.len(),
-            BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => value.len(),
+            RouteMonitoringTlvValue::StatelessParsing(capability) => capability.len(),
+            RouteMonitoringTlvValue::Unknown { value, .. } => value.len(),
         }
     }
 
@@ -214,17 +239,15 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for BmpV4RouteMonitor
         Self: Sized,
     {
         match self {
-            BmpV4RouteMonitoringTlvValue::BgpUpdate(update) => update.write(writer)?,
-            BmpV4RouteMonitoringTlvValue::VrfTableName(str) => writer.write_all(str.as_bytes())?,
-            BmpV4RouteMonitoringTlvValue::GroupTlv(values) => {
+            RouteMonitoringTlvValue::BgpUpdate(update) => update.write(writer)?,
+            RouteMonitoringTlvValue::VrfTableName(str) => writer.write_all(str.as_bytes())?,
+            RouteMonitoringTlvValue::GroupTlv(values) => {
                 for value in values {
                     writer.write_u16::<NetworkEndian>(*value)?
                 }
             }
-            BmpV4RouteMonitoringTlvValue::StatelessParsing(capability) => {
-                capability.write(writer)?
-            }
-            BmpV4RouteMonitoringTlvValue::Unknown { value, .. } => writer.write_all(value)?,
+            RouteMonitoringTlvValue::StatelessParsing(capability) => capability.write(writer)?,
+            RouteMonitoringTlvValue::Unknown { value, .. } => writer.write_all(value)?,
         }
 
         Ok(())

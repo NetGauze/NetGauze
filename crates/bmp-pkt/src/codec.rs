@@ -180,8 +180,8 @@ impl BmpParsingContext {
                 _ => {}
             },
             BmpMessage::V4(value) => match value {
-                BmpV4MessageValue::PeerDownNotification { v3_notif, .. } => {
-                    let peer_key = PeerKey::from_peer_header(v3_notif.peer_header());
+                BmpV4MessageValue::PeerDownNotification(notif) => {
+                    let peer_key = PeerKey::from_peer_header(notif.peer_header());
                     self.remove(&peer_key);
                 }
                 BmpV4MessageValue::PeerUpNotification(peer_up) => handle_peer_up(self, peer_up),

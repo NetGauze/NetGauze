@@ -15,32 +15,25 @@
 
 use crate::{
     iana::{BmpMessageType, UndefinedBmpMessageType},
+    v3,
     v4::{
-        BmpV4MessageValue, BmpV4PeerDownTlv, BmpV4RouteMonitoringError,
-        BmpV4RouteMonitoringMessage, BmpV4RouteMonitoringTlv, BmpV4RouteMonitoringTlvError,
-        BmpV4RouteMonitoringTlvType, BmpV4RouteMonitoringTlvValue,
+        BmpV4MessageValue, PeerDownNotificationMessage, PeerDownTlv, RouteMonitoringError,
+        RouteMonitoringMessage, RouteMonitoringTlv, RouteMonitoringTlvError,
+        RouteMonitoringTlvType, RouteMonitoringTlvValue,
     },
-    wire::deserializer::{
-        v3::{
-            InitiationMessageParsingError, PeerDownNotificationMessageParsingError,
-            PeerHeaderParsingError, PeerUpNotificationMessageParsingError,
-            RouteMirroringMessageParsingError, StatisticsReportMessageParsingError,
-            TerminationMessageParsingError,
-        },
-        *,
-    },
+    wire::deserializer::{v3::*, BmpParsingContext},
     PeerHeader, PeerKey,
 };
 use netgauze_bgp_pkt::{
     wire::deserializer::{
         capabilities::{BgpCapabilityParsingError, LocatedBgpCapabilityParsingError},
-        read_tlv_header_t16_l16, BgpMessageParsingError,
+        read_tlv_header_t16_l16, BgpMessageParsingError, BgpParsingContext,
     },
     BgpMessage,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located, ReadablePdu,
-    ReadablePduWithOneInput, Span,
+    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
@@ -67,10 +60,9 @@ pub enum BmpV4MessageValueParsingError {
         PeerUpNotificationMessageParsingError,
     ),
     PeerDownNotificationMessageError(
-        #[from_located(module = "crate::wire::deserializer::v3")]
-        PeerDownNotificationMessageParsingError,
+        #[from_located(module = "self")] PeerDownNotificationMessageParsingError,
     ),
-    PeerDownNotificationTlvError(#[from_located(module = "self")] BmpV4PeerDownTlvParsingError),
+    PeerDownNotificationTlvError(#[from_located(module = "self")] PeerDownTlvParsingError),
     RouteMirroringMessageError(
         #[from_located(module = "crate::wire::deserializer::v3")] RouteMirroringMessageParsingError,
     ),
@@ -102,12 +94,8 @@ impl<'a>
                 (buf, BmpV4MessageValue::StatisticsReport(value))
             }
             BmpMessageType::PeerDownNotification => {
-                let (buf, v3_notif) = parse_into_located_one_input(buf, ctx)?;
-                let (buf, tlvs) = parse_till_empty_into_located(buf)?;
-                (
-                    buf,
-                    BmpV4MessageValue::PeerDownNotification { v3_notif, tlvs },
-                )
+                let (buf, notif) = parse_into_located_one_input(buf, ctx)?;
+                (buf, BmpV4MessageValue::PeerDownNotification(notif))
             }
             BmpMessageType::PeerUpNotification => {
                 let (buf, value) = parse_into_located_one_input(buf, ctx)?;
@@ -143,13 +131,13 @@ impl<'a>
 }
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub enum BmpV4PeerDownTlvParsingError {
+pub enum PeerDownTlvParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
 }
 
-impl<'a> ReadablePdu<'a, LocatedBmpV4PeerDownTlvParsingError<'a>> for BmpV4PeerDownTlv {
-    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedBmpV4PeerDownTlvParsingError<'a>>
+impl<'a> ReadablePdu<'a, LocatedPeerDownTlvParsingError<'a>> for PeerDownTlv {
+    fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedPeerDownTlvParsingError<'a>>
     where
         Self: Sized,
     {
@@ -169,7 +157,7 @@ impl<'a> ReadablePdu<'a, LocatedBmpV4PeerDownTlvParsingError<'a>> for BmpV4PeerD
 pub enum BmpV4RouteMonitoringMessageParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
-    RouteMonitoringMessage(BmpV4RouteMonitoringError),
+    RouteMonitoringMessage(RouteMonitoringError),
     PeerHeader(#[from_located(module = "crate::wire::deserializer::v3")] PeerHeaderParsingError),
     BgpMessage(
         #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
@@ -183,7 +171,7 @@ impl<'a>
         'a,
         &mut BmpParsingContext,
         LocatedBmpV4RouteMonitoringMessageParsingError<'a>,
-    > for BmpV4RouteMonitoringMessage
+    > for RouteMonitoringMessage
 {
     fn from_wire(
         input: Span<'a>,
@@ -211,9 +199,7 @@ impl<'a>
                 // it when we've decoded all the Stateless Parsing TLVs on which
                 // the PDU decoding depends
                 match nom::combinator::peek(be_u16)(buf)? {
-                    (_, tlv_type)
-                        if tlv_type == BmpV4RouteMonitoringTlvType::BgpUpdatePdu as u16 =>
-                    {
+                    (_, tlv_type) if tlv_type == RouteMonitoringTlvType::BgpUpdatePdu as u16 => {
                         let (tmp, _tlv_type) = be_u16(buf)?;
                         let (tmp, length) = be_u16(tmp)?;
                         let (tmp, _index) = be_u16(tmp)?;
@@ -272,7 +258,7 @@ pub enum BmpV4RouteMonitoringTlvParsingError {
     ),
     FromUtf8Error(String),
     BgpCapability(#[from_located(module = "self")] BgpCapabilityParsingError),
-    InvalidBmpV4RouteMonitoringTlv(BmpV4RouteMonitoringTlvError),
+    InvalidBmpV4RouteMonitoringTlv(RouteMonitoringTlvError),
 }
 
 impl<'a> FromExternalError<Span<'a>, FromUtf8Error>
@@ -291,7 +277,7 @@ impl<'a>
         'a,
         &mut BgpParsingContext,
         LocatedBmpV4RouteMonitoringTlvParsingError<'a>,
-    > for BmpV4RouteMonitoringTlv
+    > for RouteMonitoringTlv
 {
     fn from_wire(
         buf: Span<'a>,
@@ -304,42 +290,83 @@ impl<'a>
         let (span, index) = be_u16(span)?;
         let (remainder, data) = nom::bytes::complete::take(tlv_length)(span)?;
 
-        let value = match BmpV4RouteMonitoringTlvType::from_repr(tlv_type) {
+        let value = match RouteMonitoringTlvType::from_repr(tlv_type) {
             Some(tlv_type) => match tlv_type {
-                BmpV4RouteMonitoringTlvType::VrfTableName => {
+                RouteMonitoringTlvType::VrfTableName => {
                     let (_, str) = nom::combinator::map_res(
                         nom::bytes::complete::take(tlv_length),
                         |x: Span<'_>| String::from_utf8(x.to_vec()),
                     )(data)?;
-                    BmpV4RouteMonitoringTlvValue::VrfTableName(str)
+                    RouteMonitoringTlvValue::VrfTableName(str)
                 }
-                BmpV4RouteMonitoringTlvType::BgpUpdatePdu => {
+                RouteMonitoringTlvType::BgpUpdatePdu => {
                     let (_, pdu) = parse_into_located_one_input(data, ctx)?;
-                    BmpV4RouteMonitoringTlvValue::BgpUpdate(pdu)
+                    RouteMonitoringTlvValue::BgpUpdate(pdu)
                 }
-                BmpV4RouteMonitoringTlvType::GroupTlv => {
+                RouteMonitoringTlvType::GroupTlv => {
                     let (_, values) = nom::multi::many0(be_u16)(data)?;
-                    BmpV4RouteMonitoringTlvValue::GroupTlv(values)
+                    RouteMonitoringTlvValue::GroupTlv(values)
                 }
-                BmpV4RouteMonitoringTlvType::StatelessParsing => {
+                RouteMonitoringTlvType::StatelessParsing => {
                     let (_, bgp_capability) = parse_into_located(data)?;
                     ctx.update_capabilities(&bgp_capability);
-                    BmpV4RouteMonitoringTlvValue::StatelessParsing(bgp_capability)
+                    RouteMonitoringTlvValue::StatelessParsing(bgp_capability)
                 }
             },
-            None => BmpV4RouteMonitoringTlvValue::Unknown {
+            None => RouteMonitoringTlvValue::Unknown {
                 code: tlv_type,
                 value: data.to_vec(),
             },
         };
 
-        match BmpV4RouteMonitoringTlv::build(index, value) {
+        match RouteMonitoringTlv::build(index, value) {
             Ok(tlv) => Ok((remainder, tlv)),
             Err(err) => Err(nom::Err::Error(
                 LocatedBmpV4RouteMonitoringTlvParsingError {
                     span: buf,
                     error: BmpV4RouteMonitoringTlvParsingError::InvalidBmpV4RouteMonitoringTlv(err),
                 },
+            )),
+        }
+    }
+}
+
+#[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub enum PeerDownNotificationMessageParsingError {
+    PeerDownMessageError(v3::PeerDownNotificationMessageError),
+    PeerHeaderError(#[from_located(module = "self")] PeerHeaderParsingError),
+    PeerDownNotificationReasonError(
+        #[from_located(module = "self")] PeerDownNotificationReasonParsingError,
+    ),
+    PeerDownTlvError(#[from_located(module = "self")] PeerDownTlvParsingError),
+}
+
+impl<'a>
+    ReadablePduWithOneInput<
+        'a,
+        &mut BmpParsingContext,
+        LocatedPeerDownNotificationMessageParsingError<'a>,
+    > for PeerDownNotificationMessage
+{
+    fn from_wire(
+        buf: Span<'a>,
+        ctx: &mut BmpParsingContext,
+    ) -> IResult<Span<'a>, Self, LocatedPeerDownNotificationMessageParsingError<'a>> {
+        let input = buf;
+        let (buf, peer_header): (Span<'_>, PeerHeader) = parse_into_located(buf)?;
+        let peer_key = PeerKey::from_peer_header(&peer_header);
+        let bgp_ctx = ctx.entry(peer_key).or_default();
+        bgp_ctx.set_asn4(peer_header.is_asn4());
+        let (buf, reason) = parse_into_located_one_input(buf, bgp_ctx)?;
+        let (buf, tlvs) = parse_till_empty_into_located(buf)?;
+        let msg = PeerDownNotificationMessage::build(peer_header, reason, tlvs);
+        match msg {
+            Ok(msg) => Ok((buf, msg)),
+            Err(err) => Err(nom::Err::Error(
+                LocatedPeerDownNotificationMessageParsingError::new(
+                    input,
+                    PeerDownNotificationMessageParsingError::PeerDownMessageError(err),
+                ),
             )),
         }
     }
