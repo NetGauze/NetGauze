@@ -32,6 +32,7 @@ arbitrary_ext = { workspace = true, optional = true }
 log = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["codec"], optional = true }
 bytes = { workspace = true, optional = true }
+either = { version = "1.13.0" }
 
 [features]
 default = ["serde"]

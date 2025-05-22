@@ -149,6 +149,7 @@ mod tests {
     use netgauze_bmp_pkt::{
         codec::{BmpCodec, BmpCodecDecoderError},
         iana::UndefinedBmpVersion,
+        v3::*,
         wire::deserializer::BmpMessageParsingError,
         *,
     };
