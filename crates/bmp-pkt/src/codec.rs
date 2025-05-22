@@ -17,15 +17,16 @@
 
 use crate::{
     iana::BmpVersion,
+    v3, v4,
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
-    BmpMessage, BmpV3MessageValue, PeerKey, PeerUpNotificationMessage,
+    BmpMessage, PeerKey,
 };
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
 use std::collections::HashSet;
 
-use crate::{v4::BmpV4MessageValue, wire::deserializer::BmpParsingContext};
+use crate::wire::deserializer::BmpParsingContext;
 use netgauze_bgp_pkt::capabilities::{AddPathCapability, MultipleLabel};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 use nom::Needed;
@@ -96,7 +97,7 @@ impl BmpParsingContext {
     /// of BMP message. It updates BGP parsing flags such as: Add Path and
     /// Multi label MPLS capabilities
     pub fn update(&mut self, msg: &BmpMessage) {
-        fn handle_peer_up(ctx: &mut BmpParsingContext, peer_up: &PeerUpNotificationMessage) {
+        fn handle_peer_up(ctx: &mut BmpParsingContext, peer_up: &v3::PeerUpNotificationMessage) {
             let (sent_open, received_open) =
                 match (peer_up.sent_message(), peer_up.received_message()) {
                     (BgpMessage::Open(sent_open), BgpMessage::Open(received_open)) => {
@@ -167,25 +168,25 @@ impl BmpParsingContext {
 
         match msg {
             BmpMessage::V3(value) => match value {
-                BmpV3MessageValue::PeerDownNotification(peer_down) => {
+                v3::BmpMessageValue::PeerDownNotification(peer_down) => {
                     let peer_key = PeerKey::from_peer_header(peer_down.peer_header());
                     self.remove(&peer_key);
                 }
-                BmpV3MessageValue::Termination(_) => {
+                v3::BmpMessageValue::Termination(_) => {
                     self.clear();
                 }
-                BmpV3MessageValue::PeerUpNotification(peer_up) => {
+                v3::BmpMessageValue::PeerUpNotification(peer_up) => {
                     handle_peer_up(self, peer_up);
                 }
                 _ => {}
             },
             BmpMessage::V4(value) => match value {
-                BmpV4MessageValue::PeerDownNotification(notif) => {
+                v4::BmpMessageValue::PeerDownNotification(notif) => {
                     let peer_key = PeerKey::from_peer_header(notif.peer_header());
                     self.remove(&peer_key);
                 }
-                BmpV4MessageValue::PeerUpNotification(peer_up) => handle_peer_up(self, peer_up),
-                BmpV4MessageValue::Termination(_) => {
+                v4::BmpMessageValue::PeerUpNotification(peer_up) => handle_peer_up(self, peer_up),
+                v4::BmpMessageValue::Termination(_) => {
                     self.clear();
                 }
                 _ => {}
@@ -282,10 +283,12 @@ mod tests {
 
     #[test]
     fn test_codec() -> Result<(), BmpMessageWritingError> {
-        let msg = BmpMessage::V3(BmpV3MessageValue::Initiation(InitiationMessage::new(vec![
-            InitiationInformation::SystemDescription("test11".to_string()),
-            InitiationInformation::SystemName("PE2".to_string()),
-        ])));
+        let msg = BmpMessage::V3(v3::BmpMessageValue::Initiation(v3::InitiationMessage::new(
+            vec![
+                InitiationInformation::SystemDescription("test11".to_string()),
+                InitiationInformation::SystemName("PE2".to_string()),
+            ],
+        )));
         let mut code = BmpCodec::default();
         let mut buf = BytesMut::with_capacity(msg.len());
         let mut empty_buf = BytesMut::with_capacity(msg.len());
@@ -320,8 +323,8 @@ mod tests {
             Some(Utc.timestamp_opt(1664821826, 645593000).unwrap()),
         );
 
-        let peer_up = BmpMessage::V3(BmpV3MessageValue::PeerUpNotification(
-            PeerUpNotificationMessage::build(
+        let peer_up = BmpMessage::V3(v3::BmpMessageValue::PeerUpNotification(
+            v3::PeerUpNotificationMessage::build(
                 peer_header.clone(),
                 Some(IpAddr::V6(Ipv6Addr::from_str("fc00::3").unwrap())),
                 Some(179),
@@ -401,17 +404,17 @@ mod tests {
             .unwrap(),
         ));
 
-        let peer_down = BmpMessage::V3(BmpV3MessageValue::PeerDownNotification(
-            PeerDownNotificationMessage::build(
+        let peer_down = BmpMessage::V3(v3::BmpMessageValue::PeerDownNotification(
+            v3::PeerDownNotificationMessage::build(
                 peer_header.clone(),
                 PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
             )
             .unwrap(),
         ));
 
-        let terminate = BmpMessage::V3(BmpV3MessageValue::Termination(TerminationMessage::new(
-            vec![TerminationInformation::String("test".to_string())],
-        )));
+        let terminate = BmpMessage::V3(v3::BmpMessageValue::Termination(
+            v3::TerminationMessage::new(vec![TerminationInformation::String("test".to_string())]),
+        ));
 
         let mut codec = BmpCodec::default();
         let peer_key = PeerKey::from_peer_header(&peer_header);

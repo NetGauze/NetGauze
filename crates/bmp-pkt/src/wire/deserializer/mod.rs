@@ -17,10 +17,6 @@
 
 use crate::{
     iana::{BmpVersion, UndefinedBmpVersion},
-    wire::deserializer::{
-        v3::{BmpMessageValueParsingError, LocatedBmpMessageValueParsingError},
-        v4::{BmpV4MessageValueParsingError, LocatedBmpV4MessageValueParsingError},
-    },
     BmpMessage, PeerKey,
 };
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
@@ -48,8 +44,8 @@ pub enum BmpMessageParsingError {
     NomError(#[from_nom] ErrorKind),
     UndefinedBmpVersion(#[from_external] UndefinedBmpVersion),
     InvalidBmpLength(u32),
-    BmpMessageValueError(#[from_located(module = "self")] BmpMessageValueParsingError),
-    BmpV4MessageValueError(#[from_located(module = "self")] BmpV4MessageValueParsingError),
+    BmpV3MessageValueError(#[from_located(module = "self")] v3::BmpMessageValueParsingError),
+    BmpV4MessageValueError(#[from_located(module = "self")] v4::BmpMessageValueParsingError),
 }
 
 #[derive(Debug, Default, Clone)]

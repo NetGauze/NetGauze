@@ -27,14 +27,6 @@ use netgauze_iana::address_family::AddressType;
 
 use crate::iana::{BmpMessageType, BmpPeerTypeCode, BmpVersion};
 
-use crate::{
-    v3::{
-        BmpV3MessageValue, InitiationMessage, PeerDownNotificationMessage,
-        PeerUpNotificationMessage, RouteMirroringMessage, RouteMonitoringMessage,
-        StatisticsReportMessage, TerminationMessage,
-    },
-    v4::BmpV4MessageValue,
-};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "codec")]
@@ -59,8 +51,8 @@ pub mod wire;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpMessage {
-    V3(BmpV3MessageValue),
-    V4(BmpV4MessageValue),
+    V3(v3::BmpMessageValue),
+    V4(v4::BmpMessageValue),
 }
 
 impl BmpMessage {

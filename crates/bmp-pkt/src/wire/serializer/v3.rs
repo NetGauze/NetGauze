@@ -19,7 +19,7 @@ use crate::{
         PEER_FLAGS_IS_POST_POLICY,
     },
     v3::{
-        BmpV3MessageValue, InitiationInformation, InitiationMessage, MirroredBgpMessage,
+        BmpMessageValue, InitiationInformation, InitiationMessage, MirroredBgpMessage,
         PeerDownNotificationMessage, PeerDownNotificationReason, PeerUpNotificationMessage,
         RouteMirroringMessage, RouteMirroringValue, RouteMonitoringMessage, StatisticsCounter,
         StatisticsReportMessage, TerminationInformation, TerminationMessage,
@@ -46,7 +46,7 @@ pub enum BmpMessageValueWritingError {
     StatisticsReportMessageError(#[from] StatisticsReportMessageWritingError),
 }
 
-impl WritablePdu<BmpMessageValueWritingError> for BmpV3MessageValue {
+impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     /// 1-octet msg type,
     const BASE_LENGTH: usize = 1;
 

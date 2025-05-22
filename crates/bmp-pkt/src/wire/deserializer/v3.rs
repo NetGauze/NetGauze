@@ -38,16 +38,7 @@ use netgauze_parse_utils::{
 };
 use netgauze_serde_macros::LocatedError;
 
-use crate::{
-    iana::*,
-    v3::{
-        InitiationInformation, MirroredBgpMessage, PeerDownNotificationMessageError,
-        PeerDownNotificationReason, PeerUpNotificationMessageError, RouteMirroringValue,
-        RouteMonitoringMessageError, StatisticsCounter, TerminationInformation,
-    },
-    wire::deserializer::BmpParsingContext,
-    *,
-};
+use crate::{iana::*, v3::*, wire::deserializer::BmpParsingContext, *};
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpMessageValueParsingError {
@@ -72,7 +63,7 @@ pub enum BmpMessageValueParsingError {
 }
 
 impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageValueParsingError<'a>>
-    for BmpV3MessageValue
+    for v3::BmpMessageValue
 {
     fn from_wire(
         buf: Span<'a>,
@@ -82,43 +73,43 @@ impl<'a> ReadablePduWithOneInput<'a, &mut BmpParsingContext, LocatedBmpMessageVa
         let (buf, msg) = match msg_type {
             BmpMessageType::RouteMonitoring => {
                 let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpV3MessageValue::RouteMonitoring(value))
+                (buf, BmpMessageValue::RouteMonitoring(value))
             }
             BmpMessageType::StatisticsReport => {
                 let (buf, value) = parse_into_located(buf)?;
-                (buf, BmpV3MessageValue::StatisticsReport(value))
+                (buf, BmpMessageValue::StatisticsReport(value))
             }
             BmpMessageType::PeerDownNotification => {
                 let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpV3MessageValue::PeerDownNotification(value))
+                (buf, BmpMessageValue::PeerDownNotification(value))
             }
             BmpMessageType::PeerUpNotification => {
                 let (buf, value) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpV3MessageValue::PeerUpNotification(value))
+                (buf, BmpMessageValue::PeerUpNotification(value))
             }
             BmpMessageType::Initiation => {
                 let (buf, init) = parse_into_located(buf)?;
-                (buf, BmpV3MessageValue::Initiation(init))
+                (buf, BmpMessageValue::Initiation(init))
             }
             BmpMessageType::Termination => {
                 let (buf, init) = parse_into_located(buf)?;
-                (buf, BmpV3MessageValue::Termination(init))
+                (buf, BmpMessageValue::Termination(init))
             }
             BmpMessageType::RouteMirroring => {
                 let (buf, init) = parse_into_located_one_input(buf, ctx)?;
-                (buf, BmpV3MessageValue::RouteMirroring(init))
+                (buf, BmpMessageValue::RouteMirroring(init))
             }
             BmpMessageType::Experimental251 => {
-                (buf, BmpV3MessageValue::Experimental252(buf.to_vec()))
+                (buf, BmpMessageValue::Experimental252(buf.to_vec()))
             }
             BmpMessageType::Experimental252 => {
-                (buf, BmpV3MessageValue::Experimental252(buf.to_vec()))
+                (buf, BmpMessageValue::Experimental252(buf.to_vec()))
             }
             BmpMessageType::Experimental253 => {
-                (buf, BmpV3MessageValue::Experimental253(buf.to_vec()))
+                (buf, BmpMessageValue::Experimental253(buf.to_vec()))
             }
             BmpMessageType::Experimental254 => {
-                (buf, BmpV3MessageValue::Experimental254(buf.to_vec()))
+                (buf, BmpMessageValue::Experimental254(buf.to_vec()))
             }
         };
         Ok((buf, msg))

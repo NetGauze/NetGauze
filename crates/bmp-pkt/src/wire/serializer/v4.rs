@@ -15,7 +15,7 @@
 
 use crate::{
     v4::{
-        BmpV4MessageValue, PeerDownNotificationMessage, PeerDownTlv, RouteMonitoringMessage,
+        BmpMessageValue, PeerDownNotificationMessage, PeerDownTlv, RouteMonitoringMessage,
         RouteMonitoringTlv, RouteMonitoringTlvValue,
     },
     wire::serializer::v3::{
@@ -34,9 +34,9 @@ use netgauze_serde_macros::WritingError;
 use std::{convert::identity, io::Write};
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BmpV4MessageValueWritingError {
+pub enum BmpMessageValueWritingError {
     StdIOError(#[from_std_io_error] String),
-    RouteMonitoringMessage(#[from] BmpV4RouteMonitoringMessageWritingError),
+    RouteMonitoringMessage(#[from] RouteMonitoringMessageWritingError),
     RouteMirroringMessage(#[from] RouteMirroringMessageWritingError),
     InitiationMessage(#[from] InitiationMessageWritingError),
     PeerUpNotificationMessage(#[from] PeerUpNotificationMessageWritingError),
@@ -46,7 +46,7 @@ pub enum BmpV4MessageValueWritingError {
     StatisticsReportMessage(#[from] StatisticsReportMessageWritingError),
 }
 
-impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
+impl WritablePdu<BmpMessageValueWritingError> for BmpMessageValue {
     /// 1-octet msg type,
     const BASE_LENGTH: usize = 1;
 
@@ -67,7 +67,7 @@ impl WritablePdu<BmpV4MessageValueWritingError> for BmpV4MessageValue {
         Self::BASE_LENGTH + len
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpV4MessageValueWritingError> {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpMessageValueWritingError> {
         writer.write_u8(self.get_type().into())?;
         match self {
             Self::RouteMonitoring(value) => value.write(writer)?,
@@ -148,13 +148,13 @@ impl WritablePdu<PeerDownTlvWritingError> for PeerDownTlv {
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BmpV4RouteMonitoringMessageWritingError {
+pub enum RouteMonitoringMessageWritingError {
     StdIOError(#[from_std_io_error] String),
     PeerHeader(#[from] PeerHeaderWritingError),
-    TlvV4(#[from] BmpV4RouteMonitoringTlvWritingError),
+    TlvV4(#[from] RouteMonitoringTlvWritingError),
 }
 
-impl WritablePdu<BmpV4RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
+impl WritablePdu<RouteMonitoringMessageWritingError> for RouteMonitoringMessage {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -164,10 +164,7 @@ impl WritablePdu<BmpV4RouteMonitoringMessageWritingError> for RouteMonitoringMes
             + self.tlvs().iter().map(|x| x.len()).sum::<usize>()
     }
 
-    fn write<T: Write>(
-        &self,
-        writer: &mut T,
-    ) -> Result<(), BmpV4RouteMonitoringMessageWritingError> {
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMonitoringMessageWritingError> {
         self.peer_header().write(writer)?;
         for tlv in self.tlvs() {
             tlv.write(writer)?;
@@ -180,12 +177,12 @@ impl WritablePdu<BmpV4RouteMonitoringMessageWritingError> for RouteMonitoringMes
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BmpV4RouteMonitoringTlvWritingError {
+pub enum RouteMonitoringTlvWritingError {
     StdIOError(#[from_std_io_error] String),
-    BmpV4RouteMonitoringTlvValueError(#[from] BmpV4RouteMonitoringTlvValueWritingError),
+    RouteMonitoringTlvValueError(#[from] RouteMonitoringTlvValueWritingError),
 }
 
-impl WritablePdu<BmpV4RouteMonitoringTlvWritingError> for RouteMonitoringTlv {
+impl WritablePdu<RouteMonitoringTlvWritingError> for RouteMonitoringTlv {
     const BASE_LENGTH: usize = 2 + 2 + 2; /* type + length + index */
 
     fn len(&self) -> usize {
@@ -194,7 +191,7 @@ impl WritablePdu<BmpV4RouteMonitoringTlvWritingError> for RouteMonitoringTlv {
         x
     }
 
-    fn write<T: Write>(&self, writer: &mut T) -> Result<(), BmpV4RouteMonitoringTlvWritingError>
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMonitoringTlvWritingError>
     where
         Self: Sized,
     {
@@ -211,13 +208,13 @@ impl WritablePdu<BmpV4RouteMonitoringTlvWritingError> for RouteMonitoringTlv {
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
-pub enum BmpV4RouteMonitoringTlvValueWritingError {
+pub enum RouteMonitoringTlvValueWritingError {
     StdIOError(#[from_std_io_error] String),
     BgpMessageWritingError(#[from] BgpMessageWritingError),
     BgpCapability(#[from] BGPCapabilityWritingError),
 }
 
-impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for RouteMonitoringTlvValue {
+impl WritablePdu<RouteMonitoringTlvValueWritingError> for RouteMonitoringTlvValue {
     const BASE_LENGTH: usize = 0;
 
     fn len(&self) -> usize {
@@ -231,10 +228,7 @@ impl WritablePdu<BmpV4RouteMonitoringTlvValueWritingError> for RouteMonitoringTl
         }
     }
 
-    fn write<T: Write>(
-        &self,
-        writer: &mut T,
-    ) -> Result<(), BmpV4RouteMonitoringTlvValueWritingError>
+    fn write<T: Write>(&self, writer: &mut T) -> Result<(), RouteMonitoringTlvValueWritingError>
     where
         Self: Sized,
     {

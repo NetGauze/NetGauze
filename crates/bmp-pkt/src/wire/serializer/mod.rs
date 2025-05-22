@@ -18,10 +18,7 @@
 pub mod v3;
 pub mod v4;
 
-use crate::{
-    wire::serializer::{v3::BmpMessageValueWritingError, v4::BmpV4MessageValueWritingError},
-    *,
-};
+use crate::*;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
@@ -30,8 +27,8 @@ use std::io::Write;
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageWritingError {
     StdIOError(#[from_std_io_error] String),
-    BmpMessageValueError(#[from] BmpMessageValueWritingError),
-    BmpV4MessageValueError(#[from] BmpV4MessageValueWritingError),
+    BmpV3MessageValueError(#[from] v3::BmpMessageValueWritingError),
+    BmpV4MessageValueError(#[from] v4::BmpMessageValueWritingError),
 }
 
 impl WritablePdu<BmpMessageWritingError> for BmpMessage {

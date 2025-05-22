@@ -26,7 +26,7 @@ pub const BMPV4_TLV_GROUP_GBIT: u16 = 0x8000;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum BmpV4MessageValue {
+pub enum BmpMessageValue {
     RouteMonitoring(RouteMonitoringMessage),
     StatisticsReport(v3::StatisticsReportMessage),
     PeerDownNotification(PeerDownNotificationMessage),
@@ -54,20 +54,20 @@ impl PeerDownTlv {
     }
 }
 
-impl BmpV4MessageValue {
+impl BmpMessageValue {
     pub const fn get_type(&self) -> BmpMessageType {
         match self {
-            BmpV4MessageValue::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
-            BmpV4MessageValue::StatisticsReport(_) => BmpMessageType::StatisticsReport,
-            BmpV4MessageValue::PeerDownNotification { .. } => BmpMessageType::PeerDownNotification,
-            BmpV4MessageValue::PeerUpNotification(_) => BmpMessageType::PeerUpNotification,
-            BmpV4MessageValue::Initiation(_) => BmpMessageType::Initiation,
-            BmpV4MessageValue::Termination(_) => BmpMessageType::Termination,
-            BmpV4MessageValue::RouteMirroring(_) => BmpMessageType::RouteMirroring,
-            BmpV4MessageValue::Experimental251(_) => BmpMessageType::Experimental251,
-            BmpV4MessageValue::Experimental252(_) => BmpMessageType::Experimental252,
-            BmpV4MessageValue::Experimental253(_) => BmpMessageType::Experimental253,
-            BmpV4MessageValue::Experimental254(_) => BmpMessageType::Experimental254,
+            BmpMessageValue::RouteMonitoring(_) => BmpMessageType::RouteMonitoring,
+            BmpMessageValue::StatisticsReport(_) => BmpMessageType::StatisticsReport,
+            BmpMessageValue::PeerDownNotification { .. } => BmpMessageType::PeerDownNotification,
+            BmpMessageValue::PeerUpNotification(_) => BmpMessageType::PeerUpNotification,
+            BmpMessageValue::Initiation(_) => BmpMessageType::Initiation,
+            BmpMessageValue::Termination(_) => BmpMessageType::Termination,
+            BmpMessageValue::RouteMirroring(_) => BmpMessageType::RouteMirroring,
+            BmpMessageValue::Experimental251(_) => BmpMessageType::Experimental251,
+            BmpMessageValue::Experimental252(_) => BmpMessageType::Experimental252,
+            BmpMessageValue::Experimental253(_) => BmpMessageType::Experimental253,
+            BmpMessageValue::Experimental254(_) => BmpMessageType::Experimental254,
         }
     }
 }

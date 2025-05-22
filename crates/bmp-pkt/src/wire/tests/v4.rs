@@ -14,16 +14,10 @@
 // limitations under the License.
 
 use crate::{
-    v3::PeerDownNotificationReason,
-    v4::{
-        PeerDownTlv, RouteMonitoringMessage, RouteMonitoringTlv, RouteMonitoringTlvValue,
-        BMPV4_TLV_GROUP_GBIT,
-    },
+    v4::*,
     wire::{
         deserializer::{
-            v3::*,
-            v4::{BmpV4MessageValueParsingError, BmpV4RouteMonitoringMessageParsingError},
-            BmpMessageParsingError, BmpParsingContext, LocatedBmpMessageParsingError,
+            v4::*, BmpMessageParsingError, BmpParsingContext, LocatedBmpMessageParsingError,
         },
         serializer::BmpMessageWritingError,
     },
@@ -67,7 +61,7 @@ fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {
         0x13, 0x20, 0xc6, 0x33, 0x64, 0x13,
     ];
 
-    let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
+    let good = BmpMessage::V4(v4::BmpMessageValue::RouteMonitoring(
         RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -153,7 +147,7 @@ fn test_bmp_v4_route_monitoring_with_groups() -> Result<(), BmpMessageWritingErr
         0x20, 0xc6, 0x33, 0x64, 0x13,
     ];
 
-    let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
+    let good = BmpMessage::V4(v4::BmpMessageValue::RouteMonitoring(
         RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -239,7 +233,7 @@ fn test_bmp_v4_route_monitoring_with_stateless_parsing() -> Result<(), BmpMessag
         0, 56, 0, 1, 0, 0, 0, 1, 0, 19, 0, 0, 0, 69, 32, 198, 51, 100, 19,
     ];
 
-    let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
+    let good = BmpMessage::V4(BmpMessageValue::RouteMonitoring(
         RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -317,7 +311,7 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
         0, 69, 32, 198, 51, 100, 19,
     ];
 
-    let good = BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(
+    let good = BmpMessage::V4(BmpMessageValue::RouteMonitoring(
         RouteMonitoringMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
@@ -373,8 +367,8 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
     let error = LocatedBmpMessageParsingError::new(
         unsafe { Span::new_from_raw_offset(102, &good_wire[102..]) },
         BmpMessageParsingError::BmpV4MessageValueError(
-            BmpV4MessageValueParsingError::RouteMonitoringMessageError(
-                BmpV4RouteMonitoringMessageParsingError::BgpMessage(
+            BmpMessageValueParsingError::RouteMonitoringMessageError(
+                RouteMonitoringMessageParsingError::BgpMessage(
                     BgpMessageParsingError::BgpUpdateMessageParsingError(
                         BgpUpdateMessageParsingError::Ipv4PrefixError(
                             Ipv4PrefixParsingError::InvalidIpv4PrefixLen(69),
@@ -394,7 +388,7 @@ fn test_bmp_v4_route_monitoring_without_stateless_parsing() -> Result<(), BmpMes
 
     let mut good_context = BmpParsingContext::default();
     let per_peer_header = match &good {
-        BmpMessage::V4(BmpV4MessageValue::RouteMonitoring(bmpv4_rm)) => bmpv4_rm.peer_header(),
+        BmpMessage::V4(BmpMessageValue::RouteMonitoring(rm)) => rm.peer_header(),
         _ => unreachable!(),
     };
 
@@ -426,8 +420,8 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
     ];
     let bad_eof_wire = [];
 
-    let good = BmpMessage::V4(BmpV4MessageValue::PeerDownNotification(
-        v4::PeerDownNotificationMessage::build(
+    let good = BmpMessage::V4(BmpMessageValue::PeerDownNotification(
+        PeerDownNotificationMessage::build(
             PeerHeader::new(
                 BmpPeerType::GlobalInstancePeer {
                     ipv6: true,
@@ -441,7 +435,7 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
                 Ipv4Addr::new(10, 0, 0, 1),
                 Some(Utc.timestamp_opt(1664821843, 487907000).unwrap()),
             ),
-            PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
+            v3::PeerDownNotificationReason::LocalSystemClosedFsmEventFollows(2),
             vec![PeerDownTlv::Unknown {
                 code: 16,
                 value: vec![0, 1, 2, 3, 4, 5, 6, 7],
@@ -458,7 +452,7 @@ fn test_bmp_v4_peer_down_notification() -> Result<(), BmpMessageWritingError> {
     test_parsed_completely_with_one_input(&good_wire, &mut Default::default(), &good);
 
     test_parse_error_with_one_input::<
-        BmpV3MessageValue,
+        BmpMessageValue,
         &mut BmpParsingContext,
         LocatedBmpMessageValueParsingError<'_>,
     >(&bad_eof_wire, &mut Default::default(), &bad_eof);
