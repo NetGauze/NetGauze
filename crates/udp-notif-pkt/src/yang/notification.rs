@@ -399,7 +399,8 @@ pub enum UpdateTrigger {
     #[serde(rename = "ietf-yang-push:periodic")]
     #[serde(rename_all = "kebab-case")]
     Periodic {
-        period: CentiSeconds,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        period: Option<CentiSeconds>,
 
         #[serde(skip_serializing_if = "Option::is_none")]
         anchor_time: Option<DateTime<Utc>>,
@@ -434,7 +435,8 @@ pub enum ChangeType {
 pub struct YangPushModuleVersion {
     pub module_name: String,
 
-    pub revision: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revision_label: Option<String>,
@@ -594,7 +596,7 @@ mod tests {
             },
             module_version: Some(vec![YangPushModuleVersion {
                 module_name: "example-module".to_string(),
-                revision: "2025-04-25".to_string(),
+                revision: Some("2025-04-25".to_string()),
                 revision_label: None,
             }]),
             yang_library_content_id: Some("content-id".to_string()),
@@ -686,7 +688,7 @@ mod tests {
             },
             module_version: Some(vec![YangPushModuleVersion {
                 module_name: "example-module".to_string(),
-                revision: "2025-04-25".to_string(),
+                revision: Some("2025-04-25".to_string()),
                 revision_label: None,
             }]),
             yang_library_content_id: Some("content-id".to_string()),

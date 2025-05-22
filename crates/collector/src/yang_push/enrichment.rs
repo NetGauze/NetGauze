@@ -30,7 +30,7 @@
 //! - `YangPushEnrichmentStats` - Metrics for tracking the performance and
 //!   behavior of the enrichment process.
 use crate::telemetry::{
-    DataCollectionMetadata, FilterSpec, Label, LabelValue, Manifest, SessionProtocol,
+    DataCollectionMetadata, FilterSpec, Label, LabelValue, Manifest, Message, SessionProtocol,
     TelemetryMessage, TelemetryMessageMetadata, YangPushSubscriptionMetadata,
 };
 use netgauze_udp_notif_pkt::{
@@ -248,7 +248,7 @@ impl YangPushEnrichmentActor {
             transport: sub.transport().cloned(),
             encoding: sub.encoding().cloned(),
             purpose: sub.purpose().cloned(),
-            update_trigger: sub.update_trigger().clone(),
+            update_trigger: sub.update_trigger().clone().into(),
             module_version: sub.module_version().cloned().unwrap_or_default(),
             yang_library_content_id: sub.yang_library_content_id().map(|id| id.to_string()),
         };
@@ -348,7 +348,7 @@ impl YangPushEnrichmentActor {
             .map(|(key, value)| Label {
                 name: key.clone(),
                 value: Some(LabelValue::StringValue {
-                    string_values: value.clone(),
+                    string_value: value.clone(),
                 }),
             })
             .collect();
@@ -427,19 +427,21 @@ impl YangPushEnrichmentActor {
 
         // Populate metadata and payload in a new TelemetryMessage
         Ok(TelemetryMessage {
-            timestamp,
-            session_protocol: SessionProtocol::YangPush, // only option at the moment
-            network_node_manifest: Manifest::default(),
-            data_collection_manifest: self.manifest.clone(),
-            telemetry_message_metadata,
-            data_collection_metadata: DataCollectionMetadata {
-                remote_address: peer.ip(),
-                remote_port: Some(peer.port()),
-                local_address: None,
-                local_port: None,
-                labels,
+            message: Message {
+                timestamp,
+                session_protocol: SessionProtocol::YangPush, // only option at the moment
+                network_node_manifest: Manifest::default(),
+                data_collection_manifest: self.manifest.clone(),
+                telemetry_message_metadata,
+                data_collection_metadata: DataCollectionMetadata {
+                    remote_address: peer.ip(),
+                    remote_port: Some(peer.port()),
+                    local_address: None,
+                    local_port: None,
+                    labels,
+                },
+                payload: Some(json_payload),
             },
-            payload: Some(json_payload),
         })
     }
 
@@ -601,7 +603,7 @@ mod tests {
             Some(Encoding::Json),
             Some(purpose),
             UpdateTrigger::Periodic {
-                period: CentiSeconds::new(100),
+                period: Some(CentiSeconds::new(100)),
                 anchor_time: None,
             },
             None,
@@ -702,9 +704,10 @@ mod tests {
                 .unwrap()
                 .update_trigger,
             UpdateTrigger::Periodic {
-                period: CentiSeconds::new(100),
+                period: Some(CentiSeconds::new(100)),
                 anchor_time: None
             }
+            .into()
         );
         assert_eq!(
             peer_subscription

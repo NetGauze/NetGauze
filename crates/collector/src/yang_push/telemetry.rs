@@ -35,14 +35,20 @@ use serde_json::Value;
 use std::net::IpAddr;
 
 use netgauze_udp_notif_pkt::yang::notification::{
-    Encoding, SubscriptionId, Transport, UpdateTrigger, YangPushModuleVersion,
+    CentiSeconds, ChangeType, Encoding, SubscriptionId, Transport, YangPushModuleVersion,
 };
 
-/// Telemetry Message
+/// Telemetry Message Wrapper
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
-#[serde(rename = "ietf-telemetry-message:message")]
-#[serde(rename_all = "kebab-case")]
 pub struct TelemetryMessage {
+    #[serde(rename = "ietf-telemetry-message:message")]
+    pub message: Message,
+}
+
+/// Telemetry Message Content
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct Message {
     pub timestamp: chrono::DateTime<Utc>,
     pub session_protocol: SessionProtocol,
     pub network_node_manifest: Manifest,
@@ -99,12 +105,13 @@ pub struct Manifest {
 
 /// Telemetry Notification Metadata
 #[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-#[serde(rename_all = "kebab-case")]
 pub struct TelemetryMessageMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "event-time")]
     pub event_time: Option<DateTime<Utc>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "ietf-yang-push-telemetry-message:yang-push-subscription")]
     pub yang_push_subscription: Option<YangPushSubscriptionMetadata>,
 }
 
@@ -154,6 +161,56 @@ pub struct FilterSpec {
     pub subtree_filter: Option<Value>,
 }
 
+/// Update Trigger for Yang Push Subscription
+/// (redefined for Telemetry Message)
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum UpdateTrigger {
+    #[serde(rename = "periodic")]
+    #[serde(rename_all = "kebab-case")]
+    Periodic {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        period: Option<CentiSeconds>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
+        anchor_time: Option<DateTime<Utc>>,
+    },
+
+    #[serde(rename = "on-change")]
+    #[serde(rename_all = "kebab-case")]
+    OnChange {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        dampening_period: Option<CentiSeconds>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sync_on_start: Option<bool>,
+
+        #[serde(skip_serializing_if = "Option::is_none")]
+        excluded_change: Option<Vec<ChangeType>>,
+    },
+}
+impl From<netgauze_udp_notif_pkt::yang::notification::UpdateTrigger> for UpdateTrigger {
+    fn from(trigger: netgauze_udp_notif_pkt::yang::notification::UpdateTrigger) -> Self {
+        match trigger {
+            netgauze_udp_notif_pkt::yang::notification::UpdateTrigger::Periodic {
+                period,
+                anchor_time,
+            } => UpdateTrigger::Periodic {
+                period,
+                anchor_time,
+            },
+            netgauze_udp_notif_pkt::yang::notification::UpdateTrigger::OnChange {
+                dampening_period,
+                sync_on_start,
+                excluded_change,
+            } => UpdateTrigger::OnChange {
+                dampening_period,
+                sync_on_start,
+                excluded_change,
+            },
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct DataCollectionMetadata {
@@ -183,8 +240,8 @@ pub struct Label {
 #[serde(untagged)]
 pub enum LabelValue {
     StringValue {
-        #[serde(rename = "string-values")]
-        string_values: String,
+        #[serde(rename = "string-value")]
+        string_value: String,
     },
     AnydataValue {
         #[serde(rename = "anydata-values")]
@@ -203,85 +260,87 @@ mod tests {
     #[test]
     fn test_telemetry_message_serde() {
         let original_message = TelemetryMessage {
-            timestamp: Utc.timestamp_millis_opt(0).unwrap(),
-            session_protocol: SessionProtocol::YangPush,
-            network_node_manifest: Manifest {
-                name: Some("node_id".to_string()),
-                vendor: Some("FRR".to_string()),
-                vendor_pen: None,
-                software_version: None,
-                software_flavor: None,
-                os_version: None,
-                os_type: None,
+            message: Message {
+                timestamp: Utc.timestamp_millis_opt(0).unwrap(),
+                session_protocol: SessionProtocol::YangPush,
+                network_node_manifest: Manifest {
+                    name: Some("node_id".to_string()),
+                    vendor: Some("FRR".to_string()),
+                    vendor_pen: None,
+                    software_version: None,
+                    software_flavor: None,
+                    os_version: None,
+                    os_type: None,
+                },
+                data_collection_manifest: Manifest {
+                    name: Some("dev-collector".to_string()),
+                    vendor: Some("NetGauze".to_string()),
+                    vendor_pen: Some(12345),
+                    software_version: Some("1.0.0".to_string()),
+                    software_flavor: Some("release".to_string()),
+                    os_version: Some("8.10".to_string()),
+                    os_type: Some("Rocky Linux".to_string()),
+                },
+                telemetry_message_metadata: TelemetryMessageMetadata {
+                    event_time: None,
+                    yang_push_subscription: Some(YangPushSubscriptionMetadata {
+                        id: Some(1),
+                        filter_spec: FilterSpec {
+                            stream: Some("example-stream-subtree-filter-map".to_string()),
+                            datastore: None,
+                            xpath_filter: None,
+                            subtree_filter: Some(serde_json::json!({
+                              "example-map": serde_json::json!({
+                                  "e1": "v1",
+                                  "e2": "v2",
+                              }),
+                            })),
+                        },
+                        stop_time: None,
+                        transport: Some(Transport::UDPNotif),
+                        encoding: Some(Encoding::Json),
+                        purpose: None,
+                        update_trigger: UpdateTrigger::Periodic {
+                            period: Some(CentiSeconds::new(100)),
+                            anchor_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
+                        },
+                        module_version: vec![YangPushModuleVersion {
+                            module_name: "example-module".to_string(),
+                            revision: Some("2025-01-01".to_string()),
+                            revision_label: Some("1.0.0".to_string()),
+                        }],
+                        yang_library_content_id: Some("random-content-id".to_string()),
+                    }),
+                },
+                data_collection_metadata: DataCollectionMetadata {
+                    remote_address: "127.0.0.1".parse().unwrap(),
+                    remote_port: Some(8080),
+                    local_address: None,
+                    local_port: None,
+                    labels: vec![
+                        Label {
+                            name: "platform_id".to_string(),
+                            value: Some(LabelValue::StringValue {
+                                string_value: "IETF LAB".to_string(),
+                            }),
+                        },
+                        Label {
+                            name: "test_anykey_label".to_string(),
+                            value: Some(LabelValue::AnydataValue {
+                                anydata_values: serde_json::json!({"key": "value"}),
+                            }),
+                        },
+                    ],
+                },
+                payload: None,
             },
-            data_collection_manifest: Manifest {
-                name: Some("dev-collector".to_string()),
-                vendor: Some("NetGauze".to_string()),
-                vendor_pen: Some(12345),
-                software_version: Some("1.0.0".to_string()),
-                software_flavor: Some("release".to_string()),
-                os_version: Some("8.10".to_string()),
-                os_type: Some("Rocky Linux".to_string()),
-            },
-            telemetry_message_metadata: TelemetryMessageMetadata {
-                event_time: None,
-                yang_push_subscription: Some(YangPushSubscriptionMetadata {
-                    id: Some(1),
-                    filter_spec: FilterSpec {
-                        stream: Some("example-stream-subtree-filter-map".to_string()),
-                        datastore: None,
-                        xpath_filter: None,
-                        subtree_filter: Some(serde_json::json!({
-                          "example-map": serde_json::json!({
-                              "e1": "v1",
-                              "e2": "v2",
-                          }),
-                        })),
-                    },
-                    stop_time: None,
-                    transport: Some(Transport::UDPNotif),
-                    encoding: Some(Encoding::Json),
-                    purpose: None,
-                    update_trigger: UpdateTrigger::Periodic {
-                        period: CentiSeconds::new(100),
-                        anchor_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
-                    },
-                    module_version: vec![YangPushModuleVersion {
-                        module_name: "example-module".to_string(),
-                        revision: "2025-01-01".to_string(),
-                        revision_label: Some("1.0.0".to_string()),
-                    }],
-                    yang_library_content_id: Some("random-content-id".to_string()),
-                }),
-            },
-            data_collection_metadata: DataCollectionMetadata {
-                remote_address: "127.0.0.1".parse().unwrap(),
-                remote_port: Some(8080),
-                local_address: None,
-                local_port: None,
-                labels: vec![
-                    Label {
-                        name: "platform_id".to_string(),
-                        value: Some(LabelValue::StringValue {
-                            string_values: "IETF LAB".to_string(),
-                        }),
-                    },
-                    Label {
-                        name: "test_anykey_label".to_string(),
-                        value: Some(LabelValue::AnydataValue {
-                            anydata_values: serde_json::json!({"key": "value"}),
-                        }),
-                    },
-                ],
-            },
-            payload: None,
         };
 
         // Serialize the TelemetryMessage to JSON
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Expected JSON string
-        let expected_json = r#"{"timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-message-metadata":{"yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","ietf-yang-push:periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-values":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}"#;
+        let expected_json = r#"{"ietf-telemetry-message:message":{"timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-message-metadata":{"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
