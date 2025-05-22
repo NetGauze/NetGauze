@@ -226,7 +226,7 @@ impl WritablePdu<RouteMonitoringTlvValueWritingError> for RouteMonitoringTlvValu
             RouteMonitoringTlvValue::StatelessParsing(capability) => capability.len(),
             RouteMonitoringTlvValue::Unknown { value, .. } => value.len(),
             RouteMonitoringTlvValue::PathMarking(path_marking) => {
-                4 + path_marking.reason_code.map(|_| 2).unwrap_or(0)
+                4 + path_marking.reason_code().map(|_| 2).unwrap_or(0)
             }
         }
     }
@@ -246,9 +246,9 @@ impl WritablePdu<RouteMonitoringTlvValueWritingError> for RouteMonitoringTlvValu
             RouteMonitoringTlvValue::StatelessParsing(capability) => capability.write(writer)?,
             RouteMonitoringTlvValue::Unknown { value, .. } => writer.write_all(value)?,
             RouteMonitoringTlvValue::PathMarking(path_marking) => {
-                writer.write_u32::<NetworkEndian>(path_marking.path_status)?;
-                if let Some(reason_code) = path_marking.reason_code {
-                    writer.write_u16::<NetworkEndian>(reason_code as u16)?
+                writer.write_u32::<NetworkEndian>(path_marking.path_status())?;
+                if let Some(reason_code) = path_marking.reason_code() {
+                    writer.write_u16::<NetworkEndian>(reason_code)?
                 }
             }
         }

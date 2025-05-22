@@ -17,7 +17,7 @@ use crate::{
     iana::{BmpMessageType, UndefinedBmpMessageType},
     v3,
     v4::{
-        BmpMessageValue, PathMarking, PathMarkingReason, PeerDownNotificationMessage, PeerDownTlv,
+        BmpMessageValue, PathMarking, PeerDownNotificationMessage, PeerDownTlv,
         RouteMonitoringError, RouteMonitoringMessage, RouteMonitoringTlv, RouteMonitoringTlvError,
         RouteMonitoringTlvType, RouteMonitoringTlvValue,
     },
@@ -37,10 +37,9 @@ use netgauze_parse_utils::{
     ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::number::complete::be_u32;
 use nom::{
     error::{ErrorKind, FromExternalError},
-    number::complete::{be_u16, be_u8},
+    number::complete::{be_u16, be_u32, be_u8},
     IResult,
 };
 use serde::{Deserialize, Serialize};
@@ -376,7 +375,6 @@ pub enum PathMarkingParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     ReasonCodeBadLength(usize),
-    UnknownPathMarkingReason(u16),
 }
 
 impl<'a> ReadablePdu<'a, LocatedPathMarkingParsingError<'a>> for PathMarking {
@@ -391,14 +389,6 @@ impl<'a> ReadablePdu<'a, LocatedPathMarkingParsingError<'a>> for PathMarking {
             0 => (data, None),
             2 => {
                 let (data, reason_code) = be_u16(data)?;
-
-                let reason_code = PathMarkingReason::from_repr(reason_code).ok_or_else(|| {
-                    nom::Err::Error(LocatedPathMarkingParsingError::new(
-                        data,
-                        PathMarkingParsingError::UnknownPathMarkingReason(reason_code),
-                    ))
-                })?;
-
                 (data, Some(reason_code))
             }
             _ => {
@@ -409,12 +399,6 @@ impl<'a> ReadablePdu<'a, LocatedPathMarkingParsingError<'a>> for PathMarking {
             }
         };
 
-        Ok((
-            data,
-            PathMarking {
-                path_status,
-                reason_code,
-            },
-        ))
+        Ok((data, PathMarking::new(path_status, reason_code)))
     }
 }

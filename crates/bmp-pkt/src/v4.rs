@@ -187,8 +187,29 @@ pub enum RouteMonitoringTlvValue {
 pub struct PathMarking {
     /// Represented as u32 instead of [PathStatus] since it is a bitflag
     /// [PathStatus] is just a collection of all possible flags in this bitflag
-    pub path_status: u32,
-    pub reason_code: Option<PathMarkingReason>,
+    path_status: u32,
+    /// Represented as u16 instead of [PathMarkingReason] to accept
+    /// non-IANA-defined reason codes Well-known reason codes are defined in
+    /// [PathMarkingReason] Reason codes are used (Some(_)) with
+    /// [PathStatus::Invalid] and [PathStatus::NonSelected]
+    reason_code: Option<u16>,
+}
+
+impl PathMarking {
+    pub const fn new(path_status: u32, reason_code: Option<PathStatus>) -> PathMarking {
+        Self {
+            path_status,
+            reason_code: reason_code.map(Into::into),
+        }
+    }
+
+    pub const fn path_status(&self) -> u32 {
+        self.path_status
+    }
+
+    pub const fn reason_code(&self) -> Option<u16> {
+        self.reason_code
+    }
 }
 
 // TODO assign real codes and move to IANA when draft becomes RFC

@@ -562,10 +562,10 @@ fn test_bmp_v4_path_marking() -> Result<(), BmpMessageWritingError> {
                 .unwrap(),
                 RouteMonitoringTlv::build(
                     0,
-                    RouteMonitoringTlvValue::PathMarking(PathMarking {
-                        path_status: PathStatus::Primary | PathStatus::Best,
-                        reason_code: None,
-                    }),
+                    RouteMonitoringTlvValue::PathMarking(PathMarking::new(
+                        PathStatus::Primary | PathStatus::Best,
+                        None,
+                    )),
                 )
                 .unwrap(),
             ],
@@ -689,10 +689,10 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
                 .unwrap(),
                 RouteMonitoringTlv::build(
                     0,
-                    RouteMonitoringTlvValue::PathMarking(PathMarking {
-                        path_status: 0 | PathStatus::Invalid,
-                        reason_code: Some(PathMarkingReason::InvalidAsLoop),
-                    }),
+                    RouteMonitoringTlvValue::PathMarking(PathMarking::new(
+                        0 | PathStatus::Invalid,
+                        Some(PathMarkingReason::InvalidAsLoop as u16),
+                    )),
                 )
                 .unwrap(),
             ],
