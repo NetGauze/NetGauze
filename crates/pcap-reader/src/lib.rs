@@ -208,16 +208,24 @@ impl<'a> PcapIter<'a> {
                 Ipv4::Udp(udp) => {
                     let src_port = udp.source_port();
                     let dst_port = udp.destination_port();
+                    // UDP payload length, to avoiding parsing any padding bytes.
+                    let len = udp.length() as usize - 8;
                     match udp.inner() {
                         Err(_) => None,
-                        Ok(Udp::Raw(payload)) => Some((
-                            src_ip,
-                            src_port,
-                            dst_ip,
-                            dst_port,
-                            TransportProtocol::UDP,
-                            payload.to_vec(),
-                        )),
+                        Ok(Udp::Raw(payload)) => {
+                            assert!(
+                                len <= payload.len(),
+                                "Invalid UDP payload length calculation"
+                            );
+                            Some((
+                                src_ip,
+                                src_port,
+                                dst_ip,
+                                dst_port,
+                                TransportProtocol::UDP,
+                                payload[..len].to_vec(),
+                            ))
+                        }
                     }
                 }
                 Ipv4::Icmp(_) => None,
