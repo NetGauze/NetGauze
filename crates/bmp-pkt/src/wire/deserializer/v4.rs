@@ -32,6 +32,7 @@ use netgauze_bgp_pkt::{
     BgpMessage,
 };
 
+use crate::v4::PathMarkingReason;
 use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
     ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span,
@@ -399,6 +400,9 @@ impl<'a> ReadablePdu<'a, LocatedPathMarkingParsingError<'a>> for PathMarking {
             }
         };
 
-        Ok((data, PathMarking::new(path_status, reason_code)))
+        Ok((
+            data,
+            PathMarking::new(path_status, reason_code.map(PathMarkingReason::from_code)),
+        ))
     }
 }

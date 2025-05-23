@@ -192,14 +192,14 @@ pub struct PathMarking {
     /// non-IANA-defined reason codes Well-known reason codes are defined in
     /// [PathMarkingReason] Reason codes are used (Some(_)) with
     /// [PathStatus::Invalid] and [PathStatus::NonSelected]
-    reason_code: Option<u16>,
+    reason: Option<PathMarkingReason>,
 }
 
 impl PathMarking {
-    pub const fn new(path_status: u32, reason_code: Option<PathStatus>) -> PathMarking {
+    pub fn new(path_status: u32, reason_code: Option<PathMarkingReason>) -> PathMarking {
         Self {
             path_status,
-            reason_code: reason_code.map(Into::into),
+            reason: reason_code,
         }
     }
 
@@ -207,8 +207,11 @@ impl PathMarking {
         self.path_status
     }
 
-    pub const fn reason_code(&self) -> Option<u16> {
-        self.reason_code
+    pub const fn reason(&self) -> Option<PathMarkingReason> {
+        self.reason
+    }
+    pub fn reason_code(&self) -> Option<u16> {
+        self.reason.map(|x| x.code())
     }
 }
 
@@ -248,10 +251,43 @@ impl BitOr<PathStatus> for u32 {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+pub enum PathMarkingReason {
+    WellKnown(WellKnownPathMarkingReasonCode),
+    Unknown(u16),
+}
+
+impl PathMarkingReason {
+    pub const fn code(&self) -> u16 {
+        match self {
+            PathMarkingReason::WellKnown(x) => *x as u16,
+            PathMarkingReason::Unknown(x) => *x,
+        }
+    }
+
+    pub const fn is_well_known(&self) -> bool {
+        matches!(self, PathMarkingReason::WellKnown(..))
+    }
+
+    pub const fn from_code(code: u16) -> Self {
+        match WellKnownPathMarkingReasonCode::from_repr(code) {
+            Some(code) => PathMarkingReason::WellKnown(code),
+            None => PathMarkingReason::Unknown(code),
+        }
+    }
+}
+
+impl From<WellKnownPathMarkingReasonCode> for PathMarkingReason {
+    fn from(value: WellKnownPathMarkingReasonCode) -> Self {
+        PathMarkingReason::WellKnown(value)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[repr(u16)]
-pub enum PathMarkingReason {
+pub enum WellKnownPathMarkingReasonCode {
     InvalidAsLoop = 0x0001,
     InvalidUnresolvableNexthop = 0x0002,
     NotPreferredLocalPref = 0x0003,

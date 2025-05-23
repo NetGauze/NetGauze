@@ -691,7 +691,7 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
                     0,
                     RouteMonitoringTlvValue::PathMarking(PathMarking::new(
                         0 | PathStatus::Invalid,
-                        Some(PathMarkingReason::InvalidAsLoop as u16),
+                        Some(WellKnownPathMarkingReasonCode::InvalidAsLoop.into()),
                     )),
                 )
                 .unwrap(),
