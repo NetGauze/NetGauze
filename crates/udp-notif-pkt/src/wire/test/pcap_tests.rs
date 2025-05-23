@@ -97,21 +97,47 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
         while buf.has_remaining() {
             let serialized = match codec.decode(buf) {
                 Ok(Some(msg)) => {
-                    let mut value = serde_json::to_value(&msg)
+                    let mut udp_notif_value = serde_json::to_value(&msg)
                         .expect("Couldn't serialize UDP-Notif message to json");
                     // Convert when possible inner payload into human-readable format
                     match msg.media_type {
                         MediaType::YangDataJson => {
-                            let payload = serde_json::from_slice(msg.payload())
-                                .expect("Couldn't deserialize JSON payload into a JSON object");
-                            if let Value::Object(ref mut val) = &mut value {
-                                val.insert("payload".to_string(), payload);
-                            }
+                            match serde_json::from_slice(msg.payload()) {
+                                Ok(payload) => {
+                                    if let Value::Object(ref mut val) = &mut udp_notif_value {
+                                        val.insert("payload".to_string(), payload);
+                                    }
+                                }
+                                Err(err) => {
+                                    let pkt_hexdump = value
+                                        .iter()
+                                        .map(|byte| format!("{byte:02x}"))
+                                        .collect::<Vec<String>>()
+                                        .join(" ");
+                                    let payload_hexdump = msg
+                                        .payload
+                                        .iter()
+                                        .map(|byte| format!("{byte:02x}"))
+                                        .collect::<Vec<String>>()
+                                        .join(" ");
+                                    if let Value::Object(ref mut val) = &mut udp_notif_value {
+                                        val.insert(
+                                            "payload".to_string(),
+                                            Value::String(payload_hexdump),
+                                        );
+                                        val.insert(
+                                            "error".to_string(),
+                                            Value::String(err.to_string()),
+                                        );
+                                        val.insert("dump".to_string(), Value::String(pkt_hexdump));
+                                    }
+                                }
+                            };
                         }
                         MediaType::YangDataXml => {
                             let payload = std::str::from_utf8(msg.payload())
                                 .expect("Couldn't deserialize XML payload into an UTF-8 string");
-                            if let Value::Object(ref mut val) = &mut value {
+                            if let Value::Object(ref mut val) = &mut udp_notif_value {
                                 val.insert(
                                     "payload".to_string(),
                                     Value::String(payload.to_string()),
@@ -122,21 +148,33 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                             let payload: Value =
                                 ciborium::de::from_reader(std::io::Cursor::new(msg.payload()))
                                     .expect("Couldn't deserialize CBOR payload into a CBOR object");
-                            if let Value::Object(ref mut val) = &mut value {
+                            if let Value::Object(ref mut val) = &mut udp_notif_value {
                                 val.insert("payload".to_string(), payload);
                             }
                         }
                         _ => {}
                     }
-                    serde_json::to_string(&value).unwrap()
+                    serde_json::to_string(&udp_notif_value).unwrap()
                 }
                 Ok(None) => {
                     // packet is fragmented, need to read the next PDU first before attempting to
                     // deserialize it
                     break;
                 }
-                Err(err) => serde_json::to_string(&err)
-                    .expect("Couldn't serialize UDP-Notif error message to json"),
+                Err(err) => {
+                    let hexdump = value
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect::<Vec<String>>()
+                        .join(" ");
+                    let ret = serde_json::json!(
+                        {
+                            "error": err,
+                            "dump": hexdump,
+                        }
+                    );
+                    serde_json::to_string(&ret).unwrap()
+                }
             };
             if let Some(file) = json_file.as_mut() {
                 file.write_all(serialized.as_bytes())
