@@ -249,16 +249,27 @@ impl Decoder for UdpPacketCodec {
 
     #[inline]
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let _ = match self.check_len(buf)? {
+        let (_, msg_len) = match self.check_len(buf)? {
             None => return Ok(None),
             Some(val) => val,
         };
-        // Parse the header
-        let (span, pkt) = UdpNotifPacket::from_wire(Span::new(buf))?;
-        // Advance the offset to consume the entire packet
-        buf.advance(span.location_offset());
-        self.in_message = false;
-        self.try_reassemble_segments(pkt)
+        // consume the entire UDP packet before parsing the message
+        // to avoid the parsing errors to continue if one message is corrupted
+        let pkt_buf = buf.split_to(buf.len());
+        match UdpNotifPacket::from_wire(Span::new(pkt_buf.chunk())) {
+            Ok((span, pkt)) => {
+                self.in_message = false;
+                // Check that the message length matches the actual length of the message
+                if span.location_offset() != msg_len as usize || !span.is_empty() {
+                    return Err(UdpPacketCodecError::InvalidMessageLength(msg_len));
+                }
+                self.try_reassemble_segments(pkt)
+            }
+            Err(err) => {
+                self.in_message = false;
+                Err(err)?
+            }
+        }
     }
 }
 
@@ -327,7 +338,7 @@ mod tests {
     #[test]
     fn test_decode_segmented() {
         let mut codec = UdpPacketCodec::default();
-        let value: Vec<u8> = vec![
+        let value_wire1: Vec<u8> = vec![
             0x21, // version 1, no private space, Media type: 1 = YANG data JSON
             0x10, // Header length
             0x00, 0x14, // Message length
@@ -335,6 +346,8 @@ mod tests {
             0x02, 0x00, 0x00, 0x02, // Message ID
             0x01, 0x04, 0x00, 0x00, // segment 0, not last segment
             0xff, 0xff, 0xff, 0xff, // dummy payload
+        ];
+        let value_wire2: Vec<u8> = vec![
             0x21, // version 1, no private space, Media type: 1 = YANG data JSON
             0x10, // Header length
             0x00, 0x18, // Message length
@@ -345,9 +358,9 @@ mod tests {
             0xdd, 0xdd, 0xdd, 0xdd, // dummy payload
         ];
 
-        let mut buf = BytesMut::from(&value[..]);
-
+        let mut buf = BytesMut::from(&value_wire1[..]);
         let value1 = codec.decode(&mut buf);
+        buf.extend_from_slice(&value_wire2[..]);
         let value2 = codec.decode(&mut buf);
 
         assert!(matches!(value1, Ok(None)));
@@ -372,7 +385,7 @@ mod tests {
     #[test]
     fn test_decode_unordered_segmented() {
         let mut codec = UdpPacketCodec::default();
-        let value: Vec<u8> = vec![
+        let value_wire1: Vec<u8> = vec![
             0x21, // version 1, no private space, Media type: 1 = YANG data JSON
             0x10, // Header length
             0x00, 0x18, // Message length
@@ -381,6 +394,8 @@ mod tests {
             0x01, 0x04, 0x00, 0x03, // segment 1, last segment
             0xee, 0xee, 0xee, 0xee, // dummy payload
             0xdd, 0xdd, 0xdd, 0xdd, // dummy payload
+        ];
+        let value_wire2: Vec<u8> = vec![
             0x21, // version 1, no private space, Media type: 1 = YANG data JSON
             0x10, // Header length
             0x00, 0x14, // Message length
@@ -390,9 +405,11 @@ mod tests {
             0xff, 0xff, 0xff, 0xff, // dummy payload
         ];
 
-        let mut buf = BytesMut::from(&value[..]);
+        let mut buf = BytesMut::from(&value_wire1[..]);
 
         let value1 = codec.decode(&mut buf);
+
+        buf.extend_from_slice(&value_wire2[..]);
         let value2 = codec.decode(&mut buf);
 
         assert!(matches!(value1, Ok(None)));

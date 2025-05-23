@@ -93,6 +93,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
         let (codec, buf) = peers
             .entry(key)
             .or_insert((UdpPacketCodec::default(), BytesMut::new()));
+        buf.clear();
         buf.extend_from_slice(&value);
         while buf.has_remaining() {
             let serialized = match codec.decode(buf) {
