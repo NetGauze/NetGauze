@@ -74,7 +74,7 @@ socket2 = { version = "0.5" }
 either = { version = "1.13" }
 opentelemetry = { version = "0.29" }
 opentelemetry_sdk = { version = "0.29" }
-opentelemetry-otlp = { version = "0.29" }
+opentelemetry-otlp = { version = "0.30" }
 anyhow = { version = "1" }
 serde_with = { version = "3.11" }
 indexmap = { version = "2.7" }
