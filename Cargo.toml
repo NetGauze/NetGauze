@@ -17,6 +17,7 @@ members = [
     "crates/udp-notif-service",
     "crates/collector",
     "crates/yang-push",
+    "crates/netconf-proto",
     "fuzz",
 ]
 resolver = "2"
