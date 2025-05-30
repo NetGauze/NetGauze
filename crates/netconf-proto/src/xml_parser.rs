@@ -271,6 +271,8 @@ impl<T: io::BufRead> XmlParser<T> {
                     }
                     wrote_ns = true;
                     writer.write_event(Event::Start(a.clone()))?;
+                } else {
+                    writer.write_event(self.cur.clone())?;
                 }
             } else {
                 writer.write_event(self.cur.clone())?;
