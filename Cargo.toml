@@ -16,7 +16,8 @@ members = [
     "crates/udp-notif-pkt",
     "crates/udp-notif-service",
     "crates/collector",
-    "fuzz", "crates/netconf-proto",
+    "fuzz",
+    "crates/netconf-proto",
 ]
 resolver = "2"
 
@@ -94,4 +95,4 @@ ordered-float = { version = "5.0", default-features = false }
 proc-macro2 = { version = "1.0" }
 prettyplease = { version = "0.2" }
 quick-xml = { version = "0.37" }
-iri-string = { version = "0.7"}
+iri-string = { version = "0.7" }

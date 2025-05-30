@@ -14,20 +14,22 @@
 // limitations under the License.
 
 use crate::{
-    xml_parser::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
     protocol::{Hello, NetConfMessage},
+    xml_parser::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
 };
 use quick_xml::NsReader;
 use std::fmt::Display;
 use tokio_util::{
-    bytes::{Buf, BufMut, BytesMut},
+    bytes::{Buf, BytesMut},
     codec::{Decoder, Encoder},
 };
 
 const XML_HEADER: &str = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
 const HELLO_TERMINATOR: &str = "]]>]]>";
-const MESSAGE_START: &str = "\n#";
+const CHUNK_START: &str = "\n#";
 const MESSAGE_TERMINATOR: &str = "\n##\n";
+const MAX_CHUNK_SIZE: usize = 4294967295; // Maximum chunk size as per RFC 6242
+const MAX_CHUNK_SIZE_LEN: usize = 10; // Maximum length of chunk size in characters
 
 #[derive(Debug)]
 pub struct SshCodec {
@@ -67,10 +69,10 @@ impl From<std::io::Error> for SshCodecError {
 impl Display for SshCodecError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IO(err) => write!(f, "{}", err),
-            Self::Utf(err) => write!(f, "{}", err),
-            Self::Int(err) => write!(f, "{}", err),
-            Self::Parsing(err) => write!(f, "{}", err),
+            Self::IO(err) => write!(f, "{err}"),
+            Self::Utf(err) => write!(f, "{err}"),
+            Self::Int(err) => write!(f, "{err}"),
+            Self::Parsing(err) => write!(f, "{err}"),
         }
     }
 }
@@ -105,7 +107,8 @@ impl Decoder for SshCodec {
                 .windows(HELLO_TERMINATOR.len())
                 .position(|w| w == HELLO_TERMINATOR.as_bytes());
             if let Some(pos) = pos {
-                let data = src.limit(pos).into_inner().reader();
+                let data = src.split_to(pos + HELLO_TERMINATOR.len());
+                let data = &data[..pos];
                 let reader = NsReader::from_reader(data);
                 let mut xml_parser = XmlParser::new(reader)?;
                 let hello = Hello::xml_deserialize(&mut xml_parser)?;
@@ -114,30 +117,76 @@ impl Decoder for SshCodec {
             }
             return Ok(None);
         }
-        if src.len() > MESSAGE_START.len() + 1 {
-            if let Some(position) = src[MESSAGE_START.len()..]
-                .windows(1)
-                .position(|w| w == b"\n")
-            {
-                let size_slice = &src[MESSAGE_START.len()..position + MESSAGE_START.len()];
-                let len = std::str::from_utf8(size_slice)?.parse::<usize>()?;
-                if src.len() > len + size_slice.len() + 6 {
-                    let range = position + 3..len + position + 3;
-                    self.buf.extend_from_slice(&src[range.clone()]);
-                    src.advance(range.end);
-                    if src.len() >= 2 && src.ends_with(MESSAGE_TERMINATOR.as_bytes()) {
-                        let reader = self.buf.split().reader();
-                        let reader = NsReader::from_reader(reader);
-                        let mut xml_parser = XmlParser::new(reader)?;
-                        // let reply = RpcReply::xml_deserialize(&mut xml_parser)?;
-                        let parsed = NetConfMessage::xml_deserialize(&mut xml_parser)?;
-                        src.advance(b"\n##\n".len());
-                        return Ok(Some(parsed));
-                    }
-                }
-            }
+
+        // Check if we have enough data for chunk start
+        if src.len() < CHUNK_START.len() + MAX_CHUNK_SIZE_LEN + 1 {
+            return Ok(None);
         }
-        Ok(None)
+
+        // Verify chunk start sequence
+        if !src.starts_with(CHUNK_START.as_bytes()) {
+            return Err(SshCodecError::IO(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Expected chunk start sequence or message terminator",
+            )));
+        }
+
+        // Find the end of chunk size field
+        let size_start = CHUNK_START.len();
+        // Look for a the new line character after the chunk size
+        // RFC 6242 specifies that max size is 4294967295, so we can safely assume
+        // the size field will not exceed 11 characters (including the newline).
+        let size_end = src[size_start..size_start + MAX_CHUNK_SIZE_LEN + 1]
+            .iter()
+            .position(|&b| b == b'\n');
+        let size_end = match size_end {
+            Some(pos) => size_start + pos,
+            None => {
+                return Err(SshCodecError::IO(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Chunk size is not properly terminated with a newline",
+                )))
+            }
+        };
+
+        // Parse chunk size
+        let chunk_size_slice = &src[size_start..size_end];
+        let chunk_size_str = std::str::from_utf8(chunk_size_slice)?;
+        let chunk_size = chunk_size_str.parse::<usize>()?;
+
+        // Validate chunk size per RFC 6242
+        if chunk_size == 0 || chunk_size > MAX_CHUNK_SIZE {
+            return Err(SshCodecError::IO(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Invalid chunk size: {chunk_size}"),
+            )));
+        }
+
+        // Check if we have the complete chunk
+        let chunk_start_pos = size_end + 1; // +1 for the LF after size
+        if src.len() < chunk_start_pos + chunk_size {
+            return Ok(None); // Need more data
+        }
+
+        // Extract chunk data
+        let chunk_data = &src[chunk_start_pos..chunk_start_pos + chunk_size];
+        self.buf.extend_from_slice(chunk_data);
+
+        // Advance past this chunk
+        src.advance(chunk_start_pos + chunk_size);
+
+        // Check for message terminator
+        if src.starts_with(MESSAGE_TERMINATOR.as_bytes()) {
+            let data = self.buf.split();
+            let reader = NsReader::from_reader(data.reader());
+            let mut xml_parser = XmlParser::new(reader)?;
+            let parsed = NetConfMessage::xml_deserialize(&mut xml_parser)?;
+            src.advance(MESSAGE_TERMINATOR.len());
+            Ok(Some(parsed))
+        } else {
+            // If we don't have the message terminator, we need more data
+            Ok(None)
+        }
     }
 }
 
@@ -150,21 +199,72 @@ impl Encoder<NetConfMessage> for SshCodec {
         item.xml_serialize(&mut xml_writer).unwrap();
         let buf = xml_writer.inner.into_inner().into_inner();
         if tracing::enabled!(tracing::Level::DEBUG) {
-            tracing::debug!(
-                "Serialized payload: `{}`",
-                std::str::from_utf8(&buf)?
-            );
+            tracing::debug!("Serialized payload: `{}`", std::str::from_utf8(&buf)?);
         }
+        log::info!("Serialized payload: `{}`", std::str::from_utf8(&buf)?);
         if let NetConfMessage::Hello(_) = item {
             dst.extend_from_slice(XML_HEADER.as_bytes());
             dst.extend_from_slice(&buf);
             dst.extend_from_slice(HELLO_TERMINATOR.as_bytes());
         } else {
             let size = buf.len();
-            dst.extend_from_slice(format!("{MESSAGE_START}{size}\n").as_bytes());
+            dst.extend_from_slice(format!("{CHUNK_START}{size}\n").as_bytes());
             dst.extend_from_slice(&buf);
             dst.extend_from_slice(MESSAGE_TERMINATOR.as_bytes());
         }
+        log::info!(
+            "Packaged Serialized payload:\n{}",
+            std::str::from_utf8(dst)?
+        );
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::protocol::Rpc;
+
+    #[test]
+    fn test_chunks_decoding() {
+        let input = r#"
+#4
+<rpc
+#18
+ message-id="102"
+
+#79
+     xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <close-session/>
+</rpc>
+##
+"#;
+        let mut buf = BytesMut::from(input);
+        let mut codec = SshCodec::new();
+        codec.in_hello = false;
+        let first_chunk = codec.decode(&mut buf);
+        assert!(
+            matches!(first_chunk, Ok(None)),
+            "First chunk should be None, found {first_chunk:?}"
+        );
+
+        let second_chunk = codec.decode(&mut buf);
+        assert!(
+            matches!(second_chunk, Ok(None)),
+            "Second chunk should be None, found {second_chunk:?}"
+        );
+
+        let third_chunk = codec.decode(&mut buf);
+        assert!(
+            matches!(third_chunk, Ok(Some(_))),
+            "fourth chunk should be Some, found {third_chunk:?}"
+        );
+        assert_eq!(
+            third_chunk.unwrap().unwrap(),
+            NetConfMessage::Rpc(Rpc {
+                message_id: "102".to_string(),
+                operation: "\n  <close-session/>\n".to_string(),
+            })
+        );
     }
 }
