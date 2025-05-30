@@ -14,7 +14,7 @@
 // limitations under the License.
 
 pub mod capabilities;
-pub mod protocol;
-pub mod xml_parser;
-pub mod transport;
 pub mod codec;
+pub mod protocol;
+pub mod transport;
+pub mod xml_parser;

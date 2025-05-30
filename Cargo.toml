@@ -101,6 +101,9 @@ shadow-rs = { version = "1.2", default-features = false }
 smallvec = { version = "1.15" }
 rustc-hash = { version = "2.1" }
 yang3 = { version = "0.17", features = ["bundled"] }
+quick-xml = { version = "0.37" }
+iri-string = { version = "0.7"}
+
 
 [profile.release]
 codegen-units = 1

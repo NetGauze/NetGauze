@@ -165,7 +165,6 @@ impl XmlDeserialize<Rpc> for Rpc {
         } else {
             return Err(ParsingError::MissingAttribute);
         };
-
         let operation = parser.copy_buffer_till(b"rpc")?;
         parser.close()?;
         Ok(Rpc {

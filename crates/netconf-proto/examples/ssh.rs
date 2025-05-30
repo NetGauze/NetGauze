@@ -13,15 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::future::Future;
-use std::net::{SocketAddr};
-use std::sync::Arc;
-use std::time::Duration;
 use clap::Parser;
 use futures::{SinkExt, StreamExt};
+use netgauze_netconf_proto::{
+    capabilities::{Base, Candidate, Capability, YangLibrary},
+    codec::SshCodec,
+    protocol::{Hello, NetConfMessage, Rpc},
+};
 use russh::keys::ssh_key;
-use netgauze_netconf_proto::codec::SshCodec;
-use netgauze_netconf_proto::protocol::{Hello, NetConfMessage};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 struct Client {}
 
@@ -30,9 +30,15 @@ struct Client {}
 // In this example, we're only using Channel, so these aren't needed.
 impl russh::client::Handler for Client {
     type Error = russh::Error;
+
+    async fn check_server_key(
+        &mut self,
+        _server_public_key: &ssh_key::PublicKey,
+    ) -> Result<bool, Self::Error> {
+        // trust everything
+        Ok(true)
+    }
 }
-
-
 
 #[derive(clap::Parser, Debug)]
 struct Args {
@@ -40,7 +46,6 @@ struct Args {
     user: String,
     password: String,
 }
-
 
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
@@ -59,11 +64,17 @@ pub async fn main() -> anyhow::Result<()> {
     // Establish connection and authenticate the user
     let ssh_client = Client {};
     let mut session = russh::client::connect(config, args.host, ssh_client).await?;
-    let auth_res = session.authenticate_password(&args.user, &args.password).await?;
+    let auth_res = session
+        .authenticate_password(&args.user, &args.password)
+        .await?;
     if !auth_res.success() {
         anyhow::bail!("Authentication failed");
     } else {
-        log::info!("Connected Authenticated to {} as user {}", args.host, args.user);
+        log::info!(
+            "Connected Authenticated to {} as user {}",
+            args.host,
+            args.user
+        );
     }
     log::info!("Starting the netconf subsystem");
     // Establish communication channel with netconf subsystem
@@ -74,18 +85,164 @@ pub async fn main() -> anyhow::Result<()> {
     let (mut tx, mut rx) = framed.split();
 
     log::info!("Waiting for the router to send hello message");
-    let recv_hello = if let Some(Ok(NetConfMessage::Hello(value))) = rx.next().await  {
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let recv_hello = match rx.next().await {
+        Some(Ok(NetConfMessage::Hello(value))) => value,
+        Some(Ok(msg)) => {
+            log::error!("Unexcepted message {:?}", msg);
+            return Err(anyhow::anyhow!("Received unexpected message"));
+        }
+        Some(Err(err)) => {
+            log::error!("ERROR {}", err);
+            // if matches!(err, SshCodecError::IO(io::ErrorKind::Rec)) {}
+            // return Err(anyhow::anyhow!("Received error message"));
+            Hello {
+                capabilities: HashMap::new(),
+                session_id: Some(1),
+            }
+        }
+        None => return Err(anyhow::anyhow!("channel closed unexpectedly")),
+    };
+
+    log::debug!("Received Hello:\n{:?}", recv_hello);
+    log::info!(
+        "Received Hello with session id: {:?}",
+        recv_hello.session_id
+    );
+    log::info!("Router announced capabilities:");
+    for (name, cap) in &recv_hello.capabilities {
+        log::info!(" - `{name}`  ---  `{cap}`")
+    }
+
+    log::info!("Sending Hello with the same capabilities announced by the router");
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    tx.send(NetConfMessage::Hello(Hello {
+        session_id: None,
+        capabilities:
+        // recv_hello
+        //     .capabilities
+        //     .iter()
+        //
+        //     .filter_map(|(k, cap)| {
+        //         if let Capability::Base(Base::V1_0) = cap
+        //         {
+        //             None
+        //         } else {
+        //             Some((k.clone(), cap.clone()))
+        //         }
+        //     })
+        //     .collect::<HashMap<_, _>>(),
+        HashMap::from([
+            (Box::from(":base:1.1"), Capability::Base(Base::V1_1)),
+            (Box::from(":candidate"), Capability::Candidate(Candidate::V1_0)),
+            (Box::from(":validate:1.1"), Capability::Validate(Validate::V1_1)),
+            (Box::from(":validate:1.1"), Capability::Validate(Validate::V1_1)),
+
+        ])
+    }))
+    .await?;
+    log::info!("Hello message sent");
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Getting YANG library
+    let yang_library = recv_hello
+        .capabilities
+        .iter()
+        .filter_map(|(_, cap)| {
+            if let Capability::YangLibrary(YangLibrary::V1_1 {
+                revision: _,
+                content_id,
+            }) = cap
+            {
+                Some(content_id)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if yang_library.is_empty() {
+        log::warn!("YANG Library is not supported");
+    } else {
+        let yang_library_content_id = yang_library.first().unwrap();
+        log::info!(
+            "Retrieving YANG library with content ID {} from the router",
+            yang_library_content_id
+        );
+        if let Some(Capability::YangLibrary(YangLibrary::V1_1 {
+            revision,
+            content_id,
+        })) = recv_hello.capabilities.get(&Box::from(":yang-library:1.1"))
+        {
+            let lib_request = format!("<get><filter type=\"subtree\"><yang-library xmlns=\"urn:ietf:params:xml:ns:yang:ietf-yang-library\"><content-id>{yang_library_content_id}</content-id></yang-library></filter></get>").to_string();
+            tx.send(NetConfMessage::Rpc(Rpc {
+                message_id: "101".to_string(),
+                operation: lib_request,
+            }))
+            .await?;
+        }
+
+        let yang_lib_reply = if let Some(Ok(NetConfMessage::RpcReply(value))) = rx.next().await {
+            value
+        } else {
+            return Err(anyhow::anyhow!("Received unexpected message"));
+        };
+
+        log::info!("Got YANG library reply:\n{:?}", yang_lib_reply);
+    }
+
+    log::info!("Retrieving ietf-ip schema from the router");
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let request = r#"<get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring"><identifier>ietf-ip</identifier></get-schema>"#.to_string();
+    let request = r#"<get>
+    <filter type="subtree">
+        <netconf-state xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
+            <schemas/>
+        </netconf-state>
+    </filter>
+    </get>"#
+        .to_string();
+
+    let request = r#"
+    <get xmlns="urn:ietf:params:xml:ns:netconf:base:1.1">
+      <filter>
+        <isis xmlns="http://cisco.com/ns/yang/Cisco-IOS-XR-clns-isis-oper">
+          <instances>
+            <instance>
+              <neighbors/>
+              <instance-name/>
+            </instance>
+          </instances>
+        </isis>
+      </filter>
+    </get>"#
+        .to_string();
+    tx.send(NetConfMessage::Rpc(Rpc {
+        message_id: "101".to_string(),
+        operation: request,
+    }))
+    .await?;
+    let reply = match rx.next().await {
+        Some(Ok(NetConfMessage::RpcReply(reply))) => reply,
+        Some(Ok(msg)) => {
+            log::error!("Unexcepted message {:?}", msg);
+            return Err(anyhow::anyhow!("Received unexpected message"));
+        }
+        Some(Err(err)) => {
+            log::error!("ERROR {}", err);
+            return Err(anyhow::anyhow!("Received error message"));
+        }
+        None => return Err(anyhow::anyhow!("channel closed unexpectedly")),
+    };
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    if let Some(Ok(NetConfMessage::RpcReply(value))) = rx.next().await {
         value
     } else {
         return Err(anyhow::anyhow!("Received unexpected message"));
     };
-    log::info!("Received Hello:\n{:?}", recv_hello);
 
-    log::info!("Sending Hello with the same capabilities announced by the router");
-    tx.send(NetConfMessage::Hello(Hello {
-        session_id: None,
-        capabilities: recv_hello.capabilities.clone(),
-    })).await?;
-    log::info!("Hello message sent");
+    log::info!("Got YANG schema:\n{:?}", reply);
+
     Ok(())
 }
