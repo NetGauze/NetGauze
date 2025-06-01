@@ -16,5 +16,5 @@
 pub mod capabilities;
 pub mod codec;
 pub mod protocol;
-pub mod transport;
+pub mod client;
 pub mod xml_parser;
