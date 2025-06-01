@@ -36,6 +36,12 @@ pub enum NetConfMessage {
 
 impl XmlDeserialize<NetConfMessage> for NetConfMessage {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        // Skip XML declaration header if present in the message
+        if matches!(parser.peek(), Event::Decl(_)) {
+            parser.skip()?;
+        }
+        // Skip any empty text
+        parser.skip_text()?;
         match parser.peek() {
             Event::Start(a) => match a.local_name().into_inner() {
                 b"hello" => Ok(NetConfMessage::Hello(Hello::xml_deserialize(parser)?)),
@@ -46,7 +52,7 @@ impl XmlDeserialize<NetConfMessage> for NetConfMessage {
                     std::str::from_utf8(a.local_name().into_inner())?
                 ))),
             },
-            _ => Err(ParsingError::WrongToken),
+            token => Err(ParsingError::WrongToken(format!("{token:?}"))),
         }
     }
 }
@@ -158,7 +164,7 @@ impl XmlDeserialize<Rpc> for Rpc {
         let open = if let Event::Start(open) = open {
             open
         } else {
-            return Err(ParsingError::WrongToken);
+            return Err(ParsingError::WrongToken(format!("{open:?}")));
         };
         let message_id = if let Some(msg_id) = extract_message_id(open)? {
             msg_id
@@ -838,7 +844,7 @@ impl XmlDeserialize<RpcReply> for RpcReply {
         let rpc_reply = if let Event::Start(open) = rpc_reply {
             open
         } else {
-            return Err(ParsingError::WrongToken);
+            return Err(ParsingError::WrongToken(format!("{rpc_reply:?}")));
         };
         let message_id = extract_message_id(rpc_reply)?;
         if let Ok(Some(_)) = parser.maybe_open(NETCONF_NS_STR, "ok") {
@@ -1614,6 +1620,20 @@ mod tests {
         owning_ref
             .parse_netconf_reply_op(reply_str1)
             .expect("Failed to parse reply");
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_decl() -> Result<(), ParsingError> {
+        let input_str1 = r#"<?xml version="1.0"?>
+        <rpc-reply message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+         <data></data></rpc-reply>"#;
+        let expected_data = r#"<data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"></data>"#;
+        let expected1 = NetConfMessage::RpcReply(RpcReply {
+            message_id: Some("101".to_string()),
+            reply: RpcReplyValue::Data(vec![], expected_data.to_string()),
+        });
+        test_value(input_str1, expected1)?;
         Ok(())
     }
 }
