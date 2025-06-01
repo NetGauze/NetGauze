@@ -16,9 +16,9 @@
 use clap::Parser;
 use futures::{SinkExt, StreamExt};
 use netgauze_netconf_proto::{
-    capabilities::{Base, Candidate, Capability, YangLibrary},
+    capabilities::{Base, Candidate, Capability, Validate, YangLibrary},
     codec::SshCodec,
-    protocol::{Hello, NetConfMessage, Rpc},
+    protocol::{Hello, NetConfMessage, Rpc, RpcReplyValue},
 };
 use russh::keys::ssh_key;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
@@ -50,7 +50,7 @@ struct Args {
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Info)
         .init();
     let args = Args::parse();
 
@@ -193,7 +193,7 @@ pub async fn main() -> anyhow::Result<()> {
     log::info!("Retrieving ietf-ip schema from the router");
     tokio::time::sleep(Duration::from_millis(100)).await;
     let request = r#"<get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring"><identifier>ietf-ip</identifier></get-schema>"#.to_string();
-    let request = r#"<get>
+    let request1 = r#"<get>
     <filter type="subtree">
         <netconf-state xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
             <schemas/>
@@ -202,7 +202,7 @@ pub async fn main() -> anyhow::Result<()> {
     </get>"#
         .to_string();
 
-    let request = r#"
+    let request2 = r#"
     <get xmlns="urn:ietf:params:xml:ns:netconf:base:1.1">
       <filter>
         <isis xmlns="http://cisco.com/ns/yang/Cisco-IOS-XR-clns-isis-oper">
@@ -221,28 +221,26 @@ pub async fn main() -> anyhow::Result<()> {
         operation: request,
     }))
     .await?;
-    let reply = match rx.next().await {
-        Some(Ok(NetConfMessage::RpcReply(reply))) => reply,
-        Some(Ok(msg)) => {
-            log::error!("Unexcepted message {:?}", msg);
-            return Err(anyhow::anyhow!("Received unexpected message"));
-        }
-        Some(Err(err)) => {
-            log::error!("ERROR {}", err);
-            return Err(anyhow::anyhow!("Received error message"));
-        }
-        None => return Err(anyhow::anyhow!("channel closed unexpectedly")),
-    };
-
+    log::info!("Request sent");
     tokio::time::sleep(Duration::from_millis(100)).await;
+    while let Some(msg) = rx.next().await {
+        match msg {
+            Ok(NetConfMessage::RpcReply(reply)) => {
+                log::info!("Got reply message_id: {:?}", reply.message_id);
+                match &reply.reply {
+                    RpcReplyValue::Data(_, payload) => {
+                        log::info!("Got reply payload:\n{}", payload);
+                    }
+                    RpcReplyValue::Ok => {
+                        log::info!("OK");
+                    }
+                }
+            }
+            x => log::info!("Got REPLY FROM ROUTER:\n{:?}", x),
+        }
+        break;
+    }
 
-    if let Some(Ok(NetConfMessage::RpcReply(value))) = rx.next().await {
-        value
-    } else {
-        return Err(anyhow::anyhow!("Received unexpected message"));
-    };
-
-    log::info!("Got YANG schema:\n{:?}", reply);
-
+    log::info!("Terminating NETCONF session with the router");
     Ok(())
 }
