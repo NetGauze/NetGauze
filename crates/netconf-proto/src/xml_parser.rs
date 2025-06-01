@@ -40,7 +40,7 @@ pub enum ParsingError {
     Recoverable,
     MissingChild(String),
     MissingAttribute,
-    WrongToken,
+    WrongToken(String),
     TagNotFound,
     InvalidValue(String),
     Utf8Error(std::str::Utf8Error),
@@ -55,7 +55,7 @@ impl std::fmt::Display for ParsingError {
             Self::Recoverable => write!(f, "Recoverable"),
             Self::MissingChild(e) => write!(f, "Missing child `{e}`"),
             Self::MissingAttribute => write!(f, "Missing attribute"),
-            Self::WrongToken => write!(f, "Wrong token"),
+            Self::WrongToken(token) => write!(f, "Wrong token: `{token}`"),
             Self::TagNotFound => write!(f, "Tag not found"),
             Self::InvalidValue(e) => write!(f, "Invalid value `{e}`"),
             Self::Utf8Error(e) => write!(f, "Utf8 Error `{e}`"),
@@ -183,7 +183,7 @@ impl<T: io::BufRead> XmlParser<T> {
                     .read_to_end_into(b.to_end().name(), &mut self.buf)?;
                 self.next()
             }
-            Event::End(_) => Err(ParsingError::WrongToken),
+            Event::End(_) => Err(ParsingError::WrongToken(format!("{:?}", self.cur))),
             Event::Eof => Err(ParsingError::Eof),
             _ => self.next(),
         }
