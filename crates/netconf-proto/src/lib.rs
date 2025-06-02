@@ -14,7 +14,7 @@
 // limitations under the License.
 
 pub mod capabilities;
+pub mod client;
 pub mod codec;
 pub mod protocol;
-pub mod client;
 pub mod xml_parser;

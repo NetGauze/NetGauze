@@ -15,16 +15,57 @@
 
 use crate::{
     capabilities::{Capability, YangLibrary},
-    protocol::{Hello, NetConfMessage, Rpc, RpcReplyValue},
+    protocol::{Hello, NetConfMessage, Rpc, RpcReply, RpcReplyValue},
 };
 use futures::{SinkExt, StreamExt};
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, Encoder, Framed};
 use yang3::{
     context::{Context, ContextFlags},
     data::{DataFormat, DataOperation, DataTree},
 };
+
+#[derive(Debug)]
+pub enum SshNetConfClientError<E: std::error::Error + Debug> {
+    UnexpectedMessage {
+        expecting: String,
+        received: String,
+    },
+    /// RFC 6241: A NETCONF server must send a session-id in the hello message.
+    SessionIdNotIncluded,
+    YangError(yang3::Error),
+    CodecError(E),
+}
+
+impl<E: std::error::Error + Debug> From<yang3::Error> for SshNetConfClientError<E> {
+    fn from(err: yang3::Error) -> Self {
+        SshNetConfClientError::YangError(err)
+    }
+}
+
+impl<E: std::error::Error + Debug> std::fmt::Display for SshNetConfClientError<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnexpectedMessage {
+                expecting,
+                received,
+            } => {
+                write!(
+                    f,
+                    "unexpected message: received `{received}` while expecting: `{expecting}`"
+                )
+            }
+            Self::YangError(e) => write!(f, "Yang error: {e}"),
+            Self::SessionIdNotIncluded => {
+                write!(f, "session id not included in the server's hello message")
+            }
+            Self::CodecError(e) => write!(f, "Yang error: {e}"),
+        }
+    }
+}
+
+impl<E: std::error::Error + Debug> std::error::Error for SshNetConfClientError<E> {}
 
 pub struct SshNetConfClient<
     E: From<std::io::Error> + std::error::Error + Send + Sync + 'static,
@@ -39,15 +80,31 @@ pub struct SshNetConfClient<
 }
 
 impl<
-        E: From<std::io::Error> + std::error::Error + Send + Sync + 'static,
+        E: From<std::io::Error> + std::error::Error + Send + Sync + Debug + 'static,
         T: AsyncRead + AsyncWrite + Unpin,
         C: Decoder<Item = NetConfMessage, Error = E> + Encoder<NetConfMessage, Error = E>,
     > SshNetConfClient<E, T, C>
 {
-    pub fn new(framed: Framed<T, C>) -> Self {
-        let mut ctx = Context::new(ContextFlags::NO_YANGLIBRARY).expect("Failed to create context");
-        ctx.set_searchdir("../../assets/yang/")
-            .expect("Failed to set YANG search directory");
+    pub const fn session_id(&self) -> u32 {
+        self.session_id
+    }
+
+    pub async fn connect(
+        framed: Framed<T, C>,
+        yang_search_dir: String,
+    ) -> Result<Self, SshNetConfClientError<E>> {
+        let (mut framed, session_id, peer_caps) = Self::recv_hello(framed).await?;
+
+        framed
+            .send(NetConfMessage::Hello(Hello {
+                session_id: Some(session_id),
+                capabilities: peer_caps.clone(),
+            }))
+            .await
+            .map_err(|e| SshNetConfClientError::CodecError(e))?;
+
+        let mut ctx = Context::new(ContextFlags::NO_YANGLIBRARY)?;
+        ctx.set_searchdir(yang_search_dir)?;
         ctx.load_module(
             "ietf-netconf",
             Some("2011-06-01"),
@@ -69,29 +126,86 @@ impl<
         ctx.load_module("ietf-datastores", Some("2018-02-14"), &[])
             .expect("Failed to load module");
 
-        Self {
+        Ok(Self {
             framed,
-            peer_caps: HashMap::new(),
-            session_id: 0,
+            peer_caps,
+            session_id,
             ctx,
             next_message_id: 1,
+        })
+    }
+
+    async fn recv_hello(
+        mut framed: Framed<T, C>,
+    ) -> Result<(Framed<T, C>, u32, HashMap<Box<str>, Capability>), SshNetConfClientError<E>> {
+        // Wait for hello message from the server
+        let next_msg = loop {
+            let next_msg = framed.next().await;
+            if let Some(msg) = next_msg {
+                break msg;
+            }
+        };
+        match next_msg {
+            Ok(NetConfMessage::Hello(hello)) => {
+                let session_id = if let Some(id) = hello.session_id {
+                    id
+                } else {
+                    return Err(SshNetConfClientError::SessionIdNotIncluded);
+                };
+                Ok((framed, session_id, hello.capabilities.clone()))
+            }
+            Ok(msg) => Err(SshNetConfClientError::UnexpectedMessage {
+                expecting: "hello".to_string(),
+                received: format!("{msg:?}"),
+            }),
+            Err(err) => Err(SshNetConfClientError::CodecError(err)),
         }
     }
 
-    pub async fn hello(&mut self) -> anyhow::Result<()> {
-        if let Some(Ok(NetConfMessage::Hello(value))) = self.framed.next().await {
-            self.peer_caps = value.capabilities.clone();
-            self.session_id = value.session_id.unwrap();
-        } else {
-            return Err(anyhow::anyhow!("Received unexpected message"));
-        };
-        self.framed
-            .send(NetConfMessage::Hello(Hello {
-                session_id: None,
-                capabilities: self.peer_caps.clone(),
-            }))
-            .await?;
-        Ok(())
+    pub async fn send(
+        &mut self,
+        msg: NetConfMessage,
+    ) -> Result<Option<RpcReply>, SshNetConfClientError<E>> {
+        match &msg {
+            NetConfMessage::Hello(_) => {
+                self.framed
+                    .send(msg)
+                    .await
+                    .map_err(|e| SshNetConfClientError::CodecError(e))?;
+                Ok(None)
+            }
+            NetConfMessage::Rpc(_) => {
+                self.framed
+                    .send(msg)
+                    .await
+                    .map_err(|e| SshNetConfClientError::CodecError(e))?;
+                loop {
+                    let next_msg = self.framed.next().await;
+                    match next_msg {
+                        None => continue,
+                        Some(Ok(NetConfMessage::RpcReply(reply))) => {
+                            return Ok(Some(reply));
+                        }
+                        Some(Ok(msg)) => {
+                            return Err(SshNetConfClientError::UnexpectedMessage {
+                                expecting: "RpcReply".to_string(),
+                                received: format!("{msg:?}"),
+                            })
+                        }
+                        Some(Err(err)) => {
+                            return Err(SshNetConfClientError::CodecError(err));
+                        }
+                    }
+                }
+            }
+            NetConfMessage::RpcReply(_) => {
+                self.framed
+                    .send(msg)
+                    .await
+                    .map_err(|e| SshNetConfClientError::CodecError(e))?;
+                Ok(None)
+            }
+        }
     }
 
     pub async fn get_yang_lib(&mut self) -> anyhow::Result<DataTree<'_>> {
