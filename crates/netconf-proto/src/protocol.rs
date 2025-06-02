@@ -77,6 +77,12 @@ pub struct Hello {
 
 impl XmlDeserialize<Hello> for Hello {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Hello, ParsingError> {
+        // Skip XML declaration header if present in the message
+        if matches!(parser.peek(), Event::Decl(_)) {
+            parser.skip()?;
+        }
+        // Skip any empty text
+        parser.skip_text()?;
         parser.open_start(NETCONF_NS_STR, "hello")?;
         parser.open_start_check_missing(NETCONF_NS_STR, "capabilities")?;
         let capabilities = parser
@@ -160,6 +166,12 @@ pub struct Rpc {
 
 impl XmlDeserialize<Rpc> for Rpc {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Rpc, ParsingError> {
+        // Skip XML declaration header if present in the message
+        if matches!(parser.peek(), Event::Decl(_)) {
+            parser.skip()?;
+        }
+        // Skip any empty text
+        parser.skip_text()?;
         let open = parser.open(NETCONF_NS_STR, "rpc")?;
         let open = if let Event::Start(open) = open {
             open
