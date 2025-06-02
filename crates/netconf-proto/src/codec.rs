@@ -23,6 +23,7 @@ use tokio_util::{
     bytes::{Buf, BytesMut},
     codec::{Decoder, Encoder},
 };
+use tracing::trace;
 
 const XML_HEADER: &str = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
 const HELLO_TERMINATOR: &str = "]]>]]>";
@@ -31,6 +32,8 @@ const MESSAGE_TERMINATOR: &str = "\n##\n";
 const MAX_CHUNK_SIZE: usize = 4294967295; // Maximum chunk size as per RFC 6242
 const MAX_CHUNK_SIZE_LEN: usize = 10; // Maximum length of chunk size in characters
 
+/// SshCodec is a codec for encoding and decoding NETCONF messages over SSH as
+/// per [RFC 6242](https://datatracker.ietf.org/doc/html/rfc6242).
 #[derive(Debug)]
 pub struct SshCodec {
     in_hello: bool,
@@ -102,18 +105,33 @@ impl Decoder for SshCodec {
     type Error = SshCodecError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if self.in_hello {
+        if self.in_hello && src.len() >= HELLO_TERMINATOR.len() {
             let pos = src
                 .windows(HELLO_TERMINATOR.len())
                 .position(|w| w == HELLO_TERMINATOR.as_bytes());
             if let Some(pos) = pos {
                 let data = src.split_to(pos + HELLO_TERMINATOR.len());
                 let data = &data[..pos];
+                if tracing::enabled!(tracing::Level::TRACE) {
+                    trace!("Parsing hello message: `{:?}`", std::str::from_utf8(data));
+                }
                 let reader = NsReader::from_reader(data);
                 let mut xml_parser = XmlParser::new(reader)?;
                 let hello = Hello::xml_deserialize(&mut xml_parser)?;
+                if !hello.capabilities.contains_key(":base:1.1") {
+                    return Err(SshCodecError::IO(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Hello message does not contain required base:1.1 capability, only NETCONF 1.1 as per RFC 6242 is supported",
+                    )));
+                }
                 self.in_hello = false;
                 return Ok(Some(NetConfMessage::Hello(hello)));
+            }
+            if src.len() > HELLO_TERMINATOR.len() + MAX_CHUNK_SIZE_LEN + 1 {
+                return Err(SshCodecError::IO(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Chunk size is not properly terminated with a newline",
+                )));
             }
             return Ok(None);
         }
@@ -123,7 +141,6 @@ impl Decoder for SshCodec {
             if src.len() < CHUNK_START.len() + MAX_CHUNK_SIZE_LEN + 1 {
                 return Ok(None);
             }
-
             // Verify the chunk start sequence
             if !src.starts_with(CHUNK_START.as_bytes()) {
                 return Err(SshCodecError::IO(std::io::Error::new(
@@ -180,6 +197,12 @@ impl Decoder for SshCodec {
             // Check for message terminator
             if src.starts_with(MESSAGE_TERMINATOR.as_bytes()) {
                 let data = self.buf.split();
+                if tracing::enabled!(tracing::Level::TRACE) {
+                    trace!(
+                        "Parsing netconf message: `{:?}`",
+                        std::str::from_utf8(&data)
+                    );
+                }
                 let reader = NsReader::from_reader(data.reader());
                 let mut xml_parser = XmlParser::new(reader)?;
                 let parsed = NetConfMessage::xml_deserialize(&mut xml_parser)?;
@@ -199,9 +222,8 @@ impl Encoder<NetConfMessage> for SshCodec {
         item.xml_serialize(&mut xml_writer).unwrap();
         let buf = xml_writer.inner.into_inner().into_inner();
         if tracing::enabled!(tracing::Level::DEBUG) {
-            tracing::debug!("Serialized payload: `{}`", std::str::from_utf8(&buf)?);
+            tracing::debug!("Serialized payload: `{:?}`", std::str::from_utf8(&buf));
         }
-        log::info!("Serialized payload: `{}`", std::str::from_utf8(&buf)?);
         if let NetConfMessage::Hello(_) = item {
             dst.extend_from_slice(XML_HEADER.as_bytes());
             dst.extend_from_slice(&buf);
@@ -212,10 +234,6 @@ impl Encoder<NetConfMessage> for SshCodec {
             dst.extend_from_slice(&buf);
             dst.extend_from_slice(MESSAGE_TERMINATOR.as_bytes());
         }
-        log::info!(
-            "Packaged Serialized payload:\n{}",
-            std::str::from_utf8(dst)?
-        );
         Ok(())
     }
 }
