@@ -60,7 +60,7 @@ impl<E: std::error::Error + Debug> std::fmt::Display for SshNetConfClientError<E
             Self::SessionIdNotIncluded => {
                 write!(f, "session id not included in the server's hello message")
             }
-            Self::CodecError(e) => write!(f, "Yang error: {e}"),
+            Self::CodecError(e) => write!(f, "Codec error: {e}"),
         }
     }
 }
@@ -93,8 +93,10 @@ impl<
         framed: Framed<T, C>,
         yang_search_dir: String,
     ) -> Result<Self, SshNetConfClientError<E>> {
+        log::info!("Waiting for hello message");
         let (mut framed, session_id, peer_caps) = Self::recv_hello(framed).await?;
-
+        log::info!("Hello message received and processed");
+        log::info!("Sending hello back");
         framed
             .send(NetConfMessage::Hello(Hello {
                 session_id: Some(session_id),
@@ -103,8 +105,13 @@ impl<
             .await
             .map_err(|e| SshNetConfClientError::CodecError(e))?;
 
+        Self::init_yang_context(&mut framed, &peer_caps).await?;
+
+        log::info!("Starting new YANG context");
         let mut ctx = Context::new(ContextFlags::NO_YANGLIBRARY)?;
+        log::info!("Context created");
         ctx.set_searchdir(yang_search_dir)?;
+        log::info!("Search dir set");
         ctx.load_module(
             "ietf-netconf",
             Some("2011-06-01"),
@@ -125,6 +132,7 @@ impl<
             .expect("Failed to load module");
         ctx.load_module("ietf-datastores", Some("2018-02-14"), &[])
             .expect("Failed to load module");
+        log::info!("Loaded modules");
 
         Ok(Self {
             framed,
@@ -140,7 +148,9 @@ impl<
     ) -> Result<(Framed<T, C>, u32, HashMap<Box<str>, Capability>), SshNetConfClientError<E>> {
         // Wait for hello message from the server
         let next_msg = loop {
+            log::info!("Receiving hello message");
             let next_msg = framed.next().await;
+            log::info!("GOT {:?}", next_msg);
             if let Some(msg) = next_msg {
                 break msg;
             }
@@ -160,6 +170,30 @@ impl<
             }),
             Err(err) => Err(SshNetConfClientError::CodecError(err)),
         }
+    }
+
+    async fn init_yang_context(
+        framed: &mut Framed<T, C>,
+        capabilities: &HashMap<Box<str>, Capability>,
+    ) -> Result<Context, SshNetConfClientError<E>> {
+        let mut known = HashMap::new();
+        for (key, cap) in capabilities {
+            if !matches!(cap, Capability::Unknown(_)) {
+                known.insert(key.clone(), cap.clone());
+            } else {
+                log::info!("CAPABILITY: `{key}`: `{cap:?}`");
+            }
+        }
+        log::info!("---- KNOWN CAPABILITIES --------");
+        for (key, cap) in known.iter() {
+            log::info!("CAPABILITY: `{key}`: `{cap:?}`");
+        }
+
+        if !capabilities.contains_key(":yang-library:1.1") {
+            todo!("YANG LIBRARY not supported ")
+        };
+
+        todo!("YANG LIBRARY not supported ")
     }
 
     pub async fn send(
