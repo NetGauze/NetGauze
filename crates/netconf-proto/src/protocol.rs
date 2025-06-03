@@ -946,42 +946,13 @@ fn extract_message_id(open: BytesStart<'_>) -> Result<Option<String>, ParsingErr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::capabilities::{Base, Startup};
+    use crate::{
+        capabilities::{Base, Startup},
+        tests::test_xml_value,
+    };
     use quick_xml::{reader::NsReader, DeError};
     use std::fmt::Debug;
     use yang3::data::Data;
-
-    fn test_value<T: XmlDeserialize<T> + XmlSerialize + PartialEq + Debug>(
-        input_str: &str,
-        expected: T,
-    ) -> Result<(), ParsingError> {
-        // Check first we can deserialize value correctly
-        let reader = NsReader::from_str(input_str);
-        let mut xml_parser = XmlParser::new(reader)?;
-        let parsed = <T as XmlDeserialize<T>>::xml_deserialize(&mut xml_parser);
-        assert!(parsed.is_ok(), "{parsed:?}");
-        let parsed = parsed?;
-        assert_eq!(parsed, expected);
-
-        // Check after we serialize it we can deserialize back the same value
-        let writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
-        let mut writer = XmlWriter {
-            inner: writer,
-            ns_to_apply: vec![(
-                "xmlns".into(),
-                "urn:ietf:params:xml:ns:netconf:base:1.0".to_string(),
-            )],
-        };
-        parsed.xml_serialize(&mut writer)?;
-
-        let serialize_str = String::from_utf8(writer.inner.into_inner().into_inner())
-            .expect("Serialized value is not valid UTF-8");
-        let reader = NsReader::from_str(&serialize_str);
-        let mut xml_parser = XmlParser::new(reader)?;
-        let parsed = <T as XmlDeserialize<T>>::xml_deserialize(&mut xml_parser)?;
-        assert_eq!(parsed, expected);
-        Ok(())
-    }
 
     fn test_parse_error<T: XmlDeserialize<T> + XmlSerialize + PartialEq + Debug>(
         input_str: &str,
@@ -998,7 +969,7 @@ mod tests {
     fn test_capability() -> Result<(), ParsingError> {
         let input_str = r#"<capability xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">urn:ietf:params:netconf:base:1.1</capability>"#;
         let expected = Capability::Base(Base::V1_1);
-        test_value(input_str, expected)?;
+        test_xml_value(input_str, expected)?;
         Ok(())
     }
 
@@ -1009,6 +980,7 @@ mod tests {
         <capability>urn:ietf:params:netconf:base:1.1</capability>
         <capability>urn:ietf:params:netconf:capability:startup:1.0</capability>
         <capability>https://example.net/router/2.3/myfeature</capability>
+        <capability>urn:example:yang:example-module?module=example-module&amp;revision=2022-12-22</capability>
     </capabilities>
     <session-id>4</session-id>
 </hello>"#;
@@ -1021,10 +993,67 @@ mod tests {
                     Box::from("https://example.net/router/2.3/myfeature"),
                     Capability::Unknown("https://example.net/router/2.3/myfeature".into()),
                 ),
+                (
+                    Box::from(":example-module"),
+                    Capability::YangModule {
+                        ns: "urn:example:yang:example-module".into(),
+                        module: "example-module".into(),
+                        revision: "2022-12-22".into(),
+                        features: Box::new([]),
+                        deviations: Box::new([]),
+                    },
+                ),
             ]),
         };
 
-        test_value(input_str, expected)?;
+        test_xml_value(input_str, expected)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_hello_custom() -> Result<(), ParsingError> {
+        let input_str = r#"?xml version="1.0" encoding="UTF-8"?>
+    <hello xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+      <capabilities>
+        <capability>https://www.example.com/netconf/capability/discard-commit/1.0</capability>
+        <capability>http://openconfig.net/yang/aaa?module=openconfig-aaa&amp;revision=2020-07-30</capability>
+        <capability>http://openconfig.net/yang/alarms?module=openconfig-alarms&amp;revision=2018-01-16&amp;deviations=example-openconfig-alarms-deviation</capability>
+      </capabilities>
+      <session-id>6077</session-id>
+    </hello>"#;
+        let expected = Hello {
+            session_id: Some(6077),
+            capabilities: HashMap::from([
+                (
+                    Box::from("https://www.example.com/netconf/capability/discard-commit/1.0"),
+                    Capability::Unknown(
+                        "https://www.example.com/netconf/capability/discard-commit/1.0".into(),
+                    ),
+                ),
+                (
+                    Box::from(":openconfig-aaa"),
+                    Capability::YangModule {
+                        ns: "http://openconfig.net/yang/aaa".into(),
+                        module: "openconfig-aaa".into(),
+                        revision: "2020-07-30".into(),
+                        features: Box::new([]),
+                        deviations: Box::new([]),
+                    },
+                ),
+                (
+                    Box::from(":openconfig-alarms"),
+                    Capability::YangModule {
+                        ns: "http://openconfig.net/yang/alarms".into(),
+                        module: "openconfig-alarms".into(),
+                        revision: "2018-01-16".into(),
+                        features: Box::new([]),
+                        deviations: Box::new([Box::from("example-openconfig-alarms-deviation")]),
+                    },
+                ),
+            ]),
+        };
+
+        test_xml_value(input_str, expected)?;
         Ok(())
     }
 
@@ -1065,10 +1094,10 @@ mod tests {
         let input_err_str =
             r#"<error-type xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">protocol1</error-type>"#;
 
-        test_value(input_transport_str, ErrorType::Transport)?;
-        test_value(input_rpc_str, ErrorType::Rpc)?;
-        test_value(input_protocol_str, ErrorType::Protocol)?;
-        test_value(input_application_str, ErrorType::Application)?;
+        test_xml_value(input_transport_str, ErrorType::Transport)?;
+        test_xml_value(input_rpc_str, ErrorType::Rpc)?;
+        test_xml_value(input_protocol_str, ErrorType::Protocol)?;
+        test_xml_value(input_application_str, ErrorType::Application)?;
         assert!(matches!(
             test_parse_error::<ErrorType>(input_err_str),
             Err(ParsingError::InvalidValue(_))
@@ -1106,26 +1135,26 @@ mod tests {
         let input_err_str =
             r#"<error-tag xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">not valid</error-tag>"#;
 
-        test_value(in_use_str, ErrorTag::InUse)?;
-        test_value(invalid_value_str, ErrorTag::InvalidValue)?;
-        test_value(too_big_str, ErrorTag::TooBig)?;
-        test_value(missing_attribute_str, ErrorTag::MissingAttribute)?;
-        test_value(bad_attribute_str, ErrorTag::BadAttribute)?;
-        test_value(unknown_attribute_str, ErrorTag::UnknownAttribute)?;
-        test_value(missing_element_str, ErrorTag::MissingElement)?;
-        test_value(bad_element_str, ErrorTag::BadElement)?;
-        test_value(unknown_element_str, ErrorTag::UnknownElement)?;
-        test_value(unknown_namespace_str, ErrorTag::UnknownNamespace)?;
-        test_value(access_denied_str, ErrorTag::AccessDenied)?;
-        test_value(lock_denied_str, ErrorTag::LockDenied)?;
-        test_value(resource_denied_str, ErrorTag::ResourceDenied)?;
-        test_value(rollback_failed_str, ErrorTag::RollbackFailed)?;
-        test_value(data_exists_str, ErrorTag::DataExists)?;
-        test_value(data_missing_str, ErrorTag::DataMissing)?;
-        test_value(operation_not_supported_str, ErrorTag::OperationNotSupported)?;
-        test_value(operation_failed_str, ErrorTag::OperationFailed)?;
-        test_value(partial_operation_str, ErrorTag::PartialOperation)?;
-        test_value(malformed_message_str, ErrorTag::MalformedMessage)?;
+        test_xml_value(in_use_str, ErrorTag::InUse)?;
+        test_xml_value(invalid_value_str, ErrorTag::InvalidValue)?;
+        test_xml_value(too_big_str, ErrorTag::TooBig)?;
+        test_xml_value(missing_attribute_str, ErrorTag::MissingAttribute)?;
+        test_xml_value(bad_attribute_str, ErrorTag::BadAttribute)?;
+        test_xml_value(unknown_attribute_str, ErrorTag::UnknownAttribute)?;
+        test_xml_value(missing_element_str, ErrorTag::MissingElement)?;
+        test_xml_value(bad_element_str, ErrorTag::BadElement)?;
+        test_xml_value(unknown_element_str, ErrorTag::UnknownElement)?;
+        test_xml_value(unknown_namespace_str, ErrorTag::UnknownNamespace)?;
+        test_xml_value(access_denied_str, ErrorTag::AccessDenied)?;
+        test_xml_value(lock_denied_str, ErrorTag::LockDenied)?;
+        test_xml_value(resource_denied_str, ErrorTag::ResourceDenied)?;
+        test_xml_value(rollback_failed_str, ErrorTag::RollbackFailed)?;
+        test_xml_value(data_exists_str, ErrorTag::DataExists)?;
+        test_xml_value(data_missing_str, ErrorTag::DataMissing)?;
+        test_xml_value(operation_not_supported_str, ErrorTag::OperationNotSupported)?;
+        test_xml_value(operation_failed_str, ErrorTag::OperationFailed)?;
+        test_xml_value(partial_operation_str, ErrorTag::PartialOperation)?;
+        test_xml_value(malformed_message_str, ErrorTag::MalformedMessage)?;
         assert!(matches!(
             test_parse_error::<ErrorTag>(input_err_str),
             Err(ParsingError::InvalidValue(_))
@@ -1139,8 +1168,8 @@ mod tests {
         let warning_str = r#"<error-severity xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">warning</error-severity>"#;
         let input_err_str = r#"<error-severity xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">invalid</error-severity>"#;
 
-        test_value(error_str, ErrorSeverity::Error)?;
-        test_value(warning_str, ErrorSeverity::Warning)?;
+        test_xml_value(error_str, ErrorSeverity::Error)?;
+        test_xml_value(warning_str, ErrorSeverity::Warning)?;
         assert!(matches!(
             test_parse_error::<ErrorSeverity>(input_err_str),
             Err(ParsingError::InvalidValue(_))
@@ -1292,14 +1321,14 @@ mod tests {
             },
         ]);
 
-        test_value(session_id_str, session_id)?;
-        test_value(bad_attributes_str, bad_attributes)?;
-        test_value(bad_element_str, bad_elements)?;
-        test_value(ok_elements_str, ok_elements)?;
-        test_value(error_elements_str, error_elements)?;
-        test_value(noop_elements_str, noop_elements)?;
-        test_value(bad_namespace_str, bad_namespace)?;
-        test_value(mixed_error_info_str, mixed_error_info)?;
+        test_xml_value(session_id_str, session_id)?;
+        test_xml_value(bad_attributes_str, bad_attributes)?;
+        test_xml_value(bad_element_str, bad_elements)?;
+        test_xml_value(ok_elements_str, ok_elements)?;
+        test_xml_value(error_elements_str, error_elements)?;
+        test_xml_value(noop_elements_str, noop_elements)?;
+        test_xml_value(bad_namespace_str, bad_namespace)?;
+        test_xml_value(mixed_error_info_str, mixed_error_info)?;
 
         Ok(())
     }
@@ -1432,10 +1461,10 @@ mod tests {
             error_info: vec![ErrorInfo::Error(vec![])],
         };
 
-        test_value(basic_str, basic)?;
-        test_value(complex_str, complex)?;
-        test_value(multiple_seq_str, multiple_seq)?;
-        test_value(empty_error_info_str, empty_error_info)?;
+        test_xml_value(basic_str, basic)?;
+        test_xml_value(complex_str, complex)?;
+        test_xml_value(multiple_seq_str, multiple_seq)?;
+        test_xml_value(empty_error_info_str, empty_error_info)?;
         assert!(matches!(
             test_parse_error::<RpcError>(missing_error_type_str),
             Err(ParsingError::MissingChild(_))
@@ -1552,7 +1581,7 @@ mod tests {
             message_id: Some("101".to_string()),
             reply: RpcReplyValue::Data(vec![], expected_data1.to_string()),
         };
-        test_value(input_str1, expected1)?;
+        test_xml_value(input_str1, expected1)?;
         Ok(())
     }
 
@@ -1583,7 +1612,7 @@ mod tests {
             message_id: Some("103".to_string()),
             reply: RpcReplyValue::Data(vec![], expected_data1.to_string()),
         };
-        test_value(input_str1, expected1)?;
+        test_xml_value(input_str1, expected1)?;
         Ok(())
     }
 
@@ -1628,7 +1657,6 @@ mod tests {
                 yang3::data::DataPrinterFlags::all(),
             )
             .expect("Failed to serialize");
-        eprint!("OUT IS {out}");
         owning_ref
             .parse_netconf_reply_op(reply_str1)
             .expect("Failed to parse reply");
@@ -1645,7 +1673,7 @@ mod tests {
             message_id: Some("101".to_string()),
             reply: RpcReplyValue::Data(vec![], expected_data.to_string()),
         });
-        test_value(input_str1, expected1)?;
+        test_xml_value(input_str1, expected1)?;
         Ok(())
     }
 }

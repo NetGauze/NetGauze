@@ -15,7 +15,10 @@
 
 //! NETCONF capabilities as defined in IANA: [Network Configuration Protocol (NETCONF) Capability URNs](https://www.iana.org/assignments/netconf-capability-urns/netconf-capability-urns.xhtml)
 
-use crate::xml_parser::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter};
+use crate::{
+    decode_html_entities,
+    xml_parser::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
+};
 use quick_xml::events::{BytesText, Event};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, io, str::FromStr};
@@ -59,6 +62,8 @@ pub enum Capability {
         ns: Box<str>,
         module: Box<str>,
         revision: Box<str>,
+        features: Box<[Box<str>]>,
+        deviations: Box<[Box<str>]>,
     },
     Unknown(Box<str>),
 }
@@ -132,7 +137,27 @@ impl CapabilityImpl for Capability {
                 ns,
                 module,
                 revision,
-            } => format!("{ns}?module={module}&revision={revision}").into(),
+                features,
+                deviations,
+            } => match (features.is_empty(), deviations.is_empty()) {
+                (true, true) => format!("{ns}?module={module}&revision={revision}").into(),
+                (true, false) => format!(
+                    "{ns}?module={module}&revision={revision}&deviations={}",
+                    deviations.join(",")
+                )
+                .into(),
+                (false, true) => format!(
+                    "{ns}?module={module}&revision={revision}&features={}",
+                    features.join(",")
+                )
+                .into(),
+                (false, false) => format!(
+                    "{ns}?module={module}&revision={revision}&features={}&deviations={}",
+                    features.join(","),
+                    deviations.join(",")
+                )
+                .into(),
+            },
             Self::Unknown(v) => v.clone(),
         }
     }
@@ -157,7 +182,7 @@ impl std::fmt::Display for Capability {
             Self::Time(v) => v.fmt(f),
             Self::YangLibrary(v) => v.fmt(f),
             Self::WithOperationalDefaults(v) => v.fmt(f),
-            Self::YangModule { .. } => self.shorthand().fmt(f),
+            Self::YangModule { .. } => self.urn().fmt(f),
             Self::Unknown(v) => write!(f, "{v}"),
         }
     }
@@ -188,39 +213,53 @@ impl From<iri_string::validate::Error> for CapabilityParsingError {
     }
 }
 
-fn extract_params(query: &'_ str) -> HashMap<&'_ str, &'_ str> {
-    query
-        .split('&')
+fn extract_params(query: &'_ str) -> HashMap<String, String> {
+    decode_html_entities(query)
+        .split("&")
         .filter_map(|pair| match pair.split_once('=') {
-            Some((key, value)) => Some((key, value)),
+            Some((key, value)) => Some((key.into(), value.into())),
             _ => None,
         })
-        .collect::<HashMap<&str, &str>>()
+        .collect::<HashMap<String, String>>()
 }
 
 fn extract_module_revision(
-    query: &'_ str,
+    params: &HashMap<String, String>,
     urn: &'_ str,
-) -> Result<(Box<str>, Box<str>), CapabilityParsingError> {
-    let params = extract_params(query);
-    let module = if let Some(module) = params.get("module") {
-        *module
+) -> Result<(Box<str>, Box<str>, Box<[Box<str>]>, Box<[Box<str>]>), CapabilityParsingError> {
+    let module: Box<str> = if let Some(module) = params.get("module") {
+        module.as_str().into()
     } else {
         return Err(CapabilityParsingError::MissingParam {
             urn: urn.into(),
             param: "module".into(),
         });
     };
-    let revision = if let Some(revision) = params.get("revision") {
-        *revision
+    let revision: Box<str> = if let Some(revision) = params.get("revision") {
+        revision.as_str().into()
     } else {
         return Err(CapabilityParsingError::MissingParam {
             urn: urn.into(),
             param: "revision".into(),
         });
     };
-
-    Ok((module.into(), revision.into()))
+    let features = if let Some(features) = params.get("features") {
+        features
+            .split(',')
+            .map(|s| s.into())
+            .collect::<Box<[Box<str>]>>()
+    } else {
+        Box::new([])
+    };
+    let deviations = if let Some(deviations) = params.get("deviations") {
+        deviations
+            .split(',')
+            .map(|s| s.into())
+            .collect::<Box<[Box<str>]>>()
+    } else {
+        Box::new([])
+    };
+    Ok((module, revision, features, deviations))
 }
 
 impl FromStr for Capability {
@@ -260,15 +299,26 @@ impl FromStr for Capability {
                 Ok(Self::Startup(Startup::V1_0))
             }
             ("urn", None, "ietf:params:netconf:capability:url:1.0", Some(query), None) => {
-                let schemes = query
+                let schemes: Vec<Box<str>> = query
                     .split('&')
                     .filter_map(|pair| match pair.split_once('=') {
-                        Some(("scheme", values)) => Some(values.split(',')),
+                        Some(("scheme", values)) => {
+                            if values.is_empty() {
+                                return None;
+                            }
+                            Some(values.split(','))
+                        }
                         _ => None,
                     })
                     .flatten()
                     .map(Box::from)
                     .collect();
+                if schemes.is_empty() {
+                    return Err(CapabilityParsingError::MissingParam {
+                        urn: "ietf:params:netconf:capability:url:1.0".into(),
+                        param: "scheme".into(),
+                    });
+                }
                 Ok(Self::Url(Url::V1_0(schemes)))
             }
             ("urn", None, "ietf:params:netconf:capability:xpath:1.0", None, None) => {
@@ -290,39 +340,40 @@ impl FromStr for Capability {
             }
             ("urn", None, "ietf:params:netconf:capability:yang-library:1.0", Some(query), None) => {
                 let params = extract_params(query);
-                let revision = if let Some(revision) = params.get("revision") {
-                    *revision
+                let revision: Box<str> = if let Some(revision) = params.get("revision") {
+                    revision.as_str().into()
                 } else {
                     return Err(CapabilityParsingError::MissingParam {
                         urn: s.into(),
                         param: "revision".into(),
                     });
                 };
-                let module_set_id = if let Some(module_set_id) = params.get("module-set-id") {
-                    *module_set_id
-                } else {
-                    return Err(CapabilityParsingError::MissingParam {
-                        urn: s.into(),
-                        param: "module-set-id".into(),
-                    });
-                };
+                let module_set_id: Box<str> =
+                    if let Some(module_set_id) = params.get("module-set-id") {
+                        module_set_id.as_str().into()
+                    } else {
+                        return Err(CapabilityParsingError::MissingParam {
+                            urn: s.into(),
+                            param: "module-set-id".into(),
+                        });
+                    };
                 Ok(Self::YangLibrary(YangLibrary::V1_0 {
-                    revision: revision.into(),
-                    module_set_id: module_set_id.into(),
+                    revision,
+                    module_set_id,
                 }))
             }
             ("urn", None, "ietf:params:netconf:capability:yang-library:1.1", Some(query), None) => {
                 let params = extract_params(query);
-                let revision = if let Some(revision) = params.get("revision") {
-                    *revision
+                let revision: Box<str> = if let Some(revision) = params.get("revision") {
+                    revision.as_str().into()
                 } else {
                     return Err(CapabilityParsingError::MissingParam {
                         urn: s.into(),
                         param: "revision".into(),
                     });
                 };
-                let content_id = if let Some(content_id) = params.get("content-id") {
-                    *content_id
+                let content_id: Box<str> = if let Some(content_id) = params.get("content-id") {
+                    content_id.as_str().into()
                 } else {
                     return Err(CapabilityParsingError::MissingParam {
                         urn: s.into(),
@@ -330,8 +381,8 @@ impl FromStr for Capability {
                     });
                 };
                 Ok(Self::YangLibrary(YangLibrary::V1_1 {
-                    revision: revision.into(),
-                    content_id: content_id.into(),
+                    revision,
+                    content_id,
                 }))
             }
             (
@@ -348,12 +399,49 @@ impl FromStr for Capability {
                 Some(query),
                 None,
             ) => Ok(Self::WithDefaults(WithDefaults::V1_0(query.to_owned()))),
-            ("urn", None, ns, Some(query), None) => {
-                if let Ok((module, revision)) = extract_module_revision(query, ns) {
+            ("urn", None, path, Some(query), None) => {
+                let params = extract_params(query);
+                if let Ok((module, revision, features, deviations)) =
+                    extract_module_revision(&params, path)
+                {
                     Ok(Self::YangModule {
-                        ns: format!("urn:{ns}").into(),
+                        ns: format!("urn:{path}").into(),
                         module,
                         revision,
+                        features,
+                        deviations,
+                    })
+                } else {
+                    Ok(Self::Unknown(s.into()))
+                }
+            }
+            ("http", Some(authority), ns, Some(query), None) => {
+                let params = extract_params(query);
+                if let Ok((module, revision, features, deviations)) =
+                    extract_module_revision(&params, ns)
+                {
+                    Ok(Self::YangModule {
+                        ns: format!("http://{authority}{ns}").into(),
+                        module,
+                        revision,
+                        features,
+                        deviations,
+                    })
+                } else {
+                    Ok(Self::Unknown(s.into()))
+                }
+            }
+            ("https", Some(authority), ns, Some(query), None) => {
+                let params = extract_params(query);
+                if let Ok((module, revision, features, deviations)) =
+                    extract_module_revision(&params, ns)
+                {
+                    Ok(Self::YangModule {
+                        ns: format!("https://{authority}{ns}").into(),
+                        module,
+                        revision,
+                        features,
+                        deviations,
                     })
                 } else {
                     Ok(Self::Unknown(s.into()))
@@ -369,7 +457,7 @@ impl XmlDeserialize<Capability> for Capability {
         parser: &mut XmlParser<impl io::BufRead>,
     ) -> Result<Capability, ParsingError> {
         parser.open_start(crate::protocol::NETCONF_NS_STR, "capability")?;
-        let body = parser.tag_string()?;
+        let body = decode_html_entities(&parser.tag_string()?);
         parser.close()?;
         Ok(Capability::from_str(&body).unwrap())
     }
@@ -419,7 +507,7 @@ impl CapabilityImpl for WritableRunning {
 
 impl std::fmt::Display for WritableRunning {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -451,7 +539,7 @@ impl CapabilityImpl for Candidate {
 
 impl std::fmt::Display for Candidate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -490,7 +578,7 @@ impl CapabilityImpl for ConfirmedCommit {
 
 impl std::fmt::Display for ConfirmedCommit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -522,7 +610,7 @@ impl CapabilityImpl for RollbackOnError {
 
 impl std::fmt::Display for RollbackOnError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -561,7 +649,7 @@ impl CapabilityImpl for Validate {
 
 impl std::fmt::Display for Validate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -594,7 +682,7 @@ impl CapabilityImpl for Startup {
 
 impl std::fmt::Display for Startup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -631,7 +719,7 @@ impl CapabilityImpl for Url {
     fn urn(&self) -> Box<str> {
         match self {
             Self::V1_0(schemas) => {
-                format!("{}?schema={}", self.identifier(), schemas.join(",")).into()
+                format!("{}?scheme={}", self.identifier(), schemas.join(",")).into()
             }
         }
     }
@@ -639,7 +727,7 @@ impl CapabilityImpl for Url {
 
 impl std::fmt::Display for Url {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -670,7 +758,7 @@ impl CapabilityImpl for Xpath {
 
 impl std::fmt::Display for Xpath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -700,7 +788,7 @@ impl CapabilityImpl for Notification {
 
 impl std::fmt::Display for Notification {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -730,7 +818,7 @@ impl CapabilityImpl for Interleave {
 
 impl std::fmt::Display for Interleave {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -760,7 +848,7 @@ impl CapabilityImpl for PartialLock {
 
 impl std::fmt::Display for PartialLock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -790,7 +878,7 @@ impl CapabilityImpl for WithDefaults {
 
 impl std::fmt::Display for WithDefaults {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -822,7 +910,7 @@ impl CapabilityImpl for Base {
 
 impl std::fmt::Display for Base {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -852,7 +940,7 @@ impl CapabilityImpl for Time {
 
 impl std::fmt::Display for Time {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -909,7 +997,7 @@ impl CapabilityImpl for YangLibrary {
 
 impl std::fmt::Display for YangLibrary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
     }
 }
 
@@ -941,6 +1029,291 @@ impl CapabilityImpl for WithOperationalDefaults {
 
 impl std::fmt::Display for WithOperationalDefaults {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.shorthand())
+        write!(f, "{}", self.urn())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::test_from_str;
+    #[test]
+    fn test_writable_running_capability() -> Result<(), ParsingError> {
+        let input = "urn:ietf:params:netconf:capability:writable-running:1.0";
+        let expected = Capability::WritableRunning(WritableRunning::V1_0);
+        assert_eq!(expected.shorthand().as_ref(), ":writable-running");
+        assert_eq!(
+            expected.identifier().as_ref(),
+            "urn:ietf:params:netconf:capability:writable-running:1.0"
+        );
+        assert_eq!(
+            expected.urn().as_ref(),
+            "urn:ietf:params:netconf:capability:writable-running:1.0"
+        );
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_candidate_capability() -> Result<(), ParsingError> {
+        let input = "urn:ietf:params:netconf:capability:candidate:1.0";
+        let expected = Capability::Candidate(Candidate::V1_0);
+        assert_eq!(expected.shorthand().as_ref(), ":candidate");
+        assert_eq!(
+            expected.identifier().as_ref(),
+            "urn:ietf:params:netconf:capability:candidate:1.0"
+        );
+        assert_eq!(
+            expected.urn().as_ref(),
+            "urn:ietf:params:netconf:capability:candidate:1.0"
+        );
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_url_capability_single_scheme() -> Result<(), ParsingError> {
+        let input = "urn:ietf:params:netconf:capability:url:1.0?scheme=http";
+        let expected = Capability::Url(Url::V1_0(vec!["http".into()]));
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_url_capability_multiple_schemes() -> Result<(), ParsingError> {
+        let input = "urn:ietf:params:netconf:capability:url:1.0?scheme=http,ftp,file";
+        let expected = Capability::Url(Url::V1_0(vec!["http".into(), "ftp".into(), "file".into()]));
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_url_capability_empty_schemes() {
+        let input = "urn:ietf:params:netconf:capability:url:1.0?scheme=";
+        let parsed = Capability::from_str(input.trim());
+        assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn test_url_capability_no_query() -> Result<(), ParsingError> {
+        let input = "urn:ietf:params:netconf:capability:url:1.0";
+        let expected = Capability::Unknown(input.into());
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_urn() -> Result<(), ParsingError> {
+        let input = "urn:example:yang:example-module?module=example-module&revision=2022-12-22";
+        let expected = Capability::YangModule {
+            ns: "urn:example:yang:example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new([]),
+            deviations: Box::new([]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    /// YANG Module must have both revision and module name, otherwise it's not
+    /// valid
+    #[test]
+    fn test_yang_urn_without_revision() -> Result<(), ParsingError> {
+        let input = "urn:example:yang:example-module?module=example-module";
+        let expected = Capability::Unknown(input.into());
+        test_from_str(input, &expected)
+    }
+
+    /// YANG Module must have both revision and module name, otherwise it's not
+    /// valid
+    #[test]
+    fn test_yang_urn_without_module() -> Result<(), ParsingError> {
+        let input = "urn:example:yang:example-module?revision=2022-12-22";
+        let expected = Capability::Unknown(input.into());
+        test_from_str(input, &expected)
+    }
+
+    /// YANG Module must have both revision and module name, otherwise it's not
+    /// valid
+    #[test]
+    fn test_yang_urn_plain() -> Result<(), ParsingError> {
+        let input = "urn:example:yang:example-module";
+        let expected = Capability::Unknown(input.into());
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_urn_with_features() -> Result<(), ParsingError> {
+        let input = "urn:example:yang:example-module?module=example-module&revision=2022-12-22&features=feature1,feature2";
+        let expected = Capability::YangModule {
+            ns: "urn:example:yang:example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new(["feature1".into(), "feature2".into()]),
+            deviations: Box::new([]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_urn_with_deviations() -> Result<(), ParsingError> {
+        let input = "urn:example:yang:example-module?module=example-module&revision=2022-12-22&deviations=deviation1,deviation2";
+        let expected = Capability::YangModule {
+            ns: "urn:example:yang:example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new([]),
+            deviations: Box::new(["deviation1".into(), "deviation2".into()]),
+        };
+        test_from_str(input, &expected)
+    }
+    #[test]
+    fn test_yang_urn_with_features_and_deviations() -> Result<(), ParsingError> {
+        let input = "urn:example:yang:example-module?module=example-module&revision=2022-12-22&features=feature1,feature2&deviations=deviation1,deviation2";
+        let expected = Capability::YangModule {
+            ns: "urn:example:yang:example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new(["feature1".into(), "feature2".into()]),
+            deviations: Box::new(["deviation1".into(), "deviation2".into()]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_http_urn() -> Result<(), ParsingError> {
+        let input =
+            "http://example.com/yang/example-module?module=example-module&revision=2022-12-22";
+        let expected = Capability::YangModule {
+            ns: "http://example.com/yang/example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new([]),
+            deviations: Box::new([]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_https_urn() -> Result<(), ParsingError> {
+        let input =
+            "https://example.com/yang/example-module?module=example-module&revision=2022-12-22";
+        let expected = Capability::YangModule {
+            ns: "https://example.com/yang/example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new([]),
+            deviations: Box::new([]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_http_urn_with_features() -> Result<(), ParsingError> {
+        let input = "http://example.com/yang/example-module?module=example-module&revision=2022-12-22&features=feature1,feature2";
+        let expected = Capability::YangModule {
+            ns: "http://example.com/yang/example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new(["feature1".into(), "feature2".into()]),
+            deviations: Box::new([]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_https_urn_with_features() -> Result<(), ParsingError> {
+        let input = "https://example.com/yang/example-module?module=example-module&revision=2022-12-22&features=feature1,feature2";
+        let expected = Capability::YangModule {
+            ns: "https://example.com/yang/example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new(["feature1".into(), "feature2".into()]),
+            deviations: Box::new([]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_http_urn_with_deviations() -> Result<(), ParsingError> {
+        let input = "http://example.com/yang/example-module?module=example-module&revision=2022-12-22&deviations=deviation1,deviation2";
+        let expected = Capability::YangModule {
+            ns: "http://example.com/yang/example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new([]),
+            deviations: Box::new(["deviation1".into(), "deviation2".into()]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_https_urn_with_deviations() -> Result<(), ParsingError> {
+        let input = "https://example.com/yang/example-module?module=example-module&revision=2022-12-22&deviations=deviation1,deviation2";
+        let expected = Capability::YangModule {
+            ns: "https://example.com/yang/example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new([]),
+            deviations: Box::new(["deviation1".into(), "deviation2".into()]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_http_urn_with_features_and_deviations() -> Result<(), ParsingError> {
+        let input = "http://example.com/yang/example-module?module=example-module&revision=2022-12-22&features=feature1,feature2&deviations=deviation1,deviation2";
+        let expected = Capability::YangModule {
+            ns: "http://example.com/yang/example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new(["feature1".into(), "feature2".into()]),
+            deviations: Box::new(["deviation1".into(), "deviation2".into()]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    #[test]
+    fn test_yang_https_urn_with_features_and_deviations() -> Result<(), ParsingError> {
+        let input = "https://example.com/yang/example-module?module=example-module&revision=2022-12-22&features=feature1,feature2&deviations=deviation1,deviation2";
+        let expected = Capability::YangModule {
+            ns: "https://example.com/yang/example-module".into(),
+            module: "example-module".into(),
+            revision: "2022-12-22".into(),
+            features: Box::new(["feature1".into(), "feature2".into()]),
+            deviations: Box::new(["deviation1".into(), "deviation2".into()]),
+        };
+        test_from_str(input, &expected)
+    }
+
+    /// HTTP YANG Module must have both revision and module name, otherwise it's
+    /// not valid
+    #[test]
+    fn test_yang_http_urn_without_revision() -> Result<(), ParsingError> {
+        let input = "http://example.com/yang/example-module?module=example-module";
+        let expected = Capability::Unknown(input.into());
+        test_from_str(input, &expected)
+    }
+
+    /// HTTPS YANG Module must have both revision and module name, otherwise
+    /// it's not valid
+    #[test]
+    fn test_yang_https_urn_without_revision() -> Result<(), ParsingError> {
+        let input = "https://example.com/yang/example-module?module=example-module";
+        let expected = Capability::Unknown(input.into());
+        test_from_str(input, &expected)
+    }
+
+    /// HTTP YANG Module must have both revision and module name, otherwise it's
+    /// not valid
+    #[test]
+    fn test_yang_http_urn_without_module() -> Result<(), ParsingError> {
+        let input = "http://example.com/yang/example-module?revision=2022-12-22";
+        let expected = Capability::Unknown(input.into());
+        test_from_str(input, &expected)
+    }
+
+    /// HTTPS YANG Module must have both revision and module name, otherwise
+    /// it's not valid
+    #[test]
+    fn test_yang_https_urn_without_module() -> Result<(), ParsingError> {
+        let input = "https://example.com/yang/example-module?revision=2022-12-22";
+        let expected = Capability::Unknown(input.into());
+        test_from_str(input, &expected)
     }
 }
