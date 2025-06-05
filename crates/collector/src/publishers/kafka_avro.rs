@@ -441,7 +441,7 @@ where
         Ok((join_handle, handle))
     }
 
-    pub async fn shutdown(self) -> Result<(), KafkaAvroPublisherActorHandleError> {
+    pub async fn shutdown(&self) -> Result<(), KafkaAvroPublisherActorHandleError> {
         self.cmd_tx
             .send(KafkaAvroPublisherActorCommand::Shutdown)
             .await
