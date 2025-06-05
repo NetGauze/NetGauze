@@ -28,6 +28,9 @@ bytes = { workspace = true, features = ["serde"]}
 tokio-util = { workspace = true, features = ["full", "tracing"] , optional = true}
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+ciborium = { workspace = true }
 
 [features]
 default = ["serde", "codec"]

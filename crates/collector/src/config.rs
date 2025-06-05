@@ -210,4 +210,5 @@ pub enum PublisherEndpoint {
     Http(HttpPublisherEndpoint),
     KafkaJson(kafka_json::KafkaConfig),
     FlowKafkaAvro(kafka_avro::KafkaConfig<FlowOutputConfig>),
+    TelemetryKafkaJson(kafka_json::KafkaConfig),
 }
