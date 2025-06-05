@@ -377,7 +377,7 @@ impl KafkaJsonPublisherActorHandle {
         Ok((join_handle, handle))
     }
 
-    pub async fn shutdown(self) -> Result<(), KafkaJsonPublisherActorHandleError> {
+    pub async fn shutdown(&self) -> Result<(), KafkaJsonPublisherActorHandleError> {
         self.cmd_tx
             .send(KafkaJsonPublisherActorCommand::Shutdown)
             .await
