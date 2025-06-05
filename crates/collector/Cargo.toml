@@ -12,6 +12,7 @@ Network metrics collector
 """
 keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
+build = "build.rs"
 
 [dependencies]
 netgauze-analytics = { workspace = true }
@@ -69,12 +70,16 @@ serde_yaml = { workspace = true }
 ordered-float = { workspace = true }
 ciborium = { workspace = true }
 bytes = { workspace = true }
-
+sysinfo = { workspace = true }
+shadow-rs = { workspace = true, features = ["default", "metadata", "build"]  }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = [
     "unprefixed_malloc_on_supported_platforms",
 ] }
+
+[build-dependencies]
+shadow-rs = { workspace = true, default-features = true }
 
 [dev-dependencies]
 chrono = { workspace = true, default-features = false, features = [
