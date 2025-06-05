@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{codec::UdpPacketCodec, MediaType};
+use crate::{codec::UdpPacketCodec, MediaType, UdpNotifPacketDecoded};
 use bytes::{Buf, BytesMut};
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 use pcap_parser::LegacyPcapReader;
@@ -33,7 +33,7 @@ fn test_pmacct_udp_notif(#[files("../../assets/pcaps/pmacct-tests/*/*.pcap")] pa
         .to_owned()
         .unwrap_or_default()
         .eq_ignore_ascii_case("true");
-    test_udp_notif_pcap(overwrite, path);
+    test_udp_notif_pcap(overwrite, path.clone());
 }
 
 #[rstest]
@@ -42,7 +42,19 @@ fn test_pcap_udp_notif(#[files("../../assets/pcaps/udp-notif/*/*.pcap")] path: P
         .to_owned()
         .unwrap_or_default()
         .eq_ignore_ascii_case("true");
-    test_udp_notif_pcap(overwrite, path);
+    test_udp_notif_pcap(overwrite, path.clone());
+}
+
+#[rstest]
+fn test_pmacct_udp_notif_decoded(
+    #[files("../../assets/pcaps/pmacct-tests/*/*.pcap")] path: PathBuf,
+) {
+    test_udp_notif_decoded_pcap(path);
+}
+
+#[rstest]
+fn test_pcap_udp_notif_decoded(#[files("../../assets/pcaps/udp-notif/*/*.pcap")] path: PathBuf) {
+    test_udp_notif_decoded_pcap(path);
 }
 
 // Rust is not smart enough to detect this method is used in rstest
@@ -192,5 +204,138 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                 assert_eq!(expected, serialized);
             }
         }
+    }
+}
+
+/// This function is used to test the decoding of UDP-Notif payload from a pcap
+/// file and compare the output with simple json decoding.
+/// It is used to verify that the payload deserializing/re-serializing
+/// process does not modify the actually received json payload
+#[allow(dead_code)]
+fn test_udp_notif_decoded_pcap(pcap_path: PathBuf) {
+    let pcap_file = File::open(pcap_path.as_path()).unwrap();
+    let pcap_reader =
+        LegacyPcapReader::new(165536, pcap_file).expect("Couldn't create pcap reader");
+    let iter = PcapIter::new(Box::new(pcap_reader));
+
+    let mut peers = HashMap::new();
+    for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
+        // The filter for 161 is included because n7-sa1_yang-push.pcap have some snmp
+        // traffic
+        if protocol != TransportProtocol::UDP
+            || ![10003, 57499].contains(&dst_port)
+            || src_port == 161
+        {
+            continue;
+        }
+        let key = (src_ip, src_port, dst_ip, dst_port);
+        let (codec, buf) = peers
+            .entry(key)
+            .or_insert((UdpPacketCodec::default(), BytesMut::new()));
+        buf.clear();
+        buf.extend_from_slice(&value);
+        while buf.has_remaining() {
+            match codec.decode(buf) {
+                Ok(Some(msg)) => {
+                    let mut udp_notif_value = serde_json::to_value(&msg)
+                        .expect("Couldn't serialize UDP-Notif message to json");
+
+                    // Convert when possible inner payload into human-readable format
+                    match msg.media_type {
+                        MediaType::YangDataJson => {
+                            match serde_json::from_slice(msg.payload()) {
+                                Ok(payload) => {
+                                    if let Value::Object(ref mut val) = &mut udp_notif_value {
+                                        val.insert("payload".to_string(), payload);
+                                    }
+                                }
+                                Err(_err) => {
+                                    udp_notif_value = Value::Null;
+                                }
+                            };
+                        }
+                        MediaType::YangDataCbor => {
+                            let payload: Value =
+                                ciborium::de::from_reader(std::io::Cursor::new(msg.payload()))
+                                    .expect("Couldn't deserialize CBOR payload into a CBOR object");
+                            if let Value::Object(ref mut val) = &mut udp_notif_value {
+                                val.insert("payload".to_string(), payload);
+                            }
+                        }
+                        _ => {}
+                    }
+                    let udp_notif_decoded_value: Value =
+                        match TryInto::<UdpNotifPacketDecoded>::try_into(&msg) {
+                            Ok(msg_decoded) => serde_json::to_value(&msg_decoded)
+                                .expect("Couldn't serialize UDP-Notif decoded message to json"),
+                            Err(_) => Value::Null,
+                        };
+
+                    let udp_notif_normalized_value = normalize_json(&udp_notif_value);
+                    assert_eq!(
+                        udp_notif_normalized_value,
+                        udp_notif_decoded_value,
+                        "Mismatch:\nUdpNotif Message: {}\nUDPNotifDecoded Message: {}",
+                        serde_json::to_string(&udp_notif_normalized_value)
+                            .expect("Couldn't serialize value"),
+                        serde_json::to_string(&udp_notif_decoded_value)
+                            .expect("Couldn't serialize decoded value"),
+                    );
+
+                    println!(
+                        "Decoded UDP Notification: {}",
+                        serde_json::to_string(&udp_notif_decoded_value)
+                            .expect("Couldn't serialize to string")
+                    );
+                }
+                Ok(None) => {
+                    // packet is fragmented, need to read the next PDU first before attempting to
+                    // deserialize it
+                    break;
+                }
+                Err(_err) => {
+                    continue;
+                }
+            };
+        }
+    }
+}
+
+/// Custom normalization function for edge cases where we parse with serde
+/// aliases
+/// - Prefixes "encoding" values with "ietf-subscribed-notifications:" if they
+///   don't have a prefix
+/// - Replaces "notification-contents" keys with "contents"
+fn normalize_json(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let mut new_map = serde_json::Map::new();
+
+            for (key, val) in map {
+                if key == "encoding" {
+                    if let Value::String(s) = val {
+                        if !s.contains(':') {
+                            new_map.insert(
+                                key.clone(),
+                                Value::String(format!("ietf-subscribed-notifications:{s}")),
+                            );
+                        } else {
+                            new_map.insert(key.clone(), val.clone());
+                        }
+                    } else {
+                        new_map.insert(key.clone(), normalize_json(val));
+                    }
+                } else if key == "notification-contents" {
+                    new_map.insert("contents".to_string(), normalize_json(val));
+                } else if !key.contains("ietf-yang-push:") {
+                    new_map.insert(key.clone(), normalize_json(val));
+                } else {
+                    new_map.insert(key.clone(), val.clone());
+                }
+            }
+
+            Value::Object(new_map)
+        }
+        _ => value.clone(),
     }
 }
