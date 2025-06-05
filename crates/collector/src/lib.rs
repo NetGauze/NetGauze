@@ -21,6 +21,7 @@ use crate::{
         kafka_avro::KafkaAvroPublisherActorHandle,
         kafka_json::KafkaJsonPublisherActorHandle,
     },
+    yang_push::telemetry::TelemetryMessageWrapper,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
@@ -29,10 +30,12 @@ use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
 use std::{str::Utf8Error, sync::Arc};
 use tracing::{info, warn};
+use yang_push::enrichment::YangPushEnrichmentActorHandle;
 
 pub mod config;
 pub mod flow;
 pub mod publishers;
+pub mod yang_push;
 
 pub async fn init_flow_collection(
     flow_config: FlowConfig,
@@ -173,6 +176,11 @@ pub async fn init_flow_collection(
                         kafka_json_handles.push(handle);
                     }
                 }
+                PublisherEndpoint::TelemetryKafkaJson(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Telemetry KafkaJson publisher not yet supported for Flow"
+                    ));
+                }
             }
         }
     }
@@ -228,6 +236,7 @@ pub async fn init_udp_notif_collection(
     let (supervisor_join_handle, supervisor_handle) =
         UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;
     let mut join_set = FuturesUnordered::new();
+    let mut enrichment_handles = Vec::new();
     let mut http_handlers = Vec::new();
     let mut kafka_handles = Vec::new();
     for (group_name, publisher_config) in udp_notif_config.publishers {
@@ -277,8 +286,36 @@ pub async fn init_udp_notif_collection(
                 }
                 PublisherEndpoint::FlowKafkaAvro(_) => {
                     return Err(anyhow::anyhow!(
-                        "Kafka Avro publisher not yet supported for UDP Notif"
+                        "Flow Kafka Avro publisher not supported for UDP Notif"
                     ));
+                }
+                PublisherEndpoint::TelemetryKafkaJson(config) => {
+                    let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
+                        publisher_config.buffer_size,
+                        udp_notif_recv.clone(),
+                        either::Left(meter.clone()),
+                    );
+                    join_set.push(enrichment_join);
+                    enrichment_handles.push(enrichment_handle.clone());
+
+                    let enriched_rx = enrichment_handle.subscribe();
+                    let hdl = KafkaJsonPublisherActorHandle::from_config(
+                        serialize_yang_push,
+                        config.clone(),
+                        enriched_rx,
+                        either::Left(meter.clone()),
+                    );
+                    match hdl {
+                        Ok((kafka_join, kafka_handle)) => {
+                            join_set.push(kafka_join);
+                            kafka_handles.push(kafka_handle);
+                        }
+                        Err(err) => {
+                            return Err(anyhow::anyhow!(
+                                "Error creating KafkaJsonPublisherActorHandle: {err}"
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -383,6 +420,16 @@ fn serialize_udp_notif(
         Some(serde_json::Value::String(peer.ip().to_string())),
         value,
     ))
+}
+
+fn serialize_yang_push(
+    input: TelemetryMessageWrapper,
+    _writer_id: String,
+) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
+    let ip = input.message().data_collection_metadata().remote_address();
+    let value = serde_json::to_value(input)?;
+    let key = serde_json::Value::String(ip.to_string());
+    Ok((Some(key), value))
 }
 
 #[derive(Debug, strum_macros::Display)]

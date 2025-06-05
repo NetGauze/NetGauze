@@ -1,0 +1,29 @@
+runtime:
+  threads: 4
+
+logging:
+  level: info
+
+telemetry:
+  url: http://localhost:4317/v1/metrics
+  exporter_timeout: 3000
+  reader_interval: 60000
+  reader_timeout: 3000
+
+udp_notif:
+  subscriber_timeout: 100
+  listeners:
+    - address: 0.0.0.0:10000
+      workers: 2
+
+  publishers:
+    group1:
+      buffer_size: 1000
+      endpoints:
+        full: !TelemetryKafkaJson
+          topic: telemetry-message-json
+          producer_config:
+            bootstrap.servers: localhost:49092
+            message.timeout.ms: "60000"
+            queue.buffering.max.messages: "1000"
+          writer_id: test-udpnotif-telemetry # TOOD: not considered yet, discuss...

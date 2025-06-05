@@ -68,6 +68,7 @@ pin-utils = { workspace = true }
 serde_yaml = { workspace = true }
 ordered-float = { workspace = true }
 ciborium = { workspace = true }
+bytes = { workspace = true }
 
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
