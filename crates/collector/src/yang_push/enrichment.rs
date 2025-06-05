@@ -48,8 +48,12 @@ use std::{
 };
 
 use chrono::Utc;
+use shadow_rs::shadow;
+use sysinfo::System;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
+
+shadow!(build);
 
 /// Cache for YangPush subscriptions metadata
 pub type SubscriptionsCache = HashMap<SubscriptionId, TelemetryMessageMetadata>;
@@ -150,6 +154,27 @@ impl YangPushEnrichmentStats {
     }
 }
 
+/// Fetches local system information into a Manifest object.
+/// (host name, OS version, software version, build info, etc.)
+fn fetch_sysinfo_manifest() -> Manifest {
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    Manifest::new(
+        Some(format!(
+            "{}@{}",
+            build::PROJECT_NAME,
+            System::host_name().unwrap_or_else(|| "unknown".to_string())
+        )),
+        Some("NetGauze".to_string()),
+        None,
+        Some(format!("{} ({})", build::PKG_VERSION, build::SHORT_COMMIT)),
+        Some(build::BUILD_RUST_CHANNEL.to_string()),
+        System::os_version(),
+        System::name(),
+    )
+}
+
 /// Actor responsible for enriching Yang Push notifications.
 /// Sends enriched TelemetryMessage objects.
 struct YangPushEnrichmentActor {
@@ -184,7 +209,7 @@ impl YangPushEnrichmentActor {
             labels: HashMap::new(),
             default_labels,
             subscriptions: HashMap::new(),
-            manifest: Manifest::default(),
+            manifest: fetch_sysinfo_manifest(),
             stats,
         }
     }
@@ -590,7 +615,7 @@ mod tests {
             labels: HashMap::new(),
             default_labels: (0, HashMap::new()),
             subscriptions: HashMap::new(),
-            manifest: Manifest::default(),
+            manifest: fetch_sysinfo_manifest(),
             stats: YangPushEnrichmentStats::new(opentelemetry::global::meter("my-meter")),
         }
     }
