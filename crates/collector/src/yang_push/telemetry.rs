@@ -229,7 +229,7 @@ pub struct YangPushSubscriptionMetadata {
     purpose: Option<String>,
 
     #[serde(flatten)]
-    update_trigger: UpdateTrigger,
+    update_trigger: Option<UpdateTrigger>,
 
     module_version: Vec<YangPushModuleVersion>,
 
@@ -246,7 +246,7 @@ impl YangPushSubscriptionMetadata {
         transport: Option<Transport>,
         encoding: Option<Encoding>,
         purpose: Option<String>,
-        update_trigger: UpdateTrigger,
+        update_trigger: Option<UpdateTrigger>,
         module_version: Vec<YangPushModuleVersion>,
         yang_library_content_id: Option<String>,
     ) -> Self {
@@ -280,8 +280,8 @@ impl YangPushSubscriptionMetadata {
     pub fn purpose(&self) -> Option<&str> {
         self.purpose.as_deref()
     }
-    pub fn update_trigger(&self) -> &UpdateTrigger {
-        &self.update_trigger
+    pub fn update_trigger(&self) -> Option<&UpdateTrigger> {
+        self.update_trigger.as_ref()
     }
     pub fn module_version(&self) -> &[YangPushModuleVersion] {
         &self.module_version
@@ -510,15 +510,15 @@ mod tests {
                         transport: Some(Transport::UDPNotif),
                         encoding: Some(Encoding::Json),
                         purpose: None,
-                        update_trigger: UpdateTrigger::Periodic {
+                        update_trigger: Some(UpdateTrigger::Periodic {
                             period: Some(CentiSeconds::new(100)),
                             anchor_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
-                        },
-                        module_version: vec![YangPushModuleVersion {
-                            module_name: "example-module".to_string(),
-                            revision: Some("2025-01-01".to_string()),
-                            revision_label: Some("1.0.0".to_string()),
-                        }],
+                        }),
+                        module_version: vec![YangPushModuleVersion::new(
+                            "example-module".to_string(),
+                            Some("2025-01-01".to_string()),
+                            Some("1.0.0".to_string()),
+                        )],
                         yang_library_content_id: Some("random-content-id".to_string()),
                     }),
                 },

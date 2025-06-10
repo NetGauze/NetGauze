@@ -294,7 +294,10 @@ mod tests {
     use core::panic;
     use serde_json::json;
     use std::collections::HashMap;
-    use yang::notification::{Encoding, NotificationVariant, UpdateTrigger};
+    use yang::notification::{
+        Encoding, NotificationVariant, SubscriptionStartedModified, Target, UpdateTrigger,
+        YangPushModuleVersion,
+    };
 
     #[test]
     fn test_udp_notif_packet_decoded_envelope_sub_started() {
@@ -305,9 +308,9 @@ mod tests {
                         "encoding": "encode-json",
                         "id": 30,
                         "ietf-yang-push-revision:module-version": [
-                            { "module-name": "openconfig-interfaces", "revision": "" }
+                            { "module-name": "openconfig-interfaces", "revision": "2025-06-10" }
                         ],
-                        "ietf-yang-push:datastore": "operational",
+                        "ietf-yang-push:datastore": "ietf-datastores:operational",
                         "ietf-yang-push:datastore-xpath-filter": "openconfig-interfaces:interfaces",
                         "ietf-yang-push:on-change": { "sync-on-start": true },
                     }
@@ -335,46 +338,46 @@ mod tests {
         assert_eq!(decoded.publisher_id(), 1234);
         assert_eq!(decoded.message_id(), 5678);
 
-        // Check that the payload is a NotificationEnvelope with a SubscriptionStarted
-        // notification
-        match decoded.payload() {
-            UdpNotifPayload::NotificationEnvelope(envelope) => {
-                assert_eq!(envelope.hostname().unwrap(), "ipf-zbl1327-r-daisy-91");
-                assert_eq!(envelope.sequence_number().unwrap(), 0);
+        // Create expected NotificationEnvelope
+        let sub_started = SubscriptionStartedModified::new(
+            30,
+            Target::new(
+                None,
+                None,
+                None,
+                None,
+                Some("ietf-datastores:operational".to_string()),
+                None,
+                Some("openconfig-interfaces:interfaces".to_string()),
+            ),
+            None,
+            None,
+            Some(Encoding::Json),
+            None,
+            Some(UpdateTrigger::OnChange {
+                dampening_period: None,
+                sync_on_start: Some(true),
+                excluded_change: None,
+            }),
+            Some(vec![YangPushModuleVersion::new(
+                "openconfig-interfaces".to_string(),
+                Some("2025-06-10".to_string()),
+                None,
+            )]),
+            None,
+            serde_json::json!({}),
+        );
+        let expected = NotificationEnvelope::new(
+            Some("ipf-zbl1327-r-daisy-91".to_string()),
+            Some(0),
+            Some(NotificationVariant::SubscriptionStarted(sub_started)),
+            json!({"event-time": "2025-04-17T15:20:14.840Z"}),
+        );
 
-                if let Some(notif_variant) = envelope.contents() {
-                    match notif_variant {
-                        NotificationVariant::SubscriptionStarted(subscription_started) => {
-                            assert_eq!(subscription_started.id(), 30);
-                            assert_eq!(subscription_started.encoding().unwrap(), &Encoding::Json);
-                            assert_eq!(
-                                subscription_started.target().datastore().unwrap(),
-                                "operational"
-                            );
-                            assert_eq!(
-                                subscription_started
-                                    .target()
-                                    .datastore_xpath_filter()
-                                    .unwrap(),
-                                "openconfig-interfaces:interfaces"
-                            );
-                            if let UpdateTrigger::OnChange {
-                                sync_on_start: Some(sync_on_start),
-                                ..
-                            } = subscription_started.update_trigger()
-                            {
-                                assert!(*sync_on_start);
-                            } else {
-                                panic!("Expected UpdateTrigger::OnChange with sync_on_start set to true");
-                            }
-                        }
-                        _ => {
-                            panic!("Expected NotificationVariant::SubscriptionStarted");
-                        }
-                    }
-                } else {
-                    panic!("Expected contents in NotificationEnvelope");
-                }
+        // Compare the decoded payload with expected NotificationEnvelope
+        match decoded.payload() {
+            UdpNotifPayload::NotificationEnvelope(decoded) => {
+                assert_eq!(decoded, &expected);
             }
             _ => {
                 panic!("Expected UdpNotifPayload::NotificationEnvelope");
@@ -412,25 +415,42 @@ mod tests {
 
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
 
-        // Check that the payload is a Legacy Notification Wrapper with a
-        // SubscriptionStarted notification
+        // Create expected NotificationLegacy
+        let sub_started = SubscriptionStartedModified::new(
+            1,
+            Target::new(
+                None,
+                None,
+                None,
+                None,
+                Some("ietf-datastores:running".to_string()),
+                None,
+                None,
+            ),
+            None,
+            None,
+            Some(Encoding::Json),
+            None,
+            None,
+            None,
+            None,
+            json!({"ietf-distributed-notif:message-publisher-ids": [
+                    16974839, 16973828, 16974828
+                  ],
+                  "additional_stuff": [ { "key1": "a" }, { "key2": "b" } ]}),
+        );
+        let expected = NotificationLegacy::new(
+            None,
+            Some(NotificationVariant::SubscriptionStarted(sub_started)),
+            serde_json::json!({
+              "eventTime": "2025-05-12T12:00:00Z",
+              "additional_stuff": "example"}),
+        );
+
+        // Compare the decoded payload with expected NotificationLegacy
         match decoded.payload() {
-            UdpNotifPayload::NotificationLegacy(notification) => {
-                if let Some(notif_variant) = notification.notification() {
-                    match notif_variant {
-                        NotificationVariant::SubscriptionStarted(subscription_started) => {
-                            assert_eq!(subscription_started.id(), 1);
-                            assert_eq!(subscription_started.encoding().unwrap(), &Encoding::Json);
-                            assert_eq!(
-                                subscription_started.target().datastore().unwrap(),
-                                "ietf-datastores:running"
-                            );
-                        }
-                        _ => {
-                            panic!("Expected NotificationVariant::SubscriptionStarted");
-                        }
-                    }
-                }
+            UdpNotifPayload::NotificationLegacy(decoded) => {
+                assert_eq!(decoded, &expected);
             }
             _ => {
                 panic!("Expected UdpNotifPayload::NotificationLegacy");
@@ -468,12 +488,10 @@ mod tests {
         // valid JSON)
         let result = UdpNotifPacketDecoded::try_from(&packet);
 
-        assert!(result.is_err());
-        if let Err(UdpNotifPayloadConversionError::JsonError(json_error)) = result {
-            println!("Expected JsonError: {json_error:?}");
-        } else {
-            panic!("Expected JsonError");
-        }
+        assert!(
+            matches!(result, Err(UdpNotifPayloadConversionError::JsonError(_))),
+            "Unexpected result: {result:?}"
+        );
     }
 
     #[test]
@@ -507,12 +525,10 @@ mod tests {
         // NotificationVariant is unknown)
         let result = UdpNotifPacketDecoded::try_from(&packet);
 
-        assert!(result.is_err());
-        if let Err(UdpNotifPayloadConversionError::JsonError(json_error)) = result {
-            println!("Expected JsonError: {json_error:?}");
-        } else {
-            panic!("Expected JsonError");
-        }
+        assert!(
+            matches!(result, Err(UdpNotifPayloadConversionError::JsonError(_))),
+            "Unexpected result: {result:?}"
+        );
     }
 
     #[test]
@@ -540,12 +556,10 @@ mod tests {
         // isn't any of the defined NotificationVariant)
         let result = UdpNotifPacketDecoded::try_from(&packet);
 
-        assert!(result.is_err());
-        if let Err(UdpNotifPayloadConversionError::JsonError(json_error)) = result {
-            println!("Expected JsonError: {json_error:?}");
-        } else {
-            panic!("Expected JsonError");
-        }
+        assert!(
+            matches!(result, Err(UdpNotifPayloadConversionError::JsonError(_))),
+            "Unexpected result: {result:?}"
+        );
     }
 
     #[test]
@@ -571,11 +585,18 @@ mod tests {
         // Attempt to decode the packet (should succeed)
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
 
+        // Create expected NotificationEnvelope
+        let expected = NotificationEnvelope::new(
+            Some("some-router".to_string()),
+            Some(5),
+            None,
+            json!({"event-time": "2025-03-04T07:11:33.252679191+00:00"}),
+        );
+
         // Check hostname and sequence number
         match decoded.payload() {
-            UdpNotifPayload::NotificationEnvelope(envelope) => {
-                assert_eq!(envelope.hostname().unwrap(), "some-router");
-                assert_eq!(envelope.sequence_number().unwrap(), 5);
+            UdpNotifPayload::NotificationEnvelope(decoded) => {
+                assert_eq!(decoded, &expected);
             }
             _ => {
                 panic!("Expected UdpNotifPayload::NotificationEnvelope");
