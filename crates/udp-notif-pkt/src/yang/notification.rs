@@ -63,6 +63,19 @@ pub struct NotificationEnvelope {
 }
 
 impl NotificationEnvelope {
+    pub fn new(
+        hostname: Option<String>,
+        sequence_number: Option<u32>,
+        contents: Option<NotificationVariant>,
+        extra_fields: Value,
+    ) -> Self {
+        Self {
+            hostname,
+            sequence_number,
+            contents,
+            extra_fields,
+        }
+    }
     pub fn hostname(&self) -> Option<&str> {
         self.hostname.as_deref()
     }
@@ -90,6 +103,17 @@ pub struct NotificationLegacy {
 }
 
 impl NotificationLegacy {
+    pub fn new(
+        sys_name: Option<String>,
+        notification: Option<NotificationVariant>,
+        extra_fields: Value,
+    ) -> Self {
+        Self {
+            sys_name,
+            notification,
+            extra_fields,
+        }
+    }
     pub fn sys_name(&self) -> Option<&str> {
         self.sys_name.as_deref()
     }
@@ -139,7 +163,7 @@ pub struct SubscriptionStartedModified {
     purpose: Option<String>,
 
     #[serde(flatten)]
-    update_trigger: UpdateTrigger,
+    update_trigger: Option<UpdateTrigger>,
 
     #[serde(rename = "ietf-yang-push-revision:module-version")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -162,7 +186,7 @@ impl SubscriptionStartedModified {
         transport: Option<Transport>,
         encoding: Option<Encoding>,
         purpose: Option<String>,
-        update_trigger: UpdateTrigger,
+        update_trigger: Option<UpdateTrigger>,
         module_version: Option<Vec<YangPushModuleVersion>>,
         yang_library_content_id: Option<String>,
         extra_fields: Value,
@@ -198,8 +222,8 @@ impl SubscriptionStartedModified {
     pub fn purpose(&self) -> Option<&str> {
         self.purpose.as_deref()
     }
-    pub fn update_trigger(&self) -> &UpdateTrigger {
-        &self.update_trigger
+    pub fn update_trigger(&self) -> Option<&UpdateTrigger> {
+        self.update_trigger.as_ref()
     }
     pub fn module_version(&self) -> Option<&Vec<YangPushModuleVersion>> {
         self.module_version.as_ref()
@@ -433,13 +457,36 @@ pub enum ChangeType {
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct YangPushModuleVersion {
-    pub module_name: String,
+    module_name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub revision: Option<String>,
+    revision: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub revision_label: Option<String>,
+    revision_label: Option<String>,
+}
+
+impl YangPushModuleVersion {
+    pub fn new(
+        module_name: String,
+        revision: Option<String>,
+        revision_label: Option<String>,
+    ) -> Self {
+        Self {
+            module_name,
+            revision,
+            revision_label,
+        }
+    }
+    pub fn module_name(&self) -> &str {
+        &self.module_name
+    }
+    pub fn revision(&self) -> Option<&str> {
+        self.revision.as_deref()
+    }
+    pub fn revision_label(&self) -> Option<&str> {
+        self.revision_label.as_deref()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -589,11 +636,11 @@ mod tests {
             transport: Some(Transport::UDPNotif),
             stop_time: Some(Utc.timestamp_millis_opt(0).unwrap()),
             purpose: Some("test-purpose".to_string()),
-            update_trigger: UpdateTrigger::OnChange {
+            update_trigger: Some(UpdateTrigger::OnChange {
                 dampening_period: Some(CentiSeconds::new(100)),
                 sync_on_start: Some(true),
                 excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
-            },
+            }),
             module_version: Some(vec![YangPushModuleVersion {
                 module_name: "example-module".to_string(),
                 revision: Some("2025-04-25".to_string()),
@@ -681,11 +728,11 @@ mod tests {
             transport: Some(Transport::UDPNotif),
             stop_time: Some(Utc.timestamp_millis_opt(10000).unwrap()),
             purpose: Some("test-purpose".to_string()),
-            update_trigger: UpdateTrigger::OnChange {
+            update_trigger: Some(UpdateTrigger::OnChange {
                 dampening_period: Some(CentiSeconds::new(100)),
                 sync_on_start: Some(true),
                 excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
-            },
+            }),
             module_version: Some(vec![YangPushModuleVersion {
                 module_name: "example-module".to_string(),
                 revision: Some("2025-04-25".to_string()),

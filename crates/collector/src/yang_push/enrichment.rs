@@ -221,7 +221,7 @@ impl YangPushEnrichmentActor {
             sub.transport().cloned(),
             sub.encoding().cloned(),
             sub.purpose().map(|id| id.to_string()),
-            sub.update_trigger().clone().into(),
+            sub.update_trigger().cloned().map(Into::into),
             sub.module_version().cloned().unwrap_or_default(),
             sub.yang_library_content_id().map(|id| id.to_string()),
         );
@@ -568,10 +568,10 @@ mod tests {
             Some(Transport::UDPNotif),
             Some(Encoding::Json),
             Some(purpose),
-            UpdateTrigger::Periodic {
+            Some(UpdateTrigger::Periodic {
                 period: Some(CentiSeconds::new(100)),
                 anchor_time: None,
-            },
+            }),
             None,
             None,
             json!({}),
@@ -661,12 +661,14 @@ mod tests {
                 .yang_push_subscription()
                 .unwrap()
                 .update_trigger()
-                .clone(),
-            UpdateTrigger::Periodic {
-                period: Some(CentiSeconds::new(100)),
-                anchor_time: None
-            }
-            .into()
+                .cloned(),
+            Some(
+                UpdateTrigger::Periodic {
+                    period: Some(CentiSeconds::new(100)),
+                    anchor_time: None
+                }
+                .into()
+            )
         );
         assert_eq!(
             peer_subscription
