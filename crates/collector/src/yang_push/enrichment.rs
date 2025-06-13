@@ -415,17 +415,19 @@ impl YangPushEnrichmentActor {
             .collect();
 
         // Match on the wrapper and process the notification content
-        let subscription_metadata = match payload {
-            UdpNotifPayload::NotificationLegacy(legacy) => {
-                self.process_notification(peer, legacy.notification())?
-            }
-            UdpNotifPayload::NotificationEnvelope(envelope) => {
-                self.process_notification(peer, envelope.contents())?
-            }
+        let (node_export_timestamp, subscription_metadata) = match payload {
+            UdpNotifPayload::NotificationLegacy(legacy) => (
+                legacy.event_time(),
+                self.process_notification(peer, legacy.notification())?,
+            ),
+            UdpNotifPayload::NotificationEnvelope(envelope) => (
+                envelope.event_time(),
+                self.process_notification(peer, envelope.contents())?,
+            ),
         };
 
         let telemetry_message_metadata = TelemetryMessageMetadata::new(
-            None,
+            Some(node_export_timestamp),
             Utc::now(),
             SessionProtocol::YangPush, // only option at the moment
             peer.ip(),

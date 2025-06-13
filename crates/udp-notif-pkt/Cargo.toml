@@ -29,7 +29,7 @@ tokio-util = { workspace = true, features = ["full", "tracing"] , optional = tru
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
 serde_json = { workspace = true }
-chrono = { workspace = true, features = ["serde"] }
+chrono = { workspace = true, default-features = true, features = ["serde"] }
 ciborium = { workspace = true }
 
 [features]
