@@ -444,7 +444,10 @@ fn serialize_yang_push(
     input: TelemetryMessageWrapper,
     _writer_id: String,
 ) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
-    let ip = input.message().data_collection_metadata().remote_address();
+    let ip = input
+        .message()
+        .telemetry_message_metadata()
+        .export_address();
     let value = serde_json::to_value(input)?;
     let key = serde_json::Value::String(ip.to_string());
     Ok((Some(key), value))
