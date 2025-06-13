@@ -20,15 +20,26 @@
 //! - [Telemetry Message](https://datatracker.ietf.org/doc/html/draft-netana-nmop-message-broker-telemetry-message).
 //!
 //! Key components include:
+//!
 //! - **TelemetryMessage**: The main structure representing a telemetry message.
-//! - **SessionProtocol**: Enum for supported telemetry session protocols (e.g.,
-//!   YANG Push, NETCONF).
-//! - **Manifest**: Metadata about the network node or data collection system.
-//! - **TelemetryMessageMetadata**: Metadata specific to the telemetry
-//!   notification, with YANG Push subscription details such as filters,
-//!   transport, and encoding.
-//! - **DataCollectionMetadata**: Metadata about the data collection, including
-//!   remote addresses and labels.
+//!
+//! - **TelemetryMessageWrapper**: A wrapper for the telemetry message needed
+//!   for including the module namespace.
+//!
+//! - **Manifest**: Common metadata structure for both network nodes and data
+//!   collection systems, including information such as name, vendor, software
+//!   version, etc.
+//!
+//! - **TelemetryMessageMetadata**: Metadata about the telemetry session between
+//!   collector and network node, including timestamps, protocol information,
+//!   and addressing details.
+//!
+//! - **YangPushSubscriptionMetadata**: YANG-Push specific extension for
+//!   subscription details when the session protocol is YANG Push.
+//!
+//! - **NetworkOperatorMetadata**: Operator-specific metadata implemented as
+//!   key-value labels that can be used to enrich collected data with custom
+//!   information.
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -58,53 +69,47 @@ impl TelemetryMessageWrapper {
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct TelemetryMessage {
-    timestamp: DateTime<Utc>,
-    session_protocol: SessionProtocol,
-    network_node_manifest: Manifest,
-    data_collection_manifest: Manifest,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    network_node_manifest: Option<Manifest>,
+
     telemetry_message_metadata: TelemetryMessageMetadata,
-    data_collection_metadata: DataCollectionMetadata,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data_collection_manifest: Option<Manifest>,
+
+    network_operator_metadata: NetworkOperatorMetadata,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     payload: Option<Value>,
 }
 
 impl TelemetryMessage {
     pub fn new(
-        timestamp: DateTime<Utc>,
-        session_protocol: SessionProtocol,
-        network_node_manifest: Manifest,
-        data_collection_manifest: Manifest,
+        network_node_manifest: Option<Manifest>,
         telemetry_message_metadata: TelemetryMessageMetadata,
-        data_collection_metadata: DataCollectionMetadata,
+        data_collection_manifest: Option<Manifest>,
+        network_operator_metadata: NetworkOperatorMetadata,
         payload: Option<Value>,
     ) -> Self {
         Self {
-            timestamp,
-            session_protocol,
             network_node_manifest,
-            data_collection_manifest,
             telemetry_message_metadata,
-            data_collection_metadata,
+            data_collection_manifest,
+            network_operator_metadata,
             payload,
         }
     }
-    pub fn timestamp(&self) -> DateTime<Utc> {
-        self.timestamp
+    pub fn network_node_manifest(&self) -> Option<&Manifest> {
+        self.network_node_manifest.as_ref()
     }
-    pub fn session_protocol(&self) -> &SessionProtocol {
-        &self.session_protocol
-    }
-    pub fn network_node_manifest(&self) -> &Manifest {
-        &self.network_node_manifest
-    }
-    pub fn data_collection_manifest(&self) -> &Manifest {
-        &self.data_collection_manifest
+    pub fn data_collection_manifest(&self) -> Option<&Manifest> {
+        self.data_collection_manifest.as_ref()
     }
     pub fn telemetry_message_metadata(&self) -> &TelemetryMessageMetadata {
         &self.telemetry_message_metadata
     }
-    pub fn data_collection_metadata(&self) -> &DataCollectionMetadata {
-        &self.data_collection_metadata
+    pub fn network_operator_metadata(&self) -> &NetworkOperatorMetadata {
+        &self.network_operator_metadata
     }
     pub fn payload(&self) -> Option<&Value> {
         self.payload.as_ref()
@@ -112,7 +117,7 @@ impl TelemetryMessage {
 }
 
 /// Telemetry Session Protocol Type
-#[derive(Default, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Default, Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum SessionProtocol {
     #[serde(rename = "yp-push")]
     YangPush,
@@ -178,11 +183,26 @@ impl Manifest {
 }
 
 /// Telemetry Notification Metadata
-#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "kebab-case")]
 pub struct TelemetryMessageMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "event-time")]
-    event_time: Option<DateTime<Utc>>,
+    node_export_timestamp: Option<DateTime<Utc>>,
+
+    collection_timestamp: DateTime<Utc>,
+
+    session_protocol: SessionProtocol,
+
+    export_address: IpAddr,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    export_port: Option<u16>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    collection_address: Option<IpAddr>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    collection_port: Option<u16>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "ietf-yang-push-telemetry-message:yang-push-subscription")]
@@ -190,17 +210,48 @@ pub struct TelemetryMessageMetadata {
 }
 
 impl TelemetryMessageMetadata {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        event_time: Option<DateTime<Utc>>,
+        node_export_timestamp: Option<DateTime<Utc>>,
+        collection_timestamp: DateTime<Utc>,
+        session_protocol: SessionProtocol,
+        export_address: IpAddr,
+        export_port: Option<u16>,
+        collection_address: Option<IpAddr>,
+        collection_port: Option<u16>,
         yang_push_subscription: Option<YangPushSubscriptionMetadata>,
     ) -> Self {
         Self {
-            event_time,
+            node_export_timestamp,
+            collection_timestamp,
+            session_protocol,
+            export_address,
+            export_port,
+            collection_address,
+            collection_port,
             yang_push_subscription,
         }
     }
-    pub fn event_time(&self) -> Option<DateTime<Utc>> {
-        self.event_time
+    pub fn node_export_timestamp(&self) -> Option<DateTime<Utc>> {
+        self.node_export_timestamp
+    }
+    pub fn collection_timestamp(&self) -> DateTime<Utc> {
+        self.collection_timestamp
+    }
+    pub fn session_protocol(&self) -> &SessionProtocol {
+        &self.session_protocol
+    }
+    pub fn export_address(&self) -> IpAddr {
+        self.export_address
+    }
+    pub fn export_port(&self) -> Option<u16> {
+        self.export_port
+    }
+    pub fn collection_address(&self) -> Option<IpAddr> {
+        self.collection_address
+    }
+    pub fn collection_port(&self) -> Option<u16> {
+        self.collection_port
     }
     pub fn yang_push_subscription(&self) -> Option<&YangPushSubscriptionMetadata> {
         self.yang_push_subscription.as_ref()
@@ -387,48 +438,16 @@ impl From<netgauze_udp_notif_pkt::yang::notification::UpdateTrigger> for UpdateT
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
-pub struct DataCollectionMetadata {
-    remote_address: IpAddr,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    remote_port: Option<u16>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    local_address: Option<IpAddr>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    local_port: Option<u16>,
-
+pub struct NetworkOperatorMetadata {
     labels: Vec<Label>,
 }
 
-impl DataCollectionMetadata {
-    pub fn new(
-        remote_address: IpAddr,
-        remote_port: Option<u16>,
-        local_address: Option<IpAddr>,
-        local_port: Option<u16>,
-        labels: Vec<Label>,
-    ) -> Self {
-        Self {
-            remote_address,
-            remote_port,
-            local_address,
-            local_port,
-            labels,
-        }
+impl NetworkOperatorMetadata {
+    pub fn new(labels: Vec<Label>) -> Self {
+        Self { labels }
     }
-    pub fn remote_address(&self) -> IpAddr {
-        self.remote_address
-    }
-    pub fn remote_port(&self) -> Option<u16> {
-        self.remote_port
-    }
-    pub fn local_address(&self) -> Option<IpAddr> {
-        self.local_address
-    }
-    pub fn local_port(&self) -> Option<u16> {
-        self.local_port
+    pub fn labels(&self) -> &[Label] {
+        &self.labels
     }
 }
 
@@ -471,9 +490,7 @@ mod tests {
     fn test_telemetry_message_serde() {
         let original_message = TelemetryMessageWrapper {
             message: TelemetryMessage {
-                timestamp: Utc.timestamp_millis_opt(0).unwrap(),
-                session_protocol: SessionProtocol::YangPush,
-                network_node_manifest: Manifest {
+                network_node_manifest: Some(Manifest {
                     name: Some("node_id".to_string()),
                     vendor: Some("FRR".to_string()),
                     vendor_pen: None,
@@ -481,18 +498,15 @@ mod tests {
                     software_flavor: None,
                     os_version: None,
                     os_type: None,
-                },
-                data_collection_manifest: Manifest {
-                    name: Some("dev-collector".to_string()),
-                    vendor: Some("NetGauze".to_string()),
-                    vendor_pen: Some(12345),
-                    software_version: Some("1.0.0".to_string()),
-                    software_flavor: Some("release".to_string()),
-                    os_version: Some("8.10".to_string()),
-                    os_type: Some("Rocky Linux".to_string()),
-                },
+                }),
                 telemetry_message_metadata: TelemetryMessageMetadata {
-                    event_time: None,
+                    node_export_timestamp: None,
+                    collection_timestamp: Utc.timestamp_millis_opt(0).unwrap(),
+                    session_protocol: SessionProtocol::YangPush,
+                    export_address: "127.0.0.1".parse().unwrap(),
+                    export_port: Some(8080),
+                    collection_address: None,
+                    collection_port: None,
                     yang_push_subscription: Some(YangPushSubscriptionMetadata {
                         id: Some(1),
                         filter_spec: FilterSpec {
@@ -522,11 +536,16 @@ mod tests {
                         yang_library_content_id: Some("random-content-id".to_string()),
                     }),
                 },
-                data_collection_metadata: DataCollectionMetadata {
-                    remote_address: "127.0.0.1".parse().unwrap(),
-                    remote_port: Some(8080),
-                    local_address: None,
-                    local_port: None,
+                data_collection_manifest: Some(Manifest {
+                    name: Some("dev-collector".to_string()),
+                    vendor: Some("NetGauze".to_string()),
+                    vendor_pen: Some(12345),
+                    software_version: Some("1.0.0".to_string()),
+                    software_flavor: Some("release".to_string()),
+                    os_version: Some("8.10".to_string()),
+                    os_type: Some("Rocky Linux".to_string()),
+                }),
+                network_operator_metadata: NetworkOperatorMetadata {
                     labels: vec![
                         Label {
                             name: "platform_id".to_string(),
@@ -550,7 +569,7 @@ mod tests {
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Expected JSON string
-        let expected_json = r#"{"ietf-telemetry-message:message":{"timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","network-node-manifest":{"name":"node_id","vendor":"FRR"},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"telemetry-message-metadata":{"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-metadata":{"remote-address":"127.0.0.1","remote-port":8080,"labels":[{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
+        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module-version":[{"module-name":"example-module","revision":"2025-01-01","revision-label":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(

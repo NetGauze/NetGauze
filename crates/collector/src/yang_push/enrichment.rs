@@ -30,7 +30,7 @@
 //! - `YangPushEnrichmentStats` - Metrics for tracking the performance and
 //!   behavior of the enrichment process.
 use crate::yang_push::telemetry::{
-    DataCollectionMetadata, FilterSpec, Label, LabelValue, Manifest, SessionProtocol,
+    FilterSpec, Label, LabelValue, Manifest, NetworkOperatorMetadata, SessionProtocol,
     TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
     YangPushSubscriptionMetadata,
 };
@@ -56,7 +56,7 @@ use tracing::{debug, error, info, warn};
 shadow!(build);
 
 /// Cache for YangPush subscriptions metadata
-pub type SubscriptionsCache = HashMap<SubscriptionId, TelemetryMessageMetadata>;
+pub type SubscriptionsCache = HashMap<SubscriptionId, YangPushSubscriptionMetadata>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum YangPushEnrichmentActorCommand {
@@ -220,7 +220,7 @@ impl YangPushEnrichmentActor {
         &mut self,
         peer: SocketAddr,
         sub: &SubscriptionStartedModified,
-    ) -> Result<TelemetryMessageMetadata, YangPushEnrichmentActorError> {
+    ) -> Result<Option<YangPushSubscriptionMetadata>, YangPushEnrichmentActorError> {
         let stream = sub.target().stream().map(|f| f.to_string());
 
         let datastore = sub.target().datastore().map(|f| f.to_string());
@@ -251,12 +251,9 @@ impl YangPushEnrichmentActor {
             sub.yang_library_content_id().map(|id| id.to_string()),
         );
 
-        let telemetry_message_metadata =
-            TelemetryMessageMetadata::new(None, Some(subscription_metadata));
-
         // Insert the subscription metadata into the cache
         let peer_subscriptions = self.subscriptions.entry(peer).or_default();
-        peer_subscriptions.insert(sub.id(), telemetry_message_metadata.clone());
+        peer_subscriptions.insert(sub.id(), subscription_metadata.clone());
 
         // Update the gauge tracking per-peer subscriptions
         self.stats
@@ -267,7 +264,7 @@ impl YangPushEnrichmentActor {
             serde_json::to_string(&self.subscriptions).unwrap()
         );
 
-        Ok(telemetry_message_metadata)
+        Ok(Some(subscription_metadata))
     }
 
     /// Handles SubscriptionTerminated messages by removing subscription
@@ -276,13 +273,24 @@ impl YangPushEnrichmentActor {
         &mut self,
         peer: SocketAddr,
         sub: &SubscriptionTerminated,
-    ) -> Result<TelemetryMessageMetadata, YangPushEnrichmentActorError> {
+    ) -> Result<Option<YangPushSubscriptionMetadata>, YangPushEnrichmentActorError> {
         // Get and delete subscription information from the cache
-        let telemetry_message_metadata = self
+        let subscription_metadata = self
             .subscriptions
             .get_mut(&peer)
-            .and_then(|subscriptions| subscriptions.remove(&sub.id()))
-            .unwrap_or_default();
+            .and_then(|subscriptions| subscriptions.remove(&sub.id()));
+
+        // Increment counter if there was a cache miss
+        if subscription_metadata.is_none() {
+            let peer_tags = [
+                opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
+                opentelemetry::KeyValue::new(
+                    "network.peer.port",
+                    opentelemetry::Value::I64(peer.port().into()),
+                ),
+            ];
+            self.stats.subscription_cache_miss.add(1, &peer_tags);
+        }
 
         // Update the gauge tracking per-peer subscriptions
         if let Some(subscriptions) = self.subscriptions.get(&peer) {
@@ -297,7 +305,7 @@ impl YangPushEnrichmentActor {
             serde_json::to_string(&self.subscriptions).unwrap()
         );
 
-        Ok(telemetry_message_metadata)
+        Ok(subscription_metadata)
     }
 
     /// Retrieves subscription metadata from the cache based on the peer address
@@ -306,27 +314,27 @@ impl YangPushEnrichmentActor {
         &self,
         peer: SocketAddr,
         subscription_id: &SubscriptionId,
-    ) -> Result<TelemetryMessageMetadata, YangPushEnrichmentActorError> {
+    ) -> Result<Option<YangPushSubscriptionMetadata>, YangPushEnrichmentActorError> {
         // Get subscription information from the cache
-        let telemetry_message_metadata = self
+        let subscription_metadata = self
             .subscriptions
             .get(&peer)
             .and_then(|subscriptions| subscriptions.get(subscription_id))
-            .cloned()
-            .unwrap_or_else(|| {
-                let peer_tags = [
-                    opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
-                    opentelemetry::KeyValue::new(
-                        "network.peer.port",
-                        opentelemetry::Value::I64(peer.port().into()),
-                    ),
-                ];
-                self.stats.subscription_cache_miss.add(1, &peer_tags);
+            .cloned();
 
-                TelemetryMessageMetadata::default()
-            });
+        // Increment counter if there was a cache miss
+        if subscription_metadata.is_none() {
+            let peer_tags = [
+                opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
+                opentelemetry::KeyValue::new(
+                    "network.peer.port",
+                    opentelemetry::Value::I64(peer.port().into()),
+                ),
+            ];
+            self.stats.subscription_cache_miss.add(1, &peer_tags);
+        }
 
-        Ok(telemetry_message_metadata)
+        Ok(subscription_metadata)
     }
 
     /// Processes Notification and returns the relevant TelemetryMessageMetadata
@@ -334,7 +342,7 @@ impl YangPushEnrichmentActor {
         &mut self,
         peer: SocketAddr,
         notification: Option<&NotificationVariant>,
-    ) -> Result<TelemetryMessageMetadata, YangPushEnrichmentActorError> {
+    ) -> Result<Option<YangPushSubscriptionMetadata>, YangPushEnrichmentActorError> {
         match notification {
             Some(NotificationVariant::SubscriptionStarted(sub_started)) => {
                 debug!(
@@ -392,8 +400,6 @@ impl YangPushEnrichmentActor {
         peer: SocketAddr,
         payload: &UdpNotifPayload,
     ) -> Result<TelemetryMessageWrapper, YangPushEnrichmentActorError> {
-        let timestamp = Utc::now();
-
         // Get sonata labels from the cache
         let (_, labels) = self.labels.get(&peer.ip()).unwrap_or(&self.default_labels);
         let labels: Vec<Label> = labels
@@ -409,7 +415,7 @@ impl YangPushEnrichmentActor {
             .collect();
 
         // Match on the wrapper and process the notification content
-        let telemetry_message_metadata = match payload {
+        let subscription_metadata = match payload {
             UdpNotifPayload::NotificationLegacy(legacy) => {
                 self.process_notification(peer, legacy.notification())?
             }
@@ -417,6 +423,17 @@ impl YangPushEnrichmentActor {
                 self.process_notification(peer, envelope.contents())?
             }
         };
+
+        let telemetry_message_metadata = TelemetryMessageMetadata::new(
+            None,
+            Utc::now(),
+            SessionProtocol::YangPush, // only option at the moment
+            peer.ip(),
+            Some(peer.port()),
+            None,
+            None,
+            subscription_metadata,
+        );
 
         // Re-serialize the UDP-Notif payload into JSON
         let json_payload = serde_json::to_value(payload).map_err(|err| {
@@ -426,12 +443,10 @@ impl YangPushEnrichmentActor {
 
         // Populate metadata and payload in a new TelemetryMessage
         Ok(TelemetryMessageWrapper::new(TelemetryMessage::new(
-            timestamp,
-            SessionProtocol::YangPush, // only option at the moment
-            Manifest::default(),
-            self.manifest.clone(),
+            None,
             telemetry_message_metadata,
-            DataCollectionMetadata::new(peer.ip(), Some(peer.port()), None, None, labels),
+            Some(self.manifest.clone()),
+            NetworkOperatorMetadata::new(labels),
             Some(json_payload),
         )))
     }
@@ -637,56 +652,28 @@ mod tests {
         assert_eq!(result.clone().unwrap(), get_result.unwrap());
 
         // Check if the subscription is cached correctly
-        let peer_subscription = result.unwrap();
+        let peer_subscription = match result {
+            Ok(Some(metadata)) => metadata,
+            _ => panic!("Expected Some(YangPushSubscriptionMetadata), got: {result:?}"),
+        };
+
+        assert_eq!(peer_subscription.id(), Some(1));
         assert_eq!(
-            peer_subscription.yang_push_subscription().unwrap().id(),
-            Some(1)
-        );
-        assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .filter_spec()
-                .datastore(),
+            peer_subscription.filter_spec().datastore(),
             Some("example-datastore-name")
         );
         assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .filter_spec()
-                .xpath_filter(),
+            peer_subscription.filter_spec().xpath_filter(),
             Some("/example/datastore/xpath")
         );
         assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .transport()
-                .cloned(),
+            peer_subscription.transport().cloned(),
             Some(Transport::UDPNotif)
         );
+        assert_eq!(peer_subscription.encoding().cloned(), Some(Encoding::Json));
+        assert_eq!(peer_subscription.purpose(), Some("example-purpose"));
         assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .encoding()
-                .cloned(),
-            Some(Encoding::Json)
-        );
-        assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .purpose(),
-            Some("example-purpose")
-        );
-        assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .update_trigger()
-                .cloned(),
+            peer_subscription.update_trigger().cloned(),
             Some(
                 UpdateTrigger::Periodic {
                     period: Some(CentiSeconds::new(100)),
@@ -696,19 +683,10 @@ mod tests {
             )
         );
         assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .module_version(),
+            peer_subscription.module_version(),
             Vec::new() // default
         );
-        assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .yang_library_content_id(),
-            None
-        );
+        assert_eq!(peer_subscription.yang_library_content_id(), None);
 
         // Modify the subscription and check if it updates the cache
         let subscription_modified =
@@ -717,10 +695,7 @@ mod tests {
             .cache_subscription(peer, &subscription_modified)
             .unwrap();
         assert_eq!(
-            peer_subscription
-                .yang_push_subscription()
-                .unwrap()
-                .purpose(),
+            peer_subscription.unwrap().purpose(),
             Some("updated-purpose")
         );
     }
@@ -767,7 +742,7 @@ mod tests {
         assert!(get_result.is_ok());
 
         let peer_subscription = get_result.unwrap();
-        assert_eq!(peer_subscription, TelemetryMessageMetadata::default());
+        assert_eq!(peer_subscription, None);
     }
 
     #[test]
