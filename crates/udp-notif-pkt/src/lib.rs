@@ -291,6 +291,7 @@ impl TryFrom<&UdpNotifPacket> for UdpNotifPacketDecoded {
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use chrono::{DateTime, Utc};
     use core::panic;
     use serde_json::json;
     use std::collections::HashMap;
@@ -316,6 +317,7 @@ mod tests {
                     }
                 },
                 "event-time": "2025-04-17T15:20:14.840Z",
+                "another-time": "2025-01-01T15:20:14.840Z",
                 "hostname": "ipf-zbl1327-r-daisy-91",
                 "sequence-number": 0
             }
@@ -368,10 +370,13 @@ mod tests {
             serde_json::json!({}),
         );
         let expected = NotificationEnvelope::new(
+            DateTime::parse_from_rfc3339("2025-04-17T15:20:14.840Z")
+                .unwrap()
+                .with_timezone(&Utc),
             Some("ipf-zbl1327-r-daisy-91".to_string()),
             Some(0),
             Some(NotificationVariant::SubscriptionStarted(sub_started)),
-            json!({"event-time": "2025-04-17T15:20:14.840Z"}),
+            json!({"another-time": "2025-01-01T15:20:14.840Z"}),
         );
 
         // Compare the decoded payload with expected NotificationEnvelope
@@ -440,10 +445,12 @@ mod tests {
                   "additional_stuff": [ { "key1": "a" }, { "key2": "b" } ]}),
         );
         let expected = NotificationLegacy::new(
+            DateTime::parse_from_rfc3339("2025-05-12T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
             None,
             Some(NotificationVariant::SubscriptionStarted(sub_started)),
             serde_json::json!({
-              "eventTime": "2025-05-12T12:00:00Z",
               "additional_stuff": "example"}),
         );
 
@@ -587,10 +594,13 @@ mod tests {
 
         // Create expected NotificationEnvelope
         let expected = NotificationEnvelope::new(
+            DateTime::parse_from_rfc3339("2025-03-04T07:11:33.252679191+00:00")
+                .unwrap()
+                .with_timezone(&Utc),
             Some("some-router".to_string()),
             Some(5),
             None,
-            json!({"event-time": "2025-03-04T07:11:33.252679191+00:00"}),
+            json!({}),
         );
 
         // Check hostname and sequence number
