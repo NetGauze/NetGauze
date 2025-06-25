@@ -343,10 +343,8 @@ impl<'a> ReadablePdu<'a, LocatedPeerHeaderParsingError<'a>> for PeerHeader {
         let (buf, timestamp_secs) = be_u32(buf)?;
         let (buf, timestamp_micro) = be_u32(buf)?;
         let time = if timestamp_secs != 0 || timestamp_micro != 0 {
-            let time_opt = Utc.timestamp_opt(
-                timestamp_secs.into(),
-                timestamp_micro.checked_mul(1_000).unwrap_or(u32::MAX),
-            );
+            let time_opt =
+                Utc.timestamp_opt(timestamp_secs.into(), timestamp_micro.saturating_mul(1_000));
             let time = if let LocalResult::Single(time) = time_opt {
                 time
             } else {
