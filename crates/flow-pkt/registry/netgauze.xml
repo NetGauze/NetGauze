@@ -1,0 +1,115 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="ipfix.xsl"?>
+<?xml-model href="ipfix.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
+<registry xmlns="http://www.iana.org/assignments" id="ipfix">
+  <registry id="ipfix-information-elements">
+    <title>NetGauze IPFIX Information Elements</title>
+
+    <record>
+      <name>windowStart</name>
+      <dataType>dateTimeSeconds</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>1</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            Start time of the aggregation window in which the flow was observed,
+            represented as a dateTimeSeconds value.
+        </paragraph>
+      </description>
+      <units>seconds</units>
+      <revision>0</revision>
+      <date>2025-06-27</date>
+    </record>
+
+    <record>
+      <name>windowEnd</name>
+      <dataType>dateTimeSeconds</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>2</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            End time of the aggregation window in which the flow was observed,
+            represented as a dateTimeSeconds value.
+        </paragraph>
+      </description>
+      <units>seconds</units>
+      <revision>0</revision>
+      <date>2025-06-27</date>
+    </record>
+
+    <record>
+      <name>originalTemplateId</name>
+      <dataType>unsigned16</dataType>
+      <group>scope</group>
+      <dataTypeSemantics>identifier</dataTypeSemantics>
+      <elementId>3</elementId>
+      <applicability>option</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The Template IDs of the original records contributing to the record
+            where this IE is contained, as seen by the Collecting Process on an
+            IPFIX Mediator. Used to provide information about the Original Template
+            IDs to a downstream Collector.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-06-27</date>
+    </record>
+
+    <record>
+      <name>originalExporterTransportPort</name>
+      <dataType>unsigned16</dataType>
+      <group>config</group>
+      <dataTypeSemantics>identifier</dataTypeSemantics>
+      <elementId>4</elementId>
+      <applicability>all</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The source port identifier used by the Exporting Process on an
+            Original Exporter, as seen by the Collecting Process on an IPFIX
+            Mediator. Used to provide information about the Original
+            Observation Points to a downstream Collector.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-06-27</date>
+    </record>
+
+    <record>
+      <name>nodeId</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>5</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+        A short name uniquely describing a node.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-06-27</date>
+    </record>
+
+    <record>
+      <name>platformId</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>6</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+            A short name uniquely describing a network operator platform.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-06-27</date>
+    </record>
+
+  </registry>
+</registry>

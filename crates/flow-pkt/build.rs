@@ -106,6 +106,22 @@ fn get_nokia_config(registry_path: &Path) -> SourceConfig {
     )
 }
 
+fn get_netgauze_config(registry_path: &Path) -> SourceConfig {
+    let netgauze_path = registry_path
+        .join("netgauze.xml")
+        .into_os_string()
+        .into_string()
+        .expect("Couldn't load netgauze registry file");
+    SourceConfig::new(
+        RegistrySource::File(netgauze_path),
+        RegistryType::IanaXML,
+        3746, // Swisscom AG
+        "netgauze".to_string(),
+        "NetGauze".to_string(),
+        None,
+    )
+}
+
 fn get_vmware_config(
     poll_iana_registry: bool,
     registry_path: &Path,
@@ -174,12 +190,16 @@ fn main() {
         &sub_registry_path,
     );
     let nokia_source = get_nokia_config(&registry_path);
+    let netgauze_config = get_netgauze_config(&registry_path);
     let vmware_source = get_vmware_config(
         cfg!(feature = "iana-upstream-build"),
         &registry_path,
         &sub_registry_path,
     );
-    let configs = Config::new(iana_source, vec![nokia_source, vmware_source]);
+    let configs = Config::new(
+        iana_source,
+        vec![nokia_source, netgauze_config, vmware_source],
+    );
     generate(&out_dir, &configs).unwrap();
 
     println!("cargo:rerun-if-changed=build.rs");
