@@ -58,6 +58,9 @@ For example, run the `./crates/flow-service/example/print-flow.rs`, you can use:
 
 ## Running Packet Serde Fuzzer
 
+- Install cargo fuzzer
+  ```cargo install cargo-fuzz```
+
 - Fuzzing BGP Peer
   ```cargo +nightly fuzz run fuzz-bgp-peer```
 
