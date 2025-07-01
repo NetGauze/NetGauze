@@ -28,7 +28,7 @@
 
 use crate::flow::EnrichedFlow;
 use netgauze_analytics::aggregation::Window;
-use netgauze_flow_pkt::FlatFlowDataInfo;
+use netgauze_flow_pkt::FlowInfo;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -53,6 +53,7 @@ pub enum FlowEnrichmentActorCommand {
 pub enum FlowEnrichmentActorError {
     EnrichmentChannelClosed,
     FlowReceiveError,
+    EmptyFlowData,
 }
 
 impl std::fmt::Display for FlowEnrichmentActorError {
@@ -60,6 +61,7 @@ impl std::fmt::Display for FlowEnrichmentActorError {
         match self {
             Self::EnrichmentChannelClosed => write!(f, "enrichment channel closed"),
             Self::FlowReceiveError => write!(f, "error in flow receive channel"),
+            Self::EmptyFlowData => write!(f, "flow data is empty after flattening"),
         }
     }
 }
@@ -72,6 +74,7 @@ pub struct FlowEnrichmentStats {
     pub received_enrichment_ops: opentelemetry::metrics::Counter<u64>,
     pub sent: opentelemetry::metrics::Counter<u64>,
     pub send_error: opentelemetry::metrics::Counter<u64>,
+    pub enrich_error: opentelemetry::metrics::Counter<u64>,
 }
 
 impl FlowEnrichmentStats {
@@ -92,11 +95,16 @@ impl FlowEnrichmentStats {
             .u64_counter("netgauze.collector.flows.enrichment.sent.error")
             .with_description("Number of enrichment updates sent upstream error")
             .build();
+        let enrich_error = meter
+            .u64_counter("netgauze.collector.flows.enrichment.enrich.error")
+            .with_description("Number of enrichment updates sent upstream error")
+            .build();
         Self {
             received_flows,
             received_enrichment_ops,
             sent,
             send_error,
+            enrich_error,
         }
     }
 }
@@ -106,7 +114,7 @@ struct FlowEnrichment {
     writer_id: String,
     cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
     enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-    agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))>,
+    agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlowInfo))>,
     enriched_tx: async_channel::Sender<EnrichedFlow>,
     default_labels: (u32, HashMap<String, String>),
     stats: FlowEnrichmentStats,
@@ -117,7 +125,7 @@ impl FlowEnrichment {
         writer_id: String,
         cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
         enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))>,
+        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlowInfo))>,
         enriched_tx: async_channel::Sender<EnrichedFlow>,
         stats: FlowEnrichmentStats,
     ) -> Self {
@@ -160,11 +168,24 @@ impl FlowEnrichment {
         }
     }
 
-    fn enrich(&self, window: Window, peer: SocketAddr, flow: FlatFlowDataInfo) -> EnrichedFlow {
+    fn enrich(
+        &self,
+        window: Window,
+        peer: SocketAddr,
+        flow: FlowInfo,
+    ) -> Result<EnrichedFlow, FlowEnrichmentActorError> {
         let (_, labels) = self.labels.get(&peer.ip()).unwrap_or(&self.default_labels);
         let (window_start, window_end) = window;
         let ts = chrono::Utc::now();
-        EnrichedFlow {
+
+        // TODO: temporary until we remove flattened stuff...
+        let flattened = flow
+            .flatten_data()
+            .into_iter()
+            .next()
+            .ok_or(FlowEnrichmentActorError::EmptyFlowData)?;
+
+        Ok(EnrichedFlow {
             labels: labels.clone(),
             peer_src: peer.ip(),
             peer_port: peer.port(),
@@ -172,8 +193,8 @@ impl FlowEnrichment {
             ts,
             window_start,
             window_end,
-            flow,
-        }
+            flow: flattened,
+        })
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
@@ -218,7 +239,14 @@ impl FlowEnrichment {
                                 ),
                             ];
                             self.stats.received_flows.add(1, &peer_tags);
-                            let enriched = self.enrich(window, peer, flat_flow);
+                            let enriched = match self.enrich(window, peer, flat_flow) {
+                                Ok(enriched) => enriched,
+                                Err(err) => {
+                                    error!("Failed to enrich flow from {}: {}", peer, err);
+                                    self.stats.enrich_error.add(1, &peer_tags);
+                                    continue;
+                                }
+                            };
                             if let Err(err) = self.enriched_tx.send(enriched).await {
                                 error!("FlowEnrichment send error: {err}");
                                  self.stats.send_error.add(1, &peer_tags);
@@ -264,7 +292,7 @@ impl FlowEnrichmentActorHandle {
     pub fn new(
         writer_id: String,
         buffer_size: usize,
-        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))>,
+        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlowInfo))>,
         stats: either::Either<opentelemetry::metrics::Meter, FlowEnrichmentStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
