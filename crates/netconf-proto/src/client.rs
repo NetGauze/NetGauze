@@ -93,10 +93,10 @@ impl<
         framed: Framed<T, C>,
         yang_search_dir: String,
     ) -> Result<Self, SshNetConfClientError<E>> {
-        log::info!("Waiting for hello message");
+        tracing::info!("Waiting for hello message");
         let (mut framed, session_id, peer_caps) = Self::recv_hello(framed).await?;
-        log::info!("Hello message received and processed");
-        log::info!("Sending hello back");
+        tracing::info!("Hello message received and processed");
+        tracing::info!("Sending hello back");
         framed
             .send(NetConfMessage::Hello(Hello {
                 session_id: Some(session_id),
@@ -107,11 +107,11 @@ impl<
 
         Self::init_yang_context(&mut framed, &peer_caps).await?;
 
-        log::info!("Starting new YANG context");
+        tracing::info!("Starting new YANG context");
         let mut ctx = Context::new(ContextFlags::NO_YANGLIBRARY)?;
-        log::info!("Context created");
+        tracing::info!("Context created");
         ctx.set_searchdir(yang_search_dir)?;
-        log::info!("Search dir set");
+        tracing::info!("Search dir set");
         ctx.load_module(
             "ietf-netconf",
             Some("2011-06-01"),
@@ -132,7 +132,7 @@ impl<
             .expect("Failed to load module");
         ctx.load_module("ietf-datastores", Some("2018-02-14"), &[])
             .expect("Failed to load module");
-        log::info!("Loaded modules");
+        tracing::info!("Loaded modules");
 
         Ok(Self {
             framed,
@@ -148,9 +148,9 @@ impl<
     ) -> Result<(Framed<T, C>, u32, HashMap<Box<str>, Capability>), SshNetConfClientError<E>> {
         // Wait for hello message from the server
         let next_msg = loop {
-            log::info!("Receiving hello message");
+            tracing::info!("Receiving hello message");
             let next_msg = framed.next().await;
-            log::info!("GOT {:?}", next_msg);
+            tracing::info!("GOT {:?}", next_msg);
             if let Some(msg) = next_msg {
                 break msg;
             }
@@ -181,12 +181,12 @@ impl<
             if !matches!(cap, Capability::Unknown(_)) {
                 known.insert(key.clone(), cap.clone());
             } else {
-                log::info!("CAPABILITY: `{key}`: `{cap:?}`");
+                tracing::info!("CAPABILITY: `{key}`: `{cap:?}`");
             }
         }
-        log::info!("---- KNOWN CAPABILITIES --------");
+        tracing::info!("---- KNOWN CAPABILITIES --------");
         for (key, cap) in known.iter() {
-            log::info!("CAPABILITY: `{key}`: `{cap:?}`");
+            tracing::info!("CAPABILITY: `{key}`: `{cap:?}`");
         }
 
         if !capabilities.contains_key(":yang-library:1.1") {

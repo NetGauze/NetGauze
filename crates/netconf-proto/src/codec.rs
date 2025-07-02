@@ -127,12 +127,14 @@ impl Decoder for SshCodec {
                 self.in_hello = false;
                 return Ok(Some(NetConfMessage::Hello(hello)));
             }
-            if src.len() > HELLO_TERMINATOR.len() + MAX_CHUNK_SIZE_LEN + 1 {
-                return Err(SshCodecError::IO(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Chunk size is not properly terminated with a newline",
-                )));
-            }
+            // TODO: fix
+            // if src.len() > HELLO_TERMINATOR.len() + MAX_CHUNK_SIZE_LEN + 1 {
+            //     return Err(SshCodecError::IO(std::io::Error::new(
+            //         std::io::ErrorKind::InvalidData,
+            //         format!("Chunk size is not properly terminated with a newline, size
+            // is {}, while expecting: {}", src.len(), HELLO_TERMINATOR.len() +
+            // MAX_CHUNK_SIZE_LEN + 1),     )));
+            // }
             return Ok(None);
         }
 
