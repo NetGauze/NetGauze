@@ -29,12 +29,12 @@
 //!   actor and subscribing to enriched messages.
 //! - `YangPushEnrichmentStats` - Metrics for tracking the performance and
 //!   behavior of the enrichment process.
-use netgauze_udp_notif_pkt::UdpNotifPacket;
-use netgauze_yang_push::model::telemetry::{
+use crate::model::telemetry::{
     FilterSpec, Label, LabelValue, Manifest, NetworkOperatorMetadata, SessionProtocol,
     TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
     YangPushSubscriptionMetadata,
 };
+use netgauze_udp_notif_pkt::UdpNotifPacket;
 
 use serde_json::Value;
 use std::{
@@ -43,13 +43,12 @@ use std::{
     sync::Arc,
 };
 
-use chrono::Utc;
-use netgauze_yang_push::model::{
-    notification::{
-        NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
-    },
-    udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
+use crate::model::notification::{
+    NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
 };
+use chrono::Utc;
+
+use crate::model::udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload};
 use shadow_rs::shadow;
 use sysinfo::System;
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -585,11 +584,12 @@ impl YangPushEnrichmentActorHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MediaType;
-    use bytes::Bytes;
-    use netgauze_yang_push::model::notification::{
-        CentiSeconds, Encoding, Target, Transport, UpdateTrigger,
+    use crate::model::{
+        notification::{CentiSeconds, Encoding, Target, Transport, UpdateTrigger},
+        udp_notif::UdpNotifPacketDecoded,
     };
+    use bytes::Bytes;
+    use netgauze_udp_notif_pkt::MediaType;
     use serde_json::json;
     use std::{collections::HashMap, net::SocketAddr};
 

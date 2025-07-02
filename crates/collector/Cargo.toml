@@ -71,7 +71,6 @@ serde_yaml = { workspace = true }
 ordered-float = { workspace = true }
 ciborium = { workspace = true }
 bytes = { workspace = true }
-sysinfo = { workspace = true }
 shadow-rs = { workspace = true, features = ["default", "metadata", "build"]  }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
