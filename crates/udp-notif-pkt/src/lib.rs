@@ -17,7 +17,6 @@
 pub mod codec;
 #[cfg(feature = "serde")]
 pub mod wire;
-pub mod yang;
 
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -25,7 +24,7 @@ use serde_json::Value;
 use std::{collections::HashMap, convert::TryFrom, fmt};
 use strum_macros::Display;
 
-use yang::notification::{NotificationEnvelope, NotificationLegacy};
+use netgauze_yang_push::model::notification::{NotificationEnvelope, NotificationLegacy};
 
 const UDP_NOTIF_VERSION: u8 = 1;
 
@@ -293,12 +292,12 @@ mod tests {
     use bytes::Bytes;
     use chrono::{DateTime, Utc};
     use core::panic;
-    use serde_json::json;
-    use std::collections::HashMap;
-    use yang::notification::{
+    use netgauze_yang_push::model::notification::{
         Encoding, NotificationVariant, SubscriptionStartedModified, Target, UpdateTrigger,
         YangPushModuleVersion,
     };
+    use serde_json::json;
+    use std::collections::HashMap;
 
     #[test]
     fn test_udp_notif_packet_decoded_envelope_sub_started() {

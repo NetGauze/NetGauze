@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;
 
-use netgauze_udp_notif_pkt::yang::notification::{
+use netgauze_yang_push::model::notification::{
     CentiSeconds, ChangeType, Encoding, SubscriptionId, Transport, YangPushModuleVersion,
 };
 
@@ -413,17 +413,17 @@ pub enum UpdateTrigger {
         excluded_change: Option<Vec<ChangeType>>,
     },
 }
-impl From<netgauze_udp_notif_pkt::yang::notification::UpdateTrigger> for UpdateTrigger {
-    fn from(trigger: netgauze_udp_notif_pkt::yang::notification::UpdateTrigger) -> Self {
+impl From<netgauze_yang_push::model::notification::UpdateTrigger> for UpdateTrigger {
+    fn from(trigger: netgauze_yang_push::model::notification::UpdateTrigger) -> Self {
         match trigger {
-            netgauze_udp_notif_pkt::yang::notification::UpdateTrigger::Periodic {
+            netgauze_yang_push::model::notification::UpdateTrigger::Periodic {
                 period,
                 anchor_time,
             } => UpdateTrigger::Periodic {
                 period,
                 anchor_time,
             },
-            netgauze_udp_notif_pkt::yang::notification::UpdateTrigger::OnChange {
+            netgauze_yang_push::model::notification::UpdateTrigger::OnChange {
                 dampening_period,
                 sync_on_start,
                 excluded_change,
@@ -482,7 +482,7 @@ pub enum LabelValue {
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use netgauze_udp_notif_pkt::yang::notification::CentiSeconds;
+    use netgauze_yang_push::model::notification::CentiSeconds;
     use serde_json;
     use std::vec;
 
