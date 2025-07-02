@@ -29,7 +29,7 @@
 //!   actor and subscribing to enriched messages.
 //! - `YangPushEnrichmentStats` - Metrics for tracking the performance and
 //!   behavior of the enrichment process.
-use netgauze_udp_notif_pkt::{UdpNotifPacket, UdpNotifPacketDecoded, UdpNotifPayload};
+use netgauze_udp_notif_pkt::UdpNotifPacket;
 use netgauze_yang_push::model::telemetry::{
     FilterSpec, Label, LabelValue, Manifest, NetworkOperatorMetadata, SessionProtocol,
     TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
@@ -44,8 +44,11 @@ use std::{
 };
 
 use chrono::Utc;
-use netgauze_yang_push::model::notification::{
-    NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
+use netgauze_yang_push::model::{
+    notification::{
+        NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
+    },
+    udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
 };
 use shadow_rs::shadow;
 use sysinfo::System;
