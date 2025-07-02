@@ -22,6 +22,7 @@ use netgauze_netconf_proto::{
 };
 use russh::keys::ssh_key;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
+use tracing::level_filters::LevelFilter;
 
 struct Client {}
 
@@ -47,11 +48,29 @@ struct Args {
     password: String,
 }
 
+fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
+    use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+    // Set up the log -> tracing bridge first
+    tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");
+
+    let env_filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("info"))
+        .expect("Failed to set default tracing env filter");
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(fmt::layer())
+        .try_init()
+        .expect("Failed to register tracing subscriber");
+
+    Ok(())
+}
+
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .init();
+    init_tracing().expect("init tracing subscriber");
+
     let args = Args::parse();
 
     let config = russh::client::Config {
@@ -70,13 +89,13 @@ pub async fn main() -> anyhow::Result<()> {
     if !auth_res.success() {
         anyhow::bail!("Authentication failed");
     } else {
-        log::info!(
+        tracing::info!(
             "Connected Authenticated to {} as user {}",
             args.host,
             args.user
         );
     }
-    log::info!("Starting the netconf subsystem");
+    tracing::info!("Starting the netconf subsystem");
     // Establish communication channel with netconf subsystem
     let mut channel = session.channel_open_session().await?;
     channel.request_subsystem(true, "netconf").await?;
@@ -84,16 +103,16 @@ pub async fn main() -> anyhow::Result<()> {
     let framed = tokio_util::codec::Framed::new(stream, SshCodec::default());
     let (mut tx, mut rx) = framed.split();
 
-    log::info!("Waiting for the router to send hello message");
+    tracing::info!("Waiting for the router to send hello message");
     tokio::time::sleep(Duration::from_millis(100)).await;
     let recv_hello = match rx.next().await {
         Some(Ok(NetConfMessage::Hello(value))) => value,
         Some(Ok(msg)) => {
-            log::error!("Unexcepted message {:?}", msg);
+            tracing::error!("Unexcepted message {:?}", msg);
             return Err(anyhow::anyhow!("Received unexpected message"));
         }
         Some(Err(err)) => {
-            log::error!("ERROR {}", err);
+            tracing::error!("ERROR {}", err);
             // if matches!(err, SshCodecError::IO(io::ErrorKind::Rec)) {}
             // return Err(anyhow::anyhow!("Received error message"));
             Hello {
@@ -104,17 +123,17 @@ pub async fn main() -> anyhow::Result<()> {
         None => return Err(anyhow::anyhow!("channel closed unexpectedly")),
     };
 
-    log::debug!("Received Hello:\n{:?}", recv_hello);
-    log::info!(
+    tracing::debug!("Received Hello:\n{:?}", recv_hello);
+    tracing::info!(
         "Received Hello with session id: {:?}",
         recv_hello.session_id
     );
-    log::info!("Router announced capabilities:");
+    tracing::info!("Router announced capabilities:");
     for (name, cap) in &recv_hello.capabilities {
-        log::info!(" - `{name}`  ---  `{cap}`")
+        tracing::info!(" - `{name}`  ---  `{cap}`")
     }
 
-    log::info!("Sending Hello with the same capabilities announced by the router");
+    tracing::info!("Sending Hello with the same capabilities announced by the router");
     tokio::time::sleep(Duration::from_millis(100)).await;
     tx.send(NetConfMessage::Hello(Hello {
         session_id: None,
@@ -141,7 +160,7 @@ pub async fn main() -> anyhow::Result<()> {
         ])
     }))
     .await?;
-    log::info!("Hello message sent");
+    tracing::info!("Hello message sent");
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Getting YANG library
@@ -161,10 +180,10 @@ pub async fn main() -> anyhow::Result<()> {
         })
         .collect::<Vec<_>>();
     if yang_library.is_empty() {
-        log::warn!("YANG Library is not supported");
+        tracing::warn!("YANG Library is not supported");
     } else {
         let yang_library_content_id = yang_library.first().unwrap();
-        log::info!(
+        tracing::info!(
             "Retrieving YANG library with content ID {} from the router",
             yang_library_content_id
         );
@@ -187,10 +206,10 @@ pub async fn main() -> anyhow::Result<()> {
             return Err(anyhow::anyhow!("Received unexpected message"));
         };
 
-        log::info!("Got YANG library reply:\n{:?}", yang_lib_reply);
+        tracing::info!("Got YANG library reply:\n{:?}", yang_lib_reply);
     }
 
-    log::info!("Retrieving ietf-ip schema from the router");
+    tracing::info!("Retrieving ietf-ip schema from the router");
     tokio::time::sleep(Duration::from_millis(100)).await;
     let request = r#"<get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring"><identifier>ietf-ip</identifier></get-schema>"#.to_string();
     let request1 = r#"<get>
@@ -221,26 +240,26 @@ pub async fn main() -> anyhow::Result<()> {
         operation: request,
     }))
     .await?;
-    log::info!("Request sent");
+    tracing::info!("Request sent");
     tokio::time::sleep(Duration::from_millis(100)).await;
     while let Some(msg) = rx.next().await {
         match msg {
             Ok(NetConfMessage::RpcReply(reply)) => {
-                log::info!("Got reply message_id: {:?}", reply.message_id);
+                tracing::info!("Got reply message_id: {:?}", reply.message_id);
                 match &reply.reply {
                     RpcReplyValue::Data(_, payload) => {
-                        log::info!("Got reply payload:\n{}", payload);
+                        tracing::info!("Got reply payload:\n{}", payload);
                     }
                     RpcReplyValue::Ok => {
-                        log::info!("OK");
+                        tracing::info!("OK");
                     }
                 }
             }
-            x => log::info!("Got REPLY FROM ROUTER:\n{:?}", x),
+            x => tracing::info!("Got REPLY FROM ROUTER:\n{:?}", x),
         }
         break;
     }
 
-    log::info!("Terminating NETCONF session with the router");
+    tracing::info!("Terminating NETCONF session with the router");
     Ok(())
 }
