@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;
 
-use netgauze_yang_push::model::notification::{
+use crate::model::notification::{
     CentiSeconds, ChangeType, Encoding, SubscriptionId, Transport, YangPushModuleVersion,
 };
 
@@ -413,17 +413,17 @@ pub enum UpdateTrigger {
         excluded_change: Option<Vec<ChangeType>>,
     },
 }
-impl From<netgauze_yang_push::model::notification::UpdateTrigger> for UpdateTrigger {
-    fn from(trigger: netgauze_yang_push::model::notification::UpdateTrigger) -> Self {
+impl From<crate::model::notification::UpdateTrigger> for UpdateTrigger {
+    fn from(trigger: crate::model::notification::UpdateTrigger) -> Self {
         match trigger {
-            netgauze_yang_push::model::notification::UpdateTrigger::Periodic {
+            crate::model::notification::UpdateTrigger::Periodic {
                 period,
                 anchor_time,
             } => UpdateTrigger::Periodic {
                 period,
                 anchor_time,
             },
-            netgauze_yang_push::model::notification::UpdateTrigger::OnChange {
+            crate::model::notification::UpdateTrigger::OnChange {
                 dampening_period,
                 sync_on_start,
                 excluded_change,
@@ -481,8 +481,8 @@ pub enum LabelValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::notification::CentiSeconds;
     use chrono::{TimeZone, Utc};
-    use netgauze_yang_push::model::notification::CentiSeconds;
     use serde_json;
     use std::vec;
 
