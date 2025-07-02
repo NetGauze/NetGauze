@@ -15,3 +15,4 @@
 
 pub mod notification;
 pub mod telemetry;
+pub mod udp_notif;

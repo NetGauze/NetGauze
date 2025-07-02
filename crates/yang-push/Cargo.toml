@@ -15,8 +15,11 @@ categories = ["network-programming"]
 
 
 [dependencies]
+netgauze-udp-notif-pkt = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 chrono = { workspace = true, default-features = true, features = ["serde"] }
+ciborium = { workspace = true }
+bytes = { workspace = true }
