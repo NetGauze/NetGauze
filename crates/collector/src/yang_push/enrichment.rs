@@ -34,12 +34,8 @@ use crate::yang_push::telemetry::{
     TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
     YangPushSubscriptionMetadata,
 };
-use netgauze_udp_notif_pkt::{
-    yang::notification::{
-        NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
-    },
-    UdpNotifPacket, UdpNotifPacketDecoded, UdpNotifPayload,
-};
+use netgauze_udp_notif_pkt::{UdpNotifPacket, UdpNotifPacketDecoded, UdpNotifPayload};
+
 use serde_json::Value;
 use std::{
     collections::HashMap,
@@ -48,6 +44,9 @@ use std::{
 };
 
 use chrono::Utc;
+use netgauze_yang_push::model::notification::{
+    NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
+};
 use shadow_rs::shadow;
 use sysinfo::System;
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -585,7 +584,7 @@ mod tests {
     use super::*;
     use crate::MediaType;
     use bytes::Bytes;
-    use netgauze_udp_notif_pkt::yang::notification::{
+    use netgauze_yang_push::model::notification::{
         CentiSeconds, Encoding, Target, Transport, UpdateTrigger,
     };
     use serde_json::json;

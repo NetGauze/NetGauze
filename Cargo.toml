@@ -16,6 +16,7 @@ members = [
     "crates/udp-notif-pkt",
     "crates/udp-notif-service",
     "crates/collector",
+    "crates/yang-push",
     "fuzz",
 ]
 resolver = "2"
@@ -36,6 +37,7 @@ netgauze-serde-macros = { version = "0.6.2", path = "crates/serde-macros" }
 netgauze-udp-notif-pkt = { version = "0.6.2", path = "crates/udp-notif-pkt" }
 netgauze-udp-notif-service = { version = "0.6.2", path = "crates/udp-notif-service" }
 netgauze-analytics = { version = "0.6.2", path = "crates/analytics" }
+netgauze-yang-push = { version = "0.6.2", path = "crates/yang-push" }
 log = "0.4"
 thiserror = "2.0"
 async-channel = "2.3"
