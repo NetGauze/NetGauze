@@ -29,12 +29,12 @@
 //!   actor and subscribing to enriched messages.
 //! - `YangPushEnrichmentStats` - Metrics for tracking the performance and
 //!   behavior of the enrichment process.
-use crate::yang_push::telemetry::{
+use netgauze_udp_notif_pkt::{UdpNotifPacket, UdpNotifPacketDecoded, UdpNotifPayload};
+use netgauze_yang_push::model::telemetry::{
     FilterSpec, Label, LabelValue, Manifest, NetworkOperatorMetadata, SessionProtocol,
     TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
     YangPushSubscriptionMetadata,
 };
-use netgauze_udp_notif_pkt::{UdpNotifPacket, UdpNotifPacketDecoded, UdpNotifPayload};
 
 use serde_json::Value;
 use std::{

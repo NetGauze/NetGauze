@@ -21,13 +21,13 @@ use crate::{
         kafka_avro::KafkaAvroPublisherActorHandle,
         kafka_json::KafkaJsonPublisherActorHandle,
     },
-    yang_push::telemetry::TelemetryMessageWrapper,
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlatFlowInfo;
 use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
 use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
+use netgauze_yang_push::model::telemetry::TelemetryMessageWrapper;
 use std::{str::Utf8Error, sync::Arc};
 use tracing::{info, warn};
 use yang_push::enrichment::YangPushEnrichmentActorHandle;
