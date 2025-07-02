@@ -12,6 +12,7 @@ YANG-Push related functionality
 """
 keywords = ["yang-push", "netconf", "yang", "parser"]
 categories = ["network-programming"]
+build = "build.rs"
 
 
 [dependencies]
@@ -21,5 +22,17 @@ serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 chrono = { workspace = true, default-features = true, features = ["serde"] }
-ciborium = { workspace = true }
+shadow-rs = { workspace = true, features = ["default", "metadata", "build"]  }
+tokio = { workspace = true, features = ["full", "tracing", "rt-multi-thread"] }
+tracing = { workspace = true }
+opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
 bytes = { workspace = true }
+sysinfo = { workspace = true }
+either = { workspace = true }
+ciborium = { workspace = true }
+async-channel = { workspace = true }
+anyhow = { workspace = true }
+
+
+[build-dependencies]
+shadow-rs = { workspace = true, default-features = true }
