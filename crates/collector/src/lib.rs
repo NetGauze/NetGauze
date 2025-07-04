@@ -15,7 +15,10 @@
 
 use crate::{
     config::{FlowConfig, PublisherEndpoint, UdpNotifConfig},
-    flow::{enrichment::FlowEnrichmentActorHandle, sonata::SonataActorHandle},
+    flow::{
+        aggregation::AggregationActorHandle, enrichment::FlowEnrichmentActorHandle,
+        sonata::SonataActorHandle,
+    },
     publishers::{
         http::{HttpPublisherActorHandle, Message},
         kafka_avro::KafkaAvroPublisherActorHandle,
@@ -122,14 +125,13 @@ pub async fn init_flow_collection(
                 PublisherEndpoint::FlowKafkaAvro(config) => {
                     for (shard_id, flow_recv) in flow_recvs.iter().enumerate() {
                         if let Some(aggregation_config) = publisher_config.aggregation.as_ref() {
-                            let (agg_join, agg_handle) =
-                                flow::aggregation::AggregationActorHandle::new(
-                                    publisher_config.buffer_size,
-                                    aggregation_config.clone(),
-                                    flow_recv.clone(),
-                                    either::Left(meter.clone()),
-                                    shard_id,
-                                );
+                            let (agg_join, agg_handle) = AggregationActorHandle::new(
+                                publisher_config.buffer_size,
+                                aggregation_config.clone(),
+                                flow_recv.clone(),
+                                either::Left(meter.clone()),
+                                shard_id,
+                            );
                             let (enrichment_join, enrichment_handle) =
                                 FlowEnrichmentActorHandle::new(
                                     config.writer_id.clone(),
