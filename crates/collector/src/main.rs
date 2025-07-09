@@ -17,6 +17,7 @@
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+use anyhow::anyhow;
 use futures::Future;
 use netgauze_collector::{
     config::{CollectorConfig, TelemetryConfig},
@@ -103,10 +104,10 @@ fn init_open_telemetry(
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
-        return Err(format!("Usage: {} <config-file>", args[0]).into());
+        return Err(anyhow!("Usage: {} <config-file>", args[0]));
     }
     let config_file = PathBuf::from(&args[1]);
     let file = File::open(&config_file)?;
@@ -114,7 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     let config: CollectorConfig = match from_reader(reader) {
         Ok(config) => config,
         Err(err) => {
-            return Err(format!("Parsing config file failed: {err}").into());
+            return Err(anyhow!("Parsing config file failed: {err}"));
         }
     };
 
@@ -131,7 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
     let runtime = runtime_builder.build()?;
 
     runtime.block_on(async move {
-        init_open_telemetry(&config.telemetry)?;
+        init_open_telemetry(&config.telemetry).map_err(|err| anyhow!(err))?;
         let meter = global::meter_provider().meter("netgauze");
         let mut handles = vec![];
 
@@ -166,12 +167,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
                 info!("Termination signal received, gracefully shutting down actors");
+                Ok(())
             }
-            _ = futures::future::try_join_all(handles) => {
+            join_ret = futures::future::try_join_all(handles) => {
                 info!("collection and publishing is terminated, shutting down the collector");
+                match join_ret {
+                    Ok(_) => {
+                        Ok(())
+                    }
+                    Err(err) => {
+                        Err(anyhow!(err))
+                    },
+                }
             }
         }
-
-        Ok::<(), Box<dyn std::error::Error + Send + Sync + 'static>>(())
     })
 }
