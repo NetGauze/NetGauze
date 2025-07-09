@@ -82,7 +82,7 @@ impl FlowEnrichmentStats {
             .build();
         let received_enrichment_ops = meter
             .u64_counter("netgauze.collector.flows.enrichment.received.enrichment.operations")
-            .with_description("Number of enrichment updates received from SONTA")
+            .with_description("Number of enrichment updates received from SONATA")
             .build();
         let sent = meter
             .u64_counter("netgauze.collector.flows.enrichment.sent")
