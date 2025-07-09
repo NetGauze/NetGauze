@@ -24,7 +24,7 @@ use netgauze_rdkafka::{
     ClientContext, Message, TopicPartitionList,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::IpAddr, str::Utf8Error};
+use std::{collections::HashMap, net::IpAddr, str::Utf8Error, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, trace, warn};
 
@@ -121,6 +121,7 @@ pub struct SonataStats {
     json_decoding_error: opentelemetry::metrics::Counter<u64>,
     invalid_operation: opentelemetry::metrics::Counter<u64>,
     send_error: opentelemetry::metrics::Counter<u64>,
+    kafka_reconnect_attempts: opentelemetry::metrics::Counter<u64>,
 }
 
 impl SonataStats {
@@ -142,14 +143,19 @@ impl SonataStats {
         let send_error = meter
             .u64_counter("netgauze.collector.flows.sonata.send_error")
             .with_description(
-                "Error sending the SONTA enrichment operation to the enrichment actor",
+                "Error sending the SONATA enrichment operation to the enrichment actor",
             )
+            .build();
+        let kafka_reconnect_attempts = meter
+            .u64_counter("netgauze.collector.flows.sonata.kafka.reconnect.attempts")
+            .with_description("Number of attempts to reconnect to the Kafka brokers")
             .build();
         Self {
             received,
             json_decoding_error,
             invalid_operation,
             send_error,
+            kafka_reconnect_attempts,
         }
     }
 }
@@ -161,6 +167,7 @@ enum SonataActorCommand {
 
 struct SonataActor {
     cmd_rx: mpsc::Receiver<SonataActorCommand>,
+    config: KafkaConsumerConfig,
     enrichment_handles: Vec<FlowEnrichmentActorHandle>,
     consumer: StreamConsumer<CosmoSonataContext>,
     stats: SonataStats,
@@ -173,9 +180,22 @@ impl SonataActor {
         enrichment_handles: Vec<FlowEnrichmentActorHandle>,
         stats: SonataStats,
     ) -> Result<Self, SonataActorError> {
+        let consumer = Self::init_consumer(&config)?;
+        Ok(Self {
+            cmd_rx,
+            config,
+            enrichment_handles,
+            consumer,
+            stats,
+        })
+    }
+
+    fn init_consumer(
+        config: &KafkaConsumerConfig,
+    ) -> Result<StreamConsumer<CosmoSonataContext>, SonataActorError> {
         let mut client_conf = ClientConfig::new();
-        for (k, v) in config.consumer_config {
-            client_conf.set(k, v);
+        for (k, v) in &config.consumer_config {
+            client_conf.set(k.clone(), v.clone());
         }
         let consumer: StreamConsumer<CosmoSonataContext> =
             match client_conf.create_with_context(CosmoSonataContext) {
@@ -190,13 +210,7 @@ impl SonataActor {
             error!("Failed to subscribe to topic `{}`: {}", config.topic, err);
             return Err(SonataActorError::KafkaError(err));
         }
-
-        Ok(Self {
-            cmd_rx,
-            enrichment_handles,
-            consumer,
-            stats,
-        })
+        Ok(consumer)
     }
 
     async fn handle_kafka_msg(&self, msg: BorrowedMessage<'_>) {
@@ -292,16 +306,38 @@ impl SonataActor {
                         Err(err) => {
                             match err {
                                 KafkaError::MessageConsumption(RDKafkaErrorCode::AllBrokersDown) => {
-                                    error!("Sonata message consumer has all brokers down, shutting down: {err}");
-                                    return Err(anyhow::Error::from(err))
+                                    error!("Sonata message consumer has all brokers down, attempting to reconnect: {err}");
+                                    loop {
+                                        // Sleep to allow the Kafka broker to recover before retrying again.
+                                        tokio::time::sleep(Duration::from_secs(60)).await;
+                                        self.stats.kafka_reconnect_attempts.add(1, &[]);
+                                        self.consumer = match Self::init_consumer(&self.config) {
+                                            Ok(consumer) => consumer,
+                                            Err(err) => {
+                                                error!("Failed to reconnect to Kafka broker, retrying again: {err}");
+                                                continue;
+                                            }
+                                        }
+                                    }
                                 }
                                 KafkaError::MessageConsumption(RDKafkaErrorCode::UnknownTopicOrPartition) => {
                                     error!("Sonata topic doesn't exist, shutting down: {err}");
                                     return Err(anyhow::Error::from(err))
                                 }
                                 KafkaError::MessageConsumptionFatal(err) => {
-                                    error!("Sonata message consumer has received fatal consumption error, shutting down: {err}");
-                                    return Err(anyhow::Error::from(err))
+                                    error!("Sonata message consumer has received fatal consumption error, attempting to reconnect: {err}");
+                                    loop {
+                                        // Sleep to allow the Kafka broker to recover before retrying again.
+                                        tokio::time::sleep(Duration::from_secs(30)).await;
+                                        self.stats.kafka_reconnect_attempts.add(1, &[]);
+                                        self.consumer = match Self::init_consumer(&self.config) {
+                                            Ok(consumer) => consumer,
+                                            Err(err) => {
+                                                error!("Failed to reconnect to Kafka broker, retrying again: {err}");
+                                                continue;
+                                            }
+                                        }
+                                    }
                                 }
                                 err => {
                                      warn!("Failed to receive Sonata message, ignoring error: {err}");
