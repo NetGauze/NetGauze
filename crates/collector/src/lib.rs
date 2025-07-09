@@ -185,7 +185,7 @@ pub async fn init_flow_collection(
         }
     }
     let ret = tokio::select! {
-        _ = supervisor_join_handle => {
+        supervisor_ret = supervisor_join_handle => {
             info!("Flow supervisor exited, shutting down all publishers");
             for handle in http_handles {
                 let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown()).await;
@@ -202,9 +202,12 @@ pub async fn init_flow_collection(
             for handle in kafka_json_handles {
                 let _ = handle.shutdown().await;
             }
-            Ok(())
+            match supervisor_ret {
+                Ok(_) => Ok(()),
+                Err(err) => Err(anyhow::anyhow!(err)),
+            }
         },
-        _ = join_set.next() => {
+        join_ret = join_set.next() => {
             warn!("Flow publisher exited, shutting down flow collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
             for handle in agg_handles {
@@ -231,7 +234,11 @@ pub async fn init_flow_collection(
             for handle in sonata_handles {
                 let _ = handle.shutdown().await;
             }
-            Ok(())
+            match join_ret {
+                None | Some(Ok(Ok(_))) => Ok(()),
+                Some(Err(err)) => Err(anyhow::anyhow!(err)),
+                Some(Ok(Err(err))) => Err(anyhow::anyhow!(err)),
+            }
         }
     };
     ret
@@ -330,7 +337,7 @@ pub async fn init_udp_notif_collection(
         }
     }
     let ret = tokio::select! {
-        _ = supervisor_join_handle => {
+        supervisor_ret = supervisor_join_handle => {
             info!("udp-notif supervisor exited, shutting down all publishers");
            for handle in http_handles {
                 let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown()).await;
@@ -344,9 +351,12 @@ pub async fn init_udp_notif_collection(
             for handle in kafka_handles {
                 let _ = handle.shutdown().await;
             }
-            Ok(())
+            match supervisor_ret {
+                Ok(_) => Ok(()),
+                Err(err) => Err(anyhow::anyhow!(err)),
+            }
         },
-        _ = join_set.next() => {
+        join_ret = join_set.next() => {
             warn!("udp-notif http publisher exited, shutting down udp-notif collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
             for handle in enrichment_handles {
@@ -364,7 +374,11 @@ pub async fn init_udp_notif_collection(
             for handle in kafka_handles {
                 let _ = handle.shutdown().await;
             }
-            Ok(())
+            match join_ret {
+                None | Some(Ok(Ok(_))) => Ok(()),
+                Some(Err(err)) => Err(anyhow::anyhow!(err)),
+                Some(Ok(Err(err))) => Err(anyhow::anyhow!(err)),
+            }
         }
     };
     ret
