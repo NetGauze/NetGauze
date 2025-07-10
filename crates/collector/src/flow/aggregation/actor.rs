@@ -32,9 +32,11 @@ use crate::flow::aggregation::{aggregator::*, config::*};
 use chrono::Utc;
 use either::Either;
 use futures::stream::{self, StreamExt};
-use netgauze_analytics::aggregation::*;
+use netgauze_analytics::aggregation::{
+    AggregationWindowStreamExt, Aggregator, TimeSeriesData, Window,
+};
 use netgauze_flow_pkt::{
-    ie::{Field, *},
+    ie::{netgauze, Field},
     FlowInfo,
 };
 use netgauze_flow_service::FlowRequest;

@@ -39,11 +39,10 @@ use chrono::{DateTime, Utc};
 use netgauze_analytics::aggregation::*;
 use netgauze_flow_pkt::{
     ie::{Field, HasIE, IE, *},
-    ipfix::{DataRecord, IpfixPacket, Set},
-    DataSetId, FlowInfo,
+    ipfix, DataSetId, FlowInfo,
 };
 use rustc_hash::{FxBuildHasher, FxHashMap};
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
 use std::{
     collections::{hash_map::Entry, HashSet},
     net::{IpAddr, SocketAddr},
@@ -237,53 +236,50 @@ impl AggFlowInfo {
     ) -> FlowInfo {
         let key = self.key;
         let rec = self.rec;
-
-        let mut additional_fields: SmallVec<[Field; 16]> = smallvec![
-            Field::originalFlowsPresent(rec.record_count),
-            Field::minExportSeconds(rec.min_export_time),
-            Field::maxExportSeconds(rec.max_export_time),
-            Field::collectionTimeMilliseconds(rec.max_collection_time),
-        ];
-
-        additional_fields.extend(extra_fields);
-
-        additional_fields.extend(
-            rec.peer_ports()
-                .iter()
-                .map(|port| Field::NetGauze(netgauze::Field::originalExporterTransportPort(*port))),
-        );
-
-        additional_fields.extend(
-            rec.observation_domain_ids()
-                .iter()
-                .map(|obs_id| Field::originalObservationDomainId(*obs_id)),
-        );
-
-        additional_fields.extend(rec.template_ids().iter().map(|template_id| {
-            Field::NetGauze(netgauze::Field::originalTemplateId(template_id.id()))
-        }));
+        let key_fields = key.key_fields;
+        let agg_fields = rec.agg_fields;
+        let peer_ports = rec.peer_ports;
+        let observation_domain_ids = rec.observation_domain_ids;
+        let template_ids = rec.template_ids;
 
         // As of rust 2024 we will be able to use `into_iter` directly on Box<[T]>.
         // (meaning we can remove the `into_vec()` calls)
         // https://doc.rust-lang.org/nightly/edition-guide/rust-2024/intoiterator-box-slice.html
-        let fields: Box<[Field]> = key
-            .key_fields
-            .into_vec()
-            .into_iter()
-            .chain(rec.agg_fields.into_vec())
-            .flatten()
-            .chain(additional_fields)
-            .collect();
+        let fields: Box<[Field]> =
+            key_fields
+                .into_vec()
+                .into_iter()
+                .chain(agg_fields.into_vec())
+                .flatten()
+                .chain([
+                    Field::originalFlowsPresent(rec.record_count),
+                    Field::minExportSeconds(rec.min_export_time),
+                    Field::maxExportSeconds(rec.max_export_time),
+                    Field::collectionTimeMilliseconds(rec.max_collection_time),
+                ])
+                .chain(extra_fields)
+                .chain(peer_ports.into_iter().map(|port| {
+                    Field::NetGauze(netgauze::Field::originalExporterTransportPort(port))
+                }))
+                .chain(
+                    observation_domain_ids
+                        .into_iter()
+                        .map(Field::originalObservationDomainId),
+                )
+                .chain(template_ids.into_iter().map(|template_id| {
+                    Field::NetGauze(netgauze::Field::originalTemplateId(template_id.id()))
+                }))
+                .collect();
 
-        let records = [DataRecord::new(Box::new([]), fields)];
+        let records = [ipfix::DataRecord::new(Box::new([]), fields)];
 
-        let sets = [Set::Data {
+        let sets = [ipfix::Set::Data {
             id: DataSetId::new(u16::MAX).unwrap(),
             records: Box::new(records),
         }];
 
         let ipfix_pkt =
-            IpfixPacket::new(Utc::now(), sequence_number, shard_id as u32, Box::new(sets));
+            ipfix::IpfixPacket::new(Utc::now(), sequence_number, shard_id as u32, Box::new(sets));
 
         FlowInfo::IPFIX(ipfix_pkt)
     }
@@ -323,8 +319,7 @@ pub(crate) fn explode(
 
             for set in pkt.sets() {
                 let template_ids;
-                let data_records = if let netgauze_flow_pkt::ipfix::Set::Data { id, records } = set
-                {
+                let data_records = if let ipfix::Set::Data { id, records } = set {
                     template_ids = HashSet::from([*id]);
                     records
                 } else {
