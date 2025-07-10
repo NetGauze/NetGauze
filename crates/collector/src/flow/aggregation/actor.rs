@@ -32,9 +32,7 @@ use crate::flow::aggregation::{aggregator::*, config::*};
 use chrono::Utc;
 use either::Either;
 use futures::stream::{self, StreamExt};
-use netgauze_analytics::aggregation::{
-    AggregationWindowStreamExt, Aggregator, TimeSeriesData, Window,
-};
+use netgauze_analytics::aggregation::{AggregationWindowStreamExt, Aggregator, TimeSeriesData};
 use netgauze_flow_pkt::{
     ie::{netgauze, Field},
     FlowInfo,
@@ -43,7 +41,7 @@ use netgauze_flow_service::FlowRequest;
 use opentelemetry::metrics::{Counter, Meter};
 use pin_utils::pin_mut;
 use std::{
-    net::{IpAddr, SocketAddr},
+    net::IpAddr,
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -111,7 +109,7 @@ pub enum AggregationCommand {
 struct AggregationActor {
     cmd_recv: mpsc::Receiver<AggregationCommand>,
     rx: async_channel::Receiver<Arc<FlowRequest>>,
-    tx: async_channel::Sender<(Window, (SocketAddr, FlowInfo))>,
+    tx: async_channel::Sender<(IpAddr, FlowInfo)>,
     config: AggregationConfig,
     stats: AggregationStats,
     shard_id: usize,
@@ -122,7 +120,7 @@ impl AggregationActor {
     fn new(
         cmd_recv: mpsc::Receiver<AggregationCommand>,
         rx: async_channel::Receiver<Arc<FlowRequest>>,
-        tx: async_channel::Sender<(Window, (SocketAddr, FlowInfo))>,
+        tx: async_channel::Sender<(IpAddr, FlowInfo)>,
         config: AggregationConfig,
         stats: AggregationStats,
         shard_id: usize,
@@ -225,7 +223,7 @@ impl AggregationActor {
                                     ];
                                     stats.aggregated_messages.add(1, &tags);
 
-                                    let message = entry.into_flowinfo_with_extra_fields(
+                                    let flow = entry.into_flowinfo_with_extra_fields(
                                       shard_id,
                                       sequence_number.fetch_add(1, Ordering::Relaxed),
                                       [
@@ -234,7 +232,7 @@ impl AggregationActor {
                                         exporter_ip.clone(),
                                     ]);
 
-                                    let send_closure = tx.send(((start, end), (SocketAddr::new(peer_ip, 0), message)));
+                                    let send_closure = tx.send((peer_ip, flow));
                                     match tokio::time::timeout(Duration::from_secs(1), send_closure).await {
                                         Ok(Ok(_)) => stats.sent_messages.add(1, &tags),
                                         Ok(Err(err)) => {
@@ -280,7 +278,7 @@ pub enum AggregationActorHandleError {
 #[derive(Debug)]
 pub struct AggregationActorHandle {
     cmd_send: mpsc::Sender<AggregationCommand>,
-    rx: async_channel::Receiver<(Window, (SocketAddr, FlowInfo))>,
+    rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
 }
 
 impl AggregationActorHandle {
@@ -310,7 +308,7 @@ impl AggregationActorHandle {
             .map_err(|_| AggregationActorHandleError::SendError)
     }
 
-    pub fn subscribe(&self) -> async_channel::Receiver<(Window, (SocketAddr, FlowInfo))> {
+    pub fn subscribe(&self) -> async_channel::Receiver<(IpAddr, FlowInfo)> {
         self.rx.clone()
     }
 }

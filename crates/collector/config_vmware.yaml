@@ -17,17 +17,19 @@ flow:
   template_cache_purge_timeout: 360
   listeners:
     # NetGauze can listen to multiple addresses/interfaces at the same time
+    - address: 0.0.0.0:9992
     - address: 0.0.0.0:9991
       # Optionally Bind to an interface/VRF
       interface: trex1
       # Optionally, number of I/O tasks per address/interface, default is 1
       workers: 2
 
+
   # Multiple publishers can be defined.
   # A packet is copied for each publisher group, and load-balancing is defined between endpoints in the same group.
   publishers:
     group1:
-      buffer_size: 50000
+      buffer_size: 100000
       aggregation:
         workers: 4
         window_duration:
@@ -99,7 +101,7 @@ flow:
           writer_id: writer1
           avro_converter:
             fields:
-              # Key Fields
+              # Custom Fields
               ip_src:
                 select: !Coalesce
                   ies:
@@ -273,7 +275,6 @@ flow:
                   index: 0
                 transform: String
                 default: !String ''
-              # Group-by Fields
               bytes:
                 select: !Single
                   ie: octetDeltaCount
@@ -292,3 +293,33 @@ flow:
                   index: 0
                 transform: StringArray
                 default: !StringArray []
+              # Internal Fields
+              stamp_inserted:
+                select: !Single
+                  ie: !NetGauze windowStart
+                  index: 0
+                transform: TimestampMillisString
+              stamp_updated:
+                select: !Single
+                  ie: !NetGauze windowEnd
+                  index: 0
+                transform: TimestampMillisString
+              writer_id:
+                select: !Single
+                  ie: !NetGauze dataCollectionManifestName
+                  index: 0
+                transform: String
+                default: !String ""
+              label:
+                select: !Multi
+                  ies:
+                    - ie: !NetGauze nodeId
+                      index: 0
+                    - ie: !NetGauze platformId
+                      index: 0
+                transform: !StringMapAgg
+                  !NetGauze nodeId:
+                    key_rename: nkey
+                  !NetGauze platformId:
+                    key_rename: pkey
+                default: !StringMap {}

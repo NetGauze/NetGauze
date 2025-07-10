@@ -18,34 +18,15 @@ pub mod config;
 pub mod enrichment;
 pub mod sonata;
 
+use std::collections::HashMap;
+
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
 use netgauze_flow_pkt::{
     ie,
     ie::{HasIE, InformationElementDataType, InformationElementTemplate},
-    FlatFlowDataInfo,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::IpAddr};
-
-/// A struct representing an enriched flow record with additional metadata
-///
-/// This struct combines raw flow data with contextual information like:
-/// * Labels - Key-value pairs for additional metadata
-/// * Peer information - Source IP and port of the flow collector
-/// * Timing information - Timestamps and aggregatopm window boundaries
-/// * Writer identification - ID of the collector instance
-/// * Flow data - The raw aggregated flat flow record information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnrichedFlow {
-    pub labels: HashMap<String, String>,
-    pub peer_src: IpAddr,
-    pub peer_port: u16,
-    pub writer_id: String,
-    pub ts: chrono::DateTime<chrono::Utc>,
-    pub window_start: chrono::DateTime<chrono::Utc>,
-    pub window_end: chrono::DateTime<chrono::Utc>,
-    pub flow: FlatFlowDataInfo,
-}
+use serde_json::Value as JsonValue;
 
 /// The supported subset of AVRO values
 ///
@@ -71,6 +52,7 @@ pub enum RawValue {
     String(String),
     TimestampMillis(i64),
     StringArray(Vec<String>),
+    StringMap(HashMap<String, String>),
 }
 
 impl RawValue {
@@ -91,6 +73,7 @@ impl RawValue {
             Self::String(_) => AvroValueKind::String,
             Self::TimestampMillis(_) => AvroValueKind::TimestampMillis,
             Self::StringArray(_) => AvroValueKind::Array,
+            Self::StringMap(_) => AvroValueKind::Map,
         }
     }
 
@@ -113,28 +96,38 @@ impl RawValue {
             Self::StringArray(v) => {
                 AvroValue::Array(v.into_iter().map(AvroValue::String).collect())
             }
+            Self::StringMap(v) => AvroValue::Map(
+                v.into_iter()
+                    .map(|(k, v)| (k, AvroValue::String(v)))
+                    .collect(),
+            ),
         }
     }
 
-    pub fn into_json_value(self) -> serde_json::Value {
+    pub fn into_json_value(self) -> JsonValue {
         match self {
-            Self::Bytes(v) => serde_json::Value::from(v),
-            Self::U8(v) => serde_json::Value::from(v),
-            Self::U16(v) => serde_json::Value::from(v),
-            Self::U32(v) => serde_json::Value::from(v),
-            Self::U64(v) => serde_json::Value::from(v),
-            Self::I8(v) => serde_json::Value::from(v),
-            Self::I16(v) => serde_json::Value::from(v),
-            Self::I32(v) => serde_json::Value::from(v),
-            Self::I64(v) => serde_json::Value::from(v),
-            Self::F32(v) => serde_json::Value::from(v),
-            Self::F64(v) => serde_json::Value::from(v),
-            Self::Boolean(v) => serde_json::Value::from(v),
-            Self::String(v) => serde_json::Value::from(v),
-            Self::TimestampMillis(v) => serde_json::Value::from(v),
+            Self::Bytes(v) => JsonValue::from(v),
+            Self::U8(v) => JsonValue::from(v),
+            Self::U16(v) => JsonValue::from(v),
+            Self::U32(v) => JsonValue::from(v),
+            Self::U64(v) => JsonValue::from(v),
+            Self::I8(v) => JsonValue::from(v),
+            Self::I16(v) => JsonValue::from(v),
+            Self::I32(v) => JsonValue::from(v),
+            Self::I64(v) => JsonValue::from(v),
+            Self::F32(v) => JsonValue::from(v),
+            Self::F64(v) => JsonValue::from(v),
+            Self::Boolean(v) => JsonValue::from(v),
+            Self::String(v) => JsonValue::from(v),
+            Self::TimestampMillis(v) => JsonValue::from(v),
             Self::StringArray(v) => {
-                serde_json::Value::Array(v.into_iter().map(serde_json::Value::String).collect())
+                JsonValue::Array(v.into_iter().map(JsonValue::String).collect())
             }
+            Self::StringMap(v) => JsonValue::Object(
+                v.into_iter()
+                    .map(|(k, v)| (k, JsonValue::String(v)))
+                    .collect(),
+            ),
         }
     }
 }

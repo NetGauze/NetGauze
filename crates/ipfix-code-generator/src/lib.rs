@@ -27,7 +27,6 @@ use thiserror::Error;
 use xml_parsers::sub_registries::parse_subregistry;
 
 mod generator;
-mod generator_aggregation;
 mod generator_sub_registries;
 
 pub mod xml_parsers {
@@ -347,7 +346,6 @@ fn generate_vendor_ie(
 
     let mut output = format_tokens(tokens);
     output.push_str("\n\n");
-    output.push_str(generate_flat_ie_struct(&ie_parsed, &[]).as_str());
 
     let dest_path = Path::new(&out_dir).join(format!(
         "{}_{}",
@@ -454,7 +452,6 @@ pub fn generate(out_dir: &OsString, config: &Config) -> Result<(), GenerateError
 
     let mut ie_output = String::new();
     ie_output.push_str(format_tokens(tokens).as_str());
-    ie_output.push_str(generate_flat_ie_struct(&iana_ie_parsed, &vendors).as_str());
     ie_deser.extend(generate_ie_deser_main(&iana_ie_parsed, &vendors));
     ie_ser.extend(generate_ie_ser_main(&iana_ie_parsed, &vendors));
 

@@ -15,8 +15,8 @@
 
 use crate::{
     ie::{
-        Field, Fields, InformationElementDataType, InformationElementSemantics,
-        InformationElementTemplate, InformationElementUnits,
+        Field, InformationElementDataType, InformationElementSemantics, InformationElementTemplate,
+        InformationElementUnits,
     },
     DataSetId, FieldSpecifier,
 };
@@ -153,136 +153,6 @@ impl NetFlowV9Packet {
     pub const fn sets(&self) -> &[Set] {
         &self.sets
     }
-
-    pub fn flatten(self) -> Vec<FlatNetFlowV9Packet> {
-        let sys_up_time = self.sys_up_time;
-        let unix_time = self.unix_time;
-        let sequence_number = self.sequence_number;
-        let source_id = self.source_id;
-        IntoIterator::into_iter(self.sets)
-            .flat_map(|set| set.flatten())
-            .map(|set| FlatNetFlowV9Packet {
-                sys_up_time,
-                unix_time,
-                sequence_number,
-                source_id,
-                set,
-            })
-            .collect()
-    }
-
-    pub fn flatten_data(self) -> Vec<FlatNetFlowV9DataPacket> {
-        let sys_up_time = self.sys_up_time;
-        let unix_time = self.unix_time;
-        let sequence_number = self.sequence_number;
-        let source_id = self.source_id;
-        IntoIterator::into_iter(self.sets)
-            .flat_map(|set| set.flatten_data())
-            .map(|set| FlatNetFlowV9DataPacket {
-                sys_up_time,
-                unix_time,
-                sequence_number,
-                source_id,
-                set,
-            })
-            .collect()
-    }
-}
-
-/// Flattened version of [NetFlowV9Packet]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FlatNetFlowV9Packet {
-    sys_up_time: u32,
-    unix_time: DateTime<Utc>,
-    sequence_number: u32,
-    source_id: u32,
-    set: FlatSet,
-}
-
-impl FlatNetFlowV9Packet {
-    pub fn new(
-        sys_up_time: u32,
-        unix_time: DateTime<Utc>,
-        sequence_number: u32,
-        source_id: u32,
-        set: FlatSet,
-    ) -> Self {
-        Self {
-            sys_up_time,
-            unix_time,
-            sequence_number,
-            source_id,
-            set,
-        }
-    }
-
-    pub const fn sys_up_time(&self) -> u32 {
-        self.sys_up_time
-    }
-
-    pub const fn unix_time(&self) -> DateTime<Utc> {
-        self.unix_time
-    }
-
-    pub const fn sequence_number(&self) -> u32 {
-        self.sequence_number
-    }
-
-    pub const fn source_id(&self) -> u32 {
-        self.source_id
-    }
-
-    pub const fn set(&self) -> &FlatSet {
-        &self.set
-    }
-}
-
-/// Flattened data only version of [NetFlowV9Packet]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FlatNetFlowV9DataPacket {
-    sys_up_time: u32,
-    unix_time: DateTime<Utc>,
-    sequence_number: u32,
-    source_id: u32,
-    set: FlatDataSet,
-}
-
-impl FlatNetFlowV9DataPacket {
-    pub fn new(
-        sys_up_time: u32,
-        unix_time: DateTime<Utc>,
-        sequence_number: u32,
-        source_id: u32,
-        set: FlatDataSet,
-    ) -> Self {
-        Self {
-            sys_up_time,
-            unix_time,
-            sequence_number,
-            source_id,
-            set,
-        }
-    }
-
-    pub const fn sys_up_time(&self) -> u32 {
-        self.sys_up_time
-    }
-
-    pub const fn unix_time(&self) -> DateTime<Utc> {
-        self.unix_time
-    }
-
-    pub const fn sequence_number(&self) -> u32 {
-        self.sequence_number
-    }
-
-    pub const fn source_id(&self) -> u32 {
-        self.source_id
-    }
-
-    pub const fn set(&self) -> &FlatDataSet {
-        &self.set
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -303,85 +173,6 @@ impl Set {
             Self::OptionsTemplate(_) => NETFLOW_OPTIONS_TEMPLATE_SET_ID,
             Self::Data { id, records: _ } => id.0,
         }
-    }
-
-    pub fn flatten(self) -> Vec<FlatSet> {
-        match self {
-            Self::Template(values) => IntoIterator::into_iter(values)
-                .map(FlatSet::Template)
-                .collect(),
-            Self::OptionsTemplate(values) => IntoIterator::into_iter(values)
-                .map(FlatSet::OptionsTemplate)
-                .collect(),
-            Self::Data { id, records } => IntoIterator::into_iter(records)
-                .map(|record| FlatSet::Data {
-                    id,
-                    record: Box::new(FlatDataRecord::new(
-                        record.scope_fields.into(),
-                        record.fields.into(),
-                    )),
-                })
-                .collect(),
-        }
-    }
-
-    pub fn flatten_data(self) -> Vec<FlatDataSet> {
-        match self {
-            Self::Template(_) => vec![],
-            Self::OptionsTemplate(_) => {
-                vec![]
-            }
-            Self::Data { id, records } => IntoIterator::into_iter(records)
-                .map(|record| {
-                    FlatDataSet::new(
-                        id,
-                        FlatDataRecord::new(record.scope_fields.into(), record.fields.into()),
-                    )
-                })
-                .collect(),
-        }
-    }
-}
-
-/// Flattened version of [Set]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum FlatSet {
-    Template(TemplateRecord),
-    OptionsTemplate(OptionsTemplateRecord),
-    Data {
-        id: DataSetId,
-        record: Box<FlatDataRecord>,
-    },
-}
-
-impl FlatSet {
-    pub const fn id(&self) -> u16 {
-        match self {
-            Self::Template(_) => NETFLOW_TEMPLATE_SET_ID,
-            Self::OptionsTemplate(_) => NETFLOW_OPTIONS_TEMPLATE_SET_ID,
-            Self::Data { id, record: _ } => id.0,
-        }
-    }
-}
-
-/// Flattened Data only version of [Set] without any templates or options
-/// template
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FlatDataSet {
-    id: DataSetId,
-    record: FlatDataRecord,
-}
-
-impl FlatDataSet {
-    pub const fn new(id: DataSetId, record: FlatDataRecord) -> Self {
-        Self { id, record }
-    }
-    pub const fn id(&self) -> u16 {
-        self.id.0
-    }
-
-    pub const fn record(&self) -> &FlatDataRecord {
-        &self.record
     }
 }
 
@@ -469,29 +260,6 @@ impl DataRecord {
     }
 
     pub const fn fields(&self) -> &[Field] {
-        &self.fields
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FlatDataRecord {
-    scope_fields: ScopeFields,
-    fields: Fields,
-}
-
-impl FlatDataRecord {
-    pub const fn new(scope_fields: ScopeFields, fields: Fields) -> Self {
-        Self {
-            scope_fields,
-            fields,
-        }
-    }
-
-    pub const fn scope_fields(&self) -> &ScopeFields {
-        &self.scope_fields
-    }
-
-    pub const fn fields(&self) -> &Fields {
         &self.fields
     }
 }
@@ -704,7 +472,6 @@ impl ScopeFieldSpecifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
 
     #[test]
     fn test_scope_fields_from() {
@@ -851,50 +618,5 @@ mod tests {
         let field_specifier = ScopeFieldSpecifier::new(ie, length);
         assert_eq!(field_specifier.element_id(), ie);
         assert_eq!(field_specifier.length(), length);
-    }
-
-    #[test]
-    fn test_flatten_netflow() {
-        let sys_up_time = 0;
-        let unix_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
-        let sequence_number = 0;
-        let source_id = 0;
-        let set = Set::Data {
-            id: DataSetId(0),
-            records: Box::new([DataRecord::new(
-                Box::new([ScopeField::System(System(1))]),
-                Box::new([Field::octetDeltaCount(1000)]),
-            )]),
-        };
-        let packet = NetFlowV9Packet::new(
-            sys_up_time,
-            unix_time,
-            sequence_number,
-            source_id,
-            Box::new([set]),
-        );
-        let flat_packets = packet.flatten();
-        assert_eq!(flat_packets.len(), 1);
-        let flat_packet = &flat_packets[0];
-        assert_eq!(flat_packet.sys_up_time(), sys_up_time);
-        assert_eq!(flat_packet.unix_time(), unix_time);
-        assert_eq!(flat_packet.sequence_number(), sequence_number);
-        assert_eq!(flat_packet.source_id(), source_id);
-        let flat_set = flat_packet.set();
-        assert_eq!(flat_set.id(), NETFLOW_TEMPLATE_SET_ID);
-        let expected = FlatSet::Data {
-            id: DataSetId(0),
-            record: Box::new(FlatDataRecord::new(
-                ScopeFields {
-                    system: Some(vec![System(1)]),
-                    ..Default::default()
-                },
-                Fields {
-                    octetDeltaCount: Some(vec![1000]),
-                    ..Default::default()
-                },
-            )),
-        };
-        assert_eq!(flat_set, &expected);
     }
 }

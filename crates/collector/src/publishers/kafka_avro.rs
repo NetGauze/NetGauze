@@ -37,7 +37,9 @@ const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 
 pub trait AvroConverter<T, E: std::error::Error> {
     fn get_avro_schema(&self) -> String;
-    fn get_avro_value(&self, input: T) -> Result<apache_avro::types::Value, E>;
+
+    type AvroValues: IntoIterator<Item = apache_avro::types::Value> + Send;
+    fn get_avro_values(&self, input: T) -> Result<Self::AvroValues, E>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,8 +160,8 @@ pub struct KafkaAvroPublisherActor<'a, T, E: std::error::Error, C: AvroConverter
     /// Configured kafka options
     config: KafkaConfig<C>,
 
-    /// Schema used for AVRO records by this producer
-    supplied_schema: SuppliedSchema,
+    /// Subject Name Strategy
+    subject_name_strategy: SubjectNameStrategy,
 
     //// librdkafka producer
     producer: ThreadedProducer<LoggingProducerContext>,
@@ -192,11 +194,16 @@ where
         let schema_str = config.avro_converter.get_avro_schema();
         let supplied_schema =
             Self::get_schema(config.topic.clone(), schema_str, sr_settings).await?;
+        let subject_name_strategy = SubjectNameStrategy::TopicRecordNameStrategyWithSchema(
+            config.topic.clone(),
+            supplied_schema.clone(),
+        );
         let producer = Self::get_producer(&stats, &config)?;
+
         Ok(Self {
             cmd_rx,
             config,
-            supplied_schema,
+            subject_name_strategy,
             producer,
             avro_encoder,
             msg_recv,
@@ -271,10 +278,10 @@ where
     }
 
     pub async fn send(&mut self, input: T) -> Result<(), KafkaAvroPublisherActorError> {
-        let avro_value = match self.config.avro_converter.get_avro_value(input) {
-            Ok(avro_value) => avro_value,
+        let avro_values = match self.config.avro_converter.get_avro_values(input) {
+            Ok(avro_values) => avro_values,
             Err(err) => {
-                error!("Error getting avro value: {err}");
+                error!("Error getting avro values: {err}");
                 self.stats.error_avro_convert.add(
                     1,
                     &[opentelemetry::KeyValue::new(
@@ -286,76 +293,80 @@ where
             }
         };
 
-        // TODO: make subject name strategy configurable
-        let encoded = match self
-            .avro_encoder
-            .encode_value(
-                avro_value,
-                &SubjectNameStrategy::TopicRecordNameStrategyWithSchema(
-                    self.config.topic.clone(),
-                    self.supplied_schema.clone(),
-                ),
-            )
-            .await
-        {
-            Ok(result) => result,
-            Err(err) => {
-                error!("Error encoding avro value: {err}");
-                self.stats.error_avro_encode.add(
-                    1,
-                    &[opentelemetry::KeyValue::new(
-                        "netgauze.kafka.avro.encode.error.msg",
-                        err.to_string(),
-                    )],
-                );
-                return Err(err)?;
-            }
-        };
+        let subject_name_strategy = &self.subject_name_strategy;
 
-        let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> =
-            BaseRecord::to(self.config.topic.as_str()).payload(&encoded);
-        let mut polling_interval = Duration::from_micros(10);
-        loop {
-            match self.producer.send(record) {
-                Ok(_) => {
-                    self.stats.sent.add(1, &[]);
-                    return Ok(());
+        // For now we return error if one record fails to be sent
+        // (not problematic as we only have single record per flowinfo
+        // at the moment...)
+        for avro_value in avro_values {
+            let encoded = match self
+                .avro_encoder
+                .encode_value(avro_value, subject_name_strategy)
+                .await
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    error!("Error encoding avro value: {err}");
+                    self.stats.error_avro_encode.add(
+                        1,
+                        &[opentelemetry::KeyValue::new(
+                            "netgauze.kafka.avro.encode.error.msg",
+                            err.to_string(),
+                        )],
+                    );
+                    return Err(err)?;
                 }
-                Err((err, rec)) => match err {
-                    KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
-                        // Exponential backoff when the librdkafka is full
-                        if polling_interval > MAX_POLLING_INTERVAL {
-                            error!("Kafka polling interval exceeded, dropping record");
-                            self.stats.error_send.add(
-                                1,
-                                &[opentelemetry::KeyValue::new(
-                                    "netgauze.kafka.sent.error.msg",
-                                    err.to_string(),
-                                )],
-                            );
-                            return Err(KafkaAvroPublisherActorError::KafkaError(err));
+            };
+
+            let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> =
+                BaseRecord::to(self.config.topic.as_str()).payload(&encoded);
+            let mut polling_interval = Duration::from_micros(10);
+            loop {
+                match self.producer.send(record) {
+                    Ok(_) => {
+                        self.stats.sent.add(1, &[]);
+                        break;
+                    }
+                    Err((err, rec)) => {
+                        match err {
+                            KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
+                                // Exponential backoff when the librdkafka is full
+                                if polling_interval > MAX_POLLING_INTERVAL {
+                                    error!("Kafka polling interval exceeded, dropping record");
+                                    self.stats.error_send.add(
+                                        1,
+                                        &[opentelemetry::KeyValue::new(
+                                            "netgauze.kafka.sent.error.msg",
+                                            err.to_string(),
+                                        )],
+                                    );
+                                    return Err(KafkaAvroPublisherActorError::KafkaError(err));
+                                }
+                                debug!("Kafka message queue is full, sleeping for {polling_interval:?}");
+                                self.stats.send_retries.add(1, &[]);
+                                tokio::time::sleep(polling_interval).await;
+                                polling_interval *= 2;
+                                record = rec;
+                                continue;
+                            }
+                            err => {
+                                error!("Error sending message: {err}");
+                                self.stats.error_send.add(
+                                    1,
+                                    &[opentelemetry::KeyValue::new(
+                                        "netgauze.kafka.sent.error.msg",
+                                        err.to_string(),
+                                    )],
+                                );
+                                return Err(KafkaAvroPublisherActorError::KafkaError(err));
+                            }
                         }
-                        debug!("Kafka message queue is full, sleeping for {polling_interval:?}");
-                        self.stats.send_retries.add(1, &[]);
-                        tokio::time::sleep(polling_interval).await;
-                        polling_interval *= 2;
-                        record = rec;
-                        continue;
                     }
-                    err => {
-                        error!("Error sending message: {err}");
-                        self.stats.error_send.add(
-                            1,
-                            &[opentelemetry::KeyValue::new(
-                                "netgauze.kafka.sent.error.msg",
-                                err.to_string(),
-                            )],
-                        );
-                        return Err(KafkaAvroPublisherActorError::KafkaError(err));
-                    }
-                },
+                }
             }
         }
+
+        Ok(())
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
@@ -420,6 +431,8 @@ where
     T: Send + 'static,
     E: std::error::Error + Send + 'static,
     C: AvroConverter<T, E> + Send + 'static,
+    C::AvroValues: Send,
+    <C::AvroValues as IntoIterator>::IntoIter: Send,
     KafkaAvroPublisherActorError: From<E>,
 {
     pub async fn from_config(

@@ -16,8 +16,8 @@
 //! Generate Rust code for the given Netflow/IPFIX definitions
 
 use crate::{
-    generator_aggregation::*, generator_sub_registries::*, InformationElement,
-    InformationElementSubRegistry, SimpleRegistry, Xref,
+    generator_sub_registries::*, InformationElement, InformationElementSubRegistry, SimpleRegistry,
+    Xref,
 };
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
@@ -1082,7 +1082,11 @@ pub(crate) fn generate_ie_ids(
     let vendor_ie_variants = vendors.iter().map(|(name, pkg, _)| {
         let name = Ident::new(name, Span::call_site());
         let pkg = Ident::new(pkg, Span::call_site());
-        quote! { #name(#pkg::IE) }
+        let strum_attr = format!("{name} {{0}}");
+        quote! {
+            #[strum(to_string = #strum_attr)]
+            #name(#pkg::IE)
+        }
     });
 
     let iana_ie_variants = iana_ies.iter().map(|ie| {
@@ -3391,142 +3395,6 @@ pub(crate) fn generate_ie_ser_main(
             }
         }
     }
-}
-
-/// Generates `get(&self, ie: IE) -> Vec<Field>`  for `Fields`
-pub fn impl_get_field(
-    iana_ies: &[InformationElement],
-    vendors: &[(String, String, u32)],
-) -> String {
-    let mut ret = String::new();
-    ret.push_str("    pub fn get(&self, ie: IE) -> Vec<Field> {\n");
-    ret.push_str("        match ie {\n");
-    if !vendors.is_empty() {
-        ret.push_str("            IE::Unknown { .. } => Vec::with_capacity(0),\n");
-    }
-    for (name, pkg, _) in vendors {
-        ret.push_str(format!("            IE::{name}(vendor_ie) => {{\n").as_str());
-        ret.push_str(format!("                if let Some(value) = &self.{pkg} {{\n").as_str());
-        ret.push_str(format!("                    value.get(vendor_ie).into_iter().map(Field::{name}).collect()\n").as_str());
-        ret.push_str("                } else {\n");
-        ret.push_str("                     Vec::with_capacity(0)\n");
-        ret.push_str("                }\n");
-        ret.push_str("            }\n");
-    }
-    for ie in iana_ies {
-        ret.push_str(format!("            IE::{} => {{\n", ie.name).as_str());
-        ret.push_str(
-            format!(
-                "                if let Some(values) = &self.{name} {{\n",
-                name = ie.name
-            )
-            .as_str(),
-        );
-        ret.push_str(
-            format!(
-                "                    values.iter().cloned().map(Field::{name}).collect()\n",
-                name = ie.name
-            )
-            .as_str(),
-        );
-        ret.push_str("                } else {\n");
-        ret.push_str("                    Vec::with_capacity(0)\n");
-        ret.push_str("                }\n");
-        ret.push_str("            }\n");
-    }
-    ret.push_str("        }\n");
-    ret.push_str("    }\n");
-    ret
-}
-
-pub fn generate_flat_ie_struct(
-    iana_ies: &[InformationElement],
-    vendors: &[(String, String, u32)],
-) -> String {
-    let mut ret = String::new();
-    ret.push_str("#[allow(non_snake_case)]\n");
-    ret.push_str(generate_derive(false, false, false, false, false, false).as_str());
-    ret.push_str("#[derive(Default)]\n");
-    ret.push_str("pub struct Fields {\n");
-    // TODO: Handle unknown fields
-    //ret.push_str("    Unknown{pen: u32, id: u16, value: Box<[u8]>},\n");
-    for (_name, pkg, _) in vendors {
-        ret.push_str(format!("    pub {pkg}: Option<{pkg}::Fields>,\n").as_str());
-    }
-    for ie in iana_ies {
-        let field_type = if ie.name == "tcpControlBits" {
-            "netgauze_iana::tcp::TCPHeaderFlags".to_string()
-        } else {
-            let rust_type = get_rust_type(&ie.data_type, &ie.name);
-            if ie.subregistry.is_some() {
-                ie.name.clone()
-            } else {
-                rust_type
-            }
-        };
-        ret.push_str("    #[serde(skip_serializing_if = \"::std::option::Option::is_none\")]\n");
-        ret.push_str(format!("    pub {}: Option<Vec<{field_type}>>,\n", ie.name).as_str());
-    }
-    ret.push_str("}\n\n");
-
-    ret.push_str("impl From<Box<[Field]>> for Fields {\n");
-    ret.push_str("    fn from(fields: Box<[Field]>) -> Self {\n");
-    ret.push_str("        let mut out = Fields::default();\n");
-    for (_name, pkg, _) in vendors {
-        ret.push_str(format!("        let mut {pkg}_fields = vec![];\n").as_str());
-    }
-    ret.push_str("        for field in fields {\n");
-    ret.push_str("            match field {\n");
-    for (name, pkg, _) in vendors {
-        ret.push_str(
-            format!("                Field::{name}(value) => {pkg}_fields.push(value),\n").as_str(),
-        );
-    }
-    // Only IANA has the unknown value
-    if !vendors.is_empty() {
-        ret.push_str("                Field::Unknown{..} => {},\n");
-    }
-    for ie in iana_ies {
-        ret.push_str(format!("                Field::{}(value) => {{\n", ie.name).as_str());
-        ret.push_str(format!("                    if out.{}.is_none() {{\n", ie.name).as_str());
-        ret.push_str(
-            format!(
-                "                        out.{} = Some(Vec::with_capacity(1));\n",
-                ie.name
-            )
-            .as_str(),
-        );
-        ret.push_str("                    }\n");
-        ret.push_str(
-            format!(
-                "                    if let Some(inner) = out.{}.as_mut() {{\n",
-                ie.name
-            )
-            .as_str(),
-        );
-        ret.push_str("                        inner.push(value);\n");
-        ret.push_str("                    }\n");
-        ret.push_str("                }\n");
-    }
-    ret.push_str("            }\n");
-    ret.push_str("        }\n");
-
-    for (_name, pkg, _) in vendors {
-        ret.push_str(format!("        out.{pkg} = if {pkg}_fields.is_empty() {{ None }} else {{ Some({pkg}_fields.into_boxed_slice().into()) }};\n").as_str());
-    }
-    ret.push_str("        out\n");
-    ret.push_str("    }\n");
-    ret.push_str("}\n\n");
-
-    ret.push_str("impl Fields {\n");
-
-    ret.push_str(impl_get_field(iana_ies, vendors).as_str());
-    ret.push_str(impl_extract_as_key_str().as_str());
-    ret.push_str(impl_reduce(iana_ies, vendors).as_str());
-
-    ret.push_str("}\n\n");
-
-    ret
 }
 
 pub fn format_tokens(token_stream: TokenStream) -> String {

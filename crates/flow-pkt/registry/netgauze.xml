@@ -111,5 +111,20 @@
       <date>2025-06-27</date>
     </record>
 
+    <record>
+      <name>dataCollectionManifestName</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>7</elementId>
+      <status>current</status>
+      <description>
+        <paragraph>
+            A short name uniquely describing the name of the data collection instance.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-06-27</date>
+    </record>
+
   </registry>
 </registry>
