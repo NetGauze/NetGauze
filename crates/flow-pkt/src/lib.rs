@@ -242,7 +242,7 @@ impl std::fmt::Display for DataSetIdError {
 
 impl std::error::Error for DataSetIdError {}
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataSetId(u16);
 

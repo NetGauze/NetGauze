@@ -21,6 +21,7 @@ netgauze-flow-pkt = { workspace = true, features = ["codec"] }
 netgauze-udp-notif-service = { workspace = true }
 netgauze-udp-notif-pkt = { workspace = true }
 netgauze-yang-push = { workspace = true }
+netgauze-iana = { workspace = true }
 tokio = { workspace = true, features = ["full", "tracing", "rt-multi-thread"] }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
@@ -72,6 +73,8 @@ ordered-float = { workspace = true }
 ciborium = { workspace = true }
 bytes = { workspace = true }
 shadow-rs = { workspace = true, features = ["default", "metadata", "build"]  }
+smallvec = { workspace = true }
+rustc-hash = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = [

@@ -13,36 +13,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A module for aggregating flow data based on configurable parameters.
+//! Actor-based flow aggregation module for processing and aggregating network
+//! flow data.
 //!
-//! The main components are:
-//! - `AggregationConfig` - Configuration for aggregation, including window
-//!   duration, lateness, and transformation operations
-//! - `InputMessage` - Represents an input message containing flow information
-//!   and the peer socket data
-//! - `FlowAggregator` - Aggregates flow data based on the provided
-//!   configuration and cache
-//! - `AggregationActor` - Actor responsible for handling aggregation commands
-//!   and processing flow requests
-//! - `AggregationActorHandle` - Handle used to control the aggregation actor
+//! This module provides the main actor implementation for flow aggregation:
+//! - `AggregationActor` - Core actor that processes flow requests using
+//!   time-windowed aggregation
+//! - `AggregationActorHandle` - Handle for controlling and communicating with
+//!   the actor
+//! - `AggregationStats` - Metrics collection for aggregation operations
+//!
+//! The actor receives flow data, applies aggregation rules defined in the
+//! configuration, and outputs aggregated results in time windows. It supports
+//! parallel processing through multiple worker shards and provides
+//! comprehensive telemetry.
 
+use crate::flow::aggregation::{aggregator::*, config::*};
+use chrono::Utc;
 use either::Either;
 use futures::stream::{self, StreamExt};
-use indexmap::IndexMap;
-use netgauze_analytics::{aggregation::*, flow::*};
-use netgauze_flow_pkt::{ie, FlatFlowDataInfo};
+use netgauze_analytics::aggregation::{
+    AggregationWindowStreamExt, Aggregator, TimeSeriesData, Window,
+};
+use netgauze_flow_pkt::{
+    ie::{netgauze, Field},
+    FlowInfo,
+};
 use netgauze_flow_service::FlowRequest;
 use opentelemetry::metrics::{Counter, Meter};
 use pin_utils::pin_mut;
-use serde::{Deserialize, Serialize};
 use std::{
-    collections::{hash_map::Entry, HashMap},
-    net::SocketAddr,
-    sync::Arc,
+    net::{IpAddr, SocketAddr},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, Clone)]
 pub struct AggregationStats {
@@ -93,152 +102,27 @@ impl AggregationStats {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AggregationConfig {
-    pub workers: usize,
-    pub window_duration: Duration,
-    pub lateness: Duration,
-    pub transform: IndexMap<ie::IE, AggrOp>,
-}
-
-impl Default for AggregationConfig {
-    fn default() -> Self {
-        AggregationConfig {
-            workers: 1,
-            window_duration: Duration::from_secs(60),
-            lateness: Duration::from_secs(10),
-            transform: IndexMap::new(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct InputMessage {
-    pub peer: SocketAddr,
-    pub flow: FlatFlowDataInfo,
-}
-
-impl TimeSeriesData<String> for InputMessage {
-    fn get_key(&self) -> String {
-        self.peer.ip().to_string()
-    }
-    fn get_ts(&self) -> chrono::DateTime<chrono::Utc> {
-        self.flow.export_time()
-    }
-}
-
-impl From<(SocketAddr, FlatFlowDataInfo)> for InputMessage {
-    fn from((peer, flow): (SocketAddr, FlatFlowDataInfo)) -> Self {
-        Self { peer, flow }
-    }
-}
-
-impl InputMessage {
-    pub fn extract_as_key_str(
-        &self,
-        ie: &ie::IE,
-        indices: &Option<Vec<usize>>,
-    ) -> Result<String, AggregationError> {
-        self.flow.extract_as_key_str(ie, indices)
-    }
-
-    pub fn reduce(
-        &mut self,
-        incoming: &InputMessage,
-        transform: &IndexMap<ie::IE, AggrOp>,
-    ) -> Result<(), AggregationError> {
-        self.flow.reduce(&incoming.flow, transform)
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct FlowAggregator {
-    pub cache: HashMap<String, InputMessage>,
-    pub config: AggregationConfig,
-}
-
-impl
-    Aggregator<
-        (HashMap<String, InputMessage>, AggregationConfig),
-        InputMessage,
-        HashMap<String, InputMessage>,
-    > for FlowAggregator
-{
-    fn init(init: (HashMap<String, InputMessage>, AggregationConfig)) -> Self {
-        let (cache, config) = init;
-        Self { cache, config }
-    }
-
-    // TODO: extend to return Result<>
-    fn push(&mut self, incoming: InputMessage) {
-        let mut key = incoming.get_key();
-
-        // Extend key with the GROUP BY keys for IEs
-        for (ie, op) in &self.config.transform {
-            if let AggrOp::Key(indices) = op {
-                key.push(',');
-                match incoming.extract_as_key_str(ie, indices) {
-                    Ok(extracted_key) => key.push_str(&extracted_key),
-                    Err(e) => {
-                        error!("Error extracting key as string: {e:?}");
-                    }
-                }
-            }
-        }
-        // Update cache
-        match self.cache.entry(key) {
-            Entry::Occupied(mut accumulator) => {
-                let accumulator = accumulator.get_mut();
-                if let Err(e) = accumulator.reduce(&incoming, &self.config.transform) {
-                    error!("Error reducing accumulator: {e:?}");
-                }
-            }
-            Entry::Vacant(accumulator) => {
-                // Push incoming message to cache
-                accumulator.insert(incoming);
-            }
-        }
-    }
-    fn flush(self) -> HashMap<String, InputMessage> {
-        self.cache
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum AggregationCommand {
     Shutdown,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum FlowAggregationActorError {
-    AggregationChannelClosed,
-    FlowReceiveError,
-}
-
-impl std::fmt::Display for FlowAggregationActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::AggregationChannelClosed => write!(f, "aggregation channel closed"),
-            Self::FlowReceiveError => write!(f, "error in flow receive channel"),
-        }
-    }
 }
 
 #[derive(Debug)]
 struct AggregationActor {
     cmd_recv: mpsc::Receiver<AggregationCommand>,
     rx: async_channel::Receiver<Arc<FlowRequest>>,
-    tx: async_channel::Sender<(Window, (SocketAddr, FlatFlowDataInfo))>,
+    tx: async_channel::Sender<(Window, (SocketAddr, FlowInfo))>,
     config: AggregationConfig,
     stats: AggregationStats,
     shard_id: usize,
+    sequence_number: Arc<AtomicU32>,
 }
 
 impl AggregationActor {
     fn new(
         cmd_recv: mpsc::Receiver<AggregationCommand>,
         rx: async_channel::Receiver<Arc<FlowRequest>>,
-        tx: async_channel::Sender<(Window, (SocketAddr, FlatFlowDataInfo))>,
+        tx: async_channel::Sender<(Window, (SocketAddr, FlowInfo))>,
         config: AggregationConfig,
         stats: AggregationStats,
         shard_id: usize,
@@ -250,11 +134,21 @@ impl AggregationActor {
             config,
             stats,
             shard_id,
+            sequence_number: Arc::new(AtomicU32::new(0)),
         }
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
         let stats = self.stats.clone();
+
+        let unified_config: UnifiedConfig = self
+            .config
+            .try_into()
+            .inspect_err(|e| error!("Flow Aggregation ConfigurationError: {e}"))?;
+
+        let key_select = unified_config.key_select();
+        let agg_select = unified_config.agg_select();
+
         let agg = self
             .rx
             .flat_map(move |req| {
@@ -271,27 +165,15 @@ impl AggregationActor {
                         opentelemetry::Value::I64(peer.port().into()),
                     ),
                 ];
-
                 stats.received_messages.add(1, &tags);
 
-                stream::iter(
-                    flow.flatten_data()
-                        .into_iter()
-                        .filter(|flow| match flow {
-                            FlatFlowDataInfo::IPFIX(packet) => {
-                                // Exclude records without octetDeltaCount (e.g. option records)
-                                packet.set().record().fields().octetDeltaCount.is_some()
-                            }
-                            _ => false,
-                        })
-                        .map(move |x| InputMessage::from((peer, x))),
-                )
+                stream::iter(explode(&flow, peer, key_select, agg_select, Utc::now()))
             })
             .window_aggregate(
-                self.config.window_duration,
-                self.config.lateness,
-                (HashMap::new(), self.config.clone()),
-                FlowAggregator::init((HashMap::new(), self.config)),
+                unified_config.window_duration(),
+                unified_config.lateness(),
+                unified_config.clone(),
+                FlowAggregator::init(unified_config.clone()),
             );
         pin_mut!(agg);
 
@@ -311,24 +193,48 @@ impl AggregationActor {
                 }
                 result = agg.next() => {
                     match result {
-                        Some(Either::Left(((window_start, window_end), cache))) => {
+                        Some(Either::Left(((start, end), cache))) => {
                             let stats = self.stats.clone();
                             let tx = self.tx.clone();
+                            let sequence_number = self.sequence_number.clone();
+                            let shard_id = self.shard_id;
+
+                            let peer_ip = match cache.keys().next() {
+                                Some(key) => key.peer_ip(),
+                                None => {
+                                    warn!("Empty aggregation cache for window [{:?} - {:?}] (should not happen)", start, end);
+                                    continue;
+                                }
+                            };
+
+                            let exporter_ip = match peer_ip {
+                                IpAddr::V4(ipv4) => Field::originalExporterIPv4Address(ipv4),
+                                IpAddr::V6(ipv6) => Field::originalExporterIPv6Address(ipv6),
+                            };
+                            let window_start = Field::NetGauze(netgauze::Field::windowStart(start));
+                            let window_end = Field::NetGauze(netgauze::Field::windowEnd(end));
+
                             tokio::spawn(async move {
-                                for (_key, message) in cache {
+                                for entry in cache.into_iter().map(AggFlowInfo::from) {
                                     let tags = [
                                         opentelemetry::KeyValue::new("shard_id", opentelemetry::Value::I64(self.shard_id as i64)),
                                         opentelemetry::KeyValue::new(
                                             "network.peer.address",
-                                            format!("{}", message.peer.ip()),
-                                        ),
-                                        opentelemetry::KeyValue::new(
-                                            "network.peer.port",
-                                            opentelemetry::Value::I64(message.peer.port().into()),
+                                            format!("{peer_ip}"),
                                         ),
                                     ];
                                     stats.aggregated_messages.add(1, &tags);
-                                    let send_closure = tx.send(((window_start, window_end), (message.peer, message.flow)));
+
+                                    let message = entry.into_flowinfo_with_extra_fields(
+                                      shard_id,
+                                      sequence_number.fetch_add(1, Ordering::Relaxed),
+                                      [
+                                        window_start.clone(),
+                                        window_end.clone(),
+                                        exporter_ip.clone(),
+                                    ]);
+
+                                    let send_closure = tx.send(((start, end), (SocketAddr::new(peer_ip, 0), message)));
                                     match tokio::time::timeout(Duration::from_secs(1), send_closure).await {
                                         Ok(Ok(_)) => stats.sent_messages.add(1, &tags),
                                         Ok(Err(err)) => {
@@ -349,11 +255,7 @@ impl AggregationActor {
                                 opentelemetry::KeyValue::new("shard_id", opentelemetry::Value::I64(self.shard_id as i64)),
                                 opentelemetry::KeyValue::new(
                                     "network.peer.address",
-                                    format!("{}", message.peer.ip()),
-                                ),
-                                opentelemetry::KeyValue::new(
-                                    "network.peer.port",
-                                    opentelemetry::Value::I64(message.peer.port().into()),
+                                    format!("{}", message.get_key()),
                                 ),
                             ];
 
@@ -378,7 +280,7 @@ pub enum AggregationActorHandleError {
 #[derive(Debug)]
 pub struct AggregationActorHandle {
     cmd_send: mpsc::Sender<AggregationCommand>,
-    rx: async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))>,
+    rx: async_channel::Receiver<(Window, (SocketAddr, FlowInfo))>,
 }
 
 impl AggregationActorHandle {
@@ -386,7 +288,7 @@ impl AggregationActorHandle {
         buffer_size: usize,
         config: AggregationConfig,
         flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
-        stats: Either<opentelemetry::metrics::Meter, AggregationStats>,
+        stats: Either<Meter, AggregationStats>,
         shard_id: usize,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
@@ -408,7 +310,7 @@ impl AggregationActorHandle {
             .map_err(|_| AggregationActorHandleError::SendError)
     }
 
-    pub fn subscribe(&self) -> async_channel::Receiver<(Window, (SocketAddr, FlatFlowDataInfo))> {
+    pub fn subscribe(&self) -> async_channel::Receiver<(Window, (SocketAddr, FlowInfo))> {
         self.rx.clone()
     }
 }
