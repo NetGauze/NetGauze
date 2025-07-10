@@ -95,7 +95,7 @@ ciborium = { version = "0.2" }
 ordered-float = { version = "5.0", default-features = false }
 proc-macro2 = { version = "1.0" }
 prettyplease = { version = "0.2" }
-sysinfo = { version = "0.35" }
+sysinfo = { version = "0.36" }
 shadow-rs = { version = "1.1", default-features = false }
 smallvec = { version = "1.15" }
 rustc-hash = { version = "2.1" }
