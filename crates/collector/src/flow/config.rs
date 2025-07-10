@@ -27,28 +27,35 @@
 //! field selection, renaming, and type conversions.
 
 use crate::{
-    flow::{EnrichedFlow, RawValue},
+    flow::RawValue,
     publishers::kafka_avro::{AvroConverter, KafkaAvroPublisherActorError},
 };
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
+use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
 use netgauze_flow_pkt::{
-    ie,
-    ie::{FieldConversionError, InformationElementDataType, InformationElementTemplate, IE},
-    FlatFlowDataInfo,
+    ie::{
+        self, Field, FieldConversionError, HasIE, InformationElementDataType,
+        InformationElementTemplate, IE,
+    },
+    ipfix::{DataRecord, Set},
+    FlowInfo,
 };
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use smallvec::SmallVec;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowOutputConfig {
-    pub fields: indexmap::IndexMap<String, FieldConfig>,
+    pub fields: IndexMap<String, FieldConfig>,
 }
 
 impl FlowOutputConfig {
-    fn get_fields(fields: &indexmap::IndexMap<String, FieldConfig>, indent: usize) -> Vec<String> {
+    fn get_fields_schema(&self, indent: usize) -> Vec<String> {
         let mut fields_schema = vec![];
         let mut custom_primitives = false;
-        for (field, config) in fields {
+        for (field, config) in &self.fields {
             if field.contains("custom_primitives.") {
                 custom_primitives = true;
             } else {
@@ -57,9 +64,13 @@ impl FlowOutputConfig {
                     "",
                     config.get_record_schema(
                         field,
-                        if config.transform == FieldTransformFunction::StringArray
-                            || config.transform == FieldTransformFunction::MplsIndex
-                        {
+                        if matches!(
+                            config.transform,
+                            FieldTransformFunction::StringArray
+                                | FieldTransformFunction::StringArrayAgg
+                                | FieldTransformFunction::StringMapAgg(_)
+                                | FieldTransformFunction::MplsIndex
+                        ) {
                             Some(AvroValueKind::String)
                         } else {
                             None
@@ -69,96 +80,42 @@ impl FlowOutputConfig {
             }
         }
         if custom_primitives {
-            fields_schema.push(format!("{:indent$}{{\"name\": \"custom_primitives\", \"type\": {{\"type\": \"map\", \"values\": \"string\"}} }}", ""));
+            fields_schema.push(format!("{:indent$}{{ \"name\": \"custom_primitives\", \"type\": {{\"type\": \"map\", \"values\": \"string\"}} }}", ""));
         }
         fields_schema
     }
-}
 
-impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
-    fn get_avro_schema(&self) -> String {
-        let indent = 2usize;
-        let mut schema = "{\n".to_string();
-        schema.push_str(format!("{:indent$}\"type\": \"record\",\n", "", indent = indent).as_str());
-        schema.push_str(
-            format!("{:indent$}\"name\": \"acct_data\",\n", "", indent = indent).as_str(),
-        );
-        // TODO: add fields extracted from the Enriched metadata
-        schema.push_str(format!("{:indent$}\"fields\": [\n", "", indent = indent).as_str());
-        let label = r#"    {"name": "label", "type": {"type": "map", "values": "string"}}"#;
-        let stamp_inserted = r#"    {"name": "stamp_inserted", "type": ["null", "string"]}"#;
-        let stamp_updated = r#"    {"name": "stamp_updated", "type": ["null", "string"]}"#;
-        let peer_ip_src = r#"    {"name": "peer_ip_src", "type": "string"}"#;
-        let writer_id = r#"    {"name": "writer_id", "type": "string"}"#;
-        let mut fields_schema = vec![
-            label.to_string(),
-            stamp_inserted.to_string(),
-            stamp_updated.to_string(),
-            peer_ip_src.to_string(),
-            writer_id.to_string(),
-        ];
-        fields_schema.extend(Self::get_fields(&self.fields, 4));
-        schema.push_str(format!("{}\n", fields_schema.join(",\n")).as_str());
-        schema.push_str(format!("{:indent$}]\n", "").as_str());
-        schema.push('}');
-        schema
-    }
+    fn get_avro_value(&self, record: &DataRecord) -> Result<AvroValue, FunctionError> {
+        let mut fields = Vec::<(String, AvroValue)>::with_capacity(self.fields.len());
+        let mut custom_primitives = IndexMap::new();
 
-    fn get_avro_value(
-        &self,
-        enriched_flow: EnrichedFlow,
-    ) -> Result<apache_avro::types::Value, FunctionError> {
-        let mut fields = vec![
-            (
-                "label".to_string(),
-                AvroValue::Map(
-                    enriched_flow
-                        .labels
-                        .into_iter()
-                        .map(|(k, v)| (k, AvroValue::String(v)))
-                        .collect(),
-                ),
-            ),
-            (
-                "stamp_inserted".to_string(),
-                AvroValue::Union(
-                    1,
-                    Box::new(AvroValue::String(
-                        enriched_flow.window_start.timestamp().to_string(),
-                    )),
-                ),
-            ),
-            (
-                "stamp_updated".to_string(),
-                AvroValue::Union(
-                    1,
-                    Box::new(AvroValue::String(
-                        enriched_flow.window_end.timestamp().to_string(),
-                    )),
-                ),
-            ),
-            (
-                "peer_ip_src".to_string(),
-                AvroValue::String(enriched_flow.peer_src.to_string()),
-            ),
-            (
-                "writer_id".to_string(),
-                AvroValue::String(enriched_flow.writer_id.to_string()),
-            ),
-        ];
-        let mut custom_primitives = indexmap::IndexMap::new();
+        // Store fields indexed by SingleFieldSelect (IE, index)
+        let fields_len = record.fields().len();
+        let mut fields_map: FxHashMap<SingleFieldSelect, &Field> =
+            FxHashMap::with_capacity_and_hasher(fields_len, FxBuildHasher);
+        let mut ie_counters: FxHashMap<IE, usize> =
+            FxHashMap::with_capacity_and_hasher(fields_len, FxBuildHasher);
+
+        for field in record.fields() {
+            let ie = field.ie();
+            let ie_count = ie_counters.entry(ie).or_insert(0);
+            fields_map.insert(SingleFieldSelect::new(ie, *ie_count), field);
+            *ie_count += 1;
+        }
+
+        // Collect required fields to construct avro record
         for (name, field_config) in &self.fields {
-            let value = field_config.avro_value(&enriched_flow.flow)?;
-            if name.starts_with("custom_primitives.") {
-                let name = name.trim_start_matches("custom_primitives.").to_string();
+            let value = field_config.avro_value(&fields_map)?;
+
+            if let Some(stripped_name) = name.strip_prefix("custom_primitives.") {
                 if let Some(value) = value {
-                    custom_primitives.insert(name, value);
+                    custom_primitives.insert(stripped_name.to_string(), value);
                 }
             } else {
                 let value = if field_config.is_nullable() {
                     value
-                        .map(|x| apache_avro::types::Value::Union(1, Box::new(x)))
-                        .unwrap_or(apache_avro::types::Value::Null)
+                        .map(|x| AvroValue::Union(1, Box::new(x)))
+                        .unwrap_or(AvroValue::Null)
                 } else if let Some(value) = value {
                     value
                 } else {
@@ -167,19 +124,67 @@ impl AvroConverter<EnrichedFlow, FunctionError> for FlowOutputConfig {
                 fields.push((name.clone(), value));
             }
         }
-        fields.push((
-            "custom_primitives".to_string(),
-            apache_avro::types::Value::Map(custom_primitives.into_iter().collect()),
-        ));
-        Ok(apache_avro::types::Value::Record(fields))
+
+        if !custom_primitives.is_empty() {
+            fields.push((
+                "custom_primitives".to_string(),
+                AvroValue::Map(custom_primitives.into_iter().collect()),
+            ));
+        }
+
+        Ok(AvroValue::Record(fields))
+    }
+}
+
+impl AvroConverter<FlowInfo, FunctionError> for FlowOutputConfig {
+    fn get_avro_schema(&self) -> String {
+        let indent = 2usize;
+
+        // Initialize schema
+        let mut schema = "{\n".to_string();
+        schema.push_str(format!("{:indent$}\"type\": \"record\",\n", "", indent = indent).as_str());
+        schema.push_str(
+            format!("{:indent$}\"name\": \"acct_data\",\n", "", indent = indent).as_str(),
+        );
+        schema.push_str(format!("{:indent$}\"fields\": [\n", "", indent = indent).as_str());
+
+        // Push custom fields to the schema
+        let mut fields_schema = vec![];
+        fields_schema.extend(self.get_fields_schema(4));
+
+        // Finalize schema
+        schema.push_str(format!("{}\n", fields_schema.join(",\n")).as_str());
+        schema.push_str(format!("{:indent$}]\n", "").as_str());
+        schema.push('}');
+        schema
+    }
+
+    // At the moment we only have a single record per FlowInfo -> pre-allocate 1
+    type AvroValues = SmallVec<[AvroValue; 1]>;
+    fn get_avro_values(&self, input: FlowInfo) -> Result<Self::AvroValues, FunctionError> {
+        match input {
+            FlowInfo::IPFIX(pkt) => pkt
+                .sets()
+                .into_iter()
+                .filter_map(|set| match set {
+                    Set::Data { id: _, records } => Some(records),
+                    _ => None,
+                })
+                .flatten()
+                .map(|record| self.get_avro_value(record))
+                .collect::<Result<SmallVec<_>, _>>(),
+            FlowInfo::NetFlowV9(_) => {
+                Err(FunctionError::UnsupportedFlowType("NetFlowV9".to_string()))
+            }
+        }
     }
 }
 
 /// Configure how fields are selected and what transformations are applied for
-/// each IE in the [FlatFlowDataInfo]
+/// each IE in the [FlowInfo]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldConfig {
-    /// Select one more [IE] fields from [FlatFlowDataInfo]
+    /// Select one more [IE] fields from [FlowInfo]
     select: FieldSelectFunction,
 
     /// Set a default value if the selected field is null
@@ -208,6 +213,18 @@ impl FieldConfig {
                         .as_str(),
                     );
                 }
+            } else if self.avro_type() == AvroValueKind::Map {
+                if let Some(inner_val) = inner_val {
+                    schema.push_str(
+                        format!(
+                            "\"type\": [\"null\", {{\"type\": \"{:?}\", \"values\": \"{:?}\"}}] ",
+                            self.avro_type(),
+                            inner_val
+                        )
+                        .to_lowercase()
+                        .as_str(),
+                    );
+                }
             } else {
                 schema.push_str(
                     format!("\"type\": [\"null\", \"{:?}\"] ", self.avro_type())
@@ -220,6 +237,18 @@ impl FieldConfig {
                 schema.push_str(
                     format!(
                         "\"type\": {{\"type\": \"{:?}\", \"items\": \"{:?}\"}} ",
+                        self.avro_type(),
+                        inner_val
+                    )
+                    .to_lowercase()
+                    .as_str(),
+                );
+            }
+        } else if self.avro_type() == AvroValueKind::Map {
+            if let Some(inner_val) = inner_val {
+                schema.push_str(
+                    format!(
+                        "\"type\": {{\"type\": \"{:?}\", \"values\": \"{:?}\"}} ",
                         self.avro_type(),
                         inner_val
                     )
@@ -242,14 +271,14 @@ impl FieldConfig {
         self.select.is_nullable() && self.default.is_none()
     }
 
-    pub fn avro_type(&self) -> apache_avro::types::ValueKind {
+    pub fn avro_type(&self) -> AvroValueKind {
         self.transform.avro_type(self.select.avro_type())
     }
 
     pub fn avro_value(
         &self,
-        flow: &FlatFlowDataInfo,
-    ) -> Result<Option<apache_avro::types::Value>, FunctionError> {
+        flow: &FxHashMap<SingleFieldSelect, &Field>,
+    ) -> Result<Option<AvroValue>, FunctionError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
         let value = match transformed {
@@ -261,7 +290,7 @@ impl FieldConfig {
 
     pub fn json_value(
         &self,
-        flow: &FlatFlowDataInfo,
+        flow: &FxHashMap<SingleFieldSelect, &Field>,
     ) -> Result<Option<serde_json::Value>, FunctionError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
@@ -273,7 +302,7 @@ impl FieldConfig {
     }
 }
 
-/// Select a field from [FlatFlowDataInfo]
+/// Select field(s) from [FlowInfo]
 pub trait FieldSelect {
     /// Return true if a field can be a null value
     fn is_nullable(&self) -> bool;
@@ -285,7 +314,7 @@ pub trait FieldSelect {
     fn avro_type(&self) -> AvroValueKind;
 
     /// Select a value from the given flow
-    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>>;
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>>;
 }
 
 /// An enum for all supported Field selection functions
@@ -293,7 +322,7 @@ pub trait FieldSelect {
 pub enum FieldSelectFunction {
     Single(SingleFieldSelect),
     Coalesce(CoalesceFieldSelect),
-    Mpls(MultiSelect),
+    Multi(MultiSelect),
     Layer2SegmentId(Layer2SegmentIdFieldSelect),
 }
 
@@ -302,7 +331,7 @@ impl FieldSelect for FieldSelectFunction {
         match self {
             FieldSelectFunction::Single(f) => f.is_nullable(),
             FieldSelectFunction::Coalesce(f) => f.is_nullable(),
-            FieldSelectFunction::Mpls(f) => f.is_nullable(),
+            FieldSelectFunction::Multi(f) => f.is_nullable(),
             FieldSelectFunction::Layer2SegmentId(f) => f.is_nullable(),
         }
     }
@@ -311,15 +340,15 @@ impl FieldSelect for FieldSelectFunction {
         match self {
             FieldSelectFunction::Single(f) => f.avro_type(),
             FieldSelectFunction::Coalesce(f) => f.avro_type(),
-            FieldSelectFunction::Mpls(f) => f.avro_type(),
+            FieldSelectFunction::Multi(f) => f.avro_type(),
             FieldSelectFunction::Layer2SegmentId(f) => f.avro_type(),
         }
     }
-    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
         match self {
             FieldSelectFunction::Single(single) => single.apply(flow),
             FieldSelectFunction::Coalesce(coalesce) => coalesce.apply(flow),
-            FieldSelectFunction::Mpls(coalesce) => coalesce.apply(flow),
+            FieldSelectFunction::Multi(coalesce) => coalesce.apply(flow),
             FieldSelectFunction::Layer2SegmentId(single) => single.apply(flow),
         }
     }
@@ -331,12 +360,18 @@ const fn default_field_index() -> usize {
     0
 }
 
-/// Selects a single field from [FlatFlowDataInfo]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Selects a single field from [FlowInfo]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SingleFieldSelect {
     pub ie: IE,
     #[serde(default = "default_field_index")]
     pub index: usize,
+}
+
+impl SingleFieldSelect {
+    fn new(ie: IE, index: usize) -> Self {
+        Self { ie, index }
+    }
 }
 
 impl FieldSelect for SingleFieldSelect {
@@ -348,25 +383,8 @@ impl FieldSelect for SingleFieldSelect {
         ie_avro_type(self.ie)
     }
 
-    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
-        match flow {
-            FlatFlowDataInfo::NetFlowV9(packet) => packet
-                .set()
-                .record()
-                .fields()
-                .get(self.ie)
-                .get(self.index)
-                .cloned()
-                .map(|x| vec![x]),
-            FlatFlowDataInfo::IPFIX(packet) => packet
-                .set()
-                .record()
-                .fields()
-                .get(self.ie)
-                .get(self.index)
-                .cloned()
-                .map(|x| vec![x]),
-        }
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
+        flow.get(self).map(|&field| vec![field.clone()])
     }
 }
 
@@ -395,29 +413,14 @@ impl FieldSelect for CoalesceFieldSelect {
         }
     }
 
-    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
-        match flow {
-            FlatFlowDataInfo::NetFlowV9(_) => {
-                for single in &self.ies {
-                    if let Some(field) = single.apply(flow) {
-                        return Some(field.clone());
-                    }
-                }
-                None
-            }
-            FlatFlowDataInfo::IPFIX(_) => {
-                for single in &self.ies {
-                    if let Some(field) = single.apply(flow) {
-                        return Some(field.clone());
-                    }
-                }
-                None
-            }
-        }
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
+        self.ies
+            .iter()
+            .find_map(|single_select| single_select.apply(flow))
     }
 }
 
-/// Special select for all MPLS labels into one array
+/// Select multiple Fields into one array
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultiSelect {
     pub ies: Vec<SingleFieldSelect>,
@@ -432,30 +435,18 @@ impl FieldSelect for MultiSelect {
         AvroValueKind::Array
     }
 
-    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
-        match flow {
-            FlatFlowDataInfo::NetFlowV9(_) => {
-                let mut ret = vec![];
-                for single in &self.ies {
-                    if let Some(field) = single.apply(flow) {
-                        for f in field {
-                            ret.push(f);
-                        }
-                    }
-                }
-                Some(ret)
-            }
-            FlatFlowDataInfo::IPFIX(_) => {
-                let mut ret = vec![];
-                for single in &self.ies {
-                    if let Some(field) = single.apply(flow) {
-                        for f in field {
-                            ret.push(f);
-                        }
-                    }
-                }
-                Some(ret)
-            }
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
+        let ret: Vec<Field> = self
+            .ies
+            .iter()
+            .filter_map(|single_select| single_select.apply(flow))
+            .flatten()
+            .collect();
+
+        if ret.is_empty() {
+            None
+        } else {
+            Some(ret)
         }
     }
 }
@@ -496,9 +487,9 @@ impl Layer2SegmentId {
 // Special select for Layer 2 Segment ID
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Layer2SegmentIdFieldSelect {
-    pub ie: IE,
-    #[serde(default = "default_field_index")]
-    pub index: usize,
+    #[serde(flatten)]
+    pub single_select: SingleFieldSelect,
+
     pub encap_type: Layer2SegmentId,
 }
 
@@ -511,51 +502,22 @@ impl FieldSelect for Layer2SegmentIdFieldSelect {
         AvroValueKind::Long
     }
 
-    fn apply(&self, flow: &FlatFlowDataInfo) -> Option<Vec<ie::Field>> {
-        match flow {
-            FlatFlowDataInfo::NetFlowV9(packet) => packet
-                .set()
-                .record()
-                .fields()
-                .get(self.ie)
-                .get(self.index)
-                .cloned()
-                .and_then(|x| {
-                    if let ie::Field::layer2SegmentId(id) = x {
-                        // check if the first byte matches the provided encap_type
-                        if (id >> 56) as u8 == u8::from(&self.encap_type) {
-                            Some(vec![ie::Field::layer2SegmentId(
-                                id & self.encap_type.get_mask(),
-                            )])
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }),
-            FlatFlowDataInfo::IPFIX(packet) => packet
-                .set()
-                .record()
-                .fields()
-                .get(self.ie)
-                .get(self.index)
-                .cloned()
-                .and_then(|x| {
-                    if let ie::Field::layer2SegmentId(id) = x {
-                        // check if the first byte matches the provided encap_type
-                        if (id >> 56) as u8 == u8::from(&self.encap_type) {
-                            Some(vec![ie::Field::layer2SegmentId(
-                                id & self.encap_type.get_mask(),
-                            )])
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }),
-        }
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
+        flow.get(&self.single_select).and_then(|&field| {
+            // Check if it's a layer2SegmentId field
+            if let ie::Field::layer2SegmentId(id) = field {
+                // Check if the first byte matches the provided encap_type
+                if (id >> 56) as u8 == u8::from(&self.encap_type) {
+                    Some(vec![ie::Field::layer2SegmentId(
+                        id & self.encap_type.get_mask(),
+                    )])
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -595,6 +557,7 @@ pub enum FunctionError {
     FieldIndexNotFound(usize),
     UnexpectedField(ie::Field),
     FieldIsNull(String),
+    UnsupportedFlowType(String),
 }
 
 impl From<FieldConversionError> for FunctionError {
@@ -610,6 +573,7 @@ impl std::fmt::Display for FunctionError {
             Self::FieldIndexNotFound(index) => write!(f, "Field Index Not Found: {index}"),
             Self::UnexpectedField(field) => write!(f, "Unexpected field: {field}"),
             Self::FieldIsNull(name) => write!(f, "field is null {name}"),
+            Self::UnsupportedFlowType(flow_type) => write!(f, "Unsupported flow type: {flow_type}"),
         }
     }
 }
@@ -622,6 +586,13 @@ impl From<FunctionError> for KafkaAvroPublisherActorError {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct KeyValueRename {
+    key_rename: String,
+    #[serde(default)]
+    val_rename: Option<IndexMap<String, String>>,
+}
+
 /// Field transformation functions
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub enum FieldTransformFunction {
@@ -629,24 +600,33 @@ pub enum FieldTransformFunction {
     #[default]
     Identity,
 
-    /// Convert the value into a string
+    /// Convert single value into a string
     String,
 
-    /// Convert the value into a string and trim trailing null characters
+    /// Convert single value into a string and trim trailing null characters
     TrimmedString,
 
-    /// Convert the value into lowercase string
+    /// Convert single value into lowercase string
     LowercaseString,
 
-    /// Convert the value to string and rename.
-    /// If no key is given for the rename, then the name is passed as is
-    Rename(indexmap::IndexMap<String, String>),
+    /// Convert single value to TimestampMillis then to String
+    TimestampMillisString,
 
-    /// Index MPLS labels
+    /// Convert single value to string and rename.
+    /// If no key is given for the rename, then the name is passed as is
+    Rename(IndexMap<String, String>),
+
+    /// Convert single value to a StringArray
+    StringArray,
+
+    /// Collect multiple MPLS labels into a StringArray
     MplsIndex,
 
-    /// Generic String Array
-    StringArray,
+    /// Transform values to String and group in String Array
+    StringArrayAgg,
+
+    /// Transform values to String and group in Map with key = IE name
+    StringMapAgg(#[serde(default)] Option<IndexMap<IE, KeyValueRename>>),
 }
 
 impl FieldTransformFunction {
@@ -660,29 +640,33 @@ impl FieldTransformFunction {
             Self::String => AvroValueKind::String,
             Self::TrimmedString => AvroValueKind::String,
             Self::LowercaseString => AvroValueKind::String,
+            Self::TimestampMillisString => AvroValueKind::String,
             Self::Rename(_) => AvroValueKind::String,
-            Self::MplsIndex => AvroValueKind::Array,
             Self::StringArray => AvroValueKind::Array,
+            Self::MplsIndex => AvroValueKind::Array,
+            Self::StringArrayAgg => AvroValueKind::Array,
+            Self::StringMapAgg(_) => AvroValueKind::Map,
         }
     }
 
-    pub fn apply(&self, field: Option<Vec<ie::Field>>) -> Result<Option<RawValue>, FunctionError> {
-        let mut field = if let Some(field) = field {
-            field
-        } else {
-            return Ok(None);
+    pub fn apply(&self, fields: Option<Vec<Field>>) -> Result<Option<RawValue>, FunctionError> {
+        let fields = match fields {
+            Some(fields) => fields,
+            None => return Ok(None),
         };
         match self {
-            Self::Identity => Ok(field.pop().map(|x| x.into())),
+            Self::Identity => Ok(fields.into_iter().last().map(|x| x.into())),
+
             Self::String => {
-                if let Some(field) = field.pop() {
+                if let Some(field) = fields.into_iter().last() {
                     Ok(Some(RawValue::String(field.try_into()?)))
                 } else {
                     Ok(None)
                 }
             }
+
             Self::TrimmedString => {
-                if let Some(field) = field.pop() {
+                if let Some(field) = fields.into_iter().last() {
                     let original: String = field.try_into()?;
                     let trimmed = original.trim_end_matches(char::from(0)).to_string();
                     Ok(Some(RawValue::String(trimmed)))
@@ -690,16 +674,27 @@ impl FieldTransformFunction {
                     Ok(None)
                 }
             }
+
             Self::LowercaseString => {
-                if let Some(field) = field.pop() {
+                if let Some(field) = fields.into_iter().last() {
                     let original: String = field.try_into()?;
                     Ok(Some(RawValue::String(original.to_lowercase())))
                 } else {
                     Ok(None)
                 }
             }
+
+            Self::TimestampMillisString => {
+                if let Some(field) = fields.into_iter().last() {
+                    let ts: DateTime<Utc> = field.try_into()?;
+                    Ok(Some(RawValue::String(ts.timestamp().to_string())))
+                } else {
+                    Ok(None)
+                }
+            }
+
             Self::Rename(rename_fields) => {
-                if let Some(field) = field.pop() {
+                if let Some(field) = fields.into_iter().last() {
                     let string_value: String = field.try_into()?;
                     let renamed = rename_fields
                         .get(&string_value)
@@ -710,9 +705,21 @@ impl FieldTransformFunction {
                     Ok(None)
                 }
             }
+
+            Self::StringArray => {
+                if let Some(field) = fields.into_iter().last() {
+                    Ok(Some(RawValue::StringArray(field.try_into()?)))
+                } else {
+                    Ok(None)
+                }
+            }
+
             Self::MplsIndex => {
-                let mut ret = vec![];
-                for field in field {
+                if fields.is_empty() {
+                    return Ok(None);
+                }
+                let mut ret = Vec::with_capacity(fields.len());
+                for field in fields {
                     fn format_mpls(num: u8, v: &[u8]) -> String {
                         format!(
                             "{num}-{}",
@@ -740,11 +747,49 @@ impl FieldTransformFunction {
                 }
                 Ok(Some(RawValue::StringArray(ret)))
             }
-            Self::StringArray => {
-                if let Some(field) = field.pop() {
-                    Ok(Some(RawValue::StringArray(field.try_into()?)))
-                } else {
+
+            Self::StringArrayAgg => {
+                if fields.is_empty() {
                     Ok(None)
+                } else {
+                    let ret: Result<Vec<String>, _> =
+                        fields.into_iter().map(|field| field.try_into()).collect();
+                    Ok(Some(RawValue::StringArray(ret?)))
+                }
+            }
+
+            Self::StringMapAgg(rename) => {
+                if fields.is_empty() {
+                    Ok(None)
+                } else {
+                    let mut ret = HashMap::with_capacity(fields.len());
+                    for field in fields {
+                        let field_ie = field.ie();
+                        let field_value: String = field.try_into()?;
+
+                        // Look for rename config for this IE
+                        if let Some(rename_config) = rename.as_ref().and_then(|r| r.get(&field_ie))
+                        {
+                            let key = if rename_config.key_rename.is_empty() {
+                                field_ie.to_string()
+                            } else {
+                                rename_config.key_rename.clone()
+                            };
+
+                            // Apply value rename if existing
+                            let value = rename_config
+                                .val_rename
+                                .as_ref()
+                                .and_then(|val_rename| val_rename.get(&field_value))
+                                .cloned()
+                                .unwrap_or(field_value);
+
+                            ret.insert(key, value);
+                        } else {
+                            ret.insert(field_ie.to_string(), field_value);
+                        }
+                    }
+                    Ok(Some(RawValue::StringMap(ret)))
                 }
             }
         }

@@ -31,7 +31,6 @@ flow:
   publishers:
     group1:
       buffer_size: 1000
-      flatten: true
       endpoints:
         http1: !Http
           url: http://10.212.242.69:8080/v0/pipelines/vmware/ingress/flows?format=json&array=true

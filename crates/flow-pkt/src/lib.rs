@@ -22,10 +22,27 @@ pub mod netflow;
 pub mod wire;
 
 use crate::ie::*;
-use indexmap::IndexMap;
-use netgauze_analytics::flow::{AggrOp, AggregationError};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
+
+/// Errors for FlowInfo operations
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum FlowInfoError {
+    /// NetFlow v9 is not supported for this operation
+    NetFlowV9NotSupported,
+}
+
+impl std::fmt::Display for FlowInfoError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NetFlowV9NotSupported => {
+                write!(f, "NetFlow v9 is not supported for this operation")
+            }
+        }
+    }
+}
+
+impl std::error::Error for FlowInfoError {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum FlowInfo {
@@ -55,116 +72,24 @@ impl FlowInfo {
         }
     }
 
-    pub fn flatten(self) -> Vec<FlatFlowInfo> {
+    /// Add fields to all data records in the flow packet
+    pub fn with_fields_added(self, add_fields: &[Field]) -> Result<Self, FlowInfoError> {
         match self {
-            FlowInfo::NetFlowV9(pkt) => pkt
-                .flatten()
-                .into_iter()
-                .map(FlatFlowInfo::NetFlowV9)
-                .collect(),
-            FlowInfo::IPFIX(pkt) => pkt.flatten().into_iter().map(FlatFlowInfo::IPFIX).collect(),
+            Self::IPFIX(packet) => Ok(Self::IPFIX(packet.with_fields_added(add_fields))),
+            Self::NetFlowV9(_) => Err(FlowInfoError::NetFlowV9NotSupported),
         }
     }
 
-    pub fn flatten_data(self) -> Vec<FlatFlowDataInfo> {
+    /// Add scope fields to all data records in the flow packet
+    pub fn with_scope_fields_added(
+        self,
+        add_scope_fields: &[Field],
+    ) -> Result<Self, FlowInfoError> {
         match self {
-            Self::NetFlowV9(pkt) => pkt
-                .flatten_data()
-                .into_iter()
-                .map(|x| FlatFlowDataInfo::NetFlowV9(Box::new(x)))
-                .collect(),
-            Self::IPFIX(pkt) => pkt
-                .flatten_data()
-                .into_iter()
-                .map(|x| FlatFlowDataInfo::IPFIX(Box::new(x)))
-                .collect(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum FlatFlowInfo {
-    NetFlowV9(netflow::FlatNetFlowV9Packet),
-    IPFIX(ipfix::FlatIpfixPacket),
-}
-
-impl FlatFlowInfo {
-    pub fn export_time(&self) -> chrono::DateTime<chrono::Utc> {
-        match self {
-            Self::IPFIX(packet) => packet.export_time(),
-            Self::NetFlowV9(packet) => packet.unix_time(),
-        }
-    }
-
-    pub fn extract_as_key_str(
-        &self,
-        ie: &IE,
-        indices: &Option<Vec<usize>>,
-    ) -> Result<String, AggregationError> {
-        match self {
-            Self::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
-            Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
-        }
-    }
-
-    pub fn reduce(
-        &mut self,
-        incoming: &FlatFlowInfo,
-        transform: &IndexMap<IE, AggrOp>,
-    ) -> Result<(), AggregationError> {
-        match self {
-            Self::IPFIX(packet) => {
-                if let Self::IPFIX(incoming_packet) = incoming {
-                    packet.reduce(incoming_packet, transform)
-                } else {
-                    Err(AggregationError::FlatFlowInfoNFv9NotSupported)
-                }
-            }
-            Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
-        }
-    }
-}
-
-/// A version of FlatFlowInfo with data only
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum FlatFlowDataInfo {
-    NetFlowV9(Box<netflow::FlatNetFlowV9DataPacket>),
-    IPFIX(Box<ipfix::FlatIpfixDataPacket>),
-}
-
-impl FlatFlowDataInfo {
-    pub fn export_time(&self) -> chrono::DateTime<chrono::Utc> {
-        match self {
-            Self::IPFIX(packet) => packet.export_time(),
-            Self::NetFlowV9(packet) => packet.unix_time(),
-        }
-    }
-
-    pub fn extract_as_key_str(
-        &self,
-        ie: &IE,
-        indices: &Option<Vec<usize>>,
-    ) -> Result<String, AggregationError> {
-        match self {
-            Self::IPFIX(packet) => packet.extract_as_key_str(ie, indices),
-            Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
-        }
-    }
-
-    pub fn reduce(
-        &mut self,
-        incoming: &FlatFlowDataInfo,
-        transform: &IndexMap<IE, AggrOp>,
-    ) -> Result<(), AggregationError> {
-        match self {
-            Self::IPFIX(packet) => {
-                if let Self::IPFIX(incoming_packet) = incoming {
-                    packet.reduce(incoming_packet, transform)
-                } else {
-                    Err(AggregationError::FlatFlowInfoNFv9NotSupported)
-                }
-            }
-            Self::NetFlowV9(_) => Err(AggregationError::FlatFlowInfoNFv9NotSupported),
+            Self::IPFIX(packet) => Ok(Self::IPFIX(
+                packet.with_scope_fields_added(add_scope_fields),
+            )),
+            Self::NetFlowV9(_) => Err(FlowInfoError::NetFlowV9NotSupported),
         }
     }
 }
@@ -242,7 +167,7 @@ impl std::fmt::Display for DataSetIdError {
 
 impl std::error::Error for DataSetIdError {}
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct DataSetId(u16);
 
@@ -288,14 +213,9 @@ fn arbitrary_datetime(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ie::protocolIdentifier,
-        ipfix::{FlatIpfixPacket, IpfixPacket},
-        netflow::{FlatNetFlowV9Packet, NetFlowV9Packet},
-    };
+    use crate::{ie::protocolIdentifier, ipfix::IpfixPacket, netflow::NetFlowV9Packet};
     use chrono::{TimeZone, Utc};
     use netgauze_iana::tcp::TCPHeaderFlags;
-    use std::net::Ipv4Addr;
 
     #[test]
     fn test_flow_info_api() {
@@ -337,315 +257,6 @@ mod tests {
         assert_eq!(flow_netflow.export_time(), export_time);
         assert_eq!(flow_netflow.sequence_number(), sequence_number);
         assert_eq!(flow_netflow.observation_domain_id(), observation_domain);
-    }
-    #[test]
-    fn test_ipfix_data_flatten() {
-        let ipfix_data = IpfixPacket::new(
-            Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-            0,
-            0,
-            Box::new([ipfix::Set::Data {
-                id: DataSetId::new(400).unwrap(),
-                records: Box::new([
-                    ipfix::DataRecord::new(
-                        Box::new([Field::egressVRFID(10)]),
-                        Box::new([
-                            Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
-                            Field::octetDeltaCount(1200),
-                            Field::VMWare(vmware::Field::flowDirection(
-                                vmware::flowDirection::ingress,
-                            )),
-                        ]),
-                    ),
-                    ipfix::DataRecord::new(
-                        Box::new([Field::egressVRFID(30), Field::interfaceName("eth0".into())]),
-                        Box::new([
-                            Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 2)),
-                            Field::packetDeltaCount(1),
-                            Field::VMWare(vmware::Field::flowDirection(
-                                vmware::flowDirection::egress,
-                            )),
-                        ]),
-                    ),
-                ]),
-            }]),
-        );
-        let flow = FlowInfo::IPFIX(ipfix_data);
-        let flattened = flow.flatten();
-        let scope_fields1 = Fields {
-            egressVRFID: Some(vec![10]),
-            ..Default::default()
-        };
-        let scope_fields2 = Fields {
-            egressVRFID: Some(vec![30]),
-            interfaceName: Some(vec!["eth0".into()]),
-            ..Default::default()
-        };
-        let fields1 = Fields {
-            destinationIPv4Address: Some(vec![Ipv4Addr::new(10, 100, 0, 1)]),
-            octetDeltaCount: Some(vec![1200]),
-            vmware: Some(vmware::Fields {
-                flowDirection: Some(vec![vmware::flowDirection::ingress]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let fields2 = Fields {
-            sourceIPv4Address: Some(vec![Ipv4Addr::new(10, 100, 0, 2)]),
-            packetDeltaCount: Some(vec![1]),
-            vmware: Some(vmware::Fields {
-                flowDirection: Some(vec![vmware::flowDirection::egress]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let expected = vec![
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-                0,
-                0,
-                ipfix::FlatSet::Data {
-                    id: DataSetId::new(400).unwrap(),
-                    record: Box::new(ipfix::FlatDataRecord::new(scope_fields1, fields1)),
-                },
-            )),
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-                0,
-                0,
-                ipfix::FlatSet::Data {
-                    id: DataSetId::new(400).unwrap(),
-                    record: Box::new(ipfix::FlatDataRecord::new(scope_fields2, fields2)),
-                },
-            )),
-        ];
-        assert_eq!(expected, flattened);
-    }
-
-    #[test]
-    fn test_netflow_data_flatten() {
-        let data = NetFlowV9Packet::new(
-            1000,
-            Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-            0,
-            0,
-            Box::new([netflow::Set::Data {
-                id: DataSetId::new(400).unwrap(),
-                records: Box::new([
-                    netflow::DataRecord::new(
-                        Box::new([netflow::ScopeField::Interface(netflow::Interface(100))]),
-                        Box::new([
-                            Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
-                            Field::octetDeltaCount(1200),
-                            Field::VMWare(vmware::Field::flowDirection(
-                                vmware::flowDirection::ingress,
-                            )),
-                        ]),
-                    ),
-                    netflow::DataRecord::new(
-                        Box::new([
-                            netflow::ScopeField::System(netflow::System(1)),
-                            netflow::ScopeField::Interface(netflow::Interface(200)),
-                        ]),
-                        Box::new([
-                            Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 2)),
-                            Field::packetDeltaCount(1),
-                            Field::VMWare(vmware::Field::flowDirection(
-                                vmware::flowDirection::egress,
-                            )),
-                        ]),
-                    ),
-                ]),
-            }]),
-        );
-        let flow = FlowInfo::NetFlowV9(data);
-        let flattened = flow.flatten();
-        let scope_fields1 = netflow::ScopeFields {
-            interface: Some(vec![netflow::Interface(100)]),
-            ..Default::default()
-        };
-        let scope_fields2 = netflow::ScopeFields {
-            system: Some(vec![netflow::System(1)]),
-            interface: Some(vec![netflow::Interface(200)]),
-            ..Default::default()
-        };
-        let fields1 = Fields {
-            destinationIPv4Address: Some(vec![Ipv4Addr::new(10, 100, 0, 1)]),
-            octetDeltaCount: Some(vec![1200]),
-            vmware: Some(vmware::Fields {
-                flowDirection: Some(vec![vmware::flowDirection::ingress]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let fields2 = Fields {
-            sourceIPv4Address: Some(vec![Ipv4Addr::new(10, 100, 0, 2)]),
-            packetDeltaCount: Some(vec![1]),
-            vmware: Some(vmware::Fields {
-                flowDirection: Some(vec![vmware::flowDirection::egress]),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let expected1 = FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-            1000,
-            Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-            0,
-            0,
-            netflow::FlatSet::Data {
-                id: DataSetId::new(400).unwrap(),
-                record: Box::new(netflow::FlatDataRecord::new(
-                    scope_fields1.clone(),
-                    fields1.clone(),
-                )),
-            },
-        ));
-        let expected2 = FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-            1000,
-            Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
-            0,
-            0,
-            netflow::FlatSet::Data {
-                id: DataSetId::new(400).unwrap(),
-                record: Box::new(netflow::FlatDataRecord::new(
-                    scope_fields2.clone(),
-                    fields2.clone(),
-                )),
-            },
-        ));
-
-        let expected = vec![expected1, expected2];
-        assert_eq!(expected, flattened);
-    }
-
-    #[test]
-    fn test_netflow_template() {
-        let template_record1 = netflow::TemplateRecord::new(
-            400,
-            Box::new([
-                FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
-                FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
-            ]),
-        );
-        let template_record2 = netflow::TemplateRecord::new(
-            401,
-            Box::new([FieldSpecifier::new(IE::srhIPv6ActiveSegmentType, 1).unwrap()]),
-        );
-        let options_template_record1 = netflow::OptionsTemplateRecord::new(
-            1,
-            Box::new([
-                netflow::ScopeFieldSpecifier::new(netflow::ScopeIE::System, 4),
-                netflow::ScopeFieldSpecifier::new(netflow::ScopeIE::Interface, 4),
-            ]),
-            Box::new([
-                FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
-                FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
-            ]),
-        );
-        let netflow_template = NetFlowV9Packet::new(
-            120,
-            Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-            10,
-            20,
-            Box::new([
-                netflow::Set::Template(Box::new([
-                    template_record1.clone(),
-                    template_record2.clone(),
-                ])),
-                netflow::Set::OptionsTemplate(Box::new([options_template_record1.clone()])),
-            ]),
-        );
-        let template = FlowInfo::NetFlowV9(netflow_template);
-
-        let flattened = template.flatten();
-        let expected = vec![
-            FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-                120,
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                netflow::FlatSet::Template(template_record1),
-            )),
-            FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-                120,
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                netflow::FlatSet::Template(template_record2),
-            )),
-            FlatFlowInfo::NetFlowV9(FlatNetFlowV9Packet::new(
-                120,
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                netflow::FlatSet::OptionsTemplate(options_template_record1),
-            )),
-        ];
-        assert_eq!(flattened, expected);
-    }
-
-    #[test]
-    fn test_ipfix_template() {
-        let template_record1 = ipfix::TemplateRecord::new(
-            400,
-            Box::new([
-                FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
-                FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
-            ]),
-        );
-        let template_record2 = ipfix::TemplateRecord::new(
-            401,
-            Box::new([FieldSpecifier::new(IE::srhIPv6ActiveSegmentType, 1).unwrap()]),
-        );
-        let options_template_record1 = ipfix::OptionsTemplateRecord::new(
-            1,
-            Box::new([
-                FieldSpecifier::new(IE::VRFname, 10).unwrap(),
-                FieldSpecifier::new(IE::ipv4Options, 1).unwrap(),
-            ]),
-            Box::new([
-                FieldSpecifier::new(IE::sourceIPv4Address, 4).unwrap(),
-                FieldSpecifier::new(IE::destinationIPv4Address, 4).unwrap(),
-            ]),
-        );
-        let ipfix_template = IpfixPacket::new(
-            Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-            10,
-            20,
-            Box::new([
-                ipfix::Set::Template(Box::new([
-                    template_record1.clone(),
-                    template_record2.clone(),
-                ])),
-                ipfix::Set::OptionsTemplate(Box::new([options_template_record1.clone()])),
-            ]),
-        );
-        let template = FlowInfo::IPFIX(ipfix_template);
-
-        let flattened = template.flatten();
-        let expected = vec![
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                ipfix::FlatSet::Template(template_record1),
-            )),
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                ipfix::FlatSet::Template(template_record2),
-            )),
-            FlatFlowInfo::IPFIX(FlatIpfixPacket::new(
-                Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
-                10,
-                20,
-                ipfix::FlatSet::OptionsTemplate(options_template_record1),
-            )),
-        ];
-        assert_eq!(flattened, expected);
     }
 
     #[test]

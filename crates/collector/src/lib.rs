@@ -26,7 +26,6 @@ use crate::{
     },
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
-use netgauze_flow_pkt::FlatFlowInfo;
 use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
 use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
@@ -75,22 +74,6 @@ pub async fn init_flow_collection(
 
             match &endpoint {
                 PublisherEndpoint::Http(config) => {
-                    let flatten = config.flatten;
-                    let flat_converter = |request: Arc<FlowRequest>, writer_id: String| {
-                        let (socket, pkt) = request.as_ref();
-                        let flattened: Vec<Message<FlatFlowInfo>> = pkt
-                            .clone()
-                            .flatten()
-                            .into_iter()
-                            .map(|flat_info| Message::insert {
-                                ts: format!("{}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
-                                peer_src: format!("{}", socket.ip()),
-                                writer_id: writer_id.clone(),
-                                payload: flat_info,
-                            })
-                            .collect();
-                        flattened
-                    };
                     let converter = |request: Arc<FlowRequest>, writer_id: String| {
                         let ret = Message::insert {
                             ts: format!("{}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
@@ -101,23 +84,13 @@ pub async fn init_flow_collection(
                         vec![ret]
                     };
                     for flow_recv in &flow_recvs {
-                        let (http_join, http_handle) = if flatten {
-                            HttpPublisherActorHandle::new(
-                                endpoint_name.clone(),
-                                config.clone(),
-                                flat_converter,
-                                flow_recv.clone(),
-                                meter.clone(),
-                            )?
-                        } else {
-                            HttpPublisherActorHandle::new(
-                                endpoint_name.clone(),
-                                config.clone(),
-                                converter,
-                                flow_recv.clone(),
-                                meter.clone(),
-                            )?
-                        };
+                        let (http_join, http_handle) = HttpPublisherActorHandle::new(
+                            endpoint_name.clone(),
+                            config.clone(),
+                            converter,
+                            flow_recv.clone(),
+                            meter.clone(),
+                        )?;
                         join_set.push(http_join);
                         http_handles.push(http_handle);
                     }

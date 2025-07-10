@@ -26,14 +26,12 @@
 //!   actor
 //! - `EnrichmentOperation` - Operations to update/delete enrichment data
 
-use crate::flow::EnrichedFlow;
-use netgauze_analytics::aggregation::Window;
-use netgauze_flow_pkt::FlowInfo;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
+use netgauze_flow_pkt::{
+    ie::{Field, *},
+    FlowInfo,
 };
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, net::IpAddr};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{error, info, warn};
 
@@ -49,11 +47,12 @@ pub enum FlowEnrichmentActorCommand {
     Shutdown,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum FlowEnrichmentActorError {
     EnrichmentChannelClosed,
     FlowReceiveError,
-    EmptyFlowData,
+    MissingRequiredLabel(String),
+    FieldAdditionFailed(String),
 }
 
 impl std::fmt::Display for FlowEnrichmentActorError {
@@ -61,7 +60,8 @@ impl std::fmt::Display for FlowEnrichmentActorError {
         match self {
             Self::EnrichmentChannelClosed => write!(f, "enrichment channel closed"),
             Self::FlowReceiveError => write!(f, "error in flow receive channel"),
-            Self::EmptyFlowData => write!(f, "flow data is empty after flattening"),
+            Self::MissingRequiredLabel(label) => write!(f, "missing required label: {label}"),
+            Self::FieldAdditionFailed(msg) => write!(f, "failed to add fields to flow: {msg}"),
         }
     }
 }
@@ -81,7 +81,7 @@ impl FlowEnrichmentStats {
     pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
         let received_flows = meter
             .u64_counter("netgauze.collector.flows.enrichment.received.flows")
-            .with_description("Number of flatten flows received for enrichment")
+            .with_description("Number of flows received for enrichment")
             .build();
         let received_enrichment_ops = meter
             .u64_counter("netgauze.collector.flows.enrichment.received.enrichment.operations")
@@ -114,8 +114,8 @@ struct FlowEnrichment {
     writer_id: String,
     cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
     enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-    agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlowInfo))>,
-    enriched_tx: async_channel::Sender<EnrichedFlow>,
+    agg_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
+    enriched_tx: async_channel::Sender<FlowInfo>,
     default_labels: (u32, HashMap<String, String>),
     stats: FlowEnrichmentStats,
 }
@@ -125,8 +125,8 @@ impl FlowEnrichment {
         writer_id: String,
         cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
         enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlowInfo))>,
-        enriched_tx: async_channel::Sender<EnrichedFlow>,
+        agg_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
+        enriched_tx: async_channel::Sender<FlowInfo>,
         stats: FlowEnrichmentStats,
     ) -> Self {
         let default_labels = (
@@ -170,31 +170,29 @@ impl FlowEnrichment {
 
     fn enrich(
         &self,
-        window: Window,
-        peer: SocketAddr,
+        peer_ip: IpAddr,
         flow: FlowInfo,
-    ) -> Result<EnrichedFlow, FlowEnrichmentActorError> {
-        let (_, labels) = self.labels.get(&peer.ip()).unwrap_or(&self.default_labels);
-        let (window_start, window_end) = window;
-        let ts = chrono::Utc::now();
+    ) -> Result<FlowInfo, FlowEnrichmentActorError> {
+        let (_, labels) = self.labels.get(&peer_ip).unwrap_or(&self.default_labels);
 
-        // TODO: temporary until we remove flattened stuff...
-        let flattened = flow
-            .flatten_data()
-            .into_iter()
-            .next()
-            .ok_or(FlowEnrichmentActorError::EmptyFlowData)?;
+        let node_id = labels
+            .get("nkey")
+            .ok_or_else(|| FlowEnrichmentActorError::MissingRequiredLabel("nkey".to_string()))?;
 
-        Ok(EnrichedFlow {
-            labels: labels.clone(),
-            peer_src: peer.ip(),
-            peer_port: peer.port(),
-            writer_id: self.writer_id.clone(),
-            ts,
-            window_start,
-            window_end,
-            flow: flattened,
-        })
+        let platform_id = labels
+            .get("pkey")
+            .ok_or_else(|| FlowEnrichmentActorError::MissingRequiredLabel("pkey".to_string()))?;
+
+        let add_fields = [
+            Field::NetGauze(netgauze::Field::nodeId(node_id.as_str().into())),
+            Field::NetGauze(netgauze::Field::platformId(platform_id.as_str().into())),
+            Field::NetGauze(netgauze::Field::dataCollectionManifestName(
+                self.writer_id.as_str().into(),
+            )),
+        ];
+
+        flow.with_fields_added(&add_fields)
+            .map_err(|e| FlowEnrichmentActorError::FieldAdditionFailed(e.to_string()))
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
@@ -227,22 +225,18 @@ impl FlowEnrichment {
                 }
                 flow = self.agg_rx.recv() => {
                     match flow {
-                        Ok((window, (peer, flat_flow))) => {
+                        Ok((peer_ip, flow)) => {
                             let peer_tags = [
                                 opentelemetry::KeyValue::new(
                                     "network.peer.address",
-                                    format!("{}", peer.ip()),
-                                ),
-                                opentelemetry::KeyValue::new(
-                                    "network.peer.port",
-                                    opentelemetry::Value::I64(peer.port().into()),
+                                    format!("{peer_ip}"),
                                 ),
                             ];
                             self.stats.received_flows.add(1, &peer_tags);
-                            let enriched = match self.enrich(window, peer, flat_flow) {
+                            let enriched = match self.enrich(peer_ip, flow) {
                                 Ok(enriched) => enriched,
                                 Err(err) => {
-                                    error!("Failed to enrich flow from {}: {}", peer, err);
+                                    error!("Failed to enrich flow from {}: {}", peer_ip, err);
                                     self.stats.enrich_error.add(1, &peer_tags);
                                     continue;
                                 }
@@ -285,14 +279,14 @@ impl std::error::Error for FlowEnrichmentActorHandleError {}
 pub struct FlowEnrichmentActorHandle {
     cmd_send: mpsc::Sender<FlowEnrichmentActorCommand>,
     enrichment_tx: async_channel::Sender<EnrichmentOperation>,
-    enriched_rx: async_channel::Receiver<EnrichedFlow>,
+    enriched_rx: async_channel::Receiver<FlowInfo>,
 }
 
 impl FlowEnrichmentActorHandle {
     pub fn new(
         writer_id: String,
         buffer_size: usize,
-        agg_rx: async_channel::Receiver<(Window, (SocketAddr, FlowInfo))>,
+        agg_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
         stats: either::Either<opentelemetry::metrics::Meter, FlowEnrichmentStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
@@ -336,7 +330,7 @@ impl FlowEnrichmentActorHandle {
             .map_err(|_| FlowEnrichmentActorHandleError::SendError)
     }
 
-    pub fn subscribe(&self) -> async_channel::Receiver<EnrichedFlow> {
+    pub fn subscribe(&self) -> async_channel::Receiver<FlowInfo> {
         self.enriched_rx.clone()
     }
 }
