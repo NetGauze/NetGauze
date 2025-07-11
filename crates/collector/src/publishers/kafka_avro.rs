@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::publishers::LoggingProducerContext;
+use apache_avro::types::Value as AvroValue;
 use netgauze_rdkafka::{
     config::{ClientConfig, FromClientConfigAndContext},
     error::{KafkaError, RDKafkaErrorCode},
@@ -29,6 +30,7 @@ use schema_registry_converter::{
     schema_registry_common::{SubjectNameStrategy, SuppliedSchema},
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{collections::HashMap, marker::PhantomData, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
@@ -38,7 +40,9 @@ const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 pub trait AvroConverter<T, E: std::error::Error> {
     fn get_avro_schema(&self) -> String;
 
-    type AvroValues: IntoIterator<Item = apache_avro::types::Value> + Send;
+    fn get_key(&self, input: &T) -> Option<Value>;
+
+    type AvroValues: IntoIterator<Item = AvroValue> + Send;
     fn get_avro_values(&self, input: T) -> Result<Self::AvroValues, E>;
 }
 
@@ -60,6 +64,7 @@ pub enum KafkaAvroPublisherActorError {
     SrcError(SRCError),
     TransformationError(String),
     ReceiveErr,
+    JsonError(serde_json::Error),
 }
 
 impl std::fmt::Display for KafkaAvroPublisherActorError {
@@ -70,6 +75,7 @@ impl std::fmt::Display for KafkaAvroPublisherActorError {
             Self::SrcError(e) => write!(f, "Source error: {e}"),
             Self::TransformationError(e) => write!(f, "Transformation error: {e}"),
             Self::ReceiveErr => write!(f, "Error receiving messages from upstream producer"),
+            Self::JsonError(e) => write!(f, "Json Error: {e}"),
         }
     }
 }
@@ -94,6 +100,12 @@ impl From<SRCError> for KafkaAvroPublisherActorError {
     }
 }
 
+impl From<serde_json::Error> for KafkaAvroPublisherActorError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::JsonError(e)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct KafkaAvroPublisherStats {
     received: opentelemetry::metrics::Counter<u64>,
@@ -101,6 +113,7 @@ pub struct KafkaAvroPublisherStats {
     send_retries: opentelemetry::metrics::Counter<u64>,
     error_avro_convert: opentelemetry::metrics::Counter<u64>,
     error_avro_encode: opentelemetry::metrics::Counter<u64>,
+    error_key_encode: opentelemetry::metrics::Counter<u64>,
     error_send: opentelemetry::metrics::Counter<u64>,
     delivered_messages: opentelemetry::metrics::Counter<u64>,
     failed_delivery_messages: opentelemetry::metrics::Counter<u64>,
@@ -128,6 +141,10 @@ impl KafkaAvroPublisherStats {
             .u64_counter("netgauze.collector.kafka.avro.error_avro_encode")
             .with_description("Error encoding message into AVRO binary array")
             .build();
+        let error_key_encode = meter
+            .u64_counter("netgauze.collector.kafka.avro.error_key_encode")
+            .with_description("Error encoding message into AVRO binary array")
+            .build();
         let error_send = meter
             .u64_counter("netgauze.collector.kafka.avro.error_send")
             .with_description("Error sending message to Kafka")
@@ -147,6 +164,7 @@ impl KafkaAvroPublisherStats {
             send_retries,
             error_avro_convert,
             error_avro_encode,
+            error_key_encode,
             error_send,
             delivered_messages,
             failed_delivery_messages,
@@ -278,6 +296,25 @@ where
     }
 
     pub async fn send(&mut self, input: T) -> Result<(), KafkaAvroPublisherActorError> {
+        let key = self.config.avro_converter.get_key(&input);
+        let encoded_key = match key {
+            Some(key) => match serde_json::to_vec(&key) {
+                Ok(value) => Some(value),
+                Err(err) => {
+                    error!("Error encoding key value into byte array: {err}");
+                    self.stats.error_key_encode.add(
+                        1,
+                        &[opentelemetry::KeyValue::new(
+                            "netgauze.kafka.key.encode.error.msg",
+                            err.to_string(),
+                        )],
+                    );
+                    return Err(err)?;
+                }
+            },
+            None => None,
+        };
+
         let avro_values = match self.config.avro_converter.get_avro_values(input) {
             Ok(avro_values) => avro_values,
             Err(err) => {
@@ -293,15 +330,10 @@ where
             }
         };
 
-        let subject_name_strategy = &self.subject_name_strategy;
-
-        // For now we return error if one record fails to be sent
-        // (not problematic as we only have single record per flowinfo
-        // at the moment...)
         for avro_value in avro_values {
-            let encoded = match self
+            let encoded_avro_value = match self
                 .avro_encoder
-                .encode_value(avro_value, subject_name_strategy)
+                .encode_value(avro_value, &self.subject_name_strategy)
                 .await
             {
                 Ok(result) => result,
@@ -318,9 +350,17 @@ where
                 }
             };
 
-            let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> =
-                BaseRecord::to(self.config.topic.as_str()).payload(&encoded);
+            // Create record (key, avro_value) to be sent
+            let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> = match &encoded_key {
+                Some(key) => BaseRecord::to(self.config.topic.as_str())
+                    .payload(&encoded_avro_value)
+                    .key(key),
+                None => BaseRecord::to(self.config.topic.as_str()).payload(&encoded_avro_value),
+            };
             let mut polling_interval = Duration::from_micros(10);
+
+            // For now we return error if one record fails to be sent (ok as we only
+            // have a single record per FlowInfo at the moment...)
             loop {
                 match self.producer.send(record) {
                     Ok(_) => {
