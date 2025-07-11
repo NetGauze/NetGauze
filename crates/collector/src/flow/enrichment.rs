@@ -27,7 +27,7 @@
 //! - `EnrichmentOperation` - Operations to update/delete enrichment data
 
 use netgauze_flow_pkt::{
-    ie::{Field, *},
+    ie::{netgauze, Field},
     FlowInfo,
 };
 use serde::{Deserialize, Serialize};
@@ -115,7 +115,7 @@ struct FlowEnrichment {
     cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
     enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
     agg_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
-    enriched_tx: async_channel::Sender<FlowInfo>,
+    enriched_tx: async_channel::Sender<(IpAddr, FlowInfo)>,
     default_labels: (u32, HashMap<String, String>),
     stats: FlowEnrichmentStats,
 }
@@ -126,7 +126,7 @@ impl FlowEnrichment {
         cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
         enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
         agg_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
-        enriched_tx: async_channel::Sender<FlowInfo>,
+        enriched_tx: async_channel::Sender<(IpAddr, FlowInfo)>,
         stats: FlowEnrichmentStats,
     ) -> Self {
         let default_labels = (
@@ -241,7 +241,7 @@ impl FlowEnrichment {
                                     continue;
                                 }
                             };
-                            if let Err(err) = self.enriched_tx.send(enriched).await {
+                            if let Err(err) = self.enriched_tx.send((peer_ip, enriched)).await {
                                 error!("FlowEnrichment send error: {err}");
                                  self.stats.send_error.add(1, &peer_tags);
                             } else {
@@ -279,7 +279,7 @@ impl std::error::Error for FlowEnrichmentActorHandleError {}
 pub struct FlowEnrichmentActorHandle {
     cmd_send: mpsc::Sender<FlowEnrichmentActorCommand>,
     enrichment_tx: async_channel::Sender<EnrichmentOperation>,
-    enriched_rx: async_channel::Receiver<FlowInfo>,
+    enriched_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
 }
 
 impl FlowEnrichmentActorHandle {
@@ -330,7 +330,7 @@ impl FlowEnrichmentActorHandle {
             .map_err(|_| FlowEnrichmentActorHandleError::SendError)
     }
 
-    pub fn subscribe(&self) -> async_channel::Receiver<FlowInfo> {
+    pub fn subscribe(&self) -> async_channel::Receiver<(IpAddr, FlowInfo)> {
         self.enriched_rx.clone()
     }
 }

@@ -43,8 +43,12 @@ use netgauze_flow_pkt::{
 };
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use smallvec::SmallVec;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    net::IpAddr,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowOutputConfig {
@@ -136,7 +140,7 @@ impl FlowOutputConfig {
     }
 }
 
-impl AvroConverter<FlowInfo, FunctionError> for FlowOutputConfig {
+impl AvroConverter<(IpAddr, FlowInfo), FunctionError> for FlowOutputConfig {
     fn get_avro_schema(&self) -> String {
         let indent = 2usize;
 
@@ -159,13 +163,20 @@ impl AvroConverter<FlowInfo, FunctionError> for FlowOutputConfig {
         schema
     }
 
+    fn get_key(&self, input: &(IpAddr, FlowInfo)) -> Option<Value> {
+        Some(Value::String(input.0.to_string()))
+    }
+
     // At the moment we only have a single record per FlowInfo -> pre-allocate 1
     type AvroValues = SmallVec<[AvroValue; 1]>;
-    fn get_avro_values(&self, input: FlowInfo) -> Result<Self::AvroValues, FunctionError> {
-        match input {
+    fn get_avro_values(
+        &self,
+        input: (IpAddr, FlowInfo),
+    ) -> Result<Self::AvroValues, FunctionError> {
+        match input.1 {
             FlowInfo::IPFIX(pkt) => pkt
                 .sets()
-                .into_iter()
+                .iter()
                 .filter_map(|set| match set {
                     Set::Data { id: _, records } => Some(records),
                     _ => None,
