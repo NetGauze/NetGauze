@@ -1,0 +1,26 @@
+<yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+  <module-set>
+    <name>complete</name>
+    <module>
+      <name>ietf-interfaces</name>
+      <revision>2018-02-20</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-interfaces</namespace>
+      <feature>arbitrary-names</feature>
+      <feature>pre-provisioning</feature>
+      <feature>if-mib</feature>
+    </module>
+    <module>
+      <name>iana-if-type</name>
+      <revision>2017-01-19</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:iana-if-type</namespace>
+    </module>
+  </module-set>
+  <schema>
+    <name>complete</name>
+    <module-set>complete</module-set>
+  </schema>
+  <content-id>17</content-id>
+</yang-library>
+<modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+  <module-set-id>17</module-set-id>
+</modules-state>
