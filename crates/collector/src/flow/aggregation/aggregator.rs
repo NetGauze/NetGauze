@@ -13,26 +13,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Core aggregation logic and data structures for flow processing.
+//! Core aggregation engine and data structures for flow processing.
 //!
-//! This module implements the core aggregation engine with the following
-//! components:
-//! - `FlowAggregator` - Main aggregator that performs time-windowed flow
-//!   aggregation
-//! - `FlowCacheKey` & `FlowCacheRecord` - Cache management for aggregated flow
-//!   state
-//! - `AggFlowInfo` - Aggregatable flow data wrapper for time-series processing
-//! - `explode()` - Flow explosion logic that explodes records FlowInfo into
-//!   multiple AggFlowInfo objects based on key and aggregation selectors
+//! This module implements the runtime aggregation engine that processes flow
+//! records in time windows. The main components are:
 //!
-//! Supported aggregation operations:
-//! - **Add** - Sum numeric values across flows
+//! - `FlowAggregator` - Main aggregation engine implementing time-windowed
+//!   flow aggregation with configurable operations
+//! - `FlowCacheKey` & `FlowCacheRecord` - In-memory cache structures for
+//!   maintaining aggregated flow state across time windows
+//! - `AggFlowInfo` - Wrapper for aggregatable flow data with time-series
+//!   metadata for windowed processing
+//! - `explode()` - Flow explosion function that transforms FlowInfo records
+//!   into multiple AggFlowInfo objects based on configuration selectors
+//!
+//! ## Aggregation Operations
+//!
+//! The aggregator supports these reduction operations on flow fields:
+//! - **Add** - Sum numeric values across flows in the same window
 //! - **Min** - Track minimum values across flows
 //! - **Max** - Track maximum values across flows
-//! - **BoolMapOr** - Bitwise OR operations for flag fields
+//! - **BoolMapOr** - Bitwise OR operations for flag/bitmap fields
 //!
-//! The aggregator maintains flow state across time windows and handles
-//! reduction operations for efficient memory usage and processing performance.
+//! ## Processing Flow
+//!
+//! 1. Incoming flows are exploded into `AggFlowInfo` records using field selectors
+//! 2. Records are grouped by `FlowCacheKey` (peer IP + key fields)
+//! 3. Aggregation operations are applied to combine records in the same group
+//! 4. Time windows manage when aggregated records are flushed
+//!
+//! The aggregator maintains efficient in-memory state and handles reduction
+//! operations for optimal performance across large flow volumes.
 
 use crate::flow::aggregation::config::*;
 use chrono::{DateTime, Utc};
@@ -53,16 +64,6 @@ use tracing::{error, info};
 pub struct FlowAggregator {
     cache: FxHashMap<FlowCacheKey, FlowCacheRecord>,
     config: UnifiedConfig,
-}
-impl FlowAggregator {
-    #[cfg(test)]
-    pub(crate) fn cache(&self) -> &FxHashMap<FlowCacheKey, FlowCacheRecord> {
-        &self.cache
-    }
-    #[cfg(test)]
-    pub(crate) fn config(&self) -> &UnifiedConfig {
-        &self.config
-    }
 }
 
 impl Aggregator<UnifiedConfig, AggFlowInfo, FxHashMap<FlowCacheKey, FlowCacheRecord>>
@@ -122,13 +123,6 @@ pub(crate) struct FlowCacheKey {
     key_fields: Box<[Option<Field>]>,
 }
 impl FlowCacheKey {
-    #[cfg(test)]
-    pub(crate) fn new(peer_ip: IpAddr, key_fields: Box<[Option<Field>]>) -> Self {
-        Self {
-            peer_ip,
-            key_fields,
-        }
-    }
     pub(crate) fn peer_ip(&self) -> IpAddr {
         self.peer_ip
     }
@@ -149,30 +143,6 @@ pub(crate) struct FlowCacheRecord {
 
 #[allow(clippy::too_many_arguments)]
 impl FlowCacheRecord {
-    #[cfg(test)]
-    pub(crate) fn new(
-        peer_ports: HashSet<u16>,
-        observation_domain_ids: HashSet<u32>,
-        template_ids: HashSet<DataSetId>,
-        min_export_time: DateTime<Utc>,
-        max_export_time: DateTime<Utc>,
-        min_collection_time: DateTime<Utc>,
-        max_collection_time: DateTime<Utc>,
-        agg_fields: Box<[Option<Field>]>,
-        record_count: u64,
-    ) -> Self {
-        Self {
-            peer_ports,
-            observation_domain_ids,
-            template_ids,
-            min_export_time,
-            max_export_time,
-            min_collection_time,
-            max_collection_time,
-            agg_fields,
-            record_count,
-        }
-    }
     fn peer_ports(&self) -> &HashSet<u16> {
         &self.peer_ports
     }
@@ -185,7 +155,7 @@ impl FlowCacheRecord {
 }
 
 impl FlowCacheRecord {
-    pub(crate) fn reduce(&mut self, rhs: &FlowCacheRecord, agg_select: &[AggFieldRef]) {
+    fn reduce(&mut self, rhs: &FlowCacheRecord, agg_select: &[AggFieldRef]) {
         // Hardcoded aggregations
         self.peer_ports.extend(rhs.peer_ports());
         self.observation_domain_ids
@@ -283,17 +253,6 @@ impl AggFlowInfo {
 
         FlowInfo::IPFIX(ipfix_pkt)
     }
-
-    /// Get the key of the AggFlowInfo.
-    #[cfg(test)]
-    pub(crate) fn key(&self) -> &FlowCacheKey {
-        &self.key
-    }
-    /// Get the record of the AggFlowInfo.
-    #[cfg(test)]
-    pub(crate) fn record(&self) -> &FlowCacheRecord {
-        &self.rec
-    }
 }
 
 /// Explode a FlowInfo into multiple AggFlowInfo records based on the provided
@@ -386,3 +345,6 @@ pub(crate) fn explode(
     }
     exploded.into_iter()
 }
+
+#[cfg(test)]
+mod tests;

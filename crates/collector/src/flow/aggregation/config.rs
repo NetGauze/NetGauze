@@ -15,11 +15,34 @@
 
 //! Configuration structures and validation for flow aggregation.
 //!
-//! Defines aggregation configuration including window duration, lateness
-//! tolerance, field transformations, and operation types. Provides validation
-//! for operation compatibility with different Information Element (IE) types
-//! and converts user-facing configuration into internal unified format for
-//! efficient processing.
+//! This module defines the configuration schema and validation logic for flow
+//! aggregation, including:
+//!
+//! ## Types
+//!
+//! - `AggregationConfig` - User-facing configuration with time windows,
+//!   worker settings, and field transformation specifications
+//! - `Transform` - Field transformation specifications (single operation
+//!   or multi-index operations for array fields)
+//! - `FieldRef` - Reference to specific field by IE and array index
+//!
+//! ## Validation
+//!
+//! The module provides comprehensive validation including:
+//! - Basic parameter validation (worker count, time windows)
+//! - Operation compatibility with Information Element (IE) types
+//! - Conversion from user configuration to optimized internal format
+//!   (`Unified Config`)
+//!
+//! ## Configuration Flow
+//!
+//! ```text
+//! AggregationConfig (user) -> validate() -> UnifiedConfig (internal)
+//! ```
+//!
+//! The conversion process validates operation compatibility and transforms
+//! the flexible user configuration into an optimized format for efficient
+//! runtime processing.
 
 use indexmap::IndexMap;
 use netgauze_flow_pkt::ie::IE;
@@ -334,3 +357,6 @@ impl TryInto<UnifiedConfig> for AggregationConfig {
         })
     }
 }
+
+#[cfg(test)]
+mod tests;
