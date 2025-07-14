@@ -18,8 +18,6 @@ pub mod config;
 pub mod enrichment;
 pub mod sonata;
 
-use std::collections::HashMap;
-
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
 use netgauze_flow_pkt::{
     ie,
@@ -27,6 +25,7 @@ use netgauze_flow_pkt::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use std::collections::HashMap;
 
 /// The supported subset of AVRO values
 ///
