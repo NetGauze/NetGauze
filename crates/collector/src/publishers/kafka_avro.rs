@@ -30,7 +30,7 @@ use schema_registry_converter::{
     schema_registry_common::{SubjectNameStrategy, SuppliedSchema},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::Value as JsonValue;
 use std::{collections::HashMap, marker::PhantomData, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
@@ -40,7 +40,7 @@ const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 pub trait AvroConverter<T, E: std::error::Error> {
     fn get_avro_schema(&self) -> String;
 
-    fn get_key(&self, input: &T) -> Option<Value>;
+    fn get_key(&self, input: &T) -> Option<JsonValue>;
 
     type AvroValues: IntoIterator<Item = AvroValue> + Send;
     fn get_avro_values(&self, input: T) -> Result<Self::AvroValues, E>;
@@ -65,6 +65,7 @@ pub enum KafkaAvroPublisherActorError {
     TransformationError(String),
     ReceiveErr,
     JsonError(serde_json::Error),
+    UnexpectedState(String),
 }
 
 impl std::fmt::Display for KafkaAvroPublisherActorError {
@@ -76,6 +77,7 @@ impl std::fmt::Display for KafkaAvroPublisherActorError {
             Self::TransformationError(e) => write!(f, "Transformation error: {e}"),
             Self::ReceiveErr => write!(f, "Error receiving messages from upstream producer"),
             Self::JsonError(e) => write!(f, "Json Error: {e}"),
+            Self::UnexpectedState(e) => write!(f, "Unexpected State: {e}"),
         }
     }
 }
@@ -330,6 +332,9 @@ where
             }
         };
 
+        let mut errors = Vec::new();
+        let mut successful_sends = 0;
+
         for avro_value in avro_values {
             let encoded_avro_value = match self
                 .avro_encoder
@@ -346,7 +351,8 @@ where
                             err.to_string(),
                         )],
                     );
-                    return Err(err)?;
+                    errors.push(KafkaAvroPublisherActorError::SrcError(err));
+                    continue; // skip this and try next avro_value
                 }
             };
 
@@ -359,13 +365,13 @@ where
             };
             let mut polling_interval = Duration::from_micros(10);
 
-            // For now we return error if one record fails to be sent (ok as we only
-            // have a single record per FlowInfo at the moment...)
+            // Try to send record with retries
             loop {
                 match self.producer.send(record) {
                     Ok(_) => {
                         self.stats.sent.add(1, &[]);
-                        break;
+                        successful_sends += 1;
+                        break; // exit retry loop and move to next avro_value
                     }
                     Err((err, rec)) => {
                         match err {
@@ -380,7 +386,9 @@ where
                                             err.to_string(),
                                         )],
                                     );
-                                    return Err(KafkaAvroPublisherActorError::KafkaError(err));
+                                    errors.push(KafkaAvroPublisherActorError::KafkaError(err));
+                                    break; // exit retry loop and move to next
+                                           // avro_value
                                 }
                                 debug!("Kafka message queue is full, sleeping for {polling_interval:?}");
                                 self.stats.send_retries.add(1, &[]);
@@ -398,7 +406,9 @@ where
                                         err.to_string(),
                                     )],
                                 );
-                                return Err(KafkaAvroPublisherActorError::KafkaError(err));
+                                errors.push(KafkaAvroPublisherActorError::KafkaError(err));
+                                break; // exit retry loop and move to next
+                                       // avro_value
                             }
                         }
                     }
@@ -406,7 +416,30 @@ where
             }
         }
 
-        Ok(())
+        match (successful_sends, errors.len(), errors.into_iter().next()) {
+            (0, _, Some(error)) => {
+                // All records in the batch failed, return first error
+                Err(error)
+            }
+            (0, _, None) => {
+                // This should never happen, but handle gracefully
+                error!("Unexpected state: no successful sends in the batch but also no errors recorded");
+                Err(KafkaAvroPublisherActorError::UnexpectedState(
+                    "no successful sends in the batch but also no errors recorded".to_string(),
+                ))
+            }
+            (_, _, None) => {
+                // Batch successfully sent
+                Ok(())
+            }
+            (successful_sends, errors_len, Some(_)) => {
+                // Partial success
+                warn!(
+                    "Partial success: {successful_sends} messages sent, {errors_len} errors occurred",
+                );
+                Ok(()) // Or Err?
+            }
+        }
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
