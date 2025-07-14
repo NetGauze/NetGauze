@@ -334,3 +334,237 @@ impl FlowEnrichmentActorHandle {
         self.enriched_rx.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+    use netgauze_flow_pkt::{
+        ie::{netgauze, Field},
+        ipfix::{DataRecord, IpfixPacket, Set},
+        DataSetId, FlowInfo,
+    };
+    use std::net::IpAddr;
+
+    #[test]
+    fn test_apply_enrichment_upsert() {
+        // Create actor state
+        let mut enrichment = FlowEnrichment::new(
+            "test-writer-id".to_string(),
+            mpsc::channel(1).1,          // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).0, // dummy sender
+            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+        );
+
+        let peer_ip: IpAddr = "10.0.0.1".parse().unwrap();
+        let mut labels = HashMap::new();
+        labels.insert("nkey".to_string(), "node-1".to_string());
+        labels.insert("pkey".to_string(), "platform-1".to_string());
+
+        // Test upsert operation
+        let op = EnrichmentOperation::Upsert(123, peer_ip, labels.clone());
+        enrichment.apply_enrichment(op);
+
+        assert_eq!(enrichment.labels.get(&peer_ip), Some(&(123, labels)));
+    }
+
+    #[test]
+    fn test_apply_enrichment_delete() {
+        // Create actor state
+        let mut enrichment = FlowEnrichment::new(
+            "test-writer-id".to_string(),
+            mpsc::channel(1).1,          // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).0, // dummy sender
+            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+        );
+
+        let peer_ip: IpAddr = "10.0.0.1".parse().unwrap();
+        let peer_ip_2: IpAddr = "10.0.0.2".parse().unwrap();
+        let mut labels = HashMap::new();
+        labels.insert("nkey".to_string(), "node-1".to_string());
+        labels.insert("pkey".to_string(), "platform-1".to_string());
+
+        // Insert first some entries
+        enrichment.labels.insert(peer_ip, (123, labels.clone()));
+        enrichment.labels.insert(peer_ip_2, (456, labels));
+        assert!(enrichment.labels.contains_key(&peer_ip));
+        assert!(enrichment.labels.contains_key(&peer_ip_2));
+
+        // Test delete operation
+        let op = EnrichmentOperation::Delete(123);
+        enrichment.apply_enrichment(op);
+
+        assert!(!enrichment.labels.contains_key(&peer_ip));
+        assert!(enrichment.labels.contains_key(&peer_ip_2));
+
+        // Test delete non-existing id
+        let op = EnrichmentOperation::Delete(1000);
+        enrichment.apply_enrichment(op);
+        assert!(!enrichment.labels.contains_key(&peer_ip));
+        assert!(enrichment.labels.contains_key(&peer_ip_2));
+    }
+
+    #[test]
+    fn test_apply_enrichment_update_existing() {
+        // Create actor state
+        let mut enrichment = FlowEnrichment::new(
+            "test-writer-id".to_string(),
+            mpsc::channel(1).1,          // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).0, // dummy sender
+            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+        );
+
+        let peer_ip: IpAddr = "10.0.0.1".parse().unwrap();
+
+        // Insert initial labels
+        let mut initial_labels = HashMap::new();
+        initial_labels.insert("nkey".to_string(), "old-node".to_string());
+        initial_labels.insert("pkey".to_string(), "old-platform".to_string());
+        enrichment.labels.insert(peer_ip, (123, initial_labels));
+
+        // Update with new labels
+        let mut new_labels = HashMap::new();
+        new_labels.insert("nkey".to_string(), "new-node".to_string());
+        new_labels.insert("pkey".to_string(), "new-platform".to_string());
+
+        let op = EnrichmentOperation::Upsert(123, peer_ip, new_labels.clone());
+        enrichment.apply_enrichment(op);
+
+        assert_eq!(enrichment.labels.get(&peer_ip), Some(&(123, new_labels)));
+    }
+
+    #[test]
+    fn test_enrich_with_existing_labels() {
+        let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
+        let peer_ip: IpAddr = "192.168.1.100".parse().unwrap();
+
+        // Create actor state
+        let mut enrichment = FlowEnrichment::new(
+            "test-writer-id".to_string(),
+            mpsc::channel(1).1,          // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).0, // dummy sender
+            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+        );
+
+        // Create labels map entry for peer_ip (simulate sonata pushing labels)
+        let mut node_labels = HashMap::new();
+        node_labels.insert("nkey".to_string(), "test-node-123".to_string());
+        node_labels.insert("pkey".to_string(), "test-platform-ABC".to_string());
+        enrichment.apply_enrichment(EnrichmentOperation::Upsert(1, peer_ip, node_labels));
+
+        // Create flow to be enriched
+        let original_flow = FlowInfo::IPFIX(IpfixPacket::new(
+            export_time,
+            0,
+            0,
+            Box::new([Set::Data {
+                id: DataSetId::new(256).unwrap(),
+                records: Box::new([DataRecord::new(
+                    Box::new([]),
+                    Box::new([
+                        Field::octetDeltaCount(5000),
+                        Field::packetDeltaCount(5),
+                        Field::tcpDestinationPort(80),
+                    ]),
+                )]),
+            }]),
+        ));
+
+        // Enrich the flow
+        let enriched_flow = enrichment
+            .enrich(peer_ip, original_flow)
+            .expect("failed to enrich");
+
+        // Create expected enriched flow
+        let expected_flow = FlowInfo::IPFIX(IpfixPacket::new(
+            export_time,
+            0,
+            0,
+            Box::new([Set::Data {
+                id: DataSetId::new(256).unwrap(),
+                records: Box::new([DataRecord::new(
+                    Box::new([]),
+                    Box::new([
+                        Field::octetDeltaCount(5000),
+                        Field::packetDeltaCount(5),
+                        Field::tcpDestinationPort(80),
+                        Field::NetGauze(netgauze::Field::nodeId("test-node-123".into())),
+                        Field::NetGauze(netgauze::Field::platformId("test-platform-ABC".into())),
+                        Field::NetGauze(netgauze::Field::dataCollectionManifestName(
+                            "test-writer-id".into(),
+                        )),
+                    ]),
+                )]),
+            }]),
+        ));
+
+        // Compare enriched with expected
+        assert_eq!(enriched_flow, expected_flow);
+    }
+
+    #[test]
+    fn test_enrich_with_default_labels() {
+        let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
+        let peer_ip: IpAddr = "192.168.1.200".parse().unwrap(); // IP not in labels map
+
+        // Create actor state
+        let enrichment = FlowEnrichment::new(
+            "test-writer-id".to_string(),
+            mpsc::channel(1).1,          // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).1, // dummy receiver
+            async_channel::bounded(1).0, // dummy sender
+            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+        );
+
+        // Create flow to be enriched
+        let original_flow = FlowInfo::IPFIX(IpfixPacket::new(
+            export_time,
+            0,
+            0,
+            Box::new([Set::Data {
+                id: DataSetId::new(256).unwrap(),
+                records: Box::new([DataRecord::new(
+                    Box::new([]),
+                    Box::new([Field::octetDeltaCount(200), Field::tcpDestinationPort(443)]),
+                )]),
+            }]),
+        ));
+
+        // Enrich the flow
+        let enriched_flow = enrichment.enrich(peer_ip, original_flow).unwrap();
+
+        // Create expected enriched flow
+        let expected_flow = FlowInfo::IPFIX(IpfixPacket::new(
+            export_time,
+            0,
+            0,
+            Box::new([Set::Data {
+                id: DataSetId::new(256).unwrap(),
+                records: Box::new([DataRecord::new(
+                    Box::new([]),
+                    Box::new([
+                        Field::octetDeltaCount(200),
+                        Field::tcpDestinationPort(443),
+                        Field::NetGauze(netgauze::Field::nodeId("unknown".into())),
+                        Field::NetGauze(netgauze::Field::platformId("unknown".into())),
+                        Field::NetGauze(netgauze::Field::dataCollectionManifestName(
+                            "test-writer-id".into(),
+                        )),
+                    ]),
+                )]),
+            }]),
+        ));
+
+        // Compare enriched with expected
+        assert_eq!(enriched_flow, expected_flow);
+    }
+}
