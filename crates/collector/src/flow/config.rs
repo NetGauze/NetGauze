@@ -43,7 +43,7 @@ use netgauze_flow_pkt::{
 };
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::Value as JsonValue;
 use smallvec::SmallVec;
 use std::{
     collections::{HashMap, HashSet},
@@ -163,8 +163,8 @@ impl AvroConverter<(IpAddr, FlowInfo), FunctionError> for FlowOutputConfig {
         schema
     }
 
-    fn get_key(&self, input: &(IpAddr, FlowInfo)) -> Option<Value> {
-        Some(Value::String(input.0.to_string()))
+    fn get_key(&self, input: &(IpAddr, FlowInfo)) -> Option<JsonValue> {
+        Some(JsonValue::String(input.0.to_string()))
     }
 
     // At the moment we only have a single record per FlowInfo -> pre-allocate 1
@@ -302,7 +302,7 @@ impl FieldConfig {
     pub fn json_value(
         &self,
         flow: &FxHashMap<SingleFieldSelect, &Field>,
-    ) -> Result<Option<serde_json::Value>, FunctionError> {
+    ) -> Result<Option<JsonValue>, FunctionError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
         let value = match transformed {
@@ -806,3 +806,6 @@ impl FieldTransformFunction {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -33,7 +33,7 @@ use std::collections::HashMap;
 /// 1. [apache_avro::types::Value] is not serializable, thus not suitable to use
 ///    in a config.
 /// 2. We support only a subset of [apache_avro::types::Value].
-#[derive(Debug, Clone, Serialize, Deserialize, strum_macros::EnumDiscriminants)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, strum_macros::EnumDiscriminants)]
 #[strum_discriminants(name(ValueKind))]
 pub enum RawValue {
     Bytes(Vec<u8>),
