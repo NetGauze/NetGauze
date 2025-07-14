@@ -751,116 +751,126 @@ fn generate_ie_field_enum_for_ie(
     } = field_operations_variants(iana_ies);
 
     quote! {
-        #[allow(non_camel_case_types)]
-        #[derive(strum_macros::Display, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
-        #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-        pub enum Field {
-            Unknown{pen: u32, id: u16, value: Vec<u8>},
-            #(#vendor_variants,)*
-            #(#iana_variants,)*
-        }
-        impl HasIE for Field {
-            /// Get the [IE] element for a given field
-            fn ie(&self) -> IE {
-                match self {
-                    Self::Unknown{pen, id, value: _value} => IE::Unknown{pen: *pen, id: *id},
-                    #(#vendor_ie_variants,)*
-                    #(#iana_ie_variants,)*
-                }
+            #[allow(non_camel_case_types)]
+            #[derive(strum_macros::Display, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+            #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+            pub enum Field {
+                Unknown{pen: u32, id: u16, value: Vec<u8>},
+                #(#vendor_variants,)*
+                #(#iana_variants,)*
             }
-        }
-
-        #[derive(Debug, Clone, strum_macros::Display)]
-        pub enum FieldConversionError {
-            InvalidType,
-        }
-        impl std::error::Error for FieldConversionError {}
-
-        #into_for_field
-
-        #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
-        pub enum FieldOperationError {
-            InapplicableAdd(IE, IE),
-            InapplicableMin(IE, IE),
-            InapplicableMax(IE, IE),
-            InapplicableBitwise(IE, IE),
-        }
-        impl std::error::Error for FieldOperationError {}
-
-        impl Field {
-            /// Arithmetic addition operation of two fields and produce a field with the new value
-            pub fn add_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
-                match (self, rhs) {
-                    #(#vendor_add_variants,)*
-                    #(#ie_add_variants,)*
-                    (f1, f2) => Err(FieldOperationError::InapplicableAdd(f1.ie(), f2.ie())),
+            impl HasIE for Field {
+                /// Get the [IE] element for a given field
+                fn ie(&self) -> IE {
+                    match self {
+                        Self::Unknown{pen, id, value: _value} => IE::Unknown{pen: *pen, id: *id},
+                        #(#vendor_ie_variants,)*
+                        #(#iana_ie_variants,)*
+                    }
                 }
             }
 
-            /// The addition assignment operation += of two fields
-            pub fn add_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
-                match (self, rhs) {
-                    #(#vendor_add_assign_variants)*
-                    #(#ie_add_assign_variants)*
-                    (f1, f2) => Err(FieldOperationError::InapplicableAdd(f1.ie(), f2.ie())),
-                }
+            #[derive(Debug, Clone)]
+            pub enum FieldConversionError {
+                UnknownField,
+                InvalidType(String, String),
             }
+            impl std::error::Error for FieldConversionError {}
 
-            /// Bitwise OR operation of two fields and produce a field with the new value
-             pub fn bitwise_or_field(&self, other: &Field) -> Result<Field, FieldOperationError> {
-                match (self, other) {
-                    #(#vendor_bitwise_or_variants,)*
-                    #(#ie_bitwise_or_variants,)*
-                    (f1, f2) => Err(FieldOperationError::InapplicableBitwise(f1.ie(), f2.ie())),
-                }
-            }
-
-            /// The bitwise OR assignment operation |= of two fields
-            pub fn bitwise_or_assign_field(&mut self, other: &Field) -> Result<(), FieldOperationError> {
-                match (self, other) {
-                    #(#vendor_bitwise_or_assign_variants)*
-                    #(#ie_bitwise_or_assign_variants)*
-                    (f1, f2) => Err(FieldOperationError::InapplicableBitwise(f1.ie(), f2.ie())),
-                }
-            }
-
-            /// Returns a new field with the minimum of the two fields
-            pub fn min_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
-                match (self, rhs) {
-                    #(#vendor_min_variants,)*
-                    #(#ie_min_variants,)*
-                    (f1, f2) => Err(FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),
-                }
-            }
-
-            /// Assign the field's value to be minimum of the two fields
-            pub fn min_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
-                match (self, rhs) {
-                    #(#vendor_min_assign_variants)*
-                    #(#ie_min_assign_variants)*
-                    (f1, f2) => Err(FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),
-                }
-            }
-
-            /// Returns a new field with the maximum of the two fields
-            pub fn max_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
-                match (self, rhs) {
-                    #(#vendor_max_variants,)*
-                    #(#ie_max_variants,)*
-                    (f1, f2) => Err(FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),
-                }
-            }
-
-            /// Assign the field's value to be maximum of the two fields
-            pub fn max_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
-                match (self, rhs) {
-                    #(#vendor_max_assign_variants)*
-                    #(#ie_max_assign_variants)*
-                    (f1, f2) => Err(FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),
-                }
+            impl std::fmt::Display for FieldConversionError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::UnknownField => write!(f, "Unknown Field"),
+                Self::InvalidType(t, fld) => write!(f, "Invalid Type ({t}) selected for conversion of field: {fld}"),
             }
         }
     }
+
+            #into_for_field
+
+            #[derive(Debug, Clone, Eq, PartialEq, strum_macros::Display)]
+            pub enum FieldOperationError {
+                InapplicableAdd(IE, IE),
+                InapplicableMin(IE, IE),
+                InapplicableMax(IE, IE),
+                InapplicableBitwise(IE, IE),
+            }
+            impl std::error::Error for FieldOperationError {}
+
+            impl Field {
+                /// Arithmetic addition operation of two fields and produce a field with the new value
+                pub fn add_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                    match (self, rhs) {
+                        #(#vendor_add_variants,)*
+                        #(#ie_add_variants,)*
+                        (f1, f2) => Err(FieldOperationError::InapplicableAdd(f1.ie(), f2.ie())),
+                    }
+                }
+
+                /// The addition assignment operation += of two fields
+                pub fn add_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                    match (self, rhs) {
+                        #(#vendor_add_assign_variants)*
+                        #(#ie_add_assign_variants)*
+                        (f1, f2) => Err(FieldOperationError::InapplicableAdd(f1.ie(), f2.ie())),
+                    }
+                }
+
+                /// Bitwise OR operation of two fields and produce a field with the new value
+                 pub fn bitwise_or_field(&self, other: &Field) -> Result<Field, FieldOperationError> {
+                    match (self, other) {
+                        #(#vendor_bitwise_or_variants,)*
+                        #(#ie_bitwise_or_variants,)*
+                        (f1, f2) => Err(FieldOperationError::InapplicableBitwise(f1.ie(), f2.ie())),
+                    }
+                }
+
+                /// The bitwise OR assignment operation |= of two fields
+                pub fn bitwise_or_assign_field(&mut self, other: &Field) -> Result<(), FieldOperationError> {
+                    match (self, other) {
+                        #(#vendor_bitwise_or_assign_variants)*
+                        #(#ie_bitwise_or_assign_variants)*
+                        (f1, f2) => Err(FieldOperationError::InapplicableBitwise(f1.ie(), f2.ie())),
+                    }
+                }
+
+                /// Returns a new field with the minimum of the two fields
+                pub fn min_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                    match (self, rhs) {
+                        #(#vendor_min_variants,)*
+                        #(#ie_min_variants,)*
+                        (f1, f2) => Err(FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),
+                    }
+                }
+
+                /// Assign the field's value to be minimum of the two fields
+                pub fn min_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                    match (self, rhs) {
+                        #(#vendor_min_assign_variants)*
+                        #(#ie_min_assign_variants)*
+                        (f1, f2) => Err(FieldOperationError::InapplicableMin(f1.ie(), f2.ie())),
+                    }
+                }
+
+                /// Returns a new field with the maximum of the two fields
+                pub fn max_field(&self, rhs: &Field) -> Result<Field, FieldOperationError> {
+                    match (self, rhs) {
+                        #(#vendor_max_variants,)*
+                        #(#ie_max_variants,)*
+                        (f1, f2) => Err(FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),
+                    }
+                }
+
+                /// Assign the field's value to be maximum of the two fields
+                pub fn max_assign_field(&mut self, rhs: &Field) -> Result<(), FieldOperationError> {
+                    match (self, rhs) {
+                        #(#vendor_max_assign_variants)*
+                        #(#ie_max_assign_variants)*
+                        (f1, f2) => Err(FieldOperationError::InapplicableMax(f1.ie(), f2.ie())),
+                    }
+                }
+            }
+        }
 }
 
 struct OperationVariants {
@@ -2554,7 +2564,7 @@ pub fn generate_into_for_field(
         // only IANA have unknown, thus we check vendor is not configured
         let unknown = if !vendors.is_empty() {
             // only IANA have unknown, thus we check vendor is not configured
-            quote! { Self::Unknown{ .. } => Err(Self::Error::InvalidType), }
+            quote! { Self::Unknown{ .. } => Err(Self::Error::UnknownField), }
         } else {
             quote! {}
         };
@@ -2587,7 +2597,8 @@ pub fn generate_into_for_field(
             } else if convert_rust_type == "String" && is_mpls_type(&ie.name) {
                 quote! { Self::#name(value) => { Ok(u32::from_be_bytes([0, value[0], value[1], value[2]]).to_string()) } }
             } else {
-                quote! { Self::#name(_) => { Err(Self::Error::InvalidType) } }
+                let ie_name_str = &ie.name;
+                quote! { Self::#name(_) => { Err(Self::Error::InvalidType(#convert_rust_type.to_string(), #ie_name_str.to_string())) } }
             }
         });
         let conv = quote! {
