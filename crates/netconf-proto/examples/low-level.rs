@@ -16,13 +16,12 @@
 use clap::Parser;
 use futures::{SinkExt, StreamExt};
 use netgauze_netconf_proto::{
-    capabilities::{Base, Candidate, Capability, Validate, YangLibrary},
+    capabilities::{Base, Capability},
     codec::SshCodec,
     protocol::{Hello, NetConfMessage, Rpc, RpcReplyValue},
 };
 use russh::keys::ssh_key;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
-use tracing::level_filters::LevelFilter;
 
 struct Client {}
 
@@ -52,7 +51,7 @@ fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
     use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
     // Set up the log -> tracing bridge first
-    tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");
+    // tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");
 
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
@@ -97,7 +96,7 @@ pub async fn main() -> anyhow::Result<()> {
     }
     tracing::info!("Starting the netconf subsystem");
     // Establish communication channel with netconf subsystem
-    let mut channel = session.channel_open_session().await?;
+    let channel = session.channel_open_session().await?;
     channel.request_subsystem(true, "netconf").await?;
     let stream = channel.into_stream();
     let framed = tokio_util::codec::Framed::new(stream, SshCodec::default());
@@ -138,68 +137,35 @@ pub async fn main() -> anyhow::Result<()> {
     tx.send(NetConfMessage::Hello(Hello {
         session_id: None,
         capabilities:
-        // recv_hello
-        //     .capabilities
-        //     .iter()
-        //
-        //     .filter_map(|(k, cap)| {
-        //         if let Capability::Base(Base::V1_0) = cap
-        //         {
-        //             None
-        //         } else {
-        //             Some((k.clone(), cap.clone()))
-        //         }
-        //     })
-        //     .collect::<HashMap<_, _>>(),
-        HashMap::from([
-            (Box::from(":base:1.1"), Capability::Base(Base::V1_1)),
-            (Box::from(":candidate"), Capability::Candidate(Candidate::V1_0)),
-            (Box::from(":validate:1.1"), Capability::Validate(Validate::V1_1)),
-            (Box::from(":validate:1.1"), Capability::Validate(Validate::V1_1)),
+        recv_hello
+            .capabilities
+            .iter()
 
-        ])
+            .filter_map(|(k, cap)| {
+                if let Capability::Base(Base::V1_0) = cap
+                {
+                    None
+                } else {
+                    Some((k.clone(), cap.clone()))
+                }
+            })
+            .collect::<HashMap<_, _>>(),
     }))
     .await?;
     tracing::info!("Hello message sent");
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    // Getting YANG library
-    let yang_library = recv_hello
-        .capabilities
-        .iter()
-        .filter_map(|(_, cap)| {
-            if let Capability::YangLibrary(YangLibrary::V1_1 {
-                revision: _,
-                content_id,
-            }) = cap
-            {
-                Some(content_id)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
-    if yang_library.is_empty() {
+    let yang_library_supported = recv_hello.capabilities.contains_key(":ietf-yang-library");
+    if !yang_library_supported {
         tracing::warn!("YANG Library is not supported");
     } else {
-        let yang_library_content_id = yang_library.first().unwrap();
-        tracing::info!(
-            "Retrieving YANG library with content ID {} from the router",
-            yang_library_content_id
-        );
-        if let Some(Capability::YangLibrary(YangLibrary::V1_1 {
-            revision,
-            content_id,
-        })) = recv_hello.capabilities.get(&Box::from(":yang-library:1.1"))
-        {
-            let lib_request = format!("<get><filter type=\"subtree\"><yang-library xmlns=\"urn:ietf:params:xml:ns:yang:ietf-yang-library\"><content-id>{yang_library_content_id}</content-id></yang-library></filter></get>").to_string();
-            tx.send(NetConfMessage::Rpc(Rpc {
-                message_id: "101".to_string(),
-                operation: lib_request,
-            }))
+        tracing::info!("Retrieving YANG library from the router");
+        let lib_request = "<get><filter type=\"subtree\"><yang-library xmlns=\"urn:ietf:params:xml:ns:yang:ietf-yang-library\"></yang-library></filter></get>".to_string();
+        tx.send(NetConfMessage::Rpc(Rpc {
+            message_id: "1011".to_string(),
+            operation: lib_request,
+        }))
             .await?;
-        }
-
         let yang_lib_reply = if let Some(Ok(NetConfMessage::RpcReply(value))) = rx.next().await {
             value
         } else {
@@ -212,29 +178,6 @@ pub async fn main() -> anyhow::Result<()> {
     tracing::info!("Retrieving ietf-ip schema from the router");
     tokio::time::sleep(Duration::from_millis(100)).await;
     let request = r#"<get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring"><identifier>ietf-ip</identifier></get-schema>"#.to_string();
-    let request1 = r#"<get>
-    <filter type="subtree">
-        <netconf-state xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
-            <schemas/>
-        </netconf-state>
-    </filter>
-    </get>"#
-        .to_string();
-
-    let request2 = r#"
-    <get xmlns="urn:ietf:params:xml:ns:netconf:base:1.1">
-      <filter>
-        <isis xmlns="http://cisco.com/ns/yang/Cisco-IOS-XR-clns-isis-oper">
-          <instances>
-            <instance>
-              <neighbors/>
-              <instance-name/>
-            </instance>
-          </instances>
-        </isis>
-      </filter>
-    </get>"#
-        .to_string();
     tx.send(NetConfMessage::Rpc(Rpc {
         message_id: "101".to_string(),
         operation: request,

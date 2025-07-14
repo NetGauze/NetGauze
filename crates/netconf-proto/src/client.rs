@@ -65,17 +65,27 @@ impl<E: std::error::Error + Debug> std::fmt::Display for SshNetConfClientError<E
     }
 }
 
-impl<E: std::error::Error + Debug> std::error::Error for SshNetConfClientError<E> {}
+impl<E: std::error::Error> std::error::Error for SshNetConfClientError<E> {}
 
-pub struct SshNetConfClient<
+/// High-level NETCONF client
+pub struct NetConfClient<
     E: From<std::io::Error> + std::error::Error + Send + Sync + 'static,
     T: AsyncRead + AsyncWrite,
     C: Decoder<Item = NetConfMessage, Error = E> + Encoder<NetConfMessage, Error = E>,
 > {
+    /// Bidirectional channel to the NETCONF peer
     framed: Framed<T, C>,
-    pub peer_caps: HashMap<Box<str>, Capability>,
+
+    /// Capabilities announced by the NETCONF peer
+    peer_caps: HashMap<Box<str>, Capability>,
+
+    /// Session ID assigned by the NETCONF peer
     session_id: u32,
+
+    /// libyang validation context
     ctx: Context,
+
+    /// Keep track of the message IDs sent to the peer
     next_message_id: u32,
 }
 
@@ -83,10 +93,14 @@ impl<
         E: From<std::io::Error> + std::error::Error + Send + Sync + Debug + 'static,
         T: AsyncRead + AsyncWrite + Unpin,
         C: Decoder<Item = NetConfMessage, Error = E> + Encoder<NetConfMessage, Error = E>,
-    > SshNetConfClient<E, T, C>
+    > NetConfClient<E, T, C>
 {
     pub const fn session_id(&self) -> u32 {
         self.session_id
+    }
+
+    pub const fn peer_capabilities(&self) -> &HashMap<Box<str>, Capability> {
+        &self.peer_caps
     }
 
     pub async fn connect(
@@ -189,11 +203,40 @@ impl<
             tracing::info!("CAPABILITY: `{key}`: `{cap:?}`");
         }
 
-        if !capabilities.contains_key(":yang-library:1.1") {
-            todo!("YANG LIBRARY not supported ")
+        if !capabilities.contains_key(":ietf-yang-library") {
+            todo!("YANG LIBRARY NOT SUPPORTED BY THE ROUTER")
         };
+        let yang_library_request = r#"<get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring"><identifier>ietf-ip</identifier></get-schema>"#.to_string();
+        framed.send(NetConfMessage::Rpc(Rpc {
+            message_id: "10100".to_string(),
+            operation: yang_library_request,
+        })).await.unwrap();
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        while let next = framed.next().await {
+            match next {
+                Some(msg) => {
+                    match msg {
+                        Ok(NetConfMessage::RpcReply(reply)) => {
+                            todo!("GOT REPLY: {:?}", reply);
+                        }
+                        Ok(msg) => {
+                            tracing::info!("Got REPLY: {:?}", msg);
+                            todo!("INVALID reply")
+                        }
+                        Err(err) => {
+                            todo!("GOT INVALID reply: {err}")
+                        }
+                    }
+                }
+                None => {
+                    eprintln!("Channel closed");
+                    break;
+                    //tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
 
-        todo!("YANG LIBRARY not supported ")
+        }
+        todo!("YANG LIBRARY not supported by the client yet")
     }
 
     pub async fn send(
