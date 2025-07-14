@@ -15,7 +15,7 @@
 
 use clap::Parser;
 use log::trace;
-use netgauze_netconf_proto::{client::SshNetConfClient, codec::SshCodec};
+use netgauze_netconf_proto::{client::NetConfClient, codec::SshCodec};
 use russh::keys::{ssh_key, PrivateKeyWithHashAlg};
 use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 use tracing::level_filters::LevelFilter;
@@ -55,7 +55,7 @@ fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
     use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
     // Set up the log -> tracing bridge first
-    tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");
+    // tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");
 
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
@@ -125,7 +125,7 @@ pub async fn main() -> anyhow::Result<()> {
     let stream = channel.into_stream();
     let framed = tokio_util::codec::Framed::new(stream, SshCodec::default());
 
-    let client = SshNetConfClient::connect(framed, "../../assets/yang".to_string()).await?;
+    let client = NetConfClient::connect(framed, "../../assets/yang".to_string()).await?;
 
     tracing::info!(
         "Connected to the router with session id: {}",
