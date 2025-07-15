@@ -61,7 +61,7 @@ schema_registry_converter = { workspace = true, default-features = false, featur
     "futures",
     "rustls_tls",
 ] }
-netgauze-rdkafka = { workspace = true, features = [
+rdkafka = { workspace = true, features = [
     "tokio",
     "cmake-build",
     "ssl-vendored",
@@ -72,7 +72,7 @@ serde_yaml = { workspace = true }
 ordered-float = { workspace = true }
 ciborium = { workspace = true }
 bytes = { workspace = true }
-shadow-rs = { workspace = true, features = ["default", "metadata", "build"]  }
+shadow-rs = { workspace = true, features = ["default", "metadata", "build"] }
 smallvec = { workspace = true }
 rustc-hash = { workspace = true }
 

@@ -15,7 +15,7 @@
 
 use crate::publishers::LoggingProducerContext;
 use apache_avro::types::Value as AvroValue;
-use netgauze_rdkafka::{
+use rdkafka::{
     config::{ClientConfig, FromClientConfigAndContext},
     error::{KafkaError, RDKafkaErrorCode},
     producer::{BaseRecord, Producer, ThreadedProducer},
