@@ -1,0 +1,1 @@
+yanglint -e -Y yanglib.xml -p models MA5800T-X17-yangpush-udpnotif-20250527-1130-messages-19.json
