@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::publishers::LoggingProducerContext;
-use netgauze_rdkafka::{
+use rdkafka::{
     config::{ClientConfig, FromClientConfigAndContext},
     error::{KafkaError, RDKafkaErrorCode},
     producer::{BaseRecord, Producer, ThreadedProducer},
