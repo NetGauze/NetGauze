@@ -87,7 +87,7 @@ tracing-test = { version = "0.2" }
 syn = { version = "2.0" }
 quote = { version = "1.0" }
 trybuild = { version = "1.0" }
-regex = { version = "1.10" }
+regex = { version = "1.11" }
 pdu = { version = "1.4" }
 pin-utils = { version = "0.1" }
 serde_yaml = { version = "0.9" }
