@@ -57,7 +57,7 @@ tower = { version = "0.5" }
 tower-service = "0.3"
 tracing = "0.1"
 tracing-subscriber = "0.3"
-bytes = "1.7"
+bytes = "1.10"
 rand = "0.9"
 ipnet = { version = "2.9" }
 strum = "0.27"
