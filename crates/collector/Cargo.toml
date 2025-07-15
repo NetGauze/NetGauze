@@ -91,7 +91,3 @@ chrono = { workspace = true, default-features = false, features = [
 ] }
 tracing-subscriber = { workspace = true }
 bytes = { workspace = true }
-
-[profile.release]
-codegen-units = 1
-lto = false
