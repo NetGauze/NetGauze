@@ -3,7 +3,7 @@
 <?xml-model href="protocol-numbers.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
 <registry xmlns="http://www.iana.org/assignments" id="protocol-numbers">
   <title>Protocol Numbers</title>
-  <updated>2025-01-08</updated>
+  <updated>2025-07-11</updated>
   <registry id="protocol-numbers-1">
     <title>Assigned Internet Protocol Numbers</title>
     <xref type="rfc" data="rfc5237"/><xref type="rfc" data="rfc7045"/>
@@ -957,7 +957,7 @@ University of California at Berkeley, June 1986.</xref>
       <name>BIT-EMU</name>
       <description>Bit-stream Emulation</description>
       <ipv6>Y</ipv6>
-      <xref type="draft" data="RFC-ietf-pals-ple-14"/>
+      <xref type="rfc" data="rfc9801"/>
     </record>
     <record date="1995-06">
       <value>148-252</value>
