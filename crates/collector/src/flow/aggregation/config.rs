@@ -20,10 +20,10 @@
 //!
 //! ## Types
 //!
-//! - `AggregationConfig` - User-facing configuration with time windows,
-//!   worker settings, and field transformation specifications
-//! - `Transform` - Field transformation specifications (single operation
-//!   or multi-index operations for array fields)
+//! - `AggregationConfig` - User-facing configuration with time windows, worker
+//!   settings, and field transformation specifications
+//! - `Transform` - Field transformation specifications (single operation or
+//!   multi-index operations for array fields)
 //! - `FieldRef` - Reference to specific field by IE and array index
 //!
 //! ## Validation
@@ -31,8 +31,8 @@
 //! The module provides comprehensive validation including:
 //! - Basic parameter validation (worker count, time windows)
 //! - Operation compatibility with Information Element (IE) types
-//! - Conversion from user configuration to optimized internal format
-//!   (`Unified Config`)
+//! - Conversion from user configuration to optimized internal format (`Unified
+//!   Config`)
 //!
 //! ## Configuration Flow
 //!

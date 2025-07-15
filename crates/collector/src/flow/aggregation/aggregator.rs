@@ -18,8 +18,8 @@
 //! This module implements the runtime aggregation engine that processes flow
 //! records in time windows. The main components are:
 //!
-//! - `FlowAggregator` - Main aggregation engine implementing time-windowed
-//!   flow aggregation with configurable operations
+//! - `FlowAggregator` - Main aggregation engine implementing time-windowed flow
+//!   aggregation with configurable operations
 //! - `FlowCacheKey` & `FlowCacheRecord` - In-memory cache structures for
 //!   maintaining aggregated flow state across time windows
 //! - `AggFlowInfo` - Wrapper for aggregatable flow data with time-series
@@ -37,7 +37,8 @@
 //!
 //! ## Processing Flow
 //!
-//! 1. Incoming flows are exploded into `AggFlowInfo` records using field selectors
+//! 1. Incoming flows are exploded into `AggFlowInfo` records using field
+//!    selectors
 //! 2. Records are grouped by `FlowCacheKey` (peer IP + key fields)
 //! 3. Aggregation operations are applied to combine records in the same group
 //! 4. Time windows manage when aggregated records are flushed
