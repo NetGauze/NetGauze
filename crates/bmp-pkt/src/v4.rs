@@ -169,7 +169,7 @@ pub enum RouteMonitoringTlvValue {
     Unknown { code: u16, value: Vec<u8> },
 }
 
-/// Path Status TLV
+/// Path Status TLV [draft-ietf-grow-bmp-path-marking-tlv](https://datatracker.ietf.org/doc/html/draft-ietf-grow-bmp-path-marking-tlv)
 /// ```text
 /// 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 /// +-------------------------------+-------------------------------+
@@ -216,6 +216,7 @@ impl PathMarking {
 }
 
 // TODO assign real codes and move to IANA when draft becomes RFC
+//  (https://datatracker.ietf.org/doc/html/draft-ietf-grow-bmp-path-marking-tlv)
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, FromRepr, Display)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
