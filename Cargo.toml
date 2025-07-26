@@ -46,7 +46,7 @@ async-channel = "2.5"
 libc = { version = "0.2" }
 byteorder = { version = "1.5" }
 chrono = { version = "0.4", default-features = false }
-criterion = { version = "0.6" }                                                             # Dev dep for bench
+criterion = { version = "0.7" }                                                             # Dev dep for bench
 futures = "0.3"
 futures-util = "0.3"
 futures-core = "0.3"
