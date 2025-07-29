@@ -15,3 +15,4 @@
 
 pub mod enrichment;
 pub mod model;
+pub mod validation;
