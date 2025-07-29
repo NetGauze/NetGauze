@@ -76,10 +76,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: Enable type layout randomization
         run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
-      - name: Install prec2 library
-        run: brew install pcre2
-      - name: Add Homebrew include dir to the C_INCLUDE path
-        run: export C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOMEBREW_PREFIX/include
       - name: run tests on macos
         run: C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOMEBREW_PREFIX/include cargo test
 
@@ -100,7 +96,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: Enable type layout randomization
         run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
-      - run: cargo test
+      - run: C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOMEBREW_PREFIX/include cargo test
 
   # TODO: enable min version checks once NetGauze is more stable
   #  minimal:
