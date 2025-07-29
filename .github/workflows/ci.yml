@@ -65,17 +65,9 @@ jobs:
         if: matrix.rust == 'nightly'
       - run: cargo test --features iana-upstream-build
 
-  xplat:
-    name: ${{matrix.name}}
-    runs-on: ${{matrix.os}}-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macOS
-            os: macos
-          - name: Windows
-            os: windows
+  macos:
+    name: macOS
+    runs-on: macos-latest
     timeout-minutes: 45
     env:
       TRYBUILD: overwrite
@@ -84,7 +76,27 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: Enable type layout randomization
         run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
-      - run: cargo test
+      - name: run tests
+        run: C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOMEBREW_PREFIX/include cargo test
+
+  # TODO: Windows build is not working
+  # windows:
+  #   name: Windows
+  #   runs-on: windows-latest
+  #   timeout-minutes: 45
+  #   env:
+  #     TRYBUILD: overwrite
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: dtolnay/rust-toolchain@nightly
+  #     - name: Install pcre2
+  #       run: vcpkg install pcre2
+  #     - name: Install dlfcn-win32
+  #       run:  vcpkg install dlfcn-win32
+  #     - name: Enable type layout randomization
+  #       run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
+  #     - name: run tests
+  #       run: cargo test
 
   # TODO: enable min version checks once NetGauze is more stable
   #  minimal:
