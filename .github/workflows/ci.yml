@@ -65,6 +65,22 @@ jobs:
         if: matrix.rust == 'nightly'
       - run: cargo test --features iana-upstream-build
 
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      TRYBUILD: overwrite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - name: Enable type layout randomization
+        run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
+      - name: Install prec2 library
+        run: brew install pcre2
+      - name: run tests on macos
+        run: cargo test
+
   xplat:
     name: ${{matrix.name}}
     runs-on: ${{matrix.os}}-latest
@@ -72,8 +88,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: macOS
-            os: macos
           - name: Windows
             os: windows
     timeout-minutes: 45
