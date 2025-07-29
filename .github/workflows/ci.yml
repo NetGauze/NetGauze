@@ -88,10 +88,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-      - name: Enable type layout randomization
-        run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
       - name: Install pcre2
         run: vcpkg install pcre2
+      - name: Install dlfcn-win32
+        run:  vcpkg install dlfcn-win32
+      - name: Enable type layout randomization
+        run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
       - name: run tests
         run: cargo test
 
