@@ -32,7 +32,12 @@ either = { workspace = true }
 ciborium = { workspace = true }
 async-channel = { workspace = true }
 anyhow = { workspace = true }
+yang3 = { workspace = true }
 
 
 [build-dependencies]
 shadow-rs = { workspace = true, default-features = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+tracing-test = { workspace = true }
