@@ -67,6 +67,9 @@ fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
         .try_init()
         .expect("Failed to register tracing subscriber");
 
+    // Set up the log -> tracing bridge first
+    //tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");
+
     Ok(())
 }
 

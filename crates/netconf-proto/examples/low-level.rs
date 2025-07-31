@@ -63,6 +63,9 @@ fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
         .try_init()
         .expect("Failed to register tracing subscriber");
 
+    // Set up the log -> tracing bridge first
+    //tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");
+
     Ok(())
 }
 
@@ -136,14 +139,11 @@ pub async fn main() -> anyhow::Result<()> {
     tokio::time::sleep(Duration::from_millis(100)).await;
     tx.send(NetConfMessage::Hello(Hello {
         session_id: None,
-        capabilities:
-        recv_hello
+        capabilities: recv_hello
             .capabilities
             .iter()
-
             .filter_map(|(k, cap)| {
-                if let Capability::Base(Base::V1_0) = cap
-                {
+                if let Capability::Base(Base::V1_0) = cap {
                     None
                 } else {
                     Some((k.clone(), cap.clone()))
@@ -165,7 +165,7 @@ pub async fn main() -> anyhow::Result<()> {
             message_id: "1011".to_string(),
             operation: lib_request,
         }))
-            .await?;
+        .await?;
         let yang_lib_reply = if let Some(Ok(NetConfMessage::RpcReply(value))) = rx.next().await {
             value
         } else {

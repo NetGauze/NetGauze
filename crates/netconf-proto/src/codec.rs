@@ -224,7 +224,7 @@ impl Encoder<NetConfMessage> for SshCodec {
         item.xml_serialize(&mut xml_writer).unwrap();
         let buf = xml_writer.inner.into_inner().into_inner();
         if tracing::enabled!(tracing::Level::DEBUG) {
-            tracing::debug!("Serialized payload: `{:?}`", std::str::from_utf8(&buf));
+            tracing::debug!("Serialized payload: `{}`", std::str::from_utf8(&buf)?);
         }
         if let NetConfMessage::Hello(_) = item {
             dst.extend_from_slice(XML_HEADER.as_bytes());
@@ -232,6 +232,10 @@ impl Encoder<NetConfMessage> for SshCodec {
             dst.extend_from_slice(HELLO_TERMINATOR.as_bytes());
         } else {
             let size = buf.len();
+            let mut out = Vec::from(format!("{CHUNK_START}{size}\n").as_bytes());
+            out.extend_from_slice(&buf);
+            out.extend_from_slice(MESSAGE_TERMINATOR.as_bytes());
+            eprintln!("OUT IS:\n----{}----\n\n", std::str::from_utf8(&out)?);
             dst.extend_from_slice(format!("{CHUNK_START}{size}\n").as_bytes());
             dst.extend_from_slice(&buf);
             dst.extend_from_slice(MESSAGE_TERMINATOR.as_bytes());

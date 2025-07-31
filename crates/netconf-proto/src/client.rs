@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use crate::{
-    capabilities::{Capability, YangLibrary},
+    capabilities::{Base, Capability, CapabilityImpl, YangLibrary},
     protocol::{Hello, NetConfMessage, Rpc, RpcReply, RpcReplyValue},
 };
 use futures::{SinkExt, StreamExt};
@@ -108,7 +108,9 @@ impl<
         yang_search_dir: String,
     ) -> Result<Self, SshNetConfClientError<E>> {
         tracing::info!("Waiting for hello message");
-        let (mut framed, session_id, peer_caps) = Self::recv_hello(framed).await?;
+        let (mut framed, session_id, mut peer_caps) = Self::recv_hello(framed).await?;
+        peer_caps.remove(&Capability::Base(Base::V1_0).shorthand());
+        peer_caps.remove(&Capability::Base(Base::V1_0).urn());
         tracing::info!("Hello message received and processed");
         tracing::info!("Sending hello back");
         framed
@@ -199,7 +201,7 @@ impl<
             }
         }
         tracing::info!("---- KNOWN CAPABILITIES --------");
-        for (key, cap) in known.iter() {
+        for (key, cap) in &known {
             tracing::info!("CAPABILITY: `{key}`: `{cap:?}`");
         }
 
@@ -207,36 +209,88 @@ impl<
             todo!("YANG LIBRARY NOT SUPPORTED BY THE ROUTER")
         };
         let yang_library_request = r#"<get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring"><identifier>ietf-ip</identifier></get-schema>"#.to_string();
-        framed.send(NetConfMessage::Rpc(Rpc {
-            message_id: "10100".to_string(),
-            operation: yang_library_request,
-        })).await.unwrap();
+        framed
+            .send(NetConfMessage::Rpc(Rpc {
+                message_id: "10100".to_string(),
+                operation: yang_library_request,
+            }))
+            .await
+            .unwrap();
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         while let next = framed.next().await {
             match next {
-                Some(msg) => {
-                    match msg {
-                        Ok(NetConfMessage::RpcReply(reply)) => {
-                            todo!("GOT REPLY: {:?}", reply);
-                        }
-                        Ok(msg) => {
-                            tracing::info!("Got REPLY: {:?}", msg);
-                            todo!("INVALID reply")
-                        }
-                        Err(err) => {
-                            todo!("GOT INVALID reply: {err}")
-                        }
+                Some(msg) => match msg {
+                    Ok(NetConfMessage::RpcReply(reply)) => {
+                        todo!("GOT REPLY: {:?}", reply);
                     }
-                }
+                    Ok(msg) => {
+                        tracing::info!("Got REPLY: {:?}", msg);
+                        todo!("INVALID reply")
+                    }
+                    Err(err) => {
+                        todo!("GOT INVALID reply: {err}")
+                    }
+                },
                 None => {
                     eprintln!("Channel closed");
                     break;
-                    //tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                    //tokio::time::sleep(tokio::time::Duration::from_secs(1)).
+                    // await;
                 }
             }
-
         }
-        todo!("YANG LIBRARY not supported by the client yet")
+        if !capabilities.contains_key(":yang-library:1.1")
+            && !capabilities.contains_key(":ietf-yang-library")
+        {
+            todo!("YANG LIBRARY not supported ")
+        };
+        framed
+            .send(NetConfMessage::Rpc(Rpc {
+                message_id: "urn:uuid:2b780556-86e9-4475-af65-8298ef1c0e73".to_string(),
+                operation: r#"
+    <get>
+      <filter type="subtree">
+        <yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+        </yang-library>
+        <modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+        </modules-state>
+      </filter>
+    </get>"#
+                    .to_string(),
+            }))
+            .await
+            .expect("Failed to send RPC message");
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let mut count = 0;
+        loop {
+            let msg = framed.next().await;
+            let msg = if let Some(msg) = msg {
+                msg
+            } else {
+                count += 1;
+                if count > 120 {
+                    todo!("too many retries")
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                continue;
+            };
+            tracing::info!("GOT {:?}", msg);
+            let msg = msg.expect("Failed to receive yang library message");
+            let reply = if let NetConfMessage::RpcReply(reply) = msg {
+                reply
+            } else {
+                tracing::error!("Received unexpected message");
+                todo!()
+            };
+            let value = if let RpcReplyValue::Data(err, resp) = reply.reply {
+                resp
+            } else {
+                tracing::error!("Received unexpected reply");
+                todo!()
+            };
+            todo!("Finish libyang context: {value}")
+        }
     }
 
     pub async fn send(
@@ -294,11 +348,12 @@ impl<
             let content_id = content_id.parse::<u32>()?;
             eprintln!("content id {content_id:#x}");
             let operation = "<get><filter type=\"subtree\"><yang-library xmlns=\"urn:ietf:params:xml:ns:yang:ietf-yang-library\"></yang-library></filter></get>".to_string();
-            let message_id = format!("{}", self.next_message_id);
             self.next_message_id += 1;
+            let message_id = format!("{}", self.next_message_id);
+
             self.framed
                 .send(NetConfMessage::Rpc(Rpc {
-                    message_id,
+                    message_id: "urn:uuid:2b780556-86e9-4475-af65-8298ef1c0e76".to_string(),
                     operation,
                 }))
                 .await?;
