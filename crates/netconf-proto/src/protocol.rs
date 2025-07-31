@@ -947,7 +947,7 @@ fn extract_message_id(open: BytesStart<'_>) -> Result<Option<String>, ParsingErr
 mod tests {
     use super::*;
     use crate::{
-        capabilities::{Base, Startup},
+        capabilities::{Base, Startup, YangModule},
         tests::test_xml_value,
     };
     use quick_xml::{reader::NsReader, DeError};
@@ -995,13 +995,13 @@ mod tests {
                 ),
                 (
                     Box::from(":example-module"),
-                    Capability::YangModule {
+                    Capability::YangModule(YangModule {
                         ns: "urn:example:yang:example-module".into(),
                         module: "example-module".into(),
                         revision: "2022-12-22".into(),
                         features: Box::new([]),
                         deviations: Box::new([]),
-                    },
+                    }),
                 ),
             ]),
         };
@@ -1032,23 +1032,23 @@ mod tests {
                 ),
                 (
                     Box::from(":openconfig-aaa"),
-                    Capability::YangModule {
+                    Capability::YangModule(YangModule {
                         ns: "http://openconfig.net/yang/aaa".into(),
                         module: "openconfig-aaa".into(),
                         revision: "2020-07-30".into(),
                         features: Box::new([]),
                         deviations: Box::new([]),
-                    },
+                    }),
                 ),
                 (
                     Box::from(":openconfig-alarms"),
-                    Capability::YangModule {
+                    Capability::YangModule(YangModule {
                         ns: "http://openconfig.net/yang/alarms".into(),
                         module: "openconfig-alarms".into(),
                         revision: "2018-01-16".into(),
                         features: Box::new([]),
                         deviations: Box::new([Box::from("example-openconfig-alarms-deviation")]),
-                    },
+                    }),
                 ),
             ]),
         };

@@ -58,13 +58,7 @@ pub enum Capability {
     Time(Time),
     YangLibrary(YangLibrary),
     WithOperationalDefaults(WithOperationalDefaults),
-    YangModule {
-        ns: Box<str>,
-        module: Box<str>,
-        revision: Box<str>,
-        features: Box<[Box<str>]>,
-        deviations: Box<[Box<str>]>,
-    },
+    YangModule(YangModule),
     Unknown(Box<str>),
 }
 
@@ -87,7 +81,7 @@ impl CapabilityImpl for Capability {
             Self::Time(v) => v.shorthand(),
             Self::YangLibrary(v) => v.shorthand(),
             Self::WithOperationalDefaults(v) => v.shorthand(),
-            Self::YangModule { module, .. } => format!(":{module}").into(),
+            Self::YangModule(v) => v.shorthand(),
             Self::Unknown(v) => v.clone(),
         }
     }
@@ -110,7 +104,7 @@ impl CapabilityImpl for Capability {
             Self::Time(v) => v.identifier(),
             Self::YangLibrary(v) => v.identifier(),
             Self::WithOperationalDefaults(v) => v.identifier(),
-            Self::YangModule { ns, .. } => format!("{ns}").into(),
+            Self::YangModule(v) => v.identifier(),
             Self::Unknown(v) => v.clone(),
         }
     }
@@ -133,31 +127,7 @@ impl CapabilityImpl for Capability {
             Self::Time(v) => v.urn(),
             Self::YangLibrary(v) => v.urn(),
             Self::WithOperationalDefaults(v) => v.urn(),
-            Self::YangModule {
-                ns,
-                module,
-                revision,
-                features,
-                deviations,
-            } => match (features.is_empty(), deviations.is_empty()) {
-                (true, true) => format!("{ns}?module={module}&revision={revision}").into(),
-                (true, false) => format!(
-                    "{ns}?module={module}&revision={revision}&deviations={}",
-                    deviations.join(",")
-                )
-                .into(),
-                (false, true) => format!(
-                    "{ns}?module={module}&revision={revision}&features={}",
-                    features.join(",")
-                )
-                .into(),
-                (false, false) => format!(
-                    "{ns}?module={module}&revision={revision}&features={}&deviations={}",
-                    features.join(","),
-                    deviations.join(",")
-                )
-                .into(),
-            },
+            Self::YangModule(v) => v.urn(),
             Self::Unknown(v) => v.clone(),
         }
     }
@@ -182,7 +152,7 @@ impl std::fmt::Display for Capability {
             Self::Time(v) => v.fmt(f),
             Self::YangLibrary(v) => v.fmt(f),
             Self::WithOperationalDefaults(v) => v.fmt(f),
-            Self::YangModule { .. } => self.urn().fmt(f),
+            Self::YangModule(v) => v.fmt(f),
             Self::Unknown(v) => write!(f, "{v}"),
         }
     }
@@ -404,13 +374,13 @@ impl FromStr for Capability {
                 if let Ok((module, revision, features, deviations)) =
                     extract_module_revision(&params, path)
                 {
-                    Ok(Self::YangModule {
+                    Ok(Self::YangModule(YangModule {
                         ns: format!("urn:{path}").into(),
                         module,
                         revision,
                         features,
                         deviations,
-                    })
+                    }))
                 } else {
                     Ok(Self::Unknown(s.into()))
                 }
@@ -420,13 +390,13 @@ impl FromStr for Capability {
                 if let Ok((module, revision, features, deviations)) =
                     extract_module_revision(&params, ns)
                 {
-                    Ok(Self::YangModule {
+                    Ok(Self::YangModule(YangModule {
                         ns: format!("http://{authority}{ns}").into(),
                         module,
                         revision,
                         features,
                         deviations,
-                    })
+                    }))
                 } else {
                     Ok(Self::Unknown(s.into()))
                 }
@@ -436,13 +406,13 @@ impl FromStr for Capability {
                 if let Ok((module, revision, features, deviations)) =
                     extract_module_revision(&params, ns)
                 {
-                    Ok(Self::YangModule {
+                    Ok(Self::YangModule(YangModule {
                         ns: format!("https://{authority}{ns}").into(),
                         module,
                         revision,
                         features,
                         deviations,
-                    })
+                    }))
                 } else {
                     Ok(Self::Unknown(s.into()))
                 }
@@ -1033,6 +1003,66 @@ impl std::fmt::Display for WithOperationalDefaults {
     }
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct YangModule {
+    pub ns: Box<str>,
+    pub module: Box<str>,
+    pub revision: Box<str>,
+    pub features: Box<[Box<str>]>,
+    pub deviations: Box<[Box<str>]>,
+}
+
+impl CapabilityImpl for YangModule {
+    fn shorthand(&self) -> Box<str> {
+        format!(":{}", self.module).into()
+    }
+
+    fn identifier(&self) -> Box<str> {
+        format!("{}", self.ns).into()
+    }
+
+    fn urn(&self) -> Box<str> {
+        match (self.features.is_empty(), self.deviations.is_empty()) {
+            (true, true) => format!(
+                "{}?module={}&revision={}",
+                self.ns, self.module, self.revision
+            )
+            .into(),
+            (true, false) => format!(
+                "{}?module={}&revision={}&deviations={}",
+                self.ns,
+                self.module,
+                self.revision,
+                self.deviations.join(",")
+            )
+            .into(),
+            (false, true) => format!(
+                "{}?module={}&revision={}&features={}",
+                self.ns,
+                self.module,
+                self.revision,
+                self.features.join(",")
+            )
+            .into(),
+            (false, false) => format!(
+                "{}?module={}&revision={}&features={}&deviations={}",
+                self.ns,
+                self.module,
+                self.revision,
+                self.features.join(","),
+                self.deviations.join(",")
+            )
+            .into(),
+        }
+    }
+}
+
+impl std::fmt::Display for YangModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.urn())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1100,13 +1130,13 @@ mod tests {
     #[test]
     fn test_yang_urn() -> Result<(), ParsingError> {
         let input = "urn:example:yang:example-module?module=example-module&revision=2022-12-22";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "urn:example:yang:example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new([]),
             deviations: Box::new([]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
@@ -1140,38 +1170,38 @@ mod tests {
     #[test]
     fn test_yang_urn_with_features() -> Result<(), ParsingError> {
         let input = "urn:example:yang:example-module?module=example-module&revision=2022-12-22&features=feature1,feature2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "urn:example:yang:example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new(["feature1".into(), "feature2".into()]),
             deviations: Box::new([]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
     #[test]
     fn test_yang_urn_with_deviations() -> Result<(), ParsingError> {
         let input = "urn:example:yang:example-module?module=example-module&revision=2022-12-22&deviations=deviation1,deviation2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "urn:example:yang:example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new([]),
             deviations: Box::new(["deviation1".into(), "deviation2".into()]),
-        };
+        });
         test_from_str(input, &expected)
     }
     #[test]
     fn test_yang_urn_with_features_and_deviations() -> Result<(), ParsingError> {
         let input = "urn:example:yang:example-module?module=example-module&revision=2022-12-22&features=feature1,feature2&deviations=deviation1,deviation2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "urn:example:yang:example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new(["feature1".into(), "feature2".into()]),
             deviations: Box::new(["deviation1".into(), "deviation2".into()]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
@@ -1179,13 +1209,13 @@ mod tests {
     fn test_yang_http_urn() -> Result<(), ParsingError> {
         let input =
             "http://example.com/yang/example-module?module=example-module&revision=2022-12-22";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "http://example.com/yang/example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new([]),
             deviations: Box::new([]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
@@ -1193,91 +1223,91 @@ mod tests {
     fn test_yang_https_urn() -> Result<(), ParsingError> {
         let input =
             "https://example.com/yang/example-module?module=example-module&revision=2022-12-22";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "https://example.com/yang/example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new([]),
             deviations: Box::new([]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
     #[test]
     fn test_yang_http_urn_with_features() -> Result<(), ParsingError> {
         let input = "http://example.com/yang/example-module?module=example-module&revision=2022-12-22&features=feature1,feature2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "http://example.com/yang/example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new(["feature1".into(), "feature2".into()]),
             deviations: Box::new([]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
     #[test]
     fn test_yang_https_urn_with_features() -> Result<(), ParsingError> {
         let input = "https://example.com/yang/example-module?module=example-module&revision=2022-12-22&features=feature1,feature2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "https://example.com/yang/example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new(["feature1".into(), "feature2".into()]),
             deviations: Box::new([]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
     #[test]
     fn test_yang_http_urn_with_deviations() -> Result<(), ParsingError> {
         let input = "http://example.com/yang/example-module?module=example-module&revision=2022-12-22&deviations=deviation1,deviation2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "http://example.com/yang/example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new([]),
             deviations: Box::new(["deviation1".into(), "deviation2".into()]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
     #[test]
     fn test_yang_https_urn_with_deviations() -> Result<(), ParsingError> {
         let input = "https://example.com/yang/example-module?module=example-module&revision=2022-12-22&deviations=deviation1,deviation2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "https://example.com/yang/example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new([]),
             deviations: Box::new(["deviation1".into(), "deviation2".into()]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
     #[test]
     fn test_yang_http_urn_with_features_and_deviations() -> Result<(), ParsingError> {
         let input = "http://example.com/yang/example-module?module=example-module&revision=2022-12-22&features=feature1,feature2&deviations=deviation1,deviation2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "http://example.com/yang/example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new(["feature1".into(), "feature2".into()]),
             deviations: Box::new(["deviation1".into(), "deviation2".into()]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
     #[test]
     fn test_yang_https_urn_with_features_and_deviations() -> Result<(), ParsingError> {
         let input = "https://example.com/yang/example-module?module=example-module&revision=2022-12-22&features=feature1,feature2&deviations=deviation1,deviation2";
-        let expected = Capability::YangModule {
+        let expected = Capability::YangModule(YangModule {
             ns: "https://example.com/yang/example-module".into(),
             module: "example-module".into(),
             revision: "2022-12-22".into(),
             features: Box::new(["feature1".into(), "feature2".into()]),
             deviations: Box::new(["deviation1".into(), "deviation2".into()]),
-        };
+        });
         test_from_str(input, &expected)
     }
 
