@@ -26,13 +26,14 @@ use crate::{
     },
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
+use netgauze_flow_pkt::FlowInfo;
 use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
 use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
 use netgauze_yang_push::{
     enrichment::YangPushEnrichmentActorHandle, model::telemetry::TelemetryMessageWrapper,
 };
-use std::{str::Utf8Error, sync::Arc};
+use std::{net::IpAddr, str::Utf8Error, sync::Arc};
 use tracing::{info, warn};
 
 pub mod config;
@@ -105,6 +106,7 @@ pub async fn init_flow_collection(
                                 either::Left(meter.clone()),
                                 shard_id,
                             );
+
                             let (enrichment_join, enrichment_handle) =
                                 FlowEnrichmentActorHandle::new(
                                     config.writer_id.clone(),
@@ -112,11 +114,11 @@ pub async fn init_flow_collection(
                                     agg_handle.subscribe(),
                                     either::Left(meter.clone()),
                                 );
-                            let enriched_rx = enrichment_handle.subscribe();
+
                             let (kafka_join, kafka_handle) =
                                 KafkaAvroPublisherActorHandle::from_config(
                                     config.clone(),
-                                    enriched_rx,
+                                    enrichment_handle.subscribe(),
                                     either::Left(meter.clone()),
                                 )
                                 .await?;
@@ -139,10 +141,55 @@ pub async fn init_flow_collection(
                         sonata_handles.push(sonata_handle);
                     }
                 }
+                PublisherEndpoint::FlowKafkaJson(config) => {
+                    for (shard_id, flow_recv) in flow_recvs.iter().enumerate() {
+                        if let Some(aggregation_config) = publisher_config.aggregation.as_ref() {
+                            let (agg_join, agg_handle) = AggregationActorHandle::new(
+                                publisher_config.buffer_size,
+                                aggregation_config.clone(),
+                                flow_recv.clone(),
+                                either::Left(meter.clone()),
+                                shard_id,
+                            );
+
+                            let (enrichment_join, enrichment_handle) =
+                                FlowEnrichmentActorHandle::new(
+                                    config.writer_id.clone(),
+                                    publisher_config.buffer_size,
+                                    agg_handle.subscribe(),
+                                    either::Left(meter.clone()),
+                                );
+
+                            let (kafka_join, kafka_handle) =
+                                KafkaJsonPublisherActorHandle::from_config(
+                                    serialize_flow,
+                                    config.clone(),
+                                    enrichment_handle.subscribe(),
+                                    either::Left(meter.clone()),
+                                )?;
+
+                            join_set.push(agg_join);
+                            join_set.push(enrichment_join);
+                            join_set.push(kafka_join);
+                            agg_handles.push(agg_handle);
+                            enrichment_handles.push(enrichment_handle);
+                            kafka_json_handles.push(kafka_handle);
+                        }
+                    }
+                    if let Some(kafka_consumer) = publisher_config.sonata_enrichment.as_ref() {
+                        let (sonata_join, sonata_handle) = SonataActorHandle::new(
+                            kafka_consumer.clone(),
+                            enrichment_handles.clone(),
+                            either::Left(meter.clone()),
+                        )?;
+                        join_set.push(sonata_join);
+                        sonata_handles.push(sonata_handle);
+                    }
+                }
                 PublisherEndpoint::KafkaJson(config) => {
                     for flow_recv in &flow_recvs {
                         let (join_handle, handle) = KafkaJsonPublisherActorHandle::from_config(
-                            serialize_flow,
+                            serialize_flow_req,
                             config.clone(),
                             flow_recv.clone(),
                             either::Left(meter.clone()),
@@ -274,6 +321,11 @@ pub async fn init_udp_notif_collection(
                             ));
                         }
                     }
+                }
+                PublisherEndpoint::FlowKafkaJson(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Flow Kafka JSON publisher not supported for UDP Notif"
+                    ));
                 }
                 PublisherEndpoint::FlowKafkaAvro(_) => {
                     return Err(anyhow::anyhow!(
@@ -456,13 +508,23 @@ impl From<serde_json::Error> for FlowSerializationError {
     }
 }
 
-fn serialize_flow(
+fn serialize_flow_req(
     input: Arc<FlowRequest>,
     _writer_id: String,
 ) -> Result<(Option<serde_json::Value>, serde_json::Value), FlowSerializationError> {
     let (peer, msg) = input.as_ref();
     let value = serde_json::to_value(msg)?;
     let key = serde_json::Value::String(peer.ip().to_string());
+    Ok((Some(key), value))
+}
+
+fn serialize_flow(
+    input: (IpAddr, FlowInfo),
+    _writer_id: String,
+) -> Result<(Option<serde_json::Value>, serde_json::Value), FlowSerializationError> {
+    let (ip, msg) = input;
+    let value = serde_json::to_value(msg)?;
+    let key = serde_json::Value::String(ip.to_string());
     Ok((Some(key), value))
 }
 
