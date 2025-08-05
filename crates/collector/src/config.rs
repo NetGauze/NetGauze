@@ -207,8 +207,19 @@ pub struct PublisherConfig {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PublisherEndpoint {
+    /// HTTP publisher endpoint
     Http(HttpPublisherEndpoint),
+
+    /// Kafka JSON publisher endpoint
     KafkaJson(kafka_json::KafkaConfig),
+
+    /// Kafka JSON publisher endpoint (for aggregated flow packets)
+    FlowKafkaJson(kafka_json::KafkaConfig),
+
+    /// Kafka Avro publisher endpoint (for aggregated flow packets with avro
+    /// conversion)
     FlowKafkaAvro(kafka_avro::KafkaConfig<FlowOutputConfig>),
+
+    /// Kafka JSON publisher endpoint (for yang-push telemetry messages)
     TelemetryKafkaJson(kafka_json::KafkaConfig),
 }
