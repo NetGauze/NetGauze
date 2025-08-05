@@ -31,10 +31,10 @@ const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KafkaConfig {
     /// Output topic
-    topic: String,
+    pub topic: String,
     /// Key/Value producer configs are defined in librdkafka
-    producer_config: HashMap<String, String>,
-    writer_id: String,
+    pub producer_config: HashMap<String, String>,
+    pub writer_id: String,
 }
 
 // --- telemetry ---

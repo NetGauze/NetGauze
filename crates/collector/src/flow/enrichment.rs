@@ -114,7 +114,7 @@ struct FlowEnrichment {
     writer_id: String,
     cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
     enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-    agg_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
+    flow_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
     enriched_tx: async_channel::Sender<(IpAddr, FlowInfo)>,
     default_labels: (u32, HashMap<String, String>),
     stats: FlowEnrichmentStats,
@@ -125,7 +125,7 @@ impl FlowEnrichment {
         writer_id: String,
         cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
         enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-        agg_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
+        flow_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
         enriched_tx: async_channel::Sender<(IpAddr, FlowInfo)>,
         stats: FlowEnrichmentStats,
     ) -> Self {
@@ -141,7 +141,7 @@ impl FlowEnrichment {
             labels: HashMap::new(),
             cmd_rx,
             enrichment_rx,
-            agg_rx,
+            flow_rx,
             enriched_tx,
             default_labels,
             stats,
@@ -223,7 +223,7 @@ impl FlowEnrichment {
                         }
                     }
                 }
-                flow = self.agg_rx.recv() => {
+                flow = self.flow_rx.recv() => {
                     match flow {
                         Ok((peer_ip, flow)) => {
                             let peer_tags = [
@@ -286,7 +286,7 @@ impl FlowEnrichmentActorHandle {
     pub fn new(
         writer_id: String,
         buffer_size: usize,
-        agg_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
+        flow_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
         stats: either::Either<opentelemetry::metrics::Meter, FlowEnrichmentStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
@@ -300,7 +300,7 @@ impl FlowEnrichmentActorHandle {
             writer_id,
             cmd_recv,
             enrichment_rx,
-            agg_rx,
+            flow_rx,
             enriched_tx,
             stats,
         );
