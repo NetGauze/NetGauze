@@ -1,0 +1,36 @@
+{
+  "ietf-yang-library:yang-library": {
+    "module-set": [
+      {
+        "name": "complete",
+        "module": [
+          {
+            "name": "ietf-distributed-notif",
+            "revision": "2024-04-21",
+            "namespace": "urn:ietf:params:xml:ns:yang:ietf-distributed-notif"
+          },
+          {
+            "name": "ietf-yp-observation",
+            "revision": "2025-05-24",
+            "namespace": "urn:ietf:params:xml:ns:yang:ietf-yp-observation",
+            "feature": [
+              "yang-push-observation-timestamp"
+            ]
+          }
+        ]
+      }
+    ],
+    "schema": [
+      {
+        "name": "complete",
+        "module-set": [
+          "complete"
+        ]
+      }
+    ],
+    "content-id": "0"
+  },
+  "ietf-yang-library:modules-state": {
+    "module-set-id": "0"
+  }
+}
