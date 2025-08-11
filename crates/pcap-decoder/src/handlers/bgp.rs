@@ -251,7 +251,7 @@ mod tests {
         let json = result.unwrap();
         assert_eq!(
             json,
-            "{\"source_address\":\"10.0.0.1:12345\",\"destination_address\":\"10.0.0.2:179\",\"info\":{\"Open\":{\"version\":4,\"my_as\":1,\"hold_time\":180,\"bgp_id\":\"1.1.1.1\",\"params\":[]}}}"
+            r#"{"source_address":"10.0.0.1:12345","destination_address":"10.0.0.2:179","info":{"Open":{"version":4,"my_as":1,"hold_time":180,"bgp_id":"1.1.1.1","params":[]}}}"#
         );
     }
 
@@ -268,7 +268,7 @@ mod tests {
         let json = result.unwrap();
         assert_eq!(
             json,
-            "{\"BgpMessageParsingError\":{\"BadMessageLength\":10}}"
+            r#"{"BgpMessageParsingError":{"BadMessageLength":10}}"#
         );
     }
 }

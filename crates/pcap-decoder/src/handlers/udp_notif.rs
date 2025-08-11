@@ -108,19 +108,8 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::Ipv4Addr;
-
     use bytes::Bytes;
-
-    // Helper to create a mock UDP Notif packet
-    fn create_udp_notif_packet_bytes(msg_type: u16, length: u16, payload: &[u8]) -> Vec<u8> {
-        let mut packet = Vec::new();
-        // MessageHeader
-        packet.extend_from_slice(&msg_type.to_be_bytes()); // msg_type
-        packet.extend_from_slice(&length.to_be_bytes()); // length
-        packet.extend_from_slice(payload);
-        packet
-    }
+    use std::net::Ipv4Addr;
 
     #[test]
     fn test_udp_notif_handler_decode_success() {
@@ -199,7 +188,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
             5678, // Wrong port
         );
-        let packet_data = create_udp_notif_packet_bytes(0x0004, 4, &[]);
+        let packet_data = [0xff];
         let mut exporter_peers = HashMap::new();
 
         let result = handler.decode(
@@ -221,7 +210,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
             1234,
         );
-        let packet_data = create_udp_notif_packet_bytes(0x0004, 4, &[]);
+        let packet_data = [0xff];
         let mut exporter_peers = HashMap::new();
 
         let result = handler.decode(
