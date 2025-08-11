@@ -156,6 +156,20 @@ pub enum NotificationVariant {
     YangPushChangeUpdate(YangPushChangeUpdate),
 }
 
+impl NotificationVariant {
+    pub fn subscription_id(&self) -> SubscriptionId {
+        match self {
+            NotificationVariant::SubscriptionStarted(sub_started) => sub_started.id(),
+            NotificationVariant::SubscriptionModified(sub_modified) => sub_modified.id(),
+            NotificationVariant::SubscriptionTerminated(sub_terminated) => sub_terminated.id(),
+            NotificationVariant::YangPushUpdate(push_update) => push_update.id(),
+            NotificationVariant::YangPushChangeUpdate(push_change_update) => {
+                push_change_update.id()
+            }
+        }
+    }
+}
+
 /// Subscription Started and Modified Message
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubscriptionStartedModified {
