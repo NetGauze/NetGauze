@@ -54,7 +54,9 @@ where
 
     for (src_ip, src_port, dst_ip, dst_port, protocol, packet_data) in PcapIter::new(pcap_reader) {
         packet_counter += 1;
-        if let Some(max_packets) = config.input_size && packet_counter >= max_packets {
+        if let Some(max_packets) = config.input_size
+            && packet_counter > max_packets
+        {
             break;
         }
 
@@ -108,8 +110,8 @@ struct Cli {
     #[clap(long, value_enum)]
     protocol: ProtocolToDecode,
 
-    /// Specify the protocol ports that will be used to filter the PCAP file
-    /// packets (comma-separated, example: 9991,9992)
+    /// Specify the protocol destination ports that will be used to filter the
+    /// PCAP file packets (comma-separated, example: 9991,9992)
     #[clap(long, value_delimiter = ',', required = true)]
     ports: Vec<u16>,
 
