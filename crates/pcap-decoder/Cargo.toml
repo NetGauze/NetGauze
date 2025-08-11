@@ -28,3 +28,9 @@ bytes = { workspace = true }
 tokio-util = { workspace = true, features = ["codec"] }
 tokio = { workspace = true, features = ["full", "rt-multi-thread"] }
 clap = { workspace = true, features = ["default", "derive"] }
+
+[dev-dependencies]
+chrono = { workspace = true, default-features = false, features = [
+    "std",
+] }
+tempfile = "1.0"
