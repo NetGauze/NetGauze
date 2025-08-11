@@ -71,3 +71,204 @@ impl ProtocolHandler<BgpMessage, BgpCodec, BgpCodecDecoderError> for BgpProtocol
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use netgauze_bgp_pkt::{open::BgpOpenMessage, wire::deserializer::BgpMessageParsingError};
+    use std::net::Ipv4Addr;
+
+    #[test]
+    fn test_bgp_handler_decode_success() {
+        let handler = BgpProtocolHandler::new(vec![179]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            179,
+        );
+        // A simple BGP OPEN message
+        let packet_data = [
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, 0x00, 0x01, 0x00, 0xb4, 0x01, 0x02, 0x03, 0x04,
+            0x00,
+        ];
+        let mut exporter_peers = HashMap::new();
+
+        let result = handler.decode(
+            flow_key,
+            TransportProtocol::TCP,
+            &packet_data,
+            &mut exporter_peers,
+        );
+
+        assert!(result.is_some());
+        if let Some(DecodeOutcome::Success((_, msg))) = result {
+            assert!(matches!(msg, BgpMessage::Open(_)));
+        } else {
+            panic!("Expected successful decode");
+        }
+    }
+
+    #[test]
+    fn test_bgp_handler_decode_failure() {
+        let handler = BgpProtocolHandler::new(vec![179]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            179,
+        );
+        // A simple BGP OPEN message
+        let packet_data = [
+            0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, // first byte differs
+            0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, 0x00, 0x01, 0x00, 0xb4, 0x01, 0x02, 0x03, 0x04,
+            0x00,
+        ];
+        let mut exporter_peers = HashMap::new();
+
+        let result = handler.decode(
+            flow_key,
+            TransportProtocol::TCP,
+            &packet_data,
+            &mut exporter_peers,
+        );
+
+        assert!(result.is_some());
+        // expecting an error due to the first byte being different
+        if let Some(DecodeOutcome::Error(e)) = result {
+            assert!(matches!(e, BgpCodecDecoderError::BgpMessageParsingError(_)));
+        } else {
+            panic!("Expected error decode");
+        }
+    }
+
+    #[test]
+    fn test_bgp_handler_decode_ignore_wrong_port() {
+        let handler = BgpProtocolHandler::new(vec![179]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            180, // Wrong port
+        );
+        let packet_data = [0xff; 20];
+        let mut exporter_peers = HashMap::new();
+
+        let result = handler.decode(
+            flow_key,
+            TransportProtocol::TCP,
+            &packet_data,
+            &mut exporter_peers,
+        );
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_bgp_handler_decode_ignore_wrong_protocol() {
+        let handler = BgpProtocolHandler::new(vec![179]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            179,
+        );
+        let packet_data = [0xff; 20];
+        let mut exporter_peers = HashMap::new();
+
+        let result = handler.decode(
+            flow_key,
+            TransportProtocol::UDP, // Wrong protocol
+            &packet_data,
+            &mut exporter_peers,
+        );
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_bgp_handler_decode_fragmented() {
+        let handler = BgpProtocolHandler::new(vec![179]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            179,
+        );
+        // A simple BGP OPEN message, split into two
+        let packet_data1 = &[
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0x00, 0x1d, 0x01,
+        ];
+        let packet_data2 = &[0x04, 0x00, 0x01, 0x00, 0xb4, 0x01, 0x02, 0x03, 0x04, 0x00];
+        let mut exporter_peers = HashMap::new();
+
+        // First packet is fragmented
+        let result1 = handler.decode(
+            flow_key,
+            TransportProtocol::TCP,
+            packet_data1,
+            &mut exporter_peers,
+        );
+        assert!(result1.is_none());
+
+        // Second packet completes it
+        let result2 = handler.decode(
+            flow_key,
+            TransportProtocol::TCP,
+            packet_data2,
+            &mut exporter_peers,
+        );
+        assert!(result2.is_some());
+        if let Some(DecodeOutcome::Success((_, msg))) = result2 {
+            assert!(matches!(msg, BgpMessage::Open(_)));
+        } else {
+            panic!("Expected successful decode on second packet");
+        }
+    }
+
+    #[test]
+    fn test_bgp_handler_serialize_success() {
+        let handler = BgpProtocolHandler::new(vec![179]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            179,
+        );
+        let open_message = BgpMessage::Open(BgpOpenMessage::new(
+            1,
+            180,
+            Ipv4Addr::new(1, 1, 1, 1),
+            vec![],
+        ));
+        let outcome = DecodeOutcome::Success((flow_key, open_message));
+
+        let result = handler.serialize(outcome);
+        assert!(result.is_ok());
+        let json = result.unwrap();
+        assert_eq!(
+            json,
+            "{\"source_address\":\"10.0.0.1:12345\",\"destination_address\":\"10.0.0.2:179\",\"info\":{\"Open\":{\"version\":4,\"my_as\":1,\"hold_time\":180,\"bgp_id\":\"1.1.1.1\",\"params\":[]}}}"
+        );
+    }
+
+    #[test]
+    fn test_bgp_handler_serialize_error() {
+        let handler = BgpProtocolHandler::new(vec![179]);
+        let error = BgpCodecDecoderError::BgpMessageParsingError(
+            BgpMessageParsingError::BadMessageLength(10),
+        );
+        let outcome = DecodeOutcome::Error(error);
+
+        let result = handler.serialize(outcome);
+        assert!(result.is_ok());
+        let json = result.unwrap();
+        assert_eq!(
+            json,
+            "{\"BgpMessageParsingError\":{\"BadMessageLength\":10}}"
+        );
+    }
+}
