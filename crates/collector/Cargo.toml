@@ -14,6 +14,13 @@ keywords = ["ipfix", "netflow", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 build = "build.rs"
 
+[package.metadata.generate-rpm]
+assets = [
+  { source = "crates/collector/LICENSE", dest = "/usr/share/doc/netgauze-collector/LICENSE", doc = true },
+  { source = "crates/collector/README.md", dest = "/usr/share/doc/netgauze-collector/README.md", doc = true },
+  { source = "target/release/netgauze-collector", dest = "/usr/bin/netgauze-collector", caps = "cap_net_raw+ep" },
+]
+
 [dependencies]
 netgauze-analytics = { workspace = true }
 netgauze-flow-service = { workspace = true }

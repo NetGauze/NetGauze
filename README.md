@@ -82,6 +82,24 @@ For example, run the `./crates/flow-service/example/print-flow.rs`, you can use:
 - Fuzzing Netflow V9
   ```cargo +nightly fuzz run fuzz-netflow-v9-pkt```
 
+## Building RPMs
+
+- Install the RPM generator
+
+  ```cargo install cargo-generate-rpm```
+
+- Build the netgauze-collector binary
+  ```
+  cargo build --release -p netgauze-collector
+  strip target/release/netgauze-collector
+  ```
+
+- Generate the netgauze-collector package
+
+  ```cargo generate-rpm -p crates/collector```
+
+  (the package will be generated in target/generate-rpm)
+
 ## License
 
 Licensed under Apache License, Version 2.0 ([LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0)
