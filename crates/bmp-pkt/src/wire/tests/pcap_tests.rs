@@ -26,6 +26,8 @@ use std::{
 };
 use tokio_util::codec::Decoder;
 
+static BMP_PORTS: &[u16] = &[1790, 1791, 10240];
+
 #[rstest]
 fn test_pmacct_bmp(#[files("../../assets/pcaps/pmacct-tests/*/*.pcap")] path: PathBuf) {
     let overwrite = std::env::var("OVERWRITE")
@@ -79,7 +81,7 @@ fn test_bmp_pcap(overwrite: bool, pcap_path: PathBuf) {
     let iter = PcapIter::new(pcap_reader);
     let mut peers = HashMap::new();
     for (src_ip, src_port, dst_ip, dst_port, protocol, value) in iter {
-        if protocol != TransportProtocol::TCP || dst_port != 1790 {
+        if protocol != TransportProtocol::TCP || !BMP_PORTS.contains(&dst_port) {
             continue;
         }
         let key = (src_ip, src_port, dst_ip, dst_port);
