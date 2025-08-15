@@ -1,5 +1,5 @@
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use netgauze_pcap_reader::TransportProtocol;
 use netgauze_udp_notif_pkt::{
     MediaType, UdpNotifPacket,
@@ -10,7 +10,6 @@ use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
 };
-use tokio_util::codec::Decoder;
 
 pub struct UdpNotifProtocolHandler {
     ports: Vec<u16>,
@@ -31,7 +30,7 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
         protocol: TransportProtocol,
         packet_data: &[u8],
         exporter_peers: &mut HashMap<(IpAddr, u16, IpAddr, u16), (UdpPacketCodec, BytesMut)>,
-    ) -> Option<DecodeOutcome<UdpNotifPacket, UdpPacketCodecError>> {
+    ) -> Option<Vec<DecodeOutcome<UdpNotifPacket, UdpPacketCodecError>>> {
         let dst_port: u16 = flow_key.3;
 
         if protocol == TransportProtocol::UDP && self.ports.contains(&dst_port) {
@@ -39,19 +38,13 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                 .entry(flow_key)
                 .or_insert((UdpPacketCodec::default(), BytesMut::new()));
             buffer.extend_from_slice(packet_data);
-            if buffer.has_remaining() {
-                match codec.decode(buffer) {
-                    Ok(Some(udp_notif_packet)) => {
-                        return Some(DecodeOutcome::Success((flow_key, udp_notif_packet))); // Return the FlowInfo
-                    }
-                    Ok(None) => {
-                        return None;
-                    }
-                    Err(e) => {
-                        // packet decoding error before the templates arrive
-                        return Some(DecodeOutcome::Error(e));
-                    }
-                }
+
+            // because of implementation specification UDP-Notif exports maximum 1 message
+            // per packet payload
+            let mut results = Vec::new();
+            super::decode_buffer(buffer, codec, flow_key, &mut results);
+            if !results.is_empty() {
+                return Some(results);
             }
         }
         None
@@ -138,11 +131,121 @@ mod tests {
         );
 
         assert!(result.is_some());
-        if let Some(DecodeOutcome::Success((_, msg))) = result {
-            assert_eq!(msg.message_id(), 0x02000002);
+        if let Some(ref outcomes) = result {
+            assert!(outcomes.len() == 1);
+            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
+                assert_eq!(msg.message_id(), 0x02000002);
+            } else {
+                panic!("Expected successful decode");
+            }
         } else {
-            panic!("Unexpected decode outcome");
+            panic!("Expected successful decode");
         }
+        // Now we should have an empty buffer for this flow key
+        assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
+    }
+
+    #[test]
+    fn test_udp_notif_handler_decode_fragmented_success() {
+        let handler = UdpNotifProtocolHandler::new(vec![4739]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            4739,
+        );
+        let packet_data1 = [
+            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
+            0x0c, // Header length
+            0x00, 0x0e, // Message length
+            0x01, 0x00, 0x00, 0x01, // Publisher ID
+            0x02, 0x00, 0x00, 0x02, // Message ID
+        ];
+        let packet_data2 = [
+            0xff, 0xff, // dummy payload
+        ];
+        let mut exporter_peers = HashMap::new();
+
+        let result1 = handler.decode(
+            flow_key,
+            TransportProtocol::UDP,
+            &packet_data1,
+            &mut exporter_peers,
+        );
+        // UDP is datagram oriented, so the codec will wait for the full datagram.
+        // The test setup simulates fragmentation at a higher level.
+        assert!(result1.is_none());
+        // The buffer for this flow key should now contain the first part, so not empty
+        assert!(!exporter_peers.get(&flow_key).unwrap().1.is_empty());
+
+        let result2 = handler.decode(
+            flow_key,
+            TransportProtocol::UDP,
+            &packet_data2,
+            &mut exporter_peers,
+        );
+
+        assert!(result2.is_some());
+        if let Some(ref outcomes) = result2 {
+            assert!(outcomes.len() == 1);
+            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
+                assert_eq!(msg.message_id(), 0x02000002);
+            } else {
+                panic!("Expected successful decode");
+            }
+        } else {
+            panic!("Expected successful decode");
+        }
+        // Now we should have an empty buffer for this flow key
+        assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
+    }
+
+    #[test]
+    fn test_udp_notif_handler_decode_multiple_messages_should_fail() {
+        let handler = UdpNotifProtocolHandler::new(vec![1234]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            1234,
+        );
+        // Two messages
+        let packet_data = [
+            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
+            0x0c, // Header length
+            0x00, 0x0e, // Message length
+            0x01, 0x00, 0x00, 0x01, // Publisher ID
+            0x02, 0x00, 0x00, 0x02, // Message ID
+            0xff, 0xff, // dummy payload
+            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
+            0x0c, // Header length
+            0x00, 0x0e, // Message length
+            0x01, 0x00, 0x00, 0x01, // Publisher ID
+            0x02, 0x00, 0x00, 0x02, // Message ID
+            0xff, 0xff, // dummy payload
+        ];
+        let mut exporter_peers = HashMap::new();
+
+        let result = handler.decode(
+            flow_key,
+            TransportProtocol::UDP,
+            &packet_data,
+            &mut exporter_peers,
+        );
+
+        assert!(result.is_some());
+        if let Some(ref outcomes) = result {
+            assert!(outcomes.len() == 1);
+            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
+                assert!(matches!(e, UdpPacketCodecError::InvalidMessageLength(14)));
+            } else {
+                panic!("Expected error decode");
+            }
+        } else {
+            panic!("Expected successful decode");
+        }
+        // Now we should have an empty buffer for this flow key
+        assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
 
     #[test]
@@ -172,11 +275,18 @@ mod tests {
         );
 
         assert!(result.is_some());
-        if let Some(DecodeOutcome::Error(e)) = result {
-            assert!(matches!(e, UdpPacketCodecError::InvalidHeaderLength(1)));
+        if let Some(ref outcomes) = result {
+            assert!(outcomes.len() == 1);
+            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
+                assert!(matches!(e, UdpPacketCodecError::InvalidHeaderLength(1)));
+            } else {
+                panic!("Expected error decode");
+            }
         } else {
-            panic!("Expected error decode");
+            panic!("Expected successful decode");
         }
+        // Now we should have an empty buffer for this flow key
+        assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
 
     #[test]
@@ -222,53 +332,6 @@ mod tests {
 
         assert!(result.is_none());
     }
-
-    #[test]
-    fn test_udp_notif_handler_decode_fragmented() {
-        let handler = UdpNotifProtocolHandler::new(vec![4739]);
-        let flow_key = (
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
-            12345,
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
-            4739,
-        );
-        let packet_data1 = [
-            0x21, // version 1, no private space, Media type: 1 = YANG data JSON
-            0x0c, // Header length
-            0x00, 0x0e, // Message length
-            0x01, 0x00, 0x00, 0x01, // Publisher ID
-            0x02, 0x00, 0x00, 0x02, // Message ID
-        ];
-        let packet_data2 = [
-            0xff, 0xff, // dummy payload
-        ];
-        let mut exporter_peers = HashMap::new();
-
-        let result1 = handler.decode(
-            flow_key,
-            TransportProtocol::UDP,
-            &packet_data1,
-            &mut exporter_peers,
-        );
-        // UDP is datagram oriented, so the codec will wait for the full datagram.
-        // The test setup simulates fragmentation at a higher level.
-        assert!(result1.is_none());
-
-        let result2 = handler.decode(
-            flow_key,
-            TransportProtocol::UDP,
-            &packet_data2,
-            &mut exporter_peers,
-        );
-
-        assert!(result2.is_some());
-        if let Some(DecodeOutcome::Success((_, msg))) = result2 {
-            assert_eq!(msg.message_id(), 0x02000002);
-        } else {
-            panic!("Expected successful decode on second packet");
-        }
-    }
-
     #[test]
     fn test_udp_notif_handler_serialize_success() {
         let handler = UdpNotifProtocolHandler::new(vec![1234]);

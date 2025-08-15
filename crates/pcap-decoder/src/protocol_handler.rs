@@ -30,7 +30,7 @@ where
         protocol: TransportProtocol,
         packet_data: &[u8],
         exporter_peers: &mut HashMap<(IpAddr, u16, IpAddr, u16), (Codec, BytesMut)>,
-    ) -> Option<DecodeOutcome<Message, ErrorMessage>>;
+    ) -> Option<Vec<DecodeOutcome<Message, ErrorMessage>>>;
 
     fn serialize(&self, data: DecodeOutcome<Message, ErrorMessage>) -> Result<String>;
 }

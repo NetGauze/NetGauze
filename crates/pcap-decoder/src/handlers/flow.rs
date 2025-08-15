@@ -1,5 +1,5 @@
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use netgauze_flow_pkt::{
     FlowInfo,
     codec::{FlowInfoCodec, FlowInfoCodecDecoderError},
@@ -9,7 +9,6 @@ use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
 };
-use tokio_util::codec::Decoder;
 
 pub struct FlowProtocolHandler {
     ports: Vec<u16>,
@@ -28,7 +27,7 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
         protocol: TransportProtocol,
         packet_data: &[u8],
         exporter_peers: &mut HashMap<(IpAddr, u16, IpAddr, u16), (FlowInfoCodec, BytesMut)>,
-    ) -> Option<DecodeOutcome<FlowInfo, FlowInfoCodecDecoderError>> {
+    ) -> Option<Vec<DecodeOutcome<FlowInfo, FlowInfoCodecDecoderError>>> {
         let dst_port: u16 = flow_key.3;
 
         if protocol == TransportProtocol::UDP && self.ports.contains(&dst_port) {
@@ -36,19 +35,11 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
                 .entry(flow_key)
                 .or_insert((FlowInfoCodec::default(), BytesMut::new()));
             buffer.extend_from_slice(packet_data);
-            if buffer.has_remaining() {
-                match codec.decode(buffer) {
-                    Ok(Some(flow_info)) => {
-                        return Some(DecodeOutcome::Success((flow_key, flow_info))); // Return the FlowInfo
-                    }
-                    Ok(None) => {
-                        return None;
-                    }
-                    Err(e) => {
-                        // packet decoding error before the templates arrive
-                        return Some(DecodeOutcome::Error(e));
-                    }
-                }
+
+            let mut results = Vec::new();
+            super::decode_buffer(buffer, codec, flow_key, &mut results);
+            if !results.is_empty() {
+                return Some(results);
             }
         }
         None
@@ -112,16 +103,126 @@ mod tests {
         );
 
         assert!(result.is_some());
-        if let Some(DecodeOutcome::Success((_, flow_info))) = result {
-            if let FlowInfo::IPFIX(packet) = flow_info {
-                assert_eq!(packet.version(), 10);
-                assert_eq!(packet.observation_domain_id(), 33312);
+        if let Some(ref outcomes) = result {
+            assert!(outcomes.len() == 1);
+            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
+                if let FlowInfo::IPFIX(packet) = msg {
+                    assert_eq!(packet.version(), 10);
+                    assert_eq!(packet.observation_domain_id(), 33312);
+                } else {
+                    panic!("Wrong flow version");
+                }
             } else {
-                panic!("Wrong flow version");
+                panic!("Expected successful decode");
             }
         } else {
             panic!("Expected successful decode");
         }
+        // Now we should have an empty buffer for this flow key
+        assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
+    }
+
+    #[test]
+    fn test_flow_handler_decode_fragmented_success() {
+        let handler = FlowProtocolHandler::new(vec![9991]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            9991,
+        );
+        let packet_data1 = &[0x00, 0x0a, 0x00, 0x24];
+        let packet_data2 = &[
+            0x65, 0xa1, 0x4f, 0x56, 0x00, 0x26, 0x10, 0xa0, 0x00, 0x00, 0x82, 0x20, 0x00, 0x03,
+            0x00, 0x14, 0x01, 0x52, 0x00, 0x02, 0x00, 0x01, 0x00, 0x95, 0x00, 0x04, 0x00, 0xa0,
+            0x00, 0x08, 0x00, 0x00,
+        ];
+        let mut exporter_peers = HashMap::new();
+
+        let result1 = handler.decode(
+            flow_key,
+            TransportProtocol::UDP,
+            packet_data1,
+            &mut exporter_peers,
+        );
+        assert!(result1.is_none());
+        // The buffer for this flow key should now contain the first part, so not empty
+        assert!(!exporter_peers.get(&flow_key).unwrap().1.is_empty());
+
+        // Second packet completes it
+        let result2 = handler.decode(
+            flow_key,
+            TransportProtocol::UDP,
+            packet_data2,
+            &mut exporter_peers,
+        );
+        assert!(result2.is_some());
+        if let Some(ref outcomes) = result2 {
+            assert!(outcomes.len() == 1);
+            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
+                if let FlowInfo::IPFIX(packet) = msg {
+                    assert_eq!(packet.version(), 10);
+                    assert_eq!(packet.observation_domain_id(), 33312);
+                } else {
+                    panic!("Wrong flow version");
+                }
+            } else {
+                panic!("Expected successful decode");
+            }
+        } else {
+            panic!("Expected successful decode");
+        }
+        // Now we should have an empty buffer for this flow key
+        assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
+    }
+
+    #[test]
+    fn test_flow_handler_decode_multiple_messages_success() {
+        let handler = FlowProtocolHandler::new(vec![9991]);
+        let flow_key = (
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            9991,
+        );
+        // Two simple IPFIX options template
+        let packet_data = [
+            0x00, 0x0a, 0x00, 0x24, 0x65, 0xa1, 0x4f, 0x56, 0x00, 0x26, 0x10, 0xa0, 0x00, 0x00,
+            0x82, 0x20, 0x00, 0x03, 0x00, 0x14, 0x01, 0x52, 0x00, 0x02, 0x00, 0x01, 0x00, 0x95,
+            0x00, 0x04, 0x00, 0xa0, 0x00, 0x08, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x24, 0x65, 0xa1,
+            0x4f, 0x56, 0x00, 0x26, 0x10, 0xa0, 0x00, 0x00, 0x82, 0x20, 0x00, 0x03, 0x00, 0x14,
+            0x01, 0x52, 0x00, 0x02, 0x00, 0x01, 0x00, 0x95, 0x00, 0x04, 0x00, 0xa0, 0x00, 0x08,
+            0x00, 0x00,
+        ];
+        let mut exporter_peers = HashMap::new();
+
+        let result = handler.decode(
+            flow_key,
+            TransportProtocol::UDP,
+            &packet_data,
+            &mut exporter_peers,
+        );
+
+        assert!(result.is_some());
+        if let Some(ref outcomes) = result {
+            assert_eq!(outcomes.len(), 2);
+            for outcome in outcomes {
+                if let DecodeOutcome::Success((_, msg)) = outcome {
+                    if let FlowInfo::IPFIX(packet) = msg {
+                        assert_eq!(packet.version(), 10);
+                        assert_eq!(packet.observation_domain_id(), 33312);
+                    } else {
+                        panic!("Wrong flow version");
+                    }
+                } else {
+                    panic!("Expected successful decode");
+                }
+            }
+        } else {
+            panic!("Expected successful decode");
+        }
+        // Now we should have an empty buffer for this flow key
+        assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
 
     #[test]
@@ -149,14 +250,21 @@ mod tests {
         );
 
         assert!(result.is_some());
-        if let Some(DecodeOutcome::Error(e)) = result {
-            assert!(matches!(
-                e,
-                FlowInfoCodecDecoderError::UnsupportedVersion(3)
-            ));
+        if let Some(ref outcomes) = result {
+            assert!(outcomes.len() == 1);
+            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
+                assert!(matches!(
+                    e,
+                    FlowInfoCodecDecoderError::UnsupportedVersion(3)
+                ));
+            } else {
+                panic!("Expected error decode");
+            }
         } else {
-            panic!("Expected an error due to unsupported version");
+            panic!("Expected successful decode");
         }
+        // Now we should have an empty buffer for this flow key
+        assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
 
     #[test]
@@ -201,51 +309,6 @@ mod tests {
         );
 
         assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_flow_handler_decode_fragmented() {
-        let handler = FlowProtocolHandler::new(vec![9991]);
-        let flow_key = (
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
-            12345,
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
-            9991,
-        );
-        let packet_data1 = &[0x00, 0x0a, 0x00, 0x24];
-        let packet_data2 = &[
-            0x65, 0xa1, 0x4f, 0x56, 0x00, 0x26, 0x10, 0xa0, 0x00, 0x00, 0x82, 0x20, 0x00, 0x03,
-            0x00, 0x14, 0x01, 0x52, 0x00, 0x02, 0x00, 0x01, 0x00, 0x95, 0x00, 0x04, 0x00, 0xa0,
-            0x00, 0x08, 0x00, 0x00,
-        ];
-        let mut exporter_peers = HashMap::new();
-
-        let result1 = handler.decode(
-            flow_key,
-            TransportProtocol::UDP,
-            packet_data1,
-            &mut exporter_peers,
-        );
-        assert!(result1.is_none());
-
-        // Second packet completes it
-        let result2 = handler.decode(
-            flow_key,
-            TransportProtocol::UDP,
-            packet_data2,
-            &mut exporter_peers,
-        );
-        assert!(result2.is_some());
-        if let Some(DecodeOutcome::Success((_, msg))) = result2 {
-            if let FlowInfo::IPFIX(packet) = msg {
-                assert_eq!(packet.version(), 10);
-                assert_eq!(packet.observation_domain_id(), 33312);
-            } else {
-                panic!("Wrong flow version");
-            }
-        } else {
-            panic!("Expected successful decode on second packet");
-        }
     }
 
     #[test]

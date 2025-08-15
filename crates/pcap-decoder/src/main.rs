@@ -63,9 +63,11 @@ where
         let flow_key = (src_ip, src_port, dst_ip, dst_port);
         if let Some(message) = handler.decode(flow_key, protocol, &packet_data, &mut exporter_peers)
         {
-            let serialized_data = handler.serialize(message)?;
-            writer.write_all(serialized_data.as_bytes())?;
-            writer.write_all(b"\n")?;
+            for result in message {
+                let serialized_data = handler.serialize(result)?;
+                writer.write_all(serialized_data.as_bytes())?;
+                writer.write_all(b"\n")?;
+            }
         }
     }
 
