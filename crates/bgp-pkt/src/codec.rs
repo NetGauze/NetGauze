@@ -57,6 +57,14 @@ impl BgpCodec {
             ),
         }
     }
+
+    pub fn new_from_ctx(asn4: bool, ctx: BgpParsingContext) -> Self {
+        Self {
+            asn4_sent: Some(asn4),
+            asn4_received: Some(asn4),
+            ctx,
+        }
+    }
 }
 
 impl<Peer> BgpCodecInitializer<Peer> for BgpCodec {
