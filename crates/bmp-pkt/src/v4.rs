@@ -152,8 +152,8 @@ impl RouteMonitoringTlv {
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMonitoringTlvType {
     GroupTlv = 0,
-    StatelessParsing = 1,
-    BgpUpdatePdu = 2,
+    BgpUpdatePdu = 1,
+    StatelessParsing = 2,
     VrfTableName = 3,
     PathMarking = 4,
 }
