@@ -1,14 +1,12 @@
-use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
+use super::{decode_buffer, serialize_error, serialize_success};
+use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_bmp_pkt::{
     BmpMessage,
     codec::{BmpCodec, BmpCodecDecoderError},
 };
 use netgauze_pcap_reader::TransportProtocol;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-};
+use std::{collections::HashMap, io, net::IpAddr};
 
 pub struct BmpProtocolHandler {
     ports: Vec<u16>,
@@ -37,7 +35,7 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
             buffer.extend_from_slice(packet_data);
 
             let mut results = Vec::new();
-            super::decode_buffer(buffer, codec, flow_key, &mut results);
+            decode_buffer(buffer, codec, flow_key, &mut results);
             if !results.is_empty() {
                 return Some(results);
             }
@@ -48,18 +46,13 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
     fn serialize(
         &self,
         decode_outcome: DecodeOutcome<BmpMessage, BmpCodecDecoderError>,
-    ) -> Result<String, std::io::Error> {
+    ) -> io::Result<serde_json::Value> {
         match decode_outcome {
             DecodeOutcome::Success(m) => {
                 let (flow_key, bmp_message) = m;
-                let serializable_flow = SerializableInfo {
-                    source_address: SocketAddr::new(flow_key.0, flow_key.1),
-                    destination_address: SocketAddr::new(flow_key.2, flow_key.3),
-                    info: bmp_message,
-                };
-                Ok(serde_json::to_string(&serializable_flow)?)
+                serialize_success(flow_key, bmp_message)
             }
-            DecodeOutcome::Error(m) => Ok(serde_json::to_string(&m)?),
+            DecodeOutcome::Error(m) => serialize_error(m),
         }
     }
 }
@@ -71,6 +64,7 @@ mod tests {
         v3::{BmpMessageValue, InitiationMessage},
         wire::deserializer::BmpMessageParsingError,
     };
+    use serde_json::json;
     use std::net::Ipv4Addr;
 
     #[test]
@@ -341,10 +335,18 @@ mod tests {
         let result = handler.serialize(outcome);
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"source_address":"10.0.0.1:12345","destination_address":"10.0.0.2:1790","info":{"V3":{"Initiation":{"information":[]}}}}"#
-        );
+        let expected = json!({
+          "source_address": "10.0.0.1:12345",
+          "destination_address": "10.0.0.2:1790",
+          "info": {
+            "V3": {
+              "Initiation": {
+                "information": []
+              }
+            }
+          }
+        });
+        assert_eq!(json, expected);
     }
 
     #[test]
@@ -357,9 +359,11 @@ mod tests {
         let result = handler.serialize(outcome);
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"BmpMessageParsingError":{"InvalidBmpLength":10}}"#
-        );
+        let expected = json!({
+            "BmpMessageParsingError": {
+                "InvalidBmpLength": 10
+            }
+        });
+        assert_eq!(json, expected);
     }
 }

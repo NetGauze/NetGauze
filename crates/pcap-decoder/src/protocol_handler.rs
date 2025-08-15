@@ -3,7 +3,7 @@ use netgauze_pcap_reader::TransportProtocol;
 use serde::Serialize;
 use std::{
     collections::HashMap,
-    io::Result,
+    io,
     net::{IpAddr, SocketAddr},
 };
 
@@ -32,5 +32,8 @@ where
         exporter_peers: &mut HashMap<(IpAddr, u16, IpAddr, u16), (Codec, BytesMut)>,
     ) -> Option<Vec<DecodeOutcome<Message, ErrorMessage>>>;
 
-    fn serialize(&self, data: DecodeOutcome<Message, ErrorMessage>) -> Result<String>;
+    fn serialize(
+        &self,
+        data: DecodeOutcome<Message, ErrorMessage>,
+    ) -> io::Result<serde_json::Value>;
 }

@@ -1,15 +1,12 @@
-use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
+use super::{decode_buffer, serialize_error, serialize_success};
+use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_pcap_reader::TransportProtocol;
 use netgauze_udp_notif_pkt::{
     MediaType, UdpNotifPacket,
     codec::{UdpPacketCodec, UdpPacketCodecError},
 };
-use serde_json::Value;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-};
+use std::{collections::HashMap, net::IpAddr};
 
 pub struct UdpNotifProtocolHandler {
     ports: Vec<u16>,
@@ -42,7 +39,7 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
             // because of implementation specification UDP-Notif exports maximum 1 message
             // per packet payload
             let mut results = Vec::new();
-            super::decode_buffer(buffer, codec, flow_key, &mut results);
+            decode_buffer(buffer, codec, flow_key, &mut results);
             if !results.is_empty() {
                 return Some(results);
             }
@@ -53,7 +50,7 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
     fn serialize(
         &self,
         decode_outcome: DecodeOutcome<UdpNotifPacket, UdpPacketCodecError>,
-    ) -> Result<String, std::io::Error> {
+    ) -> Result<serde_json::Value, std::io::Error> {
         match decode_outcome {
             DecodeOutcome::Success(m) => {
                 let (flow_key, udp_notif_packet) = m;
@@ -64,36 +61,34 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                     MediaType::YangDataJson => {
                         let payload = serde_json::from_slice(udp_notif_packet.payload())
                             .expect("Couldn't deserialize JSON payload into a JSON object");
-                        if let Value::Object(val) = &mut value {
+                        if let serde_json::Value::Object(val) = &mut value {
                             val.insert("payload".to_string(), payload);
                         }
                     }
                     MediaType::YangDataXml => {
                         let payload = std::str::from_utf8(udp_notif_packet.payload())
                             .expect("Couldn't deserialize XML payload into an UTF-8 string");
-                        if let Value::Object(val) = &mut value {
-                            val.insert("payload".to_string(), Value::String(payload.to_string()));
+                        if let serde_json::Value::Object(val) = &mut value {
+                            val.insert(
+                                "payload".to_string(),
+                                serde_json::Value::String(payload.to_string()),
+                            );
                         }
                     }
                     MediaType::YangDataCbor => {
-                        let payload: Value = ciborium::de::from_reader(std::io::Cursor::new(
-                            udp_notif_packet.payload(),
-                        ))
+                        let payload: serde_json::Value = ciborium::de::from_reader(
+                            std::io::Cursor::new(udp_notif_packet.payload()),
+                        )
                         .expect("Couldn't deserialize CBOR payload into a CBOR object");
-                        if let Value::Object(val) = &mut value {
+                        if let serde_json::Value::Object(val) = &mut value {
                             val.insert("payload".to_string(), payload);
                         }
                     }
                     _ => {}
                 }
-                let serializable_flow = SerializableInfo {
-                    source_address: SocketAddr::new(flow_key.0, flow_key.1),
-                    destination_address: SocketAddr::new(flow_key.2, flow_key.3),
-                    info: value,
-                };
-                Ok(serde_json::to_string(&serializable_flow)?)
+                serialize_success(flow_key, value)
             }
-            DecodeOutcome::Error(m) => Ok(serde_json::to_string(&m)?),
+            DecodeOutcome::Error(m) => serialize_error(m),
         }
     }
 }
@@ -102,6 +97,7 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use serde_json::json;
     use std::net::Ipv4Addr;
 
     #[test]
@@ -354,10 +350,23 @@ mod tests {
 
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"source_address":"10.0.0.1:12345","destination_address":"10.0.0.2:1234","info":{"media_type":{"Unknown":238},"message_id":33554434,"options":{},"payload":[255,255],"publisher_id":16777217}}"#
-        );
+        let expected = json!({
+          "source_address": "10.0.0.1:12345",
+          "destination_address": "10.0.0.2:1234",
+          "info": {
+            "media_type": {
+              "Unknown": 238
+            },
+            "message_id": 33554434,
+            "options": {},
+            "payload": [
+              255,
+              255
+            ],
+            "publisher_id": 16777217
+          }
+        });
+        assert_eq!(json, expected);
     }
 
     #[test]
@@ -370,7 +379,10 @@ mod tests {
 
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(json, r#"{"InvalidMessageLength":10}"#);
+        let expected = json!({
+            "InvalidMessageLength": 10
+        });
+        assert_eq!(json, expected);
     }
 
     #[test]
@@ -396,10 +408,20 @@ mod tests {
 
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"source_address":"10.0.0.1:12345","destination_address":"10.0.0.2:1234","info":{"media_type":"YangDataJson","message_id":33554434,"options":{},"payload":{"a":"b"},"publisher_id":16777217}}"#
-        );
+        let expected = json!({
+          "source_address": "10.0.0.1:12345",
+          "destination_address": "10.0.0.2:1234",
+          "info": {
+            "media_type": "YangDataJson",
+            "message_id": 33554434,
+            "options": {},
+            "payload": {
+              "a": "b"
+            },
+            "publisher_id": 16777217
+          }
+        });
+        assert_eq!(json, expected);
     }
 
     #[test]
@@ -425,10 +447,18 @@ mod tests {
 
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"source_address":"10.0.0.1:12345","destination_address":"10.0.0.2:1234","info":{"media_type":"YangDataXml","message_id":33554434,"options":{},"payload":"<a b=\"c\"/>","publisher_id":16777217}}"#
-        );
+        let expected = json!({
+          "source_address": "10.0.0.1:12345",
+          "destination_address": "10.0.0.2:1234",
+          "info": {
+            "media_type": "YangDataXml",
+            "message_id": 33554434,
+            "options": {},
+            "payload": "<a b=\"c\"/>",
+            "publisher_id": 16777217
+          }
+        });
+        assert_eq!(json, expected);
     }
 
     #[test]
@@ -457,9 +487,19 @@ mod tests {
 
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"source_address":"10.0.0.1:12345","destination_address":"10.0.0.2:1234","info":{"media_type":"YangDataCbor","message_id":33554434,"options":{},"payload":{"a":"b"},"publisher_id":16777217}}"#
-        );
+        let expected = json!({
+          "source_address": "10.0.0.1:12345",
+          "destination_address": "10.0.0.2:1234",
+          "info": {
+            "media_type": "YangDataCbor",
+            "message_id": 33554434,
+            "options": {},
+            "payload": {
+              "a": "b"
+            },
+            "publisher_id": 16777217
+          }
+        });
+        assert_eq!(json, expected);
     }
 }

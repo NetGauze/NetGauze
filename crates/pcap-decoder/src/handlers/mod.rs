@@ -2,10 +2,14 @@ pub mod bgp;
 pub mod bmp;
 pub mod flow;
 pub mod udp_notif;
-use crate::protocol_handler::DecodeOutcome;
 
+use crate::protocol_handler::{DecodeOutcome, SerializableInfo};
 use bytes::{Buf, BytesMut};
-use std::net::IpAddr;
+use serde::Serialize;
+use std::{
+    io,
+    net::{IpAddr, SocketAddr},
+};
 use tokio_util::codec::Decoder;
 
 /// Decodes a buffer and pushes the results into a vector.
@@ -14,7 +18,9 @@ use tokio_util::codec::Decoder;
 /// an incomplete frame is found.
 /// If a decoding error occurs, the buffer is cleared, and the error is pushed
 /// to the results.
-fn decode_buffer<T, E, C>(
+///
+/// This function is only available within the handlers module.
+pub(in crate::handlers) fn decode_buffer<T, E, C>(
     buffer: &mut BytesMut,
     codec: &mut C,
     flow_key: (IpAddr, u16, IpAddr, u16),
@@ -38,4 +44,26 @@ fn decode_buffer<T, E, C>(
             }
         }
     }
+}
+
+/// Helper function to serialize a successful decode outcome.
+/// Only available within the handlers module.
+pub(in crate::handlers) fn serialize_success<T: Serialize>(
+    flow_key: (IpAddr, u16, IpAddr, u16),
+    info: T,
+) -> io::Result<serde_json::Value> {
+    let serializable_flow = SerializableInfo {
+        source_address: SocketAddr::new(flow_key.0, flow_key.1),
+        destination_address: SocketAddr::new(flow_key.2, flow_key.3),
+        info,
+    };
+    Ok(serde_json::to_value(&serializable_flow)?)
+}
+
+/// Helper function to serialize an error outcome.
+/// Only available within the handlers module.
+pub(in crate::handlers) fn serialize_error<E: Serialize>(
+    error: E,
+) -> io::Result<serde_json::Value> {
+    Ok(serde_json::to_value(&error)?)
 }

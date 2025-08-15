@@ -1,14 +1,12 @@
-use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
+use super::{decode_buffer, serialize_error, serialize_success};
+use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_flow_pkt::{
     FlowInfo,
     codec::{FlowInfoCodec, FlowInfoCodecDecoderError},
 };
 use netgauze_pcap_reader::TransportProtocol;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-};
+use std::{collections::HashMap, io, net::IpAddr};
 
 pub struct FlowProtocolHandler {
     ports: Vec<u16>,
@@ -37,7 +35,7 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
             buffer.extend_from_slice(packet_data);
 
             let mut results = Vec::new();
-            super::decode_buffer(buffer, codec, flow_key, &mut results);
+            decode_buffer(buffer, codec, flow_key, &mut results);
             if !results.is_empty() {
                 return Some(results);
             }
@@ -48,18 +46,13 @@ impl ProtocolHandler<FlowInfo, FlowInfoCodec, FlowInfoCodecDecoderError> for Flo
     fn serialize(
         &self,
         decode_outcome: DecodeOutcome<FlowInfo, FlowInfoCodecDecoderError>,
-    ) -> Result<String, std::io::Error> {
+    ) -> io::Result<serde_json::Value> {
         match decode_outcome {
             DecodeOutcome::Success(m) => {
                 let (flow_key, flow_info) = m;
-                let serializable_flow = SerializableInfo {
-                    source_address: SocketAddr::new(flow_key.0, flow_key.1),
-                    destination_address: SocketAddr::new(flow_key.2, flow_key.3),
-                    info: flow_info,
-                };
-                Ok(serde_json::to_string(&serializable_flow)?)
+                serialize_success(flow_key, flow_info)
             }
-            DecodeOutcome::Error(m) => Ok(serde_json::to_string(&m)?),
+            DecodeOutcome::Error(m) => serialize_error(m),
         }
     }
 }
@@ -76,6 +69,7 @@ mod tests {
         ipfix::{DataRecord, Set},
         wire::deserializer::ipfix::IpfixPacketParsingError,
     };
+    use serde_json::json;
     use std::net::Ipv4Addr;
 
     #[test]
@@ -338,10 +332,39 @@ mod tests {
 
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"source_address":"10.0.0.1:12345","destination_address":"10.0.0.2:9991","info":{"IPFIX":{"version":10,"export_time":"2025-01-01T18:00:00Z","sequence_number":15,"observation_domain_id":400,"sets":[{"Data":{"id":600,"records":[{"scope_fields":[],"fields":[{"sourceIPv4Address":"10.0.0.1"},{"octetDeltaCount":300}]}]}}]}}}"#
-        )
+        let expected = json!({
+          "source_address": "10.0.0.1:12345",
+          "destination_address": "10.0.0.2:9991",
+          "info": {
+            "IPFIX": {
+              "version": 10,
+              "export_time": "2025-01-01T18:00:00Z",
+              "sequence_number": 15,
+              "observation_domain_id": 400,
+              "sets": [
+                {
+                  "Data": {
+                    "id": 600,
+                    "records": [
+                      {
+                        "scope_fields": [],
+                        "fields": [
+                          {
+                            "sourceIPv4Address": "10.0.0.1"
+                          },
+                          {
+                            "octetDeltaCount": 300
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        });
+        assert_eq!(json, expected);
     }
 
     #[test]
@@ -356,6 +379,11 @@ mod tests {
 
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(json, r#"{"IpfixParsingError":{"InvalidLength":10}}"#)
+        let expected = json!({
+            "IpfixParsingError": {
+                "InvalidLength": 10
+            }
+        });
+        assert_eq!(json, expected);
     }
 }

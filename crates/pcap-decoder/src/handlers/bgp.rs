@@ -1,4 +1,5 @@
-use crate::protocol_handler::{DecodeOutcome, ProtocolHandler, SerializableInfo};
+use super::{decode_buffer, serialize_error, serialize_success};
+use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_bgp_pkt::{
     BgpMessage,
@@ -6,10 +7,7 @@ use netgauze_bgp_pkt::{
     wire::deserializer::{BgpParsingContext, BgpParsingIgnoredErrors},
 };
 use netgauze_pcap_reader::TransportProtocol;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-};
+use std::{collections::HashMap, io, net::IpAddr};
 
 pub struct BgpProtocolHandler {
     ports: Vec<u16>,
@@ -53,7 +51,7 @@ impl ProtocolHandler<(BgpMessage, BgpParsingIgnoredErrors), BgpCodec, BgpCodecDe
             buffer.extend_from_slice(packet_data);
 
             let mut results = Vec::new();
-            super::decode_buffer(buffer, codec, flow_key, &mut results);
+            decode_buffer(buffer, codec, flow_key, &mut results);
             if !results.is_empty() {
                 return Some(results);
             }
@@ -64,25 +62,19 @@ impl ProtocolHandler<(BgpMessage, BgpParsingIgnoredErrors), BgpCodec, BgpCodecDe
     fn serialize(
         &self,
         decode_outcome: DecodeOutcome<(BgpMessage, BgpParsingIgnoredErrors), BgpCodecDecoderError>,
-    ) -> Result<String, std::io::Error> {
+    ) -> io::Result<serde_json::Value> {
         match decode_outcome {
             DecodeOutcome::Success(m) => {
-                // extract bgp message and make sure there is not BgpParsingIgnoredErrors
                 let (flow_key, (bgp_message, bgp_parsing_error)) = m;
                 if !bgp_parsing_error.eq(&BgpParsingIgnoredErrors::default()) {
                     // the bgp message was parsed with some ignored errors, we will not serialize it
                     // we will report that some ignored errors were found and that this behavior
                     // by the CLI tool is not expected
-                    return Ok("Encountered BGP parsing errors that were ignored during the decoding of the bgp message, this behaviour is not expected, please file a bug report to the developers".to_string());
+                    return Ok(serde_json::Value::String("Encountered BGP parsing errors that were ignored during the decoding of the bgp message, this behaviour is not expected, please file a bug report to the developers".to_string()));
                 }
-                let serializable_flow = SerializableInfo {
-                    source_address: SocketAddr::new(flow_key.0, flow_key.1),
-                    destination_address: SocketAddr::new(flow_key.2, flow_key.3),
-                    info: bgp_message,
-                };
-                Ok(serde_json::to_string(&serializable_flow)?)
+                serialize_success(flow_key, bgp_message)
             }
-            DecodeOutcome::Error(m) => Ok(serde_json::to_string(&m)?),
+            DecodeOutcome::Error(m) => serialize_error(m),
         }
     }
 }
@@ -91,7 +83,9 @@ impl ProtocolHandler<(BgpMessage, BgpParsingIgnoredErrors), BgpCodec, BgpCodecDe
 mod tests {
     use super::*;
     use netgauze_bgp_pkt::{open::BgpOpenMessage, wire::deserializer::BgpMessageParsingError};
+    use serde_json::json;
     use std::net::Ipv4Addr;
+
     #[test]
     fn test_bgp_handler_decode_success() {
         let handler = BgpProtocolHandler::new(vec![179]);
@@ -384,10 +378,20 @@ mod tests {
         let result = handler.serialize(outcome);
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"source_address":"10.0.0.1:12345","destination_address":"10.0.0.2:179","info":{"Open":{"version":4,"my_as":1,"hold_time":180,"bgp_id":"1.1.1.1","params":[]}}}"#
-        );
+        let expected = json!({
+          "source_address": "10.0.0.1:12345",
+          "destination_address": "10.0.0.2:179",
+          "info": {
+            "Open": {
+              "version": 4,
+              "my_as": 1,
+              "hold_time": 180,
+              "bgp_id": "1.1.1.1",
+              "params": []
+            }
+          }
+        });
+        assert_eq!(json, expected);
     }
 
     #[test]
@@ -401,9 +405,11 @@ mod tests {
         let result = handler.serialize(outcome);
         assert!(result.is_ok());
         let json = result.unwrap();
-        assert_eq!(
-            json,
-            r#"{"BgpMessageParsingError":{"BadMessageLength":10}}"#
-        );
+        let expected = json!({
+            "BgpMessageParsingError": {
+                "BadMessageLength": 10
+            }
+        });
+        assert_eq!(json, expected);
     }
 }

@@ -65,7 +65,7 @@ where
         {
             for result in message {
                 let serialized_data = handler.serialize(result)?;
-                writer.write_all(serialized_data.as_bytes())?;
+                writer.write_all(serde_json::to_string(&serialized_data)?.as_bytes())?;
                 writer.write_all(b"\n")?;
             }
         }
