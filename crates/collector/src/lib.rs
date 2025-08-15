@@ -32,6 +32,7 @@ use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
 use netgauze_yang_push::{
     enrichment::YangPushEnrichmentActorHandle, model::telemetry::TelemetryMessageWrapper,
+    validation::ValidationActorHandle,
 };
 use std::{net::IpAddr, str::Utf8Error, sync::Arc};
 use tracing::{info, warn};
@@ -274,6 +275,7 @@ pub async fn init_udp_notif_collection(
     let (supervisor_join_handle, supervisor_handle) =
         UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;
     let mut join_set = FuturesUnordered::new();
+    let mut validation_handles = Vec::new();
     let mut enrichment_handles = Vec::new();
     let mut http_handles = Vec::new();
     let mut kafka_handles = Vec::new();
@@ -333,6 +335,14 @@ pub async fn init_udp_notif_collection(
                     ));
                 }
                 PublisherEndpoint::TelemetryKafkaJson(config) => {
+                    let (validation_join, validation_handle) = ValidationActorHandle::new(
+                        publisher_config.buffer_size,
+                        udp_notif_recv.clone(),
+                        either::Left(meter.clone()),
+                    );
+                    join_set.push(validation_join);
+                    validation_handles.push(validation_handle.clone());
+
                     let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
                         publisher_config.buffer_size,
                         udp_notif_recv.clone(),
@@ -386,6 +396,9 @@ pub async fn init_udp_notif_collection(
         join_ret = join_set.next() => {
             warn!("udp-notif http publisher exited, shutting down udp-notif collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
+            for handle in validation_handles {
+                let _ = handle.shutdown().await;
+            }
             for handle in enrichment_handles {
                 let _ = handle.shutdown().await;
             }

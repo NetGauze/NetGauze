@@ -15,27 +15,47 @@
 
 use anyhow;
 use async_channel;
-use std::{collections::HashMap, net::SocketAddr, ops::BitOr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 use yang3::{
     context::{Context, ContextFlags},
-    data::{DataFormat, DataParserFlags, DataTree, DataValidationFlags},
+    data::{DataFormat, DataOperation, DataTree},
 };
 
 use netgauze_udp_notif_pkt::UdpNotifPacket;
 
-use crate::model::notification::SubscriptionId;
+use crate::{
+    model::{
+        notification::SubscriptionId,
+        udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
+    },
+    validation::UdpNotifPayload::NotificationEnvelope,
+};
 
 /// Cache for YangPush subscriptions
-pub type SubscriptionIdx = (SocketAddr, SubscriptionId);
-pub type YangLibrary = String;
-pub type SearchDir = String;
-pub type SubscriptionData = (YangLibrary, SearchDir, Context);
-pub type SubscriptionCache = HashMap<SubscriptionIdx, SubscriptionData>;
+type SubscriptionIdx = (SocketAddr, SubscriptionId);
+type SubscriptionCache = HashMap<SubscriptionIdx, SubscriptionData>;
+
+#[derive(Debug, Clone)]
+struct SubscriptionData {
+    yang_lib: String,
+    search_dir: String,
+    context: Arc<Context>,
+}
+
+impl SubscriptionData {
+    fn new(yang_lib: String, search_dir: String, context: Arc<Context>) -> Self {
+        Self {
+            yang_lib,
+            search_dir,
+            context,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
-pub enum ValidationActorCommand {
+enum ValidationActorCommand {
     Shutdown,
 }
 
@@ -155,6 +175,7 @@ impl ValidationActor {
         validated_tx: async_channel::Sender<String>,
         stats: ValidationStats,
     ) -> Self {
+        info!("Creating Yang Push validation actor");
         Self {
             cmd_rx,
             udp_notif_rx,
@@ -197,7 +218,6 @@ impl ValidationActor {
                                 ),
                             ];
                             self.stats.received_messages.add(1, &peer_tags);
-
                             if let Err(err) = self.handle_udp_notif(peer, packet) {
                                 self.stats.udpnotif_payload_processing_error.add(1, &peer_tags);
                                 error!("Error handling UDP notification: {err}");
@@ -218,79 +238,171 @@ impl ValidationActor {
         peer: SocketAddr,
         packet: UdpNotifPacket,
     ) -> Result<(), ValidationActorError> {
-        // Check if the notification has content
-        if packet.payload().is_empty() {
-            return Err(ValidationActorError::NotificationWithoutContent);
-        }
-        let subscr_id = 0; // TODO
-
-        let ctx = match self.get_context(peer, subscr_id) {
-            Ok(ctx) => ctx,
+        // Decode UdpNotifPacket into UdpNotifPacketDecoded
+        let pkt_ptr = &packet;
+        let decoded: UdpNotifPacketDecoded = match pkt_ptr.try_into() {
+            Ok(decoded) => decoded,
             Err(err) => {
-                debug!("Found no context for peer {}: {}", peer, err);
-                let yanglibrary = "E96CB84D-F02B-4FBF-BE86-3580300CD964"; // TODO
-                let search_dir = "models"; // TODO
-                &self.create_context(yanglibrary, search_dir).unwrap()
+                warn!("Failed to decode Udp-Notif Payload: {err}");
+                return Ok(());
             }
         };
+        let envelope: UdpNotifPayload = decoded.payload().clone();
+        let payload = match envelope {
+            NotificationEnvelope(payload) => {
+                debug!("Received Yang Push notification from peer: {}", peer);
+                payload
+            }
+            _ => {
+                warn!(
+                    "Received unsupported UDP-Notif payload type: {:?}",
+                    envelope
+                );
+                return Ok(());
+            }
+        };
+        let content = match payload.contents() {
+            Some(content) => content,
+            None => {
+                warn!("Received Yang Push notification without content");
+                return Ok(());
+            }
+        };
+        let subscr_id = content.subscription_id();
+        trace!(
+            "Processing Yang Push notification for peer: {}, subscription ID: {}",
+            peer,
+            subscr_id
+        );
+        let msg = match serde_json::to_string(content) {
+            Ok(msg) => msg,
+            Err(err) => {
+                warn!("Failed to serialize Yang Push message: {err}");
+                return Ok(());
+            }
+        };
+        trace!("Serialized Yang Push message: {}", msg);
 
         // Validating YANG data against the loaded schemas
-        dbg!(packet.payload());
-        let yang_data = packet.payload();
-
-        // TODO: Decode UdpNotifPacket into UdpNotifPacketDecoded
-
-        let data_tree = DataTree::parse_string(
-            ctx,
-            yang_data,
-            DataFormat::JSON,
-            DataParserFlags::STRICT,
-            DataValidationFlags::empty(),
-        )
-        .map_err(|_| ValidationActorError::PayloadValidationError)?;
-
-        debug!("Iterating over all data nodes...");
-        for dnode in data_tree.traverse() {
-            debug!("  {}: {:?}", dnode.path(), dnode.value());
-        }
+        let _res = self.validate_message(peer, subscr_id, msg.clone()); // TODO
 
         Ok(())
     }
 
-    fn get_context(
+    fn validate_message(
+        &mut self,
+        peer: SocketAddr,
+        subscr_id: SubscriptionId,
+        message: String,
+    ) -> Result<(), ValidationActorError> {
+        trace!(
+            "Validating Yang Push message for peer: {}, subscription ID: {}",
+            peer,
+            subscr_id
+        );
+        let sub = match self.get_subscription(peer, subscr_id) {
+            Some(sub) => {
+                debug!(
+                    "Found context for peer: {}, subscription ID: {}",
+                    peer, subscr_id
+                );
+                sub
+            }
+            None => {
+                debug!(
+                    "No context found for peer: {}, subscription ID: {}",
+                    peer, subscr_id
+                );
+                self.stats.subscription_cache_miss.add(
+                    1,
+                    &[
+                        opentelemetry::KeyValue::new(
+                            "network.peer.address",
+                            format!("{}", peer.ip()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "network.peer.port",
+                            opentelemetry::Value::I64(peer.port().into()),
+                        ),
+                    ],
+                );
+                let yanglibrary =
+                    "../../assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/yanglib.json"; // TODO
+                let search_dir = "../../assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/models"; // TODO
+                self.create_subscription(peer, subscr_id, yanglibrary, search_dir)?
+            }
+        };
+
+        // Validating YANG data against the loaded schemas
+        let data_op = DataOperation::NotificationYang;
+        let _data_tree =
+            match DataTree::parse_op_string(&sub.context, message, DataFormat::JSON, data_op) {
+                Ok(tree) => tree,
+                Err(err) => {
+                    warn!("Failed to parse Yang Push message: {err}");
+                    return Err(ValidationActorError::PayloadValidationError);
+                }
+            };
+        Ok(())
+    }
+
+    fn get_subscription(
         &self,
         peer: SocketAddr,
         subscr_id: SubscriptionId,
-    ) -> Result<&Context, ValidationActorError> {
+    ) -> Option<&SubscriptionData> {
         // Retrieve the context for the given peer address
         let idx = (peer, subscr_id);
         let subscription = self.subscriptions.get(&idx);
         match subscription {
             Some(subscription) => {
-                let (_yanglibrary, _search_dir, ctx) = subscription;
-                Ok(ctx)
+                debug!(
+                    "Found subscription: {}, search dir: {}",
+                    &subscription.yang_lib, &subscription.search_dir
+                );
+                Some(subscription)
             }
             None => {
-                error!("No subscription found for peer: {}", peer);
-                Err(ValidationActorError::YangPushReceiveError)
+                debug!(
+                    "No subscription found for peer {}, subscription ID {}",
+                    peer, subscr_id
+                );
+                None
             }
         }
     }
 
-    fn create_context(
-        &self,
+    fn create_subscription(
+        &mut self,
+        peer: SocketAddr,
+        subscr_id: SubscriptionId,
         yanglibrary: &str,
         search_dir: &str,
-    ) -> Result<Context, ValidationActorError> {
+    ) -> Result<&SubscriptionData, ValidationActorError> {
+        debug!(
+            "Creating context for Yang Push validation, Yang library: {}, search dir: {}",
+            yanglibrary, search_dir
+        );
         // Initialize context
-        let flags = ContextFlags::NO_YANGLIBRARY.bitor(ContextFlags::REF_IMPLEMENTED);
-        let format = DataFormat::XML;
-        let ctx = Context::new_from_yang_library_str(yanglibrary, format, search_dir, flags)
-            .expect("Failed to create context");
-        for schema_module in ctx.modules(false) {
-            debug!("schema modules loaded: {}", schema_module.name());
+        let format = DataFormat::JSON;
+        let flags = ContextFlags::empty();
+        match Context::new_from_yang_library_file(yanglibrary, format, search_dir, flags) {
+            Ok(ctx) => {
+                debug!(
+                    "libyang context created successfully, {} modules",
+                    ctx.modules(false).count()
+                );
+                let context = Arc::new(ctx);
+                let subscription =
+                    SubscriptionData::new(yanglibrary.to_string(), search_dir.to_string(), context);
+                self.subscriptions.insert((peer, subscr_id), subscription);
+                Ok(&self.subscriptions[&(peer, subscr_id)])
+            }
+            Err(err) => {
+                error!("Failed to create libyang context: {err}");
+                Err(ValidationActorError::PayloadValidationError)
+            }
         }
-        Ok(ctx)
     }
 }
 
@@ -347,5 +459,260 @@ impl ValidationActorHandle {
 
     pub fn subscribe(&self) -> async_channel::Receiver<String> {
         self.validated_rx.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use bytes::Bytes;
+    use netgauze_udp_notif_pkt::MediaType;
+    use serde_json::json;
+
+    fn create_actor() -> ValidationActor {
+        ValidationActor::new(
+            mpsc::channel(10).1,
+            async_channel::bounded(10).1,
+            async_channel::bounded(10).0,
+            ValidationStats::new(opentelemetry::global::meter("test_meter")),
+        )
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_message_validation() {
+        let mut validator = create_actor();
+        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+        let subscr_id = 0;
+        let result = validator.validate_message(
+            peer,
+            subscr_id,
+            r###"{
+                "ietf-yang-push:push-update": {
+                  "datastore-contents": {
+                    "ietf-interfaces:interfaces": {
+                      "interface": [
+                        {
+                          "name": "ethernetCsmacd.0.1.0",
+                          "oper-status": "up"
+                        },
+                        {
+                          "name": "ethernetCsmacd.0.1.1",
+                          "oper-status": "down"
+                        }
+                      ]
+                    }
+                  },
+                  "id": 1,
+                  "ietf-distributed-notif:message-publisher-id": 1234567890,
+                  "ietf-yp-observation:point-in-time": "initial-state",
+                  "ietf-yp-observation:timestamp": "2025-01-01T01:23:45.678+01:00"
+                }
+              }"###
+                .to_string(),
+        );
+        assert!(
+            result.is_ok(),
+            "Message validation failed: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_message_validation_fail() {
+        let mut validator = create_actor();
+        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+        let subscr_id = 0;
+        let result = validator.validate_message(
+            peer,
+            subscr_id,
+            r###"{
+                "ietf-yang-push:push-update": {
+                  "datastore-contents": {
+                    "ietf-interfaces:interfaces": {
+                      "interface": [
+                        {
+                          "name": "ethernetCsmacd.0.1.0",
+                          "oper-status": "up"
+                        },
+                        {
+                          "name": "ethernetCsmacd.0.1.1",
+                          "oper-status": "down"
+                        }
+                      ]
+                    }
+                  },
+                  "id": "1"
+                }
+              }"###
+                .to_string(),
+        );
+        assert!(
+            result.is_err(),
+            "Invalid message got successfully validated"
+        );
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_packet_processing_1() {
+        let mut validator = create_actor();
+        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+
+        // Create UdpNotifPayload
+        let payload = json!({
+            "ietf-yp-notification:envelope": {
+                "contents": {
+                    "ietf-yang-push:push-update": {
+                        "datastore-contents": {
+                            "ietf-interfaces:interfaces": {
+                                "interface": [
+                                {
+                                    "name": "ethernetCsmacd.0.1.0",
+                                    "oper-status": "up"
+                                },
+                                {
+                                    "name": "ethernetCsmacd.0.1.1",
+                                    "oper-status": "down"
+                                }
+                                ]
+                            }
+                        },
+                        "id": 1,
+                        "ietf-distributed-notif:message-publisher-id": 1234567890,
+                        "ietf-yp-observation:point-in-time": "initial-state",
+                        "ietf-yp-observation:timestamp": "2025-01-01T01:00:00.000+01:00"
+                    }
+                },
+                "event-time": "2025-01-01T01:23:45.678901234+01:00",
+                "hostname": "some-router",
+                "sequence-number": 5,
+            }
+        })
+        .to_string()
+        .into_bytes();
+
+        let packet = UdpNotifPacket::new(
+            MediaType::YangDataJson,
+            1,
+            1,
+            HashMap::new(),
+            Bytes::from(payload),
+        );
+
+        // Validate the packet
+        let result = validator.handle_udp_notif(peer, packet);
+        assert!(
+            result.is_ok(),
+            "Packet validation failed: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_packet_processing_2() {
+        let mut validator = create_actor();
+        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+
+        // Create UdpNotifPayload
+        let payload1 = json!({
+            "ietf-yp-notification:envelope": {
+                "contents": {
+                    "ietf-yang-push:push-update": {
+                        "datastore-contents": {
+                            "ietf-interfaces:interfaces": {
+                                "interface": [
+                                {
+                                    "name": "ethernetCsmacd.0.1.0",
+                                    "oper-status": "up"
+                                },
+                                {
+                                    "name": "ethernetCsmacd.0.1.1",
+                                    "oper-status": "down"
+                                }
+                                ]
+                            }
+                        },
+                        "id": 1,
+                        "ietf-distributed-notif:message-publisher-id": 1234567890,
+                        "ietf-yp-observation:point-in-time": "initial-state",
+                        "ietf-yp-observation:timestamp": "2025-01-01T01:00:00.000+01:00"
+                    }
+                },
+                "event-time": "2025-01-01T01:23:45.678901234+01:00",
+                "hostname": "some-router",
+                "sequence-number": 5,
+            }
+        })
+        .to_string()
+        .into_bytes();
+
+        let payload2 = json!({
+            "ietf-yp-notification:envelope": {
+                "contents": {
+                    "ietf-yang-push:push-update": {
+                        "datastore-contents": {
+                            "ietf-interfaces:interfaces": {
+                                "interface": [
+                                {
+                                    "name": "ethernetCsmacd.0.1.0",
+                                    "oper-status": "down"
+                                },
+                                {
+                                    "name": "ethernetCsmacd.0.1.1",
+                                    "oper-status": "up"
+                                }
+                                ]
+                            }
+                        },
+                        "id": 1,
+                        "ietf-distributed-notif:message-publisher-id": 1234567890,
+                        "ietf-yp-observation:point-in-time": "initial-state",
+                        "ietf-yp-observation:timestamp": "2025-01-01T01:01:00.000+01:00"
+                    }
+                },
+                "event-time": "2025-01-01T01:23:45.678901234+01:00",
+                "hostname": "some-router",
+                "sequence-number": 6,
+            }
+        })
+        .to_string()
+        .into_bytes();
+
+        let packet1 = UdpNotifPacket::new(
+            MediaType::YangDataJson,
+            1,
+            1,
+            HashMap::new(),
+            Bytes::from(payload1),
+        );
+        let packet2 = UdpNotifPacket::new(
+            MediaType::YangDataJson,
+            1,
+            1,
+            HashMap::new(),
+            Bytes::from(payload2),
+        );
+
+        // Create a context and validate the packet
+        let result1 = validator.handle_udp_notif(peer, packet1);
+        assert!(
+            result1.is_ok(),
+            "Packet validation failed: {:?}",
+            result1.err()
+        );
+        // Check if the context was cached
+        let result2 = validator.get_subscription(peer, 1);
+        assert!(result2.is_some(), "Context caching failed");
+        // Validate the packet against the cached context
+        let result3 = validator.handle_udp_notif(peer, packet2);
+        assert!(
+            result3.is_ok(),
+            "Validation against the cached context failed: {:?}",
+            result3.err()
+        );
     }
 }
