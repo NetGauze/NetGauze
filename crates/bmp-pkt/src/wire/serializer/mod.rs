@@ -18,7 +18,7 @@
 pub mod v3;
 pub mod v4;
 
-use crate::*;
+use crate::BmpMessage;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;

@@ -15,6 +15,9 @@
 
 //! Deserializer library for BMP's wire protocol
 
+pub mod v3;
+pub mod v4;
+
 use crate::{
     iana::{BmpVersion, UndefinedBmpVersion},
     BmpMessage, PeerKey,
@@ -34,9 +37,6 @@ use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
 };
-
-pub mod v3;
-pub mod v4;
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpMessageParsingError {

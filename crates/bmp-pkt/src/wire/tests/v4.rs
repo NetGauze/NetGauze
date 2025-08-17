@@ -38,7 +38,9 @@ use netgauze_bgp_pkt::{
         update::BgpUpdateMessageParsingError, BgpMessageParsingError, BgpParsingContext,
         Ipv4PrefixParsingError,
     },
+    BgpMessage,
 };
+use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
     test_helpers::{
         test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,

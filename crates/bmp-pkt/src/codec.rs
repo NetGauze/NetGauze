@@ -271,6 +271,7 @@ mod tests {
         v3::{InitiationInformation, PeerDownNotificationReason, TerminationInformation},
         *,
     };
+    use chrono::TimeZone;
     use netgauze_bgp_pkt::{
         capabilities::{
             ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
@@ -278,7 +279,7 @@ mod tests {
         },
         open::{BgpOpenMessage, BgpOpenMessageParameter},
     };
-    use netgauze_iana::address_family::AddressFamily;
+    use netgauze_iana::address_family::{AddressFamily, AddressType};
     use std::{net::Ipv6Addr, str::FromStr};
 
     #[test]

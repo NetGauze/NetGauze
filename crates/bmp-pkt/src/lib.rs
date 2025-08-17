@@ -22,8 +22,7 @@ use std::{
     ops::Deref,
 };
 
-use netgauze_bgp_pkt::{iana::BgpMessageType, nlri::RouteDistinguisher, BgpMessage};
-use netgauze_iana::address_family::AddressType;
+use netgauze_bgp_pkt::nlri::RouteDistinguisher;
 
 use crate::iana::{BmpMessageType, BmpPeerTypeCode, BmpVersion};
 
