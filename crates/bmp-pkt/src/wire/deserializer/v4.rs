@@ -255,6 +255,10 @@ impl<'a>
 pub enum RouteMonitoringTlvParsingError {
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    InvalidTlvLength {
+        expected: u16,
+        actual: u16,
+    },
     BgpMessage(
         #[from_located(module = "netgauze_bgp_pkt::wire::deserializer")] BgpMessageParsingError,
     ),
@@ -287,8 +291,18 @@ impl<'a>
         // Can't use read_tlv_header_t16_l16 because Index is in the middle of the
         // header and not counted in Length
         let (span, tlv_type) = be_u16(buf)?;
+        let input = buf;
         let (span, tlv_length) = be_u16(span)?;
         let (span, index) = be_u16(span)?;
+        if buf.len() < tlv_length as usize {
+            return Err(nom::Err::Error(LocatedRouteMonitoringTlvParsingError::new(
+                input,
+                RouteMonitoringTlvParsingError::InvalidTlvLength {
+                    expected: tlv_length,
+                    actual: buf.len() as u16,
+                },
+            )));
+        }
         let (remainder, data) = nom::bytes::complete::take(tlv_length)(span)?;
 
         let value = match v4::RouteMonitoringTlvType::from_repr(tlv_type) {
