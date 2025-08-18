@@ -18,8 +18,8 @@ use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_pcap_reader::TransportProtocol;
 use netgauze_udp_notif_pkt::{
-    MediaType, UdpNotifPacket,
     codec::{UdpPacketCodec, UdpPacketCodecError},
+    MediaType, UdpNotifPacket,
 };
 use std::{collections::HashMap, net::IpAddr};
 
@@ -74,9 +74,8 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                 // Convert when possible inner payload into human-readable format
                 match udp_notif_packet.media_type() {
                     MediaType::YangDataJson => {
-                        let payload =
-                            serde_json::from_slice(udp_notif_packet.payload())
-                                .expect("Couldn't deserialize JSON payload into a JSON object");
+                        let payload = serde_json::from_slice(udp_notif_packet.payload())
+                            .expect("Couldn't deserialize JSON payload into a JSON object");
                         if let serde_json::Value::Object(val) = &mut value {
                             val.insert("payload".to_string(), payload);
                         }
@@ -92,11 +91,10 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                         }
                     }
                     MediaType::YangDataCbor => {
-                        let payload: serde_json::Value =
-                            ciborium::de::from_reader(std::io::Cursor::new(
-                                udp_notif_packet.payload(),
-                            ))
-                            .expect("Couldn't deserialize CBOR payload into a CBOR object");
+                        let payload: serde_json::Value = ciborium::de::from_reader(
+                            std::io::Cursor::new(udp_notif_packet.payload()),
+                        )
+                        .expect("Couldn't deserialize CBOR payload into a CBOR object");
                         if let serde_json::Value::Object(val) = &mut value {
                             val.insert("payload".to_string(), payload);
                         }
@@ -143,17 +141,19 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
-                assert_eq!(msg.message_id(), 0x02000002);
-            } else {
-                panic!("Expected successful decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Success((
+                flow_key,
+                UdpNotifPacket::new(
+                    MediaType::YangDataJson,
+                    0x01000001,
+                    0x02000002,
+                    HashMap::new(),
+                    Bytes::from(&[0xffu8, 0xffu8][..]),
+                )
+            ))])
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -198,17 +198,19 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result2.is_some());
-        if let Some(ref outcomes) = result2 {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
-                assert_eq!(msg.message_id(), 0x02000002);
-            } else {
-                panic!("Expected successful decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result2,
+            Some(vec![DecodeOutcome::Success((
+                flow_key,
+                UdpNotifPacket::new(
+                    MediaType::YangDataJson,
+                    0x01000001,
+                    0x02000002,
+                    HashMap::new(),
+                    Bytes::from(&[0xffu8, 0xffu8][..]),
+                )
+            ))])
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -246,17 +248,12 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
-                assert!(matches!(e, UdpPacketCodecError::InvalidMessageLength(14)));
-            } else {
-                panic!("Expected error decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Error(
+                UdpPacketCodecError::InvalidMessageLength(14)
+            )]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -287,17 +284,12 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
-                assert!(matches!(e, UdpPacketCodecError::InvalidHeaderLength(1)));
-            } else {
-                panic!("Expected error decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Error(
+                UdpPacketCodecError::InvalidHeaderLength(1)
+            )]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }

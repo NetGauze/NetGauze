@@ -35,7 +35,7 @@ use tokio_util::codec::Decoder;
 /// to the results.
 ///
 /// This function is only available within the handlers module.
-pub(in crate::handlers) fn decode_buffer<T, E, C>(
+fn decode_buffer<T, E, C>(
     buffer: &mut BytesMut,
     codec: &mut C,
     flow_key: (IpAddr, u16, IpAddr, u16),
@@ -63,7 +63,7 @@ pub(in crate::handlers) fn decode_buffer<T, E, C>(
 
 /// Helper function to serialize a successful decode outcome.
 /// Only available within the handlers module.
-pub(in crate::handlers) fn serialize_success<T: Serialize>(
+fn serialize_success<T: Serialize>(
     flow_key: (IpAddr, u16, IpAddr, u16),
     info: T,
 ) -> io::Result<serde_json::Value> {
@@ -72,15 +72,11 @@ pub(in crate::handlers) fn serialize_success<T: Serialize>(
         destination_address: SocketAddr::new(flow_key.2, flow_key.3),
         info,
     };
-    Ok(serde_json::to_value(
-        &serializable_flow,
-    )?)
+    Ok(serde_json::to_value(&serializable_flow)?)
 }
 
 /// Helper function to serialize an error outcome.
 /// Only available within the handlers module.
-pub(in crate::handlers) fn serialize_error<E: Serialize>(
-    error: E,
-) -> io::Result<serde_json::Value> {
+fn serialize_error<E: Serialize>(error: E) -> io::Result<serde_json::Value> {
     Ok(serde_json::to_value(&error)?)
 }

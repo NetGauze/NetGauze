@@ -17,8 +17,8 @@ use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_flow_pkt::{
-    FlowInfo,
     codec::{FlowInfoCodec, FlowInfoCodecDecoderError},
+    FlowInfo,
 };
 use netgauze_pcap_reader::TransportProtocol;
 use std::{collections::HashMap, io, net::IpAddr};
@@ -78,11 +78,11 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use ipfix::IpfixPacket;
     use netgauze_flow_pkt::{
-        DataSetId, FlowInfo,
-        ie::Field,
+        ie::{Field, IE},
         ipfix,
-        ipfix::{DataRecord, Set},
+        ipfix::{DataRecord, OptionsTemplateRecord, Set},
         wire::deserializer::ipfix::IpfixPacketParsingError,
+        DataSetId, FlowInfo,
     };
     use serde_json::json;
     use std::net::Ipv4Addr;
@@ -111,22 +111,32 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
-                if let FlowInfo::IPFIX(packet) = msg {
-                    assert_eq!(packet.version(), 10);
-                    assert_eq!(packet.observation_domain_id(), 33312);
-                } else {
-                    panic!("Wrong flow version");
-                }
-            } else {
-                panic!("Expected successful decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Success((
+                flow_key,
+                FlowInfo::IPFIX(IpfixPacket::new(
+                    Utc.with_ymd_and_hms(2024, 1, 12, 14, 40, 22).unwrap(),
+                    2494624,
+                    33312,
+                    Box::new([Set::OptionsTemplate(Box::new([
+                        OptionsTemplateRecord::new(
+                            338,
+                            Box::new([netgauze_flow_pkt::FieldSpecifier::new(
+                                IE::observationDomainId,
+                                4
+                            )
+                            .unwrap()]),
+                            Box::new([netgauze_flow_pkt::FieldSpecifier::new(
+                                IE::systemInitTimeMilliseconds,
+                                8
+                            )
+                            .unwrap()]),
+                        ),
+                    ]))]),
+                ))
+            ))]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -165,22 +175,33 @@ mod tests {
             packet_data2,
             &mut exporter_peers,
         );
-        assert!(result2.is_some());
-        if let Some(ref outcomes) = result2 {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
-                if let FlowInfo::IPFIX(packet) = msg {
-                    assert_eq!(packet.version(), 10);
-                    assert_eq!(packet.observation_domain_id(), 33312);
-                } else {
-                    panic!("Wrong flow version");
-                }
-            } else {
-                panic!("Expected successful decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+
+        assert_eq!(
+            result2,
+            Some(vec![DecodeOutcome::Success((
+                flow_key,
+                FlowInfo::IPFIX(IpfixPacket::new(
+                    Utc.with_ymd_and_hms(2024, 1, 12, 14, 40, 22).unwrap(),
+                    2494624,
+                    33312,
+                    Box::new([Set::OptionsTemplate(Box::new([
+                        OptionsTemplateRecord::new(
+                            338,
+                            Box::new([netgauze_flow_pkt::FieldSpecifier::new(
+                                IE::observationDomainId,
+                                4
+                            )
+                            .unwrap()]),
+                            Box::new([netgauze_flow_pkt::FieldSpecifier::new(
+                                IE::systemInitTimeMilliseconds,
+                                8
+                            )
+                            .unwrap()]),
+                        ),
+                    ]))]),
+                ))
+            ))]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -212,24 +233,32 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert_eq!(outcomes.len(), 2);
-            for outcome in outcomes {
-                if let DecodeOutcome::Success((_, msg)) = outcome {
-                    if let FlowInfo::IPFIX(packet) = msg {
-                        assert_eq!(packet.version(), 10);
-                        assert_eq!(packet.observation_domain_id(), 33312);
-                    } else {
-                        panic!("Wrong flow version");
-                    }
-                } else {
-                    panic!("Expected successful decode");
-                }
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        let expected_flow = FlowInfo::IPFIX(IpfixPacket::new(
+            Utc.with_ymd_and_hms(2024, 1, 12, 14, 40, 22).unwrap(),
+            2494624,
+            33312,
+            Box::new([Set::OptionsTemplate(Box::new([
+                OptionsTemplateRecord::new(
+                    338,
+                    Box::new([
+                        netgauze_flow_pkt::FieldSpecifier::new(IE::observationDomainId, 4).unwrap(),
+                    ]),
+                    Box::new([netgauze_flow_pkt::FieldSpecifier::new(
+                        IE::systemInitTimeMilliseconds,
+                        8,
+                    )
+                    .unwrap()]),
+                ),
+            ]))]),
+        ));
+        assert_eq!(
+            result,
+            Some(vec![
+                DecodeOutcome::Success((flow_key, expected_flow.clone())),
+                DecodeOutcome::Success((flow_key, expected_flow))
+            ]),
+        );
+
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -258,20 +287,12 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
-                assert!(matches!(
-                    e,
-                    FlowInfoCodecDecoderError::UnsupportedVersion(3)
-                ));
-            } else {
-                panic!("Expected error decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Error(
+                FlowInfoCodecDecoderError::UnsupportedVersion(3)
+            )]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }

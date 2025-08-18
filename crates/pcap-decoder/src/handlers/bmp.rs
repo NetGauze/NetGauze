@@ -17,8 +17,8 @@ use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_bmp_pkt::{
-    BmpMessage,
     codec::{BmpCodec, BmpCodecDecoderError},
+    BmpMessage,
 };
 use netgauze_pcap_reader::TransportProtocol;
 use std::{collections::HashMap, io, net::IpAddr};
@@ -76,7 +76,7 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
 mod tests {
     use super::*;
     use netgauze_bmp_pkt::{
-        v3::{BmpMessageValue, InitiationMessage},
+        v3::{BmpMessageValue, InitiationInformation, InitiationMessage},
         wire::deserializer::BmpMessageParsingError,
     };
     use serde_json::json;
@@ -112,20 +112,18 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
-                assert!(matches!(
-                    msg,
-                    BmpMessage::V3(BmpMessageValue::Initiation(_))
-                ));
-            } else {
-                panic!("Expected successful decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Success((
+                flow_key,
+                BmpMessage::V3(BmpMessageValue::Initiation(InitiationMessage::new(vec![
+                    InitiationInformation::SystemDescription(
+                        "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".to_string()
+                    ),
+                    InitiationInformation::SystemName("xr3".to_string())
+                ])))
+            ))]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -170,20 +168,19 @@ mod tests {
             &packet_data2,
             &mut exporter_peers,
         );
-        assert!(result2.is_some());
-        if let Some(ref outcomes) = result2 {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Success((_, msg))) = outcomes.first() {
-                assert!(matches!(
-                    msg,
-                    BmpMessage::V3(BmpMessageValue::Initiation(_))
-                ));
-            } else {
-                panic!("Expected successful decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+
+        assert_eq!(
+            result2,
+            Some(vec![DecodeOutcome::Success((
+                flow_key,
+                BmpMessage::V3(BmpMessageValue::Initiation(InitiationMessage::new(vec![
+                    InitiationInformation::SystemDescription(
+                        "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".to_string()
+                    ),
+                    InitiationInformation::SystemName("xr3".to_string())
+                ])))
+            ))]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -226,22 +223,26 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert_eq!(outcomes.len(), 2);
-            for outcome in outcomes {
-                if let DecodeOutcome::Success((_, msg)) = outcome {
-                    assert!(matches!(
-                        msg,
-                        BmpMessage::V3(BmpMessageValue::Initiation(_))
-                    ));
-                } else {
-                    panic!("Expected successful decode");
-                }
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        let expected_initiation = InitiationMessage::new(vec![
+            InitiationInformation::SystemDescription(
+                "Cisco IOS XR Software, Version 5.2.2.21I[Default]\nCopyright (c) 2014 by Cisco Systems, Inc.".to_string()
+            ),
+            InitiationInformation::SystemName("xr3".to_string())
+        ]);
+
+        assert_eq!(
+            result,
+            Some(vec![
+                DecodeOutcome::Success((
+                    flow_key,
+                    BmpMessage::V3(BmpMessageValue::Initiation(expected_initiation.clone()))
+                )),
+                DecodeOutcome::Success((
+                    flow_key,
+                    BmpMessage::V3(BmpMessageValue::Initiation(expected_initiation))
+                ))
+            ]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -255,7 +256,7 @@ mod tests {
             IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
             1790,
         );
-        // A simple BMP Initiation message, but truncated
+        // A simple BMP Initiation message, but with wrong version
         let packet_data = [
             0x01, 0x00, 0x00, 0x00, 0x6c, 0x04, 0x00, 0x01, 0x00, 0x5b, 0x43, 0x69, 0x73, 0x63,
             0x6f, 0x20, // wrong version, first byte
@@ -276,17 +277,16 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
-                assert!(matches!(e, BmpCodecDecoderError::BmpMessageParsingError(_)));
-            } else {
-                panic!("Expected error decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Error(
+                BmpCodecDecoderError::BmpMessageParsingError(
+                    BmpMessageParsingError::UndefinedBmpVersion(
+                        netgauze_bmp_pkt::iana::UndefinedBmpVersion(1)
+                    )
+                )
+            )]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }

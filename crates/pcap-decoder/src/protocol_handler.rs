@@ -29,7 +29,7 @@ pub struct SerializableInfo<I> {
     pub(crate) info: I,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub enum DecodeOutcome<M, E> {
     Success(((IpAddr, u16, IpAddr, u16), M)),
     Error(E),
