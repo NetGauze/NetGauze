@@ -40,7 +40,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         Ok::<Option<BmpServerResponse>, Infallible>(None)
     }));
     let pipeline = ServiceBuilder::new()
-        //.rate_limit(1, Duration::from_secs(30))
         .service(print_svc);
     let buffer_svc = Buffer::new(pipeline, 100);
 
@@ -48,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     let handle_clone = handle.clone();
     let server_handle = tokio::spawn(async move {
         let server = BmpServer::new(local_socket, handle_clone);
-        server.serve(buffer_svc).await.unwrap();
+        let _ = server.serve(buffer_svc).await;
     });
     //tokio::time::sleep(Duration::from_secs(3)).await;
     //handle.shutdown();
