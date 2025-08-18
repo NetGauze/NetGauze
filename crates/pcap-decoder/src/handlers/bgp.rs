@@ -17,9 +17,9 @@ use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_bgp_pkt::{
-    BgpMessage,
     codec::{BgpCodec, BgpCodecDecoderError},
     wire::deserializer::{BgpParsingContext, BgpParsingIgnoredErrors},
+    BgpMessage,
 };
 use netgauze_pcap_reader::TransportProtocol;
 use std::{collections::HashMap, io, net::IpAddr};
@@ -97,7 +97,15 @@ impl ProtocolHandler<(BgpMessage, BgpParsingIgnoredErrors), BgpCodec, BgpCodecDe
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netgauze_bgp_pkt::{open::BgpOpenMessage, wire::deserializer::BgpMessageParsingError};
+    use netgauze_bgp_pkt::{
+        open::BgpOpenMessage,
+        path_attribute::UndefinedOrigin,
+        wire::deserializer::{
+            path_attribute::{OriginParsingError, PathAttributeParsingError},
+            update::BgpUpdateMessageParsingError,
+            BgpMessageParsingError,
+        },
+    };
     use serde_json::json;
     use std::net::Ipv4Addr;
 
@@ -125,19 +133,21 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert_eq!(outcomes.len(), 1);
-            if let Some(DecodeOutcome::Success((_, (msg, ignored_parsing_err)))) = outcomes.first()
-            {
-                assert!(matches!(msg, BgpMessage::Open(_)));
-                assert!(ignored_parsing_err.eq(&BgpParsingIgnoredErrors::default()));
-            } else {
-                panic!("Expected successful decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Success((
+                flow_key,
+                (
+                    BgpMessage::Open(BgpOpenMessage::new(
+                        1,
+                        180,
+                        Ipv4Addr::new(1, 2, 3, 4),
+                        vec![],
+                    )),
+                    BgpParsingIgnoredErrors::default()
+                )
+            ))]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -177,19 +187,22 @@ mod tests {
             packet_data2,
             &mut exporter_peers,
         );
-        assert!(result2.is_some());
-        if let Some(ref outcomes) = result2 {
-            assert!(outcomes.len() == 1);
-            if let Some(DecodeOutcome::Success((_, (msg, ignored_parsing_err)))) = outcomes.first()
-            {
-                assert!(matches!(msg, BgpMessage::Open(_)));
-                assert!(ignored_parsing_err.eq(&BgpParsingIgnoredErrors::default()));
-            } else {
-                panic!("Expected successful decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+
+        assert_eq!(
+            result2,
+            Some(vec![DecodeOutcome::Success((
+                flow_key,
+                (
+                    BgpMessage::Open(BgpOpenMessage::new(
+                        1,
+                        180,
+                        Ipv4Addr::new(1, 2, 3, 4),
+                        vec![],
+                    )),
+                    BgpParsingIgnoredErrors::default()
+                )
+            ))]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -208,8 +221,8 @@ mod tests {
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, 0x00, 0x01, 0x00, 0xb4, 0x01, 0x02, 0x03, 0x04,
             0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, 0x00, 0x01, 0x00, 0xb4, 0x01, 0x02, 0x03,
-            0x04, 0x00,
+            0xff, 0xff, 0xff, 0x00, 0x1d, 0x01, 0x04, 0x00, 0x01, 0x00, 0xb4, 0x05, 0x06, 0x07,
+            0x08, 0x00,
         ];
         let mut exporter_peers = HashMap::new();
 
@@ -220,20 +233,35 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
-        if let Some(ref outcomes) = result {
-            assert_eq!(outcomes.len(), 2);
-            for outcome in outcomes {
-                if let DecodeOutcome::Success((_, (msg, ignored_parsing_err))) = outcome {
-                    assert!(matches!(msg, BgpMessage::Open(_)));
-                    assert!(ignored_parsing_err.eq(&BgpParsingIgnoredErrors::default()));
-                } else {
-                    panic!("Expected successful decode");
-                }
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![
+                DecodeOutcome::Success((
+                    flow_key,
+                    (
+                        BgpMessage::Open(BgpOpenMessage::new(
+                            1,
+                            180,
+                            Ipv4Addr::new(1, 2, 3, 4),
+                            vec![],
+                        )),
+                        BgpParsingIgnoredErrors::default()
+                    )
+                )),
+                DecodeOutcome::Success((
+                    flow_key,
+                    (
+                        BgpMessage::Open(BgpOpenMessage::new(
+                            1,
+                            180,
+                            Ipv4Addr::new(5, 6, 7, 8),
+                            vec![],
+                        )),
+                        BgpParsingIgnoredErrors::default()
+                    )
+                ))
+            ]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -272,18 +300,21 @@ mod tests {
             &mut exporter_peers,
         );
 
-        assert!(result.is_some());
         // Expecting an error due to the first byte being different
-        if let Some(ref outcomes) = result {
-            assert_eq!(outcomes.len(), 1);
-            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
-                assert!(matches!(e, BgpCodecDecoderError::BgpMessageParsingError(_)));
-            } else {
-                panic!("Expected error decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Error(
+                BgpCodecDecoderError::BgpMessageParsingError(
+                    BgpMessageParsingError::BgpUpdateMessageParsingError(
+                        BgpUpdateMessageParsingError::PathAttributeError(
+                            PathAttributeParsingError::OriginError(
+                                OriginParsingError::UndefinedOrigin(UndefinedOrigin(255))
+                            )
+                        )
+                    )
+                )
+            )]),
+        );
         // now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }
@@ -314,16 +345,16 @@ mod tests {
 
         assert!(result.is_some());
         // expecting an error due to the first byte being different
-        if let Some(ref outcomes) = result {
-            assert_eq!(outcomes.len(), 1);
-            if let Some(DecodeOutcome::Error(e)) = outcomes.first() {
-                assert!(matches!(e, BgpCodecDecoderError::BgpMessageParsingError(_)));
-            } else {
-                panic!("Expected error decode");
-            }
-        } else {
-            panic!("Expected successful decode");
-        }
+        assert_eq!(
+            result,
+            Some(vec![DecodeOutcome::Error(
+                BgpCodecDecoderError::BgpMessageParsingError(
+                    BgpMessageParsingError::ConnectionNotSynchronized(
+                        1329227995784915872903807060280344575
+                    )
+                )
+            )]),
+        );
         // Now we should have an empty buffer for this flow key
         assert!(exporter_peers.get(&flow_key).unwrap().1.is_empty());
     }

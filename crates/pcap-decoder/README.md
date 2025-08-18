@@ -99,10 +99,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a BGP protocol handler
     let handler = BgpProtocolHandler::new(config.dest_ports.clone());
-    
+
     // Process the PCAP file
     load_pcap_and_process(&config, &handler)?;
-    
+
     Ok(())
 }
 ```
@@ -114,7 +114,7 @@ The library provides handlers for different protocols:
 ```rust
 use netgauze_pcap_decoder::{
     BgpProtocolHandler,
-    BmpProtocolHandler, 
+    BmpProtocolHandler,
     FlowProtocolHandler,
     UdpNotifProtocolHandler,
 };
@@ -122,7 +122,7 @@ use netgauze_pcap_decoder::{
 // BGP Handler
 let bgp_handler = BgpProtocolHandler::new(vec![179]);
 
-// BMP Handler  
+// BMP Handler
 let bmp_handler = BmpProtocolHandler::new(vec![1790]);
 
 // NetFlow/IPFIX Handler
