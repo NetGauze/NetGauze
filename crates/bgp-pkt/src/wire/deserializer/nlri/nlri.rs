@@ -201,6 +201,12 @@ impl<'a>
         is_unreach: bool,
         multiple_labels_limit: u8,
     ) -> IResult<Span<'a>, Self, LocatedIpv4MplsVpnUnicastAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (prefix_buf, path_id) = be_u32(buf)?;
+            (prefix_buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
         let input = buf;
         let (buf, prefix_len) = be_u8(buf)?;
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
@@ -219,12 +225,6 @@ impl<'a>
                     nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
                 },
             )?;
-        let (prefix_buf, path_id) = if add_path {
-            let (prefix_buf, path_id) = be_u32(prefix_buf)?;
-            (prefix_buf, Some(path_id))
-        } else {
-            (prefix_buf, None)
-        };
         let (prefix_buf, rd) = parse_into_located(prefix_buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first
@@ -277,6 +277,12 @@ impl<'a>
         is_unreach: bool,
         multiple_labels_limit: u8,
     ) -> IResult<Span<'a>, Self, LocatedIpv6MplsVpnUnicastAddressParsingError<'a>> {
+        let (buf, path_id) = if add_path {
+            let (buf, path_id) = be_u32(buf)?;
+            (buf, Some(path_id))
+        } else {
+            (buf, None)
+        };
         let input = buf;
         let (buf, prefix_len) = be_u8(buf)?;
         let prefix_bytes = if prefix_len > u8::MAX - 7 {
@@ -295,12 +301,6 @@ impl<'a>
                     nom::Err::Failure(failure) => nom::Err::Failure(failure.into()),
                 },
             )?;
-        let (prefix_buf, path_id) = if add_path {
-            let (prefix_buf, path_id) = be_u32(prefix_buf)?;
-            (prefix_buf, Some(path_id))
-        } else {
-            (prefix_buf, None)
-        };
         let (prefix_buf, rd) = parse_into_located(prefix_buf)?;
         let read_prefix = RD_LEN * 8 + label_stack.len() as u8 * MPLS_LABEL_LEN_BITS;
         // Check subtraction operation is safe first

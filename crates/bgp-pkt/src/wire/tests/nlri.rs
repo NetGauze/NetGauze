@@ -189,6 +189,24 @@ fn test_ipv4_mpls_vpn_unicast() -> Result<(), Ipv4MplsVpnUnicastAddressWritingEr
 }
 
 #[test]
+fn test_ipv4_mpls_vpn_unicast_add_path() -> Result<(), Ipv4MplsVpnUnicastAddressWritingError> {
+    let good_wire = [
+        0x00, 0x00, 0x00, 0x00, 0x70, 0x00, 0x41, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0x01, 0xc0, 0xa8, 0x01,
+    ];
+
+    let good = Ipv4MplsVpnUnicastAddress::new(
+        Some(0),
+        RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
+        vec![MplsLabel::new([0x00, 0x41, 0x01])],
+        Ipv4Unicast::from_net(Ipv4Net::from_str("192.168.1.0/24").unwrap()).unwrap(),
+    );
+    test_parsed_completely_with_three_inputs(&good_wire, true, false, 1, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
 fn test_ipv6_mpls_vpn_unicast() -> Result<(), Ipv6MplsVpnUnicastAddressWritingError> {
     let good_wire = [
         0xd6, 0xe0, 0x08, 0x01, 0x00, 0x01, 0x0a, 0xd0, 0xb6, 0x30, 0x00, 0x03, 0xfd, 0x00, 0x00,
@@ -204,6 +222,28 @@ fn test_ipv6_mpls_vpn_unicast() -> Result<(), Ipv6MplsVpnUnicastAddressWritingEr
         Ipv6Unicast::from_net(Ipv6Net::from_str("fd00:2::4/126").unwrap()).unwrap(),
     );
     test_parsed_completely_with_three_inputs(&good_wire, false, false, 1, &good);
+    test_write(&good, &good_wire)?;
+    Ok(())
+}
+
+#[test]
+fn test_ipv6_mpls_vpn_unicast_add_path() -> Result<(), Ipv6MplsVpnUnicastAddressWritingError> {
+    let good_wire = [
+        0x00, 0x00, 0x00, 0x00, 0xd8, 0x00, 0x00, 0x31, 0x00, 0x00, 0xfb, 0xf0, 0x00, 0x00, 0x00,
+        0x12, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x28,
+    ];
+
+    let good = Ipv6MplsVpnUnicastAddress::new(
+        Some(0),
+        RouteDistinguisher::As2Administrator {
+            asn2: 64496,
+            number: 18,
+        },
+        vec![MplsLabel::new([0x00, 0x00, 0x31])],
+        Ipv6Unicast::from_net(Ipv6Net::from_str("2001:db8::28/128").unwrap()).unwrap(),
+    );
+    test_parsed_completely_with_three_inputs(&good_wire, true, false, 1, &good);
     test_write(&good, &good_wire)?;
     Ok(())
 }
