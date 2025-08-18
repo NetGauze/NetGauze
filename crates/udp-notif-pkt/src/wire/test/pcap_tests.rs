@@ -155,7 +155,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                         }
                         _ => {}
                     }
-                    serde_json::to_string(&udp_notif_value).unwrap()
+                    udp_notif_value
                 }
                 Ok(None) => {
                     // packet is fragmented, need to read the next PDU first before attempting to
@@ -174,11 +174,11 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                             "dump": hexdump,
                         }
                     );
-                    serde_json::to_string(&ret).unwrap()
+                    ret
                 }
             };
             if let Some(file) = json_file.as_mut() {
-                file.write_all(serialized.as_bytes())
+                file.write_all(serde_json::to_string(&serialized).unwrap().as_bytes())
                     .expect("Couldn't write json message");
                 file.write_all(b"\n").expect("Couldn't write json message");
             }
@@ -189,7 +189,12 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                     \nExpected output file: {json_path:?}",
                 );
                 let expected = lines.next().expect(&err_msg).expect("Error reading");
-                assert_eq!(expected, serialized);
+
+                // Compare JSON values to succeed even when key order in string values differs
+                let expected_json: Value =
+                    serde_json::from_str(&expected).expect("Failed to parse expected JSON");
+
+                assert_eq!(expected_json, serialized);
             }
         }
     }
