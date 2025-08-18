@@ -236,12 +236,16 @@ impl WritablePdu<Ipv6MplsVpnUnicastAddressWritingError> for Ipv6MplsVpnUnicastAd
 
     fn len(&self) -> usize {
         Self::BASE_LENGTH
+            + self.path_id().map_or(0, |_| 4)
             + self.rd().len()
             + self.network().len()
             + self.label_stack().iter().map(|x| x.len()).sum::<usize>()
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), Ipv6MplsVpnUnicastAddressWritingError> {
+        if let Some(path_id) = self.path_id() {
+            writer.write_u32::<NetworkEndian>(path_id)?;
+        }
         let prefix_len = self.rd().len() * 8
             + self.label_stack().len() * 3 * 8
             + self.network().address().prefix_len() as usize;
