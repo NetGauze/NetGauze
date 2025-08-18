@@ -39,8 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
         println!("Received: {}", serde_json::to_string(&x).unwrap());
         Ok::<Option<BmpServerResponse>, Infallible>(None)
     }));
-    let pipeline = ServiceBuilder::new()
-        .service(print_svc);
+    let pipeline = ServiceBuilder::new().service(print_svc);
     let buffer_svc = Buffer::new(pipeline, 100);
 
     let handle = BmpServerHandle::default();
