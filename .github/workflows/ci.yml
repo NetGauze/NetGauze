@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule: [ cron: "40 1 * * *" ]
+  workflow_call:
 
 permissions:
   contents: read
@@ -163,3 +164,208 @@ jobs:
           fail_ci_if_error: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  # Define version and release information for use across jobs
+  #
+  # The package versioning follows the Fedora Packaging Guidelines, with a custom
+  # scheme to support development builds from the main branch.
+  # ref: https://docs.fedoraproject.org/en-US/packaging-guidelines/Versioning/
+  #
+  # The format is: <name>-<version>-<release>.<arch>.rpm
+  #
+  # Versioning Scheme:
+  #
+  # 1. Tagged Releases (e.g., refs/tags/v0.7.0):
+  #    - Version: The git tag without the 'v' prefix (e.g., 0.7.0).
+  #    - Release: '1'.
+  #    - Example: netgauze-collector-0.7.0-1.el8_10.x86_64.rpm
+  #
+  # 2. Development Builds (non-tagged commits on main):
+  #    - These are for testing the latest changes on the main branch.
+  #    - Version: Based on the latest git tag (e.g., 0.7.0).
+  #    - Release: A preview identifier in the format '0.<commits_since_tag>^<date>git<short_sha>'.
+  #    - Example: netgauze-collector-0.7.0-0.1^20250822gita3c6d71b.el8_10.x86_64.rpm
+  version:
+    runs-on: ubuntu-latest
+    name: Calculate version information
+    outputs:
+      version: ${{ steps.version_and_release.outputs.VERSION }}
+      release: ${{ steps.version_and_release.outputs.RELEASE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needs the full git history to get tag information
+      - name: Define version and release
+        id: version_and_release
+        run: |
+          TAG=$(git describe --tags --abbrev=0)
+          VERSION=${TAG#v}
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            RELEASE="1"
+          else
+            COMMIT_COUNT=$(git describe --tags | cut -d'-' -f2)
+            RELEASE="0.${COMMIT_COUNT}^$(date +%Y%m%d)git$(git rev-parse --short=8 HEAD)"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "RELEASE=${RELEASE}" >> $GITHUB_OUTPUT
+
+  # Build RPM packages for different distributions
+  build-collector-rpm:
+    runs-on: ubuntu-latest
+    needs: version
+    strategy:
+      matrix: &rpm-matrix
+        include:
+          - name: "EL 8.10"
+            image: "rockylinux/rockylinux:8.10"
+            el_tag: "el8_10"
+            arch: "x86_64"
+    name: Build RPM for ${{ matrix.name }}
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needs the full git history to get tag information
+      - name: Install build dependencies
+        run: |
+          dnf install -y \
+            gcc \
+            gcc-c++ \
+            pcre2-devel \
+            perl-core \
+            cmake \
+            git \
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-generate-rpm
+        run: cargo install cargo-generate-rpm
+      - name: Build netgauze-collector
+        run: cargo build --release -p netgauze-collector
+      - name: Strip netgauze-collector binary
+        run: strip target/release/netgauze-collector
+      - name: Build RPM package
+        run: |
+          cargo generate-rpm -p crates/collector -s "version = \"${{ needs.version.outputs.version }}\"" -s "release = \"${{ needs.version.outputs.release }}.${{ matrix.el_tag }}\""
+      - name: Get RPM filename
+        id: rpm_filename
+        run: |
+          RPM_PATH=$(find target/generate-rpm -name "*.rpm")
+          echo "name=$(basename "$RPM_PATH")" >> $GITHUB_OUTPUT
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.rpm_filename.outputs.name }}
+          path: target/generate-rpm/*.rpm
+          retention-days: 30
+
+  test-collector-rpm:
+    runs-on: ubuntu-latest
+    needs: build-collector-rpm
+    strategy:
+      matrix: *rpm-matrix
+    name: Test RPM on ${{ matrix.name }}
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download RPM artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: rpm-artifact
+          pattern: netgauze-collector-*${{ matrix.el_tag }}*.rpm
+      - name: Install RPM
+        run: |
+          dnf install -y findutils
+          RPM_FILE=$(find rpm-artifact -type f -name "*.rpm")
+          echo "Installing RPM file: ${RPM_FILE}"
+          dnf install -y "${RPM_FILE}"
+        # TODO: remove following step once the confing file has been merged
+      - name: Manually create config file
+        run: |
+          cat << EOF > crates/collector/config_ci_rpm_test.yaml
+          runtime:
+            threads: 4
+        
+          logging:
+            level: info
+        
+          telemetry:
+            url: http://localhost:4317/v1/metrics
+            exporter_timeout: 3000
+            reader_interval: 60000
+            reader_timeout: 3000
+          EOF
+      - name: Run netgauze-collector (it should start and then exit without errors)
+        run: netgauze-collector crates/collector/config_ci_rpm_test.yaml
+
+  # Build pcap-decoder binary
+  #
+  # More about targets: https://doc.rust-lang.org/cargo/appendix/glossary.html#target
+  # Available GitHub Actions runner images: https://github.com/actions/runner-images
+  build-pcap-decoder-bin:
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    needs: version
+    name: Build pcap-decoder binary (${{ matrix.dist_and_arch }})
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary_name: netgauze-pcap-decoder
+            strip_command: true
+            dist_and_arch: x86_64-ubuntu_latest # used just for naming the binary
+          - os: ubuntu-latest
+            container: rockylinux/rockylinux:8.10
+            target: x86_64-unknown-linux-gnu
+            binary_name: netgauze-pcap-decoder
+            strip_command: true
+            install_deps: |
+              dnf install -y gcc gcc-c++ pcre2-devel perl-core cmake git curl
+              dnf install -y https://github.com/PowerShell/PowerShell/releases/download/v7.5.2/powershell-7.5.2-1.rh.x86_64.rpm
+            dist_and_arch: x86_64-el8_10 # used just for naming the binary
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary_name: netgauze-pcap-decoder.exe
+            strip_command: false # strip command not available on Windows
+            dist_and_arch: x86_64-windows-latest.exe # used just for naming the binary
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary_name: netgauze-pcap-decoder
+            strip_command: true
+            dist_and_arch: x86_64-apple-latest # used just for naming the binary
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary_name: netgauze-pcap-decoder
+            strip_command: true
+            dist_and_arch: aarch64-apple-latest # used just for naming the binary
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        if: matrix.install_deps
+        run: ${{ matrix.install_deps }}
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Build pcap-decoder
+        run: cargo build --release --target ${{ matrix.target }} -p netgauze-pcap-decoder
+      - name: Strip binary (Unix only)
+        if: matrix.strip_command == 'true'
+        run: strip target/${{ matrix.target }}/release/${{ matrix.binary_name }}
+      - name: Create complete binary file name
+        id: binary_filename
+        shell: pwsh # for Windows compatibility, available on all platforms
+        run: |
+          $name = "netgauze-pcap-decoder-${{ needs.version.outputs.version }}-${{ needs.version.outputs.release }}-${{ matrix.dist_and_arch }}"
+          "name=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+      - name: Rename binary
+        shell: pwsh # for Windows compatibility, available on all platforms
+        run: Move-Item -Path "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" -Destination "target/${{ matrix.target }}/release/${{ steps.binary_filename.outputs.name }}"
+      - name: Upload pcap-decoder artifact
+        uses: actions/upload-artifact@v4
+        with:
+            name: ${{ steps.binary_filename.outputs.name }}
+            path: target/${{ matrix.target }}/release/${{ steps.binary_filename.outputs.name }}
+            retention-days: 30
