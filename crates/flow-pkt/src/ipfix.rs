@@ -156,6 +156,11 @@ impl IpfixPacket {
         &self.sets
     }
 
+    /// Consume the packet and return the owned sets
+    pub fn into_sets(self) -> Box<[Set]> {
+        self.sets
+    }
+
     /// Add fields to all data records in the packet
     pub fn with_fields_added(self, add_fields: &[Field]) -> Self {
         let sets = self

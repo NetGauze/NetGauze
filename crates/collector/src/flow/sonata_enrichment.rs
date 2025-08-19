@@ -37,25 +37,25 @@ use tracing::{error, info, warn};
 
 /// Operations to update or delete enrichment data
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum EnrichmentOperation {
+pub enum SonataEnrichmentOperation {
     Upsert(u32, IpAddr, HashMap<String, String>),
     Delete(u32),
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum FlowEnrichmentActorCommand {
+pub enum SonataEnrichmentActorCommand {
     Shutdown,
 }
 
 #[derive(Debug, Clone)]
-pub enum FlowEnrichmentActorError {
+pub enum SonataEnrichmentActorError {
     EnrichmentChannelClosed,
     FlowReceiveError,
     MissingRequiredLabel(String),
     FieldAdditionFailed(String),
 }
 
-impl std::fmt::Display for FlowEnrichmentActorError {
+impl std::fmt::Display for SonataEnrichmentActorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EnrichmentChannelClosed => write!(f, "enrichment channel closed"),
@@ -66,10 +66,10 @@ impl std::fmt::Display for FlowEnrichmentActorError {
     }
 }
 
-impl std::error::Error for FlowEnrichmentActorError {}
+impl std::error::Error for SonataEnrichmentActorError {}
 
 #[derive(Debug, Clone)]
-pub struct FlowEnrichmentStats {
+pub struct SonataEnrichmentStats {
     pub received_flows: opentelemetry::metrics::Counter<u64>,
     pub received_enrichment_ops: opentelemetry::metrics::Counter<u64>,
     pub sent: opentelemetry::metrics::Counter<u64>,
@@ -77,7 +77,7 @@ pub struct FlowEnrichmentStats {
     pub enrich_error: opentelemetry::metrics::Counter<u64>,
 }
 
-impl FlowEnrichmentStats {
+impl SonataEnrichmentStats {
     pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
         let received_flows = meter
             .u64_counter("netgauze.collector.flows.enrichment.received.flows")
@@ -109,25 +109,25 @@ impl FlowEnrichmentStats {
     }
 }
 
-struct FlowEnrichment {
+struct SonataEnrichment {
     labels: HashMap<IpAddr, (u32, HashMap<String, String>)>,
     writer_id: String,
-    cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
-    enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
+    cmd_rx: mpsc::Receiver<SonataEnrichmentActorCommand>,
+    enrichment_rx: async_channel::Receiver<SonataEnrichmentOperation>,
     flow_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
     enriched_tx: async_channel::Sender<(IpAddr, FlowInfo)>,
     default_labels: (u32, HashMap<String, String>),
-    stats: FlowEnrichmentStats,
+    stats: SonataEnrichmentStats,
 }
 
-impl FlowEnrichment {
+impl SonataEnrichment {
     fn new(
         writer_id: String,
-        cmd_rx: mpsc::Receiver<FlowEnrichmentActorCommand>,
-        enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
+        cmd_rx: mpsc::Receiver<SonataEnrichmentActorCommand>,
+        enrichment_rx: async_channel::Receiver<SonataEnrichmentOperation>,
         flow_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
         enriched_tx: async_channel::Sender<(IpAddr, FlowInfo)>,
-        stats: FlowEnrichmentStats,
+        stats: SonataEnrichmentStats,
     ) -> Self {
         let default_labels = (
             0,
@@ -148,12 +148,12 @@ impl FlowEnrichment {
         }
     }
 
-    fn apply_enrichment(&mut self, op: EnrichmentOperation) {
+    fn apply_enrichment(&mut self, op: SonataEnrichmentOperation) {
         match op {
-            EnrichmentOperation::Upsert(id, ip, enrichment) => {
+            SonataEnrichmentOperation::Upsert(id, ip, enrichment) => {
                 self.labels.insert(ip, (id, enrichment));
             }
-            EnrichmentOperation::Delete(id) => {
+            SonataEnrichmentOperation::Delete(id) => {
                 let mut to_remove = None;
                 for (ip, (i, _)) in &self.labels {
                     if id == *i {
@@ -172,16 +172,16 @@ impl FlowEnrichment {
         &self,
         peer_ip: IpAddr,
         flow: FlowInfo,
-    ) -> Result<FlowInfo, FlowEnrichmentActorError> {
+    ) -> Result<FlowInfo, SonataEnrichmentActorError> {
         let (_, labels) = self.labels.get(&peer_ip).unwrap_or(&self.default_labels);
 
         let node_id = labels
             .get("nkey")
-            .ok_or_else(|| FlowEnrichmentActorError::MissingRequiredLabel("nkey".to_string()))?;
+            .ok_or_else(|| SonataEnrichmentActorError::MissingRequiredLabel("nkey".to_string()))?;
 
         let platform_id = labels
             .get("pkey")
-            .ok_or_else(|| FlowEnrichmentActorError::MissingRequiredLabel("pkey".to_string()))?;
+            .ok_or_else(|| SonataEnrichmentActorError::MissingRequiredLabel("pkey".to_string()))?;
 
         let add_fields = [
             Field::NetGauze(netgauze::Field::nodeId(node_id.as_str().into())),
@@ -192,7 +192,7 @@ impl FlowEnrichment {
         ];
 
         flow.with_fields_added(&add_fields)
-            .map_err(|e| FlowEnrichmentActorError::FieldAdditionFailed(e.to_string()))
+            .map_err(|e| SonataEnrichmentActorError::FieldAdditionFailed(e.to_string()))
     }
 
     async fn run(mut self) -> anyhow::Result<String> {
@@ -201,7 +201,7 @@ impl FlowEnrichment {
                 biased;
                 cmd = self.cmd_rx.recv() => {
                     return match cmd {
-                        Some(FlowEnrichmentActorCommand::Shutdown) => {
+                        Some(SonataEnrichmentActorCommand::Shutdown) => {
                             info!("Shutting down flow enrichment actor");
                             Ok("Enrichment shutdown successfully".to_string())
                         }
@@ -219,7 +219,7 @@ impl FlowEnrichment {
                         }
                         Err(err) => {
                             warn!("Enrichment channel closed, shutting down: {err:?}");
-                            Err(FlowEnrichmentActorError::EnrichmentChannelClosed)?;
+                            Err(SonataEnrichmentActorError::EnrichmentChannelClosed)?;
                         }
                     }
                 }
@@ -250,7 +250,7 @@ impl FlowEnrichment {
                         }
                         Err(err) => {
                             error!("Shutting down due to FlowEnrichment recv error: {err}");
-                            Err(FlowEnrichmentActorError::FlowReceiveError)?;
+                            Err(SonataEnrichmentActorError::FlowReceiveError)?;
                         }
                     }
                 }
@@ -260,43 +260,43 @@ impl FlowEnrichment {
 }
 
 #[derive(Debug)]
-pub enum FlowEnrichmentActorHandleError {
+pub enum SonataEnrichmentActorHandleError {
     SendError,
 }
-impl std::fmt::Display for FlowEnrichmentActorHandleError {
+impl std::fmt::Display for SonataEnrichmentActorHandleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FlowEnrichmentActorHandleError::SendError => {
+            SonataEnrichmentActorHandleError::SendError => {
                 write!(f, "Failed to send flow enrichment actor")
             }
         }
     }
 }
 
-impl std::error::Error for FlowEnrichmentActorHandleError {}
+impl std::error::Error for SonataEnrichmentActorHandleError {}
 
 #[derive(Debug, Clone)]
-pub struct FlowEnrichmentActorHandle {
-    cmd_send: mpsc::Sender<FlowEnrichmentActorCommand>,
-    enrichment_tx: async_channel::Sender<EnrichmentOperation>,
+pub struct SonataEnrichmentActorHandle {
+    cmd_send: mpsc::Sender<SonataEnrichmentActorCommand>,
+    enrichment_tx: async_channel::Sender<SonataEnrichmentOperation>,
     enriched_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
 }
 
-impl FlowEnrichmentActorHandle {
+impl SonataEnrichmentActorHandle {
     pub fn new(
         writer_id: String,
         buffer_size: usize,
         flow_rx: async_channel::Receiver<(IpAddr, FlowInfo)>,
-        stats: either::Either<opentelemetry::metrics::Meter, FlowEnrichmentStats>,
+        stats: either::Either<opentelemetry::metrics::Meter, SonataEnrichmentStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
         let (enrichment_tx, enrichment_rx) = async_channel::bounded(buffer_size);
         let (enriched_tx, enriched_rx) = async_channel::bounded(buffer_size);
         let stats = match stats {
-            either::Either::Left(meter) => FlowEnrichmentStats::new(meter),
+            either::Either::Left(meter) => SonataEnrichmentStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor = FlowEnrichment::new(
+        let actor = SonataEnrichment::new(
             writer_id,
             cmd_recv,
             enrichment_rx,
@@ -313,21 +313,21 @@ impl FlowEnrichmentActorHandle {
         (join_handle, handle)
     }
 
-    pub async fn shutdown(&self) -> Result<(), FlowEnrichmentActorHandleError> {
+    pub async fn shutdown(&self) -> Result<(), SonataEnrichmentActorHandleError> {
         self.cmd_send
-            .send(FlowEnrichmentActorCommand::Shutdown)
+            .send(SonataEnrichmentActorCommand::Shutdown)
             .await
-            .map_err(|_| FlowEnrichmentActorHandleError::SendError)
+            .map_err(|_| SonataEnrichmentActorHandleError::SendError)
     }
 
     pub async fn update_enrichment(
         &self,
-        op: EnrichmentOperation,
-    ) -> Result<(), FlowEnrichmentActorHandleError> {
+        op: SonataEnrichmentOperation,
+    ) -> Result<(), SonataEnrichmentActorHandleError> {
         self.enrichment_tx
             .send(op)
             .await
-            .map_err(|_| FlowEnrichmentActorHandleError::SendError)
+            .map_err(|_| SonataEnrichmentActorHandleError::SendError)
     }
 
     pub fn subscribe(&self) -> async_channel::Receiver<(IpAddr, FlowInfo)> {
@@ -349,13 +349,13 @@ mod tests {
     #[test]
     fn test_apply_enrichment_upsert() {
         // Create actor state
-        let mut enrichment = FlowEnrichment::new(
+        let mut enrichment = SonataEnrichment::new(
             "test-writer-id".to_string(),
             mpsc::channel(1).1,          // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).0, // dummy sender
-            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+            SonataEnrichmentStats::new(opentelemetry::global::meter("dummy")),
         );
 
         let peer_ip: IpAddr = "10.0.0.1".parse().unwrap();
@@ -364,7 +364,7 @@ mod tests {
         labels.insert("pkey".to_string(), "platform-1".to_string());
 
         // Test upsert operation
-        let op = EnrichmentOperation::Upsert(123, peer_ip, labels.clone());
+        let op = SonataEnrichmentOperation::Upsert(123, peer_ip, labels.clone());
         enrichment.apply_enrichment(op);
 
         assert_eq!(enrichment.labels.get(&peer_ip), Some(&(123, labels)));
@@ -373,13 +373,13 @@ mod tests {
     #[test]
     fn test_apply_enrichment_delete() {
         // Create actor state
-        let mut enrichment = FlowEnrichment::new(
+        let mut enrichment = SonataEnrichment::new(
             "test-writer-id".to_string(),
             mpsc::channel(1).1,          // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).0, // dummy sender
-            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+            SonataEnrichmentStats::new(opentelemetry::global::meter("dummy")),
         );
 
         let peer_ip: IpAddr = "10.0.0.1".parse().unwrap();
@@ -395,14 +395,14 @@ mod tests {
         assert!(enrichment.labels.contains_key(&peer_ip_2));
 
         // Test delete operation
-        let op = EnrichmentOperation::Delete(123);
+        let op = SonataEnrichmentOperation::Delete(123);
         enrichment.apply_enrichment(op);
 
         assert!(!enrichment.labels.contains_key(&peer_ip));
         assert!(enrichment.labels.contains_key(&peer_ip_2));
 
         // Test delete non-existing id
-        let op = EnrichmentOperation::Delete(1000);
+        let op = SonataEnrichmentOperation::Delete(1000);
         enrichment.apply_enrichment(op);
         assert!(!enrichment.labels.contains_key(&peer_ip));
         assert!(enrichment.labels.contains_key(&peer_ip_2));
@@ -411,13 +411,13 @@ mod tests {
     #[test]
     fn test_apply_enrichment_update_existing() {
         // Create actor state
-        let mut enrichment = FlowEnrichment::new(
+        let mut enrichment = SonataEnrichment::new(
             "test-writer-id".to_string(),
             mpsc::channel(1).1,          // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).0, // dummy sender
-            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+            SonataEnrichmentStats::new(opentelemetry::global::meter("dummy")),
         );
 
         let peer_ip: IpAddr = "10.0.0.1".parse().unwrap();
@@ -433,7 +433,7 @@ mod tests {
         new_labels.insert("nkey".to_string(), "new-node".to_string());
         new_labels.insert("pkey".to_string(), "new-platform".to_string());
 
-        let op = EnrichmentOperation::Upsert(123, peer_ip, new_labels.clone());
+        let op = SonataEnrichmentOperation::Upsert(123, peer_ip, new_labels.clone());
         enrichment.apply_enrichment(op);
 
         assert_eq!(enrichment.labels.get(&peer_ip), Some(&(123, new_labels)));
@@ -445,20 +445,20 @@ mod tests {
         let peer_ip: IpAddr = "192.168.1.100".parse().unwrap();
 
         // Create actor state
-        let mut enrichment = FlowEnrichment::new(
+        let mut enrichment = SonataEnrichment::new(
             "test-writer-id".to_string(),
             mpsc::channel(1).1,          // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).0, // dummy sender
-            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+            SonataEnrichmentStats::new(opentelemetry::global::meter("dummy")),
         );
 
         // Create labels map entry for peer_ip (simulate sonata pushing labels)
         let mut node_labels = HashMap::new();
         node_labels.insert("nkey".to_string(), "test-node-123".to_string());
         node_labels.insert("pkey".to_string(), "test-platform-ABC".to_string());
-        enrichment.apply_enrichment(EnrichmentOperation::Upsert(1, peer_ip, node_labels));
+        enrichment.apply_enrichment(SonataEnrichmentOperation::Upsert(1, peer_ip, node_labels));
 
         // Create flow to be enriched
         let original_flow = FlowInfo::IPFIX(IpfixPacket::new(
@@ -516,13 +516,13 @@ mod tests {
         let peer_ip: IpAddr = "192.168.1.200".parse().unwrap(); // IP not in labels map
 
         // Create actor state
-        let enrichment = FlowEnrichment::new(
+        let enrichment = SonataEnrichment::new(
             "test-writer-id".to_string(),
             mpsc::channel(1).1,          // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).1, // dummy receiver
             async_channel::bounded(1).0, // dummy sender
-            FlowEnrichmentStats::new(opentelemetry::global::meter("dummy")),
+            SonataEnrichmentStats::new(opentelemetry::global::meter("dummy")),
         );
 
         // Create flow to be enriched

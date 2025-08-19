@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::flow::enrichment::{EnrichmentOperation, FlowEnrichmentActorHandle};
+use crate::flow::sonata_enrichment::{SonataEnrichmentActorHandle, SonataEnrichmentOperation};
 use rdkafka::{
     config::ClientConfig,
     consumer::{
@@ -168,7 +168,7 @@ enum SonataActorCommand {
 struct SonataActor {
     cmd_rx: mpsc::Receiver<SonataActorCommand>,
     config: KafkaConsumerConfig,
-    enrichment_handles: Vec<FlowEnrichmentActorHandle>,
+    enrichment_handles: Vec<SonataEnrichmentActorHandle>,
     consumer: StreamConsumer<CosmoSonataContext>,
     stats: SonataStats,
 }
@@ -177,7 +177,7 @@ impl SonataActor {
     fn from_config(
         config: KafkaConsumerConfig,
         cmd_rx: mpsc::Receiver<SonataActorCommand>,
-        enrichment_handles: Vec<FlowEnrichmentActorHandle>,
+        enrichment_handles: Vec<SonataEnrichmentActorHandle>,
         stats: SonataStats,
     ) -> Result<Self, SonataActorError> {
         let consumer = Self::init_consumer(&config)?;
@@ -248,7 +248,11 @@ impl SonataActor {
                         ("nkey".to_string(), node.hostname),
                         ("pkey".to_string(), node.platform.name),
                     ]);
-                    EnrichmentOperation::Upsert(sonata_data.id_node, node.loopback_address, labels)
+                    SonataEnrichmentOperation::Upsert(
+                        sonata_data.id_node,
+                        node.loopback_address,
+                        labels,
+                    )
                 } else {
                     warn!(
                         "Invalid sonata node upsert operation without a node value: {:?}",
@@ -264,7 +268,7 @@ impl SonataActor {
                     return;
                 }
             }
-            SonataOperation::Delete => EnrichmentOperation::Delete(sonata_data.id_node),
+            SonataOperation::Delete => SonataEnrichmentOperation::Delete(sonata_data.id_node),
         };
         debug!("Sonata Enrichment Operation: {op:?}");
         for handle in &self.enrichment_handles {
@@ -364,7 +368,7 @@ pub struct SonataActorHandle {
 impl SonataActorHandle {
     pub fn new(
         consumer_config: KafkaConsumerConfig,
-        enrichment_handles: Vec<FlowEnrichmentActorHandle>,
+        enrichment_handles: Vec<SonataEnrichmentActorHandle>,
         stats: either::Either<opentelemetry::metrics::Meter, SonataStats>,
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), SonataActorError> {
         let (cmd_send, cmd_rx) = mpsc::channel::<SonataActorCommand>(1);
