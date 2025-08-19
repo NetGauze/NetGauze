@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  # verify, build, test, and package artifacts by running ci.yml workflow
+  test-and-build:
+    uses: ./.github/workflows/ci.yml
+
+  # Upload release artifacts to already existent GitHub releases
+  upload-release-artifacts:
+    runs-on: ubuntu-latest
+    name: Upload release artifacts
+    needs: [ test-and-build ]
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          pattern: netgauze-*
+          merge-multiple: true
+      - name: Upload artifacts to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./artifacts/*
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish crates to crates.io
+  publish-crates:
+    runs-on: ubuntu-latest
+    name: Publish crates to crates.io
+    needs: [ test-and-build ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Publish crates
+        uses: katyo/publish-crates@v2
+        with:
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
