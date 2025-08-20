@@ -164,22 +164,24 @@ impl EnrichmentCache {
                         hash_map::Entry::Occupied(mut occupied) => {
                             let curr_weight = occupied.get().weight;
                             if weight >= curr_weight {
-                                debug!("Replacing field[{}] in metadata for ip={}, scope={}, weight {}->{}",
-                                            field_ref.ie(),
-                                            ip,
-                                            scope,
-                                            curr_weight,
-                                            weight,
-                                        );
+                                debug!(
+                                    "Replacing field[{}] in metadata for ip={}, scope={}, weight {}->{}",
+                                    field_ref.ie(),
+                                    ip,
+                                    scope,
+                                    curr_weight,
+                                    weight,
+                                );
                                 occupied.insert(weighted_field);
                             } else {
-                                debug!("Ignoring lower weight field[{}] in metadata for ip={}, scope={}, weight: {}<{}",
-                                            field_ref.ie(),
-                                            ip,
-                                            scope,
-                                            curr_weight,
-                                            weight,
-                                    );
+                                debug!(
+                                    "Ignoring lower weight field[{}] in metadata for ip={}, scope={}, weight: {}<{}",
+                                    field_ref.ie(),
+                                    ip,
+                                    scope,
+                                    curr_weight,
+                                    weight,
+                                );
                             }
                         }
                         hash_map::Entry::Vacant(vacant) => {
@@ -352,35 +354,37 @@ impl PeerMetadata {
             FxHashMap::with_capacity_and_hasher(16, FxBuildHasher);
 
         // Iterating from global to more specific scopes (thanks to BTreeMap)
-        for (scope, metadata) in self.map() {
-            if Self::scope_matches(scope, incoming_obs_id, &fields_map) {
-                debug!(
-                    "Scope {} matches incoming data!",
-                    Into::<Scope>::into(scope)
-                );
+        for (scope, metadata) in self
+            .map()
+            .iter()
+            .filter(|(scope, _)| Self::scope_matches(scope, incoming_obs_id, &fields_map))
+        {
+            debug!(
+                "Scope {} matches incoming data!",
+                Into::<Scope>::into(scope)
+            );
 
-                for (field_ref, field) in metadata {
-                    match enrichment_fields.entry(*field_ref) {
-                        hash_map::Entry::Occupied(mut best) => {
-                            let curr_weight = best.get().weight();
-                            if field.weight >= curr_weight {
-                                debug!(
-                                    "Overriding field {:?} with higher/equal weight: {} >= {}",
-                                    field.field(),
-                                    field.weight(),
-                                    curr_weight,
-                                );
-                                best.insert(field);
-                            }
-                        }
-                        hash_map::Entry::Vacant(best) => {
+            for (field_ref, field) in metadata {
+                match enrichment_fields.entry(*field_ref) {
+                    hash_map::Entry::Occupied(mut best) => {
+                        let curr_weight = best.get().weight();
+                        if field.weight >= curr_weight {
                             debug!(
-                                "Selecting field {:?} with weight: {}",
+                                "Overriding field {:?} with higher/equal weight: {} >= {}",
                                 field.field(),
                                 field.weight(),
+                                curr_weight,
                             );
                             best.insert(field);
                         }
+                    }
+                    hash_map::Entry::Vacant(best) => {
+                        debug!(
+                            "Selecting field {:?} with weight: {}",
+                            field.field(),
+                            field.weight(),
+                        );
+                        best.insert(field);
                     }
                 }
             }

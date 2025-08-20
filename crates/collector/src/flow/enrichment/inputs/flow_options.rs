@@ -152,31 +152,20 @@ impl FlowOptionsActor {
                                             continue;
                                         };
 
-                                        for record in data_records {
+                                        // Filter and process options data records only
+                                        for record in data_records.iter().filter(|record| !record.scope_fields().is_empty()) {
+                                            debug!("Options Data record found: {:?}", record);
 
-                                            // Filter and process options data records only
-                                            if !record.scope_fields().is_empty() {
-                                                debug!("Options Data record found: {:?}", record);
+                                            // Construct enrichment operation from options data
+                                            let scope = Scope::new(pkt.observation_domain_id(), Some(record.scope_fields().to_vec()));
+                                            let op = EnrichmentOperation::Upsert(peer.ip(), scope, 16, record.fields().to_vec());
 
-                                                // Construct enrichment operation from options data
-                                                let scope = Scope::new(pkt.observation_domain_id(), Some(record.scope_fields().to_vec()));
-                                                let op = EnrichmentOperation::Upsert(peer.ip(), scope, 16, record.fields().to_vec());
-
-                                                debug!("Sending Enrichment Operation: \n{op}");
-                                                for handle in &self.enrichment_handles {
-                                                    if let Err(err) = handle.update_enrichment(op.clone()).await {
-                                                        warn!("Failed to send enrichment operation: {err}");
-                                                        let tags = [
-                                                            opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
-                                                            opentelemetry::KeyValue::new(
-                                                                "network.peer.port",
-                                                                opentelemetry::Value::I64(peer.port().into()),
-                                                            ),
-                                                        ];
-                                                        self.stats.send_error.add(1, &tags);
-                                                    }
+                                            debug!("Sending Enrichment Operation: \n{op}");
+                                            for handle in &self.enrichment_handles {
+                                                if let Err(err) = handle.update_enrichment(op.clone()).await {
+                                                    warn!("Failed to send enrichment operation: {err}");
+                                                    self.stats.send_error.add(1, &peer_tags);
                                                 }
-
                                             }
                                         }
                                     }
