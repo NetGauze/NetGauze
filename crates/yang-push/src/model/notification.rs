@@ -486,35 +486,37 @@ pub enum ChangeType {
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct YangPushModuleVersion {
-    module_name: String,
+    /// Alias 'module-name' still supported
+    /// (draft-ietf-netconf-yang-notifications-versioning < 9)
+    #[serde(alias = "module-name")]
+    name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     revision: Option<String>,
 
+    /// Alias 'revision-label' still supported
+    /// (draft-ietf-netconf-yang-notifications-versioning < 9)
+    #[serde(alias = "revision-label")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    revision_label: Option<String>,
+    version: Option<String>,
 }
 
 impl YangPushModuleVersion {
-    pub fn new(
-        module_name: String,
-        revision: Option<String>,
-        revision_label: Option<String>,
-    ) -> Self {
+    pub fn new(name: String, revision: Option<String>, version: Option<String>) -> Self {
         Self {
-            module_name,
+            name,
             revision,
-            revision_label,
+            version,
         }
     }
-    pub fn module_name(&self) -> &str {
-        &self.module_name
+    pub fn name(&self) -> &str {
+        &self.name
     }
     pub fn revision(&self) -> Option<&str> {
         self.revision.as_deref()
     }
-    pub fn revision_label(&self) -> Option<&str> {
-        self.revision_label.as_deref()
+    pub fn version(&self) -> Option<&str> {
+        self.version.as_deref()
     }
 }
 
@@ -671,9 +673,9 @@ mod tests {
                 excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
             }),
             module_version: Some(vec![YangPushModuleVersion {
-                module_name: "example-module".to_string(),
+                name: "example-module".to_string(),
                 revision: Some("2025-04-25".to_string()),
-                revision_label: None,
+                version: None,
             }]),
             yang_library_content_id: Some("content-id".to_string()),
             extra_fields: serde_json::json!({}),
@@ -765,9 +767,9 @@ mod tests {
                 excluded_change: Some(vec![ChangeType::Create, ChangeType::Replace]),
             }),
             module_version: Some(vec![YangPushModuleVersion {
-                module_name: "example-module".to_string(),
+                name: "example-module".to_string(),
                 revision: Some("2025-04-25".to_string()),
-                revision_label: None,
+                version: None,
             }]),
             yang_library_content_id: Some("content-id".to_string()),
             extra_fields: serde_json::json!({}),
