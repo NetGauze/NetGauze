@@ -46,14 +46,14 @@
 //! The aggregator maintains efficient in-memory state and handles reduction
 //! operations for optimal performance across large flow volumes.
 
-use crate::flow::aggregation::config::*;
+use crate::flow::{aggregation::config::*, types::FieldRef};
 use chrono::{DateTime, Utc};
 use netgauze_analytics::aggregation::*;
 use netgauze_flow_pkt::{
-    ie::{Field, HasIE, IE, *},
+    ie::{Field, *},
     ipfix, DataSetId, FlowInfo,
 };
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::{
     collections::{hash_map::Entry, HashSet},
@@ -288,18 +288,7 @@ pub(crate) fn explode(
 
                 for record in data_records {
                     // Store fields indexed by FieldRef (IE, index)
-                    let fields_len = record.fields().len();
-                    let mut fields_map: FxHashMap<FieldRef, &Field> =
-                        FxHashMap::with_capacity_and_hasher(fields_len, FxBuildHasher);
-                    let mut ie_counters: FxHashMap<IE, usize> =
-                        FxHashMap::with_capacity_and_hasher(fields_len, FxBuildHasher);
-
-                    for field in record.fields() {
-                        let ie = field.ie();
-                        let ie_count = ie_counters.entry(ie).or_insert(0);
-                        fields_map.insert(FieldRef::new(ie, *ie_count), field);
-                        *ie_count += 1;
-                    }
+                    let fields_map = FieldRef::map_fields_into_fxhashmap(record.fields());
 
                     // Initialize output arrays
                     let mut key_fields = vec![None; key_len].into_boxed_slice();
