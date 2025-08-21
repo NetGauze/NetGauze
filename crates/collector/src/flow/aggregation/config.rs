@@ -44,6 +44,7 @@
 //! the flexible user configuration into an optimized format for efficient
 //! runtime processing.
 
+use crate::flow::types::FieldRef;
 use indexmap::IndexMap;
 use netgauze_flow_pkt::ie::IE;
 use serde::{Deserialize, Serialize};
@@ -151,23 +152,6 @@ pub(crate) enum AggOp {
     BoolMapOr,
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub(crate) struct FieldRef {
-    ie: IE,
-    index: usize,
-}
-impl FieldRef {
-    pub(crate) fn new(ie: IE, index: usize) -> Self {
-        Self { ie, index }
-    }
-    pub(crate) fn ie(&self) -> IE {
-        self.ie
-    }
-    pub(crate) fn index(&self) -> usize {
-        self.index
-    }
-}
-
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct AggFieldRef {
     field_ref: FieldRef,
@@ -177,7 +161,7 @@ impl AggFieldRef {
     #[cfg(test)]
     pub(crate) fn new(ie: IE, index: usize, op: AggOp) -> Self {
         Self {
-            field_ref: FieldRef { ie, index },
+            field_ref: FieldRef::new(ie, index),
             op,
         }
     }
@@ -283,29 +267,29 @@ impl TryInto<UnifiedConfig> for AggregationConfig {
 
                     match aggr_op {
                         Op::Key => {
-                            key_select.push(FieldRef { ie, index: 0 });
+                            key_select.push(FieldRef::new(ie, 0));
                         }
                         Op::Add => {
                             agg_select.push(AggFieldRef {
-                                field_ref: FieldRef { ie, index: 0 },
+                                field_ref: FieldRef::new(ie, 0),
                                 op: AggOp::Add,
                             });
                         }
                         Op::Min => {
                             agg_select.push(AggFieldRef {
-                                field_ref: FieldRef { ie, index: 0 },
+                                field_ref: FieldRef::new(ie, 0),
                                 op: AggOp::Min,
                             });
                         }
                         Op::Max => {
                             agg_select.push(AggFieldRef {
-                                field_ref: FieldRef { ie, index: 0 },
+                                field_ref: FieldRef::new(ie, 0),
                                 op: AggOp::Max,
                             });
                         }
                         Op::BoolMapOr => {
                             agg_select.push(AggFieldRef {
-                                field_ref: FieldRef { ie, index: 0 },
+                                field_ref: FieldRef::new(ie, 0),
                                 op: AggOp::BoolMapOr,
                             });
                         }
@@ -317,29 +301,29 @@ impl TryInto<UnifiedConfig> for AggregationConfig {
 
                         match aggr_op {
                             Op::Key => {
-                                key_select.push(FieldRef { ie, index });
+                                key_select.push(FieldRef::new(ie, index));
                             }
                             Op::Add => {
                                 agg_select.push(AggFieldRef {
-                                    field_ref: FieldRef { ie, index },
+                                    field_ref: FieldRef::new(ie, index),
                                     op: AggOp::Add,
                                 });
                             }
                             Op::Min => {
                                 agg_select.push(AggFieldRef {
-                                    field_ref: FieldRef { ie, index },
+                                    field_ref: FieldRef::new(ie, index),
                                     op: AggOp::Min,
                                 });
                             }
                             Op::Max => {
                                 agg_select.push(AggFieldRef {
-                                    field_ref: FieldRef { ie, index },
+                                    field_ref: FieldRef::new(ie, index),
                                     op: AggOp::Max,
                                 });
                             }
                             Op::BoolMapOr => {
                                 agg_select.push(AggFieldRef {
-                                    field_ref: FieldRef { ie, index },
+                                    field_ref: FieldRef::new(ie, index),
                                     op: AggOp::BoolMapOr,
                                 });
                             }

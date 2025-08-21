@@ -27,6 +27,10 @@ use netgauze_flow_pkt::ie::{Field, HasIE, IE};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
 
+const fn default_field_index() -> usize {
+    0
+}
+
 /// A reference to a specific field within a flow DataRecord (Box<[Field]>)
 ///
 /// `FieldRef` uniquely identifies a field by combining an Information Element
@@ -36,6 +40,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct FieldRef {
     ie: IE,
+
+    #[serde(default = "default_field_index")]
     index: usize,
 }
 impl FieldRef {
@@ -54,7 +60,9 @@ impl FieldRef {
     ///
     /// This function processes an array of fields, assigns sequential indices
     /// to fields with the same IE, and applies a custom mapping function to
-    /// create the desired collection type.
+    /// create the desired collection type. Calling collect() on the iterator
+    /// will leverage size hints if the chosen collections supports it so it
+    /// should not have allocation overhead.
     ///
     /// # Type Parameters
     ///
