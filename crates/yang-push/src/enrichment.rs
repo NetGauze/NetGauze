@@ -678,7 +678,7 @@ mod tests {
             )
         );
         assert_eq!(
-            peer_subscription.module_version(),
+            peer_subscription.module(),
             Vec::new() // default
         );
         assert_eq!(peer_subscription.yang_library_content_id(), None);
