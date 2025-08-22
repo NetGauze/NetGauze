@@ -373,8 +373,7 @@ pub struct InvalidIpv4MulticastNetwork(
 
 impl Ipv4Multicast {
     pub fn from_net(net: Ipv4Net) -> Result<Self, InvalidIpv4MulticastNetwork> {
-        if !net.addr().is_multicast() || net.hosts().last().map(|x| x.is_multicast()) == Some(false)
-        {
+        if !net.addr().is_multicast() {
             return Err(InvalidIpv4MulticastNetwork(net));
         }
         Ok(Self(net))
@@ -450,7 +449,7 @@ pub struct InvalidIpv6UnicastNetwork(
 
 impl Ipv6Unicast {
     pub fn from_net(net: Ipv6Net) -> Result<Self, InvalidIpv6UnicastNetwork> {
-        if net.addr().is_multicast() || net.hosts().last().map(|x| x.is_multicast()) == Some(true) {
+        if net.addr().is_multicast() {
             return Err(InvalidIpv6UnicastNetwork(net));
         }
         Ok(Self(net))
@@ -1362,14 +1361,19 @@ mod tests {
     #[test]
     fn test_ipv4_unicast() {
         let unicast_addr = Ipv4Net::new(Ipv4Addr::new(192, 168, 56, 1), 4).unwrap();
+        let global_route_addr = Ipv4Net::new(Ipv4Addr::from(0), 0).unwrap();
         let multicast_addr = Ipv4Net::new(Ipv4Addr::new(224, 0, 0, 13), 4).unwrap();
 
         let unicast = Ipv4Unicast::try_from(unicast_addr);
+        let global_route = Ipv4Unicast::try_from(global_route_addr);
         let multicast = Ipv4Unicast::try_from(multicast_addr);
 
         assert!(unicast.is_ok());
         assert!(unicast.is_ok());
         assert_eq!(unicast.unwrap().address(), unicast_addr);
+        assert_eq!(Ipv4UnicastAddress::address_type(), AddressType::Ipv4Unicast);
+        assert!(global_route.is_ok());
+        assert_eq!(global_route.unwrap().address(), global_route_addr);
         assert_eq!(Ipv4UnicastAddress::address_type(), AddressType::Ipv4Unicast);
         assert_eq!(multicast, Err(InvalidIpv4UnicastNetwork(multicast_addr)));
     }
@@ -1395,13 +1399,18 @@ mod tests {
     #[test]
     fn test_ipv6_unicast() {
         let unicast_addr = Ipv6Net::new(Ipv6Addr::LOCALHOST, 64).unwrap();
+        let global_route_addr = Ipv6Net::new(Ipv6Addr::from(0), 0).unwrap();
         let multicast_addr = Ipv6Net::from_str("ff00::/8").unwrap();
 
         let unicast = Ipv6Unicast::try_from(unicast_addr);
+        let global_route = Ipv6Unicast::try_from(global_route_addr);
         let multicast = Ipv6Unicast::try_from(multicast_addr);
 
         assert!(unicast.is_ok());
         assert_eq!(unicast.unwrap().address(), unicast_addr);
+        assert_eq!(Ipv6UnicastAddress::address_type(), AddressType::Ipv6Unicast);
+        assert!(global_route.is_ok());
+        assert_eq!(global_route.unwrap().address(), global_route_addr);
         assert_eq!(Ipv6UnicastAddress::address_type(), AddressType::Ipv6Unicast);
         assert_eq!(multicast, Err(InvalidIpv6UnicastNetwork(multicast_addr)));
     }
