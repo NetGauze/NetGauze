@@ -19,7 +19,7 @@ use crate::{
     iana::BmpVersion,
     v3, v4,
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
-    BmpMessage, PeerKey,
+    BmpMessage, BmpPeerType, PeerKey,
 };
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
@@ -130,8 +130,19 @@ impl BmpParsingContext {
             // Add Key for the router announcing BMP to the collector
             let peer_key = PeerKey::from_peer_header(peer_up.peer_header());
             let bgp_ctx = ctx.entry(peer_key).or_default();
-            bgp_ctx.add_path_mut().clear();
-            bgp_ctx.multiple_labels_mut().clear();
+            // According to [RFC 9069 Section 6.1.1](https://datatracker.ietf.org/doc/html/rfc9069#name-multiple-loc-rib-peers)
+            // In some implementations, it might be required to have more than one emulated
+            // peer for Loc-RIB to convey different address families for the
+            // same Loc-RIB. In this case, the peer distinguisher and BGP ID
+            // should be the same since they represent the same Loc-RIB
+            // instance. Each emulated peer instance MUST send a Peer Up with
+            // the OPEN message indicating the address family capabilities.
+            // A BMP receiver MUST process these capabilities to know which peer belongs to
+            // which address family.
+            if !matches!(peer_key.peer_type(), BmpPeerType::LocRibInstancePeer { .. }) {
+                bgp_ctx.add_path_mut().clear();
+                bgp_ctx.multiple_labels_mut().clear();
+            }
             for add_path in &common_add_path_caps {
                 bgp_ctx.update_capabilities(&BgpCapability::AddPath((*add_path).clone()))
             }
@@ -144,26 +155,28 @@ impl BmpParsingContext {
             ));
 
             // Add a key for the BGP Peer of the first router
-            let peer_key = PeerKey::new(
-                peer_up.peer_header().address(),
-                peer_up.peer_header().peer_type(),
-                peer_up.peer_header().rd(),
-                peer_up.peer_header().peer_as(),
-                received_open.bgp_id(),
-            );
-            let bgp_ctx = ctx.entry(peer_key).or_default();
-            bgp_ctx.add_path_mut().clear();
-            bgp_ctx.multiple_labels_mut().clear();
-            for add_path in &common_add_path_caps {
-                bgp_ctx.update_capabilities(&BgpCapability::AddPath((*add_path).clone()))
+            // In Loc-Rib the bgp open message is duplicated, no need to go through it
+            // again.
+            if !matches!(peer_key.peer_type(), BmpPeerType::LocRibInstancePeer { .. }) {
+                let peer_key = PeerKey::new(
+                    peer_up.peer_header().address(),
+                    peer_up.peer_header().peer_type(),
+                    peer_up.peer_header().rd(),
+                    peer_up.peer_header().peer_as(),
+                    received_open.bgp_id(),
+                );
+                let bgp_ctx = ctx.entry(peer_key).or_default();
+                for add_path in &common_add_path_caps {
+                    bgp_ctx.update_capabilities(&BgpCapability::AddPath((*add_path).clone()))
+                }
+                bgp_ctx.update_capabilities(&BgpCapability::MultipleLabels(
+                    common_multiple_labels_caps
+                        .iter()
+                        .copied()
+                        .cloned()
+                        .collect(),
+                ));
             }
-            bgp_ctx.update_capabilities(&BgpCapability::MultipleLabels(
-                common_multiple_labels_caps
-                    .iter()
-                    .copied()
-                    .cloned()
-                    .collect(),
-            ));
         }
 
         match msg {
@@ -280,7 +293,7 @@ mod tests {
         open::{BgpOpenMessage, BgpOpenMessageParameter},
     };
     use netgauze_iana::address_family::{AddressFamily, AddressType};
-    use std::{net::Ipv6Addr, str::FromStr};
+    use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
 
     #[test]
     fn test_codec() -> Result<(), BmpMessageWritingError> {
@@ -438,5 +451,91 @@ mod tests {
         codec.update_parsing_ctx(&terminate);
         assert!(!codec.ctx.contains_key(&peer_key));
         Ok(())
+    }
+
+    #[test]
+    fn test_multiple_peer_up_for_loc_rib() {
+        // announces add path for IPv4
+        let up1_wire = vec![
+            0x04, 0x00, 0x00, 0x00, 0xa6, 0x03, 0x03, 0x80, 0x00, 0x02, 0xfb, 0xf0, 0x00, 0x30,
+            0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0xfb, 0xf0, 0x00, 0x30, 0xcb, 0x00, 0x71, 0x30, 0x68, 0x9a,
+            0xf6, 0x17, 0x00, 0x07, 0xf7, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0x00, 0x31, 0x01, 0x04, 0x5b, 0xa0, 0x00, 0xb4, 0xcb, 0x00, 0x71, 0x30, 0x14, 0x02,
+            0x12, 0x41, 0x04, 0xfb, 0xf0, 0x00, 0x30, 0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x45,
+            0x04, 0x00, 0x01, 0x01, 0x03, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x31, 0x01, 0x04, 0x5b, 0xa0, 0x00,
+            0xb4, 0xcb, 0x00, 0x71, 0x30, 0x14, 0x02, 0x12, 0x41, 0x04, 0xfb, 0xf0, 0x00, 0x30,
+            0x01, 0x04, 0x00, 0x01, 0x00, 0x01, 0x45, 0x04, 0x00, 0x01, 0x01, 0x03,
+        ];
+
+        // announces add path for IPv6
+        let up2_wire = vec![
+            0x04, 0x00, 0x00, 0x00, 0xa6, 0x03, 0x03, 0x80, 0x00, 0x02, 0xfb, 0xf0, 0x00, 0x30,
+            0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0xfb, 0xf0, 0x00, 0x30, 0xcb, 0x00, 0x71, 0x30, 0x68, 0x9a,
+            0xf6, 0x17, 0x00, 0x07, 0xf7, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0x00, 0x31, 0x01, 0x04, 0x5b, 0xa0, 0x00, 0xb4, 0xcb, 0x00, 0x71, 0x30, 0x14, 0x02,
+            0x12, 0x41, 0x04, 0xfb, 0xf0, 0x00, 0x30, 0x01, 0x04, 0x00, 0x02, 0x00, 0x01, 0x45,
+            0x04, 0x00, 0x02, 0x01, 0x03, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x31, 0x01, 0x04, 0x5b, 0xa0, 0x00,
+            0xb4, 0xcb, 0x00, 0x71, 0x30, 0x14, 0x02, 0x12, 0x41, 0x04, 0xfb, 0xf0, 0x00, 0x30,
+            0x01, 0x04, 0x00, 0x02, 0x00, 0x01, 0x45, 0x04, 0x00, 0x02, 0x01, 0x03,
+        ];
+
+        let peer_key = PeerKey::new(
+            None,
+            BmpPeerType::LocRibInstancePeer { filtered: true },
+            Some(RouteDistinguisher::As4Administrator {
+                asn4: 4226809904,
+                number: 23,
+            }),
+            4226809904,
+            Ipv4Addr::new(203, 0, 113, 48),
+        );
+        let mut codec = BmpCodec::default();
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(&up1_wire);
+        buf.extend_from_slice(&up2_wire);
+
+        // check after each decoded BGP open the ADD Path ctx is including the new
+        // address family
+        let _ = codec
+            .decode(&mut buf)
+            .expect("decode up1_wire failed")
+            .expect("no message decoded from up1");
+        // Only IPv4 add path is added to the BGP decoding context for the first peer up
+        // message
+        let add_path1 = codec
+            .ctx
+            .get_peer(&peer_key)
+            .expect("peer lookup failed")
+            .add_path();
+        assert_eq!(
+            add_path1,
+            &HashMap::from([(AddressType::Ipv4Unicast, true)])
+        );
+        let _ = codec
+            .decode(&mut buf)
+            .expect("decode up1_wire failed")
+            .expect("no message decoded from up2");
+        // IPv6 add path is added to the BGP decoding context without deleting the add
+        // path for IPv4
+        let add_path2 = codec
+            .ctx
+            .get_peer(&peer_key)
+            .expect("peer lookup failed")
+            .add_path();
+        assert_eq!(
+            add_path2,
+            &HashMap::from([
+                (AddressType::Ipv4Unicast, true),
+                (AddressType::Ipv6Unicast, true)
+            ])
+        );
     }
 }
