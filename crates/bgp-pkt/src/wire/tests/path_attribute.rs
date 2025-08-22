@@ -2405,10 +2405,13 @@ fn test_path_attribute_unknown_attribute() -> Result<(), PathAttributeWritingErr
     .unwrap();
 
     let bad_incomplete = LocatedPathAttributeParsingError::new(
-        unsafe { Span::new_from_raw_offset(3, &bad_incomplete_wire[3..]) },
-        PathAttributeParsingError::UnknownAttributeError(UnknownAttributeParsingError::NomError(
-            ErrorKind::Eof,
-        )),
+        unsafe { Span::new_from_raw_offset(2, &bad_incomplete_wire[2..]) },
+        PathAttributeParsingError::UnknownAttributeError(
+            UnknownAttributeParsingError::InvalidLength {
+                expecting: 4,
+                actual: 3,
+            },
+        ),
     );
 
     test_parsed_completely_with_one_input(&good_wire, &mut BgpParsingContext::default(), &good);
