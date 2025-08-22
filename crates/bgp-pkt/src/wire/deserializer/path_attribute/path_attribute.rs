@@ -1216,6 +1216,10 @@ pub enum UnknownAttributeParsingError {
     /// additional information.
     #[serde(with = "ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+    InvalidLength {
+        expecting: usize,
+        actual: usize,
+    },
 }
 
 impl<'a> ReadablePduWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'a>>
@@ -1226,6 +1230,7 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'
         extended_length: bool,
     ) -> IResult<Span<'a>, Self, LocatedUnknownAttributeParsingError<'a>> {
         let (buf, code) = be_u8(buf)?;
+        let input = buf;
         let (buf, len) = if extended_length {
             let (buf, len) = be_u16(buf)?;
             (buf, PathAttributeLength::U16(len))
@@ -1234,6 +1239,15 @@ impl<'a> ReadablePduWithOneInput<'a, bool, LocatedUnknownAttributeParsingError<'
             (buf, PathAttributeLength::U8(len))
         };
         let length: u16 = len.into();
+        if length as usize > buf.len() {
+            return Err(nom::Err::Error(LocatedUnknownAttributeParsingError::new(
+                input,
+                UnknownAttributeParsingError::InvalidLength {
+                    expecting: length as usize,
+                    actual: buf.len(),
+                },
+            )));
+        }
         let (buf, value) = nom::bytes::complete::take(length)(buf)?;
 
         Ok((buf, UnknownAttribute::new(code, (*value.fragment()).into())))
