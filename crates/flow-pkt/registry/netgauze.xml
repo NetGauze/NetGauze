@@ -126,5 +126,135 @@
       <date>2025-06-27</date>
     </record>
 
+    <record>
+      <name>ingressInterfaceName</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>8</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The name of the IP interface where packets of this Flow are being received.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-08-26</date>
+    </record>
+
+    <record>
+      <name>egressInterfaceName</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>9</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The name of the IP interface where packets of this Flow are being sent.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-08-26</date>
+    </record>
+
+    <record>
+      <name>ingressInterfaceDescription</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>10</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The description of the IP interface where packets of this Flow are being received.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-08-26</date>
+    </record>
+
+    <record>
+      <name>egressInterfaceDescription</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>11</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The description of the IP interface where packets of this Flow are being sent.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-08-26</date>
+    </record>
+
+    <record>
+      <name>ingressVRFname</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>12</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The name of the VRF where the packets of this flow are being received.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-08-26</date>
+    </record>
+
+    <record>
+      <name>egressVRFname</name>
+      <dataType>string</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>13</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The name of the VRF where the packets of this flow are being sent.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-08-26</date>
+    </record>
+
+    <record>
+      <name>ingressMplsVpnRouteDistinguisher</name>
+      <dataType>octetArray</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>14</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The value of the VPN route distinguisher of the ingress VRF where
+            packets of this Flow are being received.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-08-26</date>
+    </record>
+
+    <record>
+      <name>egressMplsVpnRouteDistinguisher</name>
+      <dataType>octetArray</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>15</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            The value of the VPN route distinguisher of the egress VRF where
+            packets of this Flow are being sent.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-08-26</date>
+    </record>
+
   </registry>
 </registry>
