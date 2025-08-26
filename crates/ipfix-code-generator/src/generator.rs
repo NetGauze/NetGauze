@@ -2600,6 +2600,51 @@ pub fn generate_into_for_field(
                 quote! { Self::#name(value) => { Ok(value.to_vec()) } }
             } else if convert_rust_type == "String" && is_mpls_type(&ie.name) {
                 quote! { Self::#name(value) => { Ok(u32::from_be_bytes([0, value[0], value[1], value[2]]).to_string()) } }
+            } else if convert_rust_type == "String" && is_mpls_vpn_rd_type(&ie.name) {
+                let ie_name_str = &ie.name;
+                quote! {
+                    Self::#name(value) => {
+                        if value.len() != 8 {
+                            return Err(
+                                Self::Error::InvalidType(
+                                    "String".to_string(),
+                                    #ie_name_str.to_string(),
+                                ),
+                            );
+                        }
+
+                        let type_field = u16::from_be_bytes([value[0], value[1]]);
+                        match type_field {
+                            0 => {
+                                // Type 0: Administrator field is a 2-octet AS number
+                                let admin = u16::from_be_bytes([value[2], value[3]]);
+                                let assigned = u32::from_be_bytes([value[4], value[5], value[6], value[7]]);
+                                Ok(format!("0:{admin}:{assigned}"))
+                            }
+                            1 => {
+                                // Type 1: Administrator field is a 4-octet IPv4 address
+                                let admin = std::net::Ipv4Addr::new(value[2], value[3], value[4], value[5]);
+                                let assigned = u16::from_be_bytes([value[6], value[7]]);
+                                Ok(format!("1:{admin}:{assigned}"))
+                            }
+                            2 => {
+                                // Type 2: Administrator field is a 4-octet AS number
+                                let admin = u32::from_be_bytes([value[2], value[3], value[4], value[5]]);
+                                let assigned = u16::from_be_bytes([value[6], value[7]]);
+                                Ok(format!("2:{admin}:{assigned}"))
+                            }
+                            _ => {
+                                // Unknown type - display as hex with type prefix
+                                Ok(format!("{}:{:02x}{:02x}{:02x}{:02x}:{:02x}{:02x}",
+                                    type_field,
+                                    value[2], value[3],
+                                    value[4], value[5],
+                                    value[6], value[7]
+                                ))
+                            }
+                        }
+                    }
+                }
             } else {
                 let ie_name_str = &ie.name;
                 quote! { Self::#name(_) => { Err(Self::Error::InvalidType(#convert_rust_type.to_string(), #ie_name_str.to_string())) } }
@@ -2658,6 +2703,10 @@ pub fn get_rust_type(data_type: &str, ie_name: &str) -> String {
 
 fn is_mpls_type(ie_name: &str) -> bool {
     ie_name.eq("mplsTopLabelStackSection") || ie_name.starts_with("mplsLabelStackSection")
+}
+
+fn is_mpls_vpn_rd_type(ie_name: &str) -> bool {
+    ie_name.ends_with("VpnRouteDistinguisher")
 }
 
 pub(crate) fn generate_ie_values(
