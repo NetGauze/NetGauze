@@ -37,11 +37,10 @@ use netgauze_flow_pkt::{
     ie::{netgauze, Field},
     FlowInfo,
 };
-use netgauze_flow_service::FlowRequest;
 use opentelemetry::metrics::{Counter, Meter};
 use pin_utils::pin_mut;
 use std::{
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -108,7 +107,7 @@ pub enum AggregationCommand {
 #[derive(Debug)]
 struct AggregationActor {
     cmd_recv: mpsc::Receiver<AggregationCommand>,
-    rx: async_channel::Receiver<Arc<FlowRequest>>,
+    rx: async_channel::Receiver<(SocketAddr, FlowInfo)>,
     tx: async_channel::Sender<(IpAddr, FlowInfo)>,
     config: AggregationConfig,
     stats: AggregationStats,
@@ -119,7 +118,7 @@ struct AggregationActor {
 impl AggregationActor {
     fn new(
         cmd_recv: mpsc::Receiver<AggregationCommand>,
-        rx: async_channel::Receiver<Arc<FlowRequest>>,
+        rx: async_channel::Receiver<(SocketAddr, FlowInfo)>,
         tx: async_channel::Sender<(IpAddr, FlowInfo)>,
         config: AggregationConfig,
         stats: AggregationStats,
@@ -149,8 +148,8 @@ impl AggregationActor {
 
         let agg = self
             .rx
-            .flat_map(move |req| {
-                let (peer, flow) = req.as_ref().clone();
+            .flat_map(move |input| {
+                let (peer, flow) = input;
 
                 let tags = [
                     opentelemetry::KeyValue::new(
@@ -285,7 +284,7 @@ impl AggregationActorHandle {
     pub fn new(
         buffer_size: usize,
         config: AggregationConfig,
-        flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
+        flow_rx: async_channel::Receiver<(SocketAddr, FlowInfo)>,
         stats: Either<Meter, AggregationStats>,
         shard_id: usize,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
