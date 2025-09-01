@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
 /// Operations to update or delete enrichment data
-#[derive(Debug, Clone, strum_macros::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, strum_macros::Display)]
 pub enum EnrichmentOperation {
     #[strum(to_string = "Upsert(ip={ip}, scope={scope}, weight={weight}, fields={fields:?})")]
     Upsert {
