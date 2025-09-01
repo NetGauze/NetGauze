@@ -565,7 +565,7 @@ fn test_with_variable_string_length() -> Result<(), IpfixPacketWritingError> {
                 Box::new([ie::Field::selectorId(1)]),
                 Box::new([
                     ie::Field::samplingPacketInterval(1),
-                    ie::Field::selectorAlgorithm(3),
+                    ie::Field::selectorAlgorithm(ie::selectorAlgorithm::RandomnoutofNSampling),
                     ie::Field::samplingSize(1),
                     ie::Field::samplingPopulation(1),
                     ie::Field::samplerName("NETFLOW-SAMPLER-MAP".into()),
