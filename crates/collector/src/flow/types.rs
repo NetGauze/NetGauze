@@ -23,7 +23,10 @@
 //!
 //! Note: This module/functions may be relocated in the future.
 
-use netgauze_flow_pkt::ie::{Field, HasIE, IE};
+use netgauze_flow_pkt::{
+    ie::{Field, HasIE, IE},
+    ipfix,
+};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
 
@@ -130,6 +133,126 @@ impl FieldRef {
     }
 }
 
+/// Trait for efficient field lookups in flow data structures.
+///
+/// This trait provides a consistent interface for looking up fields by either
+/// their exact `FieldRef` (IE + index) or just by their Information Element.
+pub trait FieldRefLookup<V> {
+    fn contains_field_ref(&self, field_ref: FieldRef) -> bool;
+    fn contains_ie(&self, ie: IE) -> bool;
+    fn get_by_field_ref(&self, field_ref: FieldRef) -> Option<&V>;
+    fn get_by_ie(&self, ie: IE) -> Option<&V>;
+}
+
+impl<V> FieldRefLookup<V> for FxHashMap<FieldRef, V> {
+    fn contains_field_ref(&self, field_ref: FieldRef) -> bool {
+        self.contains_key(&field_ref)
+    }
+
+    fn contains_ie(&self, ie: IE) -> bool {
+        // Try index 0 for O(1) lookup
+        if self.contains_key(&FieldRef::new(ie, 0)) {
+            return true;
+        }
+
+        // Fallback to check all indices
+        self.keys().any(|field_ref| field_ref.ie() == ie)
+    }
+
+    fn get_by_field_ref(&self, field_ref: FieldRef) -> Option<&V> {
+        self.get(&field_ref)
+    }
+
+    fn get_by_ie(&self, ie: IE) -> Option<&V> {
+        // Try index 0 for O(1) lookup
+        if let Some(value) = self.get(&FieldRef::new(ie, 0)) {
+            return Some(value);
+        }
+
+        // Fallback to check all indices
+        self.iter()
+            .find(|(field_ref, _)| field_ref.ie() == ie)
+            .map(|(_, value)| value)
+    }
+}
+
+/// An indexed flow data record struct for efficient field access.
+///
+/// The record maintains separate collections for scope fields and regular
+/// fields, matching the structure of IPFIX DataRecords.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexedDataRecord {
+    scope_fields: FxHashMap<FieldRef, Field>,
+    fields: FxHashMap<FieldRef, Field>,
+}
+
+impl IndexedDataRecord {
+    /// Create a new IndexedDataRecord from `Vec<Field>` for both scope fields
+    /// and fields
+    pub fn new(scope_fields: &[Field], fields: &[Field]) -> Self {
+        Self {
+            scope_fields: FieldRef::map_fields_into_fxhashmap_owned(scope_fields),
+            fields: FieldRef::map_fields_into_fxhashmap_owned(fields),
+        }
+    }
+    pub fn scope_fields(&self) -> &FxHashMap<FieldRef, Field> {
+        &self.scope_fields
+    }
+    pub fn into_scope_fields(self) -> FxHashMap<FieldRef, Field> {
+        self.scope_fields
+    }
+    pub fn fields(&self) -> &FxHashMap<FieldRef, Field> {
+        &self.fields
+    }
+    pub fn into_fields(self) -> FxHashMap<FieldRef, Field> {
+        self.fields
+    }
+    /// Destructure the record into its constituent parts
+    pub fn into_parts(self) -> (FxHashMap<FieldRef, Field>, FxHashMap<FieldRef, Field>) {
+        (self.scope_fields, self.fields)
+    }
+}
+
+impl FieldRefLookup<Field> for IndexedDataRecord {
+    fn contains_field_ref(&self, field_ref: FieldRef) -> bool {
+        self.scope_fields.contains_key(&field_ref) || self.fields.contains_key(&field_ref)
+    }
+
+    fn contains_ie(&self, ie: IE) -> bool {
+        self.scope_fields.contains_ie(ie) || self.fields.contains_ie(ie)
+    }
+
+    fn get_by_field_ref(&self, field_ref: FieldRef) -> Option<&Field> {
+        self.scope_fields
+            .get_by_field_ref(field_ref)
+            .or_else(|| self.fields.get_by_field_ref(field_ref))
+    }
+
+    fn get_by_ie(&self, ie: IE) -> Option<&Field> {
+        self.scope_fields
+            .get_by_ie(ie)
+            .or_else(|| self.fields.get_by_ie(ie))
+    }
+}
+
+impl From<ipfix::DataRecord> for IndexedDataRecord {
+    fn from(record: ipfix::DataRecord) -> Self {
+        IndexedDataRecord {
+            scope_fields: FieldRef::map_fields_into_fxhashmap_owned(record.scope_fields()),
+            fields: FieldRef::map_fields_into_fxhashmap_owned(record.fields()),
+        }
+    }
+}
+
+impl From<IndexedDataRecord> for ipfix::DataRecord {
+    fn from(record: IndexedDataRecord) -> Self {
+        ipfix::DataRecord::new(
+            record.scope_fields.into_values().collect(),
+            record.fields.into_values().collect(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,7 +260,10 @@ mod tests {
     use netgauze_flow_pkt::ie::{protocolIdentifier, Field, IE};
     use netgauze_iana::tcp::TCPHeaderFlags;
     use rustc_hash::{FxBuildHasher, FxHashMap};
-    use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::{
+        collections::HashMap,
+        net::{Ipv4Addr, Ipv6Addr},
+    };
 
     #[test]
     fn test_field_ref_equality_and_ordering() {
@@ -368,5 +494,122 @@ mod tests {
         ]);
 
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_indexed_data_record_new() {
+        let scope_fields = vec![
+            Field::exportingProcessId(100),
+            Field::ingressInterface(1),
+            Field::egressInterface(2),
+            Field::exportingProcessId(200),
+            Field::exportingProcessId(300),
+        ];
+        let fields = vec![
+            Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
+            Field::applicationGroupName("first".to_string().into()),
+            Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2)),
+            Field::applicationGroupName("second".to_string().into()),
+            Field::sourceTransportPort(80),
+            Field::applicationGroupName("third".to_string().into()),
+            Field::applicationGroupName("fourth".to_string().into()),
+        ];
+
+        let record = IndexedDataRecord::new(&scope_fields, &fields);
+
+        // Construct expected IndexedDataRecord
+        let mut expected_scope_fields = HashMap::with_hasher(FxBuildHasher);
+        expected_scope_fields.insert(
+            FieldRef::new(IE::exportingProcessId, 0),
+            Field::exportingProcessId(100),
+        );
+        expected_scope_fields.insert(
+            FieldRef::new(IE::exportingProcessId, 1),
+            Field::exportingProcessId(200),
+        );
+        expected_scope_fields.insert(
+            FieldRef::new(IE::exportingProcessId, 2),
+            Field::exportingProcessId(300),
+        );
+        expected_scope_fields.insert(
+            FieldRef::new(IE::ingressInterface, 0),
+            Field::ingressInterface(1),
+        );
+        expected_scope_fields.insert(
+            FieldRef::new(IE::egressInterface, 0),
+            Field::egressInterface(2),
+        );
+        let mut expected_fields = HashMap::with_hasher(FxBuildHasher);
+        expected_fields.insert(
+            FieldRef::new(IE::applicationGroupName, 0),
+            Field::applicationGroupName("first".to_string().into()),
+        );
+        expected_fields.insert(
+            FieldRef::new(IE::applicationGroupName, 1),
+            Field::applicationGroupName("second".to_string().into()),
+        );
+        expected_fields.insert(
+            FieldRef::new(IE::applicationGroupName, 2),
+            Field::applicationGroupName("third".to_string().into()),
+        );
+        expected_fields.insert(
+            FieldRef::new(IE::applicationGroupName, 3),
+            Field::applicationGroupName("fourth".to_string().into()),
+        );
+        expected_fields.insert(
+            FieldRef::new(IE::sourceIPv4Address, 0),
+            Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
+        );
+        expected_fields.insert(
+            FieldRef::new(IE::destinationIPv4Address, 0),
+            Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2)),
+        );
+        expected_fields.insert(
+            FieldRef::new(IE::sourceTransportPort, 0),
+            Field::sourceTransportPort(80),
+        );
+        let expected_record = IndexedDataRecord {
+            scope_fields: expected_scope_fields,
+            fields: expected_fields,
+        };
+
+        assert_eq!(record, expected_record);
+    }
+
+    #[test]
+    fn test_indexed_data_record_getters() {
+        let scope_fields = vec![
+            Field::exportingProcessId(100),
+            Field::exportingProcessId(200),
+            Field::exportingProcessId(300),
+        ];
+        let fields = vec![Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))];
+        let record = IndexedDataRecord::new(&scope_fields, &fields);
+
+        // Test IndexedDataRecord getter methods
+        assert!(record.contains_field_ref(FieldRef::new(IE::exportingProcessId, 0)));
+        assert!(record.contains_field_ref(FieldRef::new(IE::exportingProcessId, 1)));
+        assert!(record.contains_field_ref(FieldRef::new(IE::exportingProcessId, 2)));
+        assert!(record.contains_field_ref(FieldRef::new(IE::sourceIPv4Address, 0)));
+
+        assert!(record.contains_ie(IE::exportingProcessId));
+        assert!(record.contains_ie(IE::sourceIPv4Address));
+
+        // Test FxHashMap<FieldRef, V> getter methods
+        assert!(record
+            .scope_fields()
+            .contains_field_ref(FieldRef::new(IE::exportingProcessId, 0)));
+        assert!(record
+            .scope_fields()
+            .contains_field_ref(FieldRef::new(IE::exportingProcessId, 1)));
+        assert!(record
+            .scope_fields()
+            .contains_field_ref(FieldRef::new(IE::exportingProcessId, 2)));
+        assert!(record
+            .fields()
+            .contains_field_ref(FieldRef::new(IE::sourceIPv4Address, 0)));
+
+        assert!(record.scope_fields().contains_ie(IE::exportingProcessId));
+        assert!(record.fields().contains_ie(IE::sourceIPv4Address));
     }
 }
