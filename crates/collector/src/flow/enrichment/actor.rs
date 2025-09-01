@@ -108,7 +108,10 @@ impl EnrichmentActor {
 
     /// Enrich a flow with cached metadata for the specified peer IP.
     fn enrich(&self, peer_ip: IpAddr, flow: FlowInfo) -> Result<FlowInfo, EnrichmentActorError> {
-        debug!("Enriching flow packet from peer: {}", peer_ip);
+        debug!(
+            "Enrichment Actor: received flow packet from peer: {}",
+            peer_ip
+        );
 
         let enriched_flow = match flow {
             FlowInfo::IPFIX(pkt) => self
@@ -130,7 +133,8 @@ impl EnrichmentActor {
     ///
     /// Processes each data record in the packet, applying enrichment fields
     /// that match the observation domain and record contents. Template sets
-    /// are filtered out and not processed further.
+    /// are as well as options data records filtered out and not processed
+    /// further.
     fn enrich_ipfix_packet(
         &self,
         peer_ip: IpAddr,
@@ -149,6 +153,7 @@ impl EnrichmentActor {
                     let enriched_records = records
                         .into_vec()
                         .into_iter()
+                        .filter(|record| record.scope_fields().is_empty())
                         .map(|record| {
                             if let Some(enrichment_fields) = self
                                 .enrichment_cache

@@ -35,30 +35,24 @@
 //! - **IPFIX** - Full options template and data record support
 //! - **NetFlowV9** - Not yet implemented
 
+use crate::flow::enrichment::{
+    inputs::flow_options::normalize::OptionsDataRecord, EnrichmentActorHandle, EnrichmentOperation,
+};
 use netgauze_flow_pkt::{ipfix, FlowInfo};
 use netgauze_flow_service::FlowRequest;
-use std::sync::Arc;
+use std::{string::ToString, sync::Arc};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
-
-use crate::flow::enrichment::{EnrichmentActorHandle, EnrichmentOperation, Scope};
 
 #[derive(Debug, Clone, Copy)]
 enum FlowOptionsActorCommand {
     Shutdown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(strum_macros::Display, Debug, Clone)]
 pub enum FlowOptionsActorError {
+    #[strum(to_string = "error in flow receive channel")]
     FlowReceiveError,
-}
-
-impl std::fmt::Display for FlowOptionsActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FlowReceiveError => write!(f, "error in flow receive channel"),
-        }
-    }
 }
 
 impl std::error::Error for FlowOptionsActorError {}
@@ -67,6 +61,9 @@ impl std::error::Error for FlowOptionsActorError {}
 pub struct FlowOptionsActorStats {
     received_flows: opentelemetry::metrics::Counter<u64>,
     send_error: opentelemetry::metrics::Counter<u64>,
+    normalization_errors: opentelemetry::metrics::Counter<u64>,
+    processed_options_records: opentelemetry::metrics::Counter<u64>,
+    enrichment_ops_generated: opentelemetry::metrics::Counter<u64>,
 }
 
 impl FlowOptionsActorStats {
@@ -79,9 +76,24 @@ impl FlowOptionsActorStats {
             .u64_counter("netgauze.collector.flows.handlers.options.send_error")
             .with_description("Error sending the enrichment operation to the enrichment actor")
             .build();
+        let normalization_errors = meter
+            .u64_counter("netgauze.collector.flows.handlers.options.normalization.errors")
+            .with_description("Errors during record normalization")
+            .build();
+        let processed_options_records = meter
+            .u64_counter("netgauze.collector.flows.handlers.options.processed.records")
+            .with_description("Number of options data records processed")
+            .build();
+        let enrichment_ops_generated = meter
+            .u64_counter("netgauze.collector.flows.handlers.options.enrichment.ops.generated")
+            .with_description("Number of enrichment operations generated")
+            .build();
         Self {
             received_flows,
             send_error,
+            normalization_errors,
+            processed_options_records,
+            enrichment_ops_generated,
         }
     }
 }
@@ -110,6 +122,23 @@ impl FlowOptionsActor {
         }
     }
 
+    /// Send enrichment operations to all registered enrichment actors
+    async fn send_enrichment_operations(
+        &mut self,
+        ops: Vec<EnrichmentOperation>,
+        peer_tags: &[opentelemetry::KeyValue],
+    ) {
+        for op in ops {
+            debug!("Sending Enrichment Operation: \n{}", op);
+            for handle in &self.enrichment_handles {
+                if let Err(err) = handle.update_enrichment(op.clone()).await {
+                    warn!("Failed to send enrichment operation: {}", err);
+                    self.stats.send_error.add(1, peer_tags);
+                }
+            }
+        }
+    }
+
     /// Main actor event loop
     async fn run(mut self) -> anyhow::Result<String> {
         info!("Starting Flow Options Handler Actor");
@@ -132,6 +161,7 @@ impl FlowOptionsActor {
                     match flow {
                         Ok(req) => {
                             let (peer, flow) = req.as_ref().clone();
+                            let obs_id = flow.observation_domain_id();
 
                             let peer_tags = [
                                 opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
@@ -144,7 +174,7 @@ impl FlowOptionsActor {
 
                             match flow {
                                 FlowInfo::IPFIX(pkt) => {
-                                    for set in pkt.sets() {
+                                    for set in pkt.into_sets() {
 
                                         let data_records = if let ipfix::Set::Data { id: _, records } = set {
                                             records
@@ -153,25 +183,36 @@ impl FlowOptionsActor {
                                         };
 
                                         // Filter and process options data records only
-                                        for record in data_records.iter().filter(|record| !record.scope_fields().is_empty()) {
-                                            debug!("Options Data record found: {:?}", record);
+                                        for record in data_records
+                                            .into_vec()
+                                            .into_iter()
+                                            .filter(|record| !record.scope_fields().is_empty()) {
 
-                                            // Construct enrichment operation from options data
-                                            let scope = Scope::new(pkt.observation_domain_id(), Some(record.scope_fields().to_vec()));
-                                            let op = EnrichmentOperation::Upsert {
-                                                ip: peer.ip(),
-                                                scope,
-                                                weight: 16,
-                                                fields: record.fields().to_vec(),
+                                            debug!("Options Data record found: {:?}", record);
+                                            self.stats.processed_options_records.add(1, &peer_tags);
+
+                                            // Categorize option types
+                                            let options_record: OptionsDataRecord = record.try_into()?;
+
+                                            // Construct enrichment operations from options data
+                                            let ops = match options_record.into_enrichment_operations(peer.ip(), obs_id) {
+                                                Ok(ops) => {
+                                                    self.stats.enrichment_ops_generated.add(
+                                                        ops.len() as u64,
+                                                        &peer_tags,
+                                                    );
+                                                    ops
+                                                },
+                                                Err(e) => {
+                                                    self.stats.normalization_errors.add(1, &peer_tags);
+                                                    error!("Options Data record normalization error: {e}");
+                                                    continue;
+                                                }
                                             };
 
-                                            debug!("Sending Enrichment Operation: \n{op}");
-                                            for handle in &self.enrichment_handles {
-                                                if let Err(err) = handle.update_enrichment(op.clone()).await {
-                                                    warn!("Failed to send enrichment operation: {err}");
-                                                    self.stats.send_error.add(1, &peer_tags);
-                                                }
-                                            }
+                                            // Send enrichment operations to EnrichmentActor
+                                            self.send_enrichment_operations(ops, &peer_tags).await;
+
                                         }
                                     }
                                 }
