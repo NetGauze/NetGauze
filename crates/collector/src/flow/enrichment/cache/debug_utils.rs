@@ -39,13 +39,18 @@ use std::fmt::Display;
 impl Display for EnrichmentOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Upsert(ip, scope, weight, fields) => {
+            Self::Upsert {
+                ip,
+                scope,
+                weight,
+                fields,
+            } => {
                 write!(
                     f,
                     "Upsert(ip={ip}, scope={scope}, weight={weight}, fields={fields:?})"
                 )
             }
-            Self::Delete(ip, scope, weight) => {
+            Self::Delete { ip, scope, weight } => {
                 write!(f, "Delete(ip={ip}, scope={scope}, weight={weight})")
             }
         }

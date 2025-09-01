@@ -27,8 +27,32 @@ use std::net::IpAddr;
 /// Operations to update or delete enrichment data
 #[derive(Debug, Clone)]
 pub enum EnrichmentOperation {
-    Upsert(IpAddr, Scope, Weight, Vec<Field>),
-    Delete(IpAddr, Scope, Weight),
+    Upsert {
+        ip: IpAddr,
+        scope: Scope,
+        weight: Weight,
+        fields: Vec<Field>,
+    },
+    Delete {
+        ip: IpAddr,
+        scope: Scope,
+        weight: Weight,
+    },
+}
+
+impl EnrichmentOperation {
+    pub fn new_upsert(ip: IpAddr, scope: Scope, weight: Weight, fields: Vec<Field>) -> Self {
+        Self::Upsert {
+            ip,
+            scope,
+            weight,
+            fields,
+        }
+    }
+
+    pub fn new_delete(ip: IpAddr, scope: Scope, weight: Weight) -> Self {
+        Self::Delete { ip, scope, weight }
+    }
 }
 
 /// Weight helper type
@@ -54,7 +78,7 @@ impl Scope {
     pub fn obs_domain_id(&self) -> u32 {
         self.obs_domain_id
     }
-    pub fn scope_fields(&self) -> &Option<Vec<Field>> {
-        &self.scope_fields
+    pub fn scope_fields(&self) -> Option<&Vec<Field>> {
+        self.scope_fields.as_ref()
     }
 }

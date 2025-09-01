@@ -261,7 +261,7 @@ fn test_enrichment_cache_apply_enrichment_operations() {
 
     // Apply upsert operation
     let fields = vec![Field::samplerName("test_sampler".to_string().into())];
-    let upsert_op = EnrichmentOperation::Upsert(ip, scope.clone(), weight, fields.clone());
+    let upsert_op = EnrichmentOperation::new_upsert(ip, scope.clone(), weight, fields.clone());
     cache.apply_enrichment(upsert_op);
 
     // Create expected cache
@@ -279,7 +279,7 @@ fn test_enrichment_cache_apply_enrichment_operations() {
     assert_eq!(cache, expected_cache);
 
     // Apply delete operation
-    let delete_op = EnrichmentOperation::Delete(ip, scope, 200);
+    let delete_op = EnrichmentOperation::new_delete(ip, scope, 200);
     cache.apply_enrichment(delete_op);
 
     // Create expected cache after delete operation (empty)
