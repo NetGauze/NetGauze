@@ -121,14 +121,19 @@ impl EnrichmentCache {
     /// Apply an enrichment operation (upsert or delete) to the cache.
     pub(crate) fn apply_enrichment(&mut self, op: EnrichmentOperation) {
         match op {
-            EnrichmentOperation::Upsert(ip, scope, weight, incoming_fields) => {
+            EnrichmentOperation::Upsert {
+                ip,
+                scope,
+                weight,
+                fields,
+            } => {
                 debug!(
                     "Applying upsert operation for ip={}, scope={}, weight={}, incoming_fields={:?}",
-                    ip, scope, weight, incoming_fields
+                    ip, scope, weight, fields
                 );
-                self.upsert(ip, scope, weight, incoming_fields);
+                self.upsert(ip, scope, weight, fields);
             }
-            EnrichmentOperation::Delete(ip, scope, weight) => {
+            EnrichmentOperation::Delete { ip, scope, weight } => {
                 debug!(
                     "Applying delete operation for ip={}, scope={}, weight={}",
                     ip, scope, weight
