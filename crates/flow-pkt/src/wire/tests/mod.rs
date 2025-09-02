@@ -442,6 +442,51 @@ fn test_u64_reduced_size_encoding() -> Result<(), ie_ser::FieldWritingError> {
     Ok(())
 }
 
+#[test]
+fn test_u256_value() -> Result<(), ie_ser::FieldWritingError> {
+    let value_wire = [0x11; 32];
+    let reduced_wire = [0x11; 8];
+    let value = ie::Field::ipv6ExtensionHeadersFull(Box::new([0x11; 32]));
+    let reduced_value = ie::Field::ipv6ExtensionHeadersFull(Box::new([
+        0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00,
+    ]));
+    let invalid_length = nom::Err::Error(ie_desr::LocatedFieldParsingError::new(
+        Span::new(&value_wire),
+        ie_desr::FieldParsingError::InvalidLength {
+            ie_name: "ipv6ExtensionHeadersFull".to_string(),
+            length: 33,
+        },
+    ));
+    test_parsed_completely_with_two_inputs(
+        &value_wire,
+        &ie::IE::ipv6ExtensionHeadersFull,
+        32u16,
+        &value,
+    );
+    test_parsed_completely_with_two_inputs(
+        &reduced_wire,
+        &ie::IE::ipv6ExtensionHeadersFull,
+        8u16,
+        &reduced_value,
+    );
+    test_parse_error_with_two_inputs::<
+        ie::Field,
+        &ie::IE,
+        u16,
+        ie_desr::LocatedFieldParsingError<'_>,
+    >(
+        &value_wire,
+        &ie::IE::ipv6ExtensionHeadersFull,
+        33u16,
+        invalid_length,
+    );
+    test_write_with_one_input(&value, None, &value_wire)?;
+    test_write_with_one_input(&reduced_value, Some(8), &reduced_wire)?;
+    Ok(())
+}
+
 // #[test]
 // fn test_u32_reduced_size_encoding() -> Result<(), ie_ser::FieldWritingError>
 // {     let four_wire = [0xff, 0xee, 0xdd, 0xcc];

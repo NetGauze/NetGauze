@@ -1514,7 +1514,7 @@ fn generate_u256_deserializer(ie_name: &String, enum_subreg: bool) -> TokenStrea
                 return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::InvalidLength{ie_name: #ie_name.to_string(), length})))
             }
             let mut res: [u8; 32] = [0; 32];
-            res.copy_from_slice(buf.slice(..8).fragment());
+            res[..len].copy_from_slice(buf.slice(..len).fragment());
             #subreg
         }
     }
@@ -2310,7 +2310,11 @@ pub(crate) fn generate_pkg_ie_serializers(
             "unsigned256" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_all(value.as_ref())?
+                        let len = match length {
+                            None => value.len(),
+                            Some(len) => len as usize,
+                        };
+                        writer.write_all(value[..len].as_ref())?
                     }
                 }
             }
@@ -3249,7 +3253,11 @@ pub(crate) fn generate_ie_ser_main(
             "unsigned256" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_all(value.as_ref())?
+                        let len = match length {
+                            None => value.len(),
+                            Some(len) => len as usize,
+                        };
+                        writer.write_all(value[..len].as_ref())?
                     }
                 }
             }
