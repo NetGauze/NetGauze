@@ -34,13 +34,10 @@ use crate::model::telemetry::{
     TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
     YangPushSubscriptionMetadata,
 };
-use netgauze_udp_notif_pkt::UdpNotifPacket;
-
 use serde_json::Value;
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
-    sync::Arc,
 };
 
 use crate::model::notification::{
@@ -48,7 +45,10 @@ use crate::model::notification::{
 };
 use chrono::Utc;
 
-use crate::model::udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload};
+use crate::{
+    model::udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
+    validation::SubscriptionInfo,
+};
 use shadow_rs::shadow;
 use sysinfo::System;
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -180,7 +180,7 @@ fn fetch_sysinfo_manifest() -> Manifest {
 /// Sends enriched TelemetryMessage objects.
 struct YangPushEnrichmentActor {
     cmd_rx: mpsc::Receiver<YangPushEnrichmentActorCommand>,
-    udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
+    validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
     enriched_tx: async_channel::Sender<TelemetryMessageWrapper>,
     labels: HashMap<IpAddr, (u32, HashMap<String, String>)>,
     default_labels: (u32, HashMap<String, String>),
@@ -192,7 +192,7 @@ struct YangPushEnrichmentActor {
 impl YangPushEnrichmentActor {
     fn new(
         cmd_rx: mpsc::Receiver<YangPushEnrichmentActorCommand>,
-        udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
+        validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
         enriched_tx: async_channel::Sender<TelemetryMessageWrapper>,
         stats: YangPushEnrichmentStats,
     ) -> Self {
@@ -205,7 +205,7 @@ impl YangPushEnrichmentActor {
         );
         Self {
             cmd_rx,
-            udp_notif_rx,
+            validated_rx,
             enriched_tx,
             labels: HashMap::new(),
             default_labels,
@@ -472,10 +472,11 @@ impl YangPushEnrichmentActor {
                         }
                     }
                 }
-                msg = self.udp_notif_rx.recv() => {
+                msg = self.validated_rx.recv() => {
                     match msg {
-                        Ok(arc_tuple) => {
-                            let (peer, pkt) = arc_tuple.as_ref();
+                        Ok(msg) => {
+                            let (subscription_info, pkt) = msg;
+                            let peer = subscription_info.peer();
                             let peer_tags = [
                                 opentelemetry::KeyValue::new(
                                     "network.peer.address",
@@ -488,18 +489,8 @@ impl YangPushEnrichmentActor {
                             ];
                             self.stats.received_messages.add(1, &peer_tags);
 
-                            // Decode the UdpNotifPacket into UdpNotifPacketDecoded
-                            let pkt_decoded: UdpNotifPacketDecoded = match pkt.try_into() {
-                              Ok(decoded) => decoded,
-                              Err(err) => {
-                                  warn!("Failed to decode Udp-Notif Payload: {err}");
-                                  self.stats.udpnotif_payload_decoding_error.add(1, &peer_tags);
-                                  continue;
-                              }
-                            };
-
                             // Process the payload and send the enriched TelemetryMessage
-                            match self.process_payload(*peer, pkt_decoded.payload()) {
+                            match self.process_payload(peer, pkt.payload()) {
                                 Ok(telemetry_message) => {
                                     if let Err(err) = self.enriched_tx.send(telemetry_message).await {
                                         error!("YangPushEnrichmentActor send error: {err}");
@@ -551,7 +542,7 @@ pub struct YangPushEnrichmentActorHandle {
 impl YangPushEnrichmentActorHandle {
     pub fn new(
         buffer_size: usize,
-        udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
+        validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
         stats: either::Either<opentelemetry::metrics::Meter, YangPushEnrichmentStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
@@ -560,7 +551,7 @@ impl YangPushEnrichmentActorHandle {
             either::Either::Left(meter) => YangPushEnrichmentStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor = YangPushEnrichmentActor::new(cmd_recv, udp_notif_rx, enriched_tx, stats);
+        let actor = YangPushEnrichmentActor::new(cmd_recv, validated_rx, enriched_tx, stats);
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
             cmd_send,
@@ -589,7 +580,7 @@ mod tests {
         udp_notif::UdpNotifPacketDecoded,
     };
     use bytes::Bytes;
-    use netgauze_udp_notif_pkt::MediaType;
+    use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
     use serde_json::json;
     use std::{collections::HashMap, net::SocketAddr};
 
@@ -629,7 +620,7 @@ mod tests {
     fn create_actor() -> YangPushEnrichmentActor {
         YangPushEnrichmentActor {
             cmd_rx: mpsc::channel(10).1,
-            udp_notif_rx: async_channel::bounded(10).1,
+            validated_rx: async_channel::bounded(10).1,
             enriched_tx: async_channel::bounded(10).0,
             labels: HashMap::new(),
             default_labels: (0, HashMap::new()),
