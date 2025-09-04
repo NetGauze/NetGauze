@@ -345,17 +345,16 @@ pub async fn init_udp_notif_collection(
 
                     let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
                         publisher_config.buffer_size,
-                        udp_notif_recv.clone(),
+                        validation_handle.subscribe(),
                         either::Left(meter.clone()),
                     );
                     join_set.push(enrichment_join);
                     enrichment_handles.push(enrichment_handle.clone());
 
-                    let enriched_rx = enrichment_handle.subscribe();
                     let hdl = KafkaJsonPublisherActorHandle::from_config(
                         serialize_yang_push,
                         config.clone(),
-                        enriched_rx,
+                        enrichment_handle.subscribe(),
                         either::Left(meter.clone()),
                     );
                     match hdl {
