@@ -1,0 +1,64 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="psamp-parameters.xsl"?>
+<?xml-model href="psamp-parameters.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
+<registry xmlns="http://www.iana.org/assignments" id="psamp-parameters">
+  <title>Packet Sampling (PSAMP) Parameters</title>
+  <created>2008-09-04</created>
+  <updated>2023-02-21</updated>
+  <registry id="psamp-parameters-1">
+    <title>PSAMP selectorAlgorithm Identifiers</title>
+    <xref type="rfc" data="rfc5476"/>
+    <registration_rule>Expert Review</registration_rule>
+    <expert>Unassigned</expert>
+    <record>
+      <id>0</id>
+      <description>Reserved</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>1</id>
+      <description>Systematic count-based Sampling</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>2</id>
+      <description>Systematic time-based Sampling</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>3</id>
+      <description>Random n-out-of-N Sampling</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>4</id>
+      <description>Uniform probabilistic Sampling</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>5</id>
+      <description>Property match Filtering</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>6</id>
+      <description>Hash based Filtering using BOB</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>7</id>
+      <description>Hash based Filtering using IPSX</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>8</id>
+      <description>Hash based Filtering using CRC</description>
+      <xref type="rfc" data="rfc5476"/>
+    </record>
+    <record>
+      <id>9-65535</id>
+      <description>Unassigned</description>
+    </record>
+  </registry>
+  <people/>
+</registry>

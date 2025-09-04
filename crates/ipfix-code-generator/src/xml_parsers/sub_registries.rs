@@ -112,7 +112,7 @@ pub fn parse_subregistry(
     }
 }
 
-/// Parse generic sub-registries with value, name and/or description, and
+/// Parse generic sub-registries with value (or id), name and/or description, and
 /// optionally a comment, and parameter set. Examples:
 /// - [flowEndReason (Value 136)](https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-flow-end-reason)
 /// - [flowSelectorAlgorithm (Value 390)](https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-flowselectoralgorithm)
@@ -145,6 +145,22 @@ pub fn parse_val_name_desc_u8_registry(node: &Node<'_, '_>) -> (u16, Vec<ValueNa
                 x.parse::<u8>()
             }
         });
+
+        // If value column is not present, fallback to id (e.g. psamp-parameters registry)
+        let value = match value {
+            Some(_) => value,
+            None => get_string_child(child, (IANA_NAMESPACE, "id").into()).map(|x| {
+                if let Some(hex_value) = x.strip_prefix("0x") {
+                    u8::from_str_radix(hex_value, 16)
+                } else if let Some(bin_value) = x.strip_prefix("0b") {
+                    u8::from_str_radix(bin_value, 2)
+                } else if let Some(bin_value) = x.strip_suffix('b') {
+                    u8::from_str_radix(bin_value, 2)
+                } else {
+                    x.parse::<u8>()
+                }
+            }),
+        };
 
         let name_parsed = get_string_child(child, (IANA_NAMESPACE, "name").into());
 

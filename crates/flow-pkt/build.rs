@@ -22,6 +22,8 @@ use std::{env, path::Path};
 const IPFIX_URL: &str = "https://www.iana.org/assignments/ipfix/ipfix.xml";
 const PROTOCOL_NUMBERS_URL: &str =
     "https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xml";
+const PSAMP_PARAMETERS_URL: &str =
+    "https://www.iana.org/assignments/psamp-parameters/psamp-parameters.xml";
 
 fn get_iana_config(
     poll_iana_registry: bool,
@@ -49,6 +51,12 @@ fn get_iana_config(
             String::from("protocol-numbers-1"),
             4,
         ));
+        external_sub_registries.push(ExternalSubRegistrySource::new(
+            RegistrySource::Http(PSAMP_PARAMETERS_URL.to_string()),
+            SubRegistryType::ValueNameDescRegistry,
+            String::from("psamp-parameters-1"),
+            304,
+        ));
         SourceConfig::new(
             RegistrySource::Http(IPFIX_URL.to_string()),
             RegistryType::IanaXML,
@@ -72,11 +80,25 @@ fn get_iana_config(
             .into_string()
             .expect("Couldn't load protocolNumbers registry");
 
+        // Psamp Parameters SubRegistry Path
+        let psamp_parameters_path = sub_registry_path
+            .join("iana_psamp_parameters.xml")
+            .into_os_string()
+            .into_string()
+            .expect("Couldn't load psampParameters registry");
+
         external_sub_registries.push(ExternalSubRegistrySource::new(
             RegistrySource::File(protocol_numbers_path.clone()),
             SubRegistryType::ValueNameDescRegistry,
             String::from("protocol-numbers-1"),
             4,
+        ));
+
+        external_sub_registries.push(ExternalSubRegistrySource::new(
+            RegistrySource::File(psamp_parameters_path.clone()),
+            SubRegistryType::ValueNameDescRegistry,
+            String::from("psamp-parameters-1"),
+            304,
         ));
 
         SourceConfig::new(
