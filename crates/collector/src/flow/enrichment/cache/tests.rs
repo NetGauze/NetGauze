@@ -47,8 +47,12 @@ fn test_enrichment_cache_upsert_new_entry() {
         FieldRef::new(IE::observationPointId, 0),
         WeightedField::new(weight, Field::observationPointId(42)),
     );
-    let expected_peer_metadata = PeerMetadata::from_vec(vec![(scope.into(), expected_fields)]);
-    let expected_cache = EnrichmentCache::from_vec(vec![(ip, expected_peer_metadata)]);
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
 
     // Compare cache after upsert with expected
     assert_eq!(cache, expected_cache);
@@ -79,9 +83,12 @@ fn test_enrichment_cache_upsert_weight_replacement() {
             Field::samplerName("high_priority".to_string().into()),
         ),
     );
-    let expected_peer_metadata =
-        PeerMetadata::from_vec(vec![(scope.clone().into(), expected_fields)]);
-    let expected_cache = EnrichmentCache::from_vec(vec![(ip, expected_peer_metadata)]);
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
 
     assert_eq!(cache, expected_cache);
 }
@@ -112,9 +119,12 @@ fn test_enrichment_cache_upsert_weight_ignored() {
             Field::samplerName("high_priority".to_string().into()),
         ),
     );
-    let expected_peer_metadata =
-        PeerMetadata::from_vec(vec![(scope.clone().into(), expected_fields)]);
-    let expected_cache = EnrichmentCache::from_vec(vec![(ip, expected_peer_metadata)]);
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
 
     assert_eq!(cache, expected_cache);
 }
@@ -140,9 +150,12 @@ fn test_enrichment_cache_upsert_equal_weights() {
         FieldRef::new(IE::samplerName, 0),
         WeightedField::new(weight, Field::samplerName("second".to_string().into())),
     );
-    let expected_peer_metadata =
-        PeerMetadata::from_vec(vec![(scope.clone().into(), expected_fields)]);
-    let expected_cache = EnrichmentCache::from_vec(vec![(ip, expected_peer_metadata)]);
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
 
     assert_eq!(cache, expected_cache);
 }
@@ -187,9 +200,12 @@ fn test_enrichment_cache_delete_by_weight() {
             Field::observationDomainName("OBS_NAME".to_string().into()),
         ),
     );
-    let expected_peer_metadata =
-        PeerMetadata::from_vec(vec![(scope.clone().into(), expected_fields)]);
-    let expected_cache = EnrichmentCache::from_vec(vec![(ip, expected_peer_metadata)]);
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
 
     assert_eq!(cache, expected_cache);
 
@@ -202,9 +218,12 @@ fn test_enrichment_cache_delete_by_weight() {
         FieldRef::new(IE::meteringProcessId, 0),
         WeightedField::new(150, Field::meteringProcessId(42)),
     );
-    let expected_peer_metadata =
-        PeerMetadata::from_vec(vec![(scope.clone().into(), expected_fields)]);
-    let expected_cache = EnrichmentCache::from_vec(vec![(ip, expected_peer_metadata)]);
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
 
     assert_eq!(cache, expected_cache);
 }
@@ -225,9 +244,12 @@ fn test_enrichment_cache_delete_empty_scope_cleanup() {
         FieldRef::new(IE::samplerName, 0),
         WeightedField::new(50, Field::samplerName("test".to_string().into())),
     );
-    let expected_peer_metadata =
-        PeerMetadata::from_vec(vec![(scope.clone().into(), expected_fields)]);
-    let expected_cache = EnrichmentCache::from_vec(vec![(ip, expected_peer_metadata)]);
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
 
     assert_eq!(cache, expected_cache);
 
@@ -235,7 +257,7 @@ fn test_enrichment_cache_delete_empty_scope_cleanup() {
     cache.delete(ip, scope.clone(), 100);
 
     // Create expected cache after delete (empty)
-    let expected_cache = EnrichmentCache::from_vec(vec![]);
+    let expected_cache: EnrichmentCache = vec![].into();
 
     assert_eq!(cache, expected_cache);
 }
@@ -248,7 +270,7 @@ fn test_enrichment_cache_delete_nonexistent() {
 
     // Delete from empty cache should not panic
     cache.delete(ip, scope, 100);
-    let expected_cache = EnrichmentCache::from_vec(vec![]);
+    let expected_cache: EnrichmentCache = vec![].into();
     assert_eq!(cache, expected_cache);
 }
 
@@ -261,7 +283,12 @@ fn test_enrichment_cache_apply_enrichment_operations() {
 
     // Apply upsert operation
     let fields = vec![Field::samplerName("test_sampler".to_string().into())];
-    let upsert_op = EnrichmentOperation::new_upsert(ip, scope.clone(), weight, fields.clone());
+    let upsert_op = EnrichmentOperation::Upsert {
+        ip,
+        scope: scope.clone(),
+        weight,
+        fields: fields.clone(),
+    };
     cache.apply_enrichment(upsert_op);
 
     // Create expected cache
@@ -273,17 +300,24 @@ fn test_enrichment_cache_apply_enrichment_operations() {
             Field::samplerName("test_sampler".to_string().into()),
         ),
     );
-    let expected_peer_metadata =
-        PeerMetadata::from_vec(vec![(scope.clone().into(), expected_fields)]);
-    let mut expected_cache = EnrichmentCache::from_vec(vec![(ip, expected_peer_metadata)]);
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
     assert_eq!(cache, expected_cache);
 
     // Apply delete operation
-    let delete_op = EnrichmentOperation::new_delete(ip, scope, 200);
+    let delete_op = EnrichmentOperation::Delete {
+        ip,
+        scope,
+        weight: 200,
+    };
     cache.apply_enrichment(delete_op);
 
     // Create expected cache after delete operation (empty)
-    expected_cache = EnrichmentCache::from_vec(vec![]);
+    let expected_cache: EnrichmentCache = vec![].into();
     assert_eq!(cache, expected_cache);
 }
 
@@ -450,7 +484,7 @@ fn test_peer_metadata_get_enrichment_fields_simple() {
         WeightedField::new(100, Field::samplerName("global_sampler".to_string().into())),
     );
 
-    let peer_metadata = PeerMetadata::from_vec(vec![(global_scope, fields_map)]);
+    let peer_metadata = PeerMetadata(vec![(global_scope, fields_map)].into_iter().collect());
 
     let incoming_fields = vec![
         Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
@@ -486,10 +520,14 @@ fn test_peer_metadata_get_enrichment_fields_multiple_scopes_matching() {
         WeightedField::new(100, Field::observationPointId(123)),
     );
 
-    let peer_metadata = PeerMetadata::from_vec(vec![
-        (global_scope, global_fields),
-        (specific_scope, specific_fields),
-    ]);
+    let peer_metadata = PeerMetadata(
+        vec![
+            (global_scope, global_fields),
+            (specific_scope, specific_fields),
+        ]
+        .into_iter()
+        .collect(),
+    );
 
     let incoming_fields = vec![Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))];
 
@@ -547,12 +585,16 @@ fn test_peer_metadata_get_enrichment_fields_multiple_scopes_some_matching() {
         WeightedField::new(100, Field::udpExID(29)),
     );
 
-    let peer_metadata = PeerMetadata::from_vec(vec![
-        (global_scope, global_fields_map),
-        (specific_obs_id_scope, specific_obs_id_map),
-        (specific_obs_id_scope_nomatch, specific_obs_id_nomatch_map),
-        (specific_scope, specific_fields_map),
-    ]);
+    let peer_metadata = PeerMetadata(
+        vec![
+            (global_scope, global_fields_map),
+            (specific_obs_id_scope, specific_obs_id_map),
+            (specific_obs_id_scope_nomatch, specific_obs_id_nomatch_map),
+            (specific_scope, specific_fields_map),
+        ]
+        .into_iter()
+        .collect(),
+    );
 
     let incoming_fields = vec![
         Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
@@ -617,11 +659,15 @@ fn test_peer_metadata_get_enrichment_fields_weight_priority() {
         ),
     );
 
-    let peer_metadata = PeerMetadata::from_vec(vec![
-        (global_scope.clone(), global_fields),
-        (specific_scope.clone(), specific_fields),
-        (more_specific_scope.clone(), more_specific_fields),
-    ]);
+    let peer_metadata = PeerMetadata(
+        vec![
+            (global_scope.clone(), global_fields),
+            (specific_scope.clone(), specific_fields),
+            (more_specific_scope.clone(), more_specific_fields),
+        ]
+        .into_iter()
+        .collect(),
+    );
 
     let incoming_fields = vec![
         Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
@@ -641,13 +687,15 @@ fn test_peer_metadata_get_enrichment_fields_weight_priority() {
 
     // Delete the global_sampler entry
     let ip = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
-    let mut cache = EnrichmentCache::from_vec(vec![(ip, peer_metadata)]);
+    let mut cache: EnrichmentCache = vec![(ip, peer_metadata)].into();
     cache.delete(ip, (&global_scope).into(), 201); // weight 201 > 200 --> delete
 
     // Get enrichment fields and compare (specific_sampler wins since has higher
     // weight)
     let enrichment_fields = cache
-        .get_or_create_peer_metadata(ip)
+        .0
+        .entry(ip)
+        .or_insert_with(PeerMetadata::new)
         .get_enrichment_fields(1000, &incoming_fields);
     let expected_enrichment_fields = Some(vec![Field::samplerName(
         "specific_sampler".to_string().into(),
@@ -660,7 +708,9 @@ fn test_peer_metadata_get_enrichment_fields_weight_priority() {
     // Get enrichment fields and compare (more_specific_sampler is now the only
     // matching scope left)
     let enrichment_fields = cache
-        .get_or_create_peer_metadata(ip)
+        .0
+        .entry(ip)
+        .or_insert_with(PeerMetadata::new)
         .get_enrichment_fields(1000, &incoming_fields);
     let expected_enrichment_fields = Some(vec![Field::samplerName(
         "more_specific_sampler".to_string().into(),
@@ -719,11 +769,15 @@ fn test_peer_metadata_get_enrichment_fields_same_weight_specificity_tiebreaker()
         ),
     );
 
-    let peer_metadata = PeerMetadata::from_vec(vec![
-        (global_scope, global_fields),
-        (specific_scope, specific_fields),
-        (more_specific_scope, more_specific_fields),
-    ]);
+    let peer_metadata = PeerMetadata(
+        vec![
+            (global_scope, global_fields),
+            (specific_scope, specific_fields),
+            (more_specific_scope, more_specific_fields),
+        ]
+        .into_iter()
+        .collect(),
+    );
 
     let incoming_fields = vec![
         Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
@@ -768,7 +822,7 @@ fn test_peer_metadata_get_enrichment_fields_no_matches() {
         WeightedField::new(100, Field::samplerName("test_sampler".to_string().into())),
     );
 
-    let peer_metadata = PeerMetadata::from_vec(vec![(scope, fields_map)]);
+    let peer_metadata = PeerMetadata(vec![(scope, fields_map)].into_iter().collect());
 
     let incoming_fields = vec![
         Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
