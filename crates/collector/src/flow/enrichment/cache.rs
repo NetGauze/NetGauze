@@ -55,59 +55,31 @@ use std::{
 };
 use tracing::debug;
 
-mod debug_utils;
-
 /// Main enrichment cache storing peer metadata indexed by IP address.
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) struct EnrichmentCache(FxHashMap<IpAddr, PeerMetadata>);
+pub struct EnrichmentCache(FxHashMap<IpAddr, PeerMetadata>);
 
 impl EnrichmentCache {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self(FxHashMap::with_hasher(FxBuildHasher))
     }
 
-    #[cfg(test)]
-    pub(crate) fn from_vec(vec: Vec<(IpAddr, PeerMetadata)>) -> Self {
-        let mut cache = Self::new();
-        for (ip, metadata) in vec {
-            cache.0.insert(ip, metadata);
-        }
-        cache
-    }
-
-    pub(crate) fn get(&self, ip: &IpAddr) -> Option<&PeerMetadata> {
+    pub fn get(&self, ip: &IpAddr) -> Option<&PeerMetadata> {
         self.0.get(ip)
     }
 
-    pub(crate) fn get_mut(&mut self, ip: &IpAddr) -> Option<&mut PeerMetadata> {
+    pub fn get_mut(&mut self, ip: &IpAddr) -> Option<&mut PeerMetadata> {
         self.0.get_mut(ip)
     }
 
     /// Get the number of peer IPs with cached metadata entries.
-    pub(crate) fn peer_count(&self) -> usize {
+    pub fn peer_count(&self) -> usize {
         self.0.len()
-    }
-
-    /// Get or create peer metadata for the given IP address.
-    ///
-    /// Returns a mutable reference to the peer metadata, creating a new entry
-    /// with an empty BTreeMap if one doesn't already exist.
-    pub(crate) fn get_or_create_peer_metadata(&mut self, ip: IpAddr) -> &mut PeerMetadata {
-        self.0.entry(ip).or_insert_with(|| {
-            debug!("Creating new peer metadata cache entry for ip={}", ip);
-            PeerMetadata::new()
-        })
-    }
-
-    // Remove peer metadata from the cache for the given IP address.
-    pub(crate) fn remove(&mut self, ip: &IpAddr) -> Option<PeerMetadata> {
-        debug!("Deleting peer metadata cache entry for ip={}", ip);
-        self.0.remove(ip)
     }
 
     /// Get enrichment fields for the given peer IP, observation ID and incoming
     /// fields.
-    pub(crate) fn get_enrichment_fields(
+    pub fn get_enrichment_fields(
         &self,
         peer_ip: &IpAddr,
         obs_domain_id: u32,
@@ -119,7 +91,9 @@ impl EnrichmentCache {
     }
 
     /// Apply an enrichment operation (upsert or delete) to the cache.
-    pub(crate) fn apply_enrichment(&mut self, op: EnrichmentOperation) {
+    pub fn apply_enrichment(&mut self, op: EnrichmentOperation) {
+        debug!("Apply enrichment operation: {op}");
+
         match op {
             EnrichmentOperation::Upsert {
                 ip,
@@ -127,17 +101,9 @@ impl EnrichmentCache {
                 weight,
                 fields,
             } => {
-                debug!(
-                    "Applying upsert operation for ip={}, scope={}, weight={}, incoming_fields={:?}",
-                    ip, scope, weight, fields
-                );
                 self.upsert(ip, scope, weight, fields);
             }
             EnrichmentOperation::Delete { ip, scope, weight } => {
-                debug!(
-                    "Applying delete operation for ip={}, scope={}, weight={}",
-                    ip, scope, weight
-                );
                 self.delete(ip, scope, weight);
             }
         }
@@ -150,24 +116,27 @@ impl EnrichmentCache {
     /// fields replace lower weight ones. Equal weights favor the incoming
     /// field.
     fn upsert(&mut self, ip: IpAddr, scope: Scope, weight: Weight, incoming_fields: Vec<Field>) {
-        let peer_metadata = self.get_or_create_peer_metadata(ip);
-
-        // Index incoming fields with FieldRef and create WeightedField entries
+        // Index incoming fields with FieldRef and store as WeightedField entries
         let indexed_incoming: FxHashMap<FieldRef, WeightedField> =
-            FieldRef::map_fields_into_fxhashmap_owned(&incoming_fields)
-                .into_iter()
-                .map(|(field_ref, field)| (field_ref, WeightedField::new(weight, field)))
-                .collect();
+            FieldRef::map_fields(&incoming_fields, |field_ref, field| {
+                (field_ref, WeightedField::new(weight, field.clone()))
+            });
 
-        match peer_metadata.map.entry(scope.clone().into()) {
-            btree_map::Entry::Occupied(mut entry) => {
-                let curr_fields = entry.get_mut();
+        // Get or create PeerMetadata instance
+        let peer_metadata = self.0.entry(ip).or_insert_with(|| {
+            debug!("Creating new peer metadata cache entry for ip={}", ip);
+            PeerMetadata::new()
+        });
+
+        match peer_metadata.0.entry(scope.clone().into()) {
+            btree_map::Entry::Occupied(mut scoped_enrichment_fields) => {
+                let scoped_enrichment_fields = scoped_enrichment_fields.get_mut();
 
                 for (field_ref, weighted_field) in indexed_incoming {
-                    // Check if field with same IE already exists
-                    match curr_fields.entry(field_ref) {
-                        hash_map::Entry::Occupied(mut occupied) => {
-                            let curr_weight = occupied.get().weight;
+                    // Check if field already exists
+                    match scoped_enrichment_fields.entry(field_ref) {
+                        hash_map::Entry::Occupied(mut enrichment_fields) => {
+                            let curr_weight = enrichment_fields.get().weight();
                             if weight >= curr_weight {
                                 debug!(
                                     "Replacing field[{}] in metadata for ip={}, scope={}, weight {}->{}",
@@ -177,7 +146,7 @@ impl EnrichmentCache {
                                     curr_weight,
                                     weight,
                                 );
-                                occupied.insert(weighted_field);
+                                enrichment_fields.insert(weighted_field);
                             } else {
                                 debug!(
                                     "Ignoring lower weight field[{}] in metadata for ip={}, scope={}, weight: {}<{}",
@@ -189,7 +158,7 @@ impl EnrichmentCache {
                                 );
                             }
                         }
-                        hash_map::Entry::Vacant(vacant) => {
+                        hash_map::Entry::Vacant(enrichment_fields) => {
                             debug!(
                                 "Adding new field[{}] in metadata for ip={}, scope={}, weight={}",
                                 field_ref.ie(),
@@ -197,7 +166,7 @@ impl EnrichmentCache {
                                 scope,
                                 weight
                             );
-                            vacant.insert(weighted_field);
+                            enrichment_fields.insert(weighted_field);
                         }
                     }
                 }
@@ -222,7 +191,7 @@ impl EnrichmentCache {
     /// automatically.
     fn delete(&mut self, ip: IpAddr, scope: Scope, weight: Weight) {
         if let Some(peer_metadata) = self.get_mut(&ip) {
-            match peer_metadata.map.entry(scope.clone().into()) {
+            match peer_metadata.0.entry(scope.clone().into()) {
                 btree_map::Entry::Occupied(mut occupied) => {
                     let current_fields = occupied.get_mut();
 
@@ -245,9 +214,9 @@ impl EnrichmentCache {
                             scope, ip
                         );
 
-                        if peer_metadata.map.is_empty() {
+                        if peer_metadata.0.is_empty() {
                             debug!("Cache now empty for ip={}, cleaning up...", ip);
-                            self.remove(&ip);
+                            self.0.remove(&ip);
                         } else {
                             debug!("Updated cache for {ip}: \n{}", peer_metadata)
                         }
@@ -266,151 +235,13 @@ impl EnrichmentCache {
     }
 }
 
-/// Hierarchical metadata storage for a single peer, organized by scope.
-///
-/// Metadata is stored in a BTreeMap keyed by IndexedScope to ensure
-/// consistent ordering from global to specific scopes during lookups.
-/// Each scope contains a map of fields indexed by FieldRef for efficient
-/// access.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct PeerMetadata {
-    map: BTreeMap<IndexedScope, FxHashMap<FieldRef, WeightedField>>,
-}
-impl PeerMetadata {
-    pub(crate) fn new() -> Self {
-        Self {
-            map: BTreeMap::new(),
+impl From<Vec<(IpAddr, PeerMetadata)>> for EnrichmentCache {
+    fn from(value: Vec<(IpAddr, PeerMetadata)>) -> Self {
+        let mut cache = FxHashMap::with_capacity_and_hasher(value.len(), FxBuildHasher);
+        for (ip, metadata) in value {
+            cache.insert(ip, metadata);
         }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn from_vec(vec: Vec<(IndexedScope, FxHashMap<FieldRef, WeightedField>)>) -> Self {
-        let mut metadata = Self::new();
-        for (scope, fields) in vec {
-            metadata.map.insert(scope, fields);
-        }
-        metadata
-    }
-
-    pub(crate) fn map(&self) -> &BTreeMap<IndexedScope, FxHashMap<FieldRef, WeightedField>> {
-        &self.map
-    }
-
-    /// Check if a scope matches the incoming observation domain ID and fields.
-    ///
-    /// A scope matches if:
-    /// - The observation domain ID matches (or scope has ID 0 for
-    ///   global/system)
-    /// - All scope fields exactly match corresponding incoming fields
-    #[inline]
-    fn scope_matches(
-        scope: &IndexedScope,
-        incoming_obs_id: u32,
-        incoming_fields: &FxHashMap<FieldRef, &Field>,
-    ) -> bool {
-        if scope.obs_domain_id != 0 && scope.obs_domain_id != incoming_obs_id {
-            return false;
-        }
-
-        scope.scope_fields.iter().all(|(field_ref, field)| {
-            incoming_fields
-                .get(field_ref)
-                .is_some_and(|incoming| field == *incoming)
-        })
-    }
-
-    /// Extract enrichment fields for the given observation ID and incoming
-    /// fields.
-    ///
-    /// Iterates through all scopes in order (global to specific) and collects
-    /// matching fields. For duplicate field types across scopes, returns the
-    /// highest weight field, with equal weights favoring more specific scopes.
-    ///
-    /// As an example, consider the following PeerMetadata entries:
-    /// - Scope {obs_domain_id: 0, scope_fields: []} ->
-    ///   \[samplerName("global_sampler")\], weight 64
-    /// - Scope {obs_domain_id: 2000, scope_fields: \[selectorId(1)\]} -> ->
-    ///   \[samplerName("specific_sampler")\], weight 16
-    ///
-    /// Given inputs incoming_obs_id: 2000, and incoming_fields: \[bytes(600),
-    /// selectorId(1)\] => the return will be \[samplerName("global_sampler")\]
-    /// even though a more specific scope would exist, due to the higher weight.
-    pub(crate) fn get_enrichment_fields(
-        &self,
-        incoming_obs_id: u32,
-        incoming_fields: &[Field],
-    ) -> Option<Vec<Field>> {
-        debug!(
-            "Getting enrichment fields for obs_id={}, incoming_fields={:?}",
-            incoming_obs_id, incoming_fields
-        );
-
-        if self.map.is_empty() {
-            debug!("No scopes available for enrichment");
-            return None;
-        }
-
-        // Store incoming fields indexed by FieldRef (IE, index)
-        let fields_map = FieldRef::map_fields_into_fxhashmap(incoming_fields);
-
-        // Map to temporarily store enrichment fields
-        // (needed due to possible weight based field overwrites)
-        let mut enrichment_fields: FxHashMap<FieldRef, &WeightedField> =
-            FxHashMap::with_capacity_and_hasher(16, FxBuildHasher);
-
-        // Iterating from global to more specific scopes (thanks to BTreeMap)
-        for (scope, metadata) in self
-            .map()
-            .iter()
-            .filter(|(scope, _)| Self::scope_matches(scope, incoming_obs_id, &fields_map))
-        {
-            debug!(
-                "Scope {} matches incoming data!",
-                Into::<Scope>::into(scope)
-            );
-
-            for (field_ref, field) in metadata {
-                match enrichment_fields.entry(*field_ref) {
-                    hash_map::Entry::Occupied(mut best) => {
-                        let curr_weight = best.get().weight();
-                        if field.weight >= curr_weight {
-                            debug!(
-                                "Overriding field {:?} with higher/equal weight: {} >= {}",
-                                field.field(),
-                                field.weight(),
-                                curr_weight,
-                            );
-                            best.insert(field);
-                        }
-                    }
-                    hash_map::Entry::Vacant(best) => {
-                        debug!(
-                            "Selecting field {:?} with weight: {}",
-                            field.field(),
-                            field.weight(),
-                        );
-                        best.insert(field);
-                    }
-                }
-            }
-        }
-
-        if enrichment_fields.is_empty() {
-            debug!("No matching fields found for enrichment");
-            return None;
-        } else {
-            debug!(
-                "Enrichment fields retrieved based on scope matches:\n{}",
-                debug_utils::format_fields_table(&enrichment_fields)
-            );
-        }
-
-        Some(
-            enrichment_fields
-                .values()
-                .map(|weighted_field| weighted_field.field().clone())
-                .collect::<Vec<_>>(),
-        )
+        Self(cache)
     }
 }
 
@@ -419,14 +250,14 @@ impl PeerMetadata {
 /// Converts scope fields into a sorted slice of (FieldRef, Field) pairs
 /// for efficient comparison during scope matching operations.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub(crate) struct IndexedScope {
+struct IndexedScope {
     obs_domain_id: u32,
     scope_fields: Box<[(FieldRef, Field)]>,
 }
 
 impl IndexedScope {
     #[cfg(test)]
-    pub(crate) fn new(obs_domain_id: u32, scope_fields: Vec<(FieldRef, Field)>) -> Self {
+    fn new(obs_domain_id: u32, scope_fields: Vec<(FieldRef, Field)>) -> Self {
         Self {
             obs_domain_id,
             scope_fields: scope_fields.into_boxed_slice(),
@@ -473,19 +304,355 @@ impl From<&IndexedScope> for Scope {
 /// enabling the cache to resolve conflicts when multiple sources
 /// provide the same field type.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub(crate) struct WeightedField {
+struct WeightedField {
     weight: Weight,
     field: Field,
 }
 impl WeightedField {
-    pub(crate) fn new(weight: Weight, field: Field) -> Self {
+    fn new(weight: Weight, field: Field) -> Self {
         Self { weight, field }
     }
-    pub(crate) fn weight(&self) -> Weight {
+    fn weight(&self) -> Weight {
         self.weight
     }
-    pub(crate) fn field(&self) -> &Field {
+    fn field(&self) -> &Field {
         &self.field
+    }
+}
+
+/// Hierarchical metadata storage for a single peer, organized by scope.
+///
+/// Metadata is stored in a BTreeMap keyed by IndexedScope to ensure
+/// consistent ordering from global to specific scopes during lookups.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PeerMetadata(BTreeMap<IndexedScope, IndexedMetadata>);
+impl PeerMetadata {
+    fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+
+    /// Check if a scope matches the incoming observation domain ID and fields.
+    ///
+    /// A scope matches if:
+    /// - The observation domain ID matches (or scope has ID 0 for
+    ///   global/system)
+    /// - All scope fields exactly match corresponding incoming fields
+    #[inline]
+    fn scope_matches(
+        scope: &IndexedScope,
+        incoming_obs_id: u32,
+        incoming_fields: &FxHashMap<FieldRef, &Field>,
+    ) -> bool {
+        if scope.obs_domain_id != 0 && scope.obs_domain_id != incoming_obs_id {
+            return false;
+        }
+
+        scope.scope_fields.iter().all(|(field_ref, field)| {
+            incoming_fields
+                .get(field_ref)
+                .is_some_and(|incoming| field == *incoming)
+        })
+    }
+
+    /// Extract enrichment fields for the given observation ID and incoming
+    /// fields.
+    ///
+    /// Iterates through all scopes in order (global to specific) and collects
+    /// matching fields. For duplicate field types across scopes, returns the
+    /// highest weight field, with equal weights favoring more specific scopes.
+    ///
+    /// As an example, consider the following PeerMetadata entries:
+    /// - Scope {obs_domain_id: 0, scope_fields: []} ->
+    ///   \[samplerName("global_sampler")\], weight 64
+    /// - Scope {obs_domain_id: 2000, scope_fields: \[selectorId(1)\]} -> ->
+    ///   \[samplerName("specific_sampler")\], weight 16
+    ///
+    /// Given inputs incoming_obs_id: 2000, and incoming_fields: \[bytes(600),
+    /// selectorId(1)\] => the return will be \[samplerName("global_sampler")\]
+    /// even though a more specific scope would exist, due to the higher weight.
+    fn get_enrichment_fields(
+        &self,
+        incoming_obs_id: u32,
+        incoming_fields: &[Field],
+    ) -> Option<Vec<Field>> {
+        debug!(
+            "Getting enrichment fields for obs_id={}, incoming_fields={:?}",
+            incoming_obs_id, incoming_fields
+        );
+
+        if self.0.is_empty() {
+            debug!("No scopes available for enrichment");
+            return None;
+        }
+
+        // Store incoming fields indexed by FieldRef (IE, index)
+        let fields_map = FieldRef::map_fields_into_fxhashmap(incoming_fields);
+
+        // Map to temporarily store enrichment fields
+        // (needed due to possible weight based field overwrites)
+        let mut enrichment_fields: FxHashMap<FieldRef, &WeightedField> =
+            FxHashMap::with_capacity_and_hasher(16, FxBuildHasher);
+
+        // Iterating from global to more specific scopes (thanks to BTreeMap)
+        for (scope, metadata) in self
+            .0
+            .iter()
+            .filter(|(scope, _)| Self::scope_matches(scope, incoming_obs_id, &fields_map))
+        {
+            debug!(
+                "Scope {} matches incoming data!",
+                Into::<Scope>::into(scope)
+            );
+
+            for (field_ref, field) in metadata {
+                match enrichment_fields.entry(*field_ref) {
+                    hash_map::Entry::Occupied(mut best) => {
+                        let curr_weight = best.get().weight();
+                        if field.weight >= curr_weight {
+                            debug!(
+                                "Overriding field {:?} with higher/equal weight: {} >= {}",
+                                field.field(),
+                                field.weight(),
+                                curr_weight,
+                            );
+                            best.insert(field);
+                        }
+                    }
+                    hash_map::Entry::Vacant(best) => {
+                        debug!(
+                            "Selecting field {:?} with weight: {}",
+                            field.field(),
+                            field.weight(),
+                        );
+                        best.insert(field);
+                    }
+                }
+            }
+        }
+
+        if enrichment_fields.is_empty() {
+            debug!("No matching fields found for enrichment");
+            return None;
+        } else {
+            debug!(
+                "Enrichment fields retrieved based on scope matches:\n{}",
+                format_indexed_metadata(&enrichment_fields)
+            );
+        }
+
+        Some(
+            enrichment_fields
+                .values()
+                .map(|weighted_field| weighted_field.field().clone())
+                .collect::<Vec<_>>(),
+        )
+    }
+}
+
+impl AsRef<BTreeMap<IndexedScope, IndexedMetadata>> for PeerMetadata {
+    fn as_ref(&self) -> &BTreeMap<IndexedScope, IndexedMetadata> {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for PeerMetadata {
+    /// Formats PeerMetadata as a markdown-style table for debug logging
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.as_ref().is_empty() {
+            return writeln!(f, "No metadata");
+        }
+
+        // Calculate column widths
+        let max_scope_width = self
+            .as_ref()
+            .keys()
+            .take(10)
+            .map(|scope| Into::<Scope>::into(scope).to_string().len())
+            .max()
+            .unwrap_or(40)
+            .max(40);
+        let max_field_width = self
+            .as_ref()
+            .values()
+            .take(10)
+            .flat_map(|field_map| {
+                field_map.values().map(|w_fld| {
+                    let field_display = format!("{:?}", w_fld.field());
+                    field_display.len()
+                })
+            })
+            .max()
+            .unwrap_or(40)
+            .max(40);
+        let max_index_width = 6;
+        let max_weight_width = 6;
+
+        // Header
+        writeln!(
+            f,
+            "| {:<width_scope$} | {:<width_field$} | {:<width_index$} | {:<width_weight$} |",
+            "Scope",
+            "Fields",
+            "Index",
+            "Weight",
+            width_scope = max_scope_width,
+            width_field = max_field_width,
+            width_index = max_index_width,
+            width_weight = max_weight_width
+        )?;
+
+        // Separator
+        writeln!(
+            f,
+            "|{:-<width_scope$}|{:-<width_field$}|{:-<width_index$}|{:-<width_weight$}|",
+            "",
+            "",
+            "",
+            "",
+            width_scope = max_scope_width + 2,
+            width_field = max_field_width + 2,
+            width_index = max_index_width + 2,
+            width_weight = max_weight_width + 2
+        )?;
+
+        // Data rows grouped by scope
+        let mut first_scope = true;
+        for (scope, fields) in self.as_ref() {
+            // Add separator between scopes (except before the first one)
+            if !first_scope {
+                writeln!(
+                    f,
+                    "|{:-<width_scope$}|{:-<width_field$}|{:-<width_index$}|{:-<width_weight$}|",
+                    "",
+                    "",
+                    "",
+                    "",
+                    width_scope = max_scope_width + 2,
+                    width_field = max_field_width + 2,
+                    width_index = max_index_width + 2,
+                    width_weight = max_weight_width + 2
+                )?;
+            }
+            first_scope = false;
+
+            if fields.is_empty() {
+                writeln!(
+                    f,
+                    "| {:<width_scope$} | {:<width_field$} | {:<width_index$} | {:<width_weight$} |",
+                    Into::<Scope>::into(scope).to_string(),
+                    "No fields",
+                    "--",
+                    "--",
+                    width_scope = max_scope_width,
+                    width_field = max_field_width,
+                    width_index = max_index_width,
+                    width_weight = max_weight_width
+                )?;
+            } else {
+                let mut first_field = true;
+                for (field_ref, metadata_field) in fields {
+                    let field_display = format!("{:?}", metadata_field.field());
+                    let field_truncated = if field_display.len() > max_field_width {
+                        format!("{}...", &field_display[..max_field_width - 3])
+                    } else {
+                        field_display
+                    };
+
+                    // Only show scope on the first row of each scope group
+                    let scope_display = if first_field {
+                        Into::<Scope>::into(scope).to_string()
+                    } else {
+                        "".to_string()
+                    };
+
+                    writeln!(f,
+                        "| {:<width_scope$} | {:<width_field$} | {:<width_index$} | {:<width_weight$} |",
+                        scope_display,
+                        field_truncated,
+                        field_ref.index(),
+                        metadata_field.weight(),
+                        width_scope = max_scope_width,
+                        width_field = max_field_width,
+                        width_index = max_index_width,
+                        width_weight = max_weight_width
+                    )?;
+
+                    first_field = false;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// A hash map that indexes enrichment fields by their reference for fast
+/// lookup.
+type IndexedMetadata = FxHashMap<FieldRef, WeightedField>;
+
+/// Formats IndexedMetadata as a markdown-style table for debug logging
+fn format_indexed_metadata(enrichment_fields: &FxHashMap<FieldRef, &WeightedField>) -> String {
+    if enrichment_fields.is_empty() {
+        "No enrichment fields found".to_string()
+    } else {
+        // Calculate column widths
+        let max_field_width = enrichment_fields
+            .values()
+            .map(|weighted_field| format!("{:?}", weighted_field.field()).len())
+            .max()
+            .unwrap_or(60)
+            .max(60);
+        let max_index_width = enrichment_fields
+            .keys()
+            .map(|field_ref| field_ref.index().to_string().len())
+            .max()
+            .unwrap_or(5)
+            .max(5);
+        let max_weight_width = enrichment_fields
+            .values()
+            .map(|weighted_field| weighted_field.weight().to_string().len())
+            .max()
+            .unwrap_or(6)
+            .max(6);
+
+        let mut output = String::new();
+
+        // Header
+        output.push_str(&format!(
+            "| {:<width_field$} | {:<width_index$} | {:<width_weight$} |\n",
+            "Field",
+            "Index",
+            "Weight",
+            width_field = max_field_width,
+            width_index = max_index_width,
+            width_weight = max_weight_width
+        ));
+
+        // Separator
+        output.push_str(&format!(
+            "|{:-<width_field$}|{:-<width_index$}|{:-<width_weight$}|\n",
+            "",
+            "",
+            "",
+            width_field = max_field_width + 2,
+            width_index = max_index_width + 2,
+            width_weight = max_weight_width + 2
+        ));
+
+        // Data rows
+        for (field_ref, weighted_field) in enrichment_fields {
+            output.push_str(&format!(
+                "| {:<width_field$} | {:<width_index$} | {:<width_weight$} |\n",
+                format!("{:?}", weighted_field.field()),
+                field_ref.index(),
+                weighted_field.weight(),
+                width_field = max_field_width,
+                width_index = max_index_width,
+                width_weight = max_weight_width
+            ));
+        }
+
+        output
     }
 }
 

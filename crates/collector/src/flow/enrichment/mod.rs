@@ -25,34 +25,21 @@ use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
 /// Operations to update or delete enrichment data
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum_macros::Display)]
 pub enum EnrichmentOperation {
+    #[strum(to_string = "Upsert(ip={ip}, scope={scope}, weight={weight}, fields={fields:?})")]
     Upsert {
         ip: IpAddr,
         scope: Scope,
         weight: Weight,
         fields: Vec<Field>,
     },
+    #[strum(to_string = "Delete(ip={ip}, scope={scope}, weight={weight})")]
     Delete {
         ip: IpAddr,
         scope: Scope,
         weight: Weight,
     },
-}
-
-impl EnrichmentOperation {
-    pub fn new_upsert(ip: IpAddr, scope: Scope, weight: Weight, fields: Vec<Field>) -> Self {
-        Self::Upsert {
-            ip,
-            scope,
-            weight,
-            fields,
-        }
-    }
-
-    pub fn new_delete(ip: IpAddr, scope: Scope, weight: Weight) -> Self {
-        Self::Delete { ip, scope, weight }
-    }
 }
 
 /// Weight helper type
@@ -80,5 +67,17 @@ impl Scope {
     }
     pub fn scope_fields(&self) -> Option<&Vec<Field>> {
         self.scope_fields.as_ref()
+    }
+}
+
+impl std::fmt::Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_global() {
+            write!(f, "[SYSTEM]")
+        } else if let Some(ref fields) = self.scope_fields() {
+            write!(f, "obs_id({})+{:?}", self.obs_domain_id(), fields)
+        } else {
+            write!(f, "[obs_id={}]", self.obs_domain_id())
+        }
     }
 }

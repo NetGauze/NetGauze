@@ -158,7 +158,12 @@ impl FlowOptionsActor {
 
                                             // Construct enrichment operation from options data
                                             let scope = Scope::new(pkt.observation_domain_id(), Some(record.scope_fields().to_vec()));
-                                            let op = EnrichmentOperation::new_upsert(peer.ip(), scope, 16, record.fields().to_vec());
+                                            let op = EnrichmentOperation::Upsert {
+                                                ip: peer.ip(),
+                                                scope,
+                                                weight: 16,
+                                                fields: record.fields().to_vec(),
+                                            };
 
                                             debug!("Sending Enrichment Operation: \n{op}");
                                             for handle in &self.enrichment_handles {
