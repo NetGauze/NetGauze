@@ -248,21 +248,12 @@ impl UdpNotifSupervisor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum UdpNotifSupervisorHandleError {
+    #[strum(to_string = "error sending command to supervisor")]
     SendError,
+    #[strum(to_string = "error receiving response from supervisor")]
     ReceiveError,
-}
-
-impl std::fmt::Display for UdpNotifSupervisorHandleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Self::SendError => write!(f, "error sending command to supervisor"),
-            Self::ReceiveError => {
-                write!(f, "error receiving response from supervisor")
-            }
-        }
-    }
 }
 
 impl std::error::Error for UdpNotifSupervisorHandleError {

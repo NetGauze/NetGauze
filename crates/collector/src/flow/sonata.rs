@@ -90,21 +90,14 @@ pub struct KafkaConsumerConfig {
     pub consumer_config: HashMap<String, String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum SonataActorError {
+    #[strum(to_string = "Kafka error: {0}")]
     KafkaError(KafkaError),
+    #[strum(to_string = "UTF8 error: {0}")]
     Utf8Error(Utf8Error),
+    #[strum(to_string = "JSON serde error: {0}")]
     JsonError(serde_json::Error),
-}
-
-impl std::fmt::Display for SonataActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::KafkaError(e) => write!(f, "Kafka error: {e}"),
-            SonataActorError::Utf8Error(err) => write!(f, "UTF8 Error: {err}"),
-            SonataActorError::JsonError(err) => write!(f, "JSON serde Error: {err}"),
-        }
-    }
 }
 
 impl std::error::Error for SonataActorError {}

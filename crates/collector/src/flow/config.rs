@@ -534,30 +534,23 @@ fn ie_avro_type(ie: IE) -> AvroValueKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum_macros::Display)]
 pub enum FunctionError {
+    #[strum(to_string = "Field conversion error: {0}")]
     FieldConversionError(FieldConversionError),
+    #[strum(to_string = "Field index not found: {0}")]
     FieldIndexNotFound(usize),
+    #[strum(to_string = "Unexpected field: {0}")]
     UnexpectedField(ie::Field),
+    #[strum(to_string = "Field is null: {0}")]
     FieldIsNull(String),
+    #[strum(to_string = "Unsupported flow type: {0}")]
     UnsupportedFlowType(String),
 }
 
 impl From<FieldConversionError> for FunctionError {
     fn from(value: FieldConversionError) -> Self {
         Self::FieldConversionError(value)
-    }
-}
-
-impl std::fmt::Display for FunctionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FieldConversionError(err) => write!(f, "Field Conversion Error: {err}"),
-            Self::FieldIndexNotFound(index) => write!(f, "Field Index Not Found: {index}"),
-            Self::UnexpectedField(field) => write!(f, "Unexpected field: {field}"),
-            Self::FieldIsNull(name) => write!(f, "field is null {name}"),
-            Self::UnsupportedFlowType(flow_type) => write!(f, "Unsupported flow type: {flow_type}"),
-        }
     }
 }
 

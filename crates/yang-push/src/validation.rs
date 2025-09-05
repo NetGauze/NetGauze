@@ -91,29 +91,16 @@ enum ValidationActorCommand {
     Shutdown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, strum_macros::Display)]
 pub enum ValidationActorError {
+    #[strum(to_string = "error in Yang Push receive channel")]
     YangPushReceiveError,
+    #[strum(to_string = "received Yang Push Notification without content")]
     NotificationWithoutContent,
+    #[strum(to_string = "failed to serialize UDP-Notif payload")]
     PayloadSerializationError,
+    #[strum(to_string = "failed to validate UDP-Notif payload")]
     PayloadValidationError,
-}
-
-impl std::fmt::Display for ValidationActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::YangPushReceiveError => write!(f, "error in flow receive channel"),
-            Self::NotificationWithoutContent => {
-                write!(f, "Received Yang Push Notification without content")
-            }
-            Self::PayloadSerializationError => {
-                write!(f, "failed to serialize UDP-Notif payload")
-            }
-            Self::PayloadValidationError => {
-                write!(f, "failed to validate UDP-Notif payload")
-            }
-        }
-    }
 }
 
 impl std::error::Error for ValidationActorError {}
@@ -449,18 +436,10 @@ impl ValidationActor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum ValidationActorHandleError {
+    #[strum(to_string = "failed to send command to Yang Push validation actor")]
     SendError,
-}
-impl std::fmt::Display for ValidationActorHandleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ValidationActorHandleError::SendError => {
-                write!(f, "Failed to send command to Yang Push validation actor")
-            }
-        }
-    }
 }
 
 impl std::error::Error for ValidationActorHandleError {}
