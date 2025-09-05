@@ -163,34 +163,16 @@ impl Default for PeerUsage {
 }
 
 /// Errors that can occur in the `UdpNotifActor`.
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum UdpNotifActorError {
+    #[strum(to_string = "[Actor {0}-{1}] failed to bind to socket address {1}: {2}")]
     SocketBindError(ActorId, SocketAddr, std::io::Error),
+    #[strum(to_string = "[Actor {0}-{1}] failed to get local address: {2}")]
     GetLocalAddressError(ActorId, SocketAddr, std::io::Error),
+    #[strum(to_string = "[Actor {0}-{1}] command channel closed")]
     CommandChannelClosed(ActorId, SocketAddr),
+    #[strum(to_string = "[Actor {0}-{1}] unrecoverable error processing packet: {2}")]
     PacketProcessingError(ActorId, SocketAddr, std::io::Error),
-}
-
-impl std::fmt::Display for UdpNotifActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SocketBindError(actor_id, addr, err) => write!(
-                f,
-                "[Actor {actor_id}-{addr}] failed to bind to socket address {addr}: {err}"
-            ),
-            Self::GetLocalAddressError(actor_id, addr, err) => write!(
-                f,
-                "[Actor {actor_id}-{addr}] failed to get local address: {err}"
-            ),
-            Self::CommandChannelClosed(actor_id, addr) => {
-                write!(f, "[Actor {actor_id}-{addr}] command channel closed",)
-            }
-            Self::PacketProcessingError(actor_id, addr, err) => write!(
-                f,
-                "[Actor {actor_id}-{addr}] unrecoverable error processing packet: {err}"
-            ),
-        }
-    }
 }
 
 impl std::error::Error for UdpNotifActorError {}
@@ -795,23 +777,12 @@ impl UdpNotifActor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum ActorHandleError {
+    #[strum(to_string = "error sending command to actor")]
     SendError,
+    #[strum(to_string = "error receiving response from actor")]
     ReceiveError,
-}
-
-impl std::fmt::Display for ActorHandleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            ActorHandleError::SendError => {
-                write!(f, "error sending command to actor")
-            }
-            ActorHandleError::ReceiveError => {
-                write!(f, "error receiving response from actor")
-            }
-        }
-    }
 }
 
 impl std::error::Error for ActorHandleError {

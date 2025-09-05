@@ -95,30 +95,20 @@ impl KafkaJsonPublisherStats {
 
 // --- actor ---
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum KafkaJsonPublisherActorError<E: std::error::Error> {
     /// Error communicating with the Kafka brokers
+    #[strum(to_string = "Kafka error: {0}")]
     KafkaError(KafkaError),
-
     /// Error serializing incoming messages into [serde_json::Value]
+    #[strum(to_string = "Serialization error: {0}")]
     SerializationError(E),
-
     /// Error encoding [serde_json::Value] into `Vec<u8>` to send to kafka
+    #[strum(to_string = "Encoding error: {0}")]
     EncodingError(serde_json::Error),
-
     /// Error receiving incoming messages from input async_channel
+    #[strum(to_string = "Error receiving messages from upstream producer")]
     ReceiveErr,
-}
-
-impl<E: std::error::Error> std::fmt::Display for KafkaJsonPublisherActorError<E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::KafkaError(e) => write!(f, "Kafka error: {e}"),
-            Self::SerializationError(e) => write!(f, "Serialization error: {e}"),
-            Self::EncodingError(e) => write!(f, "Encoding error: {e}"),
-            Self::ReceiveErr => write!(f, "Error receiving messages from upstream producer"),
-        }
-    }
 }
 
 impl<E: std::error::Error> std::error::Error for KafkaJsonPublisherActorError<E> {}
