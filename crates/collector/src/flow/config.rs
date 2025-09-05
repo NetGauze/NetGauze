@@ -27,7 +27,7 @@
 //! field selection, renaming, and type conversions.
 
 use crate::{
-    flow::RawValue,
+    flow::{types::FieldRef, RawValue},
     publishers::kafka_avro::{AvroConverter, KafkaAvroPublisherActorError},
 };
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
@@ -41,7 +41,7 @@ use netgauze_flow_pkt::{
     ipfix::{DataRecord, Set},
     FlowInfo,
 };
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use smallvec::SmallVec;
@@ -93,19 +93,8 @@ impl FlowOutputConfig {
         let mut fields = Vec::<(String, AvroValue)>::with_capacity(self.fields.len());
         let mut custom_primitives = IndexMap::new();
 
-        // Store fields indexed by SingleFieldSelect (IE, index)
-        let fields_len = record.fields().len();
-        let mut fields_map: FxHashMap<SingleFieldSelect, &Field> =
-            FxHashMap::with_capacity_and_hasher(fields_len, FxBuildHasher);
-        let mut ie_counters: FxHashMap<IE, usize> =
-            FxHashMap::with_capacity_and_hasher(fields_len, FxBuildHasher);
-
-        for field in record.fields() {
-            let ie = field.ie();
-            let ie_count = ie_counters.entry(ie).or_insert(0);
-            fields_map.insert(SingleFieldSelect::new(ie, *ie_count), field);
-            *ie_count += 1;
-        }
+        // Store fields indexed by FieldRef (IE, index)
+        let fields_map = FieldRef::map_fields_into_fxhashmap(record.fields());
 
         // Collect required fields to construct avro record
         for (name, field_config) in &self.fields {
@@ -365,25 +354,8 @@ impl FieldSelect for FieldSelectFunction {
     }
 }
 
-/// When a [SingleFieldSelect] doesn't define an index, then assume this
-/// value as default index.
-const fn default_field_index() -> usize {
-    0
-}
-
 /// Selects a single field from [FlowInfo]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SingleFieldSelect {
-    pub ie: IE,
-    #[serde(default = "default_field_index")]
-    pub index: usize,
-}
-
-impl SingleFieldSelect {
-    fn new(ie: IE, index: usize) -> Self {
-        Self { ie, index }
-    }
-}
+pub type SingleFieldSelect = FieldRef;
 
 impl FieldSelect for SingleFieldSelect {
     fn is_nullable(&self) -> bool {
@@ -391,7 +363,7 @@ impl FieldSelect for SingleFieldSelect {
     }
 
     fn avro_type(&self) -> AvroValueKind {
-        ie_avro_type(self.ie)
+        ie_avro_type(self.ie())
     }
 
     fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
@@ -416,7 +388,7 @@ impl FieldSelect for CoalesceFieldSelect {
     }
 
     fn avro_type(&self) -> AvroValueKind {
-        let avro_type = self.ies.iter().map(|x| x.ie).collect::<HashSet<_>>();
+        let avro_type = self.ies.iter().map(|x| x.ie()).collect::<HashSet<_>>();
         if avro_type.len() == 1 {
             self.ies[0].avro_type()
         } else {

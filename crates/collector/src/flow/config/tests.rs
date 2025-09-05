@@ -23,10 +23,8 @@ use std::net::Ipv4Addr;
 
 #[test]
 fn test_field_select_function_single() {
-    let field_select = FieldSelectFunction::Single(SingleFieldSelect {
-        ie: IE::sourceIPv4Address,
-        index: 0,
-    });
+    let field_select =
+        FieldSelectFunction::Single(SingleFieldSelect::new(IE::sourceIPv4Address, 0));
 
     // Test is_nullable
     assert!(field_select.is_nullable());
@@ -41,32 +39,17 @@ fn test_field_select_function_single() {
     let dst_ip_field = Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2));
 
     let mut flow_map = FxHashMap::with_hasher(FxBuildHasher);
+    flow_map.insert(SingleFieldSelect::new(IE::octetDeltaCount, 0), &octet_field);
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::octetDeltaCount,
-            index: 0,
-        },
-        &octet_field,
-    );
-    flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::sourceTransportPort,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::sourceTransportPort, 0),
         &port_field,
     );
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::sourceIPv4Address,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::sourceIPv4Address, 0),
         &src_ip_field,
     );
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::destinationIPv4Address,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::destinationIPv4Address, 0),
         &dst_ip_field,
     );
 
@@ -79,14 +62,8 @@ fn test_field_select_function_single() {
 fn test_field_select_function_coalesce() {
     let coalesce_select = CoalesceFieldSelect {
         ies: vec![
-            SingleFieldSelect {
-                ie: IE::sourceIPv4Address,
-                index: 0,
-            },
-            SingleFieldSelect {
-                ie: IE::destinationIPv4Address,
-                index: 0,
-            },
+            SingleFieldSelect::new(IE::sourceIPv4Address, 0),
+            SingleFieldSelect::new(IE::destinationIPv4Address, 0),
         ],
     };
     let field_select = FieldSelectFunction::Coalesce(coalesce_select.clone());
@@ -103,32 +80,17 @@ fn test_field_select_function_coalesce() {
     let packet_field = Field::packetDeltaCount(150);
 
     let mut flow_map = FxHashMap::with_hasher(FxBuildHasher);
+    flow_map.insert(SingleFieldSelect::new(IE::octetDeltaCount, 0), &octet_field);
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::octetDeltaCount,
-            index: 0,
-        },
-        &octet_field,
-    );
-    flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::sourceIPv4Address,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::sourceIPv4Address, 0),
         &src_ip_field,
     );
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::destinationIPv4Address,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::destinationIPv4Address, 0),
         &dst_ip_field,
     );
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::packetDeltaCount,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::packetDeltaCount, 0),
         &packet_field,
     );
 
@@ -136,10 +98,7 @@ fn test_field_select_function_coalesce() {
     assert_eq!(result.unwrap()[0], src_ip_field);
 
     // Remove source address to test coalesce missing first option
-    flow_map.remove(&SingleFieldSelect {
-        ie: IE::sourceIPv4Address,
-        index: 0,
-    });
+    flow_map.remove(&SingleFieldSelect::new(IE::sourceIPv4Address, 0));
 
     // Now should select the second field since first is missing
     let result = field_select.apply(&flow_map);
@@ -150,14 +109,8 @@ fn test_field_select_function_coalesce() {
 fn test_field_select_function_multi() {
     let multi_select = MultiSelect {
         ies: vec![
-            SingleFieldSelect {
-                ie: IE::sourceIPv4Address,
-                index: 0,
-            },
-            SingleFieldSelect {
-                ie: IE::destinationIPv4Address,
-                index: 0,
-            },
+            SingleFieldSelect::new(IE::sourceIPv4Address, 0),
+            SingleFieldSelect::new(IE::destinationIPv4Address, 0),
         ],
     };
     let field_select = FieldSelectFunction::Multi(multi_select.clone());
@@ -177,46 +130,25 @@ fn test_field_select_function_multi() {
     let dst_port_field = Field::destinationTransportPort(8443);
 
     let mut flow_map = FxHashMap::with_hasher(FxBuildHasher);
+    flow_map.insert(SingleFieldSelect::new(IE::octetDeltaCount, 0), &octet_field);
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::octetDeltaCount,
-            index: 0,
-        },
-        &octet_field,
-    );
-    flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::packetDeltaCount,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::packetDeltaCount, 0),
         &packet_field,
     );
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::sourceIPv4Address,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::sourceIPv4Address, 0),
         &src_ip_field,
     );
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::destinationIPv4Address,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::destinationIPv4Address, 0),
         &dst_ip_field,
     );
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::sourceTransportPort,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::sourceTransportPort, 0),
         &src_port_field,
     );
     flow_map.insert(
-        SingleFieldSelect {
-            ie: IE::destinationTransportPort,
-            index: 0,
-        },
+        SingleFieldSelect::new(IE::destinationTransportPort, 0),
         &dst_port_field,
     );
 
@@ -433,10 +365,7 @@ fn test_flow_output_config_get_avro_schema() {
     fields.insert(
         "src_ip".to_string(),
         FieldConfig {
-            select: FieldSelectFunction::Single(SingleFieldSelect {
-                ie: IE::sourceIPv4Address,
-                index: 0,
-            }),
+            select: FieldSelectFunction::Single(SingleFieldSelect::new(IE::sourceIPv4Address, 0)),
             default: None,
             transform: FieldTransformFunction::Identity,
         },
@@ -445,10 +374,10 @@ fn test_flow_output_config_get_avro_schema() {
     fields.insert(
         "dst_ip".to_string(),
         FieldConfig {
-            select: FieldSelectFunction::Single(SingleFieldSelect {
-                ie: IE::destinationIPv4Address,
-                index: 0,
-            }),
+            select: FieldSelectFunction::Single(SingleFieldSelect::new(
+                IE::destinationIPv4Address,
+                0,
+            )),
             default: Some(RawValue::String("0.0.0.0".to_string())),
             transform: FieldTransformFunction::Identity,
         },
@@ -457,10 +386,7 @@ fn test_flow_output_config_get_avro_schema() {
     fields.insert(
         "bytes".to_string(),
         FieldConfig {
-            select: FieldSelectFunction::Single(SingleFieldSelect {
-                ie: IE::octetDeltaCount,
-                index: 0,
-            }),
+            select: FieldSelectFunction::Single(SingleFieldSelect::new(IE::octetDeltaCount, 0)),
             default: None,
             transform: FieldTransformFunction::StringArray,
         },
@@ -470,10 +396,7 @@ fn test_flow_output_config_get_avro_schema() {
     fields.insert(
         "custom_primitives.test_field".to_string(),
         FieldConfig {
-            select: FieldSelectFunction::Single(SingleFieldSelect {
-                ie: IE::applicationName,
-                index: 0,
-            }),
+            select: FieldSelectFunction::Single(SingleFieldSelect::new(IE::packetDeltaCount, 0)),
             default: None,
             transform: FieldTransformFunction::String,
         },
