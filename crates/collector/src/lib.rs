@@ -23,6 +23,7 @@ use crate::{
         http::{HttpPublisherActorHandle, Message},
         kafka_avro::KafkaAvroPublisherActorHandle,
         kafka_json::KafkaJsonPublisherActorHandle,
+        kafka_yang::KafkaYangPublisherActorHandle,
     },
 };
 use futures_util::{stream::FuturesUnordered, StreamExt};
@@ -31,8 +32,9 @@ use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle
 use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
 use netgauze_yang_push::{
-    enrichment::YangPushEnrichmentActorHandle, model::telemetry::TelemetryMessageWrapper,
-    validation::ValidationActorHandle,
+    enrichment::YangPushEnrichmentActorHandle,
+    model::telemetry::TelemetryMessageWrapper,
+    validation::{SubscriptionInfo, ValidationActorHandle},
 };
 use std::{net::IpAddr, str::Utf8Error, sync::Arc};
 use tracing::{info, warn};
@@ -204,6 +206,11 @@ pub async fn init_flow_collection(
                         "Telemetry KafkaJson publisher not yet supported for Flow"
                     ));
                 }
+                PublisherEndpoint::TelemetryKafkaYang(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Telemetry KafkaYang publisher not supported for Flow"
+                    ));
+                }
             }
         }
     }
@@ -278,7 +285,8 @@ pub async fn init_udp_notif_collection(
     let mut validation_handles = Vec::new();
     let mut enrichment_handles = Vec::new();
     let mut http_handles = Vec::new();
-    let mut kafka_handles = Vec::new();
+    let mut kafka_json_handles = Vec::new();
+    let mut kafka_yang_handles = Vec::new();
     for (group_name, publisher_config) in udp_notif_config.publishers {
         info!("Starting publishers group '{group_name}'");
         let (udp_notif_recv, _) = supervisor_handle
@@ -315,7 +323,7 @@ pub async fn init_udp_notif_collection(
                     match hdl {
                         Ok((kafka_join, kafka_handle)) => {
                             join_set.push(kafka_join);
-                            kafka_handles.push(kafka_handle);
+                            kafka_json_handles.push(kafka_handle);
                         }
                         Err(err) => {
                             return Err(anyhow::anyhow!(
@@ -345,27 +353,61 @@ pub async fn init_udp_notif_collection(
 
                     let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
                         publisher_config.buffer_size,
-                        udp_notif_recv.clone(),
+                        validation_handle.subscribe(),
                         either::Left(meter.clone()),
                     );
                     join_set.push(enrichment_join);
                     enrichment_handles.push(enrichment_handle.clone());
 
-                    let enriched_rx = enrichment_handle.subscribe();
                     let hdl = KafkaJsonPublisherActorHandle::from_config(
-                        serialize_yang_push,
+                        serialize_telemetry_json,
                         config.clone(),
-                        enriched_rx,
+                        enrichment_handle.subscribe(),
                         either::Left(meter.clone()),
                     );
                     match hdl {
                         Ok((kafka_join, kafka_handle)) => {
                             join_set.push(kafka_join);
-                            kafka_handles.push(kafka_handle);
+                            kafka_json_handles.push(kafka_handle);
                         }
                         Err(err) => {
                             return Err(anyhow::anyhow!(
                                 "Error creating KafkaJsonPublisherActorHandle: {err}"
+                            ));
+                        }
+                    }
+                }
+                PublisherEndpoint::TelemetryKafkaYang(config) => {
+                    let (validation_join, validation_handle) = ValidationActorHandle::new(
+                        publisher_config.buffer_size,
+                        udp_notif_recv.clone(),
+                        either::Left(meter.clone()),
+                    );
+                    join_set.push(validation_join);
+                    validation_handles.push(validation_handle.clone());
+
+                    let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
+                        publisher_config.buffer_size,
+                        validation_handle.subscribe(),
+                        either::Left(meter.clone()),
+                    );
+                    join_set.push(enrichment_join);
+                    enrichment_handles.push(enrichment_handle.clone());
+
+                    let hdl = KafkaYangPublisherActorHandle::from_config(
+                        serialize_telemetry_yang,
+                        config.clone(),
+                        enrichment_handle.subscribe(),
+                        either::Left(meter.clone()),
+                    );
+                    match hdl {
+                        Ok((kafka_join, kafka_handle)) => {
+                            join_set.push(kafka_join);
+                            kafka_yang_handles.push(kafka_handle);
+                        }
+                        Err(err) => {
+                            return Err(anyhow::anyhow!(
+                                "Error creating KafkaYangPublisherActorHandle: {err}"
                             ));
                         }
                     }
@@ -385,7 +427,10 @@ pub async fn init_udp_notif_collection(
                     warn!("Error in shutting down udp-notif http publisher {}: {}", handle.name(), err)
                 }
             }
-            for handle in kafka_handles {
+            for handle in kafka_json_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_yang_handles {
                 let _ = handle.shutdown().await;
             }
             match supervisor_ret {
@@ -411,7 +456,10 @@ pub async fn init_udp_notif_collection(
                     warn!("Error in shutting down udp-notif http publisher {}: {}", handle.name(), err)
                 }
             }
-            for handle in kafka_handles {
+            for handle in kafka_json_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_yang_handles {
                 let _ = handle.shutdown().await;
             }
             match join_ret {
@@ -494,17 +542,34 @@ fn serialize_udp_notif(
     ))
 }
 
-fn serialize_yang_push(
-    input: TelemetryMessageWrapper,
+fn serialize_telemetry_json(
+    input: (SubscriptionInfo, TelemetryMessageWrapper),
     _writer_id: String,
 ) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
-    let ip = input
-        .message()
-        .telemetry_message_metadata()
-        .export_address();
-    let value = serde_json::to_value(input)?;
+    let tmw = input.1;
+    let ip = tmw.message().telemetry_message_metadata().export_address();
+    let value = serde_json::to_value(tmw)?;
     let key = serde_json::Value::String(ip.to_string());
     Ok((Some(key), value))
+}
+
+fn serialize_telemetry_yang(
+    input: (SubscriptionInfo, TelemetryMessageWrapper),
+    _writer_id: String,
+) -> Result<
+    (
+        Option<SubscriptionInfo>,
+        Option<serde_json::Value>,
+        serde_json::Value,
+    ),
+    UdpNotifSerializationError,
+> {
+    let subscription_info = input.0;
+    let tmw = input.1;
+    let ip = tmw.message().telemetry_message_metadata().export_address();
+    let value = serde_json::to_value(tmw)?;
+    let key = serde_json::Value::String(ip.to_string());
+    Ok((Some(subscription_info), Some(key), value))
 }
 
 #[derive(Debug, strum_macros::Display)]
