@@ -222,18 +222,13 @@ impl<T, M: Serialize, F: Fn(Arc<T>, String) -> Vec<M>> HttpPublisherActor<T, M, 
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum HttpPublisherActorHandleError {
     SendError,
     ReceiveError,
 }
 
 impl std::error::Error for HttpPublisherActorHandleError {}
-impl std::fmt::Display for HttpPublisherActorHandleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct HttpPublisherActorHandle {

@@ -57,29 +57,22 @@ pub struct KafkaConfig<C> {
     pub avro_converter: C,
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum KafkaAvroPublisherActorError {
+    #[strum(to_string = "Kafka error: {0}")]
     KafkaError(KafkaError),
+    #[strum(to_string = "Avro error: {0}")]
     AvroError(Box<apache_avro::Error>),
+    #[strum(to_string = "Source error: {0}")]
     SrcError(SRCError),
+    #[strum(to_string = "Transformation error: {0}")]
     TransformationError(String),
+    #[strum(to_string = "Error receiving messages from upstream producer")]
     ReceiveErr,
+    #[strum(to_string = "Json error: {0}")]
     JsonError(serde_json::Error),
+    #[strum(to_string = "Unexpected state: {0}")]
     UnexpectedState(String),
-}
-
-impl std::fmt::Display for KafkaAvroPublisherActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::KafkaError(e) => write!(f, "Kafka error: {e}"),
-            Self::AvroError(e) => write!(f, "Avro error: {e}"),
-            Self::SrcError(e) => write!(f, "Source error: {e}"),
-            Self::TransformationError(e) => write!(f, "Transformation error: {e}"),
-            Self::ReceiveErr => write!(f, "Error receiving messages from upstream producer"),
-            Self::JsonError(e) => write!(f, "Json Error: {e}"),
-            Self::UnexpectedState(e) => write!(f, "Unexpected State: {e}"),
-        }
-    }
 }
 
 impl std::error::Error for KafkaAvroPublisherActorError {}

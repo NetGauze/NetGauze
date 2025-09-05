@@ -26,20 +26,11 @@ use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 
 /// Errors for FlowInfo operations
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, strum_macros::Display)]
 pub enum FlowInfoError {
     /// NetFlow v9 is not supported for this operation
+    #[strum(serialize = "NetFlow v9 is not supported for this operation")]
     NetFlowV9NotSupported,
-}
-
-impl std::fmt::Display for FlowInfoError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NetFlowV9NotSupported => {
-                write!(f, "NetFlow v9 is not supported for this operation")
-            }
-        }
-    }
 }
 
 impl std::error::Error for FlowInfoError {}
@@ -95,20 +86,11 @@ impl FlowInfo {
 }
 
 /// Errors when crafting a new Set
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, strum_macros::Display)]
 pub enum FieldSpecifierError {
     /// Specified field length was out of the range defined by the registry
+    #[strum(to_string = "Invalid length specified {0} for IE: {1:?}")]
     InvalidLength(u16, IE),
-}
-
-impl std::fmt::Display for FieldSpecifierError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FieldSpecifierError::InvalidLength(len, ie) => {
-                write!(f, "Invalid length specified {len} for IE: {ie:?}")
-            }
-        }
-    }
 }
 
 impl std::error::Error for FieldSpecifierError {}
@@ -150,19 +132,10 @@ impl FieldSpecifier {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize, strum_macros::Display)]
 pub enum DataSetIdError {
+    #[strum(serialize = "Invalid data set id specified: {0}")]
     InvalidId(u16),
-}
-
-impl std::fmt::Display for DataSetIdError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InvalidId(id) => {
-                write!(f, "Invalid data set id specified {id}")
-            }
-        }
-    }
 }
 
 impl std::error::Error for DataSetIdError {}

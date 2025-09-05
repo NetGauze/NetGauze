@@ -64,27 +64,16 @@ pub enum YangPushEnrichmentActorCommand {
     Shutdown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, strum_macros::Display)]
 pub enum YangPushEnrichmentActorError {
+    #[strum(to_string = "enrichment channel closed")]
     EnrichmentChannelClosed,
+    #[strum(to_string = "error in flow receive channel")]
     YangPushReceiveError,
+    #[strum(to_string = "received Yang-Push Notification without content")]
     NotificationWithoutContent,
+    #[strum(to_string = "failed to serialize UDP-Notif payload")]
     PayloadSerializationError,
-}
-
-impl std::fmt::Display for YangPushEnrichmentActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::EnrichmentChannelClosed => write!(f, "enrichment channel closed"),
-            Self::YangPushReceiveError => write!(f, "error in flow receive channel"),
-            Self::NotificationWithoutContent => {
-                write!(f, "Received Yang Push Notification without content")
-            }
-            Self::PayloadSerializationError => {
-                write!(f, "failed to serialize UDP-Notif Payload")
-            }
-        }
-    }
 }
 
 impl std::error::Error for YangPushEnrichmentActorError {}
@@ -516,18 +505,10 @@ impl YangPushEnrichmentActor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum YangPushEnrichmentActorHandleError {
+    #[strum(to_string = "failed to send to Yang-Push enrichment actor")]
     SendError,
-}
-impl std::fmt::Display for YangPushEnrichmentActorHandleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            YangPushEnrichmentActorHandleError::SendError => {
-                write!(f, "Failed to send yang-push enrichment actor")
-            }
-        }
-    }
 }
 
 impl std::error::Error for YangPushEnrichmentActorHandleError {}

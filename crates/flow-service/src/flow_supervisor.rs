@@ -253,23 +253,14 @@ impl FlowCollectorsSupervisorActor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum FlowCollectorsSupervisorActorHandleError {
+    #[strum(to_string = "No flow actor started successfully")]
     NoListenerStarted,
+    #[strum(to_string = "Error sending command to supervisor actor")]
     SendError,
+    #[strum(to_string = "Error receiving response from supervisor actor")]
     ReceiveError,
-}
-
-impl std::fmt::Display for FlowCollectorsSupervisorActorHandleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Self::NoListenerStarted => write!(f, "No flow actor started successfully"),
-            Self::SendError => write!(f, "Error sending command to supervisor actor"),
-            Self::ReceiveError => {
-                write!(f, "Error receiving response from supervisor actor")
-            }
-        }
-    }
 }
 
 impl std::error::Error for FlowCollectorsSupervisorActorHandleError {}
