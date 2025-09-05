@@ -170,7 +170,7 @@ fn fetch_sysinfo_manifest() -> Manifest {
 struct YangPushEnrichmentActor {
     cmd_rx: mpsc::Receiver<YangPushEnrichmentActorCommand>,
     validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
-    enriched_tx: async_channel::Sender<TelemetryMessageWrapper>,
+    enriched_tx: async_channel::Sender<(SubscriptionInfo, TelemetryMessageWrapper)>,
     labels: HashMap<IpAddr, (u32, HashMap<String, String>)>,
     default_labels: (u32, HashMap<String, String>),
     subscriptions: HashMap<SocketAddr, SubscriptionsCache>,
@@ -182,7 +182,7 @@ impl YangPushEnrichmentActor {
     fn new(
         cmd_rx: mpsc::Receiver<YangPushEnrichmentActorCommand>,
         validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
-        enriched_tx: async_channel::Sender<TelemetryMessageWrapper>,
+        enriched_tx: async_channel::Sender<(SubscriptionInfo, TelemetryMessageWrapper)>,
         stats: YangPushEnrichmentStats,
     ) -> Self {
         let default_labels = (
@@ -481,7 +481,7 @@ impl YangPushEnrichmentActor {
                             // Process the payload and send the enriched TelemetryMessage
                             match self.process_payload(peer, pkt.payload()) {
                                 Ok(telemetry_message) => {
-                                    if let Err(err) = self.enriched_tx.send(telemetry_message).await {
+                                    if let Err(err) = self.enriched_tx.send((subscription_info, telemetry_message)).await {
                                         error!("YangPushEnrichmentActor send error: {err}");
                                         self.stats.send_error.add(1, &peer_tags);
                                     } else {
@@ -517,7 +517,7 @@ impl std::error::Error for YangPushEnrichmentActorHandleError {}
 #[derive(Debug, Clone)]
 pub struct YangPushEnrichmentActorHandle {
     cmd_send: mpsc::Sender<YangPushEnrichmentActorCommand>,
-    enriched_rx: async_channel::Receiver<TelemetryMessageWrapper>,
+    enriched_rx: async_channel::Receiver<(SubscriptionInfo, TelemetryMessageWrapper)>,
 }
 
 impl YangPushEnrichmentActorHandle {
@@ -548,7 +548,9 @@ impl YangPushEnrichmentActorHandle {
             .map_err(|_| YangPushEnrichmentActorHandleError::SendError)
     }
 
-    pub fn subscribe(&self) -> async_channel::Receiver<TelemetryMessageWrapper> {
+    pub fn subscribe(
+        &self,
+    ) -> async_channel::Receiver<(SubscriptionInfo, TelemetryMessageWrapper)> {
         self.enriched_rx.clone()
     }
 }
