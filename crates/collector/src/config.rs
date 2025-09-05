@@ -15,7 +15,7 @@
 
 use crate::{
     flow::{aggregation::AggregationConfig, config::FlowOutputConfig, sonata::KafkaConsumerConfig},
-    publishers::{http::HttpPublisherEndpoint, kafka_avro, kafka_json},
+    publishers::{http::HttpPublisherEndpoint, kafka_avro, kafka_json, kafka_yang},
 };
 use netgauze_flow_service::flow_supervisor;
 use netgauze_udp_notif_service::supervisor as udp_notif_supervisor;
@@ -222,4 +222,8 @@ pub enum PublisherEndpoint {
 
     /// Kafka JSON publisher endpoint (for yang-push telemetry messages)
     TelemetryKafkaJson(kafka_json::KafkaConfig),
+
+    /// Kafka JSON publisher endpoint
+    /// (for validated yang-push telemetry messages)
+    TelemetryKafkaYang(kafka_yang::KafkaConfig),
 }

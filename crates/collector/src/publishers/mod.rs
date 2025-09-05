@@ -23,6 +23,7 @@ use tracing::{trace, warn};
 pub mod http;
 pub mod kafka_avro;
 pub mod kafka_json;
+pub mod kafka_yang;
 
 /// Producer context with tracing logs enabled
 #[derive(Clone)]
