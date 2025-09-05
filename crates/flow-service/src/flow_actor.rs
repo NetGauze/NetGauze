@@ -183,34 +183,16 @@ impl Default for PeerUsage {
 }
 
 /// Errors that can occur in the `FlowCollectorActor`.
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum FlowCollectorActorError {
+    #[strum(to_string = "[Actor {0}-{1}] failed to bind to socket address {1}: {2}")]
     SocketBindError(ActorId, SocketAddr, std::io::Error),
+    #[strum(to_string = "[Actor {0}-{1}] failed to get local address: {2}")]
     GetLocalAddressError(ActorId, SocketAddr, std::io::Error),
+    #[strum(to_string = "[Actor {0}-{1}] command channel closed")]
     CommandChannelClosed(ActorId, SocketAddr),
+    #[strum(to_string = "[Actor {0}-{1}] unrecoverable error processing packet: {2}")]
     UnrecoverablePacketProcessingError(ActorId, SocketAddr, std::io::Error),
-}
-
-impl std::fmt::Display for FlowCollectorActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SocketBindError(actor_id, addr, err) => write!(
-                f,
-                "[Actor {actor_id}-{addr}] failed to bind to socket address {addr}: {err}"
-            ),
-            Self::GetLocalAddressError(actor_id, addr, err) => write!(
-                f,
-                "[Actor {actor_id}-{addr}] failed to get local address: {err}"
-            ),
-            Self::CommandChannelClosed(actor_id, addr) => {
-                write!(f, "[Actor {actor_id}-{addr}] command channel closed",)
-            }
-            Self::UnrecoverablePacketProcessingError(actor_id, addr, err) => write!(
-                f,
-                "[Actor {actor_id}-{addr}] unrecoverable error processing packet: {err}"
-            ),
-        }
-    }
 }
 
 impl std::error::Error for FlowCollectorActorError {
@@ -893,21 +875,12 @@ impl FlowCollectorActor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum FlowCollectorActorHandleError {
+    #[strum(to_string = "Error sending command to actor")]
     SendError,
+    #[strum(to_string = "Error receiving response from actor")]
     ReceiveError,
-}
-
-impl std::fmt::Display for FlowCollectorActorHandleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            FlowCollectorActorHandleError::SendError => write!(f, "Error sending command to actor"),
-            FlowCollectorActorHandleError::ReceiveError => {
-                write!(f, "Error receiving response from actor")
-            }
-        }
-    }
 }
 
 impl std::error::Error for FlowCollectorActorHandleError {

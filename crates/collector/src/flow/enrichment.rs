@@ -47,23 +47,16 @@ pub enum FlowEnrichmentActorCommand {
     Shutdown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum_macros::Display)]
 pub enum FlowEnrichmentActorError {
+    #[strum(to_string = "enrichment channel closed")]
     EnrichmentChannelClosed,
+    #[strum(to_string = "error in flow receive channel")]
     FlowReceiveError,
+    #[strum(to_string = "missing required label: {0}")]
     MissingRequiredLabel(String),
+    #[strum(to_string = "failed to add fields to flow: {0}")]
     FieldAdditionFailed(String),
-}
-
-impl std::fmt::Display for FlowEnrichmentActorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::EnrichmentChannelClosed => write!(f, "enrichment channel closed"),
-            Self::FlowReceiveError => write!(f, "error in flow receive channel"),
-            Self::MissingRequiredLabel(label) => write!(f, "missing required label: {label}"),
-            Self::FieldAdditionFailed(msg) => write!(f, "failed to add fields to flow: {msg}"),
-        }
-    }
 }
 
 impl std::error::Error for FlowEnrichmentActorError {}
@@ -259,18 +252,10 @@ impl FlowEnrichment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, strum_macros::Display)]
 pub enum FlowEnrichmentActorHandleError {
+    #[strum(to_string = "Failed to send command to flow enrichment actor")]
     SendError,
-}
-impl std::fmt::Display for FlowEnrichmentActorHandleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FlowEnrichmentActorHandleError::SendError => {
-                write!(f, "Failed to send flow enrichment actor")
-            }
-        }
-    }
 }
 
 impl std::error::Error for FlowEnrichmentActorHandleError {}
