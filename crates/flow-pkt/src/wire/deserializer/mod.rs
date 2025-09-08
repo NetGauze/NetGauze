@@ -92,10 +92,12 @@ impl<'a> ReadablePdu<'a, LocatedFieldSpecifierParsingError<'a>> for FieldSpecifi
         let (buf, code) = be_u16(buf)?;
         let is_enterprise = code & 0x8000u16 != 0;
         let (buf, length) = be_u16(buf)?;
-        let (buf, pen) = if is_enterprise {
-            be_u32(buf)?
+        let (buf, (pen, code)) = if is_enterprise {
+            let (buf, pen) = be_u32(buf)?;
+            // remove the enterprise bit from the IE number
+            (buf, (pen, code & 0x7FFF))
         } else {
-            (buf, 0)
+            (buf, (0, code))
         };
         let ie = match IE::try_from((pen, code)) {
             Ok(ie) => ie,
