@@ -911,3 +911,77 @@ fn test_zero_length_fields() {
     let ret = IpfixPacket::from_wire(Span::new(&good_template_wire), &mut templates_map);
     assert!(ret.is_err());
 }
+
+#[test]
+fn test_with_unknown_pen() -> Result<(), IpfixPacketWritingError> {
+    let good_template_wire = [
+        0x00, 0x0a, 0x00, 0x38, 0x66, 0x8b, 0xb8, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x28, 0x01, 0x90, 0x00, 0x06, 0x00, 0x08, 0x00, 0x04, 0x00, 0x0c,
+        0x00, 0x04, 0x82, 0x37, 0x00, 0x04, 0x00, 0x00, 0x00, 0xd5, 0x01, 0xd3, 0x00, 0x01, 0x83,
+        0x01, 0x00, 0x08, 0x00, 0x00, 0x00, 0xd5, 0x01, 0xf4, 0x00, 0x01,
+    ];
+
+    let good_data_wire = [
+        0x00, 0x0a, 0x00, 0x2c, 0x66, 0x74, 0x35, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x90, 0x00, 0x1c, 0x0a, 0x64, 0x00, 0x01, 0x0a, 0x64, 0x00, 0x97, 0x01, 0x02,
+        0x03, 0x04, 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x05, 0x00, 0x00,
+    ];
+
+    let good_template = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
+        0,
+        0,
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
+            400,
+            Box::new([
+                FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::Unknown { pen: 213, id: 567 }, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::natThresholdEvent, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::Unknown { pen: 213, id: 769 }, 8).unwrap(),
+                FieldSpecifier::new(ie::IE::srhIPv6ActiveSegmentType, 1).unwrap(),
+            ]),
+        )]))]),
+    );
+
+    let good_data = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+        0,
+        0,
+        Box::new([Set::Data {
+            id: DataSetId::new(400).unwrap(),
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(10, 100, 0, 151)),
+                    ie::Field::Unknown {
+                        pen: 213,
+                        id: 567,
+                        value: vec![1, 2, 3, 4],
+                    },
+                    ie::Field::natThresholdEvent(
+                        ie::natThresholdEvent::Addresspoolhighthresholdevent,
+                    ),
+                    ie::Field::Unknown {
+                        pen: 213,
+                        id: 769,
+                        value: vec![1, 2, 3, 4, 5, 6, 7, 8],
+                    },
+                    ie::Field::srhIPv6ActiveSegmentType(
+                        ie::srhIPv6ActiveSegmentType::BGPSegmentRoutingPrefixSID,
+                    ),
+                ]),
+            )]),
+        }]),
+    );
+
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
+    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+
+    test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
+    test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
+
+    Ok(())
+}

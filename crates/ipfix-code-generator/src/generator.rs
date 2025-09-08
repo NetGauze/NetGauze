@@ -2944,8 +2944,8 @@ pub(crate) fn generate_ie_deser_main(
                     #(#vendor_parsers,)*
                     #(#iana_parsers,)*
                     ie => {
-                        // todo Handle unknown IEs
-                        return Err(nom::Err::Error(LocatedFieldParsingError::new(buf, FieldParsingError::UnknownInformationElement(*ie))))
+                        let (buf, value) = nom::bytes::complete::take(length)(buf)?;
+                        (buf, Field::Unknown{pen: ie.pen(), id: ie.id(), value: value.to_vec()})
                     }
                 };
                 Ok((buf, value))
