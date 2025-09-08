@@ -30,12 +30,14 @@ netgauze-udp-notif-pkt = { path = "../crates/udp-notif-pkt", features = [
     "fuzz",
     "codec",
 ] }
+netgauze-netconf-proto = { path = "../crates/netconf-proto" }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tokio-test = { workspace = true }
 tokio-util = { workspace = true }
 futures-core = { workspace = true }
 bytes = { workspace = true }
+quick-xml = { workspace = true, features = ["serialize", "async-tokio"] }
 
 [[bin]]
 name = "fuzz-bgp-peer"
@@ -107,5 +109,12 @@ doc = false
 [[bin]]
 name = "fuzz-udp-notif-pkt-serialize"
 path = "fuzz_targets/fuzz_udp_notif_pkt_serialize.rs"
+test = false
+doc = false
+
+
+[[bin]]
+name = "fuzz-netconf"
+path = "fuzz_targets/fuzz_netconf.rs"
 test = false
 doc = false

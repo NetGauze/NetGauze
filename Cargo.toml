@@ -18,6 +18,7 @@ members = [
     "crates/collector",
     "crates/yang-push",
     "crates/pcap-decoder",
+    "crates/netconf-proto",
     "fuzz",
 ]
 resolver = "2"
@@ -102,7 +103,8 @@ shadow-rs = { version = "1.2", default-features = false }
 smallvec = { version = "1.15" }
 rustc-hash = { version = "2.1" }
 yang3 = { version = "0.18", features = ["bundled"] }
-tempfile = {  version = "3.20.0" }
+tempfile = { version = "3.20.0" }
+quick-xml = { version = "0.38.3" }
 
 [profile.release]
 codegen-units = 1
