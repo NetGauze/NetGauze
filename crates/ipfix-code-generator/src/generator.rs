@@ -1793,7 +1793,26 @@ fn generate_vec_u8_deserializer(ie_name: &str) -> TokenStream {
     let ident = Ident::new(ie_name, Span::call_site());
     quote! {
         {
-            let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;
+            let (buf, len) = if length == u16::MAX {
+                // first byte is the length if it's less than 255
+                let (buf, short_length) = nom::number::complete::be_u8(buf)?;
+                // the following three bytes are the length if first byte is 255
+                if short_length == u8::MAX {
+                    let mut variable_length: u32= 0;
+                    let (buf, part1) = nom::number::complete::be_u8(buf)?;
+                    let (buf, part2) = nom::number::complete::be_u8(buf)?;
+                    let (buf, part3) = nom::number::complete::be_u8(buf)?;
+                    variable_length = (variable_length << 8) + part1  as u32;
+                    variable_length = (variable_length << 8) + part2  as u32;
+                    variable_length = (variable_length << 8) + part3  as u32;
+                    (buf, variable_length as usize)
+                } else {
+                    (buf, short_length as usize)
+                }
+            } else {
+                (buf, length as usize)
+            };
+            let (buf, value) = nom::multi::count(nom::number::complete::be_u8, len)(buf)?;
             (buf, Field::#ident(value.into_boxed_slice()))
         }
     }
@@ -1888,11 +1907,27 @@ pub(crate) fn generate_pkg_ie_serializers(
     let ie_len = ies.iter().map(|ie| {
         let name = Ident::new(&ie.name, Span::call_site());
         match ie.data_type.as_str() {
-            "octetArray"
-            | "macAddress"
-            | "basicList"
-            | "subTemplateList"
-            | "subTemplateMultiList" => {
+            "octetArray" => {
+                quote! {
+                    Self::#name(value) => {
+                        match length {
+                            None => value.len(),
+                            Some(len) => if len == u16::MAX {
+                                if value.len() < u8::MAX as usize {
+                                    // One octet for the length field
+                                    value.len() + 1
+                                } else {
+                                    // 4 octets for the length field, first is 255 and other three carries the len
+                                    value.len() + 4
+                                }
+                            } else {
+                                len as usize
+                            }
+                        }
+                    }
+                }
+            }
+            "macAddress" | "basicList" | "subTemplateList" | "subTemplateMultiList" => {
                 quote! {
                     Self::#name(value) => {
                         value.len()
@@ -1998,7 +2033,24 @@ pub(crate) fn generate_pkg_ie_serializers(
             "octetArray" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_all(value.as_ref())?
+                        match length {
+                            Some(u16::MAX) | None => {
+                                if value.len() < u8::MAX as usize {
+                                    writer.write_u8(value.len() as u8)?;
+                                } else {
+                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&value.len().to_be_bytes()[1..])?;
+                                }
+                                writer.write_all(value)?;
+                            }
+                            Some(len) => {
+                                writer.write_all(value)?;
+                                // fill the rest with zeros
+                                for _ in value.len()..(len as usize) {
+                                    writer.write_u8(0)?
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2990,7 +3042,24 @@ pub(crate) fn generate_ie_ser_main(
             "octetArray" => {
                 quote! {
                     Self::#ident(value) => {
-                        writer.write_all(value.as_ref())?
+                        match length {
+                            Some(u16::MAX) | None => {
+                                if value.len() < u8::MAX as usize {
+                                    writer.write_u8(value.len() as u8)?;
+                                } else {
+                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&value.len().to_be_bytes()[1..])?;
+                                }
+                                writer.write_all(value)?;
+                            }
+                            Some(len) => {
+                                writer.write_all(value)?;
+                                // fill the rest with zeros
+                                for _ in value.len()..(len as usize) {
+                                    writer.write_u8(0)?
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3317,11 +3386,27 @@ pub(crate) fn generate_ie_ser_main(
     let iana_len = iana_ies.iter().map(|ie| {
         let name = Ident::new(&ie.name, Span::call_site());
         match ie.data_type.as_str() {
-            "octetArray"
-            | "macAddress"
-            | "basicList"
-            | "subTemplateList"
-            | "subTemplateMultiList" => {
+            "octetArray" => {
+                quote! {
+                    Self::#name(value) => {
+                        match length {
+                            None => value.len(),
+                            Some(len) => if len == u16::MAX {
+                                if value.len() < u8::MAX as usize {
+                                    // One octet for the length field
+                                    value.len() + 1
+                                } else {
+                                    // 4 octets for the length field, first is 255 and other three carries the len
+                                    value.len() + 4
+                                }
+                            } else {
+                                len as usize
+                            }
+                        }
+                    }
+                }
+            }
+            "macAddress" | "basicList" | "subTemplateList" | "subTemplateMultiList" => {
                 quote! {
                     Self::#name(value) => {
                         value.len()
