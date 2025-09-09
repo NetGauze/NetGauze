@@ -783,6 +783,84 @@ fn test_with_vmware_pen_fields() -> Result<(), IpfixPacketWritingError> {
 }
 
 #[test]
+fn test_with_vendor_unknown_fields() -> Result<(), IpfixPacketWritingError> {
+    let good_template_wire = [
+        0x00, 0x0a, 0x00, 0x44, 0x66, 0x8b, 0xb8, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x34, 0x01, 0x90, 0x00, 0x07, 0x00, 0x08, 0x00, 0x04, 0x00, 0x04,
+        0x00, 0x01, 0x00, 0x02, 0x00, 0x04, 0x83, 0x7a, 0x00, 0x02, 0x00, 0x00, 0x1a, 0xdc, 0x89,
+        0xf8, 0x00, 0x02, 0x00, 0x00, 0x1a, 0xdc, 0x89, 0xf9, 0xff, 0xff, 0x00, 0x00, 0x1a, 0xdc,
+        0x83, 0x79, 0x00, 0x01, 0x00, 0x00, 0x1a, 0xdc,
+    ];
+
+    let good_data_wire = [
+        0x00, 0x0a, 0x00, 0x28, 0x66, 0x74, 0x35, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x90, 0x00, 0x18, 0x0a, 0x64, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x0a, 0x11, 0xee, 0x03, 0x02, 0xee, 0xff, 0x00, 0x00, 0x00,
+    ];
+
+    let good_template = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
+        0,
+        0,
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
+            400,
+            Box::new([
+                FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
+                FieldSpecifier::new(ie::IE::packetDeltaCount, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::ingressInterfaceAttr), 2)
+                    .unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::Unknown { id: 2552 }), 2)
+                    .unwrap(),
+                // variable length
+                FieldSpecifier::new(
+                    ie::IE::VMWare(ie::vmware::IE::Unknown { id: 2553 }),
+                    u16::MAX,
+                )
+                .unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::vxlanExportRole), 1).unwrap(),
+            ]),
+        )]))]),
+    );
+
+    let good_data = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap(),
+        0,
+        0,
+        Box::new([Set::Data {
+            id: DataSetId::new(400).unwrap(),
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(10, 100, 0, 1)),
+                    ie::Field::protocolIdentifier(ie::protocolIdentifier::ICMP),
+                    ie::Field::packetDeltaCount(1),
+                    ie::Field::VMWare(ie::vmware::Field::ingressInterfaceAttr(10)),
+                    ie::Field::VMWare(ie::vmware::Field::Unknown {
+                        id: 2552,
+                        value: Box::new([0x11, 0xee]),
+                    }),
+                    ie::Field::VMWare(ie::vmware::Field::Unknown {
+                        id: 2553,
+                        value: Box::new([0x02, 0xee, 0xff]),
+                    }),
+                    ie::Field::VMWare(ie::vmware::Field::vxlanExportRole(0)),
+                ]),
+            )]),
+        }]),
+    );
+
+    let mut templates_map = HashMap::new();
+    test_parsed_completely_with_one_input(&good_template_wire, &mut templates_map, &good_template);
+    test_parsed_completely_with_one_input(&good_data_wire, &mut templates_map, &good_data);
+
+    test_write_with_one_input(&good_template, Some(&templates_map), &good_template_wire)?;
+    test_write_with_one_input(&good_data, Some(&templates_map), &good_data_wire)?;
+
+    Ok(())
+}
+
+#[test]
 fn test_with_iana_subregs() -> Result<(), IpfixPacketWritingError> {
     let good_template_wire = [
         0x00, 0x0a, 0x00, 0x7c, 0x66, 0x8b, 0xb8, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

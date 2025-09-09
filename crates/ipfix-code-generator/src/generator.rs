@@ -219,11 +219,20 @@ fn generate_impl_ie_template_for_ie(ie: &[InformationElement]) -> TokenStream {
             })
     });
 
+    let id_variants = ie.iter().map(|ie| {
+        let name = Ident::new(ie.name.as_str(), Span::call_site());
+        let element = ie.element_id;
+        quote! { Self::#name => #element }
+    });
+
     let pen = ie.first().unwrap().pen;
     quote! {
         impl super::InformationElementTemplate for IE {
             fn id(&self) -> u16 {
-                (*self) as u16
+                match self {
+                    Self::Unknown{ id } => *id,
+                     #(#id_variants,)*
+                }
             }
 
             fn pen(&self) -> u32 {
@@ -232,24 +241,28 @@ fn generate_impl_ie_template_for_ie(ie: &[InformationElement]) -> TokenStream {
 
             fn semantics(&self) -> Option<super::InformationElementSemantics> {
                 match self {
+                    Self::Unknown{..} => None,
                     #(#semantics,)*
                 }
             }
 
             fn data_type(&self) -> super::InformationElementDataType {
                 match self {
+                    Self::Unknown{..} => super::InformationElementDataType::octetArray,
                     #(#data_types,)*
                 }
             }
 
             fn units(&self) -> Option<super::InformationElementUnits> {
                 match self {
+                    Self::Unknown{..} => None,
                     #(#units,)*
                 }
             }
 
             fn value_range(&self) -> Option<std::ops::Range<u64>> {
                 match self {
+                    Self::Unknown{..} => None,
                     #(#value_ranges,)*
                 }
             }
@@ -257,18 +270,17 @@ fn generate_impl_ie_template_for_ie(ie: &[InformationElement]) -> TokenStream {
     }
 }
 
-fn generate_from_for_ie(vendor_name: &str) -> TokenStream {
+fn generate_from_for_ie(vendor_name: &str, ies: &[InformationElement]) -> TokenStream {
     let ident = Ident::new(vendor_name, Span::call_site());
+    let ie_variants = ies.iter().map(|ie| {
+        let element_id = ie.element_id;
+        let name = Ident::new(ie.name.as_str(), Span::call_site());
+        quote! { #element_id =>  Ok(Self::#name) }
+    });
     quote! {
         #[derive(Copy, Eq, Hash, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub struct UndefinedIE(pub u16);
-
-        impl From<IE> for u16 {
-            fn from(value: IE) -> Self {
-                value as u16
-            }
-        }
 
         impl TryFrom<u16> for IE {
             type Error = UndefinedIE;
@@ -276,9 +288,9 @@ fn generate_from_for_ie(vendor_name: &str) -> TokenStream {
             fn try_from(value: u16) -> Result<Self, Self::Error> {
                // Remove Enterprise bit
                let value = value & 0x7FFF;
-               match Self::from_repr(value) {
-                   Some(val) => Ok(val),
-                   None => Err(UndefinedIE(value)),
+               match value {
+                    #(#ie_variants,)*
+                   _ => Ok(Self::Unknown{id: value}),
                }
             }
         }
@@ -299,7 +311,6 @@ pub(crate) fn generate_information_element_ids(
 ) -> TokenStream {
     let ie_variants = ie.iter().map(|ie| {
         let ie_name = Ident::new(ie.name.as_str(), Span::call_site());
-        let ie_value = ie.element_id;
         let mut doc_comments = Vec::new();
         for line in ie.description.lines() {
             let line = format!(" {}", line.trim());
@@ -316,7 +327,7 @@ pub(crate) fn generate_information_element_ids(
 
         quote! {
             #(#doc_comments)*
-            #ie_name = #ie_value
+            #ie_name
         }
     });
 
@@ -327,16 +338,17 @@ pub(crate) fn generate_information_element_ids(
     });
     let mut tokens = quote! {
         #[allow(non_camel_case_types)]
-        #[repr(u16)]
         #[derive(strum_macros::Display, strum_macros::FromRepr, Copy, Eq, Hash, Clone, PartialEq, Debug, Ord, PartialOrd, serde::Serialize, serde::Deserialize)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum IE {
+             Unknown{id: u16},
             #(#ie_variants,)*
         }
 
         impl IE {
              pub const fn has_registry(&self) -> bool {
                 match self {
+                    Self::Unknown{..} => false,
                     #(#if_has_subregistry_variants,)*
                 }
             }
@@ -344,7 +356,7 @@ pub(crate) fn generate_information_element_ids(
     };
 
     tokens.extend(generate_impl_ie_template_for_ie(ie));
-    tokens.extend(generate_from_for_ie(vendor_name));
+    tokens.extend(generate_from_for_ie(vendor_name, ie));
     tokens
 }
 
@@ -2400,12 +2412,48 @@ pub(crate) fn generate_pkg_ie_serializers(
             const BASE_LENGTH: usize = 0;
             fn len(&self, length: Option<u16>) -> usize {
                 match self {
+                    Self::Unknown{id: _, value} => {
+                        match length {
+                            None => value.len(),
+                            Some(len) => {
+                                if len == u16::MAX {
+                                    if value.len() < u8::MAX as usize {
+                                        value.len() + 1
+                                    } else {
+                                        value.len() + 4
+                                    }
+                                } else {
+                                    len as usize
+                                }
+                            }
+                        }
+                    }
                     #(#ie_len,)*
                 }
             }
 
             fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), FieldWritingError> {
                 match self {
+                    Self::Unknown{id: _, value} => {
+                        match length {
+                            Some(u16::MAX) | None => {
+                                if value.len() < u8::MAX as usize {
+                                    writer.write_u8(value.len() as u8)?;
+                                } else {
+                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&value.len().to_be_bytes()[1..])?;
+                                }
+                                writer.write_all(value)?;
+                            }
+                            Some(len) => {
+                                writer.write_all(value)?;
+                                // fill the rest with zeros
+                                for _ in value.len()..(len as usize) {
+                                    writer.write_u8(0)?
+                                }
+                            }
+                        }
+                    }
                     #(#ie_ser)*
                 }
                 Ok(())
@@ -2496,6 +2544,7 @@ pub(crate) fn generate_fields_enum(ies: &[InformationElement]) -> TokenStream {
         #[derive(strum_macros::Display, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
         #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
         pub enum Field {
+            Unknown{id: u16, value: Box<[u8]>},
             #(#ie_fields,)*
         }
 
@@ -2503,6 +2552,7 @@ pub(crate) fn generate_fields_enum(ies: &[InformationElement]) -> TokenStream {
             /// Get the [IE] element for a given field
             pub const fn ie(&self) -> IE {
                 match self {
+                    Self::Unknown{id, value: _} => IE::Unknown{id: *id},
                     #(#ie_variants,)*
                 }
             }
@@ -2617,13 +2667,7 @@ pub fn generate_into_for_field(
     let mut code = TokenStream::new();
     for convert_rust_type in rust_converted_types {
         let ty = syn::parse_str::<syn::Type>(convert_rust_type).expect("wrong type");
-        // only IANA have unknown, thus we check vendor is not configured
-        let unknown = if !vendors.is_empty() {
-            // only IANA have unknown, thus we check vendor is not configured
-            quote! { Self::Unknown{ .. } => Err(Self::Error::UnknownField), }
-        } else {
-            quote! {}
-        };
+        let unknown = quote! { Self::Unknown{ .. } => Err(Self::Error::UnknownField), };
         let vendor_variants = vendors.iter().map(|(name, _pkg, _)| {
             let name = Ident::new(name, Span::call_site());
             quote! { Self::#name(value) => { value.try_into() } }
@@ -2896,7 +2940,30 @@ fn generate_ie_values_deserializers(ies: &[InformationElement]) -> TokenStream {
                 length: u16,
             ) -> nom::IResult<netgauze_parse_utils::Span<'a>, Self, LocatedFieldParsingError<'a>> {
                 let (buf, value) = match ie {
-                     #(#parsers,)*
+                    IE::Unknown {id } => {
+                        let (buf, len) = if length == u16::MAX {
+                            // first byte is the length if it's less than 255
+                            let (buf, short_length) = nom::number::complete::be_u8(buf)?;
+                            // the following three bytes are the length if first byte is 255
+                            if short_length == u8::MAX {
+                                let mut variable_length: u32= 0;
+                                let (buf, part1) = nom::number::complete::be_u8(buf)?;
+                                let (buf, part2) = nom::number::complete::be_u8(buf)?;
+                                let (buf, part3) = nom::number::complete::be_u8(buf)?;
+                                variable_length = (variable_length << 8) + part1  as u32;
+                                variable_length = (variable_length << 8) + part2  as u32;
+                                variable_length = (variable_length << 8) + part3  as u32;
+                                (buf, variable_length as usize)
+                            } else {
+                                (buf, short_length as usize)
+                            }
+                        } else {
+                            (buf, length as usize)
+                        };
+                        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, len)(buf)?;
+                        (buf, Self::Unknown{ id: *id, value: value.into_boxed_slice()})
+                    }
+                    #(#parsers,)*
                 };
                Ok((buf, value))
             }
@@ -3532,7 +3599,22 @@ pub(crate) fn generate_ie_ser_main(
             const BASE_LENGTH: usize = 0;
             fn len(&self, length: Option<u16>) -> usize {
                 match self {
-                    Self::Unknown{pen: _pen, id: _id, value} => value.len(),
+                    Self::Unknown{pen: _pen, id: _id, value} => {
+                        match length {
+                            None => value.len(),
+                            Some(len) => {
+                                if len == u16::MAX {
+                                    if value.len() < u8::MAX as usize {
+                                        value.len() + 1
+                                    } else {
+                                        value.len() + 4
+                                    }
+                                } else {
+                                    len as usize
+                                }
+                            }
+                        }
+                    },
                     #(#vendor_len,)*
                     #(#iana_len,)*
                 }
@@ -3540,7 +3622,26 @@ pub(crate) fn generate_ie_ser_main(
 
             fn write<T:  std::io::Write>(&self, writer: &mut T, length: Option<u16>) -> Result<(), FieldWritingError> {
                 match self {
-                    Self::Unknown{pen: _pen, id: _id, value} => writer.write_all(value)?,
+                    Self::Unknown{pen: _pen, id: _id, value} => {
+                        match length {
+                            Some(u16::MAX) | None => {
+                                if value.len() < u8::MAX as usize {
+                                    writer.write_u8(value.len() as u8)?;
+                                } else {
+                                    writer.write_u8(u8::MAX)?;
+                                    writer.write_all(&value.len().to_be_bytes()[1..])?;
+                                }
+                                writer.write_all(value)?;
+                            }
+                            Some(len) => {
+                                writer.write_all(value)?;
+                                // fill the rest with zeros
+                                for _ in value.len()..(len as usize) {
+                                    writer.write_u8(0)?
+                                }
+                            }
+                        }
+                    },
                     #(#vendor_ser)*
                     #(#iana_ser)*
                 }
