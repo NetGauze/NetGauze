@@ -1040,7 +1040,7 @@ fn test_with_unknown_pen() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::Unknown {
                         pen: 213,
                         id: 567,
-                        value: vec![1, 2, 3, 4],
+                        value: Box::new([1, 2, 3, 4]),
                     },
                     ie::Field::natThresholdEvent(
                         ie::natThresholdEvent::Addresspoolhighthresholdevent,
@@ -1048,7 +1048,7 @@ fn test_with_unknown_pen() -> Result<(), IpfixPacketWritingError> {
                     ie::Field::Unknown {
                         pen: 213,
                         id: 769,
-                        value: vec![1, 2, 3, 4, 5, 6, 7, 8],
+                        value: Box::new([1, 2, 3, 4, 5, 6, 7, 8]),
                     },
                     ie::Field::srhIPv6ActiveSegmentType(
                         ie::srhIPv6ActiveSegmentType::BGPSegmentRoutingPrefixSID,
@@ -1210,7 +1210,7 @@ fn test_with_unknown_pen_complex() -> Result<(), IpfixPacketWritingError> {
                         ie::Field::Unknown {
                             pen: 2011,
                             id: 232,
-                            value: vec![0, 0],
+                            value: Box::new([0, 0]),
                         },
                         ie::Field::tcpControlBits(TCPHeaderFlags::new(
                             false, false, false, false, true, false, false, false,
@@ -1272,7 +1272,7 @@ fn test_with_unknown_pen_complex() -> Result<(), IpfixPacketWritingError> {
                         ie::Field::Unknown {
                             pen: 2011,
                             id: 232,
-                            value: vec![0, 1],
+                            value: Box::new([0, 1]),
                         },
                         ie::Field::tcpControlBits(TCPHeaderFlags::new(
                             false, false, false, true, true, false, false, false,

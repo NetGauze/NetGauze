@@ -767,7 +767,7 @@ fn generate_ie_field_enum_for_ie(
             #[derive(strum_macros::Display, Eq, Hash, PartialOrd, Ord, Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
             #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
             pub enum Field {
-                Unknown{pen: u32, id: u16, value: Vec<u8>},
+                Unknown{pen: u32, id: u16, value: Box<[u8]>},
                 #(#vendor_variants,)*
                 #(#iana_variants,)*
             }
@@ -3063,8 +3063,8 @@ pub(crate) fn generate_ie_deser_main(
                     #(#vendor_parsers,)*
                     #(#iana_parsers,)*
                     ie => {
-                        let (buf, value) = nom::bytes::complete::take(length)(buf)?;
-                        (buf, Field::Unknown{pen: ie.pen(), id: ie.id(), value: value.to_vec()})
+                        let (buf, value) = nom::multi::count(nom::number::complete::be_u8, length as usize)(buf)?;
+                        (buf, Field::Unknown{pen: ie.pen(), id: ie.id(), value: value.into_boxed_slice()})
                     }
                 };
                 Ok((buf, value))
