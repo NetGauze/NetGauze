@@ -1191,11 +1191,11 @@ mod tests {
   <session-id>4</session-id>
 </hello>"#;
         let expected = NetConfMessage::Hello(Hello::new(
+            Some(4),
             HashSet::from([
                 Capability::NetconfBase(NetconfVersion::V1_1),
                 Capability::Standard(StandardCapability::Startup),
             ]),
-            Some(4),
         ));
 
         test_xml_value(input_str, expected)?;
