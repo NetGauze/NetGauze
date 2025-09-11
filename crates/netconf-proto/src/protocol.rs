@@ -1177,6 +1177,32 @@ mod tests {
     }
 
     #[test]
+    fn test_hello_from_rfc_6242() -> Result<(), ParsingError> {
+        let input_str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<hello xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <capabilities>
+    <capability>
+      urn:ietf:params:netconf:base:1.1
+    </capability>
+    <capability>
+      urn:ietf:params:netconf:capability:startup:1.0
+    </capability>
+  </capabilities>
+  <session-id>4</session-id>
+</hello>"#;
+        let expected = NetConfMessage::Hello(Hello::new(
+            HashSet::from([
+                Capability::NetconfBase(NetconfVersion::V1_1),
+                Capability::Standard(StandardCapability::Startup),
+            ]),
+            Some(4),
+        ));
+
+        test_xml_value(input_str, expected)?;
+        Ok(())
+    }
+
+    #[test]
     fn test_rpc() -> Result<(), ParsingError> {
         let input_str = r#"<rpc xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="101"><copy-config><target><startup/></target><source><running/></source></copy-config></rpc>"#;
 
