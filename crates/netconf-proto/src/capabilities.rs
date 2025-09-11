@@ -94,7 +94,7 @@ impl FromStr for Capability {
     type Err = CapabilityParsingError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        match s.trim() {
             CAP_WRITABLE => Ok(Capability::Standard(StandardCapability::WritableRunning)),
             CAP_CANDIDATE => Ok(Capability::Standard(StandardCapability::Candidate)),
             CAP_CONFIRMED_COMMIT_1_0 => Ok(Capability::Standard(
