@@ -91,25 +91,25 @@ impl XmlSerialize for NetConfMessage {
 #[derive(PartialEq, Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename = "hello")]
 pub struct Hello {
-    capabilities: HashSet<Capability>,
     #[serde(rename = "session-id")]
     session_id: Option<u32>,
+    capabilities: HashSet<Capability>,
 }
 
 impl Hello {
-    pub const fn new(capabilities: HashSet<Capability>, session_id: Option<u32>) -> Self {
+    pub const fn new(session_id: Option<u32>, capabilities: HashSet<Capability>) -> Self {
         Self {
-            capabilities,
             session_id,
+            capabilities,
         }
-    }
-
-    pub const fn capabilities(&self) -> &HashSet<Capability> {
-        &self.capabilities
     }
 
     pub const fn session_id(&self) -> Option<u32> {
         self.session_id
+    }
+
+    pub const fn capabilities(&self) -> &HashSet<Capability> {
+        &self.capabilities
     }
 }
 
@@ -138,7 +138,7 @@ impl XmlDeserialize<Hello> for Hello {
             None
         };
         parser.close()?;
-        Ok(Hello::new(HashSet::from_iter(capabilities), session_id))
+        Ok(Hello::new(session_id, HashSet::from_iter(capabilities)))
     }
 }
 
@@ -1653,7 +1653,7 @@ mod tests {
         let expected_rpc_reply_data =
             r#"<data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"></data>"#;
 
-        let hello = NetConfMessage::Hello(Hello::new(HashSet::new(), Some(4)));
+        let hello = NetConfMessage::Hello(Hello::new(Some(4), HashSet::new()));
         let rpc = NetConfMessage::Rpc(Rpc::new("101".into(), RpcOperation::Raw("<copy-config xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><target><startup/></target><source><running/></source></copy-config>".into())));
         let rpc_reply = NetConfMessage::RpcReply(RpcReply {
             message_id: Some("101".into()),
