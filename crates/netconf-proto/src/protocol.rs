@@ -359,8 +359,22 @@ pub enum WellKnownOperation {
 #[derive(PartialEq, Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RpcReply {
-    pub message_id: Option<Box<str>>,
-    pub reply: RpcReplyContent,
+    message_id: Option<Box<str>>,
+    reply: RpcReplyContent,
+}
+
+impl RpcReply {
+    pub const fn new(message_id: Option<Box<str>>, reply: RpcReplyContent) -> Self {
+        Self { message_id, reply }
+    }
+
+    pub fn message_id(&self) -> Option<&str> {
+        self.message_id.as_ref().map(|x| x.as_ref())
+    }
+
+    pub const fn reply(&self) -> &RpcReplyContent {
+        &self.reply
+    }
 }
 
 impl XmlDeserialize<RpcReply> for RpcReply {
