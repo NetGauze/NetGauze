@@ -488,17 +488,66 @@ pub enum RpcReplyContent {
 #[derive(PartialEq, Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct RpcError {
-    pub error_type: ErrorType,
-    pub error_tag: ErrorTag,
-    pub error_severity: ErrorSeverity,
+    error_type: ErrorType,
+    error_tag: ErrorTag,
+    error_severity: ErrorSeverity,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_app_tag: Option<Box<str>>,
+    error_app_tag: Option<Box<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_path: Option<Box<str>>,
+    error_path: Option<Box<str>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_message: Option<ErrorMessage>,
+    error_message: Option<ErrorMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_info: Option<ErrorInfo>,
+    error_info: Option<ErrorInfo>,
+}
+
+impl RpcError {
+    pub const fn new(
+        error_type: ErrorType,
+        error_tag: ErrorTag,
+        error_severity: ErrorSeverity,
+        error_app_tag: Option<Box<str>>,
+        error_path: Option<Box<str>>,
+        error_message: Option<ErrorMessage>,
+        error_info: Option<ErrorInfo>,
+    ) -> Self {
+        Self {
+            error_type,
+            error_tag,
+            error_severity,
+            error_app_tag,
+            error_path,
+            error_message,
+            error_info,
+        }
+    }
+
+    pub const fn error_type(&self) -> ErrorType {
+        self.error_type
+    }
+
+    pub const fn error_tag(&self) -> ErrorTag {
+        self.error_tag
+    }
+
+    pub const fn error_severity(&self) -> ErrorSeverity {
+        self.error_severity
+    }
+    pub fn error_app_tag(&self) -> Option<&str> {
+        self.error_app_tag.as_ref().map(|x| x.as_ref())
+    }
+
+    pub fn error_path(&self) -> Option<&str> {
+        self.error_path.as_ref().map(|x| x.as_ref())
+    }
+
+    pub fn error_message(&self) -> Option<&ErrorMessage> {
+        self.error_message.as_ref()
+    }
+
+    pub fn error_info(&self) -> Option<&ErrorInfo> {
+        self.error_info.as_ref()
+    }
 }
 
 impl XmlDeserialize<RpcError> for RpcError {
