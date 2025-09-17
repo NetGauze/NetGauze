@@ -461,6 +461,36 @@ pub enum RpcReplyContent {
     },
 }
 
+impl RpcReplyContent {
+    pub const fn is_ok(&self) -> bool {
+        matches!(self, RpcReplyContent::Ok)
+    }
+
+    pub const fn has_errors(&self) -> bool {
+        if let RpcReplyContent::ErrorsAndData { errors, .. } = self {
+            !errors.is_empty()
+        } else {
+            false
+        }
+    }
+
+    pub const fn errors(&self) -> Option<&[RpcError]> {
+        if let RpcReplyContent::ErrorsAndData { errors, .. } = self {
+            Some(errors.as_slice())
+        } else {
+            None
+        }
+    }
+
+    pub const fn responses(&self) -> Option<&str> {
+        if let RpcReplyContent::ErrorsAndData { responses, .. } = self {
+            Some(responses)
+        } else {
+            None
+        }
+    }
+}
+
 ///
 /// ```xml
 ///  <xs:complexType name="rpcErrorType">
@@ -1666,6 +1696,36 @@ mod tests {
         };
         test_xml_value(input_str1, expected1)?;
         Ok(())
+    }
+
+    #[test]
+    fn test_rpc_reply_content() {
+        let data: Box<str> = "SomeData".into();
+        let errors = vec![RpcError::default()];
+        let with_ok = RpcReplyContent::Ok;
+        let with_data_and_errors = RpcReplyContent::ErrorsAndData {
+            errors: errors.clone(),
+            responses: data.clone(),
+        };
+        let with_data_no_errors = RpcReplyContent::ErrorsAndData {
+            errors: vec![],
+            responses: data.clone(),
+        };
+        assert!(with_ok.is_ok());
+        assert!(!with_data_no_errors.is_ok());
+        assert!(!with_data_no_errors.is_ok());
+
+        assert!(!with_ok.has_errors());
+        assert!(with_data_and_errors.has_errors());
+        assert!(!with_data_no_errors.has_errors());
+
+        assert_eq!(with_ok.errors(), None);
+        assert_eq!(with_data_and_errors.errors(), Some(errors.as_slice()));
+        assert_eq!(with_data_no_errors.errors(), Some(vec![].as_slice()));
+
+        assert_eq!(with_ok.responses(), None);
+        assert_eq!(with_ok.responses(), None);
+        assert_eq!(with_data_and_errors.responses(), Some(data.as_ref()));
     }
 
     #[test]
