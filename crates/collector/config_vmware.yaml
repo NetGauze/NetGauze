@@ -30,8 +30,24 @@ flow:
   publishers:
     group1:
       buffer_size: 100000
+      shards: 4
+      enrichment:
+        inputs:
+          flow_options:
+            weight: 16
+          files:
+            poll_interval_seconds: 30
+            paths:
+              - path: flow2rd.map
+                format: !PmacctMaps
+                  id: mplsVpnRouteDistinguisher
+              - path: sampling.map
+                format: !PmacctMaps
+                  id: samplerRandomInterval
+                  weight: 200
+              - path: cache-dump.json
+                format: !JSONUpserts
       aggregation:
-        workers: 4
         window_duration:
           secs: 60
           nanos: 0

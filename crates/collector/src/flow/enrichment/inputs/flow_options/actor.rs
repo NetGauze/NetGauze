@@ -36,7 +36,8 @@
 //! - **NetFlowV9** - Not yet implemented
 
 use crate::flow::enrichment::{
-    inputs::flow_options::normalize::OptionsDataRecord, EnrichmentActorHandle, EnrichmentOperation,
+    inputs::flow_options::{normalize::OptionsDataRecord, FlowOptionsConfig},
+    EnrichmentActorHandle, EnrichmentOperation,
 };
 use netgauze_flow_pkt::{ipfix, FlowInfo};
 use netgauze_flow_service::FlowRequest;
@@ -69,23 +70,23 @@ pub struct FlowOptionsActorStats {
 impl FlowOptionsActorStats {
     pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
         let received_flows = meter
-            .u64_counter("netgauze.collector.flows.handlers.options.received.flows")
+            .u64_counter("netgauze.collector.flows.enrichment.input.options.received.flows")
             .with_description("Number of Received Flows")
             .build();
         let send_error = meter
-            .u64_counter("netgauze.collector.flows.handlers.options.send_error")
+            .u64_counter("netgauze.collector.flows.enrichment.input.options.send_error")
             .with_description("Error sending the enrichment operation to the enrichment actor")
             .build();
         let normalization_errors = meter
-            .u64_counter("netgauze.collector.flows.handlers.options.normalization.errors")
+            .u64_counter("netgauze.collector.flows.enrichment.input.options.normalization.errors")
             .with_description("Errors during record normalization")
             .build();
         let processed_options_records = meter
-            .u64_counter("netgauze.collector.flows.handlers.options.processed.records")
+            .u64_counter("netgauze.collector.flows.enrichment.input.options.processed.records")
             .with_description("Number of options data records processed")
             .build();
         let enrichment_ops_generated = meter
-            .u64_counter("netgauze.collector.flows.handlers.options.enrichment.ops.generated")
+            .u64_counter("netgauze.collector.flows.enrichment.input.options.ops.generated")
             .with_description("Number of enrichment operations generated")
             .build();
         Self {
@@ -101,6 +102,7 @@ impl FlowOptionsActorStats {
 /// Core flow options actor that processes flow requests to extract options
 /// metadata.
 struct FlowOptionsActor {
+    config: FlowOptionsConfig,
     cmd_rx: mpsc::Receiver<FlowOptionsActorCommand>,
     flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
     enrichment_handles: Vec<EnrichmentActorHandle>,
@@ -109,12 +111,14 @@ struct FlowOptionsActor {
 
 impl FlowOptionsActor {
     fn new(
+        config: FlowOptionsConfig,
         cmd_rx: mpsc::Receiver<FlowOptionsActorCommand>,
         flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
         enrichment_handles: Vec<EnrichmentActorHandle>,
         stats: FlowOptionsActorStats,
     ) -> Self {
         Self {
+            config,
             cmd_rx,
             flow_rx,
             enrichment_handles,
@@ -195,7 +199,11 @@ impl FlowOptionsActor {
                                             let options_record: OptionsDataRecord = record.try_into()?;
 
                                             // Construct enrichment operations from options data
-                                            let ops = match options_record.into_enrichment_operations(peer.ip(), obs_id) {
+                                            let ops = match options_record.into_enrichment_operations(
+                                                  self.config.weight(),
+                                                  peer.ip(),
+                                                  obs_id)
+                                            {
                                                 Ok(ops) => {
                                                     self.stats.enrichment_ops_generated.add(
                                                         ops.len() as u64,
@@ -249,6 +257,7 @@ pub struct FlowOptionsActorHandle {
 
 impl FlowOptionsActorHandle {
     pub fn new(
+        config: FlowOptionsConfig,
         flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
         enrichment_handles: Vec<EnrichmentActorHandle>,
         stats: either::Either<opentelemetry::metrics::Meter, FlowOptionsActorStats>,
@@ -258,7 +267,7 @@ impl FlowOptionsActorHandle {
             either::Left(meter) => FlowOptionsActorStats::new(meter),
             either::Right(stats) => stats,
         };
-        let actor = FlowOptionsActor::new(cmd_rx, flow_rx, enrichment_handles, stats);
+        let actor = FlowOptionsActor::new(config, cmd_rx, flow_rx, enrichment_handles, stats);
         let join_handle = tokio::spawn(actor.run());
         let handle = Self { cmd_send };
         (join_handle, handle)
