@@ -21,7 +21,6 @@ use std::time::Duration;
 #[test]
 fn test_aggregation_config_validate_success() {
     let config = AggregationConfig {
-        workers: 4,
         window_duration: Duration::from_secs(300),
         lateness: Duration::from_secs(30),
         transform: IndexMap::new(),
@@ -31,25 +30,8 @@ fn test_aggregation_config_validate_success() {
 }
 
 #[test]
-fn test_aggregation_config_validate_invalid_worker_count() {
-    let config = AggregationConfig {
-        workers: 0,
-        window_duration: Duration::from_secs(60),
-        lateness: Duration::from_secs(10),
-        transform: IndexMap::new(),
-    };
-
-    let result = config.validate();
-    assert!(matches!(
-        result,
-        Err(ConfigurationError::InvalidWorkerCount)
-    ));
-}
-
-#[test]
 fn test_aggregation_config_validate_invalid_window_duration() {
     let config = AggregationConfig {
-        workers: 1,
         window_duration: Duration::ZERO,
         lateness: Duration::from_secs(10),
         transform: IndexMap::new(),
@@ -65,7 +47,6 @@ fn test_aggregation_config_validate_invalid_window_duration() {
 #[test]
 fn test_aggregation_config_validate_lateness_exceeds_window() {
     let config = AggregationConfig {
-        workers: 1,
         window_duration: Duration::from_secs(30),
         lateness: Duration::from_secs(60),
         transform: IndexMap::new(),
@@ -87,7 +68,6 @@ fn test_aggregation_config_try_into_unified_config_single_transforms() {
     transform.insert(IE::packetDeltaCount, Transform::Single(Op::Add));
 
     let config = AggregationConfig {
-        workers: 2,
         window_duration: Duration::from_secs(180),
         lateness: Duration::from_secs(30),
         transform,
@@ -142,7 +122,6 @@ fn test_aggregation_config_try_into_unified_config_multi_transforms() {
     );
 
     let config = AggregationConfig {
-        workers: 1,
         window_duration: Duration::from_secs(240),
         lateness: Duration::from_secs(40),
         transform,
@@ -186,7 +165,6 @@ fn test_aggregation_config_try_into_unified_config_mixed_transforms() {
     transform.insert(IE::packetDeltaCount, Transform::Single(Op::Add));
 
     let config = AggregationConfig {
-        workers: 3,
         window_duration: Duration::from_secs(300),
         lateness: Duration::from_secs(50),
         transform,
@@ -216,28 +194,11 @@ fn test_aggregation_config_try_into_unified_config_mixed_transforms() {
 }
 
 #[test]
-fn test_aggregation_config_try_into_unified_config_validation_failure() {
-    let config = AggregationConfig {
-        workers: 0, // Invalid
-        window_duration: Duration::from_secs(60),
-        lateness: Duration::from_secs(10),
-        transform: IndexMap::new(),
-    };
-
-    let result: Result<UnifiedConfig, ConfigurationError> = config.try_into();
-    assert!(matches!(
-        result,
-        Err(ConfigurationError::InvalidWorkerCount)
-    ));
-}
-
-#[test]
 fn test_aggregation_config_try_into_unified_config_invalid_operation_arithmetic() {
     let mut transform = IndexMap::new();
     transform.insert(IE::destinationTransportPort, Transform::Single(Op::Add)); // invalid operation
 
     let config = AggregationConfig {
-        workers: 1,
         window_duration: Duration::from_secs(60),
         lateness: Duration::from_secs(10),
         transform,
@@ -260,7 +221,6 @@ fn test_aggregation_config_try_into_unified_config_invalid_operation_comparison(
     transform.insert(IE::samplerName, Transform::Single(Op::Min)); // invalid operation
 
     let config = AggregationConfig {
-        workers: 1,
         window_duration: Duration::from_secs(60),
         lateness: Duration::from_secs(10),
         transform,
@@ -283,7 +243,6 @@ fn test_aggregation_config_try_into_unified_config_invalid_operation_bitwise() {
     transform.insert(IE::wlanSSID, Transform::Single(Op::BoolMapOr));
 
     let config = AggregationConfig {
-        workers: 1,
         window_duration: Duration::from_secs(60),
         lateness: Duration::from_secs(10),
         transform,
@@ -312,7 +271,6 @@ fn test_aggregation_config_try_into_unified_config_invalid_operation_multi_trans
     transform.insert(IE::interfaceName, Transform::Multi(iface_map));
 
     let config = AggregationConfig {
-        workers: 1,
         window_duration: Duration::from_secs(60),
         lateness: Duration::from_secs(10),
         transform,
