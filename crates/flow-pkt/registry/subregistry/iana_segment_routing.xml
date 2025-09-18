@@ -1,0 +1,1516 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="segment-routing.xsl"?>
+<?xml-model href="segment-routing.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
+<registry xmlns="http://www.iana.org/assignments" id="segment-routing">
+  <title>Segment Routing</title>
+  <created>2021-01-08</created>
+  <updated>2025-09-03</updated>
+  
+  <registry id="srv6-endpoint-behaviors">
+    <title>SRv6 Endpoint Behaviors</title>
+    <xref type="rfc" data="rfc8986"/>
+    <range>
+      <value>0</value>
+      <registration_rule>Reserved</registration_rule>
+      <note>Not to be allocated</note>
+    </range>
+    <range>
+      <value>1-32767</value>
+      <registration_rule>First Come First Served</registration_rule>
+    </range>
+    <range>
+      <value>32768-34815</value>
+      <registration_rule>Private Use</registration_rule>
+    </range>
+    <range>
+      <value>34816-65534</value>
+      <registration_rule>Reserved</registration_rule>
+    </range>
+    <range>
+      <value>65535</value>
+      <registration_rule>Reserved</registration_rule>
+      <note>Opaque</note>
+    </range>
+    <record date="2021-01-08">
+      <value>0</value>
+      <hex>0x0000</hex>
+      <description>Reserved</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>1</value>
+      <hex>0x0001</hex>
+      <description>End</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>2</value>
+      <hex>0x0002</hex>
+      <description>End with PSP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>3</value>
+      <hex>0x0003</hex>
+      <description>End with USP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>4</value>
+      <hex>0x0004</hex>
+      <description>End with PSP &amp; USP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>5</value>
+      <hex>0x0005</hex>
+      <description>End.X</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>6</value>
+      <hex>0x0006</hex>
+      <description>End.X with PSP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>7</value>
+      <hex>0x0007</hex>
+      <description>End.X with USP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>8</value>
+      <hex>0x0008</hex>
+      <description>End.X with PSP &amp; USP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>9</value>
+      <hex>0x0009</hex>
+      <description>End.T</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>10</value>
+      <hex>0x000A</hex>
+      <description>End.T with PSP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>11</value>
+      <hex>0x000B</hex>
+      <description>End.T with USP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>12</value>
+      <hex>0x000C</hex>
+      <description>End.T with PSP &amp; USP</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12">
+      <value>13</value>
+      <hex>0x000D</hex>
+      <description>End.B6.Insert</description>
+      <xref type="draft" data="draft-filsfils-spring-srv6-net-pgm-insertion-04"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-01-08">
+      <value>14</value>
+      <hex>0x000E</hex>
+      <description>End.B6.Encaps</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>15</value>
+      <hex>0x000F</hex>
+      <description>End.BM</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>16</value>
+      <hex>0x0010</hex>
+      <description>End.DX6</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>17</value>
+      <hex>0x0011</hex>
+      <description>End.DX4</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>18</value>
+      <hex>0x0012</hex>
+      <description>End.DT6</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>19</value>
+      <hex>0x0013</hex>
+      <description>End.DT4</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>20</value>
+      <hex>0x0014</hex>
+      <description>End.DT46</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>21</value>
+      <hex>0x0015</hex>
+      <description>End.DX2</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>22</value>
+      <hex>0x0016</hex>
+      <description>End.DX2V</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>23</value>
+      <hex>0x0017</hex>
+      <description>End.DT2U</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>24</value>
+      <hex>0x0018</hex>
+      <description>End.DT2M</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>25</value>
+      <hex>0x0019</hex>
+      <description>Reserved</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12">
+      <value>26</value>
+      <hex>0x001A</hex>
+      <description>End.B6.Insert.Red</description>
+      <xref type="draft" data="draft-filsfils-spring-srv6-net-pgm-insertion-04"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-01-08">
+      <value>27</value>
+      <hex>0x001B</hex>
+      <description>End.B6.Encaps.Red</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>28</value>
+      <hex>0x001C</hex>
+      <description>End with USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>29</value>
+      <hex>0x001D</hex>
+      <description>End with PSP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>30</value>
+      <hex>0x001E</hex>
+      <description>End with USP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>31</value>
+      <hex>0x001F</hex>
+      <description>End with PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>32</value>
+      <hex>0x0020</hex>
+      <description>End.X with USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>33</value>
+      <hex>0x0021</hex>
+      <description>End.X with PSP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>34</value>
+      <hex>0x0022</hex>
+      <description>End.X with USP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>35</value>
+      <hex>0x0023</hex>
+      <description>End.X with PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>36</value>
+      <hex>0x0024</hex>
+      <description>End.T with USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>37</value>
+      <hex>0x0025</hex>
+      <description>End.T with PSP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>38</value>
+      <hex>0x0026</hex>
+      <description>End.T with USP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>39</value>
+      <hex>0x0027</hex>
+      <description>End.T with PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2023-02-23">
+      <value>40</value>
+      <hex>0x0028</hex>
+      <description>End.MAP</description>
+      <xref type="rfc" data="rfc9433"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2023-02-23">
+      <value>41</value>
+      <hex>0x0029</hex>
+      <description> End.Limit</description>
+      <xref type="rfc" data="rfc9433"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12">
+      <value>42</value>
+      <hex>0x002A</hex>
+      <description>End with NEXT-ONLY-CSID</description>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>43</value>
+      <hex>0x002B</hex>
+      <description>End with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>44</value>
+      <hex>0x002C</hex>
+      <description>End with NEXT-CSID &amp; PSP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>45</value>
+      <hex>0x002D</hex>
+      <description>End with NEXT-CSID &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>46</value>
+      <hex>0x002E</hex>
+      <description>End with NEXT-CSID, PSP &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>47</value>
+      <hex>0x002F</hex>
+      <description>End with NEXT-CSID &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>48</value>
+      <hex>0x0030</hex>
+      <description>End with NEXT-CSID, PSP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>49</value>
+      <hex>0x0031</hex>
+      <description>End with NEXT-CSID, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>50</value>
+      <hex>0x0032</hex>
+      <description>End with NEXT-CSID, PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12">
+      <value>51</value>
+      <hex>0x0033</hex>
+      <description>End.X with NEXT-ONLY-CSID</description>
+      <xref type="draft" data="draft-filsfils-spring-net-pgm-extension-srv6-usid-10"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>52</value>
+      <hex>0x0034</hex>
+      <description>End.X with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>53</value>
+      <hex>0x0035</hex>
+      <description>End.X with NEXT-CSID &amp; PSP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>54</value>
+      <hex>0x0036</hex>
+      <description>End.X with NEXT-CSID &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>55</value>
+      <hex>0x0037</hex>
+      <description>End.X with NEXT-CSID, PSP &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>56</value>
+      <hex>0x0038</hex>
+      <description>End.X with NEXT-CSID &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>57</value>
+      <hex>0x0039</hex>
+      <description>End.X with NEXT-CSID, PSP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>58</value>
+      <hex>0x003A</hex>
+      <description>End.X with NEXT-CSID, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-02-12">
+      <value>59</value>
+      <hex>0x003B</hex>
+      <description>End.X with NEXT-CSID, PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>60</value>
+      <hex>0x003C</hex>
+      <description>uDX6 (End.DX6 with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>61</value>
+      <hex>0x003D</hex>
+      <description>uDX4 (End.DX4 with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>62</value>
+      <hex>0x003E</hex>
+      <description>uDT6 (End.DT6 with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>63</value>
+      <hex>0x003F</hex>
+      <description>uDT4 (End.DT4 with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>64</value>
+      <hex>0x0040</hex>
+      <description>uDT46 (End.DT46 with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>65</value>
+      <hex>0x0041</hex>
+      <description>uDX2 (End.DX2 with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>66</value>
+      <hex>0x0042</hex>
+      <description>uDX2V (End.DX2V with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>67</value>
+      <hex>0x0043</hex>
+      <description>uDT2U (End.DT2U with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2025-07-24">
+      <value>68</value>
+      <hex>0x0044</hex>
+      <description>uDT2M (End.DT2M with NEXT-CSID)</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-03-12" updated="2023-02-23">
+      <value>69</value>
+      <hex>0x0045</hex>
+      <description>End.M.GTP6.D</description>
+      <xref type="rfc" data="rfc9433"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2023-02-23">
+      <value>70</value>
+      <hex>0x0046</hex>
+      <description>End.M.GTP6.Di</description>
+      <xref type="rfc" data="rfc9433"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2023-02-23">
+      <value>71</value>
+      <hex>0x0047</hex>
+      <description>End.M.GTP6.E</description>
+      <xref type="rfc" data="rfc9433"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12" updated="2023-02-23">
+      <value>72</value>
+      <hex>0x0048</hex>
+      <description>End.M.GTP4.E</description>
+      <xref type="rfc" data="rfc9433"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-03-12">
+      <value>73</value>
+      <hex>0x0049</hex>
+      <description>End.DTM</description>
+      <xref type="draft" data="draft-agrawal-spring-srv6-mpls-interworking-05"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-05-12">
+      <value>74</value>
+      <hex>0x004A</hex>
+      <description>End.M (Mirror SID)</description>
+      <xref type="draft" data="draft-ietf-rtgwg-srv6-egress-protection-02"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2022-07-05" updated="2023-08-28">
+      <value>75</value>
+      <hex>0x004B</hex>
+      <description>End.Replicate</description>
+      <xref type="rfc" data="rfc9524"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2022-07-05">
+      <value>76</value>
+      <hex>0x004C</hex>
+      <description>End.DTMC4</description>
+      <xref type="draft" data="draft-ietf-bess-mvpn-evpn-sr-p2mp-06"/>
+      <controller><xref type="person" data="Rishabh_Parekh"/></controller>
+    </record>
+    <record date="2022-07-05">
+      <value>77</value>
+      <hex>0x004D</hex>
+      <description>End.DTMC6</description>
+      <xref type="draft" data="draft-ietf-bess-mvpn-evpn-sr-p2mp-06"/>
+      <controller><xref type="person" data="Rishabh_Parekh"/></controller>
+    </record>
+    <record date="2022-07-05">
+      <value>78</value>
+      <hex>0x004E</hex>
+      <description>End.DTMC46</description>
+      <xref type="draft" data="draft-ietf-bess-mvpn-evpn-sr-p2mp-06"/>
+      <controller><xref type="person" data="Rishabh_Parekh"/></controller>
+    </record>
+    <record date="2022-11-23">
+      <value>79</value>
+      <hex>0x004F</hex>
+      <description>End.BXC</description>
+      <xref type="draft" data="draft-han-spring-srv6-underlay-tunnel-programming-02"/>
+      <controller><xref type="person" data="Ran_Chen"/></controller>
+    </record>
+    <record date="2022-11-23">
+      <value>80</value>
+      <hex>0x0050</hex>
+      <description>End.BXC with PSP</description>
+      <xref type="draft" data="draft-han-spring-srv6-underlay-tunnel-programming-02"/>
+      <controller><xref type="person" data="Ran_Chen"/></controller>
+    </record>
+    <record date="2022-11-23">
+      <value>81</value>
+      <hex>0x0051</hex>
+      <description>End.BXC with USP</description>
+      <xref type="draft" data="draft-han-spring-srv6-underlay-tunnel-programming-02"/>
+      <controller><xref type="person" data="Ran_Chen"/></controller>
+    </record>
+    <record date="2022-11-23">
+      <value>82</value>
+      <hex>0x0052</hex>
+      <description>End.BXC with USD</description>
+      <xref type="draft" data="draft-han-spring-srv6-underlay-tunnel-programming-02"/>
+      <controller><xref type="person" data="Ran_Chen"/></controller>
+    </record>
+    <record date="2022-11-23">
+      <value>83</value>
+      <hex>0x0053</hex>
+      <description>End.BXC with PSP, USP &amp; USD</description>
+      <xref type="draft" data="draft-han-spring-srv6-underlay-tunnel-programming-02"/>
+      <controller><xref type="person" data="Ran_Chen"/></controller>
+    </record>
+    <record date="2023-06-06">
+      <value>84</value>
+      <hex>0x0054</hex>
+      <description>End.NSH - NSH Segment</description>
+      <xref type="rfc" data="rfc9491"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>85</value>
+      <hex>0x0055</hex>
+      <description>End.T with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>86</value>
+      <hex>0x0056</hex>
+      <description>End.T with NEXT-CSID &amp; PSP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>87</value>
+      <hex>0x0057</hex>
+      <description>End.T with NEXT-CSID &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>88</value>
+      <hex>0x0058</hex>
+      <description>End.T with NEXT-CSID, PSP &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>89</value>
+      <hex>0x0059</hex>
+      <description>End.T with NEXT-CSID &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>90</value>
+      <hex>0x005A</hex>
+      <description>End.T with NEXT-CSID, PSP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>91</value>
+      <hex>0x005B</hex>
+      <description>End.T with NEXT-CSID, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>92</value>
+      <hex>0x005C</hex>
+      <description>End.T with NEXT-CSID, PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>93</value>
+      <hex>0x005D</hex>
+      <description>End.B6.Encaps with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>94</value>
+      <hex>0x005E</hex>
+      <description>End.B6.Encaps.Red with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-07-27" updated="2025-02-12">
+      <value>95</value>
+      <hex>0x005F</hex>
+      <description>End.BM with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2024-01-18" updated="2025-02-12">
+      <value>96</value>
+      <hex>0x0060</hex>
+      <description>End.LBS with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2024-01-18" updated="2025-02-12">
+      <value>97</value>
+      <hex>0x0061</hex>
+      <description>End.XLBS with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2025-09-03">
+      <value>98</value>
+      <hex>0x0062</hex>
+      <description>End.B6.Encaps.Red with NEXT-CSID, PSP &amp; USD</description>
+      <xref type="person" data="Pablo_Camarillo"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2025-09-03">
+      <value>99</value>
+      <hex>0x0063</hex>
+      <description>End.B6.Insert.Red with NEXT-CSID, PSP &amp; USD</description>
+      <xref type="person" data="Pablo_Camarillo"/>
+      <controller><xref type="person" data="Pablo_Camarillo"/></controller>
+    </record>
+    <record date="2021-06-07">
+      <value>100</value>
+      <hex>0x0064</hex>
+      <description>End.PSID</description>
+      <xref type="draft" data="draft-ietf-spring-srv6-path-segment-02"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>    
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>101</value>
+      <hex>0x0065</hex>
+      <description>End with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>102</value>
+      <hex>0x0066</hex>
+      <description>End with REPLACE-CSID &amp; PSP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-01-19" updated="2025-02-12">
+      <value>103</value>
+      <hex>0x0067</hex>
+      <description>End with REPLACE-CSID &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>104</value>
+      <hex>0x0068</hex>
+      <description>End with REPLACE-CSID, PSP &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>105</value>
+      <hex>0x0069</hex>
+      <description>End.X with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>106</value>
+      <hex>0x006A</hex>
+      <description>End.X with REPLACE-CSID &amp; PSP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-01-19" updated="2025-02-12">
+      <value>107</value>
+      <hex>0x006B</hex>
+      <description>End.X with REPLACE-CSID &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>108</value>
+      <hex>0x006C</hex>
+      <description>End.X with REPLACE-CSID, PSP &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>109</value>
+      <hex>0x006D</hex>
+      <description>End.T with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>110</value>
+      <hex>0x006E</hex>
+      <description>End.T with REPLACE-CSID &amp; PSP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-13" updated="2025-02-12">
+      <value>111</value>
+      <hex>0x006F</hex>
+      <description>End.T with REPLACE-CSID &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>112</value>
+      <hex>0x0070</hex>
+      <description>End.T with REPLACE-CSID, PSP &amp; USP</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record>
+      <value>113</value>
+      <hex>0x0071</hex>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>114</value>
+      <hex>0x0072</hex>
+      <description>End.B6.Encaps with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>115</value>
+      <hex>0x0073</hex>
+      <description>End.BM with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>116</value>
+      <hex>0x0074</hex>
+      <description>End.DX6 with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>117</value>
+      <hex>0x0075</hex>
+      <description>End.DX4 with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>118</value>
+      <hex>0x0076</hex>
+      <description>End.DT6 with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>119</value>
+      <hex>0x0077</hex>
+      <description>End.DT4 with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>120</value>
+      <hex>0x0078</hex>
+      <description>End.DT46 with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>121</value>
+      <hex>0x0079</hex>
+      <description>End.DX2 with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>122</value>
+      <hex>0x007A</hex>
+      <description>End.DX2V with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>123</value>
+      <hex>0x007B</hex>
+      <description>End.DT2U with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>124</value>
+      <hex>0x007C</hex>
+      <description>End.DT2M with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record>
+      <value>125-126</value>
+      <hex>0x007D-0x007E</hex>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>127</value>
+      <hex>0x007F</hex>
+      <description>End.B6.Encaps.Red with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-01-19" updated="2025-02-12">
+      <value>128</value>
+      <hex>0x0080</hex>
+      <description>End with REPLACE-CSID &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-01-19" updated="2025-02-12">
+      <value>129</value>
+      <hex>0x0081</hex>
+      <description>End with REPLACE-CSID, PSP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>130</value>
+      <hex>0x0082</hex>
+      <description>End with REPLACE-CSID, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>131</value>
+      <hex>0x0083</hex>
+      <description>End with REPLACE-CSID, PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-01-19" updated="2025-02-12">
+      <value>132</value>
+      <hex>0x0084</hex>
+      <description>End.X with REPLACE-CSID &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>133</value>
+      <hex>0x0085</hex>
+      <description>End.X with REPLACE-CSID, PSP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-01-19" updated="2025-02-12">
+      <value>134</value>
+      <hex>0x0086</hex>
+      <description>End.X with REPLACE-CSID, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>135</value>
+      <hex>0x0087</hex>
+      <description>End.X with REPLACE-CSID, PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>136</value>
+      <hex>0x0088</hex>
+      <description>End.T with REPLACE-CSID &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>137</value>
+      <hex>0x0089</hex>
+      <description>End.T with REPLACE-CSID, PSP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2023-04-14" updated="2025-02-12">
+      <value>138</value>
+      <hex>0x008A</hex>
+      <description>End.T with REPLACE-CSID, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2021-06-04" updated="2025-02-12">
+      <value>139</value>
+      <hex>0x008B</hex>
+      <description>End.T with REPLACE-CSID, PSP, USP &amp; USD</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2024-01-18" updated="2025-02-12">
+      <value>140</value>
+      <hex>0x008C</hex>
+      <description>End.LBS with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2024-01-18" updated="2025-02-12">
+      <value>141</value>
+      <hex>0x008D</hex>
+      <description>End.XLBS with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9800"/>
+      <controller>IETF</controller>
+    </record>
+    <record>
+      <value>142-149</value>
+      <hex>0x008E-0x0095</hex>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2022-10-14">
+      <value>150</value>
+      <hex>0x0096</hex>
+      <description>End.XU</description>
+      <xref type="draft" data="draft-dong-spring-srv6-inter-layer-programming-04"/>
+      <controller><xref type="person" data="Jie_Dong"/></controller>
+    </record>
+    <record date="2022-10-14">
+      <value>151</value>
+      <hex>0x0097</hex>
+      <description>End.XU with PSP</description>
+      <xref type="draft" data="draft-dong-spring-srv6-inter-layer-programming-04"/>
+      <controller><xref type="person" data="Jie_Dong"/></controller>
+    </record>
+    <record date="2022-10-14">
+      <value>152</value>
+      <hex>0x0098</hex>
+      <description>End.XU with USP</description>
+      <xref type="draft" data="draft-dong-spring-srv6-inter-layer-programming-04"/>
+      <controller><xref type="person" data="Jie_Dong"/></controller>
+    </record>
+    <record date="2022-10-14">
+      <value>153</value>
+      <hex>0x0099</hex>
+      <description>End.XU with USD</description>
+      <xref type="draft" data="draft-dong-spring-srv6-inter-layer-programming-04"/>
+      <controller><xref type="person" data="Jie_Dong"/></controller>
+    </record>
+    <record date="2022-10-14">
+      <value>154</value>
+      <hex>0x009A</hex>
+      <description>End.XU with PSP, USP &amp; USD</description>
+      <xref type="draft" data="draft-dong-spring-srv6-inter-layer-programming-04"/>
+      <controller><xref type="person" data="Jie_Dong"/></controller>
+    </record>
+    <record date="2022-10-14">
+      <value>155</value>
+      <hex>0x009B</hex>
+      <description>End.XU with REPPLACE-CSID</description>
+      <xref type="draft" data="draft-dong-spring-srv6-inter-layer-programming-04"/>
+      <controller><xref type="person" data="Jie_Dong"/></controller>
+    </record>
+    <record date="2022-10-14">
+      <value>156</value>
+      <hex>0x009C</hex>
+      <description>End.XU with REPPLACE-CSID &amp; PSP</description>
+      <xref type="draft" data="draft-dong-spring-srv6-inter-layer-programming-04"/>
+      <controller><xref type="person" data="Jie_Dong"/></controller>
+    </record>
+    <record date="2022-10-14">
+      <value>157</value>
+      <hex>0x009D</hex>
+      <description>End.XU with REPPLACE-CSID &amp; PSP &amp; USP &amp; USD</description>
+      <xref type="draft" data="draft-dong-spring-srv6-inter-layer-programming-04"/>
+      <controller><xref type="person" data="Jie_Dong"/></controller>
+    </record>
+    <record date="2024-04-16">
+      <value>158</value>
+      <hex>0x009E</hex>
+      <description>End.DX1</description>
+      <xref type="rfc" data="rfc9801"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2024-04-16">
+      <value>159</value>
+      <hex>0x009F</hex>
+      <description>End.DX1 with NEXT-CSID</description>
+      <xref type="rfc" data="rfc9801"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2024-04-16">
+      <value>160</value>
+      <hex>0x00A0</hex>
+      <description>End.DX1 with REPLACE-CSID</description>
+      <xref type="rfc" data="rfc9801"/>
+      <controller>IETF</controller>
+    </record>
+    <record date="2024-11-06">
+      <value>161</value>
+      <hex>0x00A1</hex>
+      <description>End.AN - SR-aware function</description>
+      <xref type="draft" data="draft-ietf-spring-sr-service-programming-10"/>
+      <controller><xref type="person" data="Francois_Clad"/></controller>
+    </record>
+    <record date="2024-11-06">
+      <value>162</value>
+      <hex>0x00A2</hex>
+      <description>End.AS - Static proxy</description>
+      <xref type="draft" data="draft-ietf-spring-sr-service-programming-10"/>
+      <controller><xref type="person" data="Francois_Clad"/></controller>
+    </record>
+    <record date="2024-11-06">
+      <value>163</value>
+      <hex>0x00A3</hex>
+      <description>End.AD - Dynamic proxy</description>
+      <xref type="draft" data="draft-ietf-spring-sr-service-programming-10"/>
+      <controller><xref type="person" data="Francois_Clad"/></controller>
+    </record>
+    <record date="2024-11-06">
+      <value>164</value>
+      <hex>0x00A4</hex>
+      <description>End.AM - Masquerading proxy</description>
+      <xref type="draft" data="draft-ietf-spring-sr-service-programming-10"/>
+      <controller><xref type="person" data="Francois_Clad"/></controller>
+    </record>
+    <record date="2024-11-06">
+      <value>165</value>
+      <hex>0x00A5</hex>
+      <description>End.AM - Masquerading proxy with NAT</description>
+      <xref type="draft" data="draft-ietf-spring-sr-service-programming-10"/>
+      <controller><xref type="person" data="Francois_Clad"/></controller>
+    </record>
+    <record date="2024-11-06">
+      <value>166</value>
+      <hex>0x00A6</hex>
+      <description>End.AM - Masquerading proxy with Caching</description>
+      <xref type="draft" data="draft-ietf-spring-sr-service-programming-10"/>
+      <controller><xref type="person" data="Francois_Clad"/></controller>
+    </record>
+    <record date="2024-11-06">
+      <value>167</value>
+      <hex>0x00A7</hex>
+      <description>End.AM - Masquerading proxy with NAT &amp; Caching</description>
+      <xref type="draft" data="draft-ietf-spring-sr-service-programming-10"/>
+      <controller><xref type="person" data="Francois_Clad"/></controller>
+    </record>
+    <record date="2025-02-17">
+      <value>168</value>
+      <hex>0x00A8</hex>
+      <description>End.M.GTP6.E.Red</description>
+      <xref type="draft" data="draft-kawakami-dmm-srv6-gtp6e-reduced-02"/>
+      <controller><xref type="person" data="Yuya_Kawakami"/></controller>
+    </record>
+    <record date="2025-02-28">
+      <value>169</value>
+      <hex>0x00A9</hex>
+      <description>End.AN.CI.S</description>
+      <xref type="draft" data="draft-lin-spring-srv6-aware-context-indicator-04"/>
+      <controller><xref type="person" data="Jiaming_Ye"/></controller>
+    </record>
+    <record date="2025-02-28">
+      <value>170</value>
+      <hex>0x00AA</hex>
+      <description>End.AN.CI.D.A</description>
+      <xref type="draft" data="draft-lin-spring-srv6-aware-context-indicator-04"/>
+      <controller><xref type="person" data="Jiaming_Ye"/></controller>
+    </record>
+    <record date="2025-02-28">
+      <value>171</value>
+      <hex>0x00AB</hex>
+      <description>End.AN.CI.D.T</description>
+      <xref type="draft" data="draft-lin-spring-srv6-aware-context-indicator-04"/>
+      <controller><xref type="person" data="Jiaming_Ye"/></controller>
+    </record>
+    <record date="2025-02-28">
+      <value>172</value>
+      <hex>0x00AC</hex>
+      <description>End.AN.CI.D.V</description>
+      <xref type="draft" data="draft-lin-spring-srv6-aware-context-indicator-04"/>
+      <controller><xref type="person" data="Jiaming_Ye"/></controller>
+    </record>
+    <record date="2025-02-28">
+      <value>173</value>
+      <hex>0x00AD</hex>
+      <description>End.AN.CI.D.D</description>
+      <xref type="draft" data="draft-lin-spring-srv6-aware-context-indicator-04"/>
+      <controller><xref type="person" data="Jiaming_Ye"/></controller>
+    </record>
+    <record>
+      <value>174-179</value>
+      <hex>0x00AE-0x00B3</hex>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2025-04-25">
+      <value>180</value>
+      <hex>0x00B4</hex>
+      <description>End.AS with REPLACE-CSID</description>
+      <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>
+    <record date="2025-04-25">
+      <value>181</value>
+      <hex>0x00B5</hex>
+      <description>End.AS with NEXT-CSID</description>
+      <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>
+    <record date="2025-04-25">
+      <value>182</value>
+      <hex>0x00B6</hex>
+      <description>End.AD with REPLACE-CSID</description>
+      <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>
+    <record date="2025-04-25">
+      <value>183</value>
+      <hex>0x00B7</hex>
+      <description>End.AD with NEXT-CSID</description>
+      <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>
+    <record date="2025-04-25">
+      <value>184</value>
+      <hex>0x00B8</hex>
+      <description>End.AM with REPLACE-CSID</description>
+      <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>
+    <record date="2025-04-25">
+      <value>185</value>
+      <hex>0x00B9</hex>
+      <description>End.AM with NEXT-CSID</description>
+      <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>
+    <record date="2025-04-25">
+      <value>186</value>
+      <hex>0x00BA</hex>
+      <description>End.AMN with REPLACE-CSID</description>
+      <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>
+    <record date="2025-04-25">
+      <value>187</value>
+      <hex>0x00BB</hex>
+      <description>End.AMN with NEXT-CSID</description>
+      <xref type="draft" data="draft-lh-spring-srv6-sfc-csid-04"/>
+      <controller><xref type="person" data="Cheng_Li"/></controller>
+    </record>
+    <record>
+      <value>188-32766</value>
+      <hex>0x00BC-0x7FFE</hex>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2021-01-08">
+      <value>32767</value>
+      <hex>0x7FFF</hex>
+      <description>The SID defined in <xref type="rfc" data="rfc8754"/></description>
+      <xref type="rfc" data="rfc8986"/>
+      <xref type="rfc" data="rfc8754"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>32768-34815</value>
+      <hex>0x8000-0x87FF</hex>
+      <description>Reserved for Private Use</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>34816-65534</value>
+      <hex>0x8800-0xFFFE</hex>
+      <description>Reserved</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+    <record date="2021-01-08">
+      <value>65535</value>
+      <hex>0xFFFF</hex>
+      <description>Opaque</description>
+      <xref type="rfc" data="rfc8986"/>
+	  <controller>IETF</controller>
+    </record>
+  </registry>
+  
+  <registry id="segment-types">
+    <title>Segment Types</title>
+    <xref type="rfc" data="rfc9256"/>
+    <registration_rule>Specification Required</registration_rule>
+    <expert>Ketan Talaulikar, Matthew Bocci</expert>
+    <record date="2022-03-31">
+      <value>A</value>
+      <description>SR-MPLS Label</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>B</value>
+      <description>SRv6 SID</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>C</value>
+      <description>IPv4 Prefix with optional SR Algorithm</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>D</value>
+      <description>IPv6 Global Prefix with optional SR Algorithm for SR-MPLS</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>E</value>
+      <description>IPv4 Prefix with Local Interface ID</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>F</value>
+      <description>IPv4 Addresses for link endpoints as Local, Remote pair</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>G</value>
+      <description>IPv6 Prefix and Interface ID for link endpoints as Local, Remote pair for SR-MPLS</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>H</value>
+      <description>IPv6 Addresses for link endpoints as Local, Remote pair for SR-MPLS</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>I</value>
+      <description>IPv6 Global Prefix with optional SR Algorithm for SRv6</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>J</value>
+      <description>IPv6 Prefix and Interface ID for link endpoints as Local, Remote pair for SRv6</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+    <record date="2022-03-31">
+      <value>K</value>
+      <description>IPv6 Addresses for link endpoints as Local, Remote pair for SRv6</description>
+      <xref type="rfc" data="rfc9256"/>
+    </record>
+  </registry>
+
+  <registry id="sr-policy-enlp-values">
+    <title>SR Policy ENLP Values</title>
+    <xref type="draft" data="RFC-ietf-idr-sr-policy-safi-13"/>
+    <registration_rule>Standards Action</registration_rule>
+    <record date="2025-02-18">
+      <value>0</value>
+      <description>Reserved</description>
+      <xref type="draft" data="RFC-ietf-idr-sr-policy-safi-13"/>
+    </record>
+    <record date="2025-02-18" updated="2025-08-04">
+      <value>1</value>
+      <description>Push an IPv4 Explicit NULL label on an unlabeled IPv4 packet
+      but do not push an IPv6 Explicit NULL label on an unlabeled IPv6 packet</description>
+      <xref type="draft" data="RFC-ietf-idr-sr-policy-safi-13"/>
+    </record>
+    <record date="2025-02-18" updated="2025-08-04">
+      <value>2</value>
+      <description>Push an IPv6 Explicit NULL label on an unlabeled IPv6 packet
+      but do not push an IPv4 Explicit NULL label on an unlabeled IPv4 packet</description>
+      <xref type="draft" data="RFC-ietf-idr-sr-policy-safi-13"/>
+    </record>
+    <record date="2025-02-18" updated="2025-08-04">
+      <value>3</value>
+      <description>Push an IPv6 Explicit NULL label on an unlabeled IPv6 packet
+      and push an IPv4 Explicit NULL label on an unlabeled IPv4 packet</description>
+      <xref type="draft" data="RFC-ietf-idr-sr-policy-safi-13"/>
+    </record>
+    <record date="2025-02-18">
+      <value>4</value>
+      <description>Do not push an Explicit NULL label</description>
+      <xref type="draft" data="RFC-ietf-idr-sr-policy-safi-13"/>
+    </record>
+    <record>
+      <value>5-255</value>
+      <description>Unassigned</description>
+    </record>
+  </registry>
+
+  <registry id="sr-policy-protocol-origin">
+    <title>SR Policy Protocol Origin</title>
+    <xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/>
+    <range>
+    <value>1-250</value>
+    <registration_rule>Expert Review</registration_rule>
+    </range>
+    <range>
+    <value>251-255</value>
+    <registration_rule>Private Use</registration_rule>
+    </range>
+    <expert>Unassigned</expert>
+    <record date="2025-03-16">
+      <value>0</value>
+      <description>Reserved</description>
+      <reference><xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/></reference>
+      <controller>IETF</controller>
+    </record>
+    <record date="2025-03-16">
+      <value>1</value>
+      <description>PCEP</description>
+      <reference><xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/></reference>
+      <controller>IETF</controller>
+    </record>
+    <record date="2025-03-16">
+      <value>2</value>
+      <description>BGP SR Policy</description>
+      <reference><xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/></reference>
+      <controller>IETF</controller>
+    </record>
+    <record date="2025-03-16">
+      <value>3</value>
+      <description>Configuration (CLI, YANG model via NETCONF, etc.)</description>
+      <reference><xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/></reference>
+      <controller>IETF</controller>
+    </record>
+    <record>
+      <value>4-9</value>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2025-03-16">
+      <value>10</value>
+      <description>PCEP (In PCEP or when BGP-LS Producer is PCE)</description>
+      <reference><xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/></reference>
+      <controller>IETF</controller>
+    </record>
+    <record>
+      <value>11-19</value>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2025-03-16">
+      <value>20</value>
+      <description>BGP SR Policy (In PCEP or when BGP-LS Producer is PCE)</description>
+      <reference><xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/></reference>
+      <controller>IETF</controller>
+    </record>
+    <record>
+      <value>21-29</value>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2025-03-16">
+      <value>30</value>
+      <description>Configuration (CLI, YANG model via NETCONF, etc.) (In PCEP or when BGP-LS Producer is PCE)</description>
+      <reference><xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/></reference>
+      <controller>IETF</controller>
+    </record>
+    <record>
+      <value>31-250</value>
+      <description>Unassigned</description>
+      <controller/>
+    </record>
+    <record date="2025-03-16">
+      <value>251-255</value>
+      <description>Reserved for Private Use</description>
+      <reference><xref type="draft" data="RFC-ietf-idr-bgp-ls-sr-policy-17"/></reference>
+      <controller>IETF</controller>
+    </record>
+    </registry>
+
+  <people>
+    <person id="Cheng_Li">
+      <name>Cheng Li</name>
+      <uri>mailto:c.l&amp;huawei.com</uri>
+      <updated>2025-04-25</updated>
+    </person>
+    <person id="Francois_Clad">
+      <name>Francois Clad</name>
+      <uri>mailto:fclad.ietf&amp;gmail.com</uri>
+      <updated>2024-01-18</updated>
+    </person>
+    <person id="Jiaming_Ye">
+      <name>Jiaming Ye</name>
+      <uri>mailto:yejiaming&amp;chinamobile.com</uri>
+      <updated>2025-02-28</updated>
+    </person>
+    <person id="Jie_Dong">
+      <name>Jie Dong</name>
+      <uri>mailto:jie.dong&amp;huawei.com</uri>
+      <updated>2022-10-14</updated>
+    </person>
+    <person id="Pablo_Camarillo">
+      <name>Pablo Camarillo</name>
+      <uri>mailto:pcamaril&amp;cisco.com</uri>
+      <updated>2023-01-13</updated>
+    </person>
+    <person id="Ran_Chen">
+      <name>Ran Chen</name>
+      <uri>mailto:chen.ran&amp;zte.com.cn</uri>
+      <updated>2022-11-23</updated>
+    </person>
+    <person id="Rishabh_Parekh">
+      <name>Rishabh Parekh</name>
+      <uri>mailto:riparekh&amp;cisco.com</uri>
+      <updated>2022-07-05</updated>
+    </person>
+    <person id="Yuya_Kawakami">
+      <name>Yuya Kawakami</name>
+      <uri>mailto:yuyarin&amp;yuyarin.net</uri>
+      <updated>2025-02-17</updated>
+    </person>
+  </people>
+</registry>

@@ -24,6 +24,8 @@ const PROTOCOL_NUMBERS_URL: &str =
     "https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xml";
 const PSAMP_PARAMETERS_URL: &str =
     "https://www.iana.org/assignments/psamp-parameters/psamp-parameters.xml";
+const SEGMENT_ROUTING_URL: &str =
+    "https://www.iana.org/assignments/segment-routing/segment-routing.xml";
 
 fn get_iana_config(
     poll_iana_registry: bool,
@@ -57,6 +59,12 @@ fn get_iana_config(
             String::from("psamp-parameters-1"),
             304,
         ));
+        external_sub_registries.push(ExternalSubRegistrySource::new(
+            RegistrySource::Http(SEGMENT_ROUTING_URL.to_string()),
+            SubRegistryType::ValueNameDescRegistry,
+            String::from("srv6-endpoint-behaviors"),
+            502,
+        ));
         SourceConfig::new(
             RegistrySource::Http(IPFIX_URL.to_string()),
             RegistryType::IanaXML,
@@ -78,7 +86,14 @@ fn get_iana_config(
             .join("iana_protocol_numbers.xml")
             .into_os_string()
             .into_string()
-            .expect("Couldn't load protocolNumbers registry");
+            .expect("Couldn't load protocolNumbers registry file");
+
+        // Segment Routing SubRegistry Path
+        let segment_routing_path = sub_registry_path
+            .join("iana_segment_routing.xml")
+            .into_os_string()
+            .into_string()
+            .expect("Couldn't load segmentRouting registry file");
 
         // Psamp Parameters SubRegistry Path
         let psamp_parameters_path = sub_registry_path
@@ -92,6 +107,12 @@ fn get_iana_config(
             SubRegistryType::ValueNameDescRegistry,
             String::from("protocol-numbers-1"),
             4,
+        ));
+        external_sub_registries.push(ExternalSubRegistrySource::new(
+            RegistrySource::File(segment_routing_path.clone()),
+            SubRegistryType::ValueNameDescRegistry,
+            String::from("srv6-endpoint-behaviors"),
+            502,
         ));
 
         external_sub_registries.push(ExternalSubRegistrySource::new(
