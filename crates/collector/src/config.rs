@@ -14,7 +14,10 @@
 // limitations under the License.
 
 use crate::{
-    flow::{aggregation::AggregationConfig, config::FlowOutputConfig, sonata::KafkaConsumerConfig},
+    flow::{
+        aggregation::AggregationConfig, config::FlowOutputConfig, enrichment::EnrichmentConfig,
+        sonata::KafkaConsumerConfig,
+    },
     publishers::{http::HttpPublisherEndpoint, kafka_avro, kafka_json, kafka_yang},
     telemetry::config::TelemetryYangConverter,
 };
@@ -51,6 +54,10 @@ pub(crate) const fn default_cmd_size_buffer() -> usize {
 
 pub(crate) const fn default_buffer_size() -> usize {
     1_000
+}
+
+pub(crate) const fn default_shards() -> usize {
+    1
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -198,6 +205,12 @@ impl From<Binding> for udp_notif_supervisor::BindingAddress {
 pub struct PublisherConfig {
     #[serde(default = "default_buffer_size")]
     pub buffer_size: usize,
+
+    #[serde(default = "default_shards")]
+    pub shards: usize,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub enrichment: Option<EnrichmentConfig>,
 
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub aggregation: Option<AggregationConfig>,

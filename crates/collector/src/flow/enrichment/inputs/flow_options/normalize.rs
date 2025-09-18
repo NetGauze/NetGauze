@@ -20,7 +20,7 @@
 //! - Converting records to enrichment operations
 
 use crate::flow::{
-    enrichment::{EnrichmentOperation, Scope},
+    enrichment::{EnrichmentOperation, EnrichmentPayload, Scope},
     types::{FieldRefLookup, IndexedDataRecord},
 };
 use netgauze_flow_pkt::{
@@ -385,6 +385,29 @@ impl OptionsDataRecord {
         Ok(records)
     }
 
+    /// Normalize unclassified records by filtering out some IEs
+    fn normalize_unclassified_type(record: IndexedDataRecord) -> IndexedDataRecord {
+        let (scope_fields, fields) = record.into_parts();
+
+        let scope_fields: Vec<Field> = scope_fields
+            .into_values()
+            .filter(|field| {
+                !matches!(
+                    field,
+                    Field::paddingOctets(_) | Field::exportingProcessId(_) /* ignore to support
+                                                                            * 6wind */
+                )
+            })
+            .collect();
+
+        let fields: Vec<Field> = fields
+            .into_values()
+            .filter(|field| !matches!(field, Field::paddingOctets(_)))
+            .collect();
+
+        IndexedDataRecord::new(&scope_fields, &fields)
+    }
+
     /// Create an enrichment upsert operation from a data record
     fn upsert_from_rec(
         peer_ip: IpAddr,
@@ -392,15 +415,15 @@ impl OptionsDataRecord {
         weight: u8,
         record: &IndexedDataRecord,
     ) -> EnrichmentOperation {
-        EnrichmentOperation::Upsert {
+        EnrichmentOperation::Upsert(EnrichmentPayload {
             ip: peer_ip,
             scope: Scope::new(
                 obs_id,
                 Some(record.scope_fields().values().cloned().collect()),
             ),
             weight,
-            fields: record.fields().values().cloned().collect(),
-        }
+            fields: Some(record.fields().values().cloned().collect()),
+        })
     }
 
     /// Generate enrichment upsert operations from this options record
@@ -409,6 +432,7 @@ impl OptionsDataRecord {
     /// enrichment operations for each normalized record.
     pub fn into_enrichment_operations(
         self,
+        weight: u8,
         peer_ip: IpAddr,
         obs_id: u32,
     ) -> Result<Vec<EnrichmentOperation>, OptionsDataRecordError> {
@@ -417,21 +441,22 @@ impl OptionsDataRecord {
         match self {
             OptionsDataRecord::Sampling(record) => {
                 for rec in Self::normalize_sampling_type(record) {
-                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, 16, &rec));
+                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, weight, &rec));
                 }
             }
             OptionsDataRecord::Interface(record) => {
                 for rec in Self::normalize_interface_type(record)? {
-                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, 16, &rec));
+                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, weight, &rec));
                 }
             }
             OptionsDataRecord::Vrf(record) => {
                 for rec in Self::normalize_vrf_type(record)? {
-                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, 16, &rec));
+                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, weight, &rec));
                 }
             }
             OptionsDataRecord::Unclassified(record) => {
-                ops.push(Self::upsert_from_rec(peer_ip, obs_id, 10, &record));
+                let rec = Self::normalize_unclassified_type(record);
+                ops.push(Self::upsert_from_rec(peer_ip, obs_id, weight, &rec));
             }
         }
         Ok(ops)
