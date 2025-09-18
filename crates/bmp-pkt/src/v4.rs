@@ -231,9 +231,8 @@ pub enum PathStatus {
     AddPath = 0x00000080,
     FilteredInInboundPolicy = 0x00000100,
     FilteredInOutboundPolicy = 0x00000200,
-    InvalidRov = 0x00000400,
-    Stale = 0x00000800,
-    Suppressed = 0x00001000,
+    Stale = 0x00000400,
+    Suppressed = 0x00000800,
 }
 
 impl BitOr for PathStatus {
