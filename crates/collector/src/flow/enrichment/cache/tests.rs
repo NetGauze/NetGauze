@@ -32,7 +32,7 @@ fn test_enrichment_cache_upsert_new_entry() {
     ];
 
     // Upsert operation
-    cache.upsert(ip, scope.clone(), weight, fields.clone());
+    cache.upsert(ip, scope.clone(), weight, Some(fields.clone()));
 
     // Create expected cache
     let mut expected_fields = FxHashMap::default();
@@ -67,12 +67,12 @@ fn test_enrichment_cache_upsert_weight_replacement() {
     // Insert field with low weight
     let low_weight: Weight = 50;
     let fields1 = vec![Field::samplerName("low_priority".to_string().into())];
-    cache.upsert(ip, scope.clone(), low_weight, fields1);
+    cache.upsert(ip, scope.clone(), low_weight, Some(fields1));
 
     // Insert field with higher weight - should replace
     let high_weight: Weight = 150;
     let fields2 = vec![Field::samplerName("high_priority".to_string().into())];
-    cache.upsert(ip, scope.clone(), high_weight, fields2);
+    cache.upsert(ip, scope.clone(), high_weight, Some(fields2));
 
     // Create expected cache
     let mut expected_fields = FxHashMap::default();
@@ -103,12 +103,12 @@ fn test_enrichment_cache_upsert_weight_ignored() {
     // Insert field with high weight
     let high_weight: Weight = 200;
     let fields1 = vec![Field::samplerName("high_priority".to_string().into())];
-    cache.upsert(ip, scope.clone(), high_weight, fields1);
+    cache.upsert(ip, scope.clone(), high_weight, Some(fields1));
 
     // Try to insert field with lower weight - should be ignored
     let low_weight: Weight = 100;
     let fields2 = vec![Field::samplerName("low_priority".to_string().into())];
-    cache.upsert(ip, scope.clone(), low_weight, fields2);
+    cache.upsert(ip, scope.clone(), low_weight, Some(fields2));
 
     // Create expected cache
     let mut expected_fields = FxHashMap::default();
@@ -138,11 +138,11 @@ fn test_enrichment_cache_upsert_equal_weights() {
 
     // Insert first field
     let fields1 = vec![Field::samplerName("first".to_string().into())];
-    cache.upsert(ip, scope.clone(), weight, fields1);
+    cache.upsert(ip, scope.clone(), weight, Some(fields1));
 
     // Insert second field with equal weight - should replace
     let fields2 = vec![Field::samplerName("second".to_string().into())];
-    cache.upsert(ip, scope.clone(), weight, fields2);
+    cache.upsert(ip, scope.clone(), weight, Some(fields2));
 
     // Create expected cache
     let mut expected_fields = FxHashMap::default();
@@ -171,13 +171,13 @@ fn test_enrichment_cache_delete_by_weight() {
         Field::samplerName("test1".to_string().into()),
         Field::observationPointId(1),
     ];
-    cache.upsert(ip, scope.clone(), 50, fields);
+    cache.upsert(ip, scope.clone(), 50, Some(fields));
 
     let fields2 = vec![Field::meteringProcessId(42)];
-    cache.upsert(ip, scope.clone(), 150, fields2);
+    cache.upsert(ip, scope.clone(), 150, Some(fields2));
 
     let fields3 = vec![Field::observationDomainName("OBS_NAME".to_string().into())];
-    cache.upsert(ip, scope.clone(), 80, fields3);
+    cache.upsert(ip, scope.clone(), 80, Some(fields3));
 
     // Create expected cache
     let mut expected_fields = FxHashMap::default();
@@ -210,7 +210,7 @@ fn test_enrichment_cache_delete_by_weight() {
     assert_eq!(cache, expected_cache);
 
     // Delete fields with weight < 100
-    cache.delete(ip, scope.clone(), 100);
+    cache.delete(ip, scope.clone(), 100, None);
 
     // Create expected cache after delete
     let mut expected_fields = FxHashMap::default();
@@ -236,7 +236,7 @@ fn test_enrichment_cache_delete_empty_scope_cleanup() {
 
     // Insert field with low weight
     let fields = vec![Field::samplerName("test".to_string().into())];
-    cache.upsert(ip, scope.clone(), 50, fields);
+    cache.upsert(ip, scope.clone(), 50, Some(fields));
 
     // Create expected cache
     let mut expected_fields = FxHashMap::default();
@@ -254,7 +254,7 @@ fn test_enrichment_cache_delete_empty_scope_cleanup() {
     assert_eq!(cache, expected_cache);
 
     // Delete with higher weight - should remove all fields and cleanup scope
-    cache.delete(ip, scope.clone(), 100);
+    cache.delete(ip, scope.clone(), 100, None);
 
     // Create expected cache after delete (empty)
     let expected_cache: EnrichmentCache = vec![].into();
@@ -269,7 +269,7 @@ fn test_enrichment_cache_delete_nonexistent() {
     let scope = Scope::new(6000, None);
 
     // Delete from empty cache should not panic
-    cache.delete(ip, scope, 100);
+    cache.delete(ip, scope, 100, None);
     let expected_cache: EnrichmentCache = vec![].into();
     assert_eq!(cache, expected_cache);
 }
@@ -283,12 +283,12 @@ fn test_enrichment_cache_apply_enrichment_operations() {
 
     // Apply upsert operation
     let fields = vec![Field::samplerName("test_sampler".to_string().into())];
-    let upsert_op = EnrichmentOperation::Upsert {
+    let upsert_op = EnrichmentOperation::Upsert(EnrichmentPayload {
         ip,
         scope: scope.clone(),
         weight,
-        fields: fields.clone(),
-    };
+        fields: Some(fields.clone()),
+    });
     cache.apply_enrichment(upsert_op);
 
     // Create expected cache
@@ -309,11 +309,12 @@ fn test_enrichment_cache_apply_enrichment_operations() {
     assert_eq!(cache, expected_cache);
 
     // Apply delete operation
-    let delete_op = EnrichmentOperation::Delete {
+    let delete_op = EnrichmentOperation::Delete(EnrichmentPayload {
         ip,
         scope,
         weight: 200,
-    };
+        fields: None,
+    });
     cache.apply_enrichment(delete_op);
 
     // Create expected cache after delete operation (empty)
@@ -688,7 +689,7 @@ fn test_peer_metadata_get_enrichment_fields_weight_priority() {
     // Delete the global_sampler entry
     let ip = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
     let mut cache: EnrichmentCache = vec![(ip, peer_metadata)].into();
-    cache.delete(ip, (&global_scope).into(), 201); // weight 201 > 200 --> delete
+    cache.delete(ip, (&global_scope).into(), 201, None); // weight 201 > 200 --> delete
 
     // Get enrichment fields and compare (specific_sampler wins since has higher
     // weight)
@@ -703,7 +704,7 @@ fn test_peer_metadata_get_enrichment_fields_weight_priority() {
     assert_eq!(enrichment_fields, expected_enrichment_fields);
 
     // Delete the specific_sampler entry
-    cache.delete(ip, (&specific_scope).into(), 151); // weight 151 > 150 --> delete
+    cache.delete(ip, (&specific_scope).into(), 151, None); // weight 151 > 150 --> delete
 
     // Get enrichment fields and compare (more_specific_sampler is now the only
     // matching scope left)
@@ -863,7 +864,7 @@ fn test_enrichment_cache_get_enrichment_fields() {
     let weight: Weight = 100;
     let fields = vec![Field::observationPointId(42)];
 
-    cache.upsert(ip, scope, weight, fields);
+    cache.upsert(ip, scope, weight, Some(fields));
 
     let incoming_fields = vec![Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))];
     let result = cache.get_enrichment_fields(&ip, 1000, &incoming_fields);
@@ -880,11 +881,54 @@ fn test_enrichment_cache_get_enrichment_fields_not_found() {
     let weight: Weight = 100;
     let fields = vec![Field::observationPointId(42)];
 
-    cache.upsert(ip, scope, weight, fields);
+    cache.upsert(ip, scope, weight, Some(fields));
 
     let incoming_fields = vec![Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))];
 
     let result = cache.get_enrichment_fields(&ip, 1000, &incoming_fields);
 
     assert_eq!(result, None);
+}
+
+#[test]
+fn test_enrichment_cache_delete_specific_fields_weight_check() {
+    let mut cache = EnrichmentCache::new();
+    let ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100));
+    let scope = Scope::new(9000, None);
+
+    // Insert fields with different weights
+    cache.upsert(
+        ip,
+        scope.clone(),
+        200,
+        Some(vec![Field::samplerName("high_priority".to_string().into())]),
+    );
+    cache.upsert(
+        ip,
+        scope.clone(),
+        80,
+        Some(vec![Field::meteringProcessId(50)]),
+    );
+
+    // Try to delete specific fields (some wwith insufficient weight 150 < 200)
+    let fields_to_delete = vec![
+        Field::samplerName("high_priority".to_string().into()),
+        Field::meteringProcessId(50),
+    ];
+    cache.delete(ip, scope.clone(), 150, Some(fields_to_delete));
+
+    // Create expected cache after delete (only low-weight field removed)
+    let mut expected_fields = FxHashMap::default();
+    expected_fields.insert(
+        FieldRef::new(IE::samplerName, 0),
+        WeightedField::new(200, Field::samplerName("high_priority".to_string().into())),
+    );
+    let expected_peer_metadata = PeerMetadata(
+        vec![(scope.clone().into(), expected_fields)]
+            .into_iter()
+            .collect(),
+    );
+    let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
+
+    assert_eq!(cache, expected_cache);
 }

@@ -53,7 +53,6 @@ use strum_macros::Display;
 
 #[derive(Debug, Clone)]
 pub enum ConfigurationError {
-    InvalidWorkerCount,
     InvalidWindowDuration,
     LatenessExceedsWindowDuration,
     InvalidOperation { ie: IE, op: Op, reason: String },
@@ -62,7 +61,6 @@ pub enum ConfigurationError {
 impl std::fmt::Display for ConfigurationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidWorkerCount => write!(f, "workers must be greater than 0"),
             Self::InvalidWindowDuration => write!(f, "window_duration must be greater than 0"),
             Self::LatenessExceedsWindowDuration => {
                 write!(f, "lateness cannot exceed window_duration")
@@ -78,16 +76,12 @@ impl std::error::Error for ConfigurationError {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AggregationConfig {
-    pub workers: usize,
     pub window_duration: Duration,
     pub lateness: Duration,
     pub transform: IndexMap<IE, Transform>,
 }
 
 impl AggregationConfig {
-    pub fn workers(&self) -> usize {
-        self.workers
-    }
     pub fn window_duration(&self) -> Duration {
         self.window_duration
     }
@@ -102,7 +96,6 @@ impl AggregationConfig {
 impl Default for AggregationConfig {
     fn default() -> Self {
         AggregationConfig {
-            workers: 1,
             window_duration: Duration::from_secs(60),
             lateness: Duration::from_secs(10),
             transform: IndexMap::new(),
@@ -112,10 +105,6 @@ impl Default for AggregationConfig {
 
 impl AggregationConfig {
     pub fn validate(&self) -> Result<(), ConfigurationError> {
-        if self.workers == 0 {
-            return Err(ConfigurationError::InvalidWorkerCount);
-        }
-
         if self.window_duration.is_zero() {
             return Err(ConfigurationError::InvalidWindowDuration);
         }
