@@ -11,3 +11,6 @@ curl https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xml > re
 
 # Load the iana packet sampling (psamp) parameters from IANA registry as xml
 curl https://www.iana.org/assignments/psamp-parameters/psamp-parameters.xml > registry/subregistry/iana_psamp_parameters.xml
+
+# Load the iana segment routing parameters from IANA registry as xml
+curl https://www.iana.org/assignments/segment-routing/segment-routing.xml > registry/subregistry/iana_segment_routing.xml
