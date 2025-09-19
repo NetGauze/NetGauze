@@ -151,20 +151,20 @@ impl RouteMonitoringTlv {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRepr, Display)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMonitoringTlvType {
-    BgpUpdatePdu = 1,
+    StatelessParsing = 1,
     GroupTlv = 2,
     VrfTableName = 3,
-    StatelessParsing = 4,
+    BgpUpdatePdu = 4,
     PathMarking = 5,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum RouteMonitoringTlvValue {
-    BgpUpdate(BgpMessage),
-    VrfTableName(String),
-    GroupTlv(Vec<u16>),
     StatelessParsing(BgpCapability),
+    GroupTlv(Vec<u16>),
+    VrfTableName(String),
+    BgpUpdate(BgpMessage),
     PathMarking(PathMarking),
     Unknown { code: u16, value: Vec<u8> },
 }
