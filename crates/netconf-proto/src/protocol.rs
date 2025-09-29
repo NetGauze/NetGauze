@@ -216,19 +216,12 @@ pub enum RpcOperation {
     WellKnown(WellKnownOperation),
 }
 
-/// ```xml
-/// <xs:simpleType name="messageIdType">
-///     <xs:restriction base="xs:string">
-///         <xs:maxLength value="4095"/>
-///     </xs:restriction>
-/// </xs:simpleType>
-/// ```
-fn extract_message_id(open: &BytesStart<'_>) -> Result<Option<Box<str>>, ParsingError> {
-    let msg_id_attr = open
+fn extract_attribute(bytes_start: &BytesStart<'_>, attribute_name: &[u8]) -> Option<Box<str>> {
+    bytes_start
         .attributes()
         .map(|attr| match attr {
             Ok(attr) => {
-                if attr.key.local_name().into_inner() == b"message-id" {
+                if attr.key.local_name().into_inner() == attribute_name {
                     match attr.unescape_value() {
                         Ok(value) => Some(value.to_string().into_boxed_str()),
                         Err(_) => None,
@@ -240,7 +233,18 @@ fn extract_message_id(open: &BytesStart<'_>) -> Result<Option<Box<str>>, Parsing
             Err(_) => None,
         })
         .find(|x| x.is_some())
-        .flatten();
+        .flatten()
+}
+
+/// ```xml
+/// <xs:simpleType name="messageIdType">
+///     <xs:restriction base="xs:string">
+///         <xs:maxLength value="4095"/>
+///     </xs:restriction>
+/// </xs:simpleType>
+/// ```
+fn extract_message_id(open: &BytesStart<'_>) -> Result<Option<Box<str>>, ParsingError> {
+    let msg_id_attr = extract_attribute(open, b"message-id");
     if let Some(msg_id) = &msg_id_attr {
         if msg_id.len() > 4095 {
             return Err(ParsingError::InvalidValue(format!(
