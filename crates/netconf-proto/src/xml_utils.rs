@@ -328,17 +328,17 @@ impl<R: io::BufRead> XmlParser<R> {
     #[inline]
     pub fn tag_string(&mut self) -> Result<Box<str>, ParsingError> {
         self.ensure_parent_has_child()?;
-        let mut accomulator = String::new();
+        let mut accumulator = String::new();
         loop {
             match self.peek() {
                 Event::CData(unescaped) => {
                     let decoded = unescaped.decode()?;
-                    accomulator.push_str(decoded.as_ref());
+                    accumulator.push_str(decoded.as_ref());
                     self.next_event()?
                 }
                 Event::Text(escaped) => {
                     let decoded = escaped.decode()?;
-                    accomulator.push_str(decoded.as_ref());
+                    accumulator.push_str(decoded.as_ref());
                     self.next_event()?
                 }
                 Event::GeneralRef(general_ref) => {
@@ -351,17 +351,17 @@ impl<R: io::BufRead> XmlParser<R> {
                         "gt" => ">",
                         _ => decoded.as_ref(),
                     };
-                    accomulator.push_str(replaced);
+                    accumulator.push_str(replaced);
                     self.next_event()?
                 }
                 Event::End(_) | Event::Start(_) | Event::Empty(_) => {
-                    if accomulator.is_empty() {
+                    if accumulator.is_empty() {
                         return Err(ParsingError::WrongToken {
                             expecting: "text".to_string(),
                             found: self.peek().clone(),
                         });
                     }
-                    return Ok(accomulator.into());
+                    return Ok(accumulator.into());
                 }
                 _ => self.next_event()?,
             };
