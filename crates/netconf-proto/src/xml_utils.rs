@@ -214,7 +214,7 @@ impl<R: io::BufRead> XmlParser<R> {
     }
 
     /// read one more tag
-    fn next(&mut self) -> Result<Event<'static>, ParsingError> {
+    pub fn next_event(&mut self) -> Result<Event<'static>, ParsingError> {
         self.buf.clear();
         let evt = self.ns_reader.read_event_into(&mut self.buf)?.into_owned();
         self.previous = std::mem::replace(&mut self.current, evt);
@@ -235,14 +235,14 @@ impl<R: io::BufRead> XmlParser<R> {
                 let _span = self
                     .ns_reader
                     .read_to_end_into(b.to_end().name(), &mut self.buf)?;
-                self.next()
+                self.next_event()
             }
             Event::End(e) => Err(ParsingError::SkipError(format!(
                 "Cannot skip a closing tag, call close() to close </{}>",
                 std::str::from_utf8(e.name().local_name().into_inner())?
             ))),
             Event::Eof => Err(ParsingError::Eof),
-            _ => self.next(),
+            _ => self.next_event(),
         }
     }
 
@@ -285,7 +285,7 @@ impl<R: io::BufRead> XmlParser<R> {
                 self.previous = self.current.clone();
                 self.current.clone()
             }
-            Event::Start(_) if self.is_tag(ns, key) => self.next()?,
+            Event::Start(_) if self.is_tag(ns, key) => self.next_event()?,
             e => {
                 return Err(ParsingError::WrongToken {
                     expecting: format!("<{key}>"),
@@ -327,12 +327,12 @@ impl<R: io::BufRead> XmlParser<R> {
                 Event::CData(unescaped) => {
                     let decoded = unescaped.decode()?;
                     accomulator.push_str(decoded.as_ref());
-                    self.next()?
+                    self.next_event()?
                 }
                 Event::Text(escaped) => {
                     let decoded = escaped.decode()?;
                     accomulator.push_str(decoded.as_ref());
-                    self.next()?
+                    self.next_event()?
                 }
                 Event::GeneralRef(general_ref) => {
                     let decoded = general_ref.decode()?;
@@ -345,7 +345,7 @@ impl<R: io::BufRead> XmlParser<R> {
                         _ => decoded.as_ref(),
                     };
                     accomulator.push_str(replaced);
-                    self.next()?
+                    self.next_event()?
                 }
                 Event::End(_) | Event::Start(_) | Event::Empty(_) => {
                     if accomulator.is_empty() {
@@ -356,7 +356,7 @@ impl<R: io::BufRead> XmlParser<R> {
                     }
                     return Ok(accomulator.into());
                 }
-                _ => self.next()?,
+                _ => self.next_event()?,
             };
         }
     }
@@ -370,7 +370,7 @@ impl<R: io::BufRead> XmlParser<R> {
         // Handle the empty case
         if !self.parent_has_child() {
             self.parents.pop();
-            return self.next();
+            return self.next_event();
         }
 
         // Handle the start/end case
@@ -378,7 +378,7 @@ impl<R: io::BufRead> XmlParser<R> {
             match self.peek() {
                 Event::End(_) => {
                     self.parents.pop();
-                    return self.next();
+                    return self.next_event();
                 }
                 _ => self.skip()?,
             };
@@ -447,7 +447,7 @@ impl<R: io::BufRead> XmlParser<R> {
             } else {
                 writer.write_event(self.current.clone())?;
             }
-            self.next()?;
+            self.next_event()?;
         }
         let ret = std::str::from_utf8(&writer.into_inner().into_inner())?.to_string();
         Ok(ret.into())
