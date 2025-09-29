@@ -257,14 +257,6 @@ impl XmlDeserialize<Rpc> for Rpc {
         // Skip any empty text
         parser.skip_text()?;
         let open = parser.open(Some(NETCONF_NS_STR), "rpc")?;
-        let open = if let Event::Start(open) = open {
-            open
-        } else {
-            return Err(ParsingError::WrongToken {
-                expecting: "<rpc>".to_string(),
-                found: open.clone(),
-            });
-        };
         let message_id = if let Some(msg_id) = extract_message_id(&open)? {
             msg_id
         } else {
@@ -380,14 +372,6 @@ impl RpcReply {
 impl XmlDeserialize<RpcReply> for RpcReply {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         let rpc_reply = parser.open(Some(NETCONF_NS_STR), "rpc-reply")?;
-        let rpc_reply = if let Event::Start(open) = rpc_reply {
-            open
-        } else {
-            return Err(ParsingError::WrongToken {
-                expecting: "<rpc-reply>".to_string(),
-                found: rpc_reply.clone(),
-            });
-        };
         let message_id = extract_message_id(&rpc_reply)?;
         if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "ok") {
             parser.close()?;

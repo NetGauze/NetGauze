@@ -274,7 +274,11 @@ impl<R: io::BufRead> XmlParser<R> {
         }
     }
 
-    pub fn open(&mut self, ns: Option<&[u8]>, key: &str) -> Result<Event<'static>, ParsingError> {
+    pub fn open(
+        &mut self,
+        ns: Option<&[u8]>,
+        key: &str,
+    ) -> Result<BytesStart<'static>, ParsingError> {
         let evt = match self.peek() {
             Event::Empty(_) if self.is_tag(ns, key) => {
                 // hack to make `prev_attr` works
@@ -294,14 +298,17 @@ impl<R: io::BufRead> XmlParser<R> {
             }
         };
         self.parents.push(evt.clone());
-        Ok(evt)
+        match evt {
+            Event::Start(b) | Event::Empty(b) => Ok(b),
+            _ => unreachable!("Only Start and Empty event should be observed after peeking"),
+        }
     }
 
     pub fn maybe_open(
         &mut self,
         ns: Option<&[u8]>,
         key: &str,
-    ) -> Result<Option<Event<'static>>, ParsingError> {
+    ) -> Result<Option<BytesStart<'static>>, ParsingError> {
         self.skip_text()?;
         match self.open(ns, key) {
             Ok(v) => Ok(Some(v)),
@@ -677,28 +684,28 @@ mod tests {
 
         // Open root
         let result_root = parser.open(Some(b"https://example.com"), "root");
-        let expected_root = Event::Start(BytesStart::from_content(
-            "root xmlns=\"https://example.com\"",
-            4,
-        ));
+        let expected_root = BytesStart::from_content("root xmlns=\"https://example.com\"", 4);
         assert_eq!(result_root, Ok(expected_root.clone()));
-        assert_eq!(parser.parents, vec![expected_root.clone()]);
-        assert_eq!(parser.previous(), &expected_root);
+        assert_eq!(parser.parents, vec![Event::Start(expected_root.clone())]);
+        assert_eq!(parser.previous(), &Event::Start(expected_root.clone()));
 
         // Open child
         let result_child = parser.open(Some(b"https://example.com"), "child");
-        let expected_child = Event::Empty(BytesStart::new("child"));
+        let expected_child = BytesStart::new("child");
         assert_eq!(result_child, Ok(expected_child.clone()));
         assert_eq!(
             parser.parents,
-            vec![expected_root.clone(), expected_child.clone()]
+            vec![
+                Event::Start(expected_root.clone()),
+                Event::Empty(expected_child.clone())
+            ]
         );
-        assert_eq!(parser.previous(), &expected_child);
+        assert_eq!(parser.previous(), &Event::Empty(expected_child.clone()));
 
         // close child
         parser.close().unwrap();
-        assert_eq!(parser.parents, vec![expected_root.clone()]);
-        assert_eq!(parser.previous(), &expected_child);
+        assert_eq!(parser.parents, vec![Event::Start(expected_root.clone())]);
+        assert_eq!(parser.previous(), &Event::Empty(expected_child));
 
         // close root
         parser.close().unwrap();
