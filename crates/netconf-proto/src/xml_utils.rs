@@ -274,6 +274,8 @@ impl<R: io::BufRead> XmlParser<R> {
         }
     }
 
+    /// Open the next XML tag that matches `ns:key`,
+    /// if an other XML element found, fail with a [ParsingError::WrongToken]`
     pub fn open(
         &mut self,
         ns: Option<&[u8]>,
@@ -304,6 +306,8 @@ impl<R: io::BufRead> XmlParser<R> {
         }
     }
 
+    /// Open the next XML tag only if it matches the `ns:key`,
+    /// otherwise return None.
     pub fn maybe_open(
         &mut self,
         ns: Option<&[u8]>,
@@ -312,7 +316,7 @@ impl<R: io::BufRead> XmlParser<R> {
         self.skip_text()?;
         match self.open(ns, key) {
             Ok(v) => Ok(Some(v)),
-            Err(ParsingError::Recoverable) => Ok(None),
+            Err(ParsingError::Recoverable) | Err(ParsingError::WrongToken { .. }) => Ok(None),
             Err(e) => Err(e),
         }
     }
@@ -742,24 +746,16 @@ mod tests {
     fn test_maybe_open_existing_tag() {
         let xml = r#"<root xmlns="https://example.com"><child/></root>"#;
         let mut parser = create_parser(xml);
+        let expected = Ok(Some(
+            BytesStart::from_content("root xmlns=\"https://example.com\"", 4).into_owned(),
+        ));
 
-        let result = parser.maybe_open(Some(b"https://example.com"), "wrong");
-        assert_eq!(
-            result,
-            Err(ParsingError::WrongToken {
-                expecting: "<wrong>".to_string(),
-                found: Event::Start(
-                    BytesStart::from_content("root xmlns=\"https://example.com\"", 4).into_owned()
-                )
-            })
-        );
-        // check pointer didn't move after the wrong open
+        let result = parser.maybe_open(Some(b"https://example.com"), "root");
+        assert_eq!(result, expected);
+        // check pointer did move after the `maybe_open` succeeded
         assert_eq!(
             parser.peek(),
-            &Event::Start(BytesStart::from_content(
-                "root xmlns=\"https://example.com\"",
-                4
-            ))
+            &Event::Empty(BytesStart::from_content("child", 5))
         );
     }
 
@@ -767,16 +763,16 @@ mod tests {
     fn test_maybe_open_non_existing_tag() {
         let xml = r#"<root xmlns="https://example.com"><child/></root>"#;
         let mut parser = create_parser(xml);
-
+        let expected = Ok(None);
         let result = parser.maybe_open(Some(b"https://example.com"), "wrong");
+        assert_eq!(result, expected);
+
+        // check pointer didn't move after the `maybe_open` didn't return anything
         assert_eq!(
-            result,
-            Err(ParsingError::WrongToken {
-                expecting: "<wrong>".to_string(),
-                found: Event::Start(
-                    BytesStart::from_content("root xmlns=\"https://example.com\"", 4).into_owned()
-                )
-            })
+            parser.peek(),
+            &Event::Start(
+                BytesStart::from_content("root xmlns=\"https://example.com\"", 4).into_owned()
+            )
         );
     }
 
