@@ -18,7 +18,7 @@
 use crate::{
     capabilities::Capability,
     xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    NETCONF_NS,
+    NETCONF_MONITORING_NS, NETCONF_NS,
 };
 use quick_xml::{
     events::{BytesStart, BytesText, Event},
@@ -26,6 +26,19 @@ use quick_xml::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, io, str::FromStr};
+
+pub(crate) fn decode_html_entities(s: &str) -> String {
+    s.replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&#34;", "\"")
+        .replace("&#39;", "'")
+        .replace("&#38;", "&")
+        .replace("&#60;", "<")
+        .replace("&#62;", ">")
+}
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum NetConfMessage {
@@ -264,8 +277,14 @@ impl XmlDeserialize<Rpc> for Rpc {
         } else {
             return Err(ParsingError::MissingAttribute("message-id".to_string()));
         };
-        let operation = parser.copy_buffer_till(b"rpc")?;
-        let operation = RpcOperation::Raw(operation);
+        let operation = match WellKnownOperation::xml_deserialize(parser) {
+            Ok(operation) => RpcOperation::WellKnown(operation),
+            Err(ParsingError::Recoverable) => {
+                let operation = parser.copy_buffer_till(b"rpc")?;
+                RpcOperation::Raw(operation)
+            }
+            Err(e) => return Err(e),
+        };
         Ok(Rpc {
             message_id,
             operation,
@@ -285,9 +304,471 @@ impl XmlSerialize for Rpc {
             RpcOperation::Raw(operation) => {
                 writer.write_all(operation.as_bytes())?;
             }
-            _ => todo!(),
+            RpcOperation::WellKnown(wellknown) => {
+                wellknown.xml_serialize(writer)?;
+            }
         }
         writer.write_event(Event::End(start.to_end()))?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Serialize, Deserialize, strum_macros::Display)]
+pub enum YangSchemaFormat {
+    #[strum(serialize = "xsd")]
+    Xsd,
+
+    #[strum(serialize = "yang")]
+    Yang,
+
+    #[strum(serialize = "yin")]
+    Yin,
+
+    #[strum(serialize = "rng")]
+    Rng,
+
+    #[strum(serialize = "rnc")]
+    Rnc,
+}
+
+impl XmlDeserialize<YangSchemaFormat> for YangSchemaFormat {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        parser.open(Some(NETCONF_MONITORING_NS), "format")?;
+        let value_str = parser.tag_string()?;
+        let value = match value_str.as_ref().trim() {
+            "xsd" => YangSchemaFormat::Xsd,
+            "yang" => YangSchemaFormat::Yang,
+            "yin" => YangSchemaFormat::Yin,
+            "rng" => YangSchemaFormat::Rng,
+            "rnc" => YangSchemaFormat::Rnc,
+            _ => {
+                return Err(ParsingError::InvalidValue(format!(
+                    "unknown YANG schema format `{value_str}`"
+                )))
+            }
+        };
+        parser.close()?;
+        Ok(value)
+    }
+}
+
+impl XmlSerialize for YangSchemaFormat {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        let start = writer.create_ns_element(NETCONF_MONITORING_NS, "format")?;
+        writer.write_event(Event::Start(start.clone()))?;
+        match self {
+            Self::Xsd => writer.write_event(Event::Text(BytesText::new("xsd")))?,
+            Self::Yang => writer.write_event(Event::Text(BytesText::new("yang")))?,
+            Self::Yin => writer.write_event(Event::Text(BytesText::new("yin")))?,
+            Self::Rng => writer.write_event(Event::Text(BytesText::new("rng")))?,
+            Self::Rnc => writer.write_event(Event::Text(BytesText::new("rnc")))?,
+        }
+        writer.write_event(Event::End(start.to_end()))?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Serialize, Deserialize, strum_macros::Display)]
+pub enum ConfigSource {
+    #[strum(serialize = "candidate")]
+    Candidate,
+
+    #[strum(serialize = "running")]
+    Running,
+
+    #[strum(serialize = "startup")]
+    Startup,
+}
+
+impl XmlDeserialize<ConfigSource> for ConfigSource {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        parser.open(Some(NETCONF_NS), "source")?;
+        let value = if parser.maybe_open(Some(NETCONF_NS), "candidate")?.is_some() {
+            ConfigSource::Candidate
+        } else if parser.maybe_open(Some(NETCONF_NS), "running")?.is_some() {
+            ConfigSource::Running
+        } else if parser.maybe_open(Some(NETCONF_NS), "startup")?.is_some() {
+            ConfigSource::Startup
+        } else {
+            return Err(ParsingError::WrongToken {
+                expecting: "<candidate/>, <running/>, <startup/>".into(),
+                found: parser.peek().clone(),
+            });
+        };
+
+        // close source type
+        parser.close()?;
+        // close source
+        parser.close()?;
+        Ok(value)
+    }
+}
+
+impl XmlSerialize for ConfigSource {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        let start = writer.create_element("source");
+        writer.write_event(Event::Start(start.clone()))?;
+        match self {
+            Self::Candidate => writer.write_event(Event::Empty(BytesStart::new("candidate")))?,
+            Self::Running => writer.write_event(Event::Empty(BytesStart::new("running")))?,
+            Self::Startup => writer.write_event(Event::Empty(BytesStart::new("startup")))?,
+        }
+        writer.write_event(Event::End(start.to_end()))?;
+        Ok(())
+    }
+}
+
+#[derive(Eq, PartialEq, Debug, Copy, Clone, Serialize, Deserialize, strum_macros::Display)]
+pub enum ConfigTarget {
+    #[strum(serialize = "candidate")]
+    Candidate,
+
+    #[strum(serialize = "running")]
+    Running,
+}
+
+impl XmlDeserialize<ConfigTarget> for ConfigTarget {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        parser.open(Some(NETCONF_NS), "target")?;
+        let value = if parser.maybe_open(Some(NETCONF_NS), "candidate")?.is_some() {
+            ConfigTarget::Candidate
+        } else if parser.maybe_open(Some(NETCONF_NS), "running")?.is_some() {
+            ConfigTarget::Running
+        } else {
+            return Err(ParsingError::WrongToken {
+                expecting: "<candidate/> or <running/>".into(),
+                found: parser.peek().clone(),
+            });
+        };
+        // close target type
+        parser.close()?;
+        // close target
+        parser.close()?;
+        Ok(value)
+    }
+}
+
+impl XmlSerialize for ConfigTarget {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        let start = writer.create_element("target");
+        writer.write_event(Event::Start(start.clone()))?;
+        match self {
+            Self::Candidate => writer.write_event(Event::Empty(BytesStart::new("candidate")))?,
+            Self::Running => writer.write_event(Event::Empty(BytesStart::new("running")))?,
+        }
+        writer.write_event(Event::End(start.to_end()))?;
+        Ok(())
+    }
+}
+
+/// The default operation to use for edit-config RPC
+#[derive(
+    Eq, PartialEq, Default, Debug, Copy, Clone, Serialize, Deserialize, strum_macros::Display,
+)]
+pub enum ConfigUpdateDefaultOperation {
+    /// The configuration data in the <config> parameter is merged with the
+    /// configuration at the corresponding level in the target datastore.
+    ///
+    /// This is the default behavior.
+    #[default]
+    #[strum(serialize = "merge")]
+    Merge,
+
+    /// The configuration data in the <config> parameter completely replaces the
+    /// configuration in the target datastore.  This is useful for loading
+    /// previously saved configuration data.
+    #[strum(serialize = "replace")]
+    Replace,
+
+    /// The target datastore is unaffected by the configuration in the <config>
+    /// parameter, unless and until the incoming configuration data uses the
+    /// "operation" attribute to request a different operation. If the
+    /// configuration in the <config> parameter contains data for
+    /// which there is not a corresponding level in the target datastore,
+    /// an <rpc-error> is returned with an <error-tag> value of data-missing.
+    /// Using "none" allows operations like "delete" to avoid unintentionally
+    /// creating the parent hierarchy of the element to be deleted.
+    #[strum(serialize = "none")]
+    None,
+}
+
+impl XmlDeserialize<ConfigUpdateDefaultOperation> for ConfigUpdateDefaultOperation {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        parser.open(Some(NETCONF_NS), "default-operation")?;
+        let value_str = parser.tag_string()?;
+        let value = match value_str.as_ref().trim() {
+            "merge" => ConfigUpdateDefaultOperation::Merge,
+            "replace" => ConfigUpdateDefaultOperation::Replace,
+            "none" => ConfigUpdateDefaultOperation::None,
+            _ => {
+                return Err(ParsingError::InvalidValue(format!(
+                    "unknown default-operation `{value_str}`"
+                )))
+            }
+        };
+        parser.close()?;
+        Ok(value)
+    }
+}
+
+impl XmlSerialize for ConfigUpdateDefaultOperation {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        let start = writer.create_element("default-operation");
+        writer.write_event(Event::Start(start.clone()))?;
+        match self {
+            Self::Merge => writer.write_event(Event::Text(BytesText::new("merge")))?,
+            Self::Replace => writer.write_event(Event::Text(BytesText::new("replace")))?,
+            Self::None => writer.write_event(Event::Text(BytesText::new("none")))?,
+        }
+        writer.write_event(Event::End(start.to_end()))?;
+        Ok(())
+    }
+}
+
+/// Validation options for edit-config RPC.
+#[derive(
+    Eq, PartialEq, Default, Debug, Copy, Clone, Serialize, Deserialize, strum_macros::Display,
+)]
+pub enum ConfigEditTestOption {
+    /// Perform a validation test before attempting to set.
+    /// If validation errors occur, do not perform the <edit-config> operation.
+    ///
+    /// This is the default test-option.
+    #[strum(serialize = "test-then-set")]
+    #[default]
+    TestThenSet,
+
+    /// Perform a set without a validation test first.
+    #[strum(serialize = "set")]
+    Set,
+
+    /// Perform only the validation test, without  attempting to set.
+    #[strum(serialize = "test-only")]
+    TestOnly,
+}
+
+impl XmlDeserialize<ConfigEditTestOption> for ConfigEditTestOption {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        parser.open(Some(NETCONF_NS), "test-option")?;
+        let value_str = parser.tag_string()?;
+        let value = match value_str.as_ref().trim() {
+            "test-then-set" => ConfigEditTestOption::TestThenSet,
+            "set" => ConfigEditTestOption::Set,
+            "test-only" => ConfigEditTestOption::TestOnly,
+            _ => {
+                return Err(ParsingError::InvalidValue(format!(
+                    "unknown test-option `{value_str}`"
+                )))
+            }
+        };
+        parser.close()?;
+        Ok(value)
+    }
+}
+
+impl XmlSerialize for ConfigEditTestOption {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        let start = writer.create_element("test-option");
+        writer.write_event(Event::Start(start.clone()))?;
+        match self {
+            Self::TestThenSet => {
+                writer.write_event(Event::Text(BytesText::new("test-then-set")))?
+            }
+            Self::Set => writer.write_event(Event::Text(BytesText::new("set")))?,
+            Self::TestOnly => writer.write_event(Event::Text(BytesText::new("test-only")))?,
+        }
+        writer.write_event(Event::End(start.to_end()))?;
+        Ok(())
+    }
+}
+
+#[derive(
+    Eq, PartialEq, Default, Debug, Copy, Clone, Serialize, Deserialize, strum_macros::Display,
+)]
+pub enum ConfigErrorOption {
+    #[strum(serialize = "stop-on-error")]
+    #[default]
+    StopOnError,
+
+    #[strum(serialize = "continue-on-error")]
+    ContinueOnError,
+
+    #[strum(serialize = "rollback-on-error")]
+    RollbackOnError,
+}
+
+impl XmlDeserialize<ConfigErrorOption> for ConfigErrorOption {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        parser.open(Some(NETCONF_NS), "error-option")?;
+        let value_str = parser.tag_string()?;
+        let value = match value_str.as_ref().trim() {
+            "stop-on-error" => ConfigErrorOption::StopOnError,
+            "continue-on-error" => ConfigErrorOption::ContinueOnError,
+            "rollback-on-error" => ConfigErrorOption::RollbackOnError,
+            _ => {
+                return Err(ParsingError::InvalidValue(format!(
+                    "unknown error-option `{value_str}`"
+                )))
+            }
+        };
+        parser.close()?;
+        Ok(value)
+    }
+}
+
+impl XmlSerialize for ConfigErrorOption {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        let start = writer.create_element("error-option");
+        writer.write_event(Event::Start(start.clone()))?;
+        match self {
+            Self::StopOnError => {
+                writer.write_event(Event::Text(BytesText::new("stop-on-error")))?
+            }
+            Self::ContinueOnError => {
+                writer.write_event(Event::Text(BytesText::new("continue-on-error")))?
+            }
+            Self::RollbackOnError => {
+                writer.write_event(Event::Text(BytesText::new("rollback-on-error")))?
+            }
+        }
+        writer.write_event(Event::End(start.to_end()))?;
+        Ok(())
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub enum Filter {
+    Subtree(Box<str>),
+    XPath(Box<str>),
+}
+
+impl XmlDeserialize<Filter> for Filter {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        let filter_start = parser.open(Some(NETCONF_NS), "filter")?;
+        let filter_type = extract_attribute(&filter_start, b"type").unwrap_or("subtree".into());
+        let filter = match filter_type.as_ref() {
+            "subtree" => {
+                let value = parser.copy_buffer_till(b"filter")?;
+                Filter::Subtree(value)
+            }
+            "xpath" => {
+                let select = extract_attribute(&filter_start, b"select")
+                    .ok_or(ParsingError::MissingAttribute("select".into()))?;
+                Filter::XPath(select)
+            }
+            _ => {
+                return Err(ParsingError::InvalidValue(format!(
+                "not supported filter type `{filter_type}`, only subtree and xpath are supported"
+            )))
+            }
+        };
+        // Close filter
+        parser.close()?;
+        Ok(filter)
+    }
+}
+
+impl XmlSerialize for Filter {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        let mut start = writer.create_element("filter");
+        match self {
+            Filter::Subtree(_) => start.push_attribute(("type", "subtree")),
+            Filter::XPath(_) => start.push_attribute(("type", "xpath")),
+        }
+
+        match self {
+            Filter::Subtree(value) => {
+                writer.write_event(Event::Start(start.clone()))?;
+                writer.write_all(value.as_bytes())?;
+            }
+            Filter::XPath(value) => {
+                start.push_attribute(("select", value.as_ref()));
+                writer.write_event(Event::Start(start.clone()))?;
+            }
+        }
+        writer.write_event(Event::End(start.to_end()))?;
+        Ok(())
+    }
+}
+
+/// The content for the edit config operation.
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub enum EditConfig {
+    /// Inline YANG XML config
+    Config(Box<str>),
+
+    /// URL-based config content
+    Url(Box<str>),
+}
+
+impl XmlDeserialize<EditConfig> for EditConfig {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        let value = if parser.maybe_open(Some(NETCONF_NS), "url")?.is_some() {
+            let url = parser.tag_string()?;
+            parser.close()?;
+            EditConfig::Url(url)
+        } else if parser.maybe_open(Some(NETCONF_NS), "config")?.is_some() {
+            let value = parser.copy_buffer_till(b"config")?;
+            parser.close()?;
+            EditConfig::Config(value)
+        } else {
+            return Err(ParsingError::WrongToken {
+                expecting: "<url/> or <config/>".into(),
+                found: parser.peek().clone(),
+            });
+        };
+        Ok(value)
+    }
+}
+
+impl XmlSerialize for EditConfig {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        match self {
+            EditConfig::Config(value) => {
+                let config_start = writer.create_element("config");
+                writer.write_event(Event::Start(config_start.clone()))?;
+                writer.write_all(value.as_bytes())?;
+                writer.write_event(Event::End(config_start.to_end()))?;
+            }
+            EditConfig::Url(value) => {
+                let url_start = writer.create_element("url");
+                writer.write_event(Event::Start(url_start.clone()))?;
+                writer.write_event(Event::Text(BytesText::new(value)))?;
+                writer.write_event(Event::End(url_start.to_end()))?;
+            }
+        }
         Ok(())
     }
 }
@@ -298,28 +779,291 @@ impl XmlSerialize for Rpc {
 /// TODO: defined NETCONF well-known operations
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum WellKnownOperation {
-    // Vendor CLI passthrough
-    CiscoCli {
-        command: Box<str>,
-    },
-    JuniperCommand {
-        format: Box<str>,
-        command: Box<str>,
-    },
-    HuaweiCli {
-        command: Box<str>,
+    /// Retrieve all or part of a specified configuration.
+    ///
+    /// [RFC 6241](https://www.rfc-editor.org/rfc/rfc6241.html).
+    GetConfig {
+        source: ConfigSource,
+        filter: Filter,
     },
 
-    // Legacy operations
-    JuniperGetConfiguration {
-        database: Option<Box<str>>,
-        format: Option<Box<str>>,
-        filter: Option<Box<str>>,
+    EditConfig {
+        target: ConfigTarget,
+        default_operation: ConfigUpdateDefaultOperation,
+        test_option: Option<ConfigEditTestOption>,
+        error_option: Option<ConfigErrorOption>,
+        edit_content: EditConfig,
     },
 
-    // Diagnostic operations
-    GenericReboot,
-    GenericFactoryReset,
+    /// Retrieve running configuration and device state information.
+    Get { filter: Filter },
+
+    /// Request graceful termination of a NETCONF session.
+    ///
+    /// [RFC 6241](https://www.rfc-editor.org/rfc/rfc6241.html).
+    CloseSession,
+
+    GetSchema {
+        /// Identifier for the schema list entry
+        identifier: Box<str>,
+
+        /// Version of the schema requested.
+        /// If this parameter is not present,
+        /// and more than one version of the schema exists on
+        /// the server, a 'data-not-unique' error is returned.
+        version: Option<Box<str>>,
+
+        /// The data modeling language of the schema.  If this parameter is not
+        /// present, and more than one formats of the schema exists on the
+        /// server, a 'data-not-unique' error is returned, as described above.
+        format: Option<YangSchemaFormat>,
+    },
+}
+
+impl WellKnownOperation {
+    /// Parse get-config operation from [RFC 6241](https://www.rfc-editor.org/rfc/rfc6241.html).
+    ///
+    /// NOTE: this method assumes that `parser.open` is already called on
+    /// get-config
+    fn parse_get_config(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        let source = ConfigSource::xml_deserialize(parser)?;
+        let filter = Filter::xml_deserialize(parser)?;
+        // Close get-config
+        parser.close()?;
+        Ok(WellKnownOperation::GetConfig { source, filter })
+    }
+
+    fn serialize_get_config<T: io::Write>(
+        writer: &mut XmlWriter<T>,
+        source: &ConfigSource,
+        filter: &Filter,
+    ) -> Result<(), quick_xml::Error> {
+        let get_config_start = writer.create_element("get-config");
+        writer.write_event(Event::Start(get_config_start.clone()))?;
+        source.xml_serialize(writer)?;
+        filter.xml_serialize(writer)?;
+        writer.write_event(Event::End(get_config_start.to_end()))?;
+        Ok(())
+    }
+
+    /// Parse edit-config operation from [RFC 6241](https://www.rfc-editor.org/rfc/rfc6241.html).
+    ///
+    /// NOTE: this method assumes that `parser.open` is already called on
+    /// edit-config
+    fn parse_edit_config(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        let target = ConfigTarget::xml_deserialize(parser)?;
+
+        let default_operation = match ConfigUpdateDefaultOperation::xml_deserialize(parser) {
+            Ok(option) => option,
+            Err(ParsingError::WrongToken { expecting, .. })
+                if expecting == "<default-operation>" =>
+            {
+                ConfigUpdateDefaultOperation::Merge
+            }
+            Err(err) => return Err(err),
+        };
+
+        let test_option = match ConfigEditTestOption::xml_deserialize(parser) {
+            Ok(option) => Some(option),
+            Err(ParsingError::WrongToken { expecting, .. }) if expecting == "<test-option>" => None,
+            Err(err) => return Err(err),
+        };
+
+        let error_option = match ConfigErrorOption::xml_deserialize(parser) {
+            Ok(option) => Some(option),
+            Err(ParsingError::WrongToken { expecting, .. }) if expecting == "<error-option>" => {
+                None
+            }
+            Err(err) => return Err(err),
+        };
+
+        let edit_content = EditConfig::xml_deserialize(parser)?;
+        // Close get-config
+        parser.close()?;
+        Ok(WellKnownOperation::EditConfig {
+            target,
+            default_operation,
+            test_option,
+            error_option,
+            edit_content,
+        })
+    }
+
+    fn serialize_edit_config<T: io::Write>(
+        writer: &mut XmlWriter<T>,
+        target: &ConfigTarget,
+        default_operation: &ConfigUpdateDefaultOperation,
+        test_option: &Option<ConfigEditTestOption>,
+        error_option: &Option<ConfigErrorOption>,
+        edit_content: &EditConfig,
+    ) -> Result<(), quick_xml::Error> {
+        let edit_config_start = writer.create_element("edit-config");
+        writer.write_event(Event::Start(edit_config_start.clone()))?;
+        target.xml_serialize(writer)?;
+        default_operation.xml_serialize(writer)?;
+        if let Some(test_option) = test_option {
+            test_option.xml_serialize(writer)?;
+        }
+        if let Some(error_option) = error_option {
+            error_option.xml_serialize(writer)?;
+        }
+        edit_content.xml_serialize(writer)?;
+        writer.write_event(Event::End(edit_config_start.to_end()))?;
+        Ok(())
+    }
+
+    fn parse_get(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        let filter = Filter::xml_deserialize(parser)?;
+        // Close get
+        parser.close()?;
+        Ok(WellKnownOperation::Get { filter })
+    }
+
+    fn serialize_get<T: io::Write>(
+        writer: &mut XmlWriter<T>,
+        filter: &Filter,
+    ) -> Result<(), quick_xml::Error> {
+        let get_start = writer.create_element("get");
+        writer.write_event(Event::Start(get_start.clone()))?;
+        filter.xml_serialize(writer)?;
+        writer.write_event(Event::End(get_start.to_end()))?;
+        Ok(())
+    }
+
+    fn parse_get_schema(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        parser.open(Some(NETCONF_MONITORING_NS), "identifier")?;
+        let identifier = parser.tag_string()?.trim().into();
+        // close identifier
+        parser.close()?;
+        let version = if parser
+            .maybe_open(Some(NETCONF_MONITORING_NS), "version")?
+            .is_some()
+        {
+            let ver = parser.tag_string()?.trim().into();
+            // close version
+            parser.close()?;
+            Some(ver)
+        } else {
+            None
+        };
+
+        let format = match YangSchemaFormat::xml_deserialize(parser) {
+            Ok(format) => Some(format),
+            Err(ParsingError::WrongToken { expecting, .. }) if expecting == "<format>" => None,
+            Err(err) => return Err(err),
+        };
+
+        // Close get-schema
+        parser.close()?;
+        Ok(WellKnownOperation::GetSchema {
+            identifier,
+            version,
+            format,
+        })
+    }
+
+    fn serialize_get_schema<T: io::Write>(
+        writer: &mut XmlWriter<T>,
+        identifier: &str,
+        version: &Option<Box<str>>,
+        format: &Option<YangSchemaFormat>,
+    ) -> Result<(), quick_xml::Error> {
+        let get_schema_start = writer.create_ns_element(NETCONF_MONITORING_NS, "get-schema")?;
+        writer.write_event(Event::Start(get_schema_start.clone()))?;
+
+        let identifier_start = writer.create_ns_element(NETCONF_MONITORING_NS, "identifier")?;
+        writer.write_event(Event::Start(identifier_start.clone()))?;
+        writer.write_event(Event::Text(BytesText::new(identifier)))?;
+        writer.write_event(Event::End(identifier_start.to_end()))?;
+
+        if let Some(version) = version {
+            let version_start = writer.create_ns_element(NETCONF_MONITORING_NS, "version")?;
+            writer.write_event(Event::Start(version_start.clone()))?;
+            writer.write_event(Event::Text(BytesText::new(version)))?;
+            writer.write_event(Event::End(version_start.to_end()))?;
+        }
+
+        if let Some(format) = format {
+            format.xml_serialize(writer)?;
+        }
+        writer.write_event(Event::End(get_schema_start.to_end()))?;
+        Ok(())
+    }
+}
+
+impl XmlDeserialize<WellKnownOperation> for WellKnownOperation {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        if parser.maybe_open(Some(NETCONF_NS), "get-config")?.is_some() {
+            return Self::parse_get_config(parser);
+        }
+        if parser
+            .maybe_open(Some(NETCONF_NS), "edit-config")?
+            .is_some()
+        {
+            return Self::parse_edit_config(parser);
+        }
+        if parser.maybe_open(Some(NETCONF_NS), "get")?.is_some() {
+            return Self::parse_get(parser);
+        }
+        if parser
+            .maybe_open(Some(NETCONF_NS), "close-session")?
+            .is_some()
+        {
+            parser.close()?;
+            return Ok(WellKnownOperation::CloseSession);
+        }
+        if parser
+            .maybe_open(Some(NETCONF_MONITORING_NS), "get-schema")?
+            .is_some()
+        {
+            return Self::parse_get_schema(parser);
+        }
+        // If we reach here, it means we found an unknown operation
+        Err(ParsingError::Recoverable)
+    }
+}
+
+impl XmlSerialize for WellKnownOperation {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        match self {
+            Self::GetConfig { source, filter } => {
+                Self::serialize_get_config(writer, source, filter)
+            }
+            Self::EditConfig {
+                target,
+                default_operation,
+                test_option,
+                error_option,
+                edit_content,
+            } => Self::serialize_edit_config(
+                writer,
+                target,
+                default_operation,
+                test_option,
+                error_option,
+                edit_content,
+            ),
+            Self::Get { filter } => Self::serialize_get(writer, filter),
+            Self::CloseSession => {
+                let close_session_start = writer.create_element("close-session");
+                writer.write_event(Event::Empty(close_session_start))?;
+                Ok(())
+            }
+            Self::GetSchema {
+                identifier,
+                version,
+                format,
+            } => Self::serialize_get_schema(writer, identifier, version, format),
+        }
+    }
 }
 
 // pub struct YangOperationData {
@@ -385,7 +1129,14 @@ impl XmlDeserialize<RpcReply> for RpcReply {
         }
         let errors: Vec<RpcError> =
             parser.collect_xml_sequence_with_tag(Some(NETCONF_NS), b"rpc-error")?;
-        let responses = parser.copy_buffer_till(b"rpc-reply")?;
+        let responses = match WellKnownRpcResponse::xml_deserialize(parser) {
+            Ok(response) => RpcResponse::WellKnown(response),
+            Err(ParsingError::Recoverable) => {
+                let responses = parser.copy_buffer_till(b"rpc-reply")?;
+                RpcResponse::Raw(responses)
+            }
+            Err(e) => return Err(e),
+        };
         parser.close()?;
         Ok(RpcReply {
             message_id,
@@ -414,7 +1165,14 @@ impl XmlSerialize for RpcReply {
                 for error in errors {
                     error.xml_serialize(writer)?;
                 }
-                writer.write_all(responses.as_bytes())?;
+                match responses {
+                    RpcResponse::Raw(responses) => {
+                        writer.write_all(responses.as_bytes())?;
+                    }
+                    RpcResponse::WellKnown(wellknown) => {
+                        wellknown.xml_serialize(writer)?;
+                    }
+                }
             }
         }
 
@@ -444,7 +1202,7 @@ pub enum RpcReplyContent {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         errors: Vec<RpcError>, // TODO: use box instead of vec
         // TODO: handle different types of responses as we do with the RPC operations
-        responses: Box<str>,
+        responses: RpcResponse,
     },
 }
 
@@ -469,12 +1227,60 @@ impl RpcReplyContent {
         }
     }
 
-    pub const fn responses(&self) -> Option<&str> {
+    pub const fn responses(&self) -> Option<&RpcResponse> {
         if let RpcReplyContent::ErrorsAndData { responses, .. } = self {
             Some(responses)
         } else {
             None
         }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub enum RpcResponse {
+    Raw(Box<str>),
+    WellKnown(WellKnownRpcResponse),
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub enum WellKnownRpcResponse {
+    YangSchema { schema: Box<str> },
+}
+
+impl WellKnownRpcResponse {
+    fn parse_yang_schema(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        let schema = decode_html_entities(parser.tag_string()?.as_ref()).into_boxed_str();
+        parser.close()?;
+        Ok(WellKnownRpcResponse::YangSchema { schema })
+    }
+}
+impl XmlDeserialize<WellKnownRpcResponse> for WellKnownRpcResponse {
+    fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
+        parser.skip_text()?;
+        if parser
+            .maybe_open(Some(NETCONF_MONITORING_NS), "data")?
+            .is_some()
+        {
+            return Self::parse_yang_schema(parser);
+        }
+        Err(ParsingError::Recoverable)
+    }
+}
+
+impl XmlSerialize for WellKnownRpcResponse {
+    fn xml_serialize<T: io::Write>(
+        &self,
+        writer: &mut XmlWriter<T>,
+    ) -> Result<(), quick_xml::Error> {
+        match self {
+            WellKnownRpcResponse::YangSchema { schema } => {
+                let data_start = writer.create_ns_element(NETCONF_MONITORING_NS, "data")?;
+                writer.write_event(Event::Start(data_start.clone()))?;
+                writer.write_event(Event::Text(BytesText::new(schema.as_ref())))?;
+                writer.write_event(Event::End(data_start.to_end()))?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -1644,7 +2450,7 @@ mod tests {
             message_id: Some("101".into()),
             reply: RpcReplyContent::ErrorsAndData {
                 errors: vec![],
-                responses: expected_data1.into(),
+                responses: RpcResponse::Raw(expected_data1.into()),
             },
         };
         test_xml_value(input_str1, expected1)?;
@@ -1655,30 +2461,27 @@ mod tests {
     fn test_rpc_reply_yang() -> Result<(), ParsingError> {
         let input_str1 = r#"<rpc-reply message-id="103"
          xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
-         <data xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
-           module bar-types {
+         <data xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">module bar-types {
              //default format (yang) returned
              //latest revision returned
              //is version 2008-06-01 yang module
              //contents here ...
-           }
-         </data>
+           }</data>
        </rpc-reply>"#;
-        let expected_data1 = r#"<data xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
-           module bar-types {
+        let expected_data1 = r#"module bar-types {
              //default format (yang) returned
              //latest revision returned
              //is version 2008-06-01 yang module
              //contents here ...
-           }
-         </data>
-       "#;
+           }"#;
 
         let expected1 = RpcReply {
             message_id: Some("103".into()),
             reply: RpcReplyContent::ErrorsAndData {
                 errors: vec![],
-                responses: expected_data1.into(),
+                responses: RpcResponse::WellKnown(WellKnownRpcResponse::YangSchema {
+                    schema: expected_data1.into(),
+                }),
             },
         };
         test_xml_value(input_str1, expected1)?;
@@ -1687,7 +2490,7 @@ mod tests {
 
     #[test]
     fn test_rpc_reply_content() {
-        let data: Box<str> = "SomeData".into();
+        let data = RpcResponse::Raw("SomeData".into());
         let errors = vec![RpcError::default()];
         let with_ok = RpcReplyContent::Ok;
         let with_data_and_errors = RpcReplyContent::ErrorsAndData {
@@ -1712,7 +2515,7 @@ mod tests {
 
         assert_eq!(with_ok.responses(), None);
         assert_eq!(with_ok.responses(), None);
-        assert_eq!(with_data_and_errors.responses(), Some(data.as_ref()));
+        assert_eq!(with_data_and_errors.responses(), Some(data).as_ref());
     }
 
     #[test]
@@ -1723,8 +2526,9 @@ mod tests {
         let rpc_reply_str = r#"<?xml version="1.0"?>
         <rpc-reply message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
          <data></data></rpc-reply>"#;
-        let expected_rpc_reply_data =
-            r#"<data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"></data>"#;
+        let expected_rpc_reply_data = RpcResponse::Raw(
+            r#"<data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"></data>"#.into(),
+        );
 
         let hello = NetConfMessage::Hello(Hello::new(Some(4), HashSet::new()));
         let rpc = NetConfMessage::Rpc(Rpc::new("101".into(), RpcOperation::Raw("<copy-config xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><target><startup/></target><source><running/></source></copy-config>".into())));
@@ -1732,12 +2536,577 @@ mod tests {
             message_id: Some("101".into()),
             reply: RpcReplyContent::ErrorsAndData {
                 errors: vec![],
-                responses: expected_rpc_reply_data.into(),
+                responses: expected_rpc_reply_data,
             },
         });
         test_xml_value(hello_str, hello)?;
         test_xml_value(rpc_str, rpc)?;
         test_xml_value(rpc_reply_str, rpc_reply)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_config() -> Result<(), ParsingError> {
+        let get_config_str = r#"<get-config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+         <source>
+           <running/>
+         </source>
+         <filter type="subtree"><top xmlns="http://example.com/schema/1.2/config"><users/></top></filter>
+       </get-config>"#;
+        let get_config = WellKnownOperation::GetConfig {
+            source: ConfigSource::Running,
+            filter: Filter::Subtree(
+                r#"<top xmlns="http://example.com/schema/1.2/config"><users/></top>"#.into(),
+            ),
+        };
+        test_xml_value(get_config_str, get_config)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_edit_test_option() -> Result<(), ParsingError> {
+        let test_then_set_str = r#"<test-option xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+        test-then-set
+       </test-option>"#;
+        let set_str =
+            r#"<test-option xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">set</test-option>"#;
+        let test_only_str = r#"<test-option xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+        test-only
+       </test-option>"#;
+        let unknown_value_str =
+            r#"<test-option xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">UNKNOWN</test-option>"#;
+        let invalid_tag_str = r#"<some-other-tag xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">INVALID</some-other-tag>"#;
+
+        let test_then_set = ConfigEditTestOption::TestThenSet;
+        let set = ConfigEditTestOption::Set;
+        let test_only = ConfigEditTestOption::TestOnly;
+        let unknown_value = Err(ParsingError::InvalidValue(
+            "unknown test-option `UNKNOWN`".to_string(),
+        ));
+        let invalid_tag = Err(ParsingError::WrongToken {
+            expecting: "<test-option>".to_string(),
+            found: Event::Start(BytesStart::from_content(
+                "some-other-tag xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"",
+                14,
+            )),
+        });
+
+        test_xml_value(test_then_set_str, test_then_set)?;
+        test_xml_value(set_str, set)?;
+        test_xml_value(test_only_str, test_only)?;
+        assert_eq!(
+            test_parse_error::<ConfigEditTestOption>(unknown_value_str),
+            unknown_value
+        );
+        assert_eq!(
+            test_parse_error::<ConfigEditTestOption>(invalid_tag_str),
+            invalid_tag
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_source() -> Result<(), ParsingError> {
+        let candidate_str =
+            r#"<source xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><candidate/></source>"#;
+        let running_str =
+            r#"<source xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><running/></source>"#;
+        let startup_str = r#"<source xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><startup></startup></source>"#;
+        let unknown_value_str =
+            r#"<source xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><UNKNOWN/></source>"#;
+        let invalid_tag_str = r#"<some-other-tag xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">INVALID</some-other-tag>"#;
+
+        let candidate = ConfigSource::Candidate;
+        let running = ConfigSource::Running;
+        let startup = ConfigSource::Startup;
+        let unknown_value = Err(ParsingError::WrongToken {
+            expecting: "<candidate/>, <running/>, <startup/>".into(),
+            found: Event::Empty(BytesStart::new("UNKNOWN")).into_owned(),
+        });
+        let invalid_tag = Err(ParsingError::WrongToken {
+            expecting: "<source>".to_string(),
+            found: Event::Start(BytesStart::from_content(
+                "some-other-tag xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"",
+                14,
+            )),
+        });
+
+        test_xml_value(candidate_str, candidate).expect("candidate");
+        test_xml_value(running_str, running).expect("running");
+        test_xml_value(startup_str, startup).expect("startup");
+        assert_eq!(
+            test_parse_error::<ConfigSource>(unknown_value_str),
+            unknown_value
+        );
+        assert_eq!(
+            test_parse_error::<ConfigSource>(invalid_tag_str),
+            invalid_tag
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_target() -> Result<(), ParsingError> {
+        let candidate_str =
+            r#"<target xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><candidate/></target>"#;
+        let running_str = r#"<target xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><running> </running></target>"#;
+        let unknown_value_str =
+            r#"<target xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><UNKNOWN/></target>"#;
+        let invalid_tag_str = r#"<some-other-tag xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">INVALID</some-other-tag>"#;
+
+        let candidate = ConfigTarget::Candidate;
+        let running = ConfigTarget::Running;
+        let unknown_value = Err(ParsingError::WrongToken {
+            expecting: "<candidate/> or <running/>".to_string(),
+            found: Event::Empty(BytesStart::from_content("UNKNOWN", 7)),
+        });
+        let invalid_tag = Err(ParsingError::WrongToken {
+            expecting: "<target>".to_string(),
+            found: Event::Start(BytesStart::from_content(
+                "some-other-tag xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"",
+                14,
+            )),
+        });
+
+        test_xml_value(candidate_str, candidate)?;
+        test_xml_value(running_str, running)?;
+        assert_eq!(
+            test_parse_error::<ConfigTarget>(unknown_value_str),
+            unknown_value
+        );
+        assert_eq!(
+            test_parse_error::<ConfigTarget>(invalid_tag_str),
+            invalid_tag
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_update_default_operation() -> Result<(), ParsingError> {
+        let merge_str = r#"<default-operation xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">merge</default-operation>"#;
+        let replace_str = r#"<default-operation xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">replace</default-operation>"#;
+        let none_str = r#"<default-operation xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">none</default-operation>"#;
+        let unknown_value_str = r#"<default-operation xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">UNKNOWN</default-operation>"#;
+        let invalid_tag_str = r#"<some-other-tag xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">INVALID</some-other-tag>"#;
+
+        let merge = ConfigUpdateDefaultOperation::Merge;
+        let replace = ConfigUpdateDefaultOperation::Replace;
+        let none = ConfigUpdateDefaultOperation::None;
+        let unknown_value = Err(ParsingError::InvalidValue(
+            "unknown default-operation `UNKNOWN`".to_string(),
+        ));
+        let invalid_tag = Err(ParsingError::WrongToken {
+            expecting: "<default-operation>".to_string(),
+            found: Event::Start(BytesStart::from_content(
+                "some-other-tag xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"",
+                14,
+            )),
+        });
+
+        test_xml_value(merge_str, merge)?;
+        test_xml_value(replace_str, replace)?;
+        test_xml_value(none_str, none)?;
+        assert_eq!(
+            test_parse_error::<ConfigUpdateDefaultOperation>(unknown_value_str),
+            unknown_value
+        );
+        assert_eq!(
+            test_parse_error::<ConfigUpdateDefaultOperation>(invalid_tag_str),
+            invalid_tag
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_filter_subtree() -> Result<(), ParsingError> {
+        let subtree_str = r#"<filter type="subtree" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><top xmlns="http://example.com/schema/1.2/config"><users/></top></filter>"#;
+        let subtree_no_type_str = r#"<filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><top xmlns="http://example.com/schema/1.2/config"><users/></top></filter>"#;
+        let subtree_complex_str = r#"<filter type="subtree" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+                <top xmlns="http://example.com/schema/1.2/config">
+                    <users>
+                        <user>
+                            <name>fred</name>
+                        </user>
+                    </users>
+                </top>
+            </filter>"#;
+        let subtree_empty_str =
+            r#"<filter type="subtree" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"></filter>"#;
+
+        let expected_subtree = Filter::Subtree(
+            r#"<top xmlns="http://example.com/schema/1.2/config"><users/></top>"#.into(),
+        );
+        let expected_subtree_no_type = Filter::Subtree(
+            r#"<top xmlns="http://example.com/schema/1.2/config"><users/></top>"#.into(),
+        );
+        let expected_subtree_complex = Filter::Subtree(
+            r#"
+                <top xmlns="http://example.com/schema/1.2/config">
+                    <users>
+                        <user>
+                            <name>fred</name>
+                        </user>
+                    </users>
+                </top>
+            "#
+            .into(),
+        );
+        let expected_subtree_empty = Filter::Subtree("".into());
+
+        test_xml_value(subtree_str, expected_subtree)?;
+        test_xml_value(subtree_no_type_str, expected_subtree_no_type)?;
+        test_xml_value(subtree_complex_str, expected_subtree_complex)?;
+        test_xml_value(subtree_empty_str, expected_subtree_empty)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_filter_xpath() -> Result<(), ParsingError> {
+        let xpath_str = r#"<filter xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:t="http://example.com/schema/1.2/config" type="xpath" select="/t:top/t:users/t:user[t:name='fred']"/>"#;
+        let xpath_complex_str = r#"<filter type="xpath" select="/top/interfaces/interface[enabled='true' and type='ethernet']" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"/>"#;
+        let xpath_namespace_str = r#"<filter type="xpath" select="/ex:top/ex:users" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:ex="http://example.com/schema"/>"#;
+        let xpath_with_content_str = r#"<filter type="xpath" select="/top/users" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">ignored content</filter>"#;
+        let xpath_empty_select_str =
+            r#"<filter type="xpath" select="" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"/>"#;
+
+        let expected_xpath = Filter::XPath("/t:top/t:users/t:user[t:name='fred']".into());
+        let expected_xpath_complex =
+            Filter::XPath("/top/interfaces/interface[enabled='true' and type='ethernet']".into());
+        let expected_xpath_namespace = Filter::XPath("/ex:top/ex:users".into());
+        let expected_xpath_with_content = Filter::XPath("/top/users".into());
+        let expected_xpath_empty = Filter::XPath("".into());
+
+        test_xml_value(xpath_str, expected_xpath).expect("failed to test xpath");
+        test_xml_value(xpath_complex_str, expected_xpath_complex)
+            .expect("failed to test complex xpath");
+        test_xml_value(xpath_namespace_str, expected_xpath_namespace)
+            .expect("failed to test xpath namespace");
+        test_xml_value(xpath_with_content_str, expected_xpath_with_content)
+            .expect("failed to test xpath with content xpath");
+        test_xml_value(xpath_empty_select_str, expected_xpath_empty)
+            .expect("failed to test xpath empty select");
+        Ok(())
+    }
+
+    #[test]
+    fn test_filter_edge_cases() -> Result<(), ParsingError> {
+        // Invalid type attribute
+        let invalid_type_str =
+            r#"<filter type="invalid" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"/>"#;
+        let invalid_type_result = test_parse_error::<Filter>(invalid_type_str);
+        assert!(matches!(
+            invalid_type_result,
+            Err(ParsingError::InvalidValue(_))
+        ));
+
+        // XPath without select attribute
+        let xpath_no_select_str =
+            r#"<filter type="xpath" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"/>"#;
+        let xpath_no_select_result = test_parse_error::<Filter>(xpath_no_select_str);
+        assert!(matches!(
+            xpath_no_select_result,
+            Err(ParsingError::MissingAttribute(_))
+        ));
+
+        // Mixed content in subtree filter
+        let mixed_content_str = r#"<filter type="subtree" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+                Some text
+                <top xmlns="http://example.com/schema/1.2/config">
+                    <users/>
+                </top>
+                More text
+            </filter>"#;
+        let expected_mixed = Filter::Subtree(
+            r#"
+                Some text
+                <top xmlns="http://example.com/schema/1.2/config">
+                    <users/>
+                </top>
+                More text
+            "#
+            .into(),
+        );
+        test_xml_value(mixed_content_str, expected_mixed)?;
+
+        // Multiple namespace declarations
+        let multi_ns_str = r#"<filter type="subtree" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+                <top xmlns="http://example.com/schema" xmlns:x="http://other.com">
+                    <x:element/>
+                </top>
+            </filter>"#;
+        let expected_multi_ns = Filter::Subtree(
+            r#"
+                <top xmlns="http://example.com/schema" xmlns:x="http://other.com">
+                    <x:element/>
+                </top>
+            "#
+            .into(),
+        );
+        test_xml_value(multi_ns_str, expected_multi_ns)?;
+
+        // Case sensitivity check
+        let case_sensitive_type_str =
+            r#"<filter type="SUBTREE" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"/>"#;
+        let case_sensitive_result = test_parse_error::<Filter>(case_sensitive_type_str);
+        assert!(matches!(
+            case_sensitive_result,
+            Err(ParsingError::InvalidValue(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_error_option() -> Result<(), ParsingError> {
+        let stop_on_error_str = r#"<error-option xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">stop-on-error</error-option>"#;
+        let continue_on_error_str = r#"<error-option xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">continue-on-error</error-option>"#;
+        let rollback_on_error_str = r#"<error-option xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">rollback-on-error</error-option>"#;
+        let unknown_value_str = r#"<error-option xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">UNKNOWN</error-option>"#;
+        let invalid_tag_str = r#"<some-other-tag xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">INVALID</some-other-tag>"#;
+
+        let stop_on_error = ConfigErrorOption::StopOnError;
+        let continue_on_error = ConfigErrorOption::ContinueOnError;
+        let rollback_on_error = ConfigErrorOption::RollbackOnError;
+        let unknown_value = Err(ParsingError::InvalidValue(
+            "unknown error-option `UNKNOWN`".to_string(),
+        ));
+        let invalid_tag = Err(ParsingError::WrongToken {
+            expecting: "<error-option>".to_string(),
+            found: Event::Start(BytesStart::from_content(
+                "some-other-tag xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"",
+                14,
+            )),
+        });
+
+        test_xml_value(stop_on_error_str, stop_on_error)?;
+        test_xml_value(continue_on_error_str, continue_on_error)?;
+        test_xml_value(rollback_on_error_str, rollback_on_error)?;
+        assert_eq!(
+            test_parse_error::<ConfigErrorOption>(unknown_value_str),
+            unknown_value
+        );
+        assert_eq!(
+            test_parse_error::<ConfigErrorOption>(invalid_tag_str),
+            invalid_tag
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_edit_config() -> Result<(), ParsingError> {
+        let edit_config_str = r#"<edit-config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+         <target>
+           <running/>
+         </target>
+         <default-operation>merge</default-operation>
+         <test-option>test-then-set</test-option>
+         <error-option>stop-on-error</error-option>
+         <config>
+           <top xmlns="http://example.com/schema/1.2/config">
+             <users>
+               <user>
+                 <name>fred</name>
+                 <uid>1000</uid>
+               </user>
+             </users>
+           </top>
+         </config>
+       </edit-config>"#;
+
+        let expected_edit_config = WellKnownOperation::EditConfig {
+            target: ConfigTarget::Running,
+            default_operation: ConfigUpdateDefaultOperation::Merge,
+            test_option: Some(ConfigEditTestOption::TestThenSet),
+            error_option: Some(ConfigErrorOption::StopOnError),
+            edit_content: EditConfig::Config(
+                r#"
+           <top xmlns="http://example.com/schema/1.2/config">
+             <users>
+               <user>
+                 <name>fred</name>
+                 <uid>1000</uid>
+               </user>
+             </users>
+           </top>
+         "#
+                .into(),
+            ),
+        };
+
+        test_xml_value(edit_config_str, expected_edit_config)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_edit_content() -> Result<(), ParsingError> {
+        let config_str = r#"<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+           <top xmlns="http://example.com/schema/1.2/config">
+             <users>
+               <user>
+                 <name>fred</name>
+                 <uid>1000</uid>
+               </user>
+             </users>
+           </top>
+         </config>"#;
+        let url_str = r#"<url xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">http://example.com/configs/base-config.xml</url>"#;
+
+        let expected_config = EditConfig::Config(
+            r#"
+           <top xmlns="http://example.com/schema/1.2/config">
+             <users>
+               <user>
+                 <name>fred</name>
+                 <uid>1000</uid>
+               </user>
+             </users>
+           </top>
+         "#
+            .into(),
+        );
+        let expected_url = EditConfig::Url("http://example.com/configs/base-config.xml".into());
+
+        test_xml_value(config_str, expected_config)?;
+        test_xml_value(url_str, expected_url)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_get() -> Result<(), ParsingError> {
+        let get_str = r#"<get xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+         <filter type="subtree"><top xmlns="http://example.com/schema/1.2/stats"><interfaces/></top></filter>
+       </get>"#;
+        let get = WellKnownOperation::Get {
+            filter: Filter::Subtree(
+                r#"<top xmlns="http://example.com/schema/1.2/stats"><interfaces/></top>"#.into(),
+            ),
+        };
+        test_xml_value(get_str, get)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_rpc() -> Result<(), ParsingError> {
+        let get_str = r#"<rpc message-id="123" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"><get>
+         <filter type="subtree"><top xmlns="http://example.com/schema/1.2/stats"><interfaces/></top></filter>
+       </get></rpc>"#;
+        let get = Rpc::new(
+            "123".into(),
+            RpcOperation::WellKnown(WellKnownOperation::Get {
+                filter: Filter::Subtree(
+                    r#"<top xmlns="http://example.com/schema/1.2/stats"><interfaces/></top>"#
+                        .into(),
+                ),
+            }),
+        );
+        test_xml_value(get_str, get)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_schema() -> Result<(), ParsingError> {
+        let get_schema_str = r#"<get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
+            <identifier>foo</identifier>
+            <version>  1.0</version>
+            <format>  yang  </format>
+        </get-schema>"#;
+        let get_schema = WellKnownOperation::GetSchema {
+            identifier: "foo".into(),
+            version: Some("1.0".into()),
+            format: Some(YangSchemaFormat::Yang),
+        };
+        test_xml_value(get_schema_str, get_schema)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_schema_rpc() -> Result<(), ParsingError> {
+        let get_schema_str = r#"<rpc message-id="123" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+            <get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">
+                <identifier>foo</identifier>
+                <version>  1.0</version>
+                <format>  yang  </format>
+            </get-schema>
+        </rpc>"#;
+        let get_schema = Rpc::new(
+            "123".into(),
+            RpcOperation::WellKnown(WellKnownOperation::GetSchema {
+                identifier: "foo".into(),
+                version: Some("1.0".into()),
+                format: Some(YangSchemaFormat::Yang),
+            }),
+        );
+        test_xml_value(get_schema_str, get_schema)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_schema_response() -> Result<(), ParsingError> {
+        let get_schema_response_str = r#"<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"
+           message-id="10110">
+  <data xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring">module tiny-example {
+  yang-version 1.1;
+  namespace "http://example.com/tiny";
+  prefix "tiny";
+
+  leaf hostname {
+    type string {
+      pattern "[a-zA-Z0-9\-]+";
+    }
+    description "System hostname";
+  }
+
+  leaf admin-email {
+    type string {
+      pattern "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}";
+    }
+    description "Admin's email &lt;required&gt;";
+  }
+
+  leaf threshold {
+    type uint32;
+    must ". &gt; 100 and . &lt; 1000" {
+      error-message "Value must be &gt; 100 &amp; &lt; 1000";
+    }
+  }
+}</data>
+</rpc-reply>"#;
+        let get_schema_response = RpcReply::new(
+            Some("10110".into()),
+            RpcReplyContent::ErrorsAndData {
+                errors: vec![],
+                responses: RpcResponse::WellKnown(WellKnownRpcResponse::YangSchema {
+                    schema: r#"module tiny-example {
+  yang-version 1.1;
+  namespace "http://example.com/tiny";
+  prefix "tiny";
+
+  leaf hostname {
+    type string {
+      pattern "[a-zA-Z0-9\-]+";
+    }
+    description "System hostname";
+  }
+
+  leaf admin-email {
+    type string {
+      pattern "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}";
+    }
+    description "Admin's email <required>";
+  }
+
+  leaf threshold {
+    type uint32;
+    must ". > 100 and . < 1000" {
+      error-message "Value must be > 100 & < 1000";
+    }
+  }
+}"#
+                    .into(),
+                }),
+            },
+        );
+
+        test_xml_value(get_schema_response_str, get_schema_response)?;
         Ok(())
     }
 }
