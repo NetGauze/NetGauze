@@ -16,7 +16,10 @@
 use clap::Parser;
 use netgauze_netconf_proto::{
     client::{connect, NetconfSshConnectConfig, SshAuth, SshHandler},
-    protocol::{RpcOperation, RpcReplyContent},
+    protocol::{
+        RpcOperation, RpcReplyContent, RpcResponse, WellKnownOperation, WellKnownRpcResponse,
+        YangSchemaFormat,
+    },
 };
 use std::{sync::Arc, time::Duration};
 
@@ -115,7 +118,12 @@ pub async fn main() -> anyhow::Result<()> {
     tracing::info!("Connected to server with caps: {:#?}", client.peer_caps());
 
     tokio::time::sleep(Duration::from_secs(1)).await;
-    let get_schema_op = RpcOperation::Raw(r#"<get-schema xmlns="urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring"><identifier>ietf-datastores</identifier></get-schema>"#.into());
+
+    let get_schema_op = RpcOperation::WellKnown(WellKnownOperation::GetSchema {
+        identifier: "ietf-datastores".into(),
+        version: None,
+        format: Some(YangSchemaFormat::Yang),
+    });
     let message_id = client.rpc(get_schema_op).await?;
     tokio::time::sleep(Duration::from_secs(1)).await;
     let response = if let Some(resp) = client.rpc_reply().await {
@@ -136,8 +144,14 @@ pub async fn main() -> anyhow::Result<()> {
         responses,
     } = response.reply()
     {
-        let decoded = decode_html_entities(responses);
-        eprintln!("RPC response:\n==================\n{decoded}\n================\n");
+        if let RpcResponse::Raw(responses) = responses {
+            let decoded = decode_html_entities(responses);
+            eprintln!("RPC response:\n==================\n{decoded}\n================\n");
+        } else if let RpcResponse::WellKnown(WellKnownRpcResponse::YangSchema { schema }) =
+            responses
+        {
+            eprintln!("RPC get-schema response:\n==================\n{schema}\n================\n");
+        }
     }
 
     client.close().await?;

@@ -264,7 +264,7 @@ mod test {
     use super::*;
     use crate::{
         capabilities::StandardCapability,
-        protocol::{Rpc, RpcOperation},
+        protocol::{Rpc, RpcOperation, WellKnownOperation},
     };
     use std::collections::HashSet;
 
@@ -352,7 +352,7 @@ mod test {
         ))));
         let rpc_expected = Ok(Some(NetConfMessage::Rpc(Rpc::new(
             "102".into(),
-            RpcOperation::Raw("\n  <close-session/>\n".into()),
+            RpcOperation::WellKnown(WellKnownOperation::CloseSession),
         ))));
         let mut buf = BytesMut::from(input);
         let mut codec = SshCodec::new();
@@ -383,7 +383,7 @@ mod test {
 "#;
         let expected = Ok(Some(NetConfMessage::Rpc(Rpc::new(
             "102".into(),
-            RpcOperation::Raw("\n  <close-session/>\n".into()),
+            RpcOperation::WellKnown(WellKnownOperation::CloseSession),
         ))));
         let mut buf = BytesMut::from(input);
         let mut codec = SshCodec::new();
