@@ -16,6 +16,7 @@
 use quick_xml::name::Namespace;
 
 pub mod capabilities;
+pub mod client;
 pub mod codec;
 pub mod protocol;
 pub mod xml_utils;
