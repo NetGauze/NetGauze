@@ -25,72 +25,101 @@ use yang3::{
 
 use netgauze_udp_notif_pkt::UdpNotifPacket;
 
-use crate::model::{
-    notification::SubscriptionId,
-    udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
+use crate::{
+    model::{
+        notification::SubscriptionId,
+        udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
+    },
+    schema_cache::{SchemaCacheRequest, SchemaCacheResponse},
 };
 
-type ContextId = String;
-
 // Cache for YangPush subscriptions
-type SubscriptionIdx = (SocketAddr, SubscriptionId);
-type SubscriptionCache = HashMap<SubscriptionIdx, SubscriptionData>;
+type ContentId = String;
+type PeerCache = HashMap<Peer, ContentId>;
+type SubscriptionCache = HashMap<ContentId, SubscriptionData>;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct Peer {
+    address: SocketAddr,
+    subscription_id: SubscriptionId,
+}
+impl Peer {
+    fn new(address: SocketAddr, subscription_id: SubscriptionId) -> Self {
+        Self {
+            address,
+            subscription_id,
+        }
+    }
+}
 
 #[derive(Debug)]
 struct SubscriptionData {
-    context_id: ContextId,
+    content_id: ContentId,
     yanglib_path: String,
     search_dir: String,
     context: Context,
 }
-
 impl SubscriptionData {
     fn new(
-        context_id: ContextId,
+        content_id: ContentId,
         yanglib_path: String,
         search_dir: String,
         context: Context,
     ) -> Self {
         Self {
-            context_id,
+            content_id,
             yanglib_path,
             search_dir,
             context,
         }
     }
+    fn get_hash(&self) -> ContentId {
+        use std::{
+            collections::hash_map::DefaultHasher,
+            hash::{Hash, Hasher},
+        };
+
+        let mut hasher = DefaultHasher::new();
+        self.yanglib_path.hash(&mut hasher);
+        self.search_dir.hash(&mut hasher);
+        // hashing of the context
+        self.context
+            .modules(false)
+            .for_each(|m| m.name().hash(&mut hasher));
+        hasher.finish().to_string()
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SubscriptionInfo {
-    peer: SocketAddr,
+    peer_addr: SocketAddr,
     subscription_id: Option<SubscriptionId>,
-    context_id: Option<ContextId>,
+    content_id: Option<ContentId>,
 }
-
 impl SubscriptionInfo {
-    pub fn new(peer: SocketAddr) -> Self {
+    pub fn new(peer_addr: SocketAddr) -> Self {
         Self {
-            peer,
+            peer_addr,
             subscription_id: None,
-            context_id: None,
+            content_id: None,
         }
     }
     pub fn with_subscription_id(mut self, subscription_id: SubscriptionId) -> Self {
         self.subscription_id = Some(subscription_id);
         self
     }
-    pub fn with_context_id(mut self, context_id: ContextId) -> Self {
-        self.context_id = Some(context_id);
+    pub fn with_content_id(mut self, context_id: ContentId) -> Self {
+        self.content_id = Some(context_id);
         self
     }
-    pub const fn peer(&self) -> SocketAddr {
-        self.peer
+    pub const fn peer_addr(&self) -> SocketAddr {
+        self.peer_addr
     }
     pub const fn subscription_id(&self) -> Option<SubscriptionId> {
         self.subscription_id
     }
-    pub const fn context_id(&self) -> Option<&ContextId> {
-        self.context_id.as_ref()
+    pub const fn content_id(&self) -> Option<&ContentId> {
+        self.content_id.as_ref()
     }
 }
 
@@ -110,7 +139,6 @@ pub enum ValidationActorError {
     #[strum(to_string = "failed to validate UDP-Notif payload")]
     PayloadValidationError,
 }
-
 impl std::error::Error for ValidationActorError {}
 
 #[derive(Debug, Clone)]
@@ -171,6 +199,10 @@ struct ValidationActor {
     cmd_rx: mpsc::Receiver<ValidationActorCommand>,
     udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
     validated_tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
+    #[allow(dead_code)] // TODO: send schema requests
+    schema_req_tx: async_channel::Sender<SchemaCacheRequest>,
+    schema_resp_rx: async_channel::Receiver<SchemaCacheResponse>,
+    peers: PeerCache,
     subscriptions: SubscriptionCache,
     stats: ValidationStats,
 }
@@ -180,6 +212,8 @@ impl ValidationActor {
         cmd_rx: mpsc::Receiver<ValidationActorCommand>,
         udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
         validated_tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
+        schema_req_tx: async_channel::Sender<SchemaCacheRequest>,
+        schema_resp_rx: async_channel::Receiver<SchemaCacheResponse>,
         stats: ValidationStats,
     ) -> Self {
         info!("Creating Yang Push validation actor");
@@ -187,6 +221,9 @@ impl ValidationActor {
             cmd_rx,
             udp_notif_rx,
             validated_tx,
+            schema_req_tx,
+            schema_resp_rx,
+            peers: HashMap::new(),
             subscriptions: HashMap::new(),
             stats,
         }
@@ -207,6 +244,20 @@ impl ValidationActor {
                         None => {
                             warn!("Yang Push validation actor terminated due to command channel closing");
                             Ok("Enrichment shutdown successfully".to_string())
+                        }
+                    }
+                }
+                req = self.schema_resp_rx.recv() => {
+                    match req {
+                        Ok(SchemaCacheResponse::SchemaResponseForPeer((_schema_request, _schema_info))) => {
+                            // TODO
+                        }
+                        Ok(SchemaCacheResponse::SchemaResponseForContent((_schema_request, _schema_info))) => {
+                            trace!("Received schema response for content, ignored");
+                        }
+                        Err(err) => {
+                            error!("Shutting down due to Yang Push receive error: {err}");
+                            Err(ValidationActorError::YangPushReceiveError)?;
                         }
                     }
                 }
@@ -259,7 +310,7 @@ impl ValidationActor {
 
     fn handle_udp_notif(
         &mut self,
-        peer: SocketAddr,
+        peer_addr: SocketAddr,
         packet: &UdpNotifPacket,
     ) -> Result<Option<(SubscriptionInfo, UdpNotifPacketDecoded)>, ValidationActorError> {
         // Decode UdpNotifPacket into UdpNotifPacketDecoded
@@ -270,11 +321,11 @@ impl ValidationActor {
                 return Ok(None);
             }
         };
-        let mut subscription_info = SubscriptionInfo::new(peer);
+        let mut subscription_info = SubscriptionInfo::new(peer_addr);
         let payload: &UdpNotifPayload = decoded.payload();
         let envelope = match payload {
             UdpNotifPayload::NotificationEnvelope(envelope) => {
-                debug!("Received Yang Push notification from peer: {}", peer);
+                debug!("Received Yang Push notification from peer: {}", peer_addr);
                 envelope
             }
             UdpNotifPayload::NotificationLegacy(_) => {
@@ -293,7 +344,7 @@ impl ValidationActor {
         subscription_info.subscription_id = Some(subscr_id);
         trace!(
             "Processing Yang Push notification for peer: {}, subscription ID: {}",
-            peer,
+            peer_addr,
             subscr_id
         );
         let msg = match serde_json::to_string(content) {
@@ -306,15 +357,16 @@ impl ValidationActor {
         trace!("Serialized Yang Push message: {}", msg);
 
         // Validating YANG data against the loaded schemas
-        match self.validate_message(peer, subscr_id, msg.clone()) {
-            Ok(context_id) => {
+        let peer = Peer::new(peer_addr, subscr_id);
+        match self.validate_message(peer, msg.clone()) {
+            Ok(subscription) => {
                 trace!(
-                    "Yang Push message validated successfully for peer: {}, subscription ID: {}, context ID: {}",
-                    peer,
+                    "Yang Push message validated successfully for peer: {}, subscription ID: {}, content ID: {}",
+                    peer_addr,
                     subscr_id,
-                    &context_id
+                    subscription.content_id,
                 );
-                subscription_info.context_id = Some(context_id);
+                subscription_info.content_id = Some(subscription.content_id.clone());
             }
             Err(err) => {
                 warn!("Yang Push message validation failed: {err}");
@@ -325,69 +377,90 @@ impl ValidationActor {
 
     fn validate_message(
         &mut self,
-        peer: SocketAddr,
-        subscr_id: SubscriptionId,
+        peer: Peer,
         message: String,
-    ) -> Result<ContextId, ValidationActorError> {
+    ) -> Result<&SubscriptionData, ValidationActorError> {
         trace!(
             "Validating Yang Push message for peer: {}, subscription ID: {}",
-            peer,
-            subscr_id
+            &peer.address,
+            &peer.subscription_id
         );
-        let sub = match self.get_subscription(peer, subscr_id) {
-            Some(sub) => {
-                debug!(
-                    "Found context for peer: {}, subscription ID: {}",
-                    peer, subscr_id
+        // Retrieve or create the context for the given peer and subscription ID
+        let subscription = match self.get_or_create_subscription(peer.clone()) {
+            Ok(subscription) => subscription,
+            Err(err) => {
+                error!(
+                    "Failed to create context for peer: {}, subscription ID: {}: {err}",
+                    &peer.address, &peer.subscription_id
                 );
-                sub
-            }
-            None => {
-                debug!(
-                    "No context found for peer: {}, subscription ID: {}",
-                    peer, subscr_id
-                );
-                self.stats.subscription_cache_miss.add(
-                    1,
-                    &[
-                        opentelemetry::KeyValue::new(
-                            "network.peer.address",
-                            format!("{}", peer.ip()),
-                        ),
-                        opentelemetry::KeyValue::new(
-                            "network.peer.port",
-                            opentelemetry::Value::I64(peer.port().into()),
-                        ),
-                    ],
-                );
-                // TODO
-                let context_id: ContextId = "E96CB84D-F02B-4FBF-BE86-3580300CD964".into();
-                self.create_subscription(peer, subscr_id, context_id)?
+                return Err(ValidationActorError::PayloadValidationError);
             }
         };
 
         // Validating YANG data against the loaded schemas
         let data_op = DataOperation::NotificationYang;
-        let _data_tree =
-            match DataTree::parse_op_string(&sub.context, message, DataFormat::JSON, data_op) {
-                Ok(tree) => tree,
-                Err(err) => {
-                    warn!("Failed to parse Yang Push message: {err}");
-                    return Err(ValidationActorError::PayloadValidationError);
-                }
-            };
-        Ok(sub.context_id.clone())
+        let _data_tree = match DataTree::parse_op_string(
+            &subscription.context,
+            message,
+            DataFormat::JSON,
+            data_op,
+        ) {
+            Ok(tree) => tree,
+            Err(err) => {
+                warn!("Failed to parse Yang Push message: {err}");
+                return Err(ValidationActorError::PayloadValidationError);
+            }
+        };
+        Ok(subscription)
     }
 
-    fn get_subscription(
-        &self,
-        peer: SocketAddr,
-        subscr_id: SubscriptionId,
-    ) -> Option<&SubscriptionData> {
-        // Retrieve the context for the given peer address
-        let idx = (peer, subscr_id);
-        let subscription = self.subscriptions.get(&idx);
-        match subscription {
+    fn get_or_create_subscription(
+        &mut self,
+        peer: Peer,
+    ) -> Result<&SubscriptionData, ValidationActorError> {
+        // Retrieve or create the context for the given peer and subscription ID
+        if self.get_subscription(peer.clone()).is_some() {
+            return Ok(self.get_subscription(peer).unwrap());
+        };
+
+        self.stats.subscription_cache_miss.add(1, &[]);
+        // TODO
+        let content_id: ContentId = "E96CB84D-F02B-4FBF-BE86-3580300CD964".into();
+        match self.create_subscription(peer.clone(), content_id.clone()) {
+            Ok(subscription) => Ok(subscription),
+            Err(err) => {
+                error!(
+                    "Failed to create context for peer: {}, subscription ID: {}: {err}",
+                    &peer.address, &peer.subscription_id
+                );
+                Err(ValidationActorError::PayloadValidationError)
+            }
+        }
+    }
+
+    fn get_subscription(&self, peer: Peer) -> Option<&SubscriptionData> {
+        // Retrieve the context for the given peer
+        let content_id = match self.peers.get(&peer) {
+            Some(content_id) => {
+                trace!(
+                    "Found content ID: {} for peer {}, subscription ID {}",
+                    content_id,
+                    peer.address,
+                    peer.subscription_id
+                );
+                content_id
+            }
+            None => {
+                // TODO: add peer
+                trace!(
+                    "No context found for peer {}, subscription ID {}",
+                    peer.address,
+                    peer.subscription_id
+                );
+                return None;
+            }
+        };
+        match self.subscriptions.get(content_id) {
             Some(subscription) => {
                 debug!(
                     "Found subscription: {}, search dir: {}",
@@ -398,7 +471,7 @@ impl ValidationActor {
             None => {
                 debug!(
                     "No subscription found for peer {}, subscription ID {}",
-                    peer, subscr_id
+                    peer.address, peer.subscription_id
                 );
                 None
             }
@@ -407,18 +480,17 @@ impl ValidationActor {
 
     fn create_subscription(
         &mut self,
-        peer: SocketAddr,
-        subscr_id: SubscriptionId,
-        context_id: ContextId,
+        peer: Peer,
+        content_id: ContentId,
     ) -> Result<&SubscriptionData, ValidationActorError> {
         // Initialize context
-        let top_dir = "../../assets/yang/".to_string() + &context_id + "/";
+        let top_dir = "../../assets/yang/".to_string() + &content_id + "/";
         let search_dir = top_dir.clone() + "models";
         let yanglib_path = top_dir.clone() + "yanglib.json";
         let format = DataFormat::JSON;
         debug!(
-            "Creating context from Yang Library file: {}, search dir: {}, context ID: {}",
-            yanglib_path, search_dir, context_id
+            "Creating context from Yang Library file: {}, search dir: {}, content ID: {}",
+            yanglib_path, search_dir, content_id
         );
         let flags = ContextFlags::empty();
         match Context::new_from_yang_library_file(&yanglib_path, format, &search_dir, flags) {
@@ -428,13 +500,15 @@ impl ValidationActor {
                     context.modules(false).count()
                 );
                 let subscription = SubscriptionData::new(
-                    context_id.clone(),
+                    content_id.clone(),
                     yanglib_path.to_string(),
                     search_dir.to_string(),
                     context,
                 );
-                self.subscriptions.insert((peer, subscr_id), subscription);
-                Ok(&self.subscriptions[&(peer, subscr_id)])
+                let hash = subscription.get_hash();
+                self.peers.insert(peer, hash.clone());
+                self.subscriptions.insert(hash.clone(), subscription);
+                Ok(&self.subscriptions[&hash])
             }
             Err(err) => {
                 error!("Failed to create libyang context: {err}");
@@ -463,6 +537,8 @@ impl ValidationActorHandle {
     pub fn new(
         buffer_size: usize,
         udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
+        schema_req_tx: async_channel::Sender<SchemaCacheRequest>,
+        schema_resp_rx: async_channel::Receiver<SchemaCacheResponse>,
         stats: either::Either<opentelemetry::metrics::Meter, ValidationStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);
@@ -471,7 +547,14 @@ impl ValidationActorHandle {
             either::Either::Left(meter) => ValidationStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor = ValidationActor::new(cmd_rx, udp_notif_rx, validated_tx, stats);
+        let actor = ValidationActor::new(
+            cmd_rx,
+            udp_notif_rx,
+            validated_tx,
+            schema_req_tx,
+            schema_resp_rx,
+            stats,
+        );
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
             cmd_tx,
@@ -505,6 +588,8 @@ mod tests {
             mpsc::channel(10).1,
             async_channel::bounded(10).1,
             async_channel::bounded(10).0,
+            async_channel::bounded(10).0,
+            async_channel::bounded(10).1,
             ValidationStats::new(opentelemetry::global::meter("test_meter")),
         )
     }
@@ -513,11 +598,12 @@ mod tests {
     #[tracing_test::traced_test]
     fn test_message_validation_ok() {
         let mut validator = create_actor();
-        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
-        let subscr_id = 0;
+        let peer = Peer {
+            address: SocketAddr::from(([127, 0, 0, 1], 12345)),
+            subscription_id: 0,
+        };
         let result = validator.validate_message(
             peer,
-            subscr_id,
             r###"{
                 "ietf-yang-push:push-update": {
                   "datastore-contents": {
@@ -553,11 +639,12 @@ mod tests {
     #[tracing_test::traced_test]
     fn test_message_validation_fail() {
         let mut validator = create_actor();
-        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
-        let subscr_id = 0;
+        let peer = Peer {
+            address: SocketAddr::from(([127, 0, 0, 1], 12345)),
+            subscription_id: 0,
+        };
         let result = validator.validate_message(
             peer,
-            subscr_id,
             r###"{
                 "ietf-yang-push:push-update": {
                   "datastore-contents": {
@@ -589,7 +676,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn test_packet_processing_1() {
         let mut validator = create_actor();
-        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+        let peer_addr = SocketAddr::from(([127, 0, 0, 1], 12345));
 
         // Create UdpNotifPayload
         let payload = json!({
@@ -633,7 +720,7 @@ mod tests {
         );
 
         // Validate the packet
-        let result = validator.handle_udp_notif(peer, &packet);
+        let result = validator.handle_udp_notif(peer_addr, &packet);
         assert!(
             result.is_ok(),
             "Packet validation failed: {:?}",
@@ -645,7 +732,11 @@ mod tests {
     #[tracing_test::traced_test]
     fn test_packet_processing_2() {
         let mut validator = create_actor();
-        let peer: SocketAddr = "127.0.0.1:12345".parse().unwrap();
+        let peer_addr = SocketAddr::from(([127, 0, 0, 1], 12345));
+        let peer = Peer {
+            address: peer_addr,
+            subscription_id: 1,
+        };
 
         // Create UdpNotifPayload
         let payload1 = json!({
@@ -728,17 +819,17 @@ mod tests {
         );
 
         // Create a context and validate the packet
-        let result1 = validator.handle_udp_notif(peer, &packet1);
+        let result1 = validator.handle_udp_notif(peer_addr, &packet1);
         assert!(
             result1.is_ok(),
             "Packet validation failed: {:?}",
             result1.err()
         );
         // Check if the context was cached
-        let result2 = validator.get_subscription(peer, 1);
+        let result2 = validator.get_subscription(peer);
         assert!(result2.is_some(), "Context caching failed");
         // Validate the packet against the cached context
-        let result3 = validator.handle_udp_notif(peer, &packet2);
+        let result3 = validator.handle_udp_notif(peer_addr, &packet2);
         assert!(
             result3.is_ok(),
             "Validation against the cached context failed: {:?}",
