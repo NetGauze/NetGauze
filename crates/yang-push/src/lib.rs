@@ -15,4 +15,5 @@
 
 pub mod enrichment;
 pub mod model;
+pub mod schema_cache;
 pub mod validation;
