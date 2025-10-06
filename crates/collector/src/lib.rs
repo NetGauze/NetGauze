@@ -36,6 +36,7 @@ use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifR
 use netgauze_yang_push::{
     enrichment::YangPushEnrichmentActorHandle,
     model::telemetry::TelemetryMessageWrapper,
+    schema_cache::SchemaCacheActorHandle,
     validation::{SubscriptionInfo, ValidationActorHandle},
 };
 use std::{net::IpAddr, str::Utf8Error, sync::Arc};
@@ -335,6 +336,7 @@ pub async fn init_udp_notif_collection(
     let (supervisor_join_handle, supervisor_handle) =
         UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;
     let mut join_set = FuturesUnordered::new();
+    let mut schema_handles = Vec::new();
     let mut validation_handles = Vec::new();
     let mut enrichment_handles = Vec::new();
     let mut http_handles = Vec::new();
@@ -396,9 +398,18 @@ pub async fn init_udp_notif_collection(
                     ));
                 }
                 PublisherEndpoint::TelemetryKafkaJson(config) => {
+                    let (schema_join, schema_handle) = SchemaCacheActorHandle::new(
+                        publisher_config.buffer_size,
+                        either::Left(meter.clone()),
+                    );
+                    join_set.push(schema_join);
+                    schema_handles.push(schema_handle.clone());
+
                     let (validation_join, validation_handle) = ValidationActorHandle::new(
                         publisher_config.buffer_size,
                         udp_notif_recv.clone(),
+                        schema_handle.schema_req_tx.clone(),
+                        schema_handle.schema_resp_rx.clone(),
                         either::Left(meter.clone()),
                     );
                     join_set.push(validation_join);
@@ -431,9 +442,18 @@ pub async fn init_udp_notif_collection(
                     }
                 }
                 PublisherEndpoint::TelemetryKafkaYang(config) => {
+                    let (schema_join, schema_handle) = SchemaCacheActorHandle::new(
+                        publisher_config.buffer_size,
+                        either::Left(meter.clone()),
+                    );
+                    join_set.push(schema_join);
+                    schema_handles.push(schema_handle.clone());
+
                     let (validation_join, validation_handle) = ValidationActorHandle::new(
                         publisher_config.buffer_size,
                         udp_notif_recv.clone(),
+                        schema_handle.schema_req_tx.clone(),
+                        schema_handle.schema_resp_rx.clone(),
                         either::Left(meter.clone()),
                     );
                     join_set.push(validation_join);
@@ -495,6 +515,9 @@ pub async fn init_udp_notif_collection(
         join_ret = join_set.next() => {
             warn!("udp-notif http publisher exited, shutting down udp-notif collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
+            for handle in schema_handles {
+                let _ = handle.shutdown().await;
+            }
             for handle in validation_handles {
                 let _ = handle.shutdown().await;
             }
