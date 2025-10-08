@@ -465,7 +465,7 @@ impl YangPushEnrichmentActor {
                     match msg {
                         Ok(msg) => {
                             let (subscription_info, pkt) = msg;
-                            let peer = subscription_info.peer();
+                            let peer = subscription_info.peer_addr();
                             let peer_tags = [
                                 opentelemetry::KeyValue::new(
                                     "network.peer.address",
