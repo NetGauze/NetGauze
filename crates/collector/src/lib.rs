@@ -44,6 +44,7 @@ use tracing::{info, warn};
 pub mod config;
 pub mod flow;
 pub mod publishers;
+pub mod telemetry;
 
 pub async fn init_flow_collection(
     flow_config: FlowConfig,
@@ -447,11 +448,12 @@ pub async fn init_udp_notif_collection(
                     enrichment_handles.push(enrichment_handle.clone());
 
                     let hdl = KafkaYangPublisherActorHandle::from_config(
-                        serialize_telemetry_yang,
                         config.clone(),
                         enrichment_handle.subscribe(),
                         either::Left(meter.clone()),
-                    );
+                    )
+                    .await;
+
                     match hdl {
                         Ok((kafka_join, kafka_handle)) => {
                             join_set.push(kafka_join);
@@ -603,25 +605,6 @@ fn serialize_telemetry_json(
     let value = serde_json::to_value(tmw)?;
     let key = serde_json::Value::String(ip.to_string());
     Ok((Some(key), value))
-}
-
-fn serialize_telemetry_yang(
-    input: (SubscriptionInfo, TelemetryMessageWrapper),
-    _writer_id: String,
-) -> Result<
-    (
-        Option<SubscriptionInfo>,
-        Option<serde_json::Value>,
-        serde_json::Value,
-    ),
-    UdpNotifSerializationError,
-> {
-    let subscription_info = input.0;
-    let tmw = input.1;
-    let ip = tmw.message().telemetry_message_metadata().export_address();
-    let value = serde_json::to_value(tmw)?;
-    let key = serde_json::Value::String(ip.to_string());
-    Ok((Some(subscription_info), Some(key), value))
 }
 
 #[derive(Debug, strum_macros::Display)]

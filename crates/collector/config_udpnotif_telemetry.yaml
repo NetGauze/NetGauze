@@ -20,10 +20,21 @@ udp_notif:
     group1:
       buffer_size: 1000
       endpoints:
-        full: !TelemetryKafkaJson
+        json-endpoint: !TelemetryKafkaJson
           topic: telemetry-message-json
           producer_config:
             bootstrap.servers: localhost:49092
             message.timeout.ms: "60000"
             queue.buffering.max.messages: "1000"
-          writer_id: test-udpnotif-telemetry # TOOD: not considered yet, discuss...
+          writer_id: test-udpnotif-telemetry # TODO: not considered yet, discuss...
+
+        yang-endpoint: !TelemetryKafkaYang
+          topic: telemetry-message-yang
+          schema_registry_url: http://localhost:48081
+          producer_config:
+            bootstrap.servers: localhost:49092
+            message.timeout.ms: "60000"
+            queue.buffering.max.messages: "1000"
+          writer_id: test-udpnotif-telemetry # TODO: not considered yet, discuss...
+          yang_converter:
+            default_schema: assets/yang/telemetry-message/yang-push-telemetry-supplied-schema.json

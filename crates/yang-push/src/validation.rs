@@ -68,12 +68,20 @@ pub struct SubscriptionInfo {
 }
 
 impl SubscriptionInfo {
-    fn new(peer: SocketAddr) -> Self {
+    pub fn new(peer: SocketAddr) -> Self {
         Self {
             peer,
             subscription_id: None,
             context_id: None,
         }
+    }
+    pub fn with_subscription_id(mut self, subscription_id: SubscriptionId) -> Self {
+        self.subscription_id = Some(subscription_id);
+        self
+    }
+    pub fn with_context_id(mut self, context_id: ContextId) -> Self {
+        self.context_id = Some(context_id);
+        self
     }
     pub const fn peer(&self) -> SocketAddr {
         self.peer
