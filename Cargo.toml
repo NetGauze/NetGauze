@@ -84,7 +84,9 @@ anyhow = { version = "1" }
 serde_with = { version = "3.14" }
 indexmap = { version = "2.10" }
 apache-avro = { version = "0.20" }
-schema_registry_converter = { version = "4.6", default-features = false }
+# TODO: temporary until https://github.com/gklijs/schema_registry_converter/pull/145 is merged
+# schema_registry_converter = { version = "4.6", default-features = false }
+schema_registry_converter = { git = "https://github.com/rodonile/schema_registry_converter", branch = "supplied-ref-serde", default-features = false }
 rdkafka = { version = "0.38", default-features = false }
 tracing-test = { version = "0.2" }
 syn = { version = "2.0" }
