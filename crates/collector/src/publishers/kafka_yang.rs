@@ -13,29 +13,77 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! NetGauze YANG-based Kafka Publisher
+//!
+//! This module provides functionality for publishing JSON messages to Apache
+//! Kafka with support for YANG schema registration to Confluent Schema
+//! Registry.
+//!
+//! # Overview
+//!
+//! The YANG Kafka publisher consists of several key components:
+//!
+//! - `YangConverter`: A trait that defines how to convert input data to
+//!   YANG-compliant JSON
+//! - `KafkaConfig`: Configuration for Kafka connection and YANG schema
+//!   settings
+//! - `KafkaYangPublisherActor`: The main actor that handles message
+//!   publishing
+//! - `KafkaYangPublisherActorHandle`: A handle for controlling the publisher
+//!   actor
 use crate::publishers::LoggingProducerContext;
-use netgauze_yang_push::validation::SubscriptionInfo;
 use rdkafka::{
     config::{ClientConfig, FromClientConfigAndContext},
     error::{KafkaError, RDKafkaErrorCode},
+    message::{Header, OwnedHeaders},
     producer::{BaseRecord, Producer, ThreadedProducer},
+};
+use schema_registry_converter::{
+    async_impl::schema_registry::{post_schema, SrSettings},
+    error::SRCError,
+    schema_registry_common::{SchemaType, SuppliedSchema},
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
 
+/// Maximum polling interval when Kafka message queue is full
 const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 
 // --- config ---
 
+/// Trait for converting input data to YANG-compliant JSON format
+pub trait YangConverter<T, E: std::error::Error> {
+    /// Returns the YANG schema definition for the data model
+    /// with references being (augmented)imports
+    /// TODO: change from SuppliedSchema to native structure
+    fn get_yang_schema(&self) -> SuppliedSchema;
+
+    /// Extract a key from the input message for Kafka partitioning
+    fn get_key(&self, input: &T) -> Option<serde_json::Value>;
+
+    /// Serialize the input data to YANG-compliant JSON
+    fn serialize_json(&self, input: T) -> Result<serde_json::Value, E>;
+}
+
+/// Configuration for the Kafka YANG publisher
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KafkaConfig {
-    /// Output topic
+pub struct KafkaConfig<C> {
+    /// Target Kafka topic for publishing messages
     topic: String,
+
     /// Key/Value producer configs are defined in librdkafka
     producer_config: HashMap<String, String>,
+
+    /// Unique identifier for this writer instance
     writer_id: String,
+
+    /// URL of the Confluent Schema Registry
+    schema_registry_url: String,
+
+    /// YANG converter implementation
+    yang_converter: C,
 }
 
 // --- telemetry ---
@@ -100,15 +148,26 @@ pub enum KafkaYangPublisherActorError<E: std::error::Error> {
     /// Error communicating with the Kafka brokers
     #[strum(to_string = "KafkaError: {0}")]
     KafkaError(KafkaError),
+
     /// Error serializing incoming messages into [serde_json::Value]
     #[strum(to_string = "SerializationError: {0}")]
     SerializationError(E),
+
     /// Error encoding [serde_json::Value] into `Vec<u8>` to send to kafka
     #[strum(to_string = "EncodingError: {0}")]
     EncodingError(serde_json::Error),
+
     /// Error receiving incoming messages from input async_channel
     #[strum(to_string = "Error receiving messages from upstream producer")]
     ReceiveErr,
+
+    /// Schema registry error
+    #[strum(to_string = "SchemaRegistryError: {0}")]
+    SchemaRegistryError(SRCError),
+
+    /// Schema validation error
+    #[strum(to_string = "SchemaValidationError: {0}")]
+    SchemaValidationError(String),
 }
 
 impl<E: std::error::Error> std::error::Error for KafkaYangPublisherActorError<E> {}
@@ -118,48 +177,96 @@ impl<E: std::error::Error> From<KafkaError> for KafkaYangPublisherActorError<E> 
         Self::KafkaError(e)
     }
 }
+impl<E: std::error::Error> From<SRCError> for KafkaYangPublisherActorError<E> {
+    fn from(e: SRCError) -> Self {
+        Self::SchemaRegistryError(e)
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 enum KafkaYangPublisherActorCommand {
     Shutdown,
 }
 
-struct KafkaYangPublisherActor<T, F> {
-    /// Serialize incoming messages into serde_json values
-    serializer: F,
-
+/// The main actor responsible for publishing messages to Kafka with YANG
+/// schemas
+///
+/// The actor handles:
+/// - receiving messages from an async channel
+/// - converting messages using the provided YANG converter
+/// - publishing messages to Kafka with proper schema headers
+/// - handling retries and error conditions
+struct KafkaYangPublisherActor<T, E: std::error::Error, C: YangConverter<T, E>> {
     cmd_rx: mpsc::Receiver<KafkaYangPublisherActorCommand>,
-
-    /// Configured kafka options
-    config: KafkaConfig,
-
-    //// librdkafka producer
+    config: KafkaConfig<C>,
     producer: ThreadedProducer<LoggingProducerContext>,
-
     msg_recv: async_channel::Receiver<T>,
-
     stats: KafkaYangPublisherStats,
+    default_schema_id: u32,
+    _phantom: std::marker::PhantomData<(T, E)>,
 }
 
-impl<
-        T,
-        E: std::error::Error + Send + Sync + 'static,
-        F: Fn(
-            T,
-            String,
-        ) -> Result<
-            (
-                Option<SubscriptionInfo>,
-                Option<serde_json::Value>,
-                serde_json::Value,
-            ),
-            E,
-        >,
-    > KafkaYangPublisherActor<T, F>
+impl<T, E, C> KafkaYangPublisherActor<T, E, C>
+where
+    E: std::error::Error + Send + Sync + 'static,
+    C: YangConverter<T, E>,
 {
+    /// Register the YANG schema with the schema registry
+    ///
+    /// This method validates the schema configuration and registers it with
+    /// the Confluent Schema Registry. The schema must have type "YANG" and
+    /// include a name for subject creation.
+    async fn register_yang_schema(
+        config: &KafkaConfig<C>,
+    ) -> Result<u32, KafkaYangPublisherActorError<E>> {
+        let sr_settings = SrSettings::new(config.schema_registry_url.clone());
+        let schema = config.yang_converter.get_yang_schema();
+
+        // Ensure schema type is set to YANG
+        if !matches!(schema.schema_type, SchemaType::Other(ref s) if s == "YANG") {
+            return Err(KafkaYangPublisherActorError::SchemaValidationError(
+                format!(
+                    "Schema type must be 'YANG', found: {:?}",
+                    schema.schema_type
+                ),
+            ));
+        }
+
+        // Extract schema name
+        let schema_name = schema
+            .name
+            .as_ref()
+            .ok_or_else(|| {
+                KafkaYangPublisherActorError::SchemaValidationError(
+                    "Schema name is required".to_string(),
+                )
+            })?
+            .clone();
+
+        // Create subject name for root schema
+        let subject = schema_name.clone() + "-root";
+
+        info!("Registering YANG schema: {}", schema_name);
+
+        match post_schema(&sr_settings, subject.clone(), schema).await {
+            Ok(schema_result) => {
+                info!(
+                    "Registered YANG schema '{}' with id {}",
+                    schema_name, schema_result.id
+                );
+                Ok(schema_result.id)
+            }
+            Err(err) => {
+                error!("Failed to register YANG schema '{}': {}", schema_name, err);
+                Err(KafkaYangPublisherActorError::SchemaRegistryError(err))
+            }
+        }
+    }
+
+    /// Create a Kafka producer from configuration
     fn get_producer(
         stats: &KafkaYangPublisherStats,
-        config: &KafkaConfig,
+        config: &KafkaConfig<C>,
     ) -> Result<ThreadedProducer<LoggingProducerContext>, KafkaYangPublisherActorError<E>> {
         let mut producer_config = ClientConfig::new();
         for (k, v) in &config.producer_config {
@@ -179,46 +286,60 @@ impl<
         }
     }
 
-    fn from_config(
-        serializer: F,
+    /// Create a new actor instance from configuration
+    async fn from_config(
         cmd_rx: mpsc::Receiver<KafkaYangPublisherActorCommand>,
-        config: KafkaConfig,
+        config: KafkaConfig<C>,
         msg_recv: async_channel::Receiver<T>,
         stats: KafkaYangPublisherStats,
     ) -> Result<Self, KafkaYangPublisherActorError<E>> {
-        let mut producer_config = ClientConfig::new();
-        for (k, v) in &config.producer_config {
-            producer_config.set(k.as_str(), v.as_str());
-        }
         let producer = Self::get_producer(&stats, &config)?;
+        let default_schema_id = Self::register_yang_schema(&config).await?;
+
         info!("Starting Kafka YANG publisher to topic: `{}`", config.topic);
+
         Ok(Self {
-            serializer,
             cmd_rx,
             config,
             producer,
             msg_recv,
             stats,
+            default_schema_id,
+            _phantom: std::marker::PhantomData,
         })
     }
 
+    /// Send a single message to Kafka
+    ///
+    /// This method:
+    /// - converts the input message using the YANG converter
+    /// - encodes the result as JSON bytes
+    /// - extracts the message key (if any)
+    /// - sends to Kafka with schema ID in the kafka header
+    /// - handles retries for queue full conditions
+    ///
+    /// If the Kafka queue is full, this method will retry with exponentially
+    /// increasing delays up to [`MAX_POLLING_INTERVAL`]. If the maximum
+    /// interval is exceeded, the message is dropped and an error is
+    /// returned.
     async fn send(&mut self, input: T) -> Result<(), KafkaYangPublisherActorError<E>> {
-        // TODO
-        let (_subscription_info, key, value) =
-            match (self.serializer)(input, self.config.writer_id.clone()) {
-                Ok(result) => result,
-                Err(err) => {
-                    error!("Error decoding message to JSON value: {err}");
-                    self.stats.error_decode.add(
-                        1,
-                        &[opentelemetry::KeyValue::new(
-                            "netgauze.json.decode.error.msg",
-                            err.to_string(),
-                        )],
-                    );
-                    return Err(KafkaYangPublisherActorError::SerializationError(err));
-                }
-            };
+        // Use the trait methods
+        let key = self.config.yang_converter.get_key(&input);
+        let value = match self.config.yang_converter.serialize_json(input) {
+            Ok(json_value) => json_value,
+            Err(err) => {
+                error!("Error serializing message to JSON: {err}");
+                self.stats.error_decode.add(
+                    1,
+                    &[opentelemetry::KeyValue::new(
+                        "netgauze.json.serialize.error.msg",
+                        err.to_string(),
+                    )],
+                );
+                return Err(KafkaYangPublisherActorError::SerializationError(err));
+            }
+        };
+
         let encoded_value = match serde_json::to_vec(&value) {
             Ok(value) => value,
             Err(err) => {
@@ -226,13 +347,14 @@ impl<
                 self.stats.error_decode.add(
                     1,
                     &[opentelemetry::KeyValue::new(
-                        "netgauze.json.decode.error.msg",
+                        "netgauze.json.encode.error.msg",
                         err.to_string(),
                     )],
                 );
                 return Err(KafkaYangPublisherActorError::EncodingError(err));
             }
         };
+
         let encoded_key = match key {
             Some(key) => match serde_json::to_vec(&key) {
                 Ok(value) => Some(value),
@@ -241,7 +363,7 @@ impl<
                     self.stats.error_decode.add(
                         1,
                         &[opentelemetry::KeyValue::new(
-                            "netgauze.json.decode.error.msg",
+                            "netgauze.json.encode.error.msg",
                             err.to_string(),
                         )],
                     );
@@ -251,12 +373,22 @@ impl<
             None => None,
         };
 
+        // Create headers with schema ID
+        let headers = OwnedHeaders::new().insert(Header {
+            key: "schema-id",
+            value: Some(self.default_schema_id.to_string().as_str()),
+        });
+
         let mut record: BaseRecord<'_, Vec<u8>, Vec<u8>> = match &encoded_key {
             Some(key) => BaseRecord::to(self.config.topic.as_str())
                 .payload(&encoded_value)
-                .key(key),
-            None => BaseRecord::to(self.config.topic.as_str()).payload(&encoded_value),
+                .key(key)
+                .headers(headers),
+            None => BaseRecord::to(self.config.topic.as_str())
+                .payload(&encoded_value)
+                .headers(headers),
         };
+
         let mut polling_interval = Duration::from_micros(10);
         loop {
             match self.producer.send(record) {
@@ -301,6 +433,7 @@ impl<
         }
     }
 
+    /// Main actor event loop
     async fn run(mut self) -> anyhow::Result<String> {
         loop {
             tokio::select! {
@@ -345,30 +478,25 @@ pub enum KafkaYangPublisherActorHandleError {
     SendError,
 }
 
+/// Handle for controlling a Kafka YANG publisher actor
 #[derive(Debug)]
-pub struct KafkaYangPublisherActorHandle {
+pub struct KafkaYangPublisherActorHandle<T, E, C>
+where
+    E: std::error::Error,
+    C: YangConverter<T, E>,
+{
     cmd_tx: mpsc::Sender<KafkaYangPublisherActorCommand>,
+    _phantom: std::marker::PhantomData<(T, E, C)>,
 }
 
-impl KafkaYangPublisherActorHandle {
-    pub fn from_config<
-        T: Send + 'static,
-        E: std::error::Error + Send + Sync + 'static,
-        F: Fn(
-                T,
-                String,
-            ) -> Result<
-                (
-                    Option<SubscriptionInfo>,
-                    Option<serde_json::Value>,
-                    serde_json::Value,
-                ),
-                E,
-            > + Send
-            + 'static,
-    >(
-        serializer: F,
-        config: KafkaConfig,
+impl<T, E, C> KafkaYangPublisherActorHandle<T, E, C>
+where
+    T: Send + 'static,
+    E: std::error::Error + Send + Sync + 'static,
+    C: YangConverter<T, E> + Send + 'static,
+{
+    pub async fn from_config(
+        config: KafkaConfig<C>,
         msg_recv: async_channel::Receiver<T>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaYangPublisherStats>,
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaYangPublisherActorError<E>> {
@@ -377,10 +505,12 @@ impl KafkaYangPublisherActorHandle {
             either::Either::Left(meter) => KafkaYangPublisherStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor =
-            KafkaYangPublisherActor::from_config(serializer, cmd_rx, config, msg_recv, stats)?;
+        let actor = KafkaYangPublisherActor::from_config(cmd_rx, config, msg_recv, stats).await?;
         let join_handle = tokio::spawn(actor.run());
-        let handle = Self { cmd_tx };
+        let handle = Self {
+            cmd_tx,
+            _phantom: std::marker::PhantomData,
+        };
         Ok((join_handle, handle))
     }
 

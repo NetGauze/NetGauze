@@ -98,3 +98,4 @@ chrono = { workspace = true, default-features = false, features = [
 ] }
 tracing-subscriber = { workspace = true }
 bytes = { workspace = true }
+tempfile = { workspace = true }
