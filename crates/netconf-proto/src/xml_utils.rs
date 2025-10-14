@@ -15,6 +15,7 @@
 
 //! Low-level XML parsing utils
 
+use crate::{NETCONF_MONITORING_NS_STR, NETCONF_NS_STR, YANG_LIBRARY_NS_STR};
 use quick_xml::{
     events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
@@ -39,7 +40,16 @@ pub struct XmlWriter<T: io::Write> {
 }
 
 impl<T: io::Write> XmlWriter<T> {
-    pub const fn new(
+    pub fn new(inner: quick_xml::writer::Writer<T>) -> Self {
+        let ns_to_apply = vec![
+            ("xmlns".to_string(), NETCONF_NS_STR.to_string()),
+            ("ncm".to_string(), NETCONF_MONITORING_NS_STR.to_string()),
+            ("yanglib".to_string(), YANG_LIBRARY_NS_STR.to_string()),
+        ];
+        Self { inner, ns_to_apply }
+    }
+
+    pub const fn new_with_custom_namespaces(
         inner: quick_xml::writer::Writer<T>,
         ns_to_apply: Vec<(String, String)>,
     ) -> Self {
@@ -851,7 +861,7 @@ mod tests {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply = vec![("xmlns".to_string(), "https://example.com".to_string())];
-        let xml_writer = XmlWriter::new(writer, ns_to_apply.clone());
+        let xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply.clone());
         assert_eq!(xml_writer.ns_to_apply, ns_to_apply);
     }
 
@@ -860,7 +870,7 @@ mod tests {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply = vec![];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply);
 
         let element = xml_writer.create_nc_element("root");
         assert_eq!(element.name().as_ref(), b"root");
@@ -875,7 +885,7 @@ mod tests {
             ("xmlns".to_string(), "https://example.com".to_string()),
             ("xmlns:ns".to_string(), "https://custom.com".to_string()),
         ];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply);
 
         let element = xml_writer.create_nc_element("root");
         assert_eq!(element.name().as_ref(), b"root");
@@ -898,7 +908,7 @@ mod tests {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply = vec![];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply);
 
         let element = xml_writer.create_ns_element("ns", "child");
         assert_eq!(element.name().as_ref(), b"ns:child");
@@ -910,7 +920,7 @@ mod tests {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply = vec![("xmlns:ns".to_string(), "https://custom.com".to_string())];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply);
 
         let element = xml_writer.create_ns_element("ns", "child");
         assert_eq!(element.name().as_ref(), b"ns:child");
@@ -929,7 +939,7 @@ mod tests {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply = vec![];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply);
 
         let start = BytesStart::new("root");
         let result = xml_writer.write_event(Event::Start(start));
@@ -953,7 +963,7 @@ mod tests {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
         let ns_to_apply = vec![];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply);
 
         // Write XML declaration
         let decl = BytesDecl::new("1.0", Some("UTF-8"), None);
@@ -996,7 +1006,7 @@ mod tests {
             ("xmlns".to_string(), "https://example.com".to_string()),
             ("xmlns:ns".to_string(), "https://custom.com".to_string()),
         ];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply);
 
         // Create first element - should have namespaces
         let element1 = xml_writer.create_nc_element("root");

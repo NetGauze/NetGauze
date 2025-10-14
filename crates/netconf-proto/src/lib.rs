@@ -72,13 +72,7 @@ mod tests {
 
         // Now test round-trip: serialize and deserialize again
         let writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
-        let mut writer = XmlWriter::new(
-            writer,
-            vec![(
-                "xmlns".into(),
-                "urn:ietf:params:xml:ns:netconf:base:1.0".to_string(),
-            )],
-        );
+        let mut writer = XmlWriter::new(writer);
         expected.clone().xml_serialize(&mut writer)?;
 
         let serialize_vec = writer.into_inner().into_inner();
@@ -116,13 +110,7 @@ mod tests {
         // Check after we serialize the test value we can deserialize back the same
         // value
         let writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
-        let mut writer = XmlWriter::new(
-            writer,
-            vec![(
-                "xmlns".into(),
-                "urn:ietf:params:xml:ns:netconf:base:1.0".to_string(),
-            )],
-        );
+        let mut writer = XmlWriter::new(writer);
         parsed.xml_serialize(&mut writer)?;
 
         let serialize_str = String::from_utf8(writer.into_inner().into_inner())

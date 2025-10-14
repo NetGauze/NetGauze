@@ -239,13 +239,7 @@ impl Encoder<NetConfMessage> for SshCodec {
     fn encode(&mut self, item: NetConfMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let buf = std::io::Cursor::new(Vec::new());
         let writer = quick_xml::writer::Writer::new_with_indent(buf, b' ', 2);
-        let mut xml_writer = XmlWriter::new(
-            writer,
-            vec![(
-                "xmlns".into(),
-                "urn:ietf:params:xml:ns:netconf:base:1.0".to_string(),
-            )],
-        );
+        let mut xml_writer = XmlWriter::new(writer);
         item.xml_serialize(&mut xml_writer)?;
         let buf = xml_writer.into_inner().into_inner();
         if tracing::enabled!(tracing::Level::TRACE) {
