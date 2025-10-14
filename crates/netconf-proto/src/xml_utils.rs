@@ -15,12 +15,17 @@
 
 //! Low-level XML parsing utils
 
+use crate::{NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_NS};
+use indexmap::IndexMap;
 use quick_xml::{
     events::{BytesStart, Event},
-    name::{Namespace, ResolveResult},
+    name::{Namespace, NamespaceError, ResolveResult},
     reader::NsReader,
 };
-use std::{collections::HashMap, fmt, io};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt, io,
+};
 
 /// XML Serialization trait
 pub trait XmlSerialize {
@@ -32,44 +37,119 @@ pub trait XmlDeserialize<T: Sized> {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<T, ParsingError>;
 }
 
+#[derive(Debug, strum_macros::Display)]
+pub enum XmlWriterError {
+    UndefinedNamespace(String),
+    DuplicateNamespacePrefix(String),
+}
+
+impl std::error::Error for XmlWriterError {}
+
+impl From<XmlWriterError> for quick_xml::Error {
+    fn from(value: XmlWriterError) -> Self {
+        match value {
+            XmlWriterError::UndefinedNamespace(ns) => {
+                quick_xml::Error::Namespace(NamespaceError::UnknownPrefix(ns.as_bytes().to_vec()))
+            }
+            XmlWriterError::DuplicateNamespacePrefix(prefix) => quick_xml::Error::Namespace(
+                NamespaceError::InvalidPrefixForXmlns(prefix.as_bytes().to_vec()),
+            ),
+        }
+    }
+}
+
 /// Transform a Rust object into an XML stream of characters
 pub struct XmlWriter<T: io::Write> {
     inner: quick_xml::writer::Writer<T>,
-    ns_to_apply: Vec<(String, String)>,
+    // Stack of multiple namespace bindings since XML allows to overwrite the bindings
+    namespace_bindings: Vec<IndexMap<Namespace<'static>, String>>,
+    // Namespaces has been appended to the xml element
+    ns_applied: bool,
 }
 
 impl<T: io::Write> XmlWriter<T> {
-    pub const fn new(
+    pub fn new(inner: quick_xml::writer::Writer<T>) -> Self {
+        let namespace_bindings = vec![IndexMap::from([
+            (NETCONF_NS, "".to_string()),
+            (NETCONF_MONITORING_NS, "ncm".to_string()),
+            (YANG_LIBRARY_NS, "yanglib".to_string()),
+            (YANG_LIBRARY_AUGMENTED_BY_NS, "yanglib-aug".to_string()),
+        ])];
+        let ns_applied = false;
+        Self {
+            inner,
+            namespace_bindings,
+            ns_applied,
+        }
+    }
+
+    pub fn new_with_custom_namespaces(
         inner: quick_xml::writer::Writer<T>,
-        ns_to_apply: Vec<(String, String)>,
-    ) -> Self {
-        Self { inner, ns_to_apply }
+        namespace_binding: IndexMap<Namespace<'static>, String>,
+    ) -> Result<Self, XmlWriterError> {
+        Self::check_duplicate_prefixes(&namespace_binding)?;
+        let ns_applied = false;
+        let namespace_bindings = vec![namespace_binding];
+        Ok(Self {
+            inner,
+            namespace_bindings,
+            ns_applied,
+        })
     }
 
-    pub fn create_nc_element(&mut self, name: &'static str) -> BytesStart<'static> {
+    /// create a new XML element with the default namespace
+    pub fn create_element(&mut self, name: &'static str) -> BytesStart<'static> {
         let mut start = BytesStart::new(name);
-        if !self.ns_to_apply.is_empty() {
-            start.extend_attributes(
-                self.ns_to_apply
-                    .iter()
-                    .map(|(k, n)| (k.as_str(), n.as_str())),
-            );
-            self.ns_to_apply.clear()
-        }
+        self.apply_namespaces(&mut start);
         start
     }
 
-    pub fn create_ns_element(&mut self, ns: &str, name: &str) -> BytesStart<'static> {
-        let mut start = BytesStart::new(format!("{ns}:{name}"));
-        if !self.ns_to_apply.is_empty() {
-            start.extend_attributes(
-                self.ns_to_apply
-                    .iter()
-                    .map(|(k, n)| (k.as_str(), n.as_str())),
-            );
-            self.ns_to_apply.clear()
-        }
-        start
+    /// Create a new element with specific namespace prefix
+    /// Note, the namespace must have been registered beforehand,
+    /// either with [XmlWriter::new_with_custom_namespaces] or
+    /// [XmlWriter::push_namespace_binding]
+    pub fn create_ns_element(
+        &mut self,
+        ns: Namespace<'_>,
+        name: &str,
+    ) -> Result<BytesStart<'static>, XmlWriterError> {
+        // the namespace must have been defined before
+        // find the prefix binding for this namespace based
+        // on the latest binding in the stack [self.namespace_bindings]
+
+        let prefix = self
+            .namespace_bindings
+            .iter()
+            .rev()
+            .find_map(|map| map.get(&ns));
+        let prefix = if let Some(prefix) = prefix {
+            prefix
+        } else {
+            return Err(XmlWriterError::UndefinedNamespace(
+                String::from_utf8(ns.into_inner().to_vec()).unwrap_or("UNKNOWN".to_string()),
+            ));
+        };
+        let mut start = if prefix.is_empty() {
+            BytesStart::new(name.to_string())
+        } else {
+            BytesStart::new(format!("{prefix}:{name}"))
+        };
+        self.apply_namespaces(&mut start);
+        Ok(start)
+    }
+
+    pub fn push_namespace_binding(
+        &mut self,
+        namespace_binding: IndexMap<Namespace<'static>, String>,
+    ) -> Result<(), XmlWriterError> {
+        Self::check_duplicate_prefixes(&namespace_binding)?;
+        self.ns_applied = false;
+        self.namespace_bindings.push(namespace_binding);
+        Ok(())
+    }
+
+    pub fn pop_namespace_binding(&mut self) -> Option<IndexMap<Namespace<'static>, String>> {
+        self.namespace_bindings.pop()
     }
 
     pub fn write_event<'a, E: Into<Event<'a>>>(&mut self, event: E) -> io::Result<()> {
@@ -82,6 +162,37 @@ impl<T: io::Write> XmlWriter<T> {
 
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
+    }
+
+    fn apply_namespaces(&mut self, start: &mut BytesStart<'_>) {
+        if !self.ns_applied {
+            if let Some(bindings) = self.namespace_bindings.last() {
+                for (namespace, prefix) in bindings {
+                    if prefix.is_empty() {
+                        start.push_attribute(("xmlns".as_bytes(), namespace.as_ref()));
+                    } else {
+                        start.push_attribute((
+                            format!("xmlns:{prefix}").as_bytes(),
+                            namespace.as_ref(),
+                        ));
+                    }
+                }
+            }
+            self.ns_applied = true;
+        }
+    }
+
+    fn check_duplicate_prefixes(
+        namespace_binding: &IndexMap<Namespace<'static>, String>,
+    ) -> Result<(), XmlWriterError> {
+        // Check for duplicate prefix values in the new namespace binding
+        let mut seen_prefixes = HashSet::new();
+        for prefix in namespace_binding.values() {
+            if !seen_prefixes.insert(prefix) {
+                return Err(XmlWriterError::DuplicateNamespacePrefix(prefix.clone()));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -254,31 +365,29 @@ impl<R: io::BufRead> XmlParser<R> {
     }
 
     /// check if this is the desired tag
-    pub fn is_tag(&self, ns: Option<&[u8]>, key: &str) -> bool {
+    pub fn is_tag(&self, ns: Option<Namespace<'_>>, key: &str) -> bool {
         let qname = match self.peek() {
             Event::Start(bs) | Event::Empty(bs) => bs.name(),
             Event::End(be) => be.name(),
             _ => return false,
         };
 
-        let (extr_ns, local) = self.ns_reader.resolve_element(qname);
-
+        let (resolved, local) = self.ns_reader.resolve_element(qname);
         if local.into_inner() != key.as_bytes() {
             return false;
         }
-
-        match extr_ns {
-            ResolveResult::Bound(v) => Some(v.into_inner()) == ns,
-            ResolveResult::Unbound => ns.is_none(),
-            _ => false,
-        }
+        let expected = match ns {
+            Some(ns) => ResolveResult::Bound(ns),
+            None => ResolveResult::Unbound,
+        };
+        resolved == expected
     }
 
     /// Open the next XML tag that matches `ns:key`,
-    /// if an other XML element found, fail with a [ParsingError::WrongToken]`
+    /// if another XML element found, fail with a [ParsingError::WrongToken]`
     pub fn open(
         &mut self,
-        ns: Option<&[u8]>,
+        ns: Option<Namespace<'_>>,
         key: &str,
     ) -> Result<BytesStart<'static>, ParsingError> {
         let evt = match self.peek() {
@@ -310,7 +419,7 @@ impl<R: io::BufRead> XmlParser<R> {
     /// otherwise return None.
     pub fn maybe_open(
         &mut self,
-        ns: Option<&[u8]>,
+        ns: Option<Namespace<'_>>,
         key: &str,
     ) -> Result<Option<BytesStart<'static>>, ParsingError> {
         self.skip_text()?;
@@ -499,12 +608,12 @@ impl<R: io::BufRead> XmlParser<R> {
         N: XmlDeserialize<N> + XmlSerialize + fmt::Debug + PartialEq + Sync,
     >(
         &mut self,
-        ns: Option<&'_ [u8]>,
+        ns: Option<Namespace<'_>>,
         tag: &'_ [u8],
     ) -> Result<Vec<N>, ParsingError> {
         let mut acc = Vec::new();
         let resolved_ns = if let Some(ns) = ns {
-            ResolveResult::Bound(Namespace(ns))
+            ResolveResult::Bound(ns)
         } else {
             ResolveResult::Unbound
         };
@@ -598,7 +707,7 @@ mod tests {
 
         // open root element, and arrive at child1
         parser
-            .open(Some(b"urn:ietf:example"), "root")
+            .open(Some(Namespace(b"urn:ietf:example")), "root")
             .expect("failed to open root");
         assert_eq!(parser.peek(), &Event::Start(BytesStart::new("child1")));
 
@@ -637,7 +746,7 @@ mod tests {
 
         // open root element, and arrive at text
         parser
-            .open(Some(b"urn:ietf:example"), "root")
+            .open(Some(Namespace(b"urn:ietf:example")), "root")
             .expect("failed to open root");
         assert_eq!(
             parser.peek(),
@@ -658,13 +767,13 @@ mod tests {
         assert!(is_match);
 
         parser.open(None, "root").expect("failed to open root");
-        let is_match = parser.is_tag(Some(b"https://example.com"), "child");
+        let is_match = parser.is_tag(Some(Namespace(b"https://example.com")), "child");
         assert!(is_match);
 
-        let is_not_match = parser.is_tag(Some(b"https://wrong.com"), "child");
+        let is_not_match = parser.is_tag(Some(Namespace(b"https://wrong.com")), "child");
         assert!(!is_not_match);
 
-        let is_not_match = parser.is_tag(Some(b"https://example.com"), "wrong");
+        let is_not_match = parser.is_tag(Some(Namespace(b"https://example.com")), "wrong");
         assert!(!is_not_match);
     }
 
@@ -687,14 +796,14 @@ mod tests {
         assert_eq!(parser.previous(), &Event::Eof);
 
         // Open root
-        let result_root = parser.open(Some(b"https://example.com"), "root");
+        let result_root = parser.open(Some(Namespace(b"https://example.com")), "root");
         let expected_root = BytesStart::from_content("root xmlns=\"https://example.com\"", 4);
         assert_eq!(result_root, Ok(expected_root.clone()));
         assert_eq!(parser.parents, vec![Event::Start(expected_root.clone())]);
         assert_eq!(parser.previous(), &Event::Start(expected_root.clone()));
 
         // Open child
-        let result_child = parser.open(Some(b"https://example.com"), "child");
+        let result_child = parser.open(Some(Namespace(b"https://example.com")), "child");
         let expected_child = BytesStart::new("child");
         assert_eq!(result_child, Ok(expected_child.clone()));
         assert_eq!(
@@ -722,7 +831,7 @@ mod tests {
         let xml = r#"<root xmlns="https://example.com"><child/></root>"#;
         let mut parser = create_parser(xml);
 
-        let result = parser.open(Some(b"https://example.com"), "wrong");
+        let result = parser.open(Some(Namespace(b"https://example.com")), "wrong");
         assert_eq!(
             result,
             Err(ParsingError::WrongToken {
@@ -750,7 +859,7 @@ mod tests {
             BytesStart::from_content("root xmlns=\"https://example.com\"", 4).into_owned(),
         ));
 
-        let result = parser.maybe_open(Some(b"https://example.com"), "root");
+        let result = parser.maybe_open(Some(Namespace(b"https://example.com")), "root");
         assert_eq!(result, expected);
         // check pointer did move after the `maybe_open` succeeded
         assert_eq!(
@@ -764,7 +873,7 @@ mod tests {
         let xml = r#"<root xmlns="https://example.com"><child/></root>"#;
         let mut parser = create_parser(xml);
         let expected = Ok(None);
-        let result = parser.maybe_open(Some(b"https://example.com"), "wrong");
+        let result = parser.maybe_open(Some(Namespace(b"https://example.com")), "wrong");
         assert_eq!(result, expected);
 
         // check pointer didn't move after the `maybe_open` didn't return anything
@@ -852,72 +961,85 @@ mod tests {
     fn test_writer_creation() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply = vec![("xmlns".to_string(), "https://example.com".to_string())];
-        let xml_writer = XmlWriter::new(writer, ns_to_apply.clone());
-        assert_eq!(xml_writer.ns_to_apply, ns_to_apply);
+        let ns_to_apply =
+            IndexMap::from([(Namespace(b"https://example.com"), "xmlns".to_string())]);
+        let xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply.clone())
+            .expect("failed creating writer");
+        assert_eq!(xml_writer.namespace_bindings, vec![ns_to_apply]);
     }
 
     #[test]
-    fn test_create_nc_element_without_namespace() {
+    fn test_create_element_without_namespace() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply = vec![];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let ns_to_apply = IndexMap::new();
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
+            .expect("failed creating writer");
 
-        let element = xml_writer.create_nc_element("root");
+        let element = xml_writer.create_element("root");
         assert_eq!(element.name().as_ref(), b"root");
-        assert_eq!(xml_writer.ns_to_apply.len(), 0);
+        assert!(xml_writer.ns_applied);
     }
 
     #[test]
-    fn test_create_nc_element_with_namespace() {
+    #[allow(clippy::type_complexity)]
+    fn test_create_element_with_namespace() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply = vec![
-            ("xmlns".to_string(), "https://example.com".to_string()),
-            ("xmlns:ns".to_string(), "https://custom.com".to_string()),
-        ];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let ns_to_apply = IndexMap::from([
+            (Namespace(b"https://example.com"), "".to_string()),
+            (Namespace(b"https://custom.com"), "ns".to_string()),
+        ]);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
+            .expect("failed creating writer");
 
-        let element = xml_writer.create_nc_element("root");
+        let element = xml_writer.create_element("root");
         assert_eq!(element.name().as_ref(), b"root");
         // Namespaces should be cleared after creating element
-        assert_eq!(xml_writer.ns_to_apply.len(), 0);
+        assert!(xml_writer.ns_applied);
 
         // Check attributes were added
-        let mut attrs = element.attributes();
-        let attr1 = attrs.next().unwrap().unwrap();
-        assert_eq!(attr1.key.as_ref(), b"xmlns");
-        assert_eq!(attr1.value.as_ref(), b"https://example.com");
-
-        let attr2 = attrs.next().unwrap().unwrap();
-        assert_eq!(attr2.key.as_ref(), b"xmlns:ns");
-        assert_eq!(attr2.value.as_ref(), b"https://custom.com");
+        let mut attrs: Vec<(Box<[u8]>, Box<[u8]>)> = element
+            .attributes()
+            .map(|x| x.expect("failed to decode attribute"))
+            .map(|x| (x.key.as_ref().into(), x.value.as_ref().into()))
+            .collect();
+        attrs.sort_by(|x, y| x.0.cmp(&y.0));
+        let expected: Vec<(Box<[u8]>, Box<[u8]>)> = vec![
+            ((*b"xmlns").into(), (*b"https://example.com").into()),
+            ((*b"xmlns:ns").into(), (*b"https://custom.com").into()),
+        ];
+        assert_eq!(attrs, expected);
     }
 
     #[test]
     fn test_create_ns_element_without_namespace() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply = vec![];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let ns_to_apply = IndexMap::new();
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
+            .expect("failed creating writer");
 
-        let element = xml_writer.create_ns_element("ns", "child");
-        assert_eq!(element.name().as_ref(), b"ns:child");
-        assert_eq!(xml_writer.ns_to_apply.len(), 0);
+        let element = xml_writer.create_ns_element(Namespace(b"ns"), "child");
+        assert!(element.is_err());
+        assert!(!xml_writer.ns_applied);
     }
 
     #[test]
     fn test_create_ns_element_with_namespace() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply = vec![("xmlns:ns".to_string(), "https://custom.com".to_string())];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let ns = Namespace(b"https://custom.com");
+        let ns_to_apply = IndexMap::from([(ns, "ns".to_string())]);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
+            .expect("failed creating writer");
 
-        let element = xml_writer.create_ns_element("ns", "child");
+        let element = xml_writer
+            .create_ns_element(ns, "child")
+            .expect("failed to create an xml element with namespace prefix");
         assert_eq!(element.name().as_ref(), b"ns:child");
         // Namespaces should be cleared after creating element
-        assert_eq!(xml_writer.ns_to_apply.len(), 0);
+        assert!(xml_writer.ns_applied);
 
         // Check attributes were added
         let mut attrs = element.attributes();
@@ -930,8 +1052,9 @@ mod tests {
     fn test_write_event() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply = vec![];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let ns_to_apply = IndexMap::new();
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
+            .expect("failed creating writer");
 
         let start = BytesStart::new("root");
         let result = xml_writer.write_event(Event::Start(start));
@@ -954,20 +1077,27 @@ mod tests {
     fn test_write_complex_document() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply = vec![];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let ns_to_apply = IndexMap::new();
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
+            .expect("failed creating writer");
 
         // Write XML declaration
         let decl = BytesDecl::new("1.0", Some("UTF-8"), None);
         xml_writer.write_event(Event::Decl(decl)).unwrap();
 
         // Write root element with namespace
-        let mut root = xml_writer.create_nc_element("root");
+        let mut root = xml_writer.create_element("root");
         root.push_attribute(("xmlns", "https://example.com"));
         xml_writer.write_event(Event::Start(root)).unwrap();
 
+        let ns = Namespace(b"https://example2.com");
+        xml_writer
+            .push_namespace_binding(IndexMap::from([(ns, "ns".to_string())]))
+            .expect("failed adding namespace binding");
         // Write child element
-        let child = xml_writer.create_ns_element("ns", "child");
+        let child = xml_writer
+            .create_ns_element(ns, "child")
+            .expect("failed to create an xml element with a namespace prefix");
         xml_writer.write_event(Event::Start(child)).unwrap();
 
         // Write text content
@@ -986,7 +1116,7 @@ mod tests {
         let xml_str = std::str::from_utf8(inner).unwrap();
         assert_eq!(
             xml_str,
-            r#"<?xml version="1.0" encoding="UTF-8"?><root xmlns="https://example.com"><ns:child>Content</ns:child></root>"#
+            r#"<?xml version="1.0" encoding="UTF-8"?><root xmlns="https://example.com"><ns:child xmlns:ns="https://example2.com">Content</ns:child></root>"#
         );
     }
 
@@ -994,22 +1124,23 @@ mod tests {
     fn test_namespace_cleared_after_use() {
         let mut buffer = Vec::new();
         let writer = quick_xml::writer::Writer::new(&mut buffer);
-        let ns_to_apply = vec![
-            ("xmlns".to_string(), "https://example.com".to_string()),
-            ("xmlns:ns".to_string(), "https://custom.com".to_string()),
-        ];
-        let mut xml_writer = XmlWriter::new(writer, ns_to_apply);
+        let ns_to_apply = IndexMap::from([
+            (Namespace(b"https://example.com"), "".to_string()),
+            (Namespace(b"https://custom.com"), "ns".to_string()),
+        ]);
+        let mut xml_writer = XmlWriter::new_with_custom_namespaces(writer, ns_to_apply)
+            .expect("failed creating writer");
 
         // Create first element - should have namespaces
-        let element1 = xml_writer.create_nc_element("root");
+        let element1 = xml_writer.create_element("root");
         let attrs1: Vec<_> = element1.attributes().collect();
         assert_eq!(attrs1.len(), 2);
-        assert_eq!(xml_writer.ns_to_apply.len(), 0);
+        assert!(xml_writer.ns_applied);
 
         // Create second element - should not have namespaces
-        let element2 = xml_writer.create_nc_element("child");
+        let element2 = xml_writer.create_element("child");
         let attrs2: Vec<_> = element2.attributes().collect();
         assert_eq!(attrs2.len(), 0);
-        assert_eq!(xml_writer.ns_to_apply.len(), 0);
+        assert!(xml_writer.ns_applied);
     }
 }

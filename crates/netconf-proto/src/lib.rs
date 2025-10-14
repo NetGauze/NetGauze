@@ -21,8 +21,18 @@ pub mod codec;
 pub mod protocol;
 pub mod xml_utils;
 
-pub(crate) const NETCONF_NS_STR: &[u8] = b"urn:ietf:params:xml:ns:netconf:base:1.0";
-pub(crate) const NETCONF_NS: Namespace<'static> = Namespace(NETCONF_NS_STR);
+pub(crate) const NETCONF_NS_STR: &str = "urn:ietf:params:xml:ns:netconf:base:1.0";
+pub(crate) const NETCONF_NS: Namespace<'static> = Namespace(NETCONF_NS_STR.as_bytes());
+pub(crate) const NETCONF_MONITORING_NS_STR: &str =
+    "urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring";
+pub(crate) const NETCONF_MONITORING_NS: Namespace<'static> =
+    Namespace(NETCONF_MONITORING_NS_STR.as_bytes());
+pub(crate) const YANG_LIBRARY_NS_STR: &str = "urn:ietf:params:xml:ns:yang:ietf-yang-library";
+pub(crate) const YANG_LIBRARY_NS: Namespace<'static> = Namespace(YANG_LIBRARY_NS_STR.as_bytes());
+pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS_STR: &str =
+    "urn:ietf:params:xml:ns:yang:ietf-yang-library-augmentedby";
+pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS: Namespace<'static> =
+    Namespace(YANG_LIBRARY_AUGMENTED_BY_NS_STR.as_bytes());
 
 #[cfg(test)]
 mod tests {
@@ -66,13 +76,7 @@ mod tests {
 
         // Now test round-trip: serialize and deserialize again
         let writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
-        let mut writer = XmlWriter::new(
-            writer,
-            vec![(
-                "xmlns".into(),
-                "urn:ietf:params:xml:ns:netconf:base:1.0".to_string(),
-            )],
-        );
+        let mut writer = XmlWriter::new(writer);
         expected.clone().xml_serialize(&mut writer)?;
 
         let serialize_vec = writer.into_inner().into_inner();
@@ -110,13 +114,7 @@ mod tests {
         // Check after we serialize the test value we can deserialize back the same
         // value
         let writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
-        let mut writer = XmlWriter::new(
-            writer,
-            vec![(
-                "xmlns".into(),
-                "urn:ietf:params:xml:ns:netconf:base:1.0".to_string(),
-            )],
-        );
+        let mut writer = XmlWriter::new(writer);
         parsed.xml_serialize(&mut writer)?;
 
         let serialize_str = String::from_utf8(writer.into_inner().into_inner())
