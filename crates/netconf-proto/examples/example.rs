@@ -63,20 +63,6 @@ fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Helper function to decode HTML special chars
-pub(crate) fn decode_html_entities(s: &str) -> String {
-    s.replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&#34;", "\"")
-        .replace("&#39;", "'")
-        .replace("&#38;", "&")
-        .replace("&#60;", "<")
-        .replace("&#62;", ">")
-}
-
 #[tokio::main]
 pub async fn main() -> anyhow::Result<()> {
     init_tracing().expect("init tracing subscriber");
@@ -125,7 +111,6 @@ pub async fn main() -> anyhow::Result<()> {
         format: Some(YangSchemaFormat::Yang),
     });
     let message_id = client.rpc(get_schema_op).await?;
-    tokio::time::sleep(Duration::from_secs(1)).await;
     let response = if let Some(resp) = client.rpc_reply().await {
         resp?
     } else {
@@ -144,13 +129,43 @@ pub async fn main() -> anyhow::Result<()> {
         responses,
     } = response.reply()
     {
-        if let RpcResponse::Raw(responses) = responses {
-            let decoded = decode_html_entities(responses);
-            eprintln!("RPC response:\n==================\n{decoded}\n================\n");
-        } else if let RpcResponse::WellKnown(WellKnownRpcResponse::YangSchema { schema }) =
-            responses
-        {
-            eprintln!("RPC get-schema response:\n==================\n{schema}\n================\n");
+        if let RpcResponse::WellKnown(WellKnownRpcResponse::YangSchema { schema }) = responses {
+            eprintln!(
+                "RPC YANG Schema response:\n==================\n{schema}\n================\n"
+            );
+        } else {
+            anyhow::bail!("Expecting get-schema response got:\n==================\n{response:?}\n================\n");
+        }
+    }
+
+    let message_id = client
+        .rpc(RpcOperation::WellKnown(WellKnownOperation::GetYangLibrary))
+        .await?;
+    let response = if let Some(resp) = client.rpc_reply().await {
+        resp?
+    } else {
+        anyhow::bail!("RPC returned no response, channel is closed");
+    };
+    if response.message_id().is_some() && response.message_id() != Some(&message_id) {
+        anyhow::bail!(
+            "RPC returned unexpected message_id, expecting {message_id}, got {}",
+            response.message_id().unwrap()
+        );
+    }
+
+    tracing::info!("RPC returned message_id: {:?}", response.message_id());
+    if let RpcReplyContent::ErrorsAndData {
+        errors: _,
+        responses,
+    } = response.reply()
+    {
+        if let RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary { library }) = responses {
+            eprintln!(
+                "RPC YANG LIBRARY
+            response:\n==================\n{library}\n================\n"
+            );
+        } else {
+            anyhow::bail!("Expecting RPC YANG library response got:\n==================\n{responses:?}\n================\n");
         }
     }
 
