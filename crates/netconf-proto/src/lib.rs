@@ -29,6 +29,10 @@ pub(crate) const NETCONF_MONITORING_NS: Namespace<'static> =
     Namespace(NETCONF_MONITORING_NS_STR.as_bytes());
 pub(crate) const YANG_LIBRARY_NS_STR: &str = "urn:ietf:params:xml:ns:yang:ietf-yang-library";
 pub(crate) const YANG_LIBRARY_NS: Namespace<'static> = Namespace(YANG_LIBRARY_NS_STR.as_bytes());
+pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS_STR: &str =
+    "urn:ietf:params:xml:ns:yang:ietf-yang-library-augmentedby";
+pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS: Namespace<'static> =
+    Namespace(YANG_LIBRARY_AUGMENTED_BY_NS_STR.as_bytes());
 
 #[cfg(test)]
 mod tests {

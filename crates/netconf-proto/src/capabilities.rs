@@ -298,7 +298,7 @@ impl XmlSerialize for Capability {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("capability");
+        let start = writer.create_element("capability");
         let end = start.to_end();
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::new(&self.to_string())))?;

@@ -157,8 +157,8 @@ impl XmlSerialize for Hello {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let hello_start = writer.create_nc_element("hello");
-        let capabilities_start = writer.create_nc_element("capabilities");
+        let hello_start = writer.create_element("hello");
+        let capabilities_start = writer.create_element("capabilities");
         writer.write_event(Event::Start(hello_start.clone()))?;
         writer.write_event(Event::Start(capabilities_start.clone()))?;
         for cap in &self.capabilities {
@@ -166,7 +166,7 @@ impl XmlSerialize for Hello {
         }
         writer.write_event(Event::End(capabilities_start.to_end()))?;
         if let Some(session_id) = self.session_id {
-            let session_id_start = writer.create_nc_element("session-id");
+            let session_id_start = writer.create_element("session-id");
             writer.write_event(Event::Start(session_id_start.clone()))?;
             writer.write_event(Event::Text(BytesText::new(&session_id.to_string())))?;
             writer.write_event(Event::End(session_id_start.to_end()))?;
@@ -297,7 +297,7 @@ impl XmlSerialize for Rpc {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let mut start = writer.create_nc_element("rpc");
+        let mut start = writer.create_element("rpc");
         start.push_attribute(("message-id", self.message_id.as_ref()));
         writer.write_event(Event::Start(start.clone()))?;
         match &self.operation {
@@ -358,7 +358,7 @@ impl XmlSerialize for YangSchemaFormat {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("format");
+        let start = writer.create_element("format");
         writer.write_event(Event::Start(start.clone()))?;
         match self {
             Self::Xsd => writer.write_event(Event::Text(BytesText::new("xsd")))?,
@@ -414,7 +414,7 @@ impl XmlSerialize for ConfigSource {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("source");
+        let start = writer.create_element("source");
         writer.write_event(Event::Start(start.clone()))?;
         match self {
             Self::Candidate => writer.write_event(Event::Empty(BytesStart::new("candidate")))?,
@@ -462,7 +462,7 @@ impl XmlSerialize for ConfigTarget {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("target");
+        let start = writer.create_element("target");
         writer.write_event(Event::Start(start.clone()))?;
         match self {
             Self::Candidate => writer.write_event(Event::Empty(BytesStart::new("candidate")))?,
@@ -529,7 +529,7 @@ impl XmlSerialize for ConfigUpdateDefaultOperation {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("default-operation");
+        let start = writer.create_element("default-operation");
         writer.write_event(Event::Start(start.clone()))?;
         match self {
             Self::Merge => writer.write_event(Event::Text(BytesText::new("merge")))?,
@@ -588,7 +588,7 @@ impl XmlSerialize for ConfigEditTestOption {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("test-option");
+        let start = writer.create_element("test-option");
         writer.write_event(Event::Start(start.clone()))?;
         match self {
             Self::TestThenSet => {
@@ -642,7 +642,7 @@ impl XmlSerialize for ConfigErrorOption {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-option");
+        let start = writer.create_element("error-option");
         writer.write_event(Event::Start(start.clone()))?;
         match self {
             Self::StopOnError => {
@@ -698,7 +698,7 @@ impl XmlSerialize for Filter {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let mut start = writer.create_nc_element("filter");
+        let mut start = writer.create_element("filter");
         match self {
             Filter::Subtree(_) => start.push_attribute(("type", "subtree")),
             Filter::XPath(_) => start.push_attribute(("type", "xpath")),
@@ -757,13 +757,13 @@ impl XmlSerialize for EditConfig {
     ) -> Result<(), quick_xml::Error> {
         match self {
             EditConfig::Config(value) => {
-                let config_start = writer.create_nc_element("config");
+                let config_start = writer.create_element("config");
                 writer.write_event(Event::Start(config_start.clone()))?;
                 writer.write_all(value.as_bytes())?;
                 writer.write_event(Event::End(config_start.to_end()))?;
             }
             EditConfig::Url(value) => {
-                let url_start = writer.create_nc_element("url");
+                let url_start = writer.create_element("url");
                 writer.write_event(Event::Start(url_start.clone()))?;
                 writer.write_event(Event::Text(BytesText::new(value)))?;
                 writer.write_event(Event::End(url_start.to_end()))?;
@@ -842,7 +842,7 @@ impl WellKnownOperation {
         source: &ConfigSource,
         filter: &Filter,
     ) -> Result<(), quick_xml::Error> {
-        let get_config_start = writer.create_nc_element("get-config");
+        let get_config_start = writer.create_element("get-config");
         writer.write_event(Event::Start(get_config_start.clone()))?;
         source.xml_serialize(writer)?;
         filter.xml_serialize(writer)?;
@@ -902,7 +902,7 @@ impl WellKnownOperation {
         error_option: &Option<ConfigErrorOption>,
         edit_content: &EditConfig,
     ) -> Result<(), quick_xml::Error> {
-        let edit_config_start = writer.create_nc_element("edit-config");
+        let edit_config_start = writer.create_element("edit-config");
         writer.write_event(Event::Start(edit_config_start.clone()))?;
         target.xml_serialize(writer)?;
         default_operation.xml_serialize(writer)?;
@@ -929,7 +929,7 @@ impl WellKnownOperation {
         writer: &mut XmlWriter<T>,
         filter: &Filter,
     ) -> Result<(), quick_xml::Error> {
-        let get_start = writer.create_nc_element("get");
+        let get_start = writer.create_element("get");
         writer.write_event(Event::Start(get_start.clone()))?;
         filter.xml_serialize(writer)?;
         writer.write_event(Event::End(get_start.to_end()))?;
@@ -975,17 +975,17 @@ impl WellKnownOperation {
         version: &Option<Box<str>>,
         format: &Option<YangSchemaFormat>,
     ) -> Result<(), quick_xml::Error> {
-        let mut get_schema_start = writer.create_nc_element("get-schema");
+        let mut get_schema_start = writer.create_element("get-schema");
         get_schema_start.push_attribute(("xmlns", NETCONF_MONITORING_NS_STR));
         writer.write_event(Event::Start(get_schema_start.clone()))?;
 
-        let identifier_start = writer.create_nc_element("identifier");
+        let identifier_start = writer.create_element("identifier");
         writer.write_event(Event::Start(identifier_start.clone()))?;
         writer.write_event(Event::Text(BytesText::new(identifier)))?;
         writer.write_event(Event::End(identifier_start.to_end()))?;
 
         if let Some(version) = version {
-            let version_start = writer.create_nc_element("version");
+            let version_start = writer.create_element("version");
             writer.write_event(Event::Start(version_start.clone()))?;
             writer.write_event(Event::Text(BytesText::new(version)))?;
             writer.write_event(Event::End(version_start.to_end()))?;
@@ -1068,7 +1068,7 @@ impl XmlSerialize for WellKnownOperation {
             }
             Self::Get { filter } => Self::serialize_get(writer, filter),
             Self::CloseSession => {
-                let close_session_start = writer.create_nc_element("close-session");
+                let close_session_start = writer.create_element("close-session");
                 writer.write_event(Event::Empty(close_session_start))?;
                 Ok(())
             }
@@ -1165,7 +1165,7 @@ impl XmlSerialize for RpcReply {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let mut start = writer.create_nc_element("rpc-reply");
+        let mut start = writer.create_element("rpc-reply");
         if let Some(message_id) = self.message_id.as_ref() {
             start.push_attribute(("message-id", message_id.as_ref()));
         }
@@ -1173,7 +1173,7 @@ impl XmlSerialize for RpcReply {
 
         match &self.reply {
             RpcReplyContent::Ok => {
-                let ok_start = writer.create_nc_element("ok");
+                let ok_start = writer.create_element("ok");
                 writer.write_event(Event::Empty(ok_start))?;
             }
             RpcReplyContent::ErrorsAndData { errors, responses } => {
@@ -1304,20 +1304,20 @@ impl XmlSerialize for WellKnownRpcResponse {
     ) -> Result<(), quick_xml::Error> {
         match self {
             Self::YangSchema { schema } => {
-                let mut data_start = writer.create_nc_element("data");
+                let mut data_start = writer.create_element("data");
                 data_start.push_attribute(("xmlns", NETCONF_MONITORING_NS_STR));
                 writer.write_event(Event::Start(data_start.clone()))?;
                 writer.write_event(Event::Text(BytesText::new(schema.as_ref())))?;
                 writer.write_event(Event::End(data_start.to_end()))?;
             }
             Self::YangLibrary { library } => {
-                let data_start = writer.create_nc_element("data");
+                let data_start = writer.create_element("data");
                 writer.write_event(Event::Start(data_start.clone()))?;
                 writer.write_all(library.as_bytes())?;
                 writer.write_event(Event::End(data_start.to_end()))?;
             }
             Self::Data(data) => {
-                let data_start = writer.create_nc_element("data");
+                let data_start = writer.create_element("data");
                 writer.write_event(Event::Start(data_start.clone()))?;
                 writer.write_all(data.as_bytes())?;
                 writer.write_event(Event::End(data_start.to_end()))?;
@@ -1454,7 +1454,7 @@ impl XmlSerialize for RpcError {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("rpc-error");
+        let start = writer.create_element("rpc-error");
         writer.write_event(Event::Start(start.clone()))?;
 
         self.error_type.xml_serialize(writer)?;
@@ -1462,14 +1462,14 @@ impl XmlSerialize for RpcError {
         self.error_severity.xml_serialize(writer)?;
 
         if let Some(error_app_tag) = &self.error_app_tag {
-            let start = writer.create_nc_element("error-app-tag");
+            let start = writer.create_element("error-app-tag");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(error_app_tag.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
 
         if let Some(error_path) = &self.error_path {
-            let start = writer.create_nc_element("error-path");
+            let start = writer.create_element("error-path");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(error_path.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
@@ -1523,7 +1523,7 @@ impl XmlSerialize for ErrorMessage {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-message");
+        let start = writer.create_element("error-message");
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::from_escaped(format!(
             "{}",
@@ -1587,7 +1587,7 @@ impl XmlSerialize for ErrorType {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-type");
+        let start = writer.create_element("error-type");
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::from_escaped(format!("{self}"))))?;
         writer.write_event(Event::End(start.to_end()))?;
@@ -1696,7 +1696,7 @@ impl XmlSerialize for ErrorTag {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-tag");
+        let start = writer.create_element("error-tag");
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::from_escaped(self.to_string())))?;
         writer.write_event(Event::End(start.to_end()))?;
@@ -1753,7 +1753,7 @@ impl XmlSerialize for ErrorSeverity {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-severity");
+        let start = writer.create_element("error-severity");
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::from_escaped(self.to_string())))?;
         writer.write_event(Event::End(start.to_end()))?;
@@ -1835,12 +1835,12 @@ impl XmlSerialize for ErrorInfo {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-info");
+        let start = writer.create_element("error-info");
         writer.write_event(Event::Start(start.clone()))?;
 
         match self {
             ErrorInfo::SessionId(session_id) => {
-                let session_id_start = writer.create_nc_element("session-id");
+                let session_id_start = writer.create_element("session-id");
                 writer.write_event(Event::Start(session_id_start.clone()))?;
                 writer.write_event(Event::Text(BytesText::new(&session_id.to_string())))?;
                 writer.write_event(Event::End(session_id_start.to_end()))?;
@@ -1947,37 +1947,37 @@ impl XmlSerialize for ErrorInfoValue {
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
         if let Some(attr) = &self.bad_attribute {
-            let start = writer.create_nc_element("bad-attribute");
+            let start = writer.create_element("bad-attribute");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(attr.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(elem) = &self.bad_element {
-            let start = writer.create_nc_element("bad-element");
+            let start = writer.create_element("bad-element");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(elem.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(elem) = &self.ok_element {
-            let start = writer.create_nc_element("ok-element");
+            let start = writer.create_element("ok-element");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(elem.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(elem) = &self.error_element {
-            let start = writer.create_nc_element("err-element");
+            let start = writer.create_element("err-element");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(elem.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(elem) = &self.noop_element {
-            let start = writer.create_nc_element("noop-element");
+            let start = writer.create_element("noop-element");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(elem.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(ns) = &self.bad_namespace {
-            let start = writer.create_nc_element("bad-namespace");
+            let start = writer.create_element("bad-namespace");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(ns.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
