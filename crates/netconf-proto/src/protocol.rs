@@ -18,7 +18,7 @@
 use crate::{
     capabilities::Capability,
     xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    NETCONF_NS, NETCONF_NS_STR,
+    NETCONF_NS,
 };
 use quick_xml::{
     events::{BytesStart, BytesText, Event},
@@ -121,16 +121,13 @@ impl XmlDeserialize<Hello> for Hello {
         }
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "hello")?;
+        parser.open(Some(NETCONF_NS), "hello")?;
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "capabilities")?;
+        parser.open(Some(NETCONF_NS), "capabilities")?;
 
         let capabilities = parser.collect_xml_sequence::<Capability>()?;
         parser.close()?;
-        let session_id = if parser
-            .maybe_open(Some(NETCONF_NS_STR), "session-id")?
-            .is_some()
-        {
+        let session_id = if parser.maybe_open(Some(NETCONF_NS), "session-id")?.is_some() {
             let val = parser.tag_string()?.parse::<u32>()?;
             parser.close()?;
             Some(val)
@@ -147,8 +144,8 @@ impl XmlSerialize for Hello {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let hello_start = writer.create_nc_element("hello");
-        let capabilities_start = writer.create_nc_element("capabilities");
+        let hello_start = writer.create_element("hello");
+        let capabilities_start = writer.create_element("capabilities");
         writer.write_event(Event::Start(hello_start.clone()))?;
         writer.write_event(Event::Start(capabilities_start.clone()))?;
         for cap in &self.capabilities {
@@ -156,7 +153,7 @@ impl XmlSerialize for Hello {
         }
         writer.write_event(Event::End(capabilities_start.to_end()))?;
         if let Some(session_id) = self.session_id {
-            let session_id_start = writer.create_nc_element("session-id");
+            let session_id_start = writer.create_element("session-id");
             writer.write_event(Event::Start(session_id_start.clone()))?;
             writer.write_event(Event::Text(BytesText::new(&session_id.to_string())))?;
             writer.write_event(Event::End(session_id_start.to_end()))?;
@@ -204,6 +201,7 @@ impl Rpc {
         &self.operation
     }
 }
+
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum RpcOperation {
     Raw(Box<str>),
@@ -260,7 +258,7 @@ impl XmlDeserialize<Rpc> for Rpc {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Rpc, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        let open = parser.open(Some(NETCONF_NS_STR), "rpc")?;
+        let open = parser.open(Some(NETCONF_NS), "rpc")?;
         let message_id = if let Some(msg_id) = extract_message_id(&open)? {
             msg_id
         } else {
@@ -280,7 +278,7 @@ impl XmlSerialize for Rpc {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let mut start = writer.create_nc_element("rpc");
+        let mut start = writer.create_element("rpc");
         start.push_attribute(("message-id", self.message_id.as_ref()));
         writer.write_event(Event::Start(start.clone()))?;
         match &self.operation {
@@ -375,9 +373,10 @@ impl RpcReply {
 
 impl XmlDeserialize<RpcReply> for RpcReply {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
-        let rpc_reply = parser.open(Some(NETCONF_NS_STR), "rpc-reply")?;
+        parser.skip_text()?;
+        let rpc_reply = parser.open(Some(NETCONF_NS), "rpc-reply")?;
         let message_id = extract_message_id(&rpc_reply)?;
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "ok") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "ok") {
             parser.close()?;
             return Ok(RpcReply {
                 message_id,
@@ -385,7 +384,7 @@ impl XmlDeserialize<RpcReply> for RpcReply {
             });
         }
         let errors: Vec<RpcError> =
-            parser.collect_xml_sequence_with_tag(Some(NETCONF_NS_STR), b"rpc-error")?;
+            parser.collect_xml_sequence_with_tag(Some(NETCONF_NS), b"rpc-error")?;
         let responses = parser.copy_buffer_till(b"rpc-reply")?;
         parser.close()?;
         Ok(RpcReply {
@@ -400,7 +399,7 @@ impl XmlSerialize for RpcReply {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let mut start = writer.create_nc_element("rpc-reply");
+        let mut start = writer.create_element("rpc-reply");
         if let Some(message_id) = self.message_id.as_ref() {
             start.push_attribute(("message-id", message_id.as_ref()));
         }
@@ -408,7 +407,7 @@ impl XmlSerialize for RpcReply {
 
         match &self.reply {
             RpcReplyContent::Ok => {
-                let ok_start = writer.create_nc_element("ok");
+                let ok_start = writer.create_element("ok");
                 writer.write_event(Event::Empty(ok_start))?;
             }
             RpcReplyContent::ErrorsAndData { errors, responses } => {
@@ -571,29 +570,29 @@ impl RpcError {
 impl XmlDeserialize<RpcError> for RpcError {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         let mut rpc_error = RpcError::default();
-        parser.open(Some(NETCONF_NS_STR), "rpc-error")?;
+        parser.open(Some(NETCONF_NS), "rpc-error")?;
         // Skip any empty text
         rpc_error.error_type = ErrorType::xml_deserialize(parser)?;
         rpc_error.error_tag = ErrorTag::xml_deserialize(parser)?;
         rpc_error.error_severity = ErrorSeverity::xml_deserialize(parser)?;
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "error-app-tag") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "error-app-tag") {
             rpc_error.error_app_tag = Some(parser.tag_string()?);
             parser.close()?;
         }
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "error-path") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "error-path") {
             rpc_error.error_path = Some(parser.tag_string()?);
             parser.close()?;
         }
 
         // skip empty text
         parser.skip_text()?;
-        if parser.is_tag(Some(NETCONF_NS_STR), "error-message") {
+        if parser.is_tag(Some(NETCONF_NS), "error-message") {
             rpc_error.error_message = Some(ErrorMessage::xml_deserialize(parser)?);
         }
         // skip empty text
         parser.skip_text()?;
-        if parser.is_tag(Some(NETCONF_NS_STR), "error-info") {
+        if parser.is_tag(Some(NETCONF_NS), "error-info") {
             rpc_error.error_info = Some(ErrorInfo::xml_deserialize(parser)?);
         }
         parser.close()?;
@@ -606,7 +605,7 @@ impl XmlSerialize for RpcError {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("rpc-error");
+        let start = writer.create_element("rpc-error");
         writer.write_event(Event::Start(start.clone()))?;
 
         self.error_type.xml_serialize(writer)?;
@@ -614,14 +613,14 @@ impl XmlSerialize for RpcError {
         self.error_severity.xml_serialize(writer)?;
 
         if let Some(error_app_tag) = &self.error_app_tag {
-            let start = writer.create_nc_element("error-app-tag");
+            let start = writer.create_element("error-app-tag");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(error_app_tag.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
 
         if let Some(error_path) = &self.error_path {
-            let start = writer.create_nc_element("error-path");
+            let start = writer.create_element("error-path");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(error_path.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
@@ -662,7 +661,7 @@ impl XmlDeserialize<ErrorMessage> for ErrorMessage {
     ) -> Result<ErrorMessage, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-message")?;
+        parser.open(Some(NETCONF_NS), "error-message")?;
         let text = parser.tag_string()?;
         let value = ErrorMessage { text };
         parser.close()?;
@@ -675,7 +674,7 @@ impl XmlSerialize for ErrorMessage {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-message");
+        let start = writer.create_element("error-message");
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::from_escaped(format!(
             "{}",
@@ -724,7 +723,7 @@ impl XmlDeserialize<ErrorType> for ErrorType {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-type")?;
+        parser.open(Some(NETCONF_NS), "error-type")?;
         let str_value = parser.tag_string()?;
         let value = ErrorType::from_str(&str_value).map_err(|_| {
             ParsingError::InvalidValue(format!("unexpected <error-type> '{str_value}'"))
@@ -739,7 +738,7 @@ impl XmlSerialize for ErrorType {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-type");
+        let start = writer.create_element("error-type");
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::from_escaped(format!("{self}"))))?;
         writer.write_event(Event::End(start.to_end()))?;
@@ -833,7 +832,7 @@ impl XmlDeserialize<ErrorTag> for ErrorTag {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-tag")?;
+        parser.open(Some(NETCONF_NS), "error-tag")?;
         let str_value = parser.tag_string()?;
         let value = ErrorTag::from_str(&str_value).map_err(|_| {
             ParsingError::InvalidValue(format!("unexpected <error-tag> '{str_value}'"))
@@ -848,7 +847,7 @@ impl XmlSerialize for ErrorTag {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-tag");
+        let start = writer.create_element("error-tag");
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::from_escaped(self.to_string())))?;
         writer.write_event(Event::End(start.to_end()))?;
@@ -888,7 +887,7 @@ impl XmlDeserialize<ErrorSeverity> for ErrorSeverity {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-severity")?;
+        parser.open(Some(NETCONF_NS), "error-severity")?;
         let str_value = parser.tag_string()?;
         let value = ErrorSeverity::from_str(&str_value).map_err(|_| {
             ParsingError::InvalidValue(
@@ -905,7 +904,7 @@ impl XmlSerialize for ErrorSeverity {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-severity");
+        let start = writer.create_element("error-severity");
         writer.write_event(Event::Start(start.clone()))?;
         writer.write_event(Event::Text(BytesText::from_escaped(self.to_string())))?;
         writer.write_event(Event::End(start.to_end()))?;
@@ -953,8 +952,8 @@ pub enum ErrorInfo {
 
 impl XmlDeserialize<ErrorInfo> for ErrorInfo {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
-        parser.open(Some(NETCONF_NS_STR), "error-info")?;
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "session-id") {
+        parser.open(Some(NETCONF_NS), "error-info")?;
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "session-id") {
             let session_id = parser.tag_string()?.parse()?;
             // Close for session-id
             parser.close()?;
@@ -987,12 +986,12 @@ impl XmlSerialize for ErrorInfo {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
-        let start = writer.create_nc_element("error-info");
+        let start = writer.create_element("error-info");
         writer.write_event(Event::Start(start.clone()))?;
 
         match self {
             ErrorInfo::SessionId(session_id) => {
-                let session_id_start = writer.create_nc_element("session-id");
+                let session_id_start = writer.create_element("session-id");
                 writer.write_event(Event::Start(session_id_start.clone()))?;
                 writer.write_event(Event::Text(BytesText::new(&session_id.to_string())))?;
                 writer.write_event(Event::End(session_id_start.to_end()))?;
@@ -1050,37 +1049,37 @@ impl XmlDeserialize<ErrorInfoValue> for ErrorInfoValue {
             bad_namespace: None,
         };
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "bad-attribute") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "bad-attribute") {
             value.bad_attribute = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "bad-element") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "bad-element") {
             value.bad_element = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "ok-element") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "ok-element") {
             value.ok_element = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "err-element") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "err-element") {
             value.error_element = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "noop-element") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "noop-element") {
             value.noop_element = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "bad-namespace") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "bad-namespace") {
             value.bad_namespace = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
@@ -1099,37 +1098,37 @@ impl XmlSerialize for ErrorInfoValue {
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
         if let Some(attr) = &self.bad_attribute {
-            let start = writer.create_nc_element("bad-attribute");
+            let start = writer.create_element("bad-attribute");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(attr.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(elem) = &self.bad_element {
-            let start = writer.create_nc_element("bad-element");
+            let start = writer.create_element("bad-element");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(elem.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(elem) = &self.ok_element {
-            let start = writer.create_nc_element("ok-element");
+            let start = writer.create_element("ok-element");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(elem.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(elem) = &self.error_element {
-            let start = writer.create_nc_element("err-element");
+            let start = writer.create_element("err-element");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(elem.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(elem) = &self.noop_element {
-            let start = writer.create_nc_element("noop-element");
+            let start = writer.create_element("noop-element");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(elem.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
         }
         if let Some(ns) = &self.bad_namespace {
-            let start = writer.create_nc_element("bad-namespace");
+            let start = writer.create_element("bad-namespace");
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::from_escaped(ns.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;

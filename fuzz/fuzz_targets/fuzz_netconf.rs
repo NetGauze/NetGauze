@@ -33,13 +33,7 @@ fuzz_target!(|data: &str| {
     let ret = NetConfMessage::xml_deserialize(&mut xml_parser);
     if let Ok(ret) = ret {
         let writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
-        let mut writer = XmlWriter::new(
-            writer,
-            vec![(
-                "xmlns".into(),
-                "urn:ietf:params:xml:ns:netconf:base:1.0".to_string(),
-            )],
-        );
+        let mut writer = XmlWriter::new(writer);
         ret.xml_serialize(&mut writer).expect("xml serialization");
     }
 });
