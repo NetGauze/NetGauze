@@ -15,7 +15,7 @@
 
 use crate::{
     xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    NETCONF_NS_STR,
+    NETCONF_NS,
 };
 use quick_xml::events::{BytesText, Event};
 use serde::{Deserialize, Serialize};
@@ -285,7 +285,7 @@ impl XmlDeserialize<Capability> for Capability {
     fn xml_deserialize(
         parser: &mut XmlParser<impl io::BufRead>,
     ) -> Result<Capability, ParsingError> {
-        parser.open(Some(NETCONF_NS_STR), "capability")?;
+        parser.open(Some(NETCONF_NS), "capability")?;
         let body = parser.tag_string()?;
         let cap = Capability::from_str(&body)?;
         parser.close()?;

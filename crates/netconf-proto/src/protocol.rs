@@ -18,8 +18,7 @@
 use crate::{
     capabilities::Capability,
     xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    NETCONF_MONITORING_NS_BYTES, NETCONF_MONITORING_NS_STR, NETCONF_NS, NETCONF_NS_STR,
-    YANG_LIBRARY_NS_STR,
+    NETCONF_MONITORING_NS, NETCONF_MONITORING_NS_STR, NETCONF_NS, YANG_LIBRARY_NS,
 };
 use quick_xml::{
     events::{BytesStart, BytesText, Event},
@@ -135,16 +134,13 @@ impl XmlDeserialize<Hello> for Hello {
         }
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "hello")?;
+        parser.open(Some(NETCONF_NS), "hello")?;
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "capabilities")?;
+        parser.open(Some(NETCONF_NS), "capabilities")?;
 
         let capabilities = parser.collect_xml_sequence::<Capability>()?;
         parser.close()?;
-        let session_id = if parser
-            .maybe_open(Some(NETCONF_NS_STR), "session-id")?
-            .is_some()
-        {
+        let session_id = if parser.maybe_open(Some(NETCONF_NS), "session-id")?.is_some() {
             let val = parser.tag_string()?.parse::<u32>()?;
             parser.close()?;
             Some(val)
@@ -275,7 +271,7 @@ impl XmlDeserialize<Rpc> for Rpc {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Rpc, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        let open = parser.open(Some(NETCONF_NS_STR), "rpc")?;
+        let open = parser.open(Some(NETCONF_NS), "rpc")?;
         let message_id = if let Some(msg_id) = extract_message_id(&open)? {
             msg_id
         } else {
@@ -338,7 +334,7 @@ pub enum YangSchemaFormat {
 impl XmlDeserialize<YangSchemaFormat> for YangSchemaFormat {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        parser.open(Some(NETCONF_MONITORING_NS_BYTES), "format")?;
+        parser.open(Some(NETCONF_MONITORING_NS), "format")?;
         let value_str = parser.tag_string()?;
         let value = match value_str.as_ref().trim() {
             "xsd" => YangSchemaFormat::Xsd,
@@ -391,21 +387,12 @@ pub enum ConfigSource {
 impl XmlDeserialize<ConfigSource> for ConfigSource {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "source")?;
-        let value = if parser
-            .maybe_open(Some(NETCONF_NS_STR), "candidate")?
-            .is_some()
-        {
+        parser.open(Some(NETCONF_NS), "source")?;
+        let value = if parser.maybe_open(Some(NETCONF_NS), "candidate")?.is_some() {
             ConfigSource::Candidate
-        } else if parser
-            .maybe_open(Some(NETCONF_NS_STR), "running")?
-            .is_some()
-        {
+        } else if parser.maybe_open(Some(NETCONF_NS), "running")?.is_some() {
             ConfigSource::Running
-        } else if parser
-            .maybe_open(Some(NETCONF_NS_STR), "startup")?
-            .is_some()
-        {
+        } else if parser.maybe_open(Some(NETCONF_NS), "startup")?.is_some() {
             ConfigSource::Startup
         } else {
             return Err(ParsingError::WrongToken {
@@ -451,16 +438,10 @@ pub enum ConfigTarget {
 impl XmlDeserialize<ConfigTarget> for ConfigTarget {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "target")?;
-        let value = if parser
-            .maybe_open(Some(NETCONF_NS_STR), "candidate")?
-            .is_some()
-        {
+        parser.open(Some(NETCONF_NS), "target")?;
+        let value = if parser.maybe_open(Some(NETCONF_NS), "candidate")?.is_some() {
             ConfigTarget::Candidate
-        } else if parser
-            .maybe_open(Some(NETCONF_NS_STR), "running")?
-            .is_some()
-        {
+        } else if parser.maybe_open(Some(NETCONF_NS), "running")?.is_some() {
             ConfigTarget::Running
         } else {
             return Err(ParsingError::WrongToken {
@@ -526,7 +507,7 @@ pub enum ConfigUpdateDefaultOperation {
 impl XmlDeserialize<ConfigUpdateDefaultOperation> for ConfigUpdateDefaultOperation {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "default-operation")?;
+        parser.open(Some(NETCONF_NS), "default-operation")?;
         let value_str = parser.tag_string()?;
         let value = match value_str.as_ref().trim() {
             "merge" => ConfigUpdateDefaultOperation::Merge,
@@ -585,7 +566,7 @@ pub enum ConfigEditTestOption {
 impl XmlDeserialize<ConfigEditTestOption> for ConfigEditTestOption {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "test-option")?;
+        parser.open(Some(NETCONF_NS), "test-option")?;
         let value_str = parser.tag_string()?;
         let value = match value_str.as_ref().trim() {
             "test-then-set" => ConfigEditTestOption::TestThenSet,
@@ -639,7 +620,7 @@ pub enum ConfigErrorOption {
 impl XmlDeserialize<ConfigErrorOption> for ConfigErrorOption {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-option")?;
+        parser.open(Some(NETCONF_NS), "error-option")?;
         let value_str = parser.tag_string()?;
         let value = match value_str.as_ref().trim() {
             "stop-on-error" => ConfigErrorOption::StopOnError,
@@ -688,7 +669,7 @@ pub enum Filter {
 impl XmlDeserialize<Filter> for Filter {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        let filter_start = parser.open(Some(NETCONF_NS_STR), "filter")?;
+        let filter_start = parser.open(Some(NETCONF_NS), "filter")?;
         let filter_type = extract_attribute(&filter_start, b"type").unwrap_or("subtree".into());
         let filter = match filter_type.as_ref() {
             "subtree" => {
@@ -751,11 +732,11 @@ pub enum EditConfig {
 impl XmlDeserialize<EditConfig> for EditConfig {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        let value = if parser.maybe_open(Some(NETCONF_NS_STR), "url")?.is_some() {
+        let value = if parser.maybe_open(Some(NETCONF_NS), "url")?.is_some() {
             let url = parser.tag_string()?;
             parser.close()?;
             EditConfig::Url(url)
-        } else if parser.maybe_open(Some(NETCONF_NS_STR), "config")?.is_some() {
+        } else if parser.maybe_open(Some(NETCONF_NS), "config")?.is_some() {
             let value = parser.copy_buffer_till(b"config")?;
             parser.close()?;
             EditConfig::Config(value)
@@ -957,12 +938,12 @@ impl WellKnownOperation {
 
     fn parse_get_schema(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        parser.open(Some(NETCONF_MONITORING_NS_BYTES), "identifier")?;
+        parser.open(Some(NETCONF_MONITORING_NS), "identifier")?;
         let identifier = parser.tag_string()?.trim().into();
         // close identifier
         parser.close()?;
         let version = if parser
-            .maybe_open(Some(NETCONF_MONITORING_NS_BYTES), "version")?
+            .maybe_open(Some(NETCONF_MONITORING_NS), "version")?
             .is_some()
         {
             let ver = parser.tag_string()?.trim().into();
@@ -1022,30 +1003,27 @@ impl WellKnownOperation {
 impl XmlDeserialize<WellKnownOperation> for WellKnownOperation {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        if parser
-            .maybe_open(Some(NETCONF_NS_STR), "get-config")?
-            .is_some()
-        {
+        if parser.maybe_open(Some(NETCONF_NS), "get-config")?.is_some() {
             return Self::parse_get_config(parser);
         }
         if parser
-            .maybe_open(Some(NETCONF_NS_STR), "edit-config")?
+            .maybe_open(Some(NETCONF_NS), "edit-config")?
             .is_some()
         {
             return Self::parse_edit_config(parser);
         }
-        if parser.maybe_open(Some(NETCONF_NS_STR), "get")?.is_some() {
+        if parser.maybe_open(Some(NETCONF_NS), "get")?.is_some() {
             return Self::parse_get(parser);
         }
         if parser
-            .maybe_open(Some(NETCONF_NS_STR), "close-session")?
+            .maybe_open(Some(NETCONF_NS), "close-session")?
             .is_some()
         {
             parser.close()?;
             return Ok(WellKnownOperation::CloseSession);
         }
         if parser
-            .maybe_open(Some(NETCONF_MONITORING_NS_BYTES), "get-schema")?
+            .maybe_open(Some(NETCONF_MONITORING_NS), "get-schema")?
             .is_some()
         {
             return Self::parse_get_schema(parser);
@@ -1155,9 +1133,9 @@ impl RpcReply {
 impl XmlDeserialize<RpcReply> for RpcReply {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
-        let rpc_reply = parser.open(Some(NETCONF_NS_STR), "rpc-reply")?;
+        let rpc_reply = parser.open(Some(NETCONF_NS), "rpc-reply")?;
         let message_id = extract_message_id(&rpc_reply)?;
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "ok") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "ok") {
             parser.close()?;
             return Ok(RpcReply {
                 message_id,
@@ -1165,7 +1143,7 @@ impl XmlDeserialize<RpcReply> for RpcReply {
             });
         }
         let errors: Vec<RpcError> =
-            parser.collect_xml_sequence_with_tag(Some(NETCONF_NS_STR), b"rpc-error")?;
+            parser.collect_xml_sequence_with_tag(Some(NETCONF_NS), b"rpc-error")?;
         let responses = match WellKnownRpcResponse::xml_deserialize(parser) {
             Ok(response) => RpcResponse::WellKnown(response),
             Err(ParsingError::Recoverable) => {
@@ -1297,14 +1275,14 @@ impl XmlDeserialize<WellKnownRpcResponse> for WellKnownRpcResponse {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
         if parser
-            .maybe_open(Some(NETCONF_MONITORING_NS_BYTES), "data")?
+            .maybe_open(Some(NETCONF_MONITORING_NS), "data")?
             .is_some()
         {
             return Self::parse_yang_schema(parser);
         }
-        if let Some(_data) = parser.maybe_open(Some(NETCONF_NS_STR), "data")? {
+        if let Some(_data) = parser.maybe_open(Some(NETCONF_NS), "data")? {
             parser.skip_text()?;
-            if parser.is_tag(Some(YANG_LIBRARY_NS_STR.as_bytes()), "yang-library") {
+            if parser.is_tag(Some(YANG_LIBRARY_NS), "yang-library") {
                 let yang_lib = parser.copy_buffer_till(b"data")?;
                 // close yang library
                 parser.close()?;
@@ -1441,29 +1419,29 @@ impl RpcError {
 impl XmlDeserialize<RpcError> for RpcError {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         let mut rpc_error = RpcError::default();
-        parser.open(Some(NETCONF_NS_STR), "rpc-error")?;
+        parser.open(Some(NETCONF_NS), "rpc-error")?;
         // Skip any empty text
         rpc_error.error_type = ErrorType::xml_deserialize(parser)?;
         rpc_error.error_tag = ErrorTag::xml_deserialize(parser)?;
         rpc_error.error_severity = ErrorSeverity::xml_deserialize(parser)?;
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "error-app-tag") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "error-app-tag") {
             rpc_error.error_app_tag = Some(parser.tag_string()?);
             parser.close()?;
         }
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "error-path") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "error-path") {
             rpc_error.error_path = Some(parser.tag_string()?);
             parser.close()?;
         }
 
         // skip empty text
         parser.skip_text()?;
-        if parser.is_tag(Some(NETCONF_NS_STR), "error-message") {
+        if parser.is_tag(Some(NETCONF_NS), "error-message") {
             rpc_error.error_message = Some(ErrorMessage::xml_deserialize(parser)?);
         }
         // skip empty text
         parser.skip_text()?;
-        if parser.is_tag(Some(NETCONF_NS_STR), "error-info") {
+        if parser.is_tag(Some(NETCONF_NS), "error-info") {
             rpc_error.error_info = Some(ErrorInfo::xml_deserialize(parser)?);
         }
         parser.close()?;
@@ -1532,7 +1510,7 @@ impl XmlDeserialize<ErrorMessage> for ErrorMessage {
     ) -> Result<ErrorMessage, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-message")?;
+        parser.open(Some(NETCONF_NS), "error-message")?;
         let text = parser.tag_string()?;
         let value = ErrorMessage { text };
         parser.close()?;
@@ -1594,7 +1572,7 @@ impl XmlDeserialize<ErrorType> for ErrorType {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-type")?;
+        parser.open(Some(NETCONF_NS), "error-type")?;
         let str_value = parser.tag_string()?;
         let value = ErrorType::from_str(&str_value).map_err(|_| {
             ParsingError::InvalidValue(format!("unexpected <error-type> '{str_value}'"))
@@ -1703,7 +1681,7 @@ impl XmlDeserialize<ErrorTag> for ErrorTag {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-tag")?;
+        parser.open(Some(NETCONF_NS), "error-tag")?;
         let str_value = parser.tag_string()?;
         let value = ErrorTag::from_str(&str_value).map_err(|_| {
             ParsingError::InvalidValue(format!("unexpected <error-tag> '{str_value}'"))
@@ -1758,7 +1736,7 @@ impl XmlDeserialize<ErrorSeverity> for ErrorSeverity {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         // Skip any empty text
         parser.skip_text()?;
-        parser.open(Some(NETCONF_NS_STR), "error-severity")?;
+        parser.open(Some(NETCONF_NS), "error-severity")?;
         let str_value = parser.tag_string()?;
         let value = ErrorSeverity::from_str(&str_value).map_err(|_| {
             ParsingError::InvalidValue(
@@ -1823,8 +1801,8 @@ pub enum ErrorInfo {
 
 impl XmlDeserialize<ErrorInfo> for ErrorInfo {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
-        parser.open(Some(NETCONF_NS_STR), "error-info")?;
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "session-id") {
+        parser.open(Some(NETCONF_NS), "error-info")?;
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "session-id") {
             let session_id = parser.tag_string()?.parse()?;
             // Close for session-id
             parser.close()?;
@@ -1920,37 +1898,37 @@ impl XmlDeserialize<ErrorInfoValue> for ErrorInfoValue {
             bad_namespace: None,
         };
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "bad-attribute") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "bad-attribute") {
             value.bad_attribute = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "bad-element") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "bad-element") {
             value.bad_element = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "ok-element") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "ok-element") {
             value.ok_element = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "err-element") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "err-element") {
             value.error_element = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "noop-element") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "noop-element") {
             value.noop_element = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true
         }
 
-        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS_STR), "bad-namespace") {
+        if let Ok(Some(_)) = parser.maybe_open(Some(NETCONF_NS), "bad-namespace") {
             value.bad_namespace = Some(parser.tag_string()?);
             parser.close()?;
             at_least_one = true

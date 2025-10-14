@@ -254,31 +254,29 @@ impl<R: io::BufRead> XmlParser<R> {
     }
 
     /// check if this is the desired tag
-    pub fn is_tag(&self, ns: Option<&[u8]>, key: &str) -> bool {
+    pub fn is_tag(&self, ns: Option<Namespace<'_>>, key: &str) -> bool {
         let qname = match self.peek() {
             Event::Start(bs) | Event::Empty(bs) => bs.name(),
             Event::End(be) => be.name(),
             _ => return false,
         };
 
-        let (extr_ns, local) = self.ns_reader.resolve_element(qname);
-
+        let (resolved, local) = self.ns_reader.resolve_element(qname);
         if local.into_inner() != key.as_bytes() {
             return false;
         }
-
-        match extr_ns {
-            ResolveResult::Bound(v) => Some(v.into_inner()) == ns,
-            ResolveResult::Unbound => ns.is_none(),
-            _ => false,
-        }
+        let expected = match ns {
+            Some(ns) => ResolveResult::Bound(ns),
+            None => ResolveResult::Unbound,
+        };
+        resolved == expected
     }
 
     /// Open the next XML tag that matches `ns:key`,
-    /// if an other XML element found, fail with a [ParsingError::WrongToken]`
+    /// if another XML element found, fail with a [ParsingError::WrongToken]`
     pub fn open(
         &mut self,
-        ns: Option<&[u8]>,
+        ns: Option<Namespace<'_>>,
         key: &str,
     ) -> Result<BytesStart<'static>, ParsingError> {
         let evt = match self.peek() {
@@ -310,7 +308,7 @@ impl<R: io::BufRead> XmlParser<R> {
     /// otherwise return None.
     pub fn maybe_open(
         &mut self,
-        ns: Option<&[u8]>,
+        ns: Option<Namespace<'_>>,
         key: &str,
     ) -> Result<Option<BytesStart<'static>>, ParsingError> {
         self.skip_text()?;
@@ -499,12 +497,12 @@ impl<R: io::BufRead> XmlParser<R> {
         N: XmlDeserialize<N> + XmlSerialize + fmt::Debug + PartialEq + Sync,
     >(
         &mut self,
-        ns: Option<&'_ [u8]>,
+        ns: Option<Namespace<'_>>,
         tag: &'_ [u8],
     ) -> Result<Vec<N>, ParsingError> {
         let mut acc = Vec::new();
         let resolved_ns = if let Some(ns) = ns {
-            ResolveResult::Bound(Namespace(ns))
+            ResolveResult::Bound(ns)
         } else {
             ResolveResult::Unbound
         };
@@ -598,7 +596,7 @@ mod tests {
 
         // open root element, and arrive at child1
         parser
-            .open(Some(b"urn:ietf:example"), "root")
+            .open(Some(Namespace(b"urn:ietf:example")), "root")
             .expect("failed to open root");
         assert_eq!(parser.peek(), &Event::Start(BytesStart::new("child1")));
 
@@ -637,7 +635,7 @@ mod tests {
 
         // open root element, and arrive at text
         parser
-            .open(Some(b"urn:ietf:example"), "root")
+            .open(Some(Namespace(b"urn:ietf:example")), "root")
             .expect("failed to open root");
         assert_eq!(
             parser.peek(),
@@ -658,13 +656,13 @@ mod tests {
         assert!(is_match);
 
         parser.open(None, "root").expect("failed to open root");
-        let is_match = parser.is_tag(Some(b"https://example.com"), "child");
+        let is_match = parser.is_tag(Some(Namespace(b"https://example.com")), "child");
         assert!(is_match);
 
-        let is_not_match = parser.is_tag(Some(b"https://wrong.com"), "child");
+        let is_not_match = parser.is_tag(Some(Namespace(b"https://wrong.com")), "child");
         assert!(!is_not_match);
 
-        let is_not_match = parser.is_tag(Some(b"https://example.com"), "wrong");
+        let is_not_match = parser.is_tag(Some(Namespace(b"https://example.com")), "wrong");
         assert!(!is_not_match);
     }
 
@@ -687,14 +685,14 @@ mod tests {
         assert_eq!(parser.previous(), &Event::Eof);
 
         // Open root
-        let result_root = parser.open(Some(b"https://example.com"), "root");
+        let result_root = parser.open(Some(Namespace(b"https://example.com")), "root");
         let expected_root = BytesStart::from_content("root xmlns=\"https://example.com\"", 4);
         assert_eq!(result_root, Ok(expected_root.clone()));
         assert_eq!(parser.parents, vec![Event::Start(expected_root.clone())]);
         assert_eq!(parser.previous(), &Event::Start(expected_root.clone()));
 
         // Open child
-        let result_child = parser.open(Some(b"https://example.com"), "child");
+        let result_child = parser.open(Some(Namespace(b"https://example.com")), "child");
         let expected_child = BytesStart::new("child");
         assert_eq!(result_child, Ok(expected_child.clone()));
         assert_eq!(
@@ -722,7 +720,7 @@ mod tests {
         let xml = r#"<root xmlns="https://example.com"><child/></root>"#;
         let mut parser = create_parser(xml);
 
-        let result = parser.open(Some(b"https://example.com"), "wrong");
+        let result = parser.open(Some(Namespace(b"https://example.com")), "wrong");
         assert_eq!(
             result,
             Err(ParsingError::WrongToken {
@@ -750,7 +748,7 @@ mod tests {
             BytesStart::from_content("root xmlns=\"https://example.com\"", 4).into_owned(),
         ));
 
-        let result = parser.maybe_open(Some(b"https://example.com"), "root");
+        let result = parser.maybe_open(Some(Namespace(b"https://example.com")), "root");
         assert_eq!(result, expected);
         // check pointer did move after the `maybe_open` succeeded
         assert_eq!(
@@ -764,7 +762,7 @@ mod tests {
         let xml = r#"<root xmlns="https://example.com"><child/></root>"#;
         let mut parser = create_parser(xml);
         let expected = Ok(None);
-        let result = parser.maybe_open(Some(b"https://example.com"), "wrong");
+        let result = parser.maybe_open(Some(Namespace(b"https://example.com")), "wrong");
         assert_eq!(result, expected);
 
         // check pointer didn't move after the `maybe_open` didn't return anything
