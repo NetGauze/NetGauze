@@ -18,7 +18,7 @@
 use crate::{
     capabilities::Capability,
     xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    NETCONF_MONITORING_NS, NETCONF_NS,
+    NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_NS,
 };
 use quick_xml::{
     events::{BytesStart, BytesText, Event},
@@ -798,6 +798,9 @@ pub enum WellKnownOperation {
     /// Retrieve running configuration and device state information.
     Get { filter: Filter },
 
+    /// Retrieve RFC8525 YANG Library
+    GetYangLibrary,
+
     /// Request graceful termination of a NETCONF session.
     ///
     /// [RFC 6241](https://www.rfc-editor.org/rfc/rfc6241.html).
@@ -1051,6 +1054,16 @@ impl XmlSerialize for WellKnownOperation {
                 error_option,
                 edit_content,
             ),
+            Self::GetYangLibrary => {
+                let subtree = r#"<yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+                    </yang-library>
+                    <modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+                    </modules-state>"#;
+                Self::Get {
+                    filter: Filter::Subtree(subtree.into()),
+                }
+                .xml_serialize(writer)
+            }
             Self::Get { filter } => Self::serialize_get(writer, filter),
             Self::CloseSession => {
                 let close_session_start = writer.create_element("close-session");
@@ -1245,6 +1258,8 @@ pub enum RpcResponse {
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum WellKnownRpcResponse {
     YangSchema { schema: Box<str> },
+    YangLibrary { library: Box<str> },
+    Data(Box<str>),
 }
 
 impl WellKnownRpcResponse {
@@ -1263,6 +1278,19 @@ impl XmlDeserialize<WellKnownRpcResponse> for WellKnownRpcResponse {
         {
             return Self::parse_yang_schema(parser);
         }
+        if let Some(_data) = parser.maybe_open(Some(NETCONF_NS), "data")? {
+            parser.skip_text()?;
+            if parser.is_tag(Some(YANG_LIBRARY_NS), "yang-library") {
+                let yang_lib = parser.copy_buffer_till(b"data")?;
+                // close yang library
+                parser.close()?;
+                return Ok(Self::YangLibrary { library: yang_lib });
+            }
+            let data = parser.copy_buffer_till(b"data")?;
+            // close data
+            parser.close()?;
+            return Ok(Self::Data(data));
+        }
         Err(ParsingError::Recoverable)
     }
 }
@@ -1277,6 +1305,18 @@ impl XmlSerialize for WellKnownRpcResponse {
                 let data_start = writer.create_ns_element(NETCONF_MONITORING_NS, "data")?;
                 writer.write_event(Event::Start(data_start.clone()))?;
                 writer.write_event(Event::Text(BytesText::new(schema.as_ref())))?;
+                writer.write_event(Event::End(data_start.to_end()))?;
+            }
+            Self::YangLibrary { library } => {
+                let data_start = writer.create_element("data");
+                writer.write_event(Event::Start(data_start.clone()))?;
+                writer.write_all(library.as_bytes())?;
+                writer.write_event(Event::End(data_start.to_end()))?;
+            }
+            Self::Data(data) => {
+                let data_start = writer.create_element("data");
+                writer.write_event(Event::Start(data_start.clone()))?;
+                writer.write_all(data.as_bytes())?;
                 writer.write_event(Event::End(data_start.to_end()))?;
             }
         }
@@ -2433,8 +2473,7 @@ mod tests {
          </top>
        </data>
      </rpc-reply>"#;
-        let expected_data1 = r#"<data attr1="x" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
-         <top xmlns="https://example.com/schema/1.2/stats">
+        let expected_data1 = r#"<top xmlns="https://example.com/schema/1.2/stats">
            <interfaces>
              <interface>
                <ifName>eth0</ifName>
@@ -2443,14 +2482,15 @@ mod tests {
              </interface>
            </interfaces>
          </top>
-       </data>
-     "#;
+       "#;
 
         let expected1 = RpcReply {
             message_id: Some("101".into()),
             reply: RpcReplyContent::ErrorsAndData {
                 errors: vec![],
-                responses: RpcResponse::Raw(expected_data1.into()),
+                responses: RpcResponse::WellKnown(WellKnownRpcResponse::Data(
+                    expected_data1.into(),
+                )),
             },
         };
         test_xml_value(input_str1, expected1)?;
@@ -2526,9 +2566,7 @@ mod tests {
         let rpc_reply_str = r#"<?xml version="1.0"?>
         <rpc-reply message-id="101" xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
          <data></data></rpc-reply>"#;
-        let expected_rpc_reply_data = RpcResponse::Raw(
-            r#"<data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0"></data>"#.into(),
-        );
+        let expected_rpc_reply_data = RpcResponse::WellKnown(WellKnownRpcResponse::Data("".into()));
 
         let hello = NetConfMessage::Hello(Hello::new(Some(4), HashSet::new()));
         let rpc = NetConfMessage::Rpc(Rpc::new("101".into(), RpcOperation::Raw("<copy-config xmlns=\"urn:ietf:params:xml:ns:netconf:base:1.0\"><target><startup/></target><source><running/></source></copy-config>".into())));
@@ -3107,6 +3145,227 @@ mod tests {
         );
 
         test_xml_value(get_schema_response_str, get_schema_response)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_yang_library_rfc8525() -> Result<(), ParsingError> {
+        // RFC 8525 Appendix B - Example YANG Library Instance for a Basic Server
+        let library = r#"<yang-library
+       xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library"
+       xmlns:ds="urn:ietf:params:xml:ns:yang:ietf-datastores">
+     <module-set>
+       <n>config-modules</n>
+       <module>
+         <n>ietf-interfaces</n>
+         <revision>2018-02-20</revision>
+         <namespace>
+           urn:ietf:params:xml:ns:yang:ietf-interfaces
+         </namespace>
+       </module>
+       <module>
+         <n>ietf-ip</n>
+         <revision>2018-02-22</revision>
+         <namespace>
+           urn:ietf:params:xml:ns:yang:ietf-ip
+         </namespace>
+       </module>
+       <import-only-module>
+         <n>ietf-yang-types</n>
+         <revision>2013-07-15</revision>
+         <namespace>
+           urn:ietf:params:xml:ns:yang:ietf-yang-types
+         </namespace>
+       </import-only-module>
+       <import-only-module>
+         <n>ietf-inet-types</n>
+         <revision>2013-07-15</revision>
+         <namespace>
+           urn:ietf:params:xml:ns:yang:ietf-inet-types
+         </namespace>
+       </import-only-module>
+     </module-set>
+     <module-set>
+       <n>state-modules</n>
+       <module>
+         <n>ietf-hardware</n>
+         <revision>2018-03-13</revision>
+         <namespace>
+           urn:ietf:params:xml:ns:yang:ietf-hardware
+         </namespace>
+       </module>
+       <import-only-module>
+         <n>ietf-inet-types</n>
+         <revision>2013-07-15</revision>
+         <namespace>
+           urn:ietf:params:xml:ns:yang:ietf-inet-types
+         </namespace>
+       </import-only-module>
+       <import-only-module>
+         <n>ietf-yang-types</n>
+         <revision>2013-07-15</revision>
+         <namespace>
+           urn:ietf:params:xml:ns:yang:ietf-yang-types
+         </namespace>
+       </import-only-module>
+       <import-only-module>
+         <n>iana-hardware</n>
+         <revision>2018-03-13</revision>
+         <namespace>
+           urn:ietf:params:xml:ns:yang:iana-hardware
+         </namespace>
+       </import-only-module>
+     </module-set>
+     <schema>
+       <n>config-schema</n>
+       <module-set>config-modules</module-set>
+     </schema>
+     <schema>
+       <n>state-schema</n>
+       <module-set>config-modules</module-set>
+       <module-set>state-modules</module-set>
+     </schema>
+     <datastore>
+       <n>ds:startup</n>
+       <schema>config-schema</schema>
+     </datastore>
+     <datastore>
+       <n>ds:running</n>
+       <schema>config-schema</schema>
+     </datastore>
+     <datastore>
+       <n>ds:operational</n>
+       <schema>state-schema</schema>
+     </datastore>
+     <content-id>75a43df9bd56b92aacc156a2958fbe12312fb285</content-id>
+   </yang-library>"#;
+        let input_str = format!(
+            r#"<?xml version='1.0' encoding='UTF-8'?>
+<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="urn:uuid:a8ba4055-2d26-431f-ad49-620f073b921c">
+  <data>
+  {library}</data></rpc-reply>"#
+        );
+
+        let expect_rpc_reply = RpcReplyContent::ErrorsAndData {
+            errors: vec![],
+            responses: RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary {
+                library: library.into(),
+            }),
+        };
+        let expected = NetConfMessage::RpcReply(RpcReply::new(
+            Some("urn:uuid:a8ba4055-2d26-431f-ad49-620f073b921c".into()),
+            expect_rpc_reply,
+        ));
+
+        test_xml_value(&input_str, expected)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_yang_library_rfc8525_with_augmented_by() -> Result<(), ParsingError> {
+        // Example from https://datatracker.ietf.org/doc/draft-ietf-netconf-yang-library-augmentedby/12/
+        let library = r#"<yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+     <content-id>1</content-id>
+     <module-set>
+       <name>module-set1</name>
+       <module>
+         <name>a-module</name>
+         <revision>2025-06-18</revision>
+         <namespace>urn:ietf:params:xml:ns:yang:a-module</namespace>
+         <augmented-by
+         xmlns="urn:ietf:params:xml:ns:yang:
+         ietf-yang-library-augmentedby">b-module</augmented-by>
+       </module>
+       <module>
+         <name>b-module</name>
+         <revision>2025-06-18</revision>
+         <namespace>urn:ietf:params:xml:ns:yang:b-module</namespace>
+         <augmented-by
+         xmlns="urn:ietf:params:xml:ns:yang:
+         ietf-yang-library-augmentedby">c-module</augmented-by>
+       </module>
+       <module>
+         <name>c-module</name>
+         <revision>2025-06-18</revision>
+         <namespace>urn:ietf:params:xml:ns:yang:c-module</namespace>
+       </module>
+     </module-set>
+   </yang-library>
+   <modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+     <module-set-id>0</module-set-id>
+   </modules-state>"#;
+        let input_str = format!(
+            r#"<?xml version='1.0' encoding='UTF-8'?>
+<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="urn:uuid:a8ba4055-2d26-431f-ad49-620f073b921c">
+  <data>{library}</data></rpc-reply>"#
+        );
+
+        let expect_rpc_reply = RpcReplyContent::ErrorsAndData {
+            errors: vec![],
+            responses: RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary {
+                library: library.into(),
+            }),
+        };
+        let expected = NetConfMessage::RpcReply(RpcReply::new(
+            Some("urn:uuid:a8ba4055-2d26-431f-ad49-620f073b921c".into()),
+            expect_rpc_reply,
+        ));
+
+        test_xml_value(&input_str, expected)?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_yang_library_rfc8525_xmlns_rename() -> Result<(), ParsingError> {
+        // Example from https://datatracker.ietf.org/doc/draft-ietf-netconf-yang-library-augmentedby/12/
+        let library = r#"<yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+     <content-id>1</content-id>
+     <module-set>
+       <name>module-set1</name>
+       <module>
+         <name>a-module</name>
+         <revision>2025-06-18</revision>
+         <namespace>urn:ietf:params:xml:ns:yang:a-module</namespace>
+         <augmented-by
+         xmlns="urn:ietf:params:xml:ns:yang:
+         ietf-yang-library-augmentedby">b-module</augmented-by>
+       </module>
+       <module>
+         <name>b-module</name>
+         <revision>2025-06-18</revision>
+         <namespace>urn:ietf:params:xml:ns:yang:b-module</namespace>
+         <augmented-by
+         xmlns="urn:ietf:params:xml:ns:yang:
+         ietf-yang-library-augmentedby">c-module</augmented-by>
+       </module>
+       <module>
+         <name>c-module</name>
+         <revision>2025-06-18</revision>
+         <namespace>urn:ietf:params:xml:ns:yang:c-module</namespace>
+       </module>
+     </module-set>
+   </yang-library>
+   <modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+     <module-set-id>0</module-set-id>
+   </modules-state>"#;
+        let input_str = format!(
+            r#"<?xml version='1.0' encoding='UTF-8'?>
+<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="urn:uuid:a8ba4055-2d26-431f-ad49-620f073b921c">
+  <data>{library}</data></rpc-reply>"#
+        );
+
+        let expect_rpc_reply = RpcReplyContent::ErrorsAndData {
+            errors: vec![],
+            responses: RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary {
+                library: library.into(),
+            }),
+        };
+        let expected = NetConfMessage::RpcReply(RpcReply::new(
+            Some("urn:uuid:a8ba4055-2d26-431f-ad49-620f073b921c".into()),
+            expect_rpc_reply,
+        ));
+
+        test_xml_value(&input_str, expected)?;
         Ok(())
     }
 }
