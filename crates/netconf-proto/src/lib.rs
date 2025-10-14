@@ -27,6 +27,7 @@ pub(crate) const NETCONF_MONITORING_NS_BYTES: &[u8] =
     b"urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring";
 pub(crate) const NETCONF_MONITORING_NS_STR: &str =
     "urn:ietf:params:xml:ns:yang:ietf-netconf-monitoring";
+pub(crate) const YANG_LIBRARY_NS_STR: &str = "urn:ietf:params:xml:ns:yang:ietf-yang-library";
 
 #[cfg(test)]
 mod tests {
