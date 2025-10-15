@@ -1129,6 +1129,12 @@ impl RpcReply {
     }
 }
 
+impl From<RpcReply> for RpcReplyContent {
+    fn from(reply: RpcReply) -> Self {
+        reply.reply
+    }
+}
+
 impl XmlDeserialize<RpcReply> for RpcReply {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         parser.skip_text()?;
@@ -1246,6 +1252,26 @@ impl RpcReplyContent {
             Some(responses)
         } else {
             None
+        }
+    }
+}
+
+impl From<RpcReplyContent> for Option<RpcResponse> {
+    fn from(value: RpcReplyContent) -> Self {
+        if let RpcReplyContent::ErrorsAndData { responses, .. } = value {
+            Some(responses)
+        } else {
+            None
+        }
+    }
+}
+
+impl From<RpcReplyContent> for Vec<RpcError> {
+    fn from(value: RpcReplyContent) -> Self {
+        if let RpcReplyContent::ErrorsAndData { errors, .. } = value {
+            errors
+        } else {
+            vec![]
         }
     }
 }
