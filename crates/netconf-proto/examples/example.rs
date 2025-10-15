@@ -159,10 +159,10 @@ pub async fn main() -> anyhow::Result<()> {
         responses,
     } = response.reply()
     {
-        if let RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary { library }) = responses {
+        if let RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary(library)) = responses {
             eprintln!(
                 "RPC YANG LIBRARY
-            response:\n==================\n{library}\n================\n"
+            response:\n==================\n{library:#?}\n================\n"
             );
         } else {
             anyhow::bail!("Expecting RPC YANG library response got:\n==================\n{responses:?}\n================\n");
