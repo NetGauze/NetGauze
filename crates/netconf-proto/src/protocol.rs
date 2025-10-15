@@ -1129,6 +1129,10 @@ impl RpcReply {
     pub const fn reply(&self) -> &RpcReplyContent {
         &self.reply
     }
+
+    pub fn into_reply(self) -> RpcReplyContent {
+        self.reply
+    }
 }
 
 impl XmlDeserialize<RpcReply> for RpcReply {
@@ -1244,6 +1248,14 @@ impl RpcReplyContent {
     }
 
     pub const fn responses(&self) -> Option<&RpcResponse> {
+        if let RpcReplyContent::ErrorsAndData { responses, .. } = self {
+            Some(responses)
+        } else {
+            None
+        }
+    }
+
+    pub fn into_responses(self) -> Option<RpcResponse> {
         if let RpcReplyContent::ErrorsAndData { responses, .. } = self {
             Some(responses)
         } else {
