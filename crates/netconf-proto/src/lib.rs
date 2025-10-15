@@ -20,6 +20,7 @@ pub mod client;
 pub mod codec;
 pub mod protocol;
 pub mod xml_utils;
+pub mod yanglib;
 
 pub(crate) const NETCONF_NS_STR: &str = "urn:ietf:params:xml:ns:netconf:base:1.0";
 pub(crate) const NETCONF_NS: Namespace<'static> = Namespace(NETCONF_NS_STR.as_bytes());
@@ -33,6 +34,9 @@ pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS_STR: &str =
     "urn:ietf:params:xml:ns:yang:ietf-yang-library-augmentedby";
 pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS: Namespace<'static> =
     Namespace(YANG_LIBRARY_AUGMENTED_BY_NS_STR.as_bytes());
+pub(crate) const YANG_DATASTORES_NS_STR: &str = "urn:ietf:params:xml:ns:yang:ietf-datastores";
+pub(crate) const YANG_DATASTORES_NS: Namespace<'static> =
+    Namespace(YANG_DATASTORES_NS_STR.as_bytes());
 
 #[cfg(test)]
 mod tests {

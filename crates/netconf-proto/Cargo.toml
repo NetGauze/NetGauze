@@ -14,7 +14,7 @@ keywords = ["netconf", "yang", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 [dependencies]
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive", "rc"] }
 quick-xml = { workspace = true, features = ["serialize", "async-tokio"] }
 strum_macros = { workspace = true }
 strum = { workspace = true, features = ["derive"] }
@@ -26,7 +26,7 @@ tracing = { workspace = true }
 futures-util = { workspace = true, features = ["sink"] }
 russh = { workspace = true }
 secrecy = { workspace = true }
-indexmap = { workspace = true }
+indexmap = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 clap = { workspace = true, features = ["derive"] }
