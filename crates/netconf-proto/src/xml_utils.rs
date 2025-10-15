@@ -15,7 +15,10 @@
 
 //! Low-level XML parsing utils
 
-use crate::{NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_NS};
+use crate::{
+    NETCONF_MONITORING_NS, NETCONF_NS, YANG_DATASTORES_NS, YANG_LIBRARY_AUGMENTED_BY_NS,
+    YANG_LIBRARY_NS,
+};
 use indexmap::IndexMap;
 use quick_xml::{
     events::{BytesStart, Event},
@@ -74,6 +77,7 @@ impl<T: io::Write> XmlWriter<T> {
             (NETCONF_MONITORING_NS, "ncm".to_string()),
             (YANG_LIBRARY_NS, "yanglib".to_string()),
             (YANG_LIBRARY_AUGMENTED_BY_NS, "yanglib-aug".to_string()),
+            (YANG_DATASTORES_NS, "ds".to_string()),
         ])];
         let ns_applied = false;
         Self {
@@ -212,6 +216,9 @@ pub enum ParsingError {
     },
 
     MissingAttribute(String),
+
+    #[strum(to_string = "required XML element `{0}` is missing")]
+    MissingElement(String),
 
     /// Invalid value error when converting from XML provided value to Rust type
     InvalidValue(String),
