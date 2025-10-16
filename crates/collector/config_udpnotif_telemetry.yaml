@@ -37,4 +37,6 @@ udp_notif:
             queue.buffering.max.messages: "1000"
           writer_id: test-udpnotif-telemetry # TODO: not considered yet, discuss...
           yang_converter:
-            default_schema: assets/yang/telemetry-message/yang-push-telemetry-supplied-schema.json
+            root_schema: "assets/yang/telemetry-message/yang-push-telemetry-supplied-schema.json"
+            custom_schemas:
+              E96CB84D-F02B-4FBF-BE86-3580300CD964: "assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/supplied-schema.json"

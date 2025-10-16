@@ -13,13 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use schema_registry_converter::schema_registry_common::SuppliedSchema;
 use std::{collections::HashMap, net::SocketAddr};
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 use tracing::{debug, error, info, warn};
 
-// Cache for YangPush schemas metadata
+// Cache for YangPush schemas and metadata
 type ContentId = String;
+type SchemaLookupCache = HashMap<SchemaIdx, ContentId>;
 type SchemaInfoCache = HashMap<ContentId, SchemaInfo>;
+// TODO: move to native schema struct and integrate in single cache
+type SchemaCache = HashMap<ContentId, SuppliedSchema>;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct SchemaIdx {
@@ -30,30 +37,6 @@ struct SchemaIdx {
 impl SchemaIdx {
     fn new(store_content_id: ContentId, xpath: String, models: Vec<String>) -> Self {
         Self {
-            store_content_id,
-            xpath,
-            models,
-        }
-    }
-}
-type SchemaLookupCache = HashMap<SchemaIdx, ContentId>;
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SchemaRequest {
-    peer_address: SocketAddr,
-    store_content_id: ContentId,
-    xpath: String,
-    models: Vec<String>,
-}
-impl SchemaRequest {
-    pub fn new(
-        peer_address: SocketAddr,
-        store_content_id: ContentId,
-        xpath: String,
-        models: Vec<String>,
-    ) -> Self {
-        Self {
-            peer_address,
             store_content_id,
             xpath,
             models,
@@ -87,6 +70,44 @@ impl SchemaInfo {
     }
     pub fn content_id(&self) -> Option<ContentId> {
         self.content_id.clone()
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct SchemaRequest {
+    peer_address: SocketAddr,
+    store_content_id: ContentId,
+    xpath: String,
+    models: Vec<String>,
+}
+impl SchemaRequest {
+    pub fn new(
+        peer_address: SocketAddr,
+        store_content_id: ContentId,
+        xpath: String,
+        models: Vec<String>,
+    ) -> Self {
+        Self {
+            peer_address,
+            store_content_id,
+            xpath,
+            models,
+        }
+    }
+    pub fn peer_address(&self) -> SocketAddr {
+        self.peer_address
+    }
+
+    pub fn store_content_id(&self) -> &str {
+        &self.store_content_id
+    }
+
+    pub fn xpath(&self) -> &str {
+        &self.xpath
+    }
+
+    pub fn models(&self) -> &[String] {
+        &self.models
     }
 }
 
@@ -132,33 +153,42 @@ impl SchemaCacheStats {
 
 struct SchemaCacheActor {
     cmd_rx: mpsc::Receiver<SchemaCacheActorCommand>,
-    schema_req_rx: async_channel::Receiver<SchemaCacheRequest>,
-    schema_resp_tx: async_channel::Sender<SchemaCacheResponse>,
+    validation_req_rx: async_channel::Receiver<SchemaRequest>,
+    validation_resp_tx: async_channel::Sender<(SchemaRequest, SchemaInfo)>,
+    kafka_yang_req_rx: async_channel::Receiver<(ContentId, oneshot::Sender<SuppliedSchema>)>,
     schema_idx: SchemaLookupCache,
     schema_info: SchemaInfoCache,
+    schema_cache: SchemaCache,
     stats: SchemaCacheStats,
 }
 
 impl SchemaCacheActor {
     fn new(
         cmd_rx: mpsc::Receiver<SchemaCacheActorCommand>,
-        schema_req_rx: async_channel::Receiver<SchemaCacheRequest>,
-        schema_resp_tx: async_channel::Sender<SchemaCacheResponse>,
+        validation_req_rx: async_channel::Receiver<SchemaRequest>,
+        validation_resp_tx: async_channel::Sender<(SchemaRequest, SchemaInfo)>,
+        kafka_yang_req_rx: async_channel::Receiver<(ContentId, oneshot::Sender<SuppliedSchema>)>,
         stats: SchemaCacheStats,
     ) -> Self {
         info!("Creating schema cache actor");
         Self {
             cmd_rx,
-            schema_req_rx,
-            schema_resp_tx,
+            validation_req_rx,
+            validation_resp_tx,
+            kafka_yang_req_rx,
             schema_idx: HashMap::new(),
             schema_info: HashMap::new(),
+            schema_cache: HashMap::new(),
             stats,
         }
     }
 
     fn get_schema_info(&self, content_id: &ContentId) -> Option<SchemaInfo> {
         self.schema_info.get(content_id).cloned()
+    }
+
+    fn get_schema(&self, content_id: &ContentId) -> Option<SuppliedSchema> {
+        self.schema_cache.get(content_id).cloned()
     }
 
     // Retrieves subscription metadata from the cache based on the peer address
@@ -168,7 +198,7 @@ impl SchemaCacheActor {
         request: SchemaRequest,
     ) -> Result<Option<SchemaInfo>, SchemaCacheActorError> {
         // Get schema information from the cache
-        debug!("Requesting schema for peer: {}", request.peer_address);
+        debug!("Requesting schema info for peer: {}", request.peer_address);
         let res = self.schema_idx.get(&SchemaIdx::new(
             request.store_content_id.clone(),
             request.xpath.clone(),
@@ -206,21 +236,41 @@ impl SchemaCacheActor {
                         }
                     }
                 }
-                req = self.schema_req_rx.recv() => {
-                    match req {
-                        Ok(SchemaCacheRequest::SchemaRequestForPeer(schema_request)) => {
-                            debug!("Received SchemaRequestForPeer for peer {}",
-                                schema_request.peer_address
+                kafka_req = self.kafka_yang_req_rx.recv() => {
+                  match kafka_req {
+                      Ok((content_id, oneshot_tx)) => {
+                          debug!("Received Schema Request from KafkaYang for content_id {}",
+                              content_id
+                          );
+                          match self.get_schema(&content_id) {
+                              Some(supplied_schema) => {
+                                  if oneshot_tx.send(supplied_schema).is_err() {
+                                      warn!("Failed to send schema response: receiver dropped for content ID {}", content_id);
+                                  }
+                              },
+                              None => warn!("Schema not found in cache for content ID {}", content_id),
+                          }
+                      },
+                      Err(err) => {
+                          error!("Schema request error: {}", err);
+                      }
+                  }
+                }
+                validation_req = self.validation_req_rx.recv() => {
+                    match validation_req {
+                        Ok(schema_request) => {
+                            debug!("Received Schema Request from Validation for peer {}",
+                                schema_request.peer_address()
                             );
                             self.stats.requests.add(1, &[
                                 opentelemetry::KeyValue::new("network.peer.address", format!("{}", schema_request.peer_address.ip())),
                             ]);
                             // TODO
                             match self.request_schema(schema_request.clone()) {
-                                Ok(Some(schema)) => {
+                                 Ok(Some(schema_info)) => {
                                     // Cache the schema information
-                                    if let Some(content_id) = &schema.content_id {
-                                        self.schema_info.insert(content_id.clone(), schema.clone());
+                                    if let Some(content_id) = &schema_info.content_id {
+                                        self.schema_info.insert(content_id.clone(), schema_info.clone());
                                         self.schema_idx.insert(SchemaIdx::new(
                                             schema_request.store_content_id.clone(),
                                             schema_request.xpath.clone(),
@@ -228,8 +278,7 @@ impl SchemaCacheActor {
                                         ), content_id.clone());
                                     }
                                     // Send back the schema response
-                                    let response = SchemaCacheResponse::SchemaResponseForPeer((schema_request.clone(), schema.clone()));
-                                    self.schema_resp_tx.send(response).await.unwrap_or_else(|e| {
+                                    self.validation_resp_tx.send((schema_request.clone(), schema_info)).await.unwrap_or_else(|e| {
                                         error!("Failed to send schema response: {}", e);
                                     });
                                     continue;
@@ -239,25 +288,6 @@ impl SchemaCacheActor {
                                 }
                                 Err(e) => {
                                     error!("Error requesting schema for peer {}: {}", schema_request.peer_address, e);
-                                }
-                            }
-                        }
-                        Ok(SchemaCacheRequest::SchemaRequestForContent(content_id)) => {
-                            debug!("Received SchemaRequestForContent request for content ID {}",
-                                content_id
-                            );
-                            // Retrieve schema information
-                            match self.get_schema_info(&content_id) {
-                                Some(schema) => {
-                                    // Send back the schema response
-                                    let response = SchemaCacheResponse::SchemaResponseForContent((content_id.clone(), schema.clone()));
-                                    self.schema_resp_tx.send(response).await.unwrap_or_else(|e| {
-                                        error!("Failed to send schema response: {}", e);
-                                    });
-                                    continue;
-                                }
-                                None => {
-                                    debug!("Schema not found in cache for content ID {}", content_id);
                                 }
                             }
                         }
@@ -283,8 +313,9 @@ impl std::error::Error for SchemaCacheActorHandleError {}
 #[derive(Debug, Clone)]
 pub struct SchemaCacheActorHandle {
     cmd_tx: mpsc::Sender<SchemaCacheActorCommand>,
-    pub schema_req_tx: async_channel::Sender<SchemaCacheRequest>,
-    pub schema_resp_rx: async_channel::Receiver<SchemaCacheResponse>,
+    pub validation_req_tx: async_channel::Sender<SchemaRequest>,
+    pub validation_resp_rx: async_channel::Receiver<(SchemaRequest, SchemaInfo)>,
+    pub kafka_yang_req_tx: async_channel::Sender<(ContentId, oneshot::Sender<SuppliedSchema>)>,
 }
 
 impl SchemaCacheActorHandle {
@@ -293,18 +324,26 @@ impl SchemaCacheActorHandle {
         stats: either::Either<opentelemetry::metrics::Meter, SchemaCacheStats>,
     ) -> (JoinHandle<Result<String, anyhow::Error>>, Self) {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);
-        let (schema_req_tx, schema_req_rx) = async_channel::bounded(buffer_size);
-        let (schema_resp_tx, schema_resp_rx) = async_channel::bounded(buffer_size);
+        let (validation_req_tx, validation_req_rx) = async_channel::bounded(buffer_size);
+        let (validation_resp_tx, validation_resp_rx) = async_channel::bounded(buffer_size);
+        let (kafka_yang_req_tx, kafka_yang_req_rx) = async_channel::bounded(buffer_size);
         let stats = match stats {
             either::Either::Left(meter) => SchemaCacheStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor = SchemaCacheActor::new(cmd_rx, schema_req_rx, schema_resp_tx, stats);
+        let actor = SchemaCacheActor::new(
+            cmd_rx,
+            validation_req_rx,
+            validation_resp_tx,
+            kafka_yang_req_rx,
+            stats,
+        );
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
             cmd_tx,
-            schema_req_tx,
-            schema_resp_rx,
+            validation_req_tx,
+            validation_resp_rx,
+            kafka_yang_req_tx,
         };
         (join_handle, handle)
     }
@@ -351,6 +390,7 @@ mod tests {
             mpsc::channel(10).1,
             async_channel::bounded(10).1,
             async_channel::bounded(10).0,
+            async_channel::bounded(10).1,
             SchemaCacheStats::new(opentelemetry::global::meter("test-meter")),
         );
         let request = SchemaRequest {

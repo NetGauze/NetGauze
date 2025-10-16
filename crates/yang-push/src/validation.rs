@@ -30,7 +30,7 @@ use crate::{
         notification::SubscriptionId,
         udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
     },
-    schema_cache::{SchemaCacheRequest, SchemaCacheResponse},
+    schema_cache::{SchemaInfo, SchemaRequest},
 };
 
 // Cache for YangPush subscriptions
@@ -200,8 +200,8 @@ struct ValidationActor {
     udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
     validated_tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
     #[allow(dead_code)] // TODO: send schema requests
-    schema_req_tx: async_channel::Sender<SchemaCacheRequest>,
-    schema_resp_rx: async_channel::Receiver<SchemaCacheResponse>,
+    schema_req_tx: async_channel::Sender<SchemaRequest>,
+    schema_resp_rx: async_channel::Receiver<(SchemaRequest, SchemaInfo)>,
     peers: PeerCache,
     subscriptions: SubscriptionCache,
     stats: ValidationStats,
@@ -212,8 +212,8 @@ impl ValidationActor {
         cmd_rx: mpsc::Receiver<ValidationActorCommand>,
         udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
         validated_tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
-        schema_req_tx: async_channel::Sender<SchemaCacheRequest>,
-        schema_resp_rx: async_channel::Receiver<SchemaCacheResponse>,
+        schema_req_tx: async_channel::Sender<SchemaRequest>,
+        schema_resp_rx: async_channel::Receiver<(SchemaRequest, SchemaInfo)>,
         stats: ValidationStats,
     ) -> Self {
         info!("Creating Yang Push validation actor");
@@ -249,11 +249,8 @@ impl ValidationActor {
                 }
                 req = self.schema_resp_rx.recv() => {
                     match req {
-                        Ok(SchemaCacheResponse::SchemaResponseForPeer((_schema_request, _schema_info))) => {
+                        Ok((_schema_request, _schema_info)) => {
                             // TODO
-                        }
-                        Ok(SchemaCacheResponse::SchemaResponseForContent((_schema_request, _schema_info))) => {
-                            trace!("Received schema response for content, ignored");
                         }
                         Err(err) => {
                             error!("Shutting down due to Yang Push receive error: {err}");
@@ -370,6 +367,7 @@ impl ValidationActor {
             }
             Err(err) => {
                 warn!("Yang Push message validation failed: {err}");
+                trace!("Yang Push message validation failed - full message: {msg}");
             }
         }
         Ok(Some((subscription_info, decoded)))
@@ -401,7 +399,7 @@ impl ValidationActor {
         let data_op = DataOperation::NotificationYang;
         let _data_tree = match DataTree::parse_op_string(
             &subscription.context,
-            message,
+            message.clone(),
             DataFormat::JSON,
             data_op,
         ) {
@@ -426,7 +424,7 @@ impl ValidationActor {
         self.stats.subscription_cache_miss.add(1, &[]);
         // TODO
         let content_id: ContentId = "E96CB84D-F02B-4FBF-BE86-3580300CD964".into();
-        match self.create_subscription(peer.clone(), content_id.clone()) {
+        match self.create_subscription(peer.clone(), content_id) {
             Ok(subscription) => Ok(subscription),
             Err(err) => {
                 error!(
@@ -537,8 +535,8 @@ impl ValidationActorHandle {
     pub fn new(
         buffer_size: usize,
         udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
-        schema_req_tx: async_channel::Sender<SchemaCacheRequest>,
-        schema_resp_rx: async_channel::Receiver<SchemaCacheResponse>,
+        schema_req_tx: async_channel::Sender<SchemaRequest>,
+        schema_resp_rx: async_channel::Receiver<(SchemaRequest, SchemaInfo)>,
         stats: either::Either<opentelemetry::metrics::Meter, ValidationStats>,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);

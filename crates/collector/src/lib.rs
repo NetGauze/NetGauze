@@ -408,8 +408,8 @@ pub async fn init_udp_notif_collection(
                     let (validation_join, validation_handle) = ValidationActorHandle::new(
                         publisher_config.buffer_size,
                         udp_notif_recv.clone(),
-                        schema_handle.schema_req_tx.clone(),
-                        schema_handle.schema_resp_rx.clone(),
+                        schema_handle.validation_req_tx.clone(),
+                        schema_handle.validation_resp_rx.clone(),
                         either::Left(meter.clone()),
                     );
                     join_set.push(validation_join);
@@ -443,7 +443,8 @@ pub async fn init_udp_notif_collection(
                 }
                 PublisherEndpoint::TelemetryKafkaYang(config) => {
                     let (schema_join, schema_handle) = SchemaCacheActorHandle::new(
-                        publisher_config.buffer_size,
+                        publisher_config.buffer_size, /* TODO: different buffer sizes for these
+                                                       * communication channels... */
                         either::Left(meter.clone()),
                     );
                     join_set.push(schema_join);
@@ -452,8 +453,8 @@ pub async fn init_udp_notif_collection(
                     let (validation_join, validation_handle) = ValidationActorHandle::new(
                         publisher_config.buffer_size,
                         udp_notif_recv.clone(),
-                        schema_handle.schema_req_tx.clone(),
-                        schema_handle.schema_resp_rx.clone(),
+                        schema_handle.validation_req_tx.clone(),
+                        schema_handle.validation_resp_rx.clone(),
                         either::Left(meter.clone()),
                     );
                     join_set.push(validation_join);
@@ -471,6 +472,7 @@ pub async fn init_udp_notif_collection(
                         config.clone(),
                         enrichment_handle.subscribe(),
                         either::Left(meter.clone()),
+                        schema_handle.kafka_yang_req_tx.clone(),
                     )
                     .await;
 

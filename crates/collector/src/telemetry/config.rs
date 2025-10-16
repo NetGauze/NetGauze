@@ -23,7 +23,10 @@ use crate::publishers::kafka_yang::YangConverter;
 use netgauze_yang_push::{model::telemetry::TelemetryMessageWrapper, validation::SubscriptionInfo};
 use schema_registry_converter::schema_registry_common::SuppliedSchema;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf};
+use tracing::error;
+
+type ContentId = String;
 
 #[derive(Debug, strum_macros::Display)]
 pub enum TelemetryYangConverterError {
@@ -32,6 +35,9 @@ pub enum TelemetryYangConverterError {
 
     #[strum(to_string = "Failed to parse schema JSON: {0}")]
     JsonError(serde_json::Error),
+
+    #[strum(to_string = "Failed to serialize telemetry message: {0}")]
+    SerializationError(crate::UdpNotifSerializationError),
 }
 
 impl From<std::io::Error> for TelemetryYangConverterError {
@@ -50,49 +56,94 @@ impl std::error::Error for TelemetryYangConverterError {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelemetryYangConverter {
-    pub default_schema: PathBuf,
+    pub root_schema: PathBuf,
+
+    #[serde(default)]
+    pub custom_schemas: HashMap<ContentId, PathBuf>,
 }
 
 impl TelemetryYangConverter {
-    pub fn new(default_schema: PathBuf) -> Self {
-        Self { default_schema }
+    pub fn new(root_schema: PathBuf) -> Self {
+        Self {
+            root_schema,
+            custom_schemas: HashMap::new(),
+        }
     }
 
-    fn load_supplied_schema(&self) -> Result<SuppliedSchema, TelemetryYangConverterError> {
-        let schema_content = fs::read_to_string(&self.default_schema)?;
+    pub fn with_custom_schemas(mut self, custom_schemas: HashMap<ContentId, PathBuf>) -> Self {
+        self.custom_schemas = custom_schemas;
+        self
+    }
+
+    pub fn add_custom_schema(&mut self, content_id: ContentId, schema_path: PathBuf) {
+        self.custom_schemas.insert(content_id, schema_path);
+    }
+
+    fn load_schema(schema_path: &PathBuf) -> Result<SuppliedSchema, TelemetryYangConverterError> {
+        let schema_content = fs::read_to_string(schema_path)?;
         let supplied_schema: SuppliedSchema = serde_json::from_str(&schema_content)?;
         Ok(supplied_schema)
     }
 }
 
-impl YangConverter<(SubscriptionInfo, TelemetryMessageWrapper), crate::UdpNotifSerializationError>
+impl YangConverter<(SubscriptionInfo, TelemetryMessageWrapper), TelemetryYangConverterError>
     for TelemetryYangConverter
 {
-    fn get_yang_schema(&self) -> SuppliedSchema {
-        self.load_supplied_schema()
-            .map_err(|err| {
-                tracing::error!(
-                    "Failed to load SuppliedSchema from {:?}: {}",
-                    self.default_schema,
-                    err
+    fn get_root_schema(&self) -> Result<SuppliedSchema, TelemetryYangConverterError> {
+        let schema = match Self::load_schema(&self.root_schema) {
+            Ok(schema) => schema,
+            Err(err) => {
+                error!(
+                    "Failed to load Telemetry Message root schema from {:?}: {}",
+                    self.root_schema, err
                 );
-                err
-            })
-            .expect("SuppliedSchema JSON file must exist and be valid")
+                return Err(err);
+            }
+        };
+
+        Ok(schema)
+    }
+
+    fn get_custom_schemas(
+        &self,
+    ) -> Result<Vec<(ContentId, SuppliedSchema)>, TelemetryYangConverterError> {
+        let mut schemas = Vec::new();
+
+        for (content_id, schema_path) in &self.custom_schemas {
+            match Self::load_schema(schema_path) {
+                Ok(schema) => schemas.push((content_id.clone(), schema)),
+                Err(err) => {
+                    error!(
+                        "Failed to load custom schema for content_id '{}' from {:?}: {}",
+                        content_id, schema_path, err
+                    );
+                    return Err(err);
+                }
+            }
+        }
+
+        Ok(schemas)
+    }
+
+    fn get_content_id(
+        &self,
+        input: &(SubscriptionInfo, TelemetryMessageWrapper),
+    ) -> Option<ContentId> {
+        input.0.content_id().cloned()
     }
 
     fn get_key(
         &self,
         input: &(SubscriptionInfo, TelemetryMessageWrapper),
     ) -> Option<serde_json::Value> {
-        let ip = input.0.peer().ip();
+        let ip = input.0.peer_addr().ip();
         Some(serde_json::Value::String(ip.to_string()))
     }
 
     fn serialize_json(
         &self,
         input: (SubscriptionInfo, TelemetryMessageWrapper),
-    ) -> Result<serde_json::Value, crate::UdpNotifSerializationError> {
+    ) -> Result<serde_json::Value, TelemetryYangConverterError> {
         let telemetry_message_wrapper = input.1;
         serde_json::to_value(telemetry_message_wrapper).map_err(Into::into)
     }
@@ -131,7 +182,7 @@ mod tests {
             8080,
         ))
         .with_subscription_id(1)
-        .with_context_id("test-subscription".to_string())
+        .with_content_id("test-subscription".to_string())
     }
 
     fn create_test_telemetry_message_wrapper() -> TelemetryMessageWrapper {
@@ -158,26 +209,26 @@ mod tests {
 
     #[test]
     fn test_new_converter() {
-        let schema_path = PathBuf::from("test-schema.json");
+        let schema_path = PathBuf::from("root-schema.json");
         let converter = TelemetryYangConverter::new(schema_path.clone());
 
-        assert_eq!(converter.default_schema, schema_path);
+        assert_eq!(converter.root_schema, schema_path);
     }
 
     #[test]
-    fn test_load_supplied_schema_success() {
+    fn test_get_root_schema_success() {
         let schema_file = create_test_schema_file();
         let converter = TelemetryYangConverter::new(schema_file.path().to_path_buf());
 
-        let result = converter.load_supplied_schema();
+        let result = converter.get_root_schema();
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_load_supplied_schema_file_not_found() {
+    fn test_get_root_schema_file_not_found() {
         let converter = TelemetryYangConverter::new(PathBuf::from("nonexistent.json"));
 
-        let result = converter.load_supplied_schema();
+        let result = converter.get_root_schema();
         assert!(result.is_err());
 
         match result.unwrap_err() {
@@ -187,14 +238,14 @@ mod tests {
     }
 
     #[test]
-    fn test_load_supplied_schema_invalid_json() {
+    fn test_get_root_schema_invalid_json() {
         let mut file = NamedTempFile::new().expect("Failed to create temp file");
         file.write_all(b"invalid json")
             .expect("Failed to write invalid JSON");
 
         let converter = TelemetryYangConverter::new(file.path().to_path_buf());
 
-        let result = converter.load_supplied_schema();
+        let result = converter.get_root_schema();
         assert!(result.is_err());
 
         match result.unwrap_err() {
@@ -227,7 +278,7 @@ mod tests {
         let ipv6_addr = "2001:db8::1".parse().unwrap();
         let subscription_info = SubscriptionInfo::new(SocketAddr::new(ipv6_addr, 8080))
             .with_subscription_id(1)
-            .with_context_id("test-subscription".to_string());
+            .with_content_id("test-subscription".to_string());
         let message_wrapper = create_test_telemetry_message_wrapper();
         let input = (subscription_info, message_wrapper);
 
