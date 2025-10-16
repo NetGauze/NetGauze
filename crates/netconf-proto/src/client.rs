@@ -143,13 +143,14 @@ pub async fn connect<H: russh::client::Handler + 'static>(
 where
     NetConfSshClientError: From<<H as russh::client::Handler>::Error>,
 {
-    tracing::debug!("TCP connecting to {}", config.host);
+    let peer = config.host;
+    tracing::debug!("[{peer}] Initiating TCP connection");
     let mut session = russh::client::connect(config.config, config.host, config.handler).await?;
-    tracing::debug!("TCP connected to {}", config.host);
+    tracing::debug!("[{peer}] TCP connected");
 
     let (user, auth_result) = match &config.auth {
         SshAuth::Password { user, password } => {
-            tracing::info!("Using password authentication for user {user}");
+            tracing::debug!("[{peer}] Using password authentication for user `{user}`");
             (
                 user,
                 session
@@ -158,13 +159,13 @@ where
             )
         }
         SshAuth::Key { user, private_key } => {
-            tracing::info!("Using private key authentication for user {user}");
+            tracing::debug!("[{peer}] Using private key authentication for user `{user}`");
             let private_key = russh::keys::PrivateKeyWithHashAlg::new(
                 Arc::clone(private_key),
                 session.best_supported_rsa_hash().await?.flatten(),
             );
-            tracing::info!(
-                "Negotiated private key and using {} hashing algorithm",
+            tracing::debug!(
+                "[{peer}] Negotiated private key and using `{}` hashing algorithm",
                 private_key.algorithm()
             );
             (
@@ -174,18 +175,21 @@ where
         }
     };
     if !auth_result.success() {
-        tracing::error!("Authentication failed");
+        tracing::error!("[{peer}] Authentication failed");
         return Err(NetConfSshClientError::SshError(
             russh::Error::NotAuthenticated,
         ));
     }
-    tracing::info!(
-        "Authentication successful to {user}@{}, requesting the NETCONF subsystem",
+    tracing::debug!(
+        "[{peer}] Authentication successful to `{user}@{}`, requesting the NETCONF subsystem",
         config.host
     );
     let channel = session.channel_open_session().await?;
     channel.request_subsystem(true, "netconf").await?;
-    tracing::info!("NETCONF subsystem connected to {user}@{}", config.host);
+    tracing::info!(
+        "[{peer}] NETCONF subsystem connected to `{user}@{}`",
+        config.host
+    );
     let stream = channel.into_stream();
     NetConfSshClient::connect(config.host, stream).await
 }
@@ -280,12 +284,22 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
     ) -> Result<Box<str>, NetConfSshClientError> {
         let message_id = self.next_message_id().to_string().into_boxed_str();
         let rpc = Rpc::new(message_id.clone(), operation);
+        if tracing::enabled!(tracing::Level::TRACE) {
+            tracing::trace!(
+                "[{}] Sending RPC Request with message id `{}` and payload `{rpc:?}`",
+                self.peer,
+                message_id
+            );
+        }
         self.framed.send(NetConfMessage::Rpc(rpc)).await?;
         Ok(message_id)
     }
 
     pub async fn rpc_reply(&mut self) -> Option<Result<RpcReply, NetConfSshClientError>> {
         let msg = self.framed.next().await;
+        if tracing::enabled!(tracing::Level::TRACE) {
+            tracing::trace!("[{}] Received NETCONF message: `{msg:?}`", self.peer);
+        }
         match msg {
             None => None,
             Some(Ok(NetConfMessage::RpcReply(reply))) => Some(Ok(reply)),
@@ -307,6 +321,10 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
 
     pub async fn close(mut self) -> Result<(), NetConfSshClientError> {
         let message_id = self.next_message_id.to_string().into_boxed_str();
+        tracing::debug!(
+            "[{}] sending close message RPC with id `{message_id}`",
+            self.peer
+        );
         self.framed
             .send(NetConfMessage::Rpc(Rpc::new(
                 message_id,
@@ -315,7 +333,13 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             .await?;
         if let Some(reply) = self.rpc_reply().await {
             let reply = reply?;
-            if !reply.reply().is_ok() {
+            if reply.reply().is_ok() {
+                tracing::debug!("[{}] received ok response to close connection", self.peer);
+            } else {
+                tracing::warn!(
+                    "[{}] received unexpected response to close connection: {reply:?}",
+                    self.peer
+                );
                 return Err(NetConfSshClientError::UnexpectedMessage {
                     expected: "ok".to_string(),
                     actual: NetConfMessage::RpcReply(reply),
@@ -323,6 +347,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             }
         }
         self.framed.close().await?;
+        tracing::info!("[{}] gracefully closed connection", self.peer);
         Ok(())
     }
 }
