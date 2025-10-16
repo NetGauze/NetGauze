@@ -213,6 +213,9 @@ pub enum ParsingError {
 
     MissingAttribute(String),
 
+    #[strum(to_string = "required XML element `{0}` is missing")]
+    MissingElement(String),
+
     /// Invalid value error when converting from XML provided value to Rust type
     InvalidValue(String),
 
