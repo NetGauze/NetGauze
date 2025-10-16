@@ -33,7 +33,8 @@ ciborium = { workspace = true }
 async-channel = { workspace = true }
 anyhow = { workspace = true }
 yang3 = { workspace = true }
-
+# TEMP to use SuppliedSchema, until we have the native Schema structs
+schema_registry_converter = { workspace = true, default-features = false }
 
 [build-dependencies]
 shadow-rs = { workspace = true, default-features = true }
