@@ -187,10 +187,13 @@ where
     channel.request_subsystem(true, "netconf").await?;
     tracing::info!("NETCONF subsystem connected to {user}@{}", config.host);
     let stream = channel.into_stream();
-    NetConfSshClient::connect(stream).await
+    NetConfSshClient::connect(config.host, stream).await
 }
 
 pub struct NetConfSshClient<T> {
+    /// Address of NETCONF server
+    peer: SocketAddr,
+
     /// Bidirectional channel to the NETCONF peer
     framed: Framed<T, SshCodec>,
 
@@ -205,6 +208,10 @@ pub struct NetConfSshClient<T> {
 }
 
 impl<T> NetConfSshClient<T> {
+    pub const fn peer(&self) -> SocketAddr {
+        self.peer
+    }
+
     pub const fn peer_caps(&self) -> &HashSet<Capability> {
         &self.peer_caps
     }
@@ -254,11 +261,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         Ok((framed, session_id, peer_caps))
     }
 
-    pub async fn connect(stream: T) -> Result<Self, NetConfSshClientError> {
+    pub async fn connect(peer: SocketAddr, stream: T) -> Result<Self, NetConfSshClientError> {
         let framed = Framed::new(stream, SshCodec::default());
         let (framed, session_id, peer_caps) = Self::exchange_hello(framed).await?;
         let next_message_id = 10110;
         Ok(Self {
+            peer,
             framed,
             peer_caps,
             session_id,
