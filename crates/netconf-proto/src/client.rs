@@ -16,7 +16,10 @@
 use crate::{
     capabilities::{Capability, NetconfVersion},
     codec::{SshCodec, SshCodecError},
-    protocol::{Hello, NetConfMessage, Rpc, RpcOperation, RpcReply},
+    protocol::{
+        Hello, NetConfMessage, Rpc, RpcOperation, RpcReply, RpcReplyContent, RpcResponse,
+        WellKnownOperation, WellKnownRpcResponse, YangSchemaFormat,
+    },
 };
 use futures_util::{stream::StreamExt, SinkExt};
 use secrecy::ExposeSecret;
@@ -350,5 +353,62 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         self.framed.close().await?;
         tracing::info!("[{}] gracefully closed connection", self.peer);
         Ok(())
+    }
+
+    /// Get YANG schema from the device
+    pub async fn get_schema(
+        &mut self,
+        name: &str,
+        version: Option<&str>,
+    ) -> Result<Box<str>, NetConfSshClientError> {
+        tracing::debug!(
+            "[{}] Getting a YANG schema with name `{name}` and version {version:?}",
+            self.peer
+        );
+        let rpc = RpcOperation::WellKnown(WellKnownOperation::GetSchema {
+            identifier: name.into(),
+            version: version.map(Into::into),
+            format: Some(YangSchemaFormat::Yang),
+        });
+        let message_id = self.rpc(rpc).await?;
+        let rpc_reply = self.rpc_reply().await?;
+        self.validate_message_id(&message_id, &rpc_reply)?;
+
+        if let Some(RpcResponse::WellKnown(WellKnownRpcResponse::YangSchema { .. })) =
+            rpc_reply.reply().responses()
+        {
+            // Some logic to unwrap the response without cloning the schema
+            let reply_content: RpcReplyContent = rpc_reply.into();
+            let rpc_response: RpcResponse =
+                Into::<Option<RpcResponse>>::into(reply_content).unwrap();
+            if let RpcResponse::WellKnown(WellKnownRpcResponse::YangSchema { schema }) =
+                rpc_response
+            {
+                return Ok(schema);
+            } else {
+                unreachable!()
+            }
+        }
+        Err(NetConfSshClientError::UnexpectedMessage {
+            expected: "YANG schema".to_string(),
+            actual: NetConfMessage::RpcReply(rpc_reply),
+        })
+    }
+
+    /// Helper to validate message ID matches between request and reply
+    fn validate_message_id(
+        &self,
+        expected_id: &str,
+        reply: &RpcReply,
+    ) -> Result<(), NetConfSshClientError> {
+        let received_id = reply.message_id().unwrap_or(expected_id);
+        if expected_id != received_id {
+            Err(NetConfSshClientError::UnexpectedMessage {
+                expected: format!("<rpc-reply message-id=\"{expected_id}\">"),
+                actual: NetConfMessage::RpcReply(reply.clone()),
+            })
+        } else {
+            Ok(())
+        }
     }
 }

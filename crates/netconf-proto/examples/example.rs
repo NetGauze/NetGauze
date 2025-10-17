@@ -103,36 +103,8 @@ pub async fn main() -> anyhow::Result<()> {
     let mut client = connect(config).await?;
     tracing::info!("Connected to server with caps: {:#?}", client.peer_caps());
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
-
-    let get_schema_op = RpcOperation::WellKnown(WellKnownOperation::GetSchema {
-        identifier: "ietf-datastores".into(),
-        version: None,
-        format: Some(YangSchemaFormat::Yang),
-    });
-    let message_id = client.rpc(get_schema_op).await?;
-    let response = client.rpc_reply().await?;
-    if response.message_id().is_some() && response.message_id() != Some(&message_id) {
-        anyhow::bail!(
-            "RPC returned unexpected message_id, expecting {message_id}, got {}",
-            response.message_id().unwrap()
-        );
-    }
-
-    tracing::info!("RPC returned message_id: {:?}", response.message_id());
-    if let RpcReplyContent::ErrorsAndData {
-        errors: _,
-        responses,
-    } = response.reply()
-    {
-        if let RpcResponse::WellKnown(WellKnownRpcResponse::YangSchema { schema }) = responses {
-            eprintln!(
-                "RPC YANG Schema response:\n==================\n{schema}\n================\n"
-            );
-        } else {
-            anyhow::bail!("Expecting get-schema response got:\n==================\n{response:?}\n================\n");
-        }
-    }
+    let schema = client.get_schema("ietf-datastores", None).await?;
+    eprintln!("RPC YANG Schema response:\n==================\n{schema}\n================\n");
 
     let message_id = client
         .rpc(RpcOperation::WellKnown(WellKnownOperation::GetYangLibrary))
