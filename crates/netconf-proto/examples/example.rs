@@ -106,32 +106,8 @@ pub async fn main() -> anyhow::Result<()> {
     let schema = client.get_schema("ietf-datastores", None).await?;
     eprintln!("RPC YANG Schema response:\n==================\n{schema}\n================\n");
 
-    let message_id = client
-        .rpc(RpcOperation::WellKnown(WellKnownOperation::GetYangLibrary))
-        .await?;
-    let response = client.rpc_reply().await?;
-    if response.message_id().is_some() && response.message_id() != Some(&message_id) {
-        anyhow::bail!(
-            "RPC returned unexpected message_id, expecting {message_id}, got {}",
-            response.message_id().unwrap()
-        );
-    }
-
-    tracing::info!("RPC returned message_id: {:?}", response.message_id());
-    if let RpcReplyContent::ErrorsAndData {
-        errors: _,
-        responses,
-    } = response.reply()
-    {
-        if let RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary(library)) = responses {
-            eprintln!(
-                "RPC YANG LIBRARY
-            response:\n==================\n{library:#?}\n================\n"
-            );
-        } else {
-            anyhow::bail!("Expecting RPC YANG library response got:\n==================\n{responses:?}\n================\n");
-        }
-    }
+    let yang_lib = client.get_yang_library().await?;
+    eprintln!("RPC YANG Schema response:\n==================\n{yang_lib:?}\n================\n");
 
     client.close().await?;
     Ok(())

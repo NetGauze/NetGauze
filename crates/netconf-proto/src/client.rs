@@ -20,6 +20,7 @@ use crate::{
         Hello, NetConfMessage, Rpc, RpcOperation, RpcReply, RpcReplyContent, RpcResponse,
         WellKnownOperation, WellKnownRpcResponse, YangSchemaFormat,
     },
+    yanglib::YangLibrary,
 };
 use futures_util::{stream::StreamExt, SinkExt};
 use secrecy::ExposeSecret;
@@ -212,6 +213,9 @@ pub struct NetConfSshClient<T> {
 
     /// Keep track of the message IDs sent to the peer
     next_message_id: u32,
+
+    /// Cache peer's YANG Library
+    yang_library: Option<Arc<YangLibrary>>,
 }
 
 impl<T> NetConfSshClient<T> {
@@ -235,6 +239,10 @@ impl<T> NetConfSshClient<T> {
         let ret = self.next_message_id;
         self.next_message_id += 1;
         ret
+    }
+
+    pub fn yang_library(&self) -> Option<Arc<YangLibrary>> {
+        self.yang_library.as_ref().map(Arc::clone)
     }
 }
 
@@ -278,6 +286,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             peer_caps,
             session_id,
             next_message_id,
+            yang_library: None,
         })
     }
 
@@ -391,6 +400,39 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         }
         Err(NetConfSshClientError::UnexpectedMessage {
             expected: "YANG schema".to_string(),
+            actual: NetConfMessage::RpcReply(rpc_reply),
+        })
+    }
+
+    /// Get the YANG Library of the device.
+    ///
+    /// Caching is used to avoid multiple requests to the device.
+    pub async fn get_yang_library(&mut self) -> Result<Arc<YangLibrary>, NetConfSshClientError> {
+        // Return cached version if any
+        if let Some(lib) = self.yang_library() {
+            return Ok(lib);
+        }
+        let message_id = self
+            .rpc(RpcOperation::WellKnown(WellKnownOperation::GetYangLibrary))
+            .await?;
+        let rpc_reply = self.rpc_reply().await?;
+        self.validate_message_id(&message_id, &rpc_reply)?;
+        if let Some(RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary { .. })) =
+            rpc_reply.reply().responses()
+        {
+            // Some logic to unwrap the response without cloning the response
+            let reply_content: RpcReplyContent = rpc_reply.into();
+            let rpc_response: RpcResponse =
+                Into::<Option<RpcResponse>>::into(reply_content).unwrap();
+            if let RpcResponse::WellKnown(WellKnownRpcResponse::YangLibrary(library)) = rpc_response
+            {
+                return Ok(library);
+            } else {
+                unreachable!()
+            }
+        }
+        Err(NetConfSshClientError::UnexpectedMessage {
+            expected: "YANG Library".to_string(),
             actual: NetConfMessage::RpcReply(rpc_reply),
         })
     }
