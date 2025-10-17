@@ -295,27 +295,30 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         Ok(message_id)
     }
 
-    pub async fn rpc_reply(&mut self) -> Option<Result<RpcReply, NetConfSshClientError>> {
+    pub async fn rpc_reply(&mut self) -> Result<RpcReply, NetConfSshClientError> {
         let msg = self.framed.next().await;
         if tracing::enabled!(tracing::Level::TRACE) {
             tracing::trace!("[{}] Received NETCONF message: `{msg:?}`", self.peer);
         }
         match msg {
-            None => None,
-            Some(Ok(NetConfMessage::RpcReply(reply))) => Some(Ok(reply)),
+            None => {
+                tracing::warn!("[{}] Broken connection", self.peer);
+                Err(NetConfSshClientError::SshError(russh::Error::IO(
+                    io::Error::new(io::ErrorKind::BrokenPipe, "No response from the server"),
+                )))
+            }
+            Some(Ok(NetConfMessage::RpcReply(reply))) => Ok(reply),
             Some(Ok(NetConfMessage::Hello(hello))) => {
-                Some(Err(NetConfSshClientError::UnexpectedMessage {
+                Err(NetConfSshClientError::UnexpectedMessage {
                     expected: "<rpc-reply>".to_string(),
                     actual: NetConfMessage::Hello(hello),
-                }))
+                })
             }
-            Some(Ok(NetConfMessage::Rpc(rpc))) => {
-                Some(Err(NetConfSshClientError::UnexpectedMessage {
-                    expected: "<rpc-reply>".to_string(),
-                    actual: NetConfMessage::Rpc(rpc),
-                }))
-            }
-            Some(Err(e)) => Some(Err(e.into())),
+            Some(Ok(NetConfMessage::Rpc(rpc))) => Err(NetConfSshClientError::UnexpectedMessage {
+                expected: "<rpc-reply>".to_string(),
+                actual: NetConfMessage::Rpc(rpc),
+            }),
+            Some(Err(e)) => Err(e.into()),
         }
     }
 
@@ -331,20 +334,18 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
                 RpcOperation::Raw("<close-session/>".into()),
             )))
             .await?;
-        if let Some(reply) = self.rpc_reply().await {
-            let reply = reply?;
-            if reply.reply().is_ok() {
-                tracing::debug!("[{}] received ok response to close connection", self.peer);
-            } else {
-                tracing::warn!(
-                    "[{}] received unexpected response to close connection: {reply:?}",
-                    self.peer
-                );
-                return Err(NetConfSshClientError::UnexpectedMessage {
-                    expected: "ok".to_string(),
-                    actual: NetConfMessage::RpcReply(reply),
-                });
-            }
+        let reply = self.rpc_reply().await?;
+        if reply.reply().is_ok() {
+            tracing::debug!("[{}] received ok response to close connection", self.peer);
+        } else {
+            tracing::warn!(
+                "[{}] received unexpected response to close connection: {reply:?}",
+                self.peer
+            );
+            return Err(NetConfSshClientError::UnexpectedMessage {
+                expected: "ok".to_string(),
+                actual: NetConfMessage::RpcReply(reply),
+            });
         }
         self.framed.close().await?;
         tracing::info!("[{}] gracefully closed connection", self.peer);
