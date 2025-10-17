@@ -111,11 +111,7 @@ pub async fn main() -> anyhow::Result<()> {
         format: Some(YangSchemaFormat::Yang),
     });
     let message_id = client.rpc(get_schema_op).await?;
-    let response = if let Some(resp) = client.rpc_reply().await {
-        resp?
-    } else {
-        anyhow::bail!("RPC returned no response, channel is closed");
-    };
+    let response = client.rpc_reply().await?;
     if response.message_id().is_some() && response.message_id() != Some(&message_id) {
         anyhow::bail!(
             "RPC returned unexpected message_id, expecting {message_id}, got {}",
@@ -141,11 +137,7 @@ pub async fn main() -> anyhow::Result<()> {
     let message_id = client
         .rpc(RpcOperation::WellKnown(WellKnownOperation::GetYangLibrary))
         .await?;
-    let response = if let Some(resp) = client.rpc_reply().await {
-        resp?
-    } else {
-        anyhow::bail!("RPC returned no response, channel is closed");
-    };
+    let response = client.rpc_reply().await?;
     if response.message_id().is_some() && response.message_id() != Some(&message_id) {
         anyhow::bail!(
             "RPC returned unexpected message_id, expecting {message_id}, got {}",
