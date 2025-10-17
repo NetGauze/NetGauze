@@ -2,16 +2,16 @@
   "ietf-yang-push:push-update": {
     "datastore-contents": {
       "ietf-interfaces:interfaces": {
-	"interface": [
-	  {
-	    "name": "ethernetCsmacd.0.1.0",
-	    "oper-status": "up"
-	  },
-	  {
-	    "name": "ethernetCsmacd.0.1.1",
-	    "oper-status": "down"
-	  }
-	]
+        "interface": [
+          {
+            "name": "ethernetCsmacd.0.1.0",
+            "oper-status": "up"
+          },
+          {
+            "name": "ethernetCsmacd.0.1.1",
+            "oper-status": "down"
+          }
+        ]
       }
     },
     "id": 1,
