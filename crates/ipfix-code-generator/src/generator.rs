@@ -2691,7 +2691,7 @@ pub fn generate_into_for_field(
                 quote! { Self::#name(value) => { Ok(format!("{value}")) } }
             } else if convert_rust_type == "String" && ie_rust_type == "super::MacAddress" {
                 // convert MacAddresses to human-readable string
-                quote! { Self::#name(value) => { Ok(value.iter().map(|x| format!("{x:x}")).collect::<Vec<_>>().join(":").to_string()) } }
+                quote! { Self::#name(value) => { Ok(value.iter().map(|x| format!("{x:02x}")).collect::<Vec<_>>().join(":").to_string()) } }
             } else if convert_rust_type == "Vec<String>" && ie.name == "tcpControlBits" {
                 quote! { Self::#name(value) => { Ok(value.to_vec()) } }
             } else if convert_rust_type == "String" && is_mpls_type(&ie.name) {
