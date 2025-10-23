@@ -30,6 +30,8 @@
 //! - `KafkaYangPublisherActorHandle`: A handle for controlling the publisher
 //!   actor
 use crate::publishers::LoggingProducerContext;
+use ipnet::IpNet;
+use netgauze_yang_push::{ContentId, CustomSchema};
 use rdkafka::{
     config::{ClientConfig, FromClientConfigAndContext},
     error::{KafkaError, RDKafkaErrorCode},
@@ -42,14 +44,12 @@ use schema_registry_converter::{
     schema_registry_common::{SchemaType, SuppliedReference, SuppliedSchema},
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, fs, time::Duration};
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
 };
 use tracing::{debug, error, info, trace, warn};
-
-type ContentId = String;
 
 /// Maximum polling interval when Kafka message queue is full
 const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
@@ -61,8 +61,6 @@ pub trait YangConverter<T, E: std::error::Error> {
     /// Returns the YANG schema definition for the telemetry message
     /// with references being (augmented)imports
     fn get_root_schema(&self) -> Result<SuppliedSchema, E>;
-
-    fn get_custom_schemas(&self) -> Result<Vec<(ContentId, SuppliedSchema)>, E>;
 
     // Get ContentId from input message
     fn get_content_id(&self, input: &T) -> Option<ContentId>;
@@ -76,7 +74,10 @@ pub trait YangConverter<T, E: std::error::Error> {
 
 /// Configuration for the Kafka YANG publisher
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct KafkaConfig<C> {
+pub struct KafkaConfig<C>
+where
+    C: Serialize,
+{
     /// Target Kafka topic for publishing messages
     topic: String,
 
@@ -179,6 +180,14 @@ pub enum KafkaYangPublisherActorError<E: std::error::Error> {
     /// Error sending schema request
     #[strum(to_string = "SchemaRequestError: {0}")]
     SchemaRequestError(async_channel::SendError<(String, oneshot::Sender<SuppliedSchema>)>),
+
+    // Error reading from file
+    #[strum(to_string = "Failed to read from file: {0}")]
+    IoError(std::io::Error),
+
+    // Serde JSON Error
+    #[strum(to_string = "JSON Error: {0}")]
+    JsonError(serde_json::Error),
 }
 
 impl<E: std::error::Error> std::error::Error for KafkaYangPublisherActorError<E> {}
@@ -200,6 +209,16 @@ impl<E: std::error::Error> From<async_channel::SendError<(String, oneshot::Sende
         Self::SchemaRequestError(e)
     }
 }
+impl<E: std::error::Error> From<std::io::Error> for KafkaYangPublisherActorError<E> {
+    fn from(e: std::io::Error) -> Self {
+        Self::IoError(e)
+    }
+}
+impl<E: std::error::Error> From<serde_json::Error> for KafkaYangPublisherActorError<E> {
+    fn from(e: serde_json::Error) -> Self {
+        Self::JsonError(e)
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 enum KafkaYangPublisherActorCommand {
@@ -218,7 +237,7 @@ struct KafkaYangPublisherActor<T, E: std::error::Error, C: YangConverter<T, E>>
 where
     T: Send + Sync,
     E: Send + Sync,
-    C: Send + Sync,
+    C: Send + Sync + Serialize,
 {
     cmd_rx: mpsc::Receiver<KafkaYangPublisherActorCommand>,
     config: KafkaConfig<C>,
@@ -236,7 +255,7 @@ impl<T, E, C> KafkaYangPublisherActor<T, E, C>
 where
     T: Send + Sync + 'static,
     E: std::error::Error + Send + Sync + 'static,
-    C: YangConverter<T, E> + Send + Sync,
+    C: YangConverter<T, E> + Send + Sync + Serialize,
 {
     /// Create a Kafka producer based on configuration
     fn get_producer(
@@ -317,10 +336,25 @@ where
         }
     }
 
+    fn parse_custom_schemas(
+        custom_schemas: &HashMap<IpNet, CustomSchema>,
+    ) -> Result<Vec<(ContentId, SuppliedSchema)>, KafkaYangPublisherActorError<E>> {
+        let mut schemas = Vec::new();
+
+        for custom_schema in custom_schemas.values() {
+            let schema_content = fs::read_to_string(&custom_schema.schema)?;
+            let supplied_schema: SuppliedSchema = serde_json::from_str(&schema_content)?;
+            schemas.push((custom_schema.content_id.clone(), supplied_schema));
+        }
+
+        Ok(schemas)
+    }
+
     /// Create a new actor instance from configuration
     async fn from_config(
         cmd_rx: mpsc::Receiver<KafkaYangPublisherActorCommand>,
         config: KafkaConfig<C>,
+        custom_schemas: HashMap<IpNet, CustomSchema>,
         msg_recv: async_channel::Receiver<T>,
         stats: KafkaYangPublisherStats,
         schema_req_tx: async_channel::Sender<(String, oneshot::Sender<SuppliedSchema>)>,
@@ -342,12 +376,9 @@ where
 
         // Load and register provided custom schemas
         let mut schema_id_cache = HashMap::new();
-        let custom_schemas = config
-            .yang_converter
-            .get_custom_schemas()
-            .map_err(|err| KafkaYangPublisherActorError::YangConverterError(err))?;
+        let custom_supplied_schemas = Self::parse_custom_schemas(&custom_schemas)?;
 
-        for (content_id, schema) in custom_schemas {
+        for (content_id, schema) in custom_supplied_schemas {
             // Extend root schema by adding custom schema as reference
             let subject = Self::get_subject_from_schema_name(&schema, None, false)?;
             let mut extended_root_schema = root_schema.clone();
@@ -668,10 +699,11 @@ impl<T, E, C> KafkaYangPublisherActorHandle<T, E, C>
 where
     T: Send + Sync + 'static,
     E: std::error::Error + Send + Sync + 'static,
-    C: YangConverter<T, E> + Send + Sync + 'static,
+    C: YangConverter<T, E> + Send + Sync + Serialize + 'static,
 {
     pub async fn from_config(
         config: KafkaConfig<C>,
+        custom_schemas: HashMap<IpNet, CustomSchema>,
         msg_recv: async_channel::Receiver<T>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaYangPublisherStats>,
         schema_req_tx: async_channel::Sender<(ContentId, oneshot::Sender<SuppliedSchema>)>,
@@ -681,9 +713,15 @@ where
             either::Either::Left(meter) => KafkaYangPublisherStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor =
-            KafkaYangPublisherActor::from_config(cmd_rx, config, msg_recv, stats, schema_req_tx)
-                .await?;
+        let actor = KafkaYangPublisherActor::from_config(
+            cmd_rx,
+            config,
+            custom_schemas,
+            msg_recv,
+            stats,
+            schema_req_tx,
+        )
+        .await?;
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
             cmd_tx,

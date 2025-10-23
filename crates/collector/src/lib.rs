@@ -407,6 +407,10 @@ pub async fn init_udp_notif_collection(
 
                     let (validation_join, validation_handle) = ValidationActorHandle::new(
                         publisher_config.buffer_size,
+                        publisher_config
+                            .custom_yang_schemas
+                            .clone()
+                            .unwrap_or_default(),
                         udp_notif_recv.clone(),
                         schema_handle.validation_req_tx.clone(),
                         schema_handle.validation_resp_rx.clone(),
@@ -452,6 +456,10 @@ pub async fn init_udp_notif_collection(
 
                     let (validation_join, validation_handle) = ValidationActorHandle::new(
                         publisher_config.buffer_size,
+                        publisher_config
+                            .custom_yang_schemas
+                            .clone()
+                            .unwrap_or_default(),
                         udp_notif_recv.clone(),
                         schema_handle.validation_req_tx.clone(),
                         schema_handle.validation_resp_rx.clone(),
@@ -470,6 +478,10 @@ pub async fn init_udp_notif_collection(
 
                     let hdl = KafkaYangPublisherActorHandle::from_config(
                         config.clone(),
+                        publisher_config
+                            .custom_yang_schemas
+                            .clone()
+                            .unwrap_or_default(),
                         enrichment_handle.subscribe(),
                         either::Left(meter.clone()),
                         schema_handle.kafka_yang_req_tx.clone(),

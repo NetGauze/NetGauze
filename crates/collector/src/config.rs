@@ -18,8 +18,10 @@ use crate::{
     publishers::{http::HttpPublisherEndpoint, kafka_avro, kafka_json, kafka_yang},
     telemetry::config::TelemetryYangConverter,
 };
+use ipnet::IpNet;
 use netgauze_flow_service::flow_supervisor;
 use netgauze_udp_notif_service::supervisor as udp_notif_supervisor;
+use netgauze_yang_push::CustomSchema;
 use serde_with::serde_as;
 use std::{collections::HashMap, net::SocketAddr, time::Duration};
 
@@ -203,6 +205,9 @@ pub struct PublisherConfig {
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub sonata_enrichment: Option<KafkaConsumerConfig>,
 
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub custom_yang_schemas: Option<HashMap<IpNet, CustomSchema>>,
+
     pub endpoints: HashMap<String, PublisherEndpoint>,
 }
 
@@ -221,10 +226,12 @@ pub enum PublisherEndpoint {
     /// conversion)
     FlowKafkaAvro(kafka_avro::KafkaConfig<FlowOutputConfig>),
 
-    /// Kafka JSON publisher endpoint (for yang-push telemetry messages)
+    /// Kafka JSON publisher endpoint (for validated yang-push telemetry
+    /// messages)
     TelemetryKafkaJson(kafka_json::KafkaConfig),
 
-    /// Kafka JSON publisher endpoint
-    /// (for validated yang-push telemetry messages)
+    /// Kafka YANG publisher endpoint
+    /// (for validated yang-push telemetry messages and YANG schema
+    /// registration)
     TelemetryKafkaYang(kafka_yang::KafkaConfig<TelemetryYangConverter>),
 }

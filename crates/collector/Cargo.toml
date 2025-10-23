@@ -82,6 +82,7 @@ bytes = { workspace = true }
 shadow-rs = { workspace = true, features = ["default", "metadata", "build"] }
 smallvec = { workspace = true }
 rustc-hash = { workspace = true }
+ipnet = { workspace = true, features = ["serde"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = [

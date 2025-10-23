@@ -20,17 +20,17 @@
 //! `YangConverter` trait to transform telemetry messages into YANG-compliant
 //! JSON format.
 use crate::publishers::kafka_yang::YangConverter;
-use netgauze_yang_push::{model::telemetry::TelemetryMessageWrapper, validation::SubscriptionInfo};
+use netgauze_yang_push::{
+    model::telemetry::TelemetryMessageWrapper, validation::SubscriptionInfo, ContentId,
+};
 use schema_registry_converter::schema_registry_common::SuppliedSchema;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 use tracing::error;
-
-type ContentId = String;
 
 #[derive(Debug, strum_macros::Display)]
 pub enum TelemetryYangConverterError {
-    #[strum(to_string = "Failed to read schema file: {0}")]
+    #[strum(to_string = "Failed to read from file: {0}")]
     IoError(std::io::Error),
 
     #[strum(to_string = "Failed to parse schema JSON: {0}")]
@@ -57,26 +57,11 @@ impl std::error::Error for TelemetryYangConverterError {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelemetryYangConverter {
     pub root_schema: PathBuf,
-
-    #[serde(default)]
-    pub custom_schemas: HashMap<ContentId, PathBuf>,
 }
 
 impl TelemetryYangConverter {
     pub fn new(root_schema: PathBuf) -> Self {
-        Self {
-            root_schema,
-            custom_schemas: HashMap::new(),
-        }
-    }
-
-    pub fn with_custom_schemas(mut self, custom_schemas: HashMap<ContentId, PathBuf>) -> Self {
-        self.custom_schemas = custom_schemas;
-        self
-    }
-
-    pub fn add_custom_schema(&mut self, content_id: ContentId, schema_path: PathBuf) {
-        self.custom_schemas.insert(content_id, schema_path);
+        Self { root_schema }
     }
 
     fn load_schema(schema_path: &PathBuf) -> Result<SuppliedSchema, TelemetryYangConverterError> {
@@ -102,27 +87,6 @@ impl YangConverter<(SubscriptionInfo, TelemetryMessageWrapper), TelemetryYangCon
         };
 
         Ok(schema)
-    }
-
-    fn get_custom_schemas(
-        &self,
-    ) -> Result<Vec<(ContentId, SuppliedSchema)>, TelemetryYangConverterError> {
-        let mut schemas = Vec::new();
-
-        for (content_id, schema_path) in &self.custom_schemas {
-            match Self::load_schema(schema_path) {
-                Ok(schema) => schemas.push((content_id.clone(), schema)),
-                Err(err) => {
-                    error!(
-                        "Failed to load custom schema for content_id '{}' from {:?}: {}",
-                        content_id, schema_path, err
-                    );
-                    return Err(err);
-                }
-            }
-        }
-
-        Ok(schemas)
     }
 
     fn get_content_id(
