@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::ContentId;
 use schema_registry_converter::schema_registry_common::SuppliedSchema;
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::{
@@ -22,7 +23,6 @@ use tokio::{
 use tracing::{debug, error, info, warn};
 
 // Cache for YangPush schemas and metadata
-type ContentId = String;
 type SchemaLookupCache = HashMap<SchemaIdx, ContentId>;
 type SchemaInfoCache = HashMap<ContentId, SchemaInfo>;
 // TODO: move to native schema struct and integrate in single cache
@@ -265,7 +265,6 @@ impl SchemaCacheActor {
                             self.stats.requests.add(1, &[
                                 opentelemetry::KeyValue::new("network.peer.address", format!("{}", schema_request.peer_address.ip())),
                             ]);
-                            // TODO
                             match self.request_schema(schema_request.clone()) {
                                  Ok(Some(schema_info)) => {
                                     // Cache the schema information
@@ -309,7 +308,7 @@ pub enum SchemaCacheActorHandleError {
 
 impl std::error::Error for SchemaCacheActorHandleError {}
 
-// Handle for interacting with the `SchemaCacheActor`
+/// Handle for interacting with the `SchemaCacheActor`
 #[derive(Debug, Clone)]
 pub struct SchemaCacheActorHandle {
     cmd_tx: mpsc::Sender<SchemaCacheActorCommand>,

@@ -15,6 +15,7 @@
 
 use anyhow;
 use async_channel;
+use ipnet::IpNet;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, trace, warn};
@@ -31,10 +32,10 @@ use crate::{
         udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
     },
     schema_cache::{SchemaInfo, SchemaRequest},
+    ContentId, CustomSchema,
 };
 
 // Cache for YangPush subscriptions
-type ContentId = String;
 type PeerCache = HashMap<Peer, ContentId>;
 type SubscriptionCache = HashMap<ContentId, SubscriptionData>;
 
@@ -197,6 +198,8 @@ impl ValidationStats {
 /// Actor responsible for validation of Yang Push messages.
 struct ValidationActor {
     cmd_rx: mpsc::Receiver<ValidationActorCommand>,
+    #[allow(dead_code)] // TODO: use this to pre-populate the subscription cache
+    custom_schemas: HashMap<IpNet, CustomSchema>,
     udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
     validated_tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
     #[allow(dead_code)] // TODO: send schema requests
@@ -210,6 +213,7 @@ struct ValidationActor {
 impl ValidationActor {
     fn new(
         cmd_rx: mpsc::Receiver<ValidationActorCommand>,
+        custom_schemas: HashMap<IpNet, CustomSchema>,
         udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
         validated_tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
         schema_req_tx: async_channel::Sender<SchemaRequest>,
@@ -217,8 +221,10 @@ impl ValidationActor {
         stats: ValidationStats,
     ) -> Self {
         info!("Creating Yang Push validation actor");
+
         Self {
             cmd_rx,
+            custom_schemas,
             udp_notif_rx,
             validated_tx,
             schema_req_tx,
@@ -534,6 +540,7 @@ pub struct ValidationActorHandle {
 impl ValidationActorHandle {
     pub fn new(
         buffer_size: usize,
+        custom_schemas: HashMap<IpNet, CustomSchema>,
         udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
         schema_req_tx: async_channel::Sender<SchemaRequest>,
         schema_resp_rx: async_channel::Receiver<(SchemaRequest, SchemaInfo)>,
@@ -547,6 +554,7 @@ impl ValidationActorHandle {
         };
         let actor = ValidationActor::new(
             cmd_rx,
+            custom_schemas,
             udp_notif_rx,
             validated_tx,
             schema_req_tx,
@@ -584,6 +592,7 @@ mod tests {
     fn create_actor() -> ValidationActor {
         ValidationActor::new(
             mpsc::channel(10).1,
+            HashMap::new(),
             async_channel::bounded(10).1,
             async_channel::bounded(10).0,
             async_channel::bounded(10).0,

@@ -17,3 +17,16 @@ pub mod enrichment;
 pub mod model;
 pub mod schema_cache;
 pub mod validation;
+
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+pub type ContentId = String;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CustomSchema {
+    pub content_id: ContentId,
+    pub search_dir: PathBuf,
+    pub yanglib: PathBuf,
+    pub schema: PathBuf,
+}

@@ -19,6 +19,17 @@ udp_notif:
   publishers:
     group1:
       buffer_size: 1000
+      custom_yang_schemas:
+        192.168.100.0/24:
+          content_id: FANO
+          search_dir: assets/yang/FANO/models
+          yanglib: assets/yang/FANO/yanglib.json
+          schema: assets/yang/FANO/supplied-schema.json
+        10.10.10.1/24:
+          content_id: E96CB84D-F02B-4FBF-BE86-3580300CD964
+          search_dir: assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/models
+          yanglib: assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/yanglib.json
+          schema: assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/supplied-schema.json
       endpoints:
         json-endpoint: !TelemetryKafkaJson
           topic: telemetry-message-json
@@ -27,7 +38,6 @@ udp_notif:
             message.timeout.ms: "60000"
             queue.buffering.max.messages: "1000"
           writer_id: test-udpnotif-telemetry # TODO: not considered yet, discuss...
-
         yang-endpoint: !TelemetryKafkaYang
           topic: telemetry-message-yang
           schema_registry_url: http://localhost:48081
@@ -38,5 +48,3 @@ udp_notif:
           writer_id: test-udpnotif-telemetry # TODO: not considered yet, discuss...
           yang_converter:
             root_schema: "assets/yang/telemetry-message/yang-push-telemetry-supplied-schema.json"
-            custom_schemas:
-              E96CB84D-F02B-4FBF-BE86-3580300CD964: "assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/supplied-schema.json"
