@@ -12,8 +12,25 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 mod actor;
 mod normalize;
 
 pub use actor::FlowOptionsActorHandle;
+
+use serde::{Deserialize, Serialize};
+
+pub(crate) const fn default_weight() -> u8 {
+    16
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowOptionsConfig {
+    #[serde(default = "default_weight")]
+    pub weight: u8,
+}
+
+impl FlowOptionsConfig {
+    pub fn weight(&self) -> u8 {
+        self.weight
+    }
+}

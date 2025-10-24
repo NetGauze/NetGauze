@@ -12,22 +12,12 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-use crate::flow::enrichment::inputs::{files::FilesConfig, flow_options::FlowOptionsConfig};
+use crate::flow::enrichment::inputs::InputsConfig;
 
 use serde::{Deserialize, Serialize};
 
-mod files;
-mod flow_options;
-
-pub use files::FilesActorHandle;
-pub use flow_options::FlowOptionsActorHandle;
-
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct InputsConfig {
+pub struct EnrichmentConfig {
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
-    pub files: Option<FilesConfig>,
-
-    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
-    pub flow_options: Option<FlowOptionsConfig>,
+    pub inputs: Option<InputsConfig>,
 }

@@ -527,15 +527,15 @@ fn test_into_enrichment_operations_sampling() {
     let obs_id = 100;
 
     let ops = options_record
-        .into_enrichment_operations(peer_ip, obs_id)
+        .into_enrichment_operations(16, peer_ip, obs_id)
         .unwrap();
 
-    let expected_ops = vec![EnrichmentOperation::Upsert {
+    let expected_ops = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
         ip: peer_ip,
         scope: Scope::new(obs_id, Some(scope_fields)),
         weight: 16,
-        fields,
-    }];
+        fields: Some(fields),
+    })];
 
     assert_eq!(ops, expected_ops);
 }
@@ -552,26 +552,26 @@ fn test_into_enrichment_operations_interface_matching_ids() {
     let obs_id = 200;
 
     let ops = options_record
-        .into_enrichment_operations(peer_ip, obs_id)
+        .into_enrichment_operations(16, peer_ip, obs_id)
         .unwrap();
 
     let expected_ops = vec![
-        EnrichmentOperation::Upsert {
+        EnrichmentOperation::Upsert(EnrichmentPayload {
             ip: peer_ip,
             scope: Scope::new(obs_id, Some(vec![Field::ingressInterface(1)])),
             weight: 16,
-            fields: vec![Field::NetGauze(netgauze::Field::ingressInterfaceName(
-                "eth0".to_string().into(),
-            ))],
-        },
-        EnrichmentOperation::Upsert {
+            fields: Some(vec![Field::NetGauze(
+                netgauze::Field::ingressInterfaceName("eth0".to_string().into()),
+            )]),
+        }),
+        EnrichmentOperation::Upsert(EnrichmentPayload {
             ip: peer_ip,
             scope: Scope::new(obs_id, Some(vec![Field::egressInterface(1)])),
             weight: 16,
-            fields: vec![Field::NetGauze(netgauze::Field::egressInterfaceName(
+            fields: Some(vec![Field::NetGauze(netgauze::Field::egressInterfaceName(
                 "eth0".to_string().into(),
-            ))],
-        },
+            ))]),
+        }),
     ];
 
     assert_eq!(ops, expected_ops);
@@ -589,15 +589,15 @@ fn test_into_enrichment_operations_unclassified() {
     let obs_id = 300;
 
     let ops = options_record
-        .into_enrichment_operations(peer_ip, obs_id)
+        .into_enrichment_operations(10, peer_ip, obs_id)
         .unwrap();
 
-    let expected_ops = vec![EnrichmentOperation::Upsert {
+    let expected_ops = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
         ip: peer_ip,
         scope: Scope::new(obs_id, Some(scope_fields)),
         weight: 10,
-        fields,
-    }];
+        fields: Some(fields),
+    })];
 
     assert_eq!(ops, expected_ops);
 }
