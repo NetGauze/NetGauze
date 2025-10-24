@@ -23,7 +23,7 @@ use netgauze_flow_pkt::ie::IE;
 use serde::{Deserialize, Serialize};
 
 fn default_weight() -> u8 {
-    32
+    128
 }
 
 fn default_poll_interval() -> u64 {
@@ -127,7 +127,7 @@ paths:
 - path: /tmp/file3.map
   format: !PmacctMaps
     id: samplerRandomInterval
-    weight: 32
+    weight: 128
 - path: /tmp/file4.jsonl
   format: JSONUpserts
 "#;
@@ -161,7 +161,7 @@ paths:
                     path: "/tmp/file1.map".to_string(),
                     format: InputFileFormat::PmacctMaps {
                         id: IE::mplsVpnRouteDistinguisher,
-                        weight: 32,
+                        weight: 128,
                     },
                 },
                 InputFile {

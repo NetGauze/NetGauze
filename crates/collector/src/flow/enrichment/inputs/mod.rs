@@ -13,15 +13,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::flow::enrichment::inputs::{files::FilesConfig, flow_options::FlowOptionsConfig};
+use crate::flow::enrichment::inputs::{
+    files::FilesConfig, flow_options::FlowOptionsConfig, kafka::KafkaConfig,
+};
 
 use serde::{Deserialize, Serialize};
 
 mod files;
 mod flow_options;
+mod kafka;
 
 pub use files::FilesActorHandle;
 pub use flow_options::FlowOptionsActorHandle;
+pub use kafka::KafkaConsumerActorHandle;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct InputsConfig {
@@ -30,4 +34,7 @@ pub struct InputsConfig {
 
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub flow_options: Option<FlowOptionsConfig>,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub kafka: Option<KafkaConfig>,
 }

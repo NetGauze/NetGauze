@@ -36,7 +36,7 @@ mod inputs;
 
 pub use actor::EnrichmentActorHandle;
 pub use config::EnrichmentConfig;
-pub use inputs::{FilesActorHandle, FlowOptionsActorHandle};
+pub use inputs::{FilesActorHandle, FlowOptionsActorHandle, KafkaConsumerActorHandle};
 
 use netgauze_flow_pkt::ie::Field;
 use serde::{Deserialize, Serialize};
