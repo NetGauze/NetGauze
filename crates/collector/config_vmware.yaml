@@ -24,7 +24,6 @@ flow:
       # Optionally, number of I/O tasks per address/interface, default is 1
       workers: 2
 
-
   # Multiple publishers can be defined.
   # A packet is copied for each publisher group, and load-balancing is defined between endpoints in the same group.
   publishers:
@@ -47,6 +46,23 @@ flow:
                   weight: 200
               - path: cache-dump.json
                 format: !JSONUpserts
+          kafka:
+            consumers:
+              - topic: sonata
+                message_format: !Sonata
+                  weight: 64 # optional, default=64
+                consumer_config:
+                  bootstrap.servers: localhost:49092
+                  group.id: group1
+                  enable.auto.commit: "false"
+                  auto.offset.reset: earliest
+              - topic: json-ops
+                message_format: !JsonOps
+                consumer_config:
+                  bootstrap.servers: localhost:49092
+                  group.id: group1
+                  enable.auto.commit: "false"
+                  auto.offset.reset: earliest
       aggregation:
         window_duration:
           secs: 60
@@ -93,13 +109,6 @@ flow:
           tcpControlBits: BoolMapOr
           minimumTTL: Min
           maximumTTL: Max
-      sonata_enrichment:
-        topic: sonata
-        consumer_config:
-          bootstrap.servers: localhost:49092
-          group.id: test
-          enable.auto.commit: "false"
-          auto.offset.reset: earliest
       endpoints:
         full: !FlowKafkaAvro
           topic: flow-avro-raw
