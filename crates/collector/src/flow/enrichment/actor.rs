@@ -50,7 +50,10 @@
 //! - **NetFlowV9** - Not yet supported
 
 use crate::flow::enrichment::{cache::EnrichmentCache, EnrichmentOperation};
-use netgauze_flow_pkt::{ipfix, FlowInfo};
+use netgauze_flow_pkt::{
+    ie::{netgauze, Field},
+    ipfix, FlowInfo,
+};
 use netgauze_flow_service::FlowRequest;
 use std::{
     net::{IpAddr, SocketAddr},
@@ -74,6 +77,7 @@ struct EnrichmentActor {
     enriched_tx: async_channel::Sender<(SocketAddr, FlowInfo)>,
     stats: EnrichmentStats,
     shard_id: usize,
+    writer_id: Field,
 }
 
 impl EnrichmentActor {
@@ -84,7 +88,13 @@ impl EnrichmentActor {
         enriched_tx: async_channel::Sender<(SocketAddr, FlowInfo)>,
         stats: EnrichmentStats,
         shard_id: usize,
+        writer_id: String,
     ) -> Self {
+        // Pre-create dataCollectionManifestName Field once
+        let writer_id = Field::NetGauze(netgauze::Field::dataCollectionManifestName(
+            writer_id.as_str().into(),
+        ));
+
         Self {
             enrichment_cache: EnrichmentCache::new(),
             cmd_rx,
@@ -93,6 +103,7 @@ impl EnrichmentActor {
             enriched_tx,
             stats,
             shard_id,
+            writer_id,
         }
     }
 
@@ -132,7 +143,8 @@ impl EnrichmentActor {
     /// Enriches an IPFIX packet with cached metadata for the specified peer IP.
     ///
     /// Processes each data record in the packet, applying enrichment fields
-    /// that match the observation domain and record contents. Template sets
+    /// that match the observation domain and record contents, and finally the
+    /// dataCollectionManifestName field (writer_id from config). Template sets
     /// are as well as options data records filtered out and not processed
     /// further.
     fn enrich_ipfix_packet(
@@ -155,14 +167,14 @@ impl EnrichmentActor {
                         .into_iter()
                         .filter(|record| record.scope_fields().is_empty())
                         .map(|record| {
-                            if let Some(enrichment_fields) = self
+                            let mut enrichment_fields = self
                                 .enrichment_cache
                                 .get_enrichment_fields(&peer_ip, obs_id, record.fields())
-                            {
-                                record.with_fields_added(&enrichment_fields)
-                            } else {
-                                record
-                            }
+                                .unwrap_or_else(|| Vec::with_capacity(1));
+
+                            enrichment_fields.push(self.writer_id.clone());
+
+                            record.with_fields_added(&enrichment_fields)
                         })
                         .collect::<Box<[_]>>();
 
@@ -371,6 +383,7 @@ impl EnrichmentActorHandle {
         flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
         stats: either::Either<opentelemetry::metrics::Meter, EnrichmentStats>,
         shard_id: usize,
+        writer_id: String,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
         let (enrichment_tx, enrichment_rx) = async_channel::bounded(buffer_size);
@@ -386,6 +399,7 @@ impl EnrichmentActorHandle {
             enriched_tx,
             stats,
             shard_id,
+            writer_id,
         );
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
@@ -428,3 +442,6 @@ impl EnrichmentActorHandle {
         self.enriched_rx.clone()
     }
 }
+
+#[cfg(test)]
+mod tests;

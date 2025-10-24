@@ -16,7 +16,6 @@
 use crate::{
     flow::{
         aggregation::AggregationConfig, config::FlowOutputConfig, enrichment::EnrichmentConfig,
-        sonata::KafkaConsumerConfig,
     },
     publishers::{http::HttpPublisherEndpoint, kafka_avro, kafka_json, kafka_yang},
     telemetry::config::TelemetryYangConverter,
@@ -214,9 +213,6 @@ pub struct PublisherConfig {
 
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub aggregation: Option<AggregationConfig>,
-
-    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
-    pub sonata_enrichment: Option<KafkaConsumerConfig>,
 
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub custom_yang_schemas: Option<HashMap<IpNet, CustomSchema>>,
