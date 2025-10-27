@@ -16,8 +16,6 @@
 pub mod aggregation;
 pub mod config;
 pub mod enrichment;
-pub mod sonata;
-pub mod sonata_enrichment;
 pub mod types;
 
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
