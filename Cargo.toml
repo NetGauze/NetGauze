@@ -107,7 +107,7 @@ tempfile = { version = "3.20.0" }
 quick-xml = { version = "0.38.3" }
 russh = { version = "0.54" }
 secrecy = { version = "0.10" }
-
+notify = { version = "8.2" }
 
 [profile.release]
 codegen-units = 1

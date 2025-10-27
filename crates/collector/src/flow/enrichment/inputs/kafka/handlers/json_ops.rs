@@ -12,25 +12,27 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-mod actor;
-mod normalize;
+use crate::flow::enrichment::{inputs::kafka::MessageHandler, EnrichmentOperation};
 
-pub use actor::FlowOptionsActorHandle;
+#[derive(Debug, Clone)]
+pub struct JsonOpsHandler;
 
-use serde::{Deserialize, Serialize};
-
-pub(crate) const fn default_weight() -> u8 {
-    16
+impl JsonOpsHandler {
+    pub fn new() -> Self {
+        Self
+    }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FlowOptionsConfig {
-    #[serde(default = "default_weight")]
-    pub weight: u8,
-}
+impl MessageHandler for JsonOpsHandler {
+    type Error = serde_json::Error;
 
-impl FlowOptionsConfig {
-    pub fn weight(&self) -> u8 {
-        self.weight
+    fn handle_message(
+        &mut self,
+        payload: &[u8],
+        _partition: i32,
+        _offset: i64,
+    ) -> Result<Vec<EnrichmentOperation>, Self::Error> {
+        let operation: EnrichmentOperation = serde_json::from_slice(payload)?;
+        Ok(vec![operation])
     }
 }

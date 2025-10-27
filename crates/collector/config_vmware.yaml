@@ -24,14 +24,46 @@ flow:
       # Optionally, number of I/O tasks per address/interface, default is 1
       workers: 2
 
-
   # Multiple publishers can be defined.
   # A packet is copied for each publisher group, and load-balancing is defined between endpoints in the same group.
   publishers:
     group1:
       buffer_size: 100000
+      shards: 4
+      enrichment:
+        inputs:
+          flow_options:
+            weight: 16
+          files:
+            poll_interval_seconds: 30
+            paths:
+              - path: flow2rd.map
+                format: !PmacctMaps
+                  id: mplsVpnRouteDistinguisher
+              - path: sampling.map
+                format: !PmacctMaps
+                  id: samplerRandomInterval
+                  weight: 200
+              - path: cache-dump.json
+                format: !JSONUpserts
+          kafka:
+            consumers:
+              - topic: sonata
+                message_format: !Sonata
+                  weight: 64 # optional, default=64
+                consumer_config:
+                  bootstrap.servers: localhost:49092
+                  group.id: group1
+                  enable.auto.commit: "false"
+                  auto.offset.reset: earliest
+              - topic: json-ops
+                message_format: !JsonOps
+                consumer_config:
+                  bootstrap.servers: localhost:49092
+                  group.id: group1
+                  enable.auto.commit: "false"
+                  auto.offset.reset: earliest
       aggregation:
-        workers: 4
         window_duration:
           secs: 60
           nanos: 0

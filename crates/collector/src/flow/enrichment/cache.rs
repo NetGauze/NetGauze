@@ -43,10 +43,10 @@
 //! - Equal weights prefer more specific (later processed) scopes
 
 use crate::flow::{
-    enrichment::{EnrichmentOperation, Scope, Weight},
+    enrichment::{DeletePayload, EnrichmentOperation, Scope, UpsertPayload, Weight},
     types::FieldRef,
 };
-use netgauze_flow_pkt::ie::Field;
+use netgauze_flow_pkt::ie::{Field, IE};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -95,16 +95,21 @@ impl EnrichmentCache {
         debug!("Apply enrichment operation: {op}");
 
         match op {
-            EnrichmentOperation::Upsert {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip,
                 scope,
                 weight,
                 fields,
-            } => {
+            }) => {
                 self.upsert(ip, scope, weight, fields);
             }
-            EnrichmentOperation::Delete { ip, scope, weight } => {
-                self.delete(ip, scope, weight);
+            EnrichmentOperation::Delete(DeletePayload {
+                ip,
+                scope,
+                weight,
+                ies,
+            }) => {
+                self.delete(ip, scope, weight, ies);
             }
         }
     }
@@ -115,7 +120,26 @@ impl EnrichmentCache {
     /// For existing entries, fields are compared by weight - higher weight
     /// fields replace lower weight ones. Equal weights favor the incoming
     /// field.
-    fn upsert(&mut self, ip: IpAddr, scope: Scope, weight: Weight, incoming_fields: Vec<Field>) {
+    fn upsert(
+        &mut self,
+        ip: IpAddr,
+        scope: Scope,
+        weight: Weight,
+        incoming_fields: Option<Vec<Field>>,
+    ) {
+        // Early returns if no fields are provided
+        let incoming_fields = match incoming_fields {
+            None => {
+                debug!("No fields provided for upsert operation for ip={}, scope={} - cache not modified", ip, scope);
+                return;
+            }
+            Some(fields) if fields.is_empty() => {
+                debug!("Empty fields vector provided for upsert operation for ip={}, scope={} - cache not modified", ip, scope);
+                return;
+            }
+            Some(fields) => fields,
+        };
+
         // Index incoming fields with FieldRef and store as WeightedField entries
         let indexed_incoming: FxHashMap<FieldRef, WeightedField> =
             FieldRef::map_fields(&incoming_fields, |field_ref, field| {
@@ -189,16 +213,29 @@ impl EnrichmentCache {
     /// Removes all fields with weight less than the specified weight within
     /// the matching scope. Cleans up empty scopes and peer entries
     /// automatically.
-    fn delete(&mut self, ip: IpAddr, scope: Scope, weight: Weight) {
+    fn delete(&mut self, ip: IpAddr, scope: Scope, weight: Weight, ies: Option<Vec<IE>>) {
+        // Early returns if empty vec is provided, and handle Null fields case
+        // as delete all for scope (given weight precedence)
+        let (scope_delete_all, ies) = match ies {
+            Some(ies) if ies.is_empty() => {
+                debug!("Empty IEs vector provided for delete operation for ip={}, scope={} - cache not modified", ip, scope);
+                return;
+            }
+            Some(ies) => (false, ies),
+            None => (true, vec![]),
+        };
+
         if let Some(peer_metadata) = self.get_mut(&ip) {
             match peer_metadata.0.entry(scope.clone().into()) {
                 btree_map::Entry::Occupied(mut occupied) => {
                     let current_fields = occupied.get_mut();
 
-                    current_fields.retain(|_ie, m_fld| {
-                        if m_fld.weight < weight {
+                    current_fields.retain(|field_ref, m_fld| {
+                        if m_fld.weight <= weight
+                            && (scope_delete_all || ies.contains(&field_ref.ie()))
+                        {
                             debug!(
-                                "Removing field [{:?}] for ip={}, scope={}, weight: {}>{}",
+                                "Removing field [{:?}] for ip={}, scope={}, weight: {}>={}",
                                 m_fld.field, ip, scope, weight, m_fld.weight
                             );
                             false
@@ -210,7 +247,7 @@ impl EnrichmentCache {
                     if current_fields.is_empty() {
                         occupied.remove();
                         debug!(
-                            "Scope {:?} now empty for ip={}, removing scope entry...",
+                            "Scope {} now empty for ip={}, removing scope entry...",
                             scope, ip
                         );
 
@@ -220,6 +257,8 @@ impl EnrichmentCache {
                         } else {
                             debug!("Updated cache for {ip}: \n{}", peer_metadata)
                         }
+                    } else {
+                        debug!("Updated cache for {ip}: \n{}", peer_metadata)
                     }
                 }
                 btree_map::Entry::Vacant(_) => {
@@ -466,7 +505,6 @@ impl std::fmt::Display for PeerMetadata {
         let max_scope_width = self
             .as_ref()
             .keys()
-            .take(10)
             .map(|scope| Into::<Scope>::into(scope).to_string().len())
             .max()
             .unwrap_or(40)
@@ -474,7 +512,6 @@ impl std::fmt::Display for PeerMetadata {
         let max_field_width = self
             .as_ref()
             .values()
-            .take(10)
             .flat_map(|field_map| {
                 field_map.values().map(|w_fld| {
                     let field_display = format!("{:?}", w_fld.field());

@@ -19,12 +19,12 @@ flow:
     # NetGauze can listen to multiple addresses/interfaces at the same time
     - address: 0.0.0.0:9991
       # Optionally Bind to an interface/VRF
-#     interface: eth0
+      #     interface: eth0
       # Optionally, number of I/O tasks per address/interface, default is 1
       workers: 2
     # more interfaces/ip ares possible
-#    - address: '[::1]:2713'
-#      workers: 2
+  #    - address: '[::1]:2713'
+  #      workers: 2
 
   # Multiple publishers can be defined.
   # A packet is copied for each publisher group, and load-balancing is defined between endpoints in the same group.
@@ -41,13 +41,19 @@ flow:
           #writer_id: writer2
     group2:
       buffer_size: 1000
-      sonata_enrichment:
-        topic: sonata
-        consumer_config:
-          bootstrap.servers: localhost:29092
-          group.id: test
-          enable.auto.commit: "false"
-          auto.offset.reset: earliest
+      enrichment:
+        inputs:
+          flow_options:
+            weight: 16
+          kafka:
+            consumers:
+              - topic: sonata
+                message_format: !Sonata
+                consumer_config:
+                  bootstrap.servers: localhost:29092
+                  group.id: test
+                  enable.auto.commit: "false"
+                  auto.offset.reset: earliest
       endpoints:
         full: !FlowKafkaAvro
           topic: flow
@@ -70,7 +76,7 @@ flow:
                       index: 1
                     - ie: packetDeltaCount
                       index: 0
-                default: !String '1000'
+                default: !String "1000"
                 transform: String
               custom_primitives.flow_direction:
                 select: !Single
@@ -86,12 +92,12 @@ udp_notif:
     # NetGauze can listen to multiple addresses/interfaces at the same time
     - address: 0.0.0.0:10000
       # Optionally Bind to an interface/VRF
-#     interface: eth0
+      #     interface: eth0
       # Optionally, number of I/O tasks per address/interface, default is 1
       workers: 2
     # more interfaces/ip ares possible
-#    - address: '[::1]:2713'
-#      workers: 2
+  #    - address: '[::1]:2713'
+  #      workers: 2
 
   # Multiple publishers can be defined.
   # A packet is copied for each publisher group, and load-balancing is defined between endpoints in the same group.
