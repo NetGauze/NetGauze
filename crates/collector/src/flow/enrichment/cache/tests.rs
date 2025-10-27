@@ -283,7 +283,7 @@ fn test_enrichment_cache_apply_enrichment_operations() {
 
     // Apply upsert operation
     let fields = vec![Field::samplerName("test_sampler".to_string().into())];
-    let upsert_op = EnrichmentOperation::Upsert(EnrichmentPayload {
+    let upsert_op = EnrichmentOperation::Upsert(UpsertPayload {
         ip,
         scope: scope.clone(),
         weight,
@@ -309,11 +309,11 @@ fn test_enrichment_cache_apply_enrichment_operations() {
     assert_eq!(cache, expected_cache);
 
     // Apply delete operation
-    let delete_op = EnrichmentOperation::Delete(EnrichmentPayload {
+    let delete_op = EnrichmentOperation::Delete(DeletePayload {
         ip,
         scope,
         weight: 200,
-        fields: None,
+        ies: None,
     });
     cache.apply_enrichment(delete_op);
 
@@ -910,11 +910,8 @@ fn test_enrichment_cache_delete_specific_fields_weight_check() {
         Some(vec![Field::meteringProcessId(50)]),
     );
 
-    // Try to delete specific fields (some wwith insufficient weight 150 < 200)
-    let fields_to_delete = vec![
-        Field::samplerName("high_priority".to_string().into()),
-        Field::meteringProcessId(50),
-    ];
+    // Try to delete specific fields (some with insufficient weight 150 < 200)
+    let fields_to_delete = vec![IE::samplerName, IE::meteringProcessId];
     cache.delete(ip, scope.clone(), 150, Some(fields_to_delete));
 
     // Create expected cache after delete (only low-weight field removed)
