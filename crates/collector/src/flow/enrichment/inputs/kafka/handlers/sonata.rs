@@ -14,9 +14,9 @@
 // limitations under the License.
 use crate::flow::enrichment::{
     inputs::kafka::{MessageHandler, SonataConfig},
-    EnrichmentOperation, EnrichmentPayload, Scope,
+    DeletePayload, EnrichmentOperation, Scope, UpsertPayload,
 };
-use netgauze_flow_pkt::ie::Field;
+use netgauze_flow_pkt::ie::{Field, IE};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::IpAddr};
 
@@ -115,22 +115,16 @@ impl MessageHandler for SonataHandler {
                     // Check if we have a cached entry for this node_id
                     if let Some(&old_loopback) = self.id_cache.get(&sonata_id_node) {
                         if loopback != old_loopback {
-                            operations.push(EnrichmentOperation::Delete(EnrichmentPayload {
+                            operations.push(EnrichmentOperation::Delete(DeletePayload {
                                 ip: old_loopback,
                                 scope: Scope {
                                     obs_domain_id: 0,
                                     scope_fields: None,
                                 },
                                 weight: self.config.weight,
-                                fields: Some(vec![
-                                    Field::NetGauze(
-                                        netgauze_flow_pkt::ie::netgauze::Field::nodeId("".into()),
-                                    ),
-                                    Field::NetGauze(
-                                        netgauze_flow_pkt::ie::netgauze::Field::platformId(
-                                            "".into(),
-                                        ),
-                                    ),
+                                ies: Some(vec![
+                                    IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
+                                    IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
                                 ]),
                             }));
                         }
@@ -148,7 +142,7 @@ impl MessageHandler for SonataHandler {
                             node.platform.name.into(),
                         ));
 
-                    operations.push(EnrichmentOperation::Upsert(EnrichmentPayload {
+                    operations.push(EnrichmentOperation::Upsert(UpsertPayload {
                         ip: node.loopback_address,
                         scope: Scope::new(0, None),
                         weight: self.config.weight,
@@ -163,20 +157,16 @@ impl MessageHandler for SonataHandler {
             }
             SonataOperation::Delete => {
                 if let Some(cached_loopback) = self.id_cache.remove(&sonata_data.id_node) {
-                    operations.push(EnrichmentOperation::Delete(EnrichmentPayload {
+                    operations.push(EnrichmentOperation::Delete(DeletePayload {
                         ip: cached_loopback,
                         scope: Scope {
                             obs_domain_id: 0,
                             scope_fields: None,
                         },
                         weight: self.config.weight,
-                        fields: Some(vec![
-                            Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::nodeId(
-                                "".into(),
-                            )),
-                            Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::platformId(
-                                "".into(),
-                            )),
+                        ies: Some(vec![
+                            IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
+                            IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
                         ]),
                     }));
                 }
@@ -246,7 +236,7 @@ mod tests {
             .handle_message(insert_json.as_bytes(), 0, 0)
             .unwrap();
 
-        let expected_operations = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
+        let expected_operations = vec![EnrichmentOperation::Upsert(UpsertPayload {
             ip: "10.0.0.1".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 10,
@@ -282,19 +272,17 @@ mod tests {
 
         let expected_operations = vec![
             // Delete old entry
-            EnrichmentOperation::Delete(EnrichmentPayload {
+            EnrichmentOperation::Delete(DeletePayload {
                 ip: "10.0.0.1".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 10,
-                fields: Some(vec![
-                    Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::nodeId("".into())),
-                    Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::platformId(
-                        "".into(),
-                    )),
+                ies: Some(vec![
+                    IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
+                    IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
                 ]),
             }),
             // Insert new entry
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "10.0.0.2".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 10,
@@ -331,7 +319,7 @@ mod tests {
 
         let expected_operations = vec![
             // Only upsert, no delete since IP is the same
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "10.0.0.1".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 10,
@@ -366,15 +354,13 @@ mod tests {
             .handle_message(delete_json.as_bytes(), 0, 0)
             .unwrap();
 
-        let expected_operations = vec![EnrichmentOperation::Delete(EnrichmentPayload {
+        let expected_operations = vec![EnrichmentOperation::Delete(DeletePayload {
             ip: "10.0.0.1".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 10,
-            fields: Some(vec![
-                Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::nodeId("".into())),
-                Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::platformId(
-                    "".into(),
-                )),
+            ies: Some(vec![
+                IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
+                IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
             ]),
         })];
 

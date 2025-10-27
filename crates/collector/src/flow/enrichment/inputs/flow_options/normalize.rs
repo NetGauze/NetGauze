@@ -20,7 +20,7 @@
 //! - Converting records to enrichment operations
 
 use crate::flow::{
-    enrichment::{EnrichmentOperation, EnrichmentPayload, Scope},
+    enrichment::{EnrichmentOperation, Scope, UpsertPayload},
     types::{FieldRefLookup, IndexedDataRecord},
 };
 use netgauze_flow_pkt::{
@@ -415,7 +415,7 @@ impl OptionsDataRecord {
         weight: u8,
         record: &IndexedDataRecord,
     ) -> EnrichmentOperation {
-        EnrichmentOperation::Upsert(EnrichmentPayload {
+        EnrichmentOperation::Upsert(UpsertPayload {
             ip: peer_ip,
             scope: Scope::new(
                 obs_id,

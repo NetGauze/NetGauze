@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::flow::enrichment::{actor::*, EnrichmentOperation, EnrichmentPayload, Scope};
+use crate::flow::enrichment::{actor::*, EnrichmentOperation, Scope, UpsertPayload};
 use chrono::{TimeZone, Utc};
 use netgauze_flow_pkt::{
     ie::{netgauze, Field},
@@ -43,7 +43,7 @@ fn test_enrich_ipfix_with_cached_metadata() {
     );
 
     // Add enrichment data to cache
-    let enrichment_op = EnrichmentOperation::Upsert(EnrichmentPayload {
+    let enrichment_op = EnrichmentOperation::Upsert(UpsertPayload {
         ip: peer_addr.ip(),
         scope: Scope::new(0, None), // Global scope
         weight: 100,
@@ -189,7 +189,7 @@ fn test_enrich_multiple_records() {
     );
 
     // Add enrichment data to cache
-    let enrichment_op = EnrichmentOperation::Upsert(EnrichmentPayload {
+    let enrichment_op = EnrichmentOperation::Upsert(UpsertPayload {
         ip: peer_addr.ip(),
         scope: Scope::new(0, None),
         weight: 100,

@@ -38,9 +38,15 @@ pub use actor::EnrichmentActorHandle;
 pub use config::EnrichmentConfig;
 pub use inputs::{FilesActorHandle, FlowOptionsActorHandle, KafkaConsumerActorHandle};
 
-use netgauze_flow_pkt::ie::Field;
+use netgauze_flow_pkt::ie::{Field, HasIE, IE};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::Display)]
+pub enum EnrichmentOperationType {
+    Upsert,
+    Delete,
+}
 
 /// Operations to update or delete enrichment data.
 ///
@@ -50,11 +56,10 @@ use std::net::IpAddr;
 ///   specified fields
 ///
 /// ## Delete Behavior:
-/// - If `fields` is `None`: Removes ALL enrichment data matching the IP and
-///   scope
-/// - If `fields` is `Some(vec![])`: No operation is performed (safeguard)
-/// - If `fields` is `Some(vec![field1, field2, ...])`: Removes only the
-///   specified fields
+/// - If `ies` is `None`: Removes ALL enrichment data matching the IP and scope
+/// - If `ies` is `Some(vec![])`: No operation is performed (safeguard)
+/// - If `ies` is `Some(vec![IE1, IE2, ...])`: Removes all the fields matching
+///   the specified IEs
 ///
 /// The empty vector safeguard prevents accidental bulk operations when
 /// malformed data is provided.
@@ -63,41 +68,36 @@ use std::net::IpAddr;
 )]
 pub enum EnrichmentOperation {
     #[strum(to_string = "Upsert({0})")]
-    Upsert(EnrichmentPayload),
+    Upsert(UpsertPayload),
 
     #[strum(to_string = "Delete({0})")]
-    Delete(EnrichmentPayload),
+    Delete(DeletePayload),
 }
 
 impl EnrichmentOperation {
-    /// Get a reference to the payload regardless of operation type
-    pub fn payload(&self) -> &EnrichmentPayload {
+    pub fn ip(&self) -> IpAddr {
         match self {
-            EnrichmentOperation::Upsert(payload) => payload,
-            EnrichmentOperation::Delete(payload) => payload,
+            EnrichmentOperation::Upsert(payload) => payload.ip,
+            EnrichmentOperation::Delete(payload) => payload.ip,
+        }
+    }
+
+    pub fn scope(&self) -> &Scope {
+        match self {
+            EnrichmentOperation::Upsert(payload) => &payload.scope,
+            EnrichmentOperation::Delete(payload) => &payload.scope,
+        }
+    }
+
+    pub fn weight(&self) -> Weight {
+        match self {
+            EnrichmentOperation::Upsert(payload) => payload.weight,
+            EnrichmentOperation::Delete(payload) => payload.weight,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::Display)]
-pub enum EnrichmentOperationType {
-    Upsert,
-    Delete,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct EnrichmentPayload {
-    pub ip: IpAddr,
-
-    pub scope: Scope,
-
-    pub weight: Weight,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fields: Option<Vec<Field>>,
-}
-
-impl std::fmt::Display for EnrichmentPayload {
+impl std::fmt::Display for UpsertPayload {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -107,11 +107,48 @@ impl std::fmt::Display for EnrichmentPayload {
     }
 }
 
-impl From<(EnrichmentPayload, EnrichmentOperationType)> for EnrichmentOperation {
-    fn from((payload, op_type): (EnrichmentPayload, EnrichmentOperationType)) -> Self {
-        match op_type {
-            EnrichmentOperationType::Upsert => EnrichmentOperation::Upsert(payload),
-            EnrichmentOperationType::Delete => EnrichmentOperation::Delete(payload),
+impl std::fmt::Display for DeletePayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ip={}, scope={}, weight={}, ies={:?}",
+            self.ip, self.scope, self.weight, self.ies
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct UpsertPayload {
+    pub ip: IpAddr,
+    pub scope: Scope,
+    pub weight: Weight,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<Field>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct DeletePayload {
+    pub ip: IpAddr,
+    pub scope: Scope,
+    pub weight: Weight,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ies: Option<Vec<IE>>,
+}
+
+/// Convert (lossy) UpsertPayload to DeletePayload
+///
+/// When `fields`=`None` we map to `ies`=`Some(vec![])` to avoid converting
+/// an upsert-nothing to a delete-all operation (safeguard)
+impl From<UpsertPayload> for DeletePayload {
+    fn from(upsert: UpsertPayload) -> Self {
+        Self {
+            ip: upsert.ip,
+            scope: upsert.scope,
+            weight: upsert.weight,
+            ies: match upsert.fields {
+                Some(fields) => Some(fields.into_iter().map(|field| field.ie()).collect()),
+                None => Some(vec![]),
+            },
         }
     }
 }
@@ -166,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_enrichment_operation_serde_upsert() {
-        let op = EnrichmentOperation::Upsert(EnrichmentPayload {
+        let op = EnrichmentOperation::Upsert(UpsertPayload {
             ip: "192.0.2.1".parse().unwrap(),
             scope: Scope::new(42, Some(vec![Field::selectorId(100)])),
             weight: 5,
@@ -190,11 +227,11 @@ mod tests {
 
     #[test]
     fn test_enrichment_operation_serde_delete() {
-        let op = EnrichmentOperation::Delete(EnrichmentPayload {
+        let op = EnrichmentOperation::Delete(DeletePayload {
             ip: "203.0.113.5".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 1,
-            fields: None,
+            ies: None,
         });
 
         let json = serde_json::to_string(&op).unwrap();
@@ -206,7 +243,7 @@ mod tests {
 
         // Test deserialization of same op with null fields specific that should also
         // result in same op
-        let del1 = r#"{"Delete":{"ip":"203.0.113.5","scope":{"obs_domain_id":0,"scope_fields":null},"weight":1, "fields":null}}"#;
+        let del1 = r#"{"Delete":{"ip":"203.0.113.5","scope":{"obs_domain_id":0,"scope_fields":null},"weight":1,"ies":null}}"#;
         let del2 = r#"{"Delete":{"ip":"203.0.113.5","scope":{"obs_domain_id":0,"scope_fields":null},"weight":1}}"#;
 
         let de1: EnrichmentOperation = serde_json::from_str(del1).unwrap();
@@ -217,18 +254,15 @@ mod tests {
     }
     #[test]
     fn test_enrichment_operation_delete_with_specific_fields() {
-        let op = EnrichmentOperation::Delete(EnrichmentPayload {
+        let op = EnrichmentOperation::Delete(DeletePayload {
             ip: "198.51.100.10".parse().unwrap(),
             scope: Scope::new(100, Some(vec![Field::selectorId(200)])),
             weight: 3,
-            fields: Some(vec![
-                Field::selectorName("specific_field".to_string().into()),
-                Field::samplingSize(10),
-            ]),
+            ies: Some(vec![IE::selectorName, IE::samplingSize]),
         });
 
         let json = serde_json::to_string(&op).unwrap();
-        let expected = r#"{"Delete":{"ip":"198.51.100.10","scope":{"obs_domain_id":100,"scope_fields":[{"selectorId":200}]},"weight":3,"fields":[{"selectorName":"specific_field"},{"samplingSize":10}]}}"#;
+        let expected = r#"{"Delete":{"ip":"198.51.100.10","scope":{"obs_domain_id":100,"scope_fields":[{"selectorId":200}]},"weight":3,"ies":["selectorName","samplingSize"]}}"#;
         assert_eq!(json, expected);
 
         let de: EnrichmentOperation = serde_json::from_str(&json).unwrap();

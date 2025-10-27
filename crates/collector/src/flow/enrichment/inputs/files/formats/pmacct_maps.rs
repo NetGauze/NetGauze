@@ -59,9 +59,9 @@
 //!
 
 use crate::flow::enrichment::{
-    EnrichmentOperation, EnrichmentOperationType, EnrichmentPayload, Scope, Weight,
+    DeletePayload, EnrichmentOperation, EnrichmentOperationType, Scope, UpsertPayload, Weight,
 };
-use netgauze_flow_pkt::ie::{netgauze, Field, IE};
+use netgauze_flow_pkt::ie::{netgauze, Field, HasIE, IE};
 use std::{
     net::{IpAddr, Ipv4Addr},
     str::FromStr,
@@ -294,6 +294,31 @@ impl PmacctMapEntry {
         }
     }
 
+    /// Helper function to create an EnrichmentOperation for a single field
+    /// based on Scope, Weight, and EnrichmentOperationType
+    fn create_operation(
+        ip: IpAddr,
+        scope: Scope,
+        weight: Weight,
+        field: Field,
+        op_type: EnrichmentOperationType,
+    ) -> EnrichmentOperation {
+        match op_type {
+            EnrichmentOperationType::Upsert => EnrichmentOperation::Upsert(UpsertPayload {
+                ip,
+                scope,
+                weight,
+                fields: Some(vec![field]),
+            }),
+            EnrichmentOperationType::Delete => EnrichmentOperation::Delete(DeletePayload {
+                ip,
+                scope,
+                weight,
+                ies: Some(vec![field.ie()]),
+            }),
+        }
+    }
+
     /// Convert PmacctMapEntry to EnrichmentOperation
     pub fn try_into_enrichment_operations(
         self,
@@ -304,7 +329,7 @@ impl PmacctMapEntry {
         let ip = self.ip;
         let id_field = Self::parse_field_from_string(ie, &self.id)?;
 
-        match self.scope {
+        let operations = match self.scope {
             Some(PmacctMapEntryScope::In(in_iface)) => {
                 let ingress_field = if let Field::mplsVpnRouteDistinguisher(rd) = id_field {
                     Field::NetGauze(netgauze::Field::ingressMplsVpnRouteDistinguisher(rd))
@@ -312,13 +337,13 @@ impl PmacctMapEntry {
                     id_field
                 };
 
-                let payload = EnrichmentPayload {
+                vec![Self::create_operation(
                     ip,
-                    scope: Scope::new(0, Some(vec![Field::ingressInterface(in_iface)])),
+                    Scope::new(0, Some(vec![Field::ingressInterface(in_iface)])),
                     weight,
-                    fields: Some(vec![ingress_field]),
-                };
-                Ok(vec![EnrichmentOperation::from((payload, op_type))])
+                    ingress_field,
+                    op_type,
+                )]
             }
             Some(PmacctMapEntryScope::Out(out_iface)) => {
                 let egress_field = if let Field::mplsVpnRouteDistinguisher(rd) = id_field {
@@ -327,62 +352,56 @@ impl PmacctMapEntry {
                     id_field
                 };
 
-                let payload = EnrichmentPayload {
+                vec![Self::create_operation(
                     ip,
-                    scope: Scope::new(0, Some(vec![Field::egressInterface(out_iface)])),
+                    Scope::new(0, Some(vec![Field::egressInterface(out_iface)])),
                     weight,
-                    fields: Some(vec![egress_field]),
-                };
-                Ok(vec![EnrichmentOperation::from((payload, op_type))])
+                    egress_field,
+                    op_type,
+                )]
             }
             Some(PmacctMapEntryScope::MplsVpnId(vrfid)) => {
-                let ingress_field = if let Field::mplsVpnRouteDistinguisher(ref rd) = id_field {
-                    Field::NetGauze(netgauze::Field::ingressMplsVpnRouteDistinguisher(
-                        rd.clone(),
-                    ))
-                } else {
-                    id_field.clone()
-                };
+                let (ingress_field, egress_field) =
+                    if let Field::mplsVpnRouteDistinguisher(rd) = id_field {
+                        (
+                            Field::NetGauze(netgauze::Field::ingressMplsVpnRouteDistinguisher(
+                                rd.clone(),
+                            )),
+                            Field::NetGauze(netgauze::Field::egressMplsVpnRouteDistinguisher(rd)),
+                        )
+                    } else {
+                        (id_field.clone(), id_field)
+                    };
 
-                let egress_field = if let Field::mplsVpnRouteDistinguisher(rd) = id_field {
-                    Field::NetGauze(netgauze::Field::egressMplsVpnRouteDistinguisher(rd))
-                } else {
-                    id_field
-                };
-
-                let operations = vec![
-                    EnrichmentOperation::from((
-                        EnrichmentPayload {
-                            ip,
-                            scope: Scope::new(0, Some(vec![Field::ingressVRFID(vrfid)])),
-                            weight,
-                            fields: Some(vec![ingress_field]),
-                        },
+                vec![
+                    Self::create_operation(
+                        ip,
+                        Scope::new(0, Some(vec![Field::ingressVRFID(vrfid)])),
+                        weight,
+                        ingress_field,
                         op_type,
-                    )),
-                    EnrichmentOperation::from((
-                        EnrichmentPayload {
-                            ip,
-                            scope: Scope::new(0, Some(vec![Field::egressVRFID(vrfid)])),
-                            weight,
-                            fields: Some(vec![egress_field]),
-                        },
+                    ),
+                    Self::create_operation(
+                        ip,
+                        Scope::new(0, Some(vec![Field::egressVRFID(vrfid)])),
+                        weight,
+                        egress_field,
                         op_type,
-                    )),
-                ];
-                Ok(operations)
+                    ),
+                ]
             }
             None => {
-                // Global operation (system scoped)
-                let payload = EnrichmentPayload {
+                vec![Self::create_operation(
                     ip,
-                    scope: Scope::new(0, None),
+                    Scope::new(0, None),
                     weight,
-                    fields: Some(vec![id_field]),
-                };
-                Ok(vec![EnrichmentOperation::from((payload, op_type))])
+                    id_field,
+                    op_type,
+                )]
             }
-        }
+        };
+
+        Ok(operations)
     }
 }
 
@@ -414,7 +433,7 @@ mod tests {
             )
             .unwrap();
 
-        let expected_ops = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
+        let expected_ops = vec![EnrichmentOperation::Upsert(UpsertPayload {
             ip: "138.187.56.12".parse().unwrap(),
             scope: Scope::new(0, Some(vec![Field::ingressInterface(381)])),
             weight: 5,
@@ -451,7 +470,7 @@ mod tests {
             )
             .unwrap();
 
-        let expected_ops = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
+        let expected_ops = vec![EnrichmentOperation::Upsert(UpsertPayload {
             ip: "138.187.55.2".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 10,
@@ -485,7 +504,7 @@ mod tests {
             .unwrap();
 
         let expected_ops = vec![
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "138.187.21.71".parse().unwrap(),
                 scope: Scope::new(0, Some(vec![Field::ingressVRFID(18)])),
                 weight: 15,
@@ -495,7 +514,7 @@ mod tests {
                     ),
                 )]),
             }),
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "138.187.21.71".parse().unwrap(),
                 scope: Scope::new(0, Some(vec![Field::egressVRFID(18)])),
                 weight: 15,

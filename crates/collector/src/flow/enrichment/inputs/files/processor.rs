@@ -20,7 +20,7 @@
 //! enrichment operations.
 use crate::flow::enrichment::{
     inputs::files::{formats::PmacctMapEntry, InputFileFormat},
-    EnrichmentOperation, EnrichmentOperationType, EnrichmentPayload,
+    DeletePayload, EnrichmentOperation, EnrichmentOperationType, UpsertPayload,
 };
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::path::PathBuf;
@@ -100,9 +100,18 @@ impl FileProcessor {
                 debug!("Processing JSONUpserts file (path: {path:?}) for {op_type} operations");
 
                 for &line in lines {
-                    match serde_json::from_str::<EnrichmentPayload>(line) {
-                        Ok(payload) => {
-                            ops.push((payload, op_type).into());
+                    match serde_json::from_str::<UpsertPayload>(line) {
+                        Ok(upsert_payload) => {
+                            match op_type {
+                                EnrichmentOperationType::Upsert => {
+                                    ops.push(EnrichmentOperation::Upsert(upsert_payload));
+                                }
+                                EnrichmentOperationType::Delete => {
+                                    // Convert to DeletePayload
+                                    let delete_payload: DeletePayload = upsert_payload.into();
+                                    ops.push(EnrichmentOperation::Delete(delete_payload));
+                                }
+                            }
                         }
                         Err(e) => {
                             if let Some(ref callback) = line_error_callback {
@@ -114,10 +123,18 @@ impl FileProcessor {
             }
         }
 
-        // Clean up - remove ops with payload having None or empty fields
-        ops.retain(|op| match &op.payload().fields {
-            Some(fields) => !fields.is_empty(),
-            None => false,
+        // Cleanup - remove any Ops with payload having None or empty
+        // fields for optimization and safety reasons: make sure no
+        // discard-all operation can be generated from files input
+        ops.retain(|op| match op {
+            EnrichmentOperation::Upsert(payload) => match &payload.fields {
+                Some(fields) => !fields.is_empty(), // not empty --> retain
+                None => false,
+            },
+            EnrichmentOperation::Delete(payload) => match &payload.ies {
+                Some(ies) => !ies.is_empty(), // not empty --> retain
+                None => false,
+            },
         });
 
         ops
@@ -218,7 +235,7 @@ impl FileProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::flow::enrichment::{EnrichmentOperation, EnrichmentPayload, Scope};
+    use crate::flow::enrichment::{DeletePayload, EnrichmentOperation, Scope, UpsertPayload};
     use netgauze_flow_pkt::ie::{netgauze, Field, IE};
     use std::cell::RefCell;
     use tempfile::NamedTempFile;
@@ -243,13 +260,13 @@ mod tests {
         result.sort();
 
         let mut expected = vec![
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.1.1".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 5,
                 fields: Some(vec![Field::applicationName("test-app".to_string().into())]),
             }),
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.1.2".parse().unwrap(),
                 scope: Scope::new(42, None),
                 weight: 10,
@@ -272,7 +289,7 @@ mod tests {
         let content1 = r#"{"ip":"192.168.1.1","scope":{"obs_domain_id":0},"weight":5,"fields":[{"applicationName":"test-app"}]}"#;
         fs::write(&path, content1).await.unwrap();
 
-        let expected1 = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
+        let expected1 = vec![EnrichmentOperation::Upsert(UpsertPayload {
             ip: "192.168.1.1".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 5,
@@ -295,13 +312,13 @@ mod tests {
         result2.sort();
 
         let mut expected2 = vec![
-            EnrichmentOperation::Delete(EnrichmentPayload {
+            EnrichmentOperation::Delete(DeletePayload {
                 ip: "192.168.1.1".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 5,
-                fields: Some(vec![Field::applicationName("test-app".to_string().into())]),
+                ies: Some(vec![IE::applicationName]),
             }),
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.1.2".parse().unwrap(),
                 scope: Scope::new(42, None),
                 weight: 10,
@@ -336,7 +353,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
         result.sort();
 
         let mut expected = vec![
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.100.1".parse().unwrap(),
                 scope: Scope::new(0, Some(vec![Field::ingressInterface(537)])),
                 weight: 32,
@@ -346,7 +363,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
                     ),
                 )]),
             }),
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.100.1".parse().unwrap(),
                 scope: Scope::new(0, Some(vec![Field::egressInterface(127)])),
                 weight: 32,
@@ -384,13 +401,13 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
         result.sort();
 
         let mut expected = vec![
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.1.1".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 5,
                 fields: Some(vec![Field::applicationName("test-app".to_string().into())]),
             }),
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.1.2".parse().unwrap(),
                 scope: Scope::new(42, None),
                 weight: 10,
@@ -420,7 +437,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
             .await
             .unwrap();
 
-        let expected = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
+        let expected = vec![EnrichmentOperation::Upsert(UpsertPayload {
             ip: "192.168.1.3".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 15,
@@ -451,13 +468,13 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
 
         // Should only process valid JSON lines, skipping malformed ones
         let mut expected = vec![
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.1.1".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 5,
                 fields: Some(vec![Field::applicationName("test-app".to_string().into())]),
             }),
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "192.168.1.2".parse().unwrap(),
                 scope: Scope::new(42, None),
                 weight: 10,
@@ -486,7 +503,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
             .process_file_changes(&path, &format, None::<FileProcessorCallback>)
             .await
             .unwrap();
-        let expected1 = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
+        let expected1 = vec![EnrichmentOperation::Upsert(UpsertPayload {
             ip: "192.168.1.1".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 5,

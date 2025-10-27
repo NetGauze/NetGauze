@@ -530,7 +530,7 @@ fn test_into_enrichment_operations_sampling() {
         .into_enrichment_operations(16, peer_ip, obs_id)
         .unwrap();
 
-    let expected_ops = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
+    let expected_ops = vec![EnrichmentOperation::Upsert(UpsertPayload {
         ip: peer_ip,
         scope: Scope::new(obs_id, Some(scope_fields)),
         weight: 16,
@@ -556,7 +556,7 @@ fn test_into_enrichment_operations_interface_matching_ids() {
         .unwrap();
 
     let expected_ops = vec![
-        EnrichmentOperation::Upsert(EnrichmentPayload {
+        EnrichmentOperation::Upsert(UpsertPayload {
             ip: peer_ip,
             scope: Scope::new(obs_id, Some(vec![Field::ingressInterface(1)])),
             weight: 16,
@@ -564,7 +564,7 @@ fn test_into_enrichment_operations_interface_matching_ids() {
                 netgauze::Field::ingressInterfaceName("eth0".to_string().into()),
             )]),
         }),
-        EnrichmentOperation::Upsert(EnrichmentPayload {
+        EnrichmentOperation::Upsert(UpsertPayload {
             ip: peer_ip,
             scope: Scope::new(obs_id, Some(vec![Field::egressInterface(1)])),
             weight: 16,
@@ -592,7 +592,7 @@ fn test_into_enrichment_operations_unclassified() {
         .into_enrichment_operations(10, peer_ip, obs_id)
         .unwrap();
 
-    let expected_ops = vec![EnrichmentOperation::Upsert(EnrichmentPayload {
+    let expected_ops = vec![EnrichmentOperation::Upsert(UpsertPayload {
         ip: peer_ip,
         scope: Scope::new(obs_id, Some(scope_fields)),
         weight: 10,
