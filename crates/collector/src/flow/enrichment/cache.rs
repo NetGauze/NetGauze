@@ -43,10 +43,10 @@
 //! - Equal weights prefer more specific (later processed) scopes
 
 use crate::flow::{
-    enrichment::{EnrichmentOperation, EnrichmentPayload, Scope, Weight},
-    types::{FieldRef, FieldRefLookup},
+    enrichment::{DeletePayload, EnrichmentOperation, Scope, UpsertPayload, Weight},
+    types::FieldRef,
 };
-use netgauze_flow_pkt::ie::Field;
+use netgauze_flow_pkt::ie::{Field, IE};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -95,7 +95,7 @@ impl EnrichmentCache {
         debug!("Apply enrichment operation: {op}");
 
         match op {
-            EnrichmentOperation::Upsert(EnrichmentPayload {
+            EnrichmentOperation::Upsert(UpsertPayload {
                 ip,
                 scope,
                 weight,
@@ -103,13 +103,13 @@ impl EnrichmentCache {
             }) => {
                 self.upsert(ip, scope, weight, fields);
             }
-            EnrichmentOperation::Delete(EnrichmentPayload {
+            EnrichmentOperation::Delete(DeletePayload {
                 ip,
                 scope,
                 weight,
-                fields,
+                ies,
             }) => {
-                self.delete(ip, scope, weight, fields);
+                self.delete(ip, scope, weight, ies);
             }
         }
     }
@@ -213,19 +213,17 @@ impl EnrichmentCache {
     /// Removes all fields with weight less than the specified weight within
     /// the matching scope. Cleans up empty scopes and peer entries
     /// automatically.
-    fn delete(&mut self, ip: IpAddr, scope: Scope, weight: Weight, fields: Option<Vec<Field>>) {
+    fn delete(&mut self, ip: IpAddr, scope: Scope, weight: Weight, ies: Option<Vec<IE>>) {
         // Early returns if empty vec is provided, and handle Null fields case
         // as delete all for scope (given weight precedence)
-        let (scope_delete_all, fields) = match fields {
-            Some(fields) if fields.is_empty() => {
-                debug!("Empty fields vector provided for delete operation for ip={}, scope={} - cache not modified", ip, scope);
+        let (scope_delete_all, ies) = match ies {
+            Some(ies) if ies.is_empty() => {
+                debug!("Empty IEs vector provided for delete operation for ip={}, scope={} - cache not modified", ip, scope);
                 return;
             }
-            Some(fields) => (false, fields),
+            Some(ies) => (false, ies),
             None => (true, vec![]),
         };
-
-        let del_fields = FieldRef::map_fields_into_fxhashmap(&fields);
 
         if let Some(peer_metadata) = self.get_mut(&ip) {
             match peer_metadata.0.entry(scope.clone().into()) {
@@ -234,7 +232,7 @@ impl EnrichmentCache {
 
                     current_fields.retain(|field_ref, m_fld| {
                         if m_fld.weight <= weight
-                            && (scope_delete_all || del_fields.contains_field_ref(*field_ref))
+                            && (scope_delete_all || ies.contains(&field_ref.ie()))
                         {
                             debug!(
                                 "Removing field [{:?}] for ip={}, scope={}, weight: {}>={}",
