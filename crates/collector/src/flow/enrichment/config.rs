@@ -12,12 +12,23 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::flow::enrichment::inputs::InputsConfig;
-
+use crate::inputs::{files::FilesConfig, flow_options::FlowOptionsConfig, kafka::KafkaConfig};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct EnrichmentConfig {
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub inputs: Option<InputsConfig>,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct InputsConfig {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub files: Option<FilesConfig>,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub flow_options: Option<FlowOptionsConfig>,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub kafka: Option<KafkaConfig>,
 }

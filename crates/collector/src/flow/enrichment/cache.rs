@@ -43,10 +43,12 @@
 //! - Equal weights prefer more specific (later processed) scopes
 
 use crate::flow::{
-    enrichment::{DeletePayload, EnrichmentOperation, Scope, UpsertPayload, Weight},
+    enrichment::{
+        DeleteAllPayload, DeletePayload, EnrichmentOperation, Scope, UpsertPayload, Weight,
+    },
     types::FieldRef,
 };
-use netgauze_flow_pkt::ie::{Field, IE};
+use netgauze_flow_pkt::ie::{Field, HasIE, IE};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -101,7 +103,7 @@ impl EnrichmentCache {
                 weight,
                 fields,
             }) => {
-                self.upsert(ip, scope, weight, fields);
+                self.upsert(ip, scope, weight, Some(fields));
             }
             EnrichmentOperation::Delete(DeletePayload {
                 ip,
@@ -109,7 +111,10 @@ impl EnrichmentCache {
                 weight,
                 ies,
             }) => {
-                self.delete(ip, scope, weight, ies);
+                self.delete(ip, scope, weight, Some(ies));
+            }
+            EnrichmentOperation::DeleteAll(DeleteAllPayload { ip, scope, weight }) => {
+                self.delete(ip, scope, weight, None);
             }
         }
     }
@@ -222,7 +227,7 @@ impl EnrichmentCache {
                 return;
             }
             Some(ies) => (false, ies),
-            None => (true, vec![]),
+            None => (true, vec![]), // None -> delete all
         };
 
         if let Some(peer_metadata) = self.get_mut(&ip) {
@@ -588,7 +593,14 @@ impl std::fmt::Display for PeerMetadata {
             } else {
                 let mut first_field = true;
                 for (field_ref, metadata_field) in fields {
-                    let field_display = format!("{:?}", metadata_field.field());
+                    let field_str = match std::convert::TryInto::<String>::try_into(
+                        metadata_field.field().clone(),
+                    ) {
+                        Ok(s) => s,
+                        Err(_) => metadata_field.field().to_string(),
+                    };
+
+                    let field_display = format!("{}({})", metadata_field.field().ie(), field_str);
                     let field_truncated = if field_display.len() > max_field_width {
                         format!("{}...", &field_display[..max_field_width - 3])
                     } else {
@@ -678,9 +690,17 @@ fn format_indexed_metadata(enrichment_fields: &FxHashMap<FieldRef, &WeightedFiel
 
         // Data rows
         for (field_ref, weighted_field) in enrichment_fields {
+            let field_str =
+                match std::convert::TryInto::<String>::try_into(weighted_field.field().clone()) {
+                    Ok(s) => s,
+                    Err(_) => weighted_field.field().to_string(),
+                };
+
+            let field_display = format!("{}({})", weighted_field.field().ie(), field_str);
+
             output.push_str(&format!(
                 "| {:<width_field$} | {:<width_index$} | {:<width_weight$} |\n",
-                format!("{:?}", weighted_field.field()),
+                field_display,
                 field_ref.index(),
                 weighted_field.weight(),
                 width_field = max_field_width,

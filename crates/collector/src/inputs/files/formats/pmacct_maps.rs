@@ -13,10 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! # Pmacct Maps Format Parsing Module
+//! # Pmacct Maps Modeling and Parsing Module
 //!
-//! This module provides functionality to parse pmacct map files and convert
-//! them into NetGauze enrichment operations.
+//! This module provides functionality for parsing pmacct map entries into
+//! structured data (`PmacctMapEntry`).
 //!
 //! ## Supported Map Types
 //!
@@ -57,11 +57,7 @@
 //! id=0:6837:1054 ip=138.187.21.71 mpls_vpn_id=18
 //! ```
 //!
-
-use crate::flow::enrichment::{
-    DeletePayload, EnrichmentOperation, EnrichmentOperationType, Scope, UpsertPayload, Weight,
-};
-use netgauze_flow_pkt::ie::{netgauze, Field, HasIE, IE};
+use netgauze_flow_pkt::ie::{Field, IE};
 use std::{
     net::{IpAddr, Ipv4Addr},
     str::FromStr,
@@ -100,8 +96,31 @@ pub struct PmacctMapEntry {
     scope: Option<PmacctMapEntryScope>,
 }
 
+impl PmacctMapEntry {
+    #[cfg(test)]
+    pub fn new(id: &str, ip: IpAddr, scope: Option<PmacctMapEntryScope>) -> Self {
+        PmacctMapEntry {
+            id: id.to_string(),
+            ip,
+            scope,
+        }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn ip(&self) -> IpAddr {
+        self.ip
+    }
+
+    pub fn into_scope(self) -> Option<PmacctMapEntryScope> {
+        self.scope
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum PmacctMapEntryScope {
+pub enum PmacctMapEntryScope {
     In(u32),
     Out(u32),
     MplsVpnId(u32),
@@ -203,7 +222,7 @@ impl PmacctMapEntry {
     /// - `samplerRandomInterval`: Parses numeric sampling interval
     ///
     /// TODO: replace with proper RD type when supported
-    fn parse_field_from_string(ie: &IE, value: &str) -> Result<Field, PmacctMapError> {
+    pub fn parse_field_from_string(ie: &IE, value: &str) -> Result<Field, PmacctMapError> {
         match ie {
             IE::mplsVpnRouteDistinguisher => {
                 let parts: Vec<_> = value.split(':').collect();
@@ -293,281 +312,176 @@ impl PmacctMapEntry {
             }),
         }
     }
-
-    /// Helper function to create an EnrichmentOperation for a single field
-    /// based on Scope, Weight, and EnrichmentOperationType
-    fn create_operation(
-        ip: IpAddr,
-        scope: Scope,
-        weight: Weight,
-        field: Field,
-        op_type: EnrichmentOperationType,
-    ) -> EnrichmentOperation {
-        match op_type {
-            EnrichmentOperationType::Upsert => EnrichmentOperation::Upsert(UpsertPayload {
-                ip,
-                scope,
-                weight,
-                fields: Some(vec![field]),
-            }),
-            EnrichmentOperationType::Delete => EnrichmentOperation::Delete(DeletePayload {
-                ip,
-                scope,
-                weight,
-                ies: Some(vec![field.ie()]),
-            }),
-        }
-    }
-
-    /// Convert PmacctMapEntry to EnrichmentOperation
-    pub fn try_into_enrichment_operations(
-        self,
-        ie: &IE,
-        op_type: EnrichmentOperationType,
-        weight: Weight,
-    ) -> Result<Vec<EnrichmentOperation>, PmacctMapError> {
-        let ip = self.ip;
-        let id_field = Self::parse_field_from_string(ie, &self.id)?;
-
-        let operations = match self.scope {
-            Some(PmacctMapEntryScope::In(in_iface)) => {
-                let ingress_field = if let Field::mplsVpnRouteDistinguisher(rd) = id_field {
-                    Field::NetGauze(netgauze::Field::ingressMplsVpnRouteDistinguisher(rd))
-                } else {
-                    id_field
-                };
-
-                vec![Self::create_operation(
-                    ip,
-                    Scope::new(0, Some(vec![Field::ingressInterface(in_iface)])),
-                    weight,
-                    ingress_field,
-                    op_type,
-                )]
-            }
-            Some(PmacctMapEntryScope::Out(out_iface)) => {
-                let egress_field = if let Field::mplsVpnRouteDistinguisher(rd) = id_field {
-                    Field::NetGauze(netgauze::Field::egressMplsVpnRouteDistinguisher(rd))
-                } else {
-                    id_field
-                };
-
-                vec![Self::create_operation(
-                    ip,
-                    Scope::new(0, Some(vec![Field::egressInterface(out_iface)])),
-                    weight,
-                    egress_field,
-                    op_type,
-                )]
-            }
-            Some(PmacctMapEntryScope::MplsVpnId(vrfid)) => {
-                let (ingress_field, egress_field) =
-                    if let Field::mplsVpnRouteDistinguisher(rd) = id_field {
-                        (
-                            Field::NetGauze(netgauze::Field::ingressMplsVpnRouteDistinguisher(
-                                rd.clone(),
-                            )),
-                            Field::NetGauze(netgauze::Field::egressMplsVpnRouteDistinguisher(rd)),
-                        )
-                    } else {
-                        (id_field.clone(), id_field)
-                    };
-
-                vec![
-                    Self::create_operation(
-                        ip,
-                        Scope::new(0, Some(vec![Field::ingressVRFID(vrfid)])),
-                        weight,
-                        ingress_field,
-                        op_type,
-                    ),
-                    Self::create_operation(
-                        ip,
-                        Scope::new(0, Some(vec![Field::egressVRFID(vrfid)])),
-                        weight,
-                        egress_field,
-                        op_type,
-                    ),
-                ]
-            }
-            None => {
-                vec![Self::create_operation(
-                    ip,
-                    Scope::new(0, None),
-                    weight,
-                    id_field,
-                    op_type,
-                )]
-            }
-        };
-
-        Ok(operations)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netgauze_flow_pkt::ie::{netgauze, Field, IE};
+    use netgauze_flow_pkt::ie::IE;
+    use std::{net::IpAddr, str::FromStr};
 
     #[test]
-    fn test_parse_route_distinguisher_with_interface() {
-        // Test parse line
-        let line = "id=0:65500:1000056012 ip=138.187.56.12 in=381";
-        let entry = PmacctMapEntry::parse_line(line).unwrap().unwrap();
-
-        let expected_entry = PmacctMapEntry {
-            id: "0:65500:1000056012".to_string(),
-            ip: "138.187.56.12".parse().unwrap(),
-            scope: Some(PmacctMapEntryScope::In(381)),
-        };
-
-        assert_eq!(entry, expected_entry);
-
-        // Test conversion to enrichment operations
-        let ops = entry
-            .try_into_enrichment_operations(
-                &IE::mplsVpnRouteDistinguisher,
-                EnrichmentOperationType::Upsert,
-                5,
-            )
-            .unwrap();
-
-        let expected_ops = vec![EnrichmentOperation::Upsert(UpsertPayload {
-            ip: "138.187.56.12".parse().unwrap(),
-            scope: Scope::new(0, Some(vec![Field::ingressInterface(381)])),
-            weight: 5,
-            fields: Some(vec![Field::NetGauze(
-                netgauze::Field::ingressMplsVpnRouteDistinguisher(
-                    [0, 0, 255, 220, 59, 155, 164, 204].into(),
-                ),
-            )]),
-        })];
-
-        assert_eq!(ops, expected_ops);
+    fn parse_line_empty_and_comments() {
+        assert_eq!(PmacctMapEntry::parse_line("").unwrap(), None);
+        assert_eq!(PmacctMapEntry::parse_line("   ").unwrap(), None);
+        assert_eq!(PmacctMapEntry::parse_line("# a comment").unwrap(), None);
+        assert_eq!(
+            PmacctMapEntry::parse_line("! another comment").unwrap(),
+            None
+        );
     }
 
     #[test]
-    fn test_parse_sampling_map_global_scope() {
-        // Test parse line
+    fn parse_line_basic_without_scope() {
         let line = "id=1024 ip=138.187.55.2";
-        let entry = PmacctMapEntry::parse_line(line).unwrap().unwrap();
+        let entry = PmacctMapEntry::parse_line(line)
+            .unwrap()
+            .expect("expected entry");
 
-        let expected_entry = PmacctMapEntry {
-            id: "1024".to_string(),
-            ip: "138.187.55.2".parse().unwrap(),
-            scope: None,
-        };
-
-        assert_eq!(entry, expected_entry);
-
-        // Test conversion to enrichment operations
-        let ops = entry
-            .try_into_enrichment_operations(
-                &IE::samplerRandomInterval,
-                EnrichmentOperationType::Upsert,
-                10,
-            )
-            .unwrap();
-
-        let expected_ops = vec![EnrichmentOperation::Upsert(UpsertPayload {
-            ip: "138.187.55.2".parse().unwrap(),
-            scope: Scope::new(0, None),
-            weight: 10,
-            fields: Some(vec![Field::samplerRandomInterval(1024)]),
-        })];
-
-        assert_eq!(ops, expected_ops);
+        let expected = PmacctMapEntry::new("1024", IpAddr::from_str("138.187.55.2").unwrap(), None);
+        assert_eq!(entry, expected);
     }
 
     #[test]
-    fn test_parse_mpls_vpn_scope() {
-        // Test parse line
-        let line = "id=0:6837:1054 ip=138.187.21.71 mpls_vpn_id=18";
-        let entry = PmacctMapEntry::parse_line(line).unwrap().unwrap();
+    fn parse_line_with_in_scope() {
+        let line = "id=0:0:0 ip=1.2.3.4 in=381";
+        let entry = PmacctMapEntry::parse_line(line)
+            .unwrap()
+            .expect("expected entry");
 
-        let expected_entry = PmacctMapEntry {
-            id: "0:6837:1054".to_string(),
-            ip: "138.187.21.71".parse().unwrap(),
-            scope: Some(PmacctMapEntryScope::MplsVpnId(18)),
-        };
-
-        assert_eq!(entry, expected_entry);
-
-        // Test conversion - should create 2 operations (ingress + egress)
-        let ops = entry
-            .try_into_enrichment_operations(
-                &IE::mplsVpnRouteDistinguisher,
-                EnrichmentOperationType::Upsert,
-                15,
-            )
-            .unwrap();
-
-        let expected_ops = vec![
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "138.187.21.71".parse().unwrap(),
-                scope: Scope::new(0, Some(vec![Field::ingressVRFID(18)])),
-                weight: 15,
-                fields: Some(vec![Field::NetGauze(
-                    netgauze::Field::ingressMplsVpnRouteDistinguisher(
-                        [0, 0, 26, 181, 0, 0, 4, 30].into(),
-                    ),
-                )]),
-            }),
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "138.187.21.71".parse().unwrap(),
-                scope: Scope::new(0, Some(vec![Field::egressVRFID(18)])),
-                weight: 15,
-                fields: Some(vec![Field::NetGauze(
-                    netgauze::Field::egressMplsVpnRouteDistinguisher(
-                        [0, 0, 26, 181, 0, 0, 4, 30].into(),
-                    ),
-                )]),
-            }),
-        ];
-
-        assert_eq!(ops, expected_ops);
+        let expected = PmacctMapEntry::new(
+            "0:0:0",
+            IpAddr::from_str("1.2.3.4").unwrap(),
+            Some(PmacctMapEntryScope::In(381)),
+        );
+        assert_eq!(entry, expected);
     }
 
     #[test]
-    fn test_parse_errors_and_comments() {
-        // Comments and empty lines are ignored
-        assert!(PmacctMapEntry::parse_line("! This is a comment")
+    fn parse_line_with_out_scope() {
+        let line = "id=0:0:0 ip=10.0.0.1 out=42";
+        let entry = PmacctMapEntry::parse_line(line)
             .unwrap()
-            .is_none());
-        assert!(PmacctMapEntry::parse_line("# This is a comment")
+            .expect("expected entry");
+
+        let expected = PmacctMapEntry::new(
+            "0:0:0",
+            IpAddr::from_str("10.0.0.1").unwrap(),
+            Some(PmacctMapEntryScope::Out(42)),
+        );
+        assert_eq!(entry, expected);
+    }
+
+    #[test]
+    fn parse_line_with_mpls_vpn_scope() {
+        let line = "id=0:0:0 ip=::1 mpls_vpn_id=18";
+        let entry = PmacctMapEntry::parse_line(line)
             .unwrap()
-            .is_none());
-        assert!(PmacctMapEntry::parse_line("").unwrap().is_none());
+            .expect("expected entry");
 
-        // Test missing mandatory fields
-        assert!(matches!(
-            PmacctMapEntry::parse_line("id=1234"),
-            Err(PmacctMapError::MissingMandatoryField { .. })
-        ));
+        let expected = PmacctMapEntry::new(
+            "0:0:0",
+            IpAddr::from_str("::1").unwrap(),
+            Some(PmacctMapEntryScope::MplsVpnId(18)),
+        );
+        assert_eq!(entry, expected);
+    }
 
-        // Test multiple scope fields (should error)
-        assert!(matches!(
-            PmacctMapEntry::parse_line("id=1234 ip=1.1.1.1 in=123 out=456"),
-            Err(PmacctMapError::MultipleScope)
-        ));
+    #[test]
+    fn parse_line_multiple_scope_error() {
+        let line = "id=1 ip=1.2.3.4 in=1 out=2";
+        match PmacctMapEntry::parse_line(line).unwrap_err() {
+            PmacctMapError::MultipleScope => {}
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
 
-        // Test invalid IP address
-        assert!(matches!(
-            PmacctMapEntry::parse_line("id=1234 ip=invalid.ip in=123"),
-            Err(PmacctMapError::InvalidIpAddress { .. })
-        ));
+    #[test]
+    fn parse_line_unknown_key_error() {
+        let line = "id=1 ip=1.2.3.4 foo=bar";
+        match PmacctMapEntry::parse_line(line) {
+            Err(PmacctMapError::UnknownKey { key }) => assert_eq!(key, "foo"),
+            other => panic!("unexpected result: {other:?}"),
+        }
+    }
 
-        // Test invalid uint parsing if ingress interface scope
-        assert!(matches!(
-            PmacctMapEntry::parse_line("id=1 ip=1.1.1.1 in=not-a-number"),
-            Err(PmacctMapError::InvalidNumericValue { field, .. }) if field == "in"
-        ));
+    #[test]
+    fn parse_line_missing_fields() {
+        match PmacctMapEntry::parse_line("id=only") {
+            Err(PmacctMapError::MissingMandatoryField { field }) => assert_eq!(field, "ip"),
+            other => panic!("unexpected result: {other:?}"),
+        }
+        match PmacctMapEntry::parse_line("ip=1.2.3.4") {
+            Err(PmacctMapError::MissingMandatoryField { field }) => assert_eq!(field, "id"),
+            other => panic!("unexpected result: {other:?}"),
+        }
+    }
 
-        // Test unknown key
-        assert!(matches!(
-            PmacctMapEntry::parse_line("id=5 ip=1.1.1.1 unknown_key=value"),
-            Err(PmacctMapError::UnknownKey { .. })
-        ));
+    #[test]
+    fn parse_field_from_string_mpls_rd_type0() {
+        let res =
+            PmacctMapEntry::parse_field_from_string(&IE::mplsVpnRouteDistinguisher, "0:65500:100")
+                .unwrap();
+
+        let expected_rd: [u8; 8] = [0, 0, 255, 220, 0, 0, 0, 100];
+        let expected = Field::mplsVpnRouteDistinguisher(expected_rd.into());
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn parse_field_from_string_mpls_rd_type1() {
+        let res = PmacctMapEntry::parse_field_from_string(
+            &IE::mplsVpnRouteDistinguisher,
+            "1:192.0.2.5:42",
+        )
+        .unwrap();
+
+        let expected_rd: [u8; 8] = [0, 1, 192, 0, 2, 5, 0, 42];
+        let expected = Field::mplsVpnRouteDistinguisher(expected_rd.into());
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn parse_field_from_string_mpls_rd_type2() {
+        let res = PmacctMapEntry::parse_field_from_string(
+            &IE::mplsVpnRouteDistinguisher,
+            "2:4200137808:1001",
+        )
+        .unwrap();
+
+        let expected_rd: [u8; 8] = [0, 2, 250, 89, 4, 80, 3, 233];
+        let expected = Field::mplsVpnRouteDistinguisher(expected_rd.into());
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn parse_field_from_string_mpls_rd_invalid_format() {
+        let res =
+            PmacctMapEntry::parse_field_from_string(&IE::mplsVpnRouteDistinguisher, "badformat");
+        match res {
+            Err(PmacctMapError::InvalidRD { .. }) => {}
+            other => panic!("unexpected result: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_field_from_string_sampler_interval() {
+        let res =
+            PmacctMapEntry::parse_field_from_string(&IE::samplerRandomInterval, "1024").unwrap();
+
+        let expected = Field::samplerRandomInterval(1024);
+        assert_eq!(res, expected);
+    }
+
+    #[test]
+    fn parse_field_from_string_sampler_interval_invalid() {
+        let res =
+            PmacctMapEntry::parse_field_from_string(&IE::samplerRandomInterval, "not-a-number");
+        match res {
+            Err(PmacctMapError::InvalidNumericValue { field, .. }) => {
+                assert!(field.contains("samplerRandomInterval"));
+            }
+            other => panic!("unexpected result: {other:?}"),
+        }
     }
 }

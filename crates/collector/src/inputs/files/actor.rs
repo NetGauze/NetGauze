@@ -48,16 +48,18 @@
 //! - All formats support comment filtering (lines starting with `#`, `//`, or
 //!   `!`)
 //! - All formats support incremental change detection with line-based diffing
-use crate::flow::enrichment::{
-    inputs::files::{
+use crate::inputs::{
+    files::{
+        handlers::{FilesLineHandler, JsonUpsertsHandler, PmacctMapsHandler},
         processor::{FileProcessor, FileProcessorCallback},
         FilesConfig, InputFileFormat,
     },
-    EnrichmentActorHandle, EnrichmentOperation,
+    EnrichmentHandle,
 };
 use notify::{Config, Event, PollWatcher, RecursiveMode, Watcher};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
     string::ToString,
     time::Duration,
@@ -78,7 +80,7 @@ pub struct FilesActorStats {
     files_failing: opentelemetry::metrics::Gauge<u64>,
     file_changes_detected: opentelemetry::metrics::Counter<u64>,
     file_processing_errors: opentelemetry::metrics::Counter<u64>,
-    file_ops_generated: opentelemetry::metrics::Counter<u64>,
+    operations_generated: opentelemetry::metrics::Counter<u64>,
     send_error: opentelemetry::metrics::Counter<u64>,
 }
 
@@ -100,7 +102,7 @@ impl FilesActorStats {
             .u64_counter("netgauze.collector.flows.enrichment.input.files.processing.errors")
             .with_description("Errors during file processing")
             .build();
-        let file_ops_generated = meter
+        let operations_generated = meter
             .u64_counter("netgauze.collector.flows.enrichment.input.files.ops.generated")
             .with_description("Number of enrichment operations generated from files")
             .build();
@@ -113,7 +115,7 @@ impl FilesActorStats {
             files_failing,
             file_changes_detected,
             file_processing_errors,
-            file_ops_generated,
+            operations_generated,
             send_error,
         }
     }
@@ -121,28 +123,39 @@ impl FilesActorStats {
 
 /// Core files actor that monitors configured files and processes enrichment
 /// data.
-struct FilesActor {
+struct FilesActor<T, E>
+where
+    T: std::fmt::Display + Clone + Send + Sync + 'static,
+    E: EnrichmentHandle<T>,
+{
     config: FilesConfig,
     cmd_rx: mpsc::Receiver<FilesActorCommand>,
     file_event_tx: mpsc::Sender<notify::Result<Event>>,
     file_event_rx: mpsc::Receiver<notify::Result<Event>>,
-    enrichment_handles: Vec<EnrichmentActorHandle>,
+    enrichment_handles: Vec<E>,
     stats: FilesActorStats,
     watcher: Option<PollWatcher>,
     watched_files: FxHashMap<PathBuf, InputFileFormat>,
     watched_directories: FxHashSet<PathBuf>,
     failing_files: FxHashSet<PathBuf>,
-    processor: FileProcessor,
+    processor: FileProcessor<T>,
+    handlers: HashMap<InputFileFormat, Box<dyn FilesLineHandler<T>>>,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl FilesActor {
+impl<T, E> FilesActor<T, E>
+where
+    T: std::fmt::Display + Clone + Send + Sync + 'static,
+    E: EnrichmentHandle<T>,
+{
     fn new(
         config: FilesConfig,
         cmd_rx: mpsc::Receiver<FilesActorCommand>,
         file_event_tx: mpsc::Sender<notify::Result<Event>>,
         file_event_rx: mpsc::Receiver<notify::Result<Event>>,
-        enrichment_handles: Vec<EnrichmentActorHandle>,
+        enrichment_handles: Vec<E>,
         stats: FilesActorStats,
+        handlers: HashMap<InputFileFormat, Box<dyn FilesLineHandler<T>>>,
     ) -> Self {
         Self {
             config,
@@ -156,6 +169,8 @@ impl FilesActor {
             watched_directories: FxHashSet::with_hasher(FxBuildHasher),
             failing_files: FxHashSet::with_hasher(FxBuildHasher),
             processor: FileProcessor::new(),
+            handlers,
+            _phantom: std::marker::PhantomData,
         }
     }
 
@@ -283,7 +298,7 @@ impl FilesActor {
     /// to handle temporary congestion in enrichment actor channels. Each
     /// operation is sent to all enrichment handles with independent retry
     /// logic.
-    async fn send_enrichment_operations(&mut self, ops: Vec<EnrichmentOperation>, path: &Path) {
+    async fn send_enrichment_operations(&mut self, ops: Vec<T>, path: &Path) {
         let file_tags = [opentelemetry::KeyValue::new(
             "path",
             path.to_string_lossy().to_string(),
@@ -337,51 +352,54 @@ impl FilesActor {
         self.stats.file_changes_detected.add(1, &file_tags);
 
         // Error callback to update processing error stats and log
-        let error_callback = |line: &str, error: &str| {
+        let error_callback = |error: &str| {
             self.stats.file_processing_errors.add(1, &file_tags);
-            error!(
-                "Failed to process line=[{}] in file {:?}: {}",
-                line, path, error
-            );
+            warn!("Failed to process entry in file {:?}: {}", path, error);
         };
 
         info!("Processing file change: {:?}", path);
 
         let format = self.watched_files.get(&path).cloned();
         if let Some(format) = format {
-            match self
-                .processor
-                .process_file_changes(&path, &format, Some(error_callback))
-                .await
-            {
-                Ok(ops) => {
-                    debug!(
-                        "Generated {} enrichment operations from file {:?}",
-                        ops.len(),
-                        path
-                    );
+            if let Some(handler) = self.handlers.get_mut(&format) {
+                match self
+                    .processor
+                    .process_file_changes(&path, handler.as_mut(), Some(error_callback))
+                    .await
+                {
+                    Ok(ops) => {
+                        debug!(
+                            "Generated {} enrichment operations from file {:?}",
+                            ops.len(),
+                            path
+                        );
 
-                    // Mark file as successfully processed for stats
-                    self.failing_files.remove(&path);
-                    self.stats
-                        .file_ops_generated
-                        .add(ops.len() as u64, &file_tags);
+                        // Mark file as successfully processed for stats
+                        self.failing_files.remove(&path);
+                        self.stats
+                            .operations_generated
+                            .add(ops.len() as u64, &file_tags);
 
-                    // Send generated ops
-                    self.send_enrichment_operations(ops, &path).await;
+                        // Send generated ops
+                        self.send_enrichment_operations(ops, &path).await;
+                    }
+                    Err(e) => {
+                        error!("Failed to read file {:?}: {}", path, e);
+
+                        // Mark file as failing for stats
+                        self.failing_files.insert(path.clone());
+
+                        // Send deletes for the file's cached entries
+                        let ops = self.processor.purge_file(
+                            &path,
+                            handler.as_mut(),
+                            None::<FileProcessorCallback>,
+                        );
+                        self.send_enrichment_operations(ops, &path).await;
+                    }
                 }
-                Err(e) => {
-                    error!("Failed to read file {:?}: {}", path, e);
-
-                    // Mark file as failing for stats
-                    self.failing_files.insert(path.clone());
-
-                    // Send deletes for the file's cached entries
-                    let ops =
-                        self.processor
-                            .purge_file(&path, &format, None::<FileProcessorCallback>);
-                    self.send_enrichment_operations(ops, &path).await;
-                }
+            } else {
+                error!("No handler found for file format {:?}", format);
             }
         } else {
             error!("No format found for file {:?}", path);
@@ -447,14 +465,19 @@ impl FilesActor {
                 notify::EventKind::Remove(_) => {
                     warn!("Watched file was removed: {:?}", path);
 
-                    // Send deletes for the file's cached entries
                     if let Some(format) = self.watched_files.get(&path).cloned() {
-                        let ops = self.processor.purge_file(
-                            &path,
-                            &format,
-                            None::<FileProcessorCallback>,
-                        );
-                        self.send_enrichment_operations(ops, &path).await;
+                        if let Some(handler) = self.handlers.get_mut(&format) {
+                            let ops = self.processor.purge_file(
+                                &path,
+                                handler.as_mut(),
+                                None::<FileProcessorCallback>,
+                            );
+                            self.send_enrichment_operations(ops, &path).await;
+                        } else {
+                            error!("No handler found for file format {:?}", format);
+                        }
+                    } else {
+                        error!("No format found for file {:?}", path);
                     }
 
                     // Mark as failing for stats
@@ -517,11 +540,15 @@ pub struct FilesActorHandle {
 }
 
 impl FilesActorHandle {
-    pub fn new(
+    pub fn new<T>(
         config: FilesConfig,
-        enrichment_handles: Vec<EnrichmentActorHandle>,
+        enrichment_handles: Vec<impl EnrichmentHandle<T> + 'static>,
         stats: either::Either<opentelemetry::metrics::Meter, FilesActorStats>,
-    ) -> (JoinHandle<anyhow::Result<String>>, Self) {
+        handlers: HashMap<InputFileFormat, Box<dyn FilesLineHandler<T>>>,
+    ) -> (JoinHandle<anyhow::Result<String>>, Self)
+    where
+        T: std::fmt::Display + Clone + Send + Sync + 'static,
+    {
         let (cmd_send, cmd_rx) = mpsc::channel::<FilesActorCommand>(100);
         let (file_event_tx, file_event_rx) = mpsc::channel(100);
         let stats = match stats {
@@ -535,10 +562,52 @@ impl FilesActorHandle {
             file_event_rx,
             enrichment_handles,
             stats,
+            handlers,
         );
         let join_handle = tokio::spawn(actor.run());
         let handle = Self { cmd_send };
         (join_handle, handle)
+    }
+
+    fn build_handlers_from_config<T>(
+        config: &FilesConfig,
+    ) -> HashMap<InputFileFormat, Box<dyn FilesLineHandler<T>>>
+    where
+        T: std::fmt::Display + Clone + Send + Sync + 'static,
+        JsonUpsertsHandler: FilesLineHandler<T>,
+        PmacctMapsHandler: FilesLineHandler<T>,
+    {
+        let mut handlers: HashMap<InputFileFormat, Box<dyn FilesLineHandler<T>>> = HashMap::new();
+
+        for input_file in &config.paths {
+            match &input_file.format {
+                format @ InputFileFormat::JSONUpserts => {
+                    handlers.insert(format.clone(), Box::new(JsonUpsertsHandler::new()));
+                }
+                format @ InputFileFormat::PmacctMaps { id, weight } => {
+                    handlers.insert(
+                        format.clone(),
+                        Box::new(PmacctMapsHandler::new(*id, *weight)),
+                    );
+                }
+            }
+        }
+
+        handlers
+    }
+
+    pub fn from_config<T>(
+        config: FilesConfig,
+        enrichment_handles: Vec<impl EnrichmentHandle<T> + 'static>,
+        stats: either::Either<opentelemetry::metrics::Meter, FilesActorStats>,
+    ) -> (JoinHandle<anyhow::Result<String>>, Self)
+    where
+        T: std::fmt::Display + Clone + Send + Sync + 'static,
+        JsonUpsertsHandler: FilesLineHandler<T>,
+        PmacctMapsHandler: FilesLineHandler<T>,
+    {
+        let handlers = Self::build_handlers_from_config(&config);
+        Self::new(config, enrichment_handles, stats, handlers)
     }
 
     pub async fn shutdown(&self) -> Result<(), FilesActorHandleError> {

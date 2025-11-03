@@ -18,8 +18,8 @@
 //! This module provides the core actor implementation for flow enrichment:
 //! - `EnrichmentActor` - Main actor that processes flow requests and applies
 //!   cached enrichment
-//! - `EnrichmentActorHandle` - Handle for controlling and communicating with
-//!   the actor
+//! - `FlowEnrichmentActorHandle` - Handle for controlling and communicating
+//!   with the actor
 //! - `EnrichmentStats` - Comprehensive metrics collection for enrichment
 //!   operations
 //!
@@ -49,7 +49,10 @@
 //! - **IPFIX** - Full enrichment support
 //! - **NetFlowV9** - Not yet supported
 
-use crate::flow::enrichment::{cache::EnrichmentCache, EnrichmentOperation};
+use crate::{
+    flow::enrichment::{cache::EnrichmentCache, EnrichmentOperation},
+    inputs::EnrichmentHandle,
+};
 use netgauze_flow_pkt::{
     ie::{netgauze, Field},
     ipfix, FlowInfo,
@@ -346,20 +349,20 @@ impl EnrichmentStats {
 }
 
 #[derive(Debug)]
-pub enum EnrichmentActorHandleError {
+pub enum FlowEnrichmentActorHandleError {
     SendError,
 }
-impl std::fmt::Display for EnrichmentActorHandleError {
+impl std::fmt::Display for FlowEnrichmentActorHandleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EnrichmentActorHandleError::SendError => {
+            FlowEnrichmentActorHandleError::SendError => {
                 write!(f, "Failed to send flow enrichment actor")
             }
         }
     }
 }
 
-impl std::error::Error for EnrichmentActorHandleError {}
+impl std::error::Error for FlowEnrichmentActorHandleError {}
 
 /// Handle for controlling and communicating with an enrichment actor.
 ///
@@ -371,13 +374,13 @@ impl std::error::Error for EnrichmentActorHandleError {}
 /// The handle can be cloned and shared across multiple components,
 /// with all operations being non-blocking and channel-based.
 #[derive(Debug, Clone)]
-pub struct EnrichmentActorHandle {
+pub struct FlowEnrichmentActorHandle {
     cmd_send: mpsc::Sender<EnrichmentActorCommand>,
     enrichment_tx: async_channel::Sender<EnrichmentOperation>,
     enriched_rx: async_channel::Receiver<(SocketAddr, FlowInfo)>,
 }
 
-impl EnrichmentActorHandle {
+impl FlowEnrichmentActorHandle {
     pub fn new(
         buffer_size: usize,
         flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
@@ -411,26 +414,11 @@ impl EnrichmentActorHandle {
     }
 
     /// Request graceful shutdown of the enrichment actor.
-    pub async fn shutdown(&self) -> Result<(), EnrichmentActorHandleError> {
+    pub async fn shutdown(&self) -> Result<(), FlowEnrichmentActorHandleError> {
         self.cmd_send
             .send(EnrichmentActorCommand::Shutdown)
             .await
-            .map_err(|_| EnrichmentActorHandleError::SendError)
-    }
-
-    /// Send an enrichment cache update to the actor.
-    ///
-    /// Updates are applied asynchronously and will affect subsequent
-    /// flow enrichment operations. The operation can be either an
-    /// upsert (add/update) or delete.
-    pub async fn update_enrichment(
-        &self,
-        op: EnrichmentOperation,
-    ) -> Result<(), EnrichmentActorHandleError> {
-        self.enrichment_tx
-            .send(op)
-            .await
-            .map_err(|_| EnrichmentActorHandleError::SendError)
+            .map_err(|_| FlowEnrichmentActorHandleError::SendError)
     }
 
     /// Subscribe to enriched flow output from the actor.
@@ -440,6 +428,26 @@ impl EnrichmentActorHandle {
     /// flow data independently.
     pub fn subscribe(&self) -> async_channel::Receiver<(SocketAddr, FlowInfo)> {
         self.enriched_rx.clone()
+    }
+}
+
+impl EnrichmentHandle<EnrichmentOperation> for FlowEnrichmentActorHandle {
+    /// Send an enrichment cache update to the actor.
+    ///
+    /// Updates are applied asynchronously and will affect subsequent
+    /// flow enrichment operations. The operation can be either an
+    /// upsert (add/update) or delete. We also apply defensive filtering:
+    //  to be safe: drop operations with empty fields/IEs
+    fn update_enrichment(
+        &self,
+        op: EnrichmentOperation,
+    ) -> futures::future::BoxFuture<'_, Result<(), anyhow::Error>> {
+        Box::pin(async move {
+            self.enrichment_tx
+                .send(op)
+                .await
+                .map_err(anyhow::Error::from)
+        })
     }
 }
 

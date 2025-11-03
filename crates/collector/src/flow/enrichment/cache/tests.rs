@@ -59,6 +59,31 @@ fn test_enrichment_cache_upsert_new_entry() {
 }
 
 #[test]
+fn test_enrichment_cache_upsert_empty_fields() {
+    let mut cache = EnrichmentCache::new();
+    let ip = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+    let scope = Scope::new(0, None);
+
+    // Upsert with empty fields vector should not modify cache
+    cache.upsert(ip, scope.clone(), 100, Some(vec![]));
+
+    assert_eq!(cache.peer_count(), 0);
+    assert!(cache.get(&ip).is_none());
+}
+
+#[test]
+fn test_enrichment_cache_upsert_none_fields() {
+    let mut cache = EnrichmentCache::new();
+    let ip = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+    let scope = Scope::new(0, None);
+
+    // Upsert with None fields should not modify cache
+    cache.upsert(ip, scope, 100, None);
+
+    assert_eq!(cache.peer_count(), 0);
+}
+
+#[test]
 fn test_enrichment_cache_upsert_weight_replacement() {
     let mut cache = EnrichmentCache::new();
     let ip = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
@@ -158,6 +183,57 @@ fn test_enrichment_cache_upsert_equal_weights() {
     let expected_cache: EnrichmentCache = vec![(ip, expected_peer_metadata)].into();
 
     assert_eq!(cache, expected_cache);
+}
+
+#[test]
+fn test_enrichment_cache_delete_empty_ies() {
+    let mut cache = EnrichmentCache::new();
+    let ip = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+    let scope = Scope::new(0, None);
+
+    cache.upsert(
+        ip,
+        scope.clone(),
+        100,
+        Some(vec![Field::observationPointId(42)]),
+    );
+
+    // Delete with empty IEs vector should not modify cache
+    cache.delete(ip, scope, 100, Some(vec![]));
+
+    assert!(cache.get(&ip).is_some());
+}
+
+#[test]
+fn test_enrichment_cache_delete_partial_field_match() {
+    let mut cache = EnrichmentCache::new();
+    let ip = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1));
+    let scope = Scope::new(0, None);
+
+    // Insert multiple fields with same weight
+    cache.upsert(
+        ip,
+        scope.clone(),
+        100,
+        Some(vec![
+            Field::samplerName("test".to_string().into()),
+            Field::observationPointId(42),
+            Field::meteringProcessId(100),
+        ]),
+    );
+
+    // Delete only some fields by IE
+    cache.delete(
+        ip,
+        scope.clone(),
+        100,
+        Some(vec![IE::samplerName, IE::observationPointId]),
+    );
+
+    // meteringProcessId should remain
+    let peer = cache.get(&ip).unwrap();
+    let enrichment = peer.get_enrichment_fields(0, &[]);
+    assert_eq!(enrichment, Some(vec![Field::meteringProcessId(100)]));
 }
 
 #[test]
@@ -287,7 +363,7 @@ fn test_enrichment_cache_apply_enrichment_operations() {
         ip,
         scope: scope.clone(),
         weight,
-        fields: Some(fields.clone()),
+        fields: fields.clone(),
     });
     cache.apply_enrichment(upsert_op);
 
@@ -309,11 +385,10 @@ fn test_enrichment_cache_apply_enrichment_operations() {
     assert_eq!(cache, expected_cache);
 
     // Apply delete operation
-    let delete_op = EnrichmentOperation::Delete(DeletePayload {
+    let delete_op = EnrichmentOperation::DeleteAll(DeleteAllPayload {
         ip,
         scope,
         weight: 200,
-        ies: None,
     });
     cache.apply_enrichment(delete_op);
 

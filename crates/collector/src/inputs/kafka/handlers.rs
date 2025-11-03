@@ -12,98 +12,144 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::flow::enrichment::{
-    inputs::kafka::{MessageHandler, SonataConfig},
-    DeletePayload, EnrichmentOperation, Scope, UpsertPayload,
+use crate::{
+    flow::enrichment::{DeletePayload, EnrichmentOperation, Scope, UpsertPayload},
+    inputs::{
+        kafka::{
+            formats::sonata::{SonataData, SonataOperation},
+            SonataConfig,
+        },
+        InputProcessingError,
+    },
 };
 use netgauze_flow_pkt::ie::{Field, IE};
-use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::IpAddr};
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum SonataOperation {
-    #[serde(rename = "insert")]
-    Insert,
-    #[serde(rename = "update")]
-    Update,
-    #[serde(rename = "delete")]
-    Delete,
+/// **Generic Kafka Message Handler Traig**
+///
+/// Trait for handling different message formats from Kafka
+pub trait KafkaMessageHandler<T>: Send + Sync + 'static {
+    /// Parse the raw message into a vector of output type `T`
+    fn handle_message(
+        &mut self,
+        payload: &[u8],
+        partition: i32,
+        offset: i64,
+    ) -> Result<Vec<T>, InputProcessingError>;
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct SonataData {
-    pub operation: SonataOperation,
-    pub id_node: u32,
-    pub node: Option<SonataNode>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct SonataNode {
-    pub hostname: String,
-    #[serde(rename = "loopbackAddress")]
-    pub loopback_address: IpAddr,
-    pub platform: SonataPlatform,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct SonataPlatform {
-    pub name: String,
-}
-
+/// **Kafka Enrichment Operation Handler**
+///
+/// Handler for Kafka messages with JSON [`EnrichmentOperation`] format,
+/// such as:
+///
+/// ```json
+/// {
+///   "Upsert": {
+///     "ip": "::ffff:192.168.100.6",
+///     "scope": {
+///       "obs_domain_id": 1999104,
+///       "scope_fields": [
+///         {
+///           "selectorId": 27
+///         }
+///       ]
+///     },
+///     "weight": 205,
+///     "fields": [
+///       {
+///         "applicationName": "APP-NAME"
+///       }
+///     ]
+///   }
+/// }
+/// ```
 #[derive(Debug, Clone)]
-pub enum SonataHandlerError {
-    /// JSON deserialization failed
-    JsonDeserializationError(String),
+pub struct KafkaJsonOpsHandler;
 
-    /// Operation is semantically invalid (e.g., Insert/Update without node
-    /// data)
-    InvalidOperation(String),
+impl KafkaJsonOpsHandler {
+    pub fn new() -> Self {
+        Self
+    }
 }
 
-impl std::fmt::Display for SonataHandlerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::JsonDeserializationError(msg) => write!(f, "JSON deserialization error: {msg}"),
-            Self::InvalidOperation(msg) => write!(f, "Invalid operation: {msg}"),
+impl KafkaMessageHandler<EnrichmentOperation> for KafkaJsonOpsHandler {
+    fn handle_message(
+        &mut self,
+        payload: &[u8],
+        partition: i32,
+        offset: i64,
+    ) -> Result<Vec<EnrichmentOperation>, InputProcessingError> {
+        let operation: EnrichmentOperation =
+            serde_json::from_slice(payload).map_err(|e| InputProcessingError::JsonError {
+                context: format!("KafkaJsonOpsHandler (partition: {partition}, offset: {offset})"),
+                reason: e.to_string(),
+            })?;
+
+        if !operation.validate() {
+            return Ok(vec![]); // drop useless no-field op
         }
+
+        Ok(vec![operation])
     }
 }
 
-impl std::error::Error for SonataHandlerError {}
-
-impl From<serde_json::Error> for SonataHandlerError {
-    fn from(err: serde_json::Error) -> Self {
-        SonataHandlerError::JsonDeserializationError(err.to_string())
-    }
-}
-
+/// **Kafka Sonata Handler**
+///
+/// Handler for Kafka messages with JSON [`SonataData`] format
+/// (Swisscom custom inventory update messages), such as:
+///
+/// ```json
+/// {
+///  "operation": "insert",
+///  "id_node": 13244,
+///  "node": {
+///    "hostname": "HOSTNAME",
+///    "loopbackAddress": "192.168.100.6",
+///    "platform": {
+///      "name": "PLATFORM-NAME",
+///    }
+///  }
+/// }
+/// ```
 #[derive(Debug, Clone)]
-pub struct SonataHandler {
+pub struct KafkaSonataHandler {
     config: SonataConfig,
 
-    // sonata id_node -> loopback mapping
+    // sonata id_node -> loopbackAddress mapping
     id_cache: HashMap<u32, IpAddr>,
 }
 
-impl SonataHandler {
+impl KafkaSonataHandler {
     pub fn new(config: SonataConfig) -> Self {
         Self {
             config,
             id_cache: HashMap::new(),
         }
     }
+    pub fn config(&self) -> &SonataConfig {
+        &self.config
+    }
+    pub fn id_cache(&self) -> &HashMap<u32, IpAddr> {
+        &self.id_cache
+    }
+    pub fn id_cache_mut(&mut self) -> &mut HashMap<u32, IpAddr> {
+        &mut self.id_cache
+    }
 }
 
-impl MessageHandler for SonataHandler {
-    type Error = SonataHandlerError;
-
+impl KafkaMessageHandler<EnrichmentOperation> for KafkaSonataHandler {
     fn handle_message(
         &mut self,
         payload: &[u8],
-        _partition: i32,
-        _offset: i64,
-    ) -> Result<Vec<EnrichmentOperation>, Self::Error> {
-        let sonata_data: SonataData = serde_json::from_slice(payload)?;
+        partition: i32,
+        offset: i64,
+    ) -> Result<Vec<EnrichmentOperation>, InputProcessingError> {
+        let sonata_data: SonataData =
+            serde_json::from_slice(payload).map_err(|e| InputProcessingError::JsonError {
+                context: format!("KafkaSonataHandler (partition: {partition}, offset: {offset})"),
+                reason: e.to_string(),
+            })?;
         let mut operations = Vec::new();
 
         match sonata_data.operation {
@@ -113,25 +159,22 @@ impl MessageHandler for SonataHandler {
                     let sonata_id_node = sonata_data.id_node;
 
                     // Check if we have a cached entry for this node_id
-                    if let Some(&old_loopback) = self.id_cache.get(&sonata_id_node) {
+                    if let Some(&old_loopback) = self.id_cache().get(&sonata_id_node) {
                         if loopback != old_loopback {
                             operations.push(EnrichmentOperation::Delete(DeletePayload {
                                 ip: old_loopback,
-                                scope: Scope {
-                                    obs_domain_id: 0,
-                                    scope_fields: None,
-                                },
-                                weight: self.config.weight,
-                                ies: Some(vec![
+                                scope: Scope::new(0, None),
+                                weight: self.config().weight,
+                                ies: vec![
                                     IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
                                     IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
-                                ]),
+                                ],
                             }));
                         }
                     }
 
                     // Update cache with new loopback address
-                    self.id_cache.insert(sonata_id_node, loopback);
+                    self.id_cache_mut().insert(sonata_id_node, loopback);
 
                     // Create Upsert Operation
                     let node_id = Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::nodeId(
@@ -145,90 +188,61 @@ impl MessageHandler for SonataHandler {
                     operations.push(EnrichmentOperation::Upsert(UpsertPayload {
                         ip: node.loopback_address,
                         scope: Scope::new(0, None),
-                        weight: self.config.weight,
-                        fields: Some(vec![node_id, platform_id]),
+                        weight: self.config().weight,
+                        fields: vec![node_id, platform_id],
                     }));
                 } else {
-                    return Err(SonataHandlerError::InvalidOperation(format!(
-                        "Insert/Update operation missing node data for id_node: {}",
-                        sonata_data.id_node
-                    )));
+                    return Err(InputProcessingError::ConversionError {
+                        context: format!(
+                            "KafkaSonataHandler (partition: {partition}, offset: {offset})"
+                        ),
+                        reason: format!(
+                            "Insert/Update operation missing node data for id_node: {} ",
+                            sonata_data.id_node
+                        ),
+                    });
                 }
             }
             SonataOperation::Delete => {
-                if let Some(cached_loopback) = self.id_cache.remove(&sonata_data.id_node) {
+                if let Some(cached_loopback) = self.id_cache_mut().remove(&sonata_data.id_node) {
                     operations.push(EnrichmentOperation::Delete(DeletePayload {
                         ip: cached_loopback,
-                        scope: Scope {
-                            obs_domain_id: 0,
-                            scope_fields: None,
-                        },
-                        weight: self.config.weight,
-                        ies: Some(vec![
+                        scope: Scope::new(0, None),
+                        weight: self.config().weight,
+                        ies: vec![
                             IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
                             IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
-                        ]),
+                        ],
                     }));
                 }
             }
         };
 
-        Ok(operations)
+        Ok(operations
+            .into_iter()
+            .filter(|op| op.validate()) // drop useless no-field ops
+            .collect())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
-
-    #[test]
-    fn test_sonata_json_serialization() {
-        let insert = r#"{"operation": "insert", "id_node": 13244, "node": {"hostname": "test-node", "loopbackAddress": "1.1.1.1", "managementAddress": "1.1.1.1", "function": null, "serviceId": null, "customField": null, "nameDaisyServiceTemplate": "migr_bgp_flow2rd_md5", "idNode": "dsy-nod-13244", "idPlatform": "dsy-plt-115", "isDeployed": false, "lastUpdate": "2025-02-20T16:00:53", "platform": {"name": "DAISY-PE", "contactEmail": "Daisy.Telemetry@swisscom.com", "agileOrgUrl": "https://agileorg.scapp.swisscom.com/organisation/10069/overview", "idPlatform": "dsy-plt-115"}}}"#;
-        let update = r#"{"operation": "update", "id_node": 13244, "node": {"hostname": "test-node", "loopbackAddress": "1.1.1.2", "managementAddress": "1.1.1.1", "function": null, "serviceId": null, "customField": null, "nameDaisyServiceTemplate": "migr_bgp_flow2rd_md5", "idNode": "dsy-nod-13244", "idPlatform": "dsy-plt-115", "isDeployed": false, "lastUpdate": "2025-02-20T16:03:14", "platform": {"name": "DAISY-PE", "contactEmail": "Daisy.Telemetry@swisscom.com", "agileOrgUrl": "https://agileorg.scapp.swisscom.com/organisation/10069/overview", "idPlatform": "dsy-plt-115"}}}"#;
-        let delete = r#"{"operation": "delete", "id_node": 13244, "node": null}"#;
-
-        let insert_data = serde_json::from_str::<SonataData>(insert).unwrap();
-        let update_data = serde_json::from_str::<SonataData>(update).unwrap();
-        let delete_data = serde_json::from_str::<SonataData>(delete).unwrap();
-
-        let expected_insert = SonataData {
-            operation: SonataOperation::Insert,
-            id_node: 13244,
-            node: Some(SonataNode {
-                hostname: "test-node".to_string(),
-                loopback_address: IpAddr::from_str("1.1.1.1").unwrap(),
-                platform: SonataPlatform {
-                    name: "DAISY-PE".to_string(),
-                },
-            }),
-        };
-        let expected_update = SonataData {
-            operation: SonataOperation::Update,
-            id_node: 13244,
-            node: Some(SonataNode {
-                hostname: "test-node".to_string(),
-                loopback_address: IpAddr::from_str("1.1.1.2").unwrap(),
-                platform: SonataPlatform {
-                    name: "DAISY-PE".to_string(),
-                },
-            }),
-        };
-        let expected_delete = SonataData {
-            operation: SonataOperation::Delete,
-            id_node: 13244,
-            node: None,
-        };
-
-        assert_eq!(insert_data, expected_insert);
-        assert_eq!(update_data, expected_update);
-        assert_eq!(delete_data, expected_delete);
-    }
+    use crate::{
+        flow::enrichment::{DeletePayload, EnrichmentOperation, Scope, UpsertPayload},
+        inputs::{
+            kafka::{
+                handlers::{KafkaMessageHandler, KafkaSonataHandler},
+                SonataConfig,
+            },
+            InputProcessingError,
+        },
+    };
 
     #[test]
     fn test_sonata_handler_insert() {
         let config = SonataConfig { weight: 10 };
-        let mut handler = SonataHandler::new(config);
+        let mut handler = KafkaSonataHandler::new(config);
 
         let insert_json = r#"{"operation": "insert", "id_node": 123, "node": {"hostname": "test-node", "loopbackAddress": "10.0.0.1", "platform": {"name": "test-platform"}}}"#;
 
@@ -240,14 +254,14 @@ mod tests {
             ip: "10.0.0.1".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 10,
-            fields: Some(vec![
+            fields: vec![
                 Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::nodeId(
                     "test-node".into(),
                 )),
                 Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::platformId(
                     "test-platform".into(),
                 )),
-            ]),
+            ],
         })];
 
         assert_eq!(operations, expected_operations);
@@ -256,7 +270,7 @@ mod tests {
     #[test]
     fn test_sonata_handler_update_with_ip_change() {
         let config = SonataConfig { weight: 10 };
-        let mut handler = SonataHandler::new(config);
+        let mut handler = KafkaSonataHandler::new(config);
 
         // First insert
         let insert_json = r#"{"operation": "insert", "id_node": 123, "node": {"hostname": "test-node", "loopbackAddress": "10.0.0.1", "platform": {"name": "test-platform"}}}"#;
@@ -276,24 +290,24 @@ mod tests {
                 ip: "10.0.0.1".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 10,
-                ies: Some(vec![
+                ies: vec![
                     IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
                     IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
-                ]),
+                ],
             }),
             // Insert new entry
             EnrichmentOperation::Upsert(UpsertPayload {
                 ip: "10.0.0.2".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 10,
-                fields: Some(vec![
+                fields: vec![
                     Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::nodeId(
                         "updated-node".into(),
                     )),
                     Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::platformId(
                         "updated-platform".into(),
                     )),
-                ]),
+                ],
             }),
         ];
 
@@ -303,7 +317,7 @@ mod tests {
     #[test]
     fn test_sonata_handler_update_same_ip() {
         let config = SonataConfig { weight: 10 };
-        let mut handler = SonataHandler::new(config);
+        let mut handler = KafkaSonataHandler::new(config);
 
         // First insert
         let insert_json = r#"{"operation": "insert", "id_node": 123, "node": {"hostname": "test-node", "loopbackAddress": "10.0.0.1", "platform": {"name": "test-platform"}}}"#;
@@ -323,14 +337,14 @@ mod tests {
                 ip: "10.0.0.1".parse().unwrap(),
                 scope: Scope::new(0, None),
                 weight: 10,
-                fields: Some(vec![
+                fields: vec![
                     Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::nodeId(
                         "updated-node".into(),
                     )),
                     Field::NetGauze(netgauze_flow_pkt::ie::netgauze::Field::platformId(
                         "updated-platform".into(),
                     )),
-                ]),
+                ],
             }),
         ];
 
@@ -340,7 +354,7 @@ mod tests {
     #[test]
     fn test_sonata_handler_delete() {
         let config = SonataConfig { weight: 10 };
-        let mut handler = SonataHandler::new(config);
+        let mut handler = KafkaSonataHandler::new(config);
 
         // First insert to have something to delete
         let insert_json = r#"{"operation": "insert", "id_node": 123, "node": {"hostname": "test-node", "loopbackAddress": "10.0.0.1", "platform": {"name": "test-platform"}}}"#;
@@ -358,10 +372,10 @@ mod tests {
             ip: "10.0.0.1".parse().unwrap(),
             scope: Scope::new(0, None),
             weight: 10,
-            ies: Some(vec![
+            ies: vec![
                 IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
                 IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
-            ]),
+            ],
         })];
 
         assert_eq!(operations, expected_operations);
@@ -370,7 +384,7 @@ mod tests {
     #[test]
     fn test_sonata_handler_delete_nonexistent() {
         let config = SonataConfig { weight: 10 };
-        let mut handler = SonataHandler::new(config);
+        let mut handler = KafkaSonataHandler::new(config);
 
         // Delete without inserting first
         let delete_json = r#"{"operation": "delete", "id_node": 123, "node": null}"#;
@@ -386,45 +400,43 @@ mod tests {
     #[test]
     fn test_sonata_handler_invalid_insert() {
         let config = SonataConfig { weight: 10 };
-        let mut handler = SonataHandler::new(config);
+        let mut handler = KafkaSonataHandler::new(config);
 
         let invalid_json = r#"{"operation": "insert", "id_node": 123, "node": null}"#;
 
         let result = handler.handle_message(invalid_json.as_bytes(), 0, 0);
         assert!(result.is_err());
 
-        match result.unwrap_err() {
-            SonataHandlerError::InvalidOperation(msg) => {
-                assert!(msg.contains("Insert/Update operation missing node data"));
-                assert!(msg.contains("123"));
-            }
-            _ => panic!("Expected InvalidOperation error"),
-        }
+        let expected_error = InputProcessingError::ConversionError {
+            context: "KafkaSonataHandler (partition: 0, offset: 0)".to_string(),
+            reason: "Insert/Update operation missing node data for id_node: 123 ".to_string(),
+        };
+
+        assert_eq!(result.unwrap_err().to_string(), expected_error.to_string());
     }
 
     #[test]
     fn test_sonata_handler_invalid_update() {
         let config = SonataConfig { weight: 10 };
-        let mut handler = SonataHandler::new(config);
+        let mut handler = KafkaSonataHandler::new(config);
 
         let invalid_json = r#"{"operation": "update", "id_node": 456, "node": null}"#;
 
         let result = handler.handle_message(invalid_json.as_bytes(), 0, 0);
         assert!(result.is_err());
 
-        match result.unwrap_err() {
-            SonataHandlerError::InvalidOperation(msg) => {
-                assert!(msg.contains("Insert/Update operation missing node data"));
-                assert!(msg.contains("456"));
-            }
-            _ => panic!("Expected InvalidOperation error"),
-        }
+        let expected_error = InputProcessingError::ConversionError {
+            context: "KafkaSonataHandler (partition: 0, offset: 0)".to_string(),
+            reason: "Insert/Update operation missing node data for id_node: 456 ".to_string(),
+        };
+
+        assert_eq!(result.unwrap_err().to_string(), expected_error.to_string());
     }
 
     #[test]
     fn test_sonata_handler_malformed_json() {
         let config = SonataConfig { weight: 10 };
-        let mut handler = SonataHandler::new(config);
+        let mut handler = KafkaSonataHandler::new(config);
 
         let malformed_json = r#"{"operation": "insert", "id_node": "not_a_number"}"#;
 
@@ -432,8 +444,10 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            SonataHandlerError::JsonDeserializationError(_) => {}
-            _ => panic!("Expected JsonDeserializationError"),
+            InputProcessingError::JsonError { context, reason: _ } => {
+                assert!(context.contains("KafkaSonataHandler (partition: 0, offset: 0"));
+            }
+            _ => panic!("Expected JsonError"),
         }
     }
 }

@@ -15,12 +15,10 @@
 
 use crate::{
     config::{FlowConfig, PublisherEndpoint, UdpNotifConfig},
-    flow::{
-        aggregation::AggregationActorHandle,
-        enrichment::{
-            EnrichmentActorHandle, FilesActorHandle, FlowOptionsActorHandle,
-            KafkaConsumerActorHandle,
-        },
+    flow::{aggregation::AggregationActorHandle, enrichment::FlowEnrichmentActorHandle},
+    inputs::{
+        files::FilesActorHandle, flow_options::FlowOptionsActorHandle,
+        kafka::KafkaConsumerActorHandle,
     },
     publishers::{
         http::{HttpPublisherActorHandle, Message},
@@ -29,6 +27,7 @@ use crate::{
         kafka_yang::KafkaYangPublisherActorHandle,
     },
 };
+
 use futures_util::{stream::FuturesUnordered, StreamExt};
 use netgauze_flow_pkt::FlowInfo;
 use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
@@ -45,6 +44,7 @@ use tracing::{info, warn};
 
 pub mod config;
 pub mod flow;
+pub mod inputs;
 pub mod publishers;
 pub mod telemetry;
 
@@ -109,7 +109,7 @@ pub async fn init_flow_collection(
                 }
                 PublisherEndpoint::FlowKafkaAvro(config) => {
                     for (shard_id, flow_recv) in flow_recvs.iter().enumerate() {
-                        let (enrichment_join, enrichment_handle) = EnrichmentActorHandle::new(
+                        let (enrichment_join, enrichment_handle) = FlowEnrichmentActorHandle::new(
                             publisher_config.buffer_size,
                             flow_recv.clone(),
                             either::Left(meter.clone()),
@@ -154,8 +154,8 @@ pub async fn init_flow_collection(
                             .and_then(|i| i.flow_options.as_ref())
                         {
                             let (flow_options_join, flow_options_handle) =
-                                FlowOptionsActorHandle::new(
-                                    flow_options_config.clone(),
+                                FlowOptionsActorHandle::from_config(
+                                    flow_options_config,
                                     flow_recv.clone(),
                                     enrichment_handles.clone(),
                                     either::Left(meter.clone()),
@@ -169,7 +169,7 @@ pub async fn init_flow_collection(
                             .as_ref()
                             .and_then(|i| i.files.as_ref())
                         {
-                            let (files_join, files_handle) = FilesActorHandle::new(
+                            let (files_join, files_handle) = FilesActorHandle::from_config(
                                 files_config.clone(),
                                 enrichment_handles.clone(),
                                 either::Left(meter.clone()),
@@ -183,23 +183,22 @@ pub async fn init_flow_collection(
                             .as_ref()
                             .and_then(|i| i.kafka.as_ref())
                         {
-                            let (kafka_joins, kafka_handles) =
-                                KafkaConsumerActorHandle::from_config(
-                                    kafka_config.clone(),
-                                    enrichment_handles.clone(),
-                                    either::Left(meter.clone()),
-                                )?;
-
-                            for kafka_join in kafka_joins {
-                                join_set.push(kafka_join);
+                            for consumer_config in &kafka_config.consumers {
+                                let (join_handle, actor_handle) =
+                                    KafkaConsumerActorHandle::from_config(
+                                        consumer_config,
+                                        enrichment_handles.clone(),
+                                        either::Left(meter.clone()),
+                                    )?;
+                                join_set.push(join_handle);
+                                kafka_input_handles.push(actor_handle);
                             }
-                            kafka_input_handles.extend(kafka_handles);
                         }
                     }
                 }
                 PublisherEndpoint::FlowKafkaJson(config) => {
                     for (shard_id, flow_recv) in flow_recvs.iter().enumerate() {
-                        let (enrichment_join, enrichment_handle) = EnrichmentActorHandle::new(
+                        let (enrichment_join, enrichment_handle) = FlowEnrichmentActorHandle::new(
                             publisher_config.buffer_size,
                             flow_recv.clone(),
                             either::Left(meter.clone()),
@@ -244,8 +243,8 @@ pub async fn init_flow_collection(
                             .and_then(|i| i.flow_options.as_ref())
                         {
                             let (flow_options_join, flow_options_handle) =
-                                FlowOptionsActorHandle::new(
-                                    flow_options_config.clone(),
+                                FlowOptionsActorHandle::from_config(
+                                    flow_options_config,
                                     flow_recv.clone(),
                                     enrichment_handles.clone(),
                                     either::Left(meter.clone()),
@@ -259,7 +258,7 @@ pub async fn init_flow_collection(
                             .as_ref()
                             .and_then(|i| i.files.as_ref())
                         {
-                            let (files_join, files_handle) = FilesActorHandle::new(
+                            let (files_join, files_handle) = FilesActorHandle::from_config(
                                 files_config.clone(),
                                 enrichment_handles.clone(),
                                 either::Left(meter.clone()),
@@ -273,17 +272,16 @@ pub async fn init_flow_collection(
                             .as_ref()
                             .and_then(|i| i.kafka.as_ref())
                         {
-                            let (kafka_joins, kafka_handles) =
-                                KafkaConsumerActorHandle::from_config(
-                                    kafka_config.clone(),
-                                    enrichment_handles.clone(),
-                                    either::Left(meter.clone()),
-                                )?;
-
-                            for kafka_join in kafka_joins {
-                                join_set.push(kafka_join);
+                            for consumer_config in &kafka_config.consumers {
+                                let (join_handle, actor_handle) =
+                                    KafkaConsumerActorHandle::from_config(
+                                        consumer_config,
+                                        enrichment_handles.clone(),
+                                        either::Left(meter.clone()),
+                                    )?;
+                                join_set.push(join_handle);
+                                kafka_input_handles.push(actor_handle);
                             }
-                            kafka_input_handles.extend(kafka_handles);
                         }
                     }
                 }
