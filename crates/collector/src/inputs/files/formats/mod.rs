@@ -12,27 +12,4 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::flow::enrichment::{inputs::kafka::MessageHandler, EnrichmentOperation};
-
-#[derive(Debug, Clone)]
-pub struct JsonOpsHandler;
-
-impl JsonOpsHandler {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl MessageHandler for JsonOpsHandler {
-    type Error = serde_json::Error;
-
-    fn handle_message(
-        &mut self,
-        payload: &[u8],
-        _partition: i32,
-        _offset: i64,
-    ) -> Result<Vec<EnrichmentOperation>, Self::Error> {
-        let operation: EnrichmentOperation = serde_json::from_slice(payload)?;
-        Ok(vec![operation])
-    }
-}
+pub mod pmacct_maps;

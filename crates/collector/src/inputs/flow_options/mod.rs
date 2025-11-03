@@ -12,8 +12,26 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-mod json_ops;
-mod sonata;
+use serde::{Deserialize, Serialize};
 
-pub use json_ops::JsonOpsHandler;
-pub use sonata::SonataHandler;
+mod actor;
+mod handlers;
+mod normalize;
+
+pub use actor::FlowOptionsActorHandle;
+
+pub(crate) const fn default_weight() -> u8 {
+    16
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowOptionsConfig {
+    #[serde(default = "default_weight")]
+    pub weight: u8,
+}
+
+impl FlowOptionsConfig {
+    pub fn weight(&self) -> u8 {
+        self.weight
+    }
+}

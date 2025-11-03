@@ -47,10 +47,10 @@ fn test_enrich_ipfix_with_cached_metadata() {
         ip: peer_addr.ip(),
         scope: Scope::new(0, None), // Global scope
         weight: 100,
-        fields: Some(vec![
+        fields: vec![
             Field::NetGauze(netgauze::Field::platformId("test-platform-ABC".into())),
             Field::NetGauze(netgauze::Field::nodeId("test-node-123".into())),
-        ]),
+        ],
     });
     actor.enrichment_cache.apply_enrichment(enrichment_op);
 
@@ -193,9 +193,7 @@ fn test_enrich_multiple_records() {
         ip: peer_addr.ip(),
         scope: Scope::new(0, None),
         weight: 100,
-        fields: Some(vec![Field::NetGauze(netgauze::Field::nodeId(
-            "router-01".into(),
-        ))]),
+        fields: vec![Field::NetGauze(netgauze::Field::nodeId("router-01".into()))],
     });
     actor.enrichment_cache.apply_enrichment(enrichment_op);
 

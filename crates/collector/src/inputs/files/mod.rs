@@ -12,15 +12,15 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use netgauze_flow_pkt::ie::IE;
+use serde::{Deserialize, Serialize};
 
 mod actor;
 mod formats;
+mod handlers;
 mod processor;
 
 pub use actor::FilesActorHandle;
-
-use netgauze_flow_pkt::ie::IE;
-use serde::{Deserialize, Serialize};
 
 fn default_weight() -> u8 {
     128
@@ -62,15 +62,23 @@ impl InputFile {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum InputFileFormat {
+    /// Pmacct custom maps format
     PmacctMaps {
         id: IE,
 
         #[serde(default = "default_weight")]
         weight: u8,
     },
+
+    /// JSON-serialized upsert messages
     JSONUpserts,
+}
+
+pub enum LineChangeType {
+    Added,
+    Removed,
 }
 
 #[cfg(test)]

@@ -19,15 +19,12 @@
 //! - Normalizing records into enrichment-ready format
 //! - Converting records to enrichment operations
 
-use crate::flow::{
-    enrichment::{EnrichmentOperation, Scope, UpsertPayload},
-    types::{FieldRefLookup, IndexedDataRecord},
-};
+use crate::flow::types::{FieldRefLookup, IndexedDataRecord};
 use netgauze_flow_pkt::{
     ie::{netgauze, Field, IE},
     ipfix,
 };
-use std::{net::IpAddr, string::ToString};
+use std::string::ToString;
 use tracing::debug;
 
 #[derive(strum_macros::Display, Debug, Clone, PartialEq, Eq)]
@@ -408,58 +405,16 @@ impl OptionsDataRecord {
         IndexedDataRecord::new(&scope_fields, &fields)
     }
 
-    /// Create an enrichment upsert operation from a data record
-    fn upsert_from_rec(
-        peer_ip: IpAddr,
-        obs_id: u32,
-        weight: u8,
-        record: &IndexedDataRecord,
-    ) -> EnrichmentOperation {
-        EnrichmentOperation::Upsert(UpsertPayload {
-            ip: peer_ip,
-            scope: Scope::new(
-                obs_id,
-                Some(record.scope_fields().values().cloned().collect()),
-            ),
-            weight,
-            fields: Some(record.fields().values().cloned().collect()),
-        })
-    }
-
-    /// Generate enrichment upsert operations from this options record
-    ///
-    /// Normalizes the record based on its type and creates appropriate
-    /// enrichment operations for each normalized record.
-    pub fn into_enrichment_operations(
-        self,
-        weight: u8,
-        peer_ip: IpAddr,
-        obs_id: u32,
-    ) -> Result<Vec<EnrichmentOperation>, OptionsDataRecordError> {
-        let mut ops = Vec::new();
-
+    /// Normalize this OptionsDataRecord into one or more IndexedDataRecord(s)
+    pub fn into_normalized_records(self) -> Result<Vec<IndexedDataRecord>, OptionsDataRecordError> {
         match self {
-            OptionsDataRecord::Sampling(record) => {
-                for rec in Self::normalize_sampling_type(record) {
-                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, weight, &rec));
-                }
-            }
-            OptionsDataRecord::Interface(record) => {
-                for rec in Self::normalize_interface_type(record)? {
-                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, weight, &rec));
-                }
-            }
-            OptionsDataRecord::Vrf(record) => {
-                for rec in Self::normalize_vrf_type(record)? {
-                    ops.push(Self::upsert_from_rec(peer_ip, obs_id, weight, &rec));
-                }
-            }
+            OptionsDataRecord::Sampling(record) => Ok(Self::normalize_sampling_type(record)),
+            OptionsDataRecord::Interface(record) => Self::normalize_interface_type(record),
+            OptionsDataRecord::Vrf(record) => Self::normalize_vrf_type(record),
             OptionsDataRecord::Unclassified(record) => {
-                let rec = Self::normalize_unclassified_type(record);
-                ops.push(Self::upsert_from_rec(peer_ip, obs_id, weight, &rec));
+                Ok(vec![Self::normalize_unclassified_type(record)])
             }
         }
-        Ok(ops)
     }
 }
 

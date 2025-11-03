@@ -43,12 +43,12 @@
 //!
 //! Additional formats can be added via the `MessageFormat` enum and
 //! corresponding message handlers implementing the `MessageHandler` trait.
-use crate::flow::enrichment::{
-    inputs::kafka::{
-        handlers::{JsonOpsHandler, SonataHandler},
-        KafkaConfig, KafkaConsumerConfig, MessageFormat, MessageHandler,
+use crate::inputs::{
+    kafka::{
+        handlers::{KafkaJsonOpsHandler, KafkaMessageHandler, KafkaSonataHandler},
+        KafkaConsumerConfig, KafkaMessageFormat,
     },
-    EnrichmentActorHandle,
+    EnrichmentHandle,
 };
 use rdkafka::{
     config::ClientConfig,
@@ -61,8 +61,6 @@ use rdkafka::{
 use std::{str::Utf8Error, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, trace, warn};
-
-type JoinHandles = Vec<JoinHandle<anyhow::Result<String>>>;
 
 const MAX_BACKOFF_TIME: Duration = Duration::from_secs(10);
 
@@ -167,21 +165,32 @@ impl ConsumerContext for KafkaContext {
 }
 
 /// Main Kafka consumer actor that processes enrichment messages.
-struct KafkaConsumerActor<H: MessageHandler> {
+struct KafkaConsumerActor<T, H, E>
+where
+    T: std::fmt::Display + Clone + Send + Sync + 'static,
+    H: KafkaMessageHandler<T>,
+    E: EnrichmentHandle<T>,
+{
     cmd_rx: mpsc::Receiver<KafkaConsumerActorCommand>,
     config: KafkaConsumerConfig,
-    enrichment_handles: Vec<EnrichmentActorHandle>,
+    enrichment_handles: Vec<E>,
     consumer: StreamConsumer<KafkaContext>,
     stats: KafkaConsumerStats,
     message_handler: H,
     otel_tags: Vec<opentelemetry::KeyValue>,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<H: MessageHandler> KafkaConsumerActor<H> {
+impl<T, H, E> KafkaConsumerActor<T, H, E>
+where
+    T: std::fmt::Display + Clone + Send + Sync + 'static,
+    H: KafkaMessageHandler<T>,
+    E: EnrichmentHandle<T>,
+{
     fn new(
         config: KafkaConsumerConfig,
         cmd_rx: mpsc::Receiver<KafkaConsumerActorCommand>,
-        enrichment_handles: Vec<EnrichmentActorHandle>,
+        enrichment_handles: Vec<E>,
         stats: KafkaConsumerStats,
         message_handler: H,
     ) -> Result<Self, KafkaConsumerActorError> {
@@ -200,6 +209,7 @@ impl<H: MessageHandler> KafkaConsumerActor<H> {
             stats,
             message_handler,
             otel_tags,
+            _phantom: std::marker::PhantomData,
         })
     }
 
@@ -279,7 +289,7 @@ impl<H: MessageHandler> KafkaConsumerActor<H> {
                                 Some(p) => p,
                                 None => {
                                     self.stats.empty_payload.add(1, &self.otel_tags);
-                                    warn!("Empty payload at partition {partition} and offset {offset}");
+                                    warn!("Empty payload at topic \"{}\" partition {partition} and offset {offset}", self.config.topic);
                                     continue;
                                 }
                             };
@@ -292,7 +302,7 @@ impl<H: MessageHandler> KafkaConsumerActor<H> {
                                 Err(err) => {
                                     self.stats.message_handling_error.add(1, &self.otel_tags);
                                     warn!(
-                                        "Failed to handle message at partition {partition} and offset {offset}: {err}"
+                                        "Failed to handle message at topic \"{}\": {err}", self.config.topic
                                     );
                                     continue;
                                 }
@@ -300,7 +310,7 @@ impl<H: MessageHandler> KafkaConsumerActor<H> {
 
                             // Track operations generated
                             self.stats.operations_generated.add(operations.len() as u64, &self.otel_tags);
-                            trace!("Generated {} operations from message at partition {partition} offset {offset}", operations.len());
+                            trace!("Generated {} operations from message at topic \"{}\" partition {partition} offset {offset}", operations.len(), self.config.topic);
 
                             // Send enrichment operations to all registered enrichment actors.
                             //
@@ -408,12 +418,15 @@ pub struct KafkaConsumerActorHandle {
 }
 
 impl KafkaConsumerActorHandle {
-    pub fn new<H: MessageHandler>(
+    pub fn new<T>(
         consumer_config: KafkaConsumerConfig,
-        enrichment_handles: Vec<EnrichmentActorHandle>,
+        enrichment_handles: Vec<impl EnrichmentHandle<T> + 'static>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaConsumerStats>,
-        message_handler: H,
-    ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaConsumerActorError> {
+        message_handler: impl KafkaMessageHandler<T> + 'static,
+    ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaConsumerActorError>
+    where
+        T: std::fmt::Display + Clone + Send + Sync + 'static,
+    {
         let (cmd_send, cmd_rx) = mpsc::channel::<KafkaConsumerActorCommand>(1);
         let stats = match stats {
             either::Left(meter) => KafkaConsumerStats::new(meter),
@@ -430,44 +443,30 @@ impl KafkaConsumerActorHandle {
         Ok((join_handle, KafkaConsumerActorHandle { cmd_send }))
     }
 
-    /// Create a KafkaConsumerActor from KafkaConsumerConfig
-    pub fn from_consumer_config(
-        consumer_config: KafkaConsumerConfig,
-        enrichment_handles: Vec<EnrichmentActorHandle>,
+    pub fn from_config<T>(
+        consumer_config: &KafkaConsumerConfig,
+        enrichment_handles: Vec<impl EnrichmentHandle<T> + 'static>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaConsumerStats>,
-    ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaConsumerActorError> {
+    ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaConsumerActorError>
+    where
+        T: std::fmt::Display + Clone + Send + Sync + 'static,
+        KafkaJsonOpsHandler: KafkaMessageHandler<T>,
+        KafkaSonataHandler: KafkaMessageHandler<T>,
+    {
         match &consumer_config.message_format {
-            MessageFormat::JsonOps => {
-                let handler = JsonOpsHandler::new();
-                Self::new(consumer_config, enrichment_handles, stats, handler)
-            }
-            MessageFormat::Sonata(sonata_config) => {
-                let handler = SonataHandler::new(sonata_config.clone());
-                Self::new(consumer_config, enrichment_handles, stats, handler)
-            }
+            KafkaMessageFormat::JsonOps => Self::new(
+                consumer_config.clone(),
+                enrichment_handles,
+                stats,
+                KafkaJsonOpsHandler::new(),
+            ),
+            KafkaMessageFormat::Sonata(sonata_config) => Self::new(
+                consumer_config.clone(),
+                enrichment_handles,
+                stats,
+                KafkaSonataHandler::new(sonata_config.clone()),
+            ),
         }
-    }
-
-    /// Create multiple KafkaConsumerActor instances from KafkaConfig
-    pub fn from_config(
-        kafka_config: KafkaConfig,
-        enrichment_handles: Vec<EnrichmentActorHandle>,
-        stats: either::Either<opentelemetry::metrics::Meter, KafkaConsumerStats>,
-    ) -> Result<(JoinHandles, Vec<Self>), KafkaConsumerActorError> {
-        let mut join_handles = Vec::new();
-        let mut actor_handles = Vec::new();
-
-        for consumer_config in kafka_config.consumers {
-            let (join_handle, actor_handle) = Self::from_consumer_config(
-                consumer_config,
-                enrichment_handles.clone(),
-                stats.clone(),
-            )?;
-            join_handles.push(join_handle);
-            actor_handles.push(actor_handle);
-        }
-
-        Ok((join_handles, actor_handles))
     }
 
     pub async fn shutdown(&self) -> Result<(), KafkaConsumerActorHandleError> {
