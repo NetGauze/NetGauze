@@ -77,7 +77,8 @@ pub struct TelemetryMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
     data_collection_manifest: Option<Manifest>,
 
-    network_operator_metadata: NetworkOperatorMetadata,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    network_operator_metadata: Option<NetworkOperatorMetadata>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     payload: Option<Value>,
@@ -88,7 +89,7 @@ impl TelemetryMessage {
         network_node_manifest: Option<Manifest>,
         telemetry_message_metadata: TelemetryMessageMetadata,
         data_collection_manifest: Option<Manifest>,
-        network_operator_metadata: NetworkOperatorMetadata,
+        network_operator_metadata: Option<NetworkOperatorMetadata>,
         payload: Option<Value>,
     ) -> Self {
         Self {
@@ -108,8 +109,8 @@ impl TelemetryMessage {
     pub fn telemetry_message_metadata(&self) -> &TelemetryMessageMetadata {
         &self.telemetry_message_metadata
     }
-    pub fn network_operator_metadata(&self) -> &NetworkOperatorMetadata {
-        &self.network_operator_metadata
+    pub fn network_operator_metadata(&self) -> Option<&NetworkOperatorMetadata> {
+        self.network_operator_metadata.as_ref()
     }
     pub fn payload(&self) -> Option<&Value> {
         self.payload.as_ref()
@@ -439,6 +440,7 @@ impl From<crate::model::notification::UpdateTrigger> for UpdateTrigger {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct NetworkOperatorMetadata {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     labels: Vec<Label>,
 }
 
@@ -456,12 +458,18 @@ pub struct Label {
     name: String,
 
     #[serde(flatten)]
-    value: Option<LabelValue>,
+    value: LabelValue,
 }
 
 impl Label {
-    pub fn new(name: String, value: Option<LabelValue>) -> Self {
+    pub fn new(name: String, value: LabelValue) -> Self {
         Self { name, value }
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn value(&self) -> &LabelValue {
+        &self.value
     }
 }
 
@@ -476,6 +484,21 @@ pub enum LabelValue {
         #[serde(rename = "anydata-values")]
         anydata_values: Value,
     },
+}
+
+impl LabelValue {
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            LabelValue::StringValue { string_value } => Some(string_value.as_str()),
+            _ => None,
+        }
+    }
+    pub fn as_anydata(&self) -> Option<&Value> {
+        match self {
+            LabelValue::AnydataValue { anydata_values } => Some(anydata_values),
+            _ => None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -545,22 +568,22 @@ mod tests {
                     os_version: Some("8.10".to_string()),
                     os_type: Some("Rocky Linux".to_string()),
                 }),
-                network_operator_metadata: NetworkOperatorMetadata {
+                network_operator_metadata: Some(NetworkOperatorMetadata {
                     labels: vec![
                         Label {
                             name: "platform_id".to_string(),
-                            value: Some(LabelValue::StringValue {
+                            value: LabelValue::StringValue {
                                 string_value: "IETF LAB".to_string(),
-                            }),
+                            },
                         },
                         Label {
                             name: "test_anykey_label".to_string(),
-                            value: Some(LabelValue::AnydataValue {
+                            value: LabelValue::AnydataValue {
                                 anydata_values: serde_json::json!({"key": "value"}),
-                            }),
+                            },
                         },
                     ],
-                },
+                }),
                 payload: None,
             },
         };
@@ -570,6 +593,47 @@ mod tests {
 
         // Expected JSON string
         let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
+
+        // Assert that the serialized JSON string matches the expected JSON string
+        assert_eq!(
+            serialized, expected_json,
+            "Serialized JSON does not match the expected JSON"
+        );
+
+        // Deserialize the JSON string back to a TelemetryMessage
+        let deserialized: TelemetryMessageWrapper =
+            serde_json::from_str(&serialized).expect("Failed to deserialize");
+
+        // Assert that the original and deserialized messages are equal
+        assert_eq!(original_message, deserialized);
+    }
+
+    #[test]
+    fn test_telemetry_message_minimal() {
+        let original_message = TelemetryMessageWrapper {
+            message: TelemetryMessage {
+                network_node_manifest: None,
+                telemetry_message_metadata: TelemetryMessageMetadata {
+                    node_export_timestamp: None,
+                    collection_timestamp: Utc.timestamp_millis_opt(0).unwrap(),
+                    session_protocol: SessionProtocol::Unknown,
+                    export_address: "127.0.0.1".parse().unwrap(),
+                    export_port: None,
+                    collection_address: None,
+                    collection_port: None,
+                    yang_push_subscription: None,
+                },
+                data_collection_manifest: None,
+                network_operator_metadata: None,
+                payload: None,
+            },
+        };
+
+        // Serialize the TelemetryMessage to JSON
+        let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
+
+        // Expected JSON string
+        let expected_json = r#"{"ietf-telemetry-message:message":{"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","session-protocol":"unknown","export-address":"127.0.0.1"}}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
