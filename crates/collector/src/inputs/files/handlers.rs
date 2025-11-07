@@ -12,17 +12,12 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::{
-    flow::enrichment::{
-        DeletePayload, EnrichmentOperation, EnrichmentOperationType, Scope, UpsertPayload, Weight,
+use crate::inputs::{
+    files::{
+        formats::pmacct_maps::{PmacctMapEntry, PmacctMapEntryScope, PmacctMapError},
+        LineChangeType,
     },
-    inputs::{
-        files::{
-            formats::pmacct_maps::{PmacctMapEntry, PmacctMapEntryScope, PmacctMapError},
-            LineChangeType,
-        },
-        InputProcessingError,
-    },
+    InputProcessingError,
 };
 use netgauze_flow_pkt::ie::{netgauze, Field, HasIE, IE};
 use std::{net::IpAddr, path::Path};
@@ -40,10 +35,10 @@ pub trait FilesLineHandler<T>: Send + Sync + 'static {
     ) -> Result<Vec<T>, InputProcessingError>;
 }
 
-/// **Json Upserts Handler**
+/// **Flow Upserts Handler**
 ///
-/// Handler for json-line input files with [`EnrichmentUpserts`] format,
-/// such as:
+/// Handler for json-line input files with
+/// [`crate::flow::enrichment::UpsertPayload`] format, such as:
 ///
 /// ```jsonl
 /// {"ip":"::ffff:192.168.100.6","scope":{"obs_domain_id":1999104,"scope_fields":[{"selectorId":27}]},"weight":200,"fields":[{"virtualStationName":"STATION-NAME"}]}
@@ -51,24 +46,25 @@ pub trait FilesLineHandler<T>: Send + Sync + 'static {
 /// {"ip":"::ffff:192.168.100.6","scope":{"obs_domain_id":1999104,"scope_fields":[{"ingressInterface":7000}]},"weight":254,"fields":[{"observationPointType":"Portchannel"}]}
 /// ```
 #[derive(Debug, Clone)]
-pub struct JsonUpsertsHandler;
+pub struct FlowUpsertsHandler;
 
-impl JsonUpsertsHandler {
+impl FlowUpsertsHandler {
     pub fn new() -> Self {
         Self
     }
 }
-impl FilesLineHandler<EnrichmentOperation> for JsonUpsertsHandler {
+
+impl FilesLineHandler<crate::flow::enrichment::EnrichmentOperation> for FlowUpsertsHandler {
     fn handle_line(
         &mut self,
         line: &str,
         change_type: LineChangeType,
         _path: &Path,
-    ) -> Result<Vec<EnrichmentOperation>, InputProcessingError> {
+    ) -> Result<Vec<crate::flow::enrichment::EnrichmentOperation>, InputProcessingError> {
         // Parse JSON into UpsertPayload
-        let upsert: UpsertPayload =
+        let upsert: crate::flow::enrichment::UpsertPayload =
             serde_json::from_str(line).map_err(|e| InputProcessingError::JsonError {
-                context: format!("JsonUpsertsHandler (line '{line}')"),
+                context: format!("FlowUpsertsHandler (line '{line}')"),
                 reason: e.to_string(),
             })?;
 
@@ -77,14 +73,95 @@ impl FilesLineHandler<EnrichmentOperation> for JsonUpsertsHandler {
         }
 
         match change_type {
-            LineChangeType::Added => Ok(vec![EnrichmentOperation::Upsert(upsert)]),
+            LineChangeType::Added => {
+                Ok(vec![crate::flow::enrichment::EnrichmentOperation::Upsert(
+                    upsert,
+                )])
+            }
             LineChangeType::Removed => {
                 // If line was removed: generate delete payload from upsert payload (one-way
                 // conversion)
-                let delete: DeletePayload = upsert.into();
-                Ok(vec![EnrichmentOperation::Delete(delete)])
+                let delete: crate::flow::enrichment::DeletePayload = upsert.into();
+                Ok(vec![crate::flow::enrichment::EnrichmentOperation::Delete(
+                    delete,
+                )])
             }
         }
+    }
+}
+
+impl FilesLineHandler<crate::yang_push::EnrichmentOperation> for FlowUpsertsHandler {
+    fn handle_line(
+        &mut self,
+        _line: &str,
+        _change_type: LineChangeType,
+        _path: &Path,
+    ) -> Result<Vec<crate::yang_push::EnrichmentOperation>, InputProcessingError> {
+        Err(InputProcessingError::UnsupportedOperation {
+            handler: "FlowUpsertsHandler".to_string(),
+            reason: "This handler only supports flow::enrichment::EnrichmentOperation".to_string(),
+        })
+    }
+}
+
+/// **Yang-Push Upserts Handler**
+///
+/// Handler for json-line input files with [`crate::yang_push::UpsertPayload`]
+/// format, such as:
+///
+/// ```jsonl
+/// {"ip":"1.1.1.1","weight":29, "labels":[{"name":"node_id","string-value":"n1"},{"name":"platform_id","string-value":"p1"}]}
+/// ```
+pub struct YangPushUpsertsHandler;
+
+impl YangPushUpsertsHandler {
+    pub fn new() -> Self {
+        Self
+    }
+}
+impl FilesLineHandler<crate::yang_push::EnrichmentOperation> for YangPushUpsertsHandler {
+    fn handle_line(
+        &mut self,
+        line: &str,
+        change_type: LineChangeType,
+        _path: &Path,
+    ) -> Result<Vec<crate::yang_push::EnrichmentOperation>, InputProcessingError> {
+        // Parse JSON into UpsertPayload
+        let upsert: crate::yang_push::UpsertPayload =
+            serde_json::from_str(line).map_err(|e| InputProcessingError::JsonError {
+                context: format!("YangPushUpsertsHandler (line '{line}')"),
+                reason: e.to_string(),
+            })?;
+
+        if !upsert.validate() {
+            return Ok(vec![]); // drop useless no-field op
+        }
+
+        match change_type {
+            LineChangeType::Added => {
+                Ok(vec![crate::yang_push::EnrichmentOperation::Upsert(upsert)])
+            }
+            LineChangeType::Removed => {
+                // If line was removed: generate delete payload from upsert payload (one-way
+                // conversion)
+                let delete: crate::yang_push::DeletePayload = upsert.into();
+                Ok(vec![crate::yang_push::EnrichmentOperation::Delete(delete)])
+            }
+        }
+    }
+}
+
+impl FilesLineHandler<crate::flow::enrichment::EnrichmentOperation> for YangPushUpsertsHandler {
+    fn handle_line(
+        &mut self,
+        _line: &str,
+        _change_type: LineChangeType,
+        _path: &Path,
+    ) -> Result<Vec<crate::flow::enrichment::EnrichmentOperation>, InputProcessingError> {
+        Err(InputProcessingError::UnsupportedOperation {
+            handler: "YangPushUpsertsHandler".to_string(),
+            reason: "This handler only supports yang_push::EnrichmentOperation".to_string(),
+        })
     }
 }
 
@@ -116,18 +193,22 @@ impl PmacctMapsHandler {
     }
 }
 
-impl FilesLineHandler<EnrichmentOperation> for PmacctMapsHandler {
+impl FilesLineHandler<crate::flow::enrichment::EnrichmentOperation> for PmacctMapsHandler {
     fn handle_line(
         &mut self,
         line: &str,
         change_type: LineChangeType,
         _path: &Path,
-    ) -> Result<Vec<EnrichmentOperation>, InputProcessingError> {
+    ) -> Result<Vec<crate::flow::enrichment::EnrichmentOperation>, InputProcessingError> {
         match PmacctMapEntry::parse_line(line) {
             Ok(Some(entry)) => {
                 let op_type = match change_type {
-                    LineChangeType::Added => EnrichmentOperationType::Upsert,
-                    LineChangeType::Removed => EnrichmentOperationType::Delete,
+                    LineChangeType::Added => {
+                        crate::flow::enrichment::EnrichmentOperationType::Upsert
+                    }
+                    LineChangeType::Removed => {
+                        crate::flow::enrichment::EnrichmentOperationType::Delete
+                    }
                 };
 
                 let ops = entry
@@ -151,28 +232,50 @@ impl FilesLineHandler<EnrichmentOperation> for PmacctMapsHandler {
     }
 }
 
+impl FilesLineHandler<crate::yang_push::EnrichmentOperation> for PmacctMapsHandler {
+    fn handle_line(
+        &mut self,
+        _line: &str,
+        _change_type: LineChangeType,
+        _path: &Path,
+    ) -> Result<Vec<crate::yang_push::EnrichmentOperation>, InputProcessingError> {
+        Err(InputProcessingError::UnsupportedOperation {
+            handler: "PmacctMapsHandler".to_string(),
+            reason: "This handler only supports flow::enrichment::EnrichmentOperation".to_string(),
+        })
+    }
+}
+
 /// Helper function to create an EnrichmentOperation for a single field
 /// based on Scope, Weight, and EnrichmentOperationType
 fn create_operation(
     ip: IpAddr,
-    scope: Scope,
-    weight: Weight,
+    scope: crate::flow::enrichment::Scope,
+    weight: crate::flow::enrichment::Weight,
     field: Field,
-    op_type: EnrichmentOperationType,
-) -> EnrichmentOperation {
+    op_type: crate::flow::enrichment::EnrichmentOperationType,
+) -> crate::flow::enrichment::EnrichmentOperation {
     match op_type {
-        EnrichmentOperationType::Upsert => EnrichmentOperation::Upsert(UpsertPayload {
-            ip,
-            scope,
-            weight,
-            fields: vec![field],
-        }),
-        EnrichmentOperationType::Delete => EnrichmentOperation::Delete(DeletePayload {
-            ip,
-            scope,
-            weight,
-            ies: vec![field.ie()],
-        }),
+        crate::flow::enrichment::EnrichmentOperationType::Upsert => {
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip,
+                    scope,
+                    weight,
+                    fields: vec![field],
+                },
+            )
+        }
+        crate::flow::enrichment::EnrichmentOperationType::Delete => {
+            crate::flow::enrichment::EnrichmentOperation::Delete(
+                crate::flow::enrichment::DeletePayload {
+                    ip,
+                    scope,
+                    weight,
+                    ies: vec![field.ie()],
+                },
+            )
+        }
     }
 }
 
@@ -181,9 +284,9 @@ impl PmacctMapEntry {
     pub fn try_into_enrichment_operations(
         self,
         ie: &IE,
-        op_type: EnrichmentOperationType,
-        weight: Weight,
-    ) -> Result<Vec<EnrichmentOperation>, PmacctMapError> {
+        op_type: crate::flow::enrichment::EnrichmentOperationType,
+        weight: crate::flow::enrichment::Weight,
+    ) -> Result<Vec<crate::flow::enrichment::EnrichmentOperation>, PmacctMapError> {
         let ip = self.ip();
         let id_field = Self::parse_field_from_string(ie, self.id())?;
 
@@ -197,7 +300,10 @@ impl PmacctMapEntry {
 
                 vec![create_operation(
                     ip,
-                    Scope::new(0, Some(vec![Field::ingressInterface(in_iface)])),
+                    crate::flow::enrichment::Scope::new(
+                        0,
+                        Some(vec![Field::ingressInterface(in_iface)]),
+                    ),
                     weight,
                     ingress_field,
                     op_type,
@@ -212,7 +318,10 @@ impl PmacctMapEntry {
 
                 vec![create_operation(
                     ip,
-                    Scope::new(0, Some(vec![Field::egressInterface(out_iface)])),
+                    crate::flow::enrichment::Scope::new(
+                        0,
+                        Some(vec![Field::egressInterface(out_iface)]),
+                    ),
                     weight,
                     egress_field,
                     op_type,
@@ -234,14 +343,20 @@ impl PmacctMapEntry {
                 vec![
                     create_operation(
                         ip,
-                        Scope::new(0, Some(vec![Field::ingressVRFID(vrfid)])),
+                        crate::flow::enrichment::Scope::new(
+                            0,
+                            Some(vec![Field::ingressVRFID(vrfid)]),
+                        ),
                         weight,
                         ingress_field,
                         op_type,
                     ),
                     create_operation(
                         ip,
-                        Scope::new(0, Some(vec![Field::egressVRFID(vrfid)])),
+                        crate::flow::enrichment::Scope::new(
+                            0,
+                            Some(vec![Field::egressVRFID(vrfid)]),
+                        ),
                         weight,
                         egress_field,
                         op_type,
@@ -251,7 +366,7 @@ impl PmacctMapEntry {
             None => {
                 vec![create_operation(
                     ip,
-                    Scope::new(0, None),
+                    crate::flow::enrichment::Scope::new(0, None),
                     weight,
                     id_field,
                     op_type,
@@ -268,7 +383,7 @@ mod tests {
     use crate::{
         flow::enrichment::{DeletePayload, EnrichmentOperation, Scope, UpsertPayload},
         inputs::files::{
-            handlers::{JsonUpsertsHandler, PmacctMapsHandler},
+            handlers::{FlowUpsertsHandler, PmacctMapsHandler},
             processor::{FileProcessor, FileProcessorCallback},
         },
     };
@@ -288,7 +403,7 @@ mod tests {
 
         fs::write(&path, content).await.unwrap();
 
-        let mut handler = JsonUpsertsHandler::new();
+        let mut handler = FlowUpsertsHandler::new();
         let mut result = processor
             .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
             .await
@@ -319,7 +434,7 @@ mod tests {
         let mut processor = FileProcessor::new();
         let temp_file = NamedTempFile::new().unwrap();
         let path = temp_file.path().to_path_buf();
-        let mut handler = JsonUpsertsHandler::new();
+        let mut handler = FlowUpsertsHandler::new();
 
         // First processing - initial content
         let content1 = r#"{"ip":"192.168.1.1","scope":{"obs_domain_id":0},"weight":5,"fields":[{"applicationName":"test-app"}]}"#;
@@ -472,7 +587,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
 
         fs::write(&path, content).await.unwrap();
 
-        let mut handler = JsonUpsertsHandler::new();
+        let mut handler = FlowUpsertsHandler::new();
         let mut result = processor
             .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
             .await
@@ -510,7 +625,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
 
         fs::write(&path, content).await.unwrap();
 
-        let mut handler = JsonUpsertsHandler::new();
+        let mut handler = FlowUpsertsHandler::new();
         let mut result = processor
             .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
             .await
@@ -547,7 +662,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
 
         fs::write(&path, content).await.unwrap();
 
-        let mut handler = JsonUpsertsHandler::new();
+        let mut handler = FlowUpsertsHandler::new();
 
         // First processing
         let result1 = processor
@@ -575,7 +690,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
 
     #[tokio::test]
     async fn test_error_callback_with_invalid_lines() {
-        let mut processor = FileProcessor::new();
+        let mut processor = FileProcessor::<crate::flow::enrichment::EnrichmentOperation>::new();
         let temp_file = NamedTempFile::new().unwrap();
         let path = temp_file.path().to_path_buf();
 
@@ -584,7 +699,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
 
         fs::write(&path, content).await.unwrap();
 
-        let mut handler = JsonUpsertsHandler::new();
+        let mut handler = FlowUpsertsHandler::new();
 
         // Use RefCell for interior mutability of callback closure
         let captured_errors = RefCell::new(Vec::new());

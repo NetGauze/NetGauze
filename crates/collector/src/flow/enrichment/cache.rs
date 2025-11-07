@@ -215,9 +215,9 @@ impl EnrichmentCache {
 
     /// Remove metadata entries matching the given scope and weight criteria.
     ///
-    /// Removes all fields with weight less than the specified weight within
-    /// the matching scope. Cleans up empty scopes and peer entries
-    /// automatically.
+    /// Removes all fields with weight less or equal than the specified weight
+    /// within the matching scope & ies. Cleans up empty scopes and peer
+    /// entries automatically.
     fn delete(&mut self, ip: IpAddr, scope: Scope, weight: Weight, ies: Option<Vec<IE>>) {
         // Early returns if empty vec is provided, and handle Null fields case
         // as delete all for scope (given weight precedence)

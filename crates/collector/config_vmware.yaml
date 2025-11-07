@@ -45,7 +45,7 @@ flow:
                   id: samplerRandomInterval
                   weight: 200
               - path: cache-dump.json
-                format: !JSONUpserts
+                format: !FlowUpserts
           kafka:
             consumers:
               - topic: sonata
@@ -57,7 +57,7 @@ flow:
                   enable.auto.commit: "false"
                   auto.offset.reset: earliest
               - topic: json-ops
-                message_format: !JsonOps
+                message_format: !FlowEnrichmentOps
                 consumer_config:
                   bootstrap.servers: localhost:49092
                   group.id: group1

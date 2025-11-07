@@ -29,27 +29,32 @@
 //!   actor and subscribing to enriched messages.
 //! - `YangPushEnrichmentStats` - Metrics for tracking the performance and
 //!   behavior of the enrichment process.
-use crate::model::telemetry::{
-    FilterSpec, Label, LabelValue, Manifest, NetworkOperatorMetadata, SessionProtocol,
-    TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
-    YangPushSubscriptionMetadata,
+use crate::{
+    inputs::EnrichmentHandle,
+    yang_push::{DeleteAllPayload, DeletePayload, EnrichmentOperation, UpsertPayload, Weight},
+};
+use chrono::Utc;
+use netgauze_yang_push::{
+    model::{
+        notification::{
+            NotificationVariant, SubscriptionId, SubscriptionStartedModified,
+            SubscriptionTerminated,
+        },
+        telemetry::{
+            FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol,
+            TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
+            YangPushSubscriptionMetadata,
+        },
+        udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
+    },
+    validation::SubscriptionInfo,
 };
 use serde_json::Value;
+use shadow_rs::shadow;
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
 };
-
-use crate::model::notification::{
-    NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
-};
-use chrono::Utc;
-
-use crate::{
-    model::udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
-    validation::SubscriptionInfo,
-};
-use shadow_rs::shadow;
 use sysinfo::System;
 use tokio::{sync::mpsc, task::JoinHandle};
 use tracing::{debug, error, info, warn};
@@ -58,6 +63,13 @@ shadow!(build);
 
 /// Cache for YangPush subscriptions metadata
 pub type SubscriptionsCache = HashMap<SubscriptionId, YangPushSubscriptionMetadata>;
+
+/// Weighted Label for Enrichment Cache
+#[derive(Debug, Clone)]
+struct WeightedLabel {
+    label: Label,
+    weight: Weight,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum YangPushEnrichmentActorCommand {
@@ -81,6 +93,7 @@ impl std::error::Error for YangPushEnrichmentActorError {}
 #[derive(Debug, Clone)]
 pub struct YangPushEnrichmentStats {
     pub received_messages: opentelemetry::metrics::Counter<u64>,
+    pub received_enrichment_ops: opentelemetry::metrics::Counter<u64>,
     pub sent_messages: opentelemetry::metrics::Counter<u64>,
     pub send_error: opentelemetry::metrics::Counter<u64>,
     pub udpnotif_payload_decoding_error: opentelemetry::metrics::Counter<u64>,
@@ -94,6 +107,10 @@ impl YangPushEnrichmentStats {
         let received_messages = meter
             .u64_counter("netgauze.collector.yang_push.enrichment.received.messages")
             .with_description("Number of Yang-Push messages received for enrichment")
+            .build();
+        let received_enrichment_ops = meter
+            .u64_counter("netgauze.collector.yang_push.enrichment.received.enrichment.operations")
+            .with_description("Number of enrichment updates received")
             .build();
         let sent_messages = meter
             .u64_counter("netgauze.collector.yang_push.enrichment.sent.messages")
@@ -121,6 +138,7 @@ impl YangPushEnrichmentStats {
             .build();
         Self {
             received_messages,
+            received_enrichment_ops,
             sent_messages,
             send_error,
             udpnotif_payload_decoding_error,
@@ -146,18 +164,20 @@ impl YangPushEnrichmentStats {
 
 /// Fetches local system information into a Manifest object.
 /// (host name, OS version, software version, build info, etc.)
-fn fetch_sysinfo_manifest() -> Manifest {
+fn fetch_sysinfo_manifest(name: Option<String>) -> Manifest {
     let mut sys = System::new_all();
     sys.refresh_all();
 
     Manifest::new(
-        Some(format!(
-            "{}@{}",
-            build::PROJECT_NAME,
-            System::host_name().unwrap_or_else(|| "unknown".to_string())
-        )),
+        name.filter(|n| !n.is_empty()).or_else(|| {
+            Some(format!(
+                "{}@{}",
+                build::PROJECT_NAME,
+                System::host_name().unwrap_or_else(|| "unknown".to_string())
+            ))
+        }),
         Some("NetGauze".to_string()),
-        None,
+        Some(3746), // Swisscom AG (temp until NetGauze has its own PEN number)
         Some(format!("{} ({})", build::PKG_VERSION, build::SHORT_COMMIT)),
         Some(build::BUILD_RUST_CHANNEL.to_string()),
         System::os_version(),
@@ -169,10 +189,10 @@ fn fetch_sysinfo_manifest() -> Manifest {
 /// Sends enriched TelemetryMessage objects.
 struct YangPushEnrichmentActor {
     cmd_rx: mpsc::Receiver<YangPushEnrichmentActorCommand>,
+    enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
     validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
     enriched_tx: async_channel::Sender<(SubscriptionInfo, TelemetryMessageWrapper)>,
-    labels: HashMap<IpAddr, (u32, HashMap<String, String>)>,
-    default_labels: (u32, HashMap<String, String>),
+    labels: HashMap<IpAddr, HashMap<String, WeightedLabel>>,
     subscriptions: HashMap<SocketAddr, SubscriptionsCache>,
     manifest: Manifest,
     stats: YangPushEnrichmentStats,
@@ -181,26 +201,160 @@ struct YangPushEnrichmentActor {
 impl YangPushEnrichmentActor {
     fn new(
         cmd_rx: mpsc::Receiver<YangPushEnrichmentActorCommand>,
+        enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
         validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
         enriched_tx: async_channel::Sender<(SubscriptionInfo, TelemetryMessageWrapper)>,
         stats: YangPushEnrichmentStats,
+        writer_id: String,
     ) -> Self {
-        let default_labels = (
-            0,
-            HashMap::from([
-                ("pkey".to_string(), "unknown".to_string()),
-                ("nkey".to_string(), "unknown".to_string()),
-            ]),
-        );
         Self {
             cmd_rx,
             validated_rx,
+            enrichment_rx,
             enriched_tx,
             labels: HashMap::new(),
-            default_labels,
             subscriptions: HashMap::new(),
-            manifest: fetch_sysinfo_manifest(),
+            manifest: fetch_sysinfo_manifest(Some(writer_id)),
             stats,
+        }
+    }
+
+    /// Apply an enrichment operation (upsert or delete) to the labels cache.
+    ///
+    /// All operations use weight-based precedence: higher weights override
+    /// lower weights, equal weights favor the incoming operation.
+    ///
+    /// - **Upsert**: Adds or replaces labels if incoming weight >= current
+    ///   weight
+    /// - **Delete**: Removes specific labels incoming weight >= current weight
+    /// - **DeleteAll**: Removes all labels incoming weight >= current weight
+    ///
+    /// Empty IP cache entries are automatically cleaned up.
+    pub fn apply_enrichment(&mut self, op: EnrichmentOperation) {
+        debug!("Apply enrichment operation: {op}");
+
+        match op {
+            EnrichmentOperation::Upsert(UpsertPayload {
+                ip,
+                weight,
+                labels: incoming_labels,
+            }) => {
+                // Early return if no labels are provided
+                if incoming_labels.is_empty() {
+                    debug!("Empty labels vector provided for upsert operation for ip={} - cache not modified", ip);
+                    return;
+                }
+
+                let labels = self.labels.entry(ip).or_insert_with(|| {
+                    debug!("Creating new label cache entry for ip={}", ip);
+                    HashMap::new()
+                });
+                for incoming in incoming_labels {
+                    let name = incoming.name().to_string();
+
+                    if let Some(current) = labels.get(&name) {
+                        if weight >= current.weight {
+                            debug!(
+                                "Replacing label '{}' for ip={}, weight {}->{}",
+                                name, ip, current.weight, weight,
+                            );
+
+                            labels.insert(
+                                name,
+                                WeightedLabel {
+                                    label: incoming,
+                                    weight,
+                                },
+                            );
+                        } else {
+                            debug!(
+                                "Ignoring lower weight label '{}' for ip={}, weight: {}<{}",
+                                name, ip, weight, current.weight,
+                            );
+                        }
+                    } else {
+                        debug!(
+                            "Adding new label '{}' for ip={}, weight={}",
+                            name, ip, weight
+                        );
+                        labels.insert(
+                            name,
+                            WeightedLabel {
+                                label: incoming,
+                                weight,
+                            },
+                        );
+                    }
+                }
+                debug!("Updated label cache for {}: {} labels", ip, labels.len());
+            }
+            EnrichmentOperation::Delete(DeletePayload {
+                ip,
+                weight,
+                label_names,
+            }) => {
+                // Early return if no label names are provided
+                if label_names.is_empty() {
+                    debug!("Empty label_names vector provided for delete operation for ip={} - cache not modified", ip);
+                    return;
+                }
+                if let Some(labels) = self.labels.get_mut(&ip) {
+                    for name in label_names {
+                        if let Some(current) = labels.get(&name) {
+                            if weight >= current.weight {
+                                debug!(
+                                    "Removing label '{}' for ip={}, weight: {}>={}",
+                                    name, ip, weight, current.weight
+                                );
+                                labels.remove(&name);
+                            } else {
+                                debug!(
+                                "Ignoring delete for label '{}' (lower weight) for ip={}, weight: {}<{}",
+                                name,
+                                ip,
+                                weight,
+                                current.weight
+                            );
+                            }
+                        }
+                        {
+                            debug!(
+                                "Label '{}' not found for ip={}, nothing to delete",
+                                name, ip
+                            );
+                        }
+                    }
+
+                    // cleanup if all labels were removed for ip
+                    if labels.is_empty() {
+                        debug!("Label cache now empty for ip={}, cleaning up...", ip);
+                        self.labels.remove(&ip);
+                    }
+                } else {
+                    debug!("No cache entry for ip={}, nothing to delete", ip);
+                }
+            }
+            EnrichmentOperation::DeleteAll(DeleteAllPayload { ip, weight }) => {
+                debug!("DeleteAll received for ip={ip}, weight={weight}");
+
+                if let Some(labels) = self.labels.get_mut(&ip) {
+                    labels.retain(|_, wl| weight < wl.weight);
+
+                    // cleanup if all labels were removed for ip
+                    if labels.is_empty() {
+                        debug!(
+                            "Label cache now empty for ip={} after DeleteAll, cleaning up...",
+                            ip
+                        );
+                        self.labels.remove(&ip);
+                    }
+                } else {
+                    debug!(
+                        "No cache entry for ip={}, nothing to delete (DeleteAll)",
+                        ip
+                    );
+                }
+            }
         }
     }
 
@@ -390,19 +544,10 @@ impl YangPushEnrichmentActor {
         peer: SocketAddr,
         payload: &UdpNotifPayload,
     ) -> Result<TelemetryMessageWrapper, YangPushEnrichmentActorError> {
-        // Get sonata labels from the cache
-        let (_, labels) = self.labels.get(&peer.ip()).unwrap_or(&self.default_labels);
-        let labels: Vec<Label> = labels
-            .iter()
-            .map(|(key, value)| {
-                Label::new(
-                    key.clone(),
-                    LabelValue::StringValue {
-                        string_value: value.clone(),
-                    },
-                )
-            })
-            .collect();
+        let labels: Option<Vec<Label>> = self
+            .labels
+            .get(&peer.ip())
+            .map(|l_map| l_map.values().cloned().map(|wl| wl.label).collect());
 
         // Match on the wrapper and process the notification content
         let (node_export_timestamp, subscription_metadata) = match payload {
@@ -438,7 +583,7 @@ impl YangPushEnrichmentActor {
             None,
             telemetry_message_metadata,
             Some(self.manifest.clone()),
-            Some(NetworkOperatorMetadata::new(labels)),
+            labels.map(NetworkOperatorMetadata::new),
             Some(json_payload),
         )))
     }
@@ -461,6 +606,17 @@ impl YangPushEnrichmentActor {
                         }
                     }
                 }
+                enrichment = self.enrichment_rx.recv() => {
+                    match enrichment {
+                        Ok(op) => {
+                            self.stats.received_enrichment_ops.add(1, &[]);
+                            self.apply_enrichment(op);
+                        }
+                        Err(err) => {
+                            warn!("Enrichment channel closed, shutting down: {err:?}");
+                            Err(YangPushEnrichmentActorError::EnrichmentChannelClosed)?;
+                        }
+                    }                }
                 msg = self.validated_rx.recv() => {
                     match msg {
                         Ok(msg) => {
@@ -517,6 +673,7 @@ impl std::error::Error for YangPushEnrichmentActorHandleError {}
 #[derive(Debug, Clone)]
 pub struct YangPushEnrichmentActorHandle {
     cmd_send: mpsc::Sender<YangPushEnrichmentActorCommand>,
+    enrichment_tx: async_channel::Sender<EnrichmentOperation>,
     enriched_rx: async_channel::Receiver<(SubscriptionInfo, TelemetryMessageWrapper)>,
 }
 
@@ -525,17 +682,27 @@ impl YangPushEnrichmentActorHandle {
         buffer_size: usize,
         validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
         stats: either::Either<opentelemetry::metrics::Meter, YangPushEnrichmentStats>,
+        writer_id: String,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
         let (cmd_send, cmd_recv) = mpsc::channel(10);
+        let (enrichment_tx, enrichment_rx) = async_channel::bounded(buffer_size);
         let (enriched_tx, enriched_rx) = async_channel::bounded(buffer_size);
         let stats = match stats {
             either::Either::Left(meter) => YangPushEnrichmentStats::new(meter),
             either::Either::Right(stats) => stats,
         };
-        let actor = YangPushEnrichmentActor::new(cmd_recv, validated_rx, enriched_tx, stats);
+        let actor = YangPushEnrichmentActor::new(
+            cmd_recv,
+            enrichment_rx,
+            validated_rx,
+            enriched_tx,
+            stats,
+            writer_id,
+        );
         let join_handle = tokio::spawn(actor.run());
         let handle = Self {
             cmd_send,
+            enrichment_tx,
             enriched_rx,
         };
         (join_handle, handle)
@@ -555,15 +722,34 @@ impl YangPushEnrichmentActorHandle {
     }
 }
 
+impl EnrichmentHandle<EnrichmentOperation> for YangPushEnrichmentActorHandle {
+    /// Send an enrichment cache update to the actor.
+    ///
+    /// Updates are applied asynchronously and will affect subsequent
+    /// flow enrichment operations. The operation can be either an
+    /// upsert (add/update) or delete.
+    fn update_enrichment(
+        &self,
+        op: EnrichmentOperation,
+    ) -> futures::future::BoxFuture<'_, Result<(), anyhow::Error>> {
+        Box::pin(async move {
+            self.enrichment_tx
+                .send(op)
+                .await
+                .map_err(anyhow::Error::from)
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{
+    use bytes::Bytes;
+    use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
+    use netgauze_yang_push::model::{
         notification::{CentiSeconds, Encoding, Target, Transport, UpdateTrigger},
         udp_notif::UdpNotifPacketDecoded,
     };
-    use bytes::Bytes;
-    use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
     use serde_json::json;
     use std::{collections::HashMap, net::SocketAddr};
 
@@ -603,12 +789,12 @@ mod tests {
     fn create_actor() -> YangPushEnrichmentActor {
         YangPushEnrichmentActor {
             cmd_rx: mpsc::channel(10).1,
+            enrichment_rx: async_channel::bounded(10).1,
             validated_rx: async_channel::bounded(10).1,
             enriched_tx: async_channel::bounded(10).0,
             labels: HashMap::new(),
-            default_labels: (0, HashMap::new()),
             subscriptions: HashMap::new(),
-            manifest: fetch_sysinfo_manifest(),
+            manifest: fetch_sysinfo_manifest(None),
             stats: YangPushEnrichmentStats::new(opentelemetry::global::meter("my-meter")),
         }
     }
