@@ -166,7 +166,7 @@ mod tests {
                 None,
             ),
             None,
-            NetworkOperatorMetadata::new(Vec::new()),
+            None,
             None,
         ))
     }
@@ -275,9 +275,6 @@ mod tests {
             "collection-timestamp": "1970-01-01T00:00:00Z",
             "session-protocol": "yp-push",
             "export-address": "127.0.0.1"
-        },
-        "network-operator-metadata": {
-            "labels": []
         }
     }
 }"#;

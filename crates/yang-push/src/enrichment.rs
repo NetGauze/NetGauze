@@ -397,9 +397,9 @@ impl YangPushEnrichmentActor {
             .map(|(key, value)| {
                 Label::new(
                     key.clone(),
-                    Some(LabelValue::StringValue {
+                    LabelValue::StringValue {
                         string_value: value.clone(),
-                    }),
+                    },
                 )
             })
             .collect();
@@ -438,7 +438,7 @@ impl YangPushEnrichmentActor {
             None,
             telemetry_message_metadata,
             Some(self.manifest.clone()),
-            NetworkOperatorMetadata::new(labels),
+            Some(NetworkOperatorMetadata::new(labels)),
             Some(json_payload),
         )))
     }
