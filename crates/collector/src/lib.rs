@@ -26,6 +26,7 @@ use crate::{
         kafka_json::KafkaJsonPublisherActorHandle,
         kafka_yang::KafkaYangPublisherActorHandle,
     },
+    yang_push::enrichment::YangPushEnrichmentActorHandle,
 };
 
 use futures_util::{stream::FuturesUnordered, StreamExt};
@@ -34,7 +35,6 @@ use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle
 use netgauze_udp_notif_pkt::MediaType;
 use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
 use netgauze_yang_push::{
-    enrichment::YangPushEnrichmentActorHandle,
     model::telemetry::TelemetryMessageWrapper,
     schema_cache::SchemaCacheActorHandle,
     validation::{SubscriptionInfo, ValidationActorHandle},
@@ -47,6 +47,7 @@ pub mod flow;
 pub mod inputs;
 pub mod publishers;
 pub mod telemetry;
+pub mod yang_push;
 
 pub async fn init_flow_collection(
     flow_config: FlowConfig,
@@ -387,6 +388,8 @@ pub async fn init_udp_notif_collection(
     let mut schema_handles = Vec::new();
     let mut validation_handles = Vec::new();
     let mut enrichment_handles = Vec::new();
+    let mut files_input_handles = Vec::new();
+    let mut kafka_input_handles = Vec::new();
     let mut http_handles = Vec::new();
     let mut kafka_json_handles = Vec::new();
     let mut kafka_yang_handles = Vec::new();
@@ -471,6 +474,7 @@ pub async fn init_udp_notif_collection(
                         publisher_config.buffer_size,
                         validation_handle.subscribe(),
                         either::Left(meter.clone()),
+                        config.writer_id.clone(),
                     );
                     join_set.push(enrichment_join);
                     enrichment_handles.push(enrichment_handle.clone());
@@ -490,6 +494,39 @@ pub async fn init_udp_notif_collection(
                             return Err(anyhow::anyhow!(
                                 "Error creating KafkaJsonPublisherActorHandle: {err}"
                             ));
+                        }
+                    }
+
+                    if let Some(enrichment_config) = publisher_config.enrichment.as_ref() {
+                        if let Some(files_config) = enrichment_config
+                            .inputs
+                            .as_ref()
+                            .and_then(|i| i.files.as_ref())
+                        {
+                            let (files_join, files_handle) = FilesActorHandle::from_config(
+                                files_config.clone(),
+                                enrichment_handles.clone(),
+                                either::Left(meter.clone()),
+                            );
+                            join_set.push(files_join);
+                            files_input_handles.push(files_handle);
+                        }
+
+                        if let Some(kafka_config) = enrichment_config
+                            .inputs
+                            .as_ref()
+                            .and_then(|i| i.kafka.as_ref())
+                        {
+                            for consumer_config in &kafka_config.consumers {
+                                let (join_handle, actor_handle) =
+                                    KafkaConsumerActorHandle::from_config(
+                                        consumer_config,
+                                        enrichment_handles.clone(),
+                                        either::Left(meter.clone()),
+                                    )?;
+                                join_set.push(join_handle);
+                                kafka_input_handles.push(actor_handle);
+                            }
                         }
                     }
                 }
@@ -520,6 +557,7 @@ pub async fn init_udp_notif_collection(
                         publisher_config.buffer_size,
                         validation_handle.subscribe(),
                         either::Left(meter.clone()),
+                        config.writer_id.clone(),
                     );
                     join_set.push(enrichment_join);
                     enrichment_handles.push(enrichment_handle.clone());
@@ -545,6 +583,38 @@ pub async fn init_udp_notif_collection(
                             return Err(anyhow::anyhow!(
                                 "Error creating KafkaYangPublisherActorHandle: {err}"
                             ));
+                        }
+                    }
+                    if let Some(enrichment_config) = publisher_config.enrichment.as_ref() {
+                        if let Some(files_config) = enrichment_config
+                            .inputs
+                            .as_ref()
+                            .and_then(|i| i.files.as_ref())
+                        {
+                            let (files_join, files_handle) = FilesActorHandle::from_config(
+                                files_config.clone(),
+                                enrichment_handles.clone(),
+                                either::Left(meter.clone()),
+                            );
+                            join_set.push(files_join);
+                            files_input_handles.push(files_handle);
+                        }
+
+                        if let Some(kafka_config) = enrichment_config
+                            .inputs
+                            .as_ref()
+                            .and_then(|i| i.kafka.as_ref())
+                        {
+                            for consumer_config in &kafka_config.consumers {
+                                let (join_handle, actor_handle) =
+                                    KafkaConsumerActorHandle::from_config(
+                                        consumer_config,
+                                        enrichment_handles.clone(),
+                                        either::Left(meter.clone()),
+                                    )?;
+                                join_set.push(join_handle);
+                                kafka_input_handles.push(actor_handle);
+                            }
                         }
                     }
                 }
@@ -599,6 +669,12 @@ pub async fn init_udp_notif_collection(
                 let _ = handle.shutdown().await;
             }
             for handle in kafka_yang_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in files_input_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_input_handles {
                 let _ = handle.shutdown().await;
             }
             match join_ret {

@@ -62,7 +62,7 @@ impl InputFile {
     }
 }
 
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(strum_macros::Display, Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum InputFileFormat {
     /// Pmacct custom maps format
     PmacctMaps {
@@ -72,8 +72,13 @@ pub enum InputFileFormat {
         weight: u8,
     },
 
-    /// JSON-serialized upsert messages
-    JSONUpserts,
+    /// JSON-serialized [`crate::flow::enrichment::UpsertPayload`] messages
+    #[strum(to_string = "JSON Flow Upsert message")]
+    FlowUpserts,
+
+    /// JSON-serialized [`crate::yang_push::UpsertPayload`] messages
+    #[strum(to_string = "JSON Yang-Push EnrichmentOperation message")]
+    YangPushUpserts,
 }
 
 pub enum LineChangeType {
@@ -115,7 +120,11 @@ mod tests {
                 },
                 InputFile {
                     path: "/tmp/file4.jsonl".to_string(),
-                    format: InputFileFormat::JSONUpserts,
+                    format: InputFileFormat::FlowUpserts,
+                },
+                InputFile {
+                    path: "/tmp/file5.jsonl".to_string(),
+                    format: InputFileFormat::YangPushUpserts,
                 },
             ],
         };
@@ -137,7 +146,9 @@ paths:
     id: samplerRandomInterval
     weight: 128
 - path: /tmp/file4.jsonl
-  format: JSONUpserts
+  format: FlowUpserts
+- path: /tmp/file5.jsonl
+  format: YangPushUpserts
 "#;
         assert_eq!(yaml, expected);
     }
@@ -157,7 +168,9 @@ paths:
     id: samplerRandomInterval
     weight: 32
 - path: /tmp/file4.jsonl
-  format: !JSONUpserts
+  format: !FlowUpserts
+- path: /tmp/file5.jsonl
+  format: !YangPushUpserts
 "#;
 
         let config: FilesConfig = serde_yaml::from_str(yaml).unwrap();
@@ -188,7 +201,11 @@ paths:
                 },
                 InputFile {
                     path: "/tmp/file4.jsonl".to_string(),
-                    format: InputFileFormat::JSONUpserts,
+                    format: InputFileFormat::FlowUpserts,
+                },
+                InputFile {
+                    path: "/tmp/file5.jsonl".to_string(),
+                    format: InputFileFormat::YangPushUpserts,
                 },
             ],
         };
