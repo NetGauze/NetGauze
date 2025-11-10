@@ -1,0 +1,1361 @@
+/// Copyright (C) 2025-present The NetGauze Authors.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///    http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+/// implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
+
+/// YANG module is defined in RFC 7950 and a top-level in YANG schema file.
+/// ```abnf
+///  module-stmt = optsep module-keyword sep identifier-arg-str
+///                optsep
+///                "{" stmtsep
+///                    module-header-stmts
+///                    linkage-stmts
+///                    meta-stmts
+///                    revision-stmts
+///                    body-stmts
+///                "}" optsep
+/// ```
+/// AH: Made revision_stmts optional and revision_stmt in revision_stmts as +
+/// AH: Made body_stmts optional and body_stmt in body_stmts as +
+module_stmt = {
+    module_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~ module_header_stmts ~ linkage_stmts? ~ meta_stmts? ~ revision_stmts?  ~ body_stmts? ~ ^"}"
+}
+
+
+/// YANG submodule is a module that is included in another module.
+/// ```abnf
+/// submodule-stmt      = optsep submodule-keyword sep identifier-arg-str
+///                       optsep
+///                       "{" stmtsep
+///                           submodule-header-stmts
+///                           linkage-stmts
+///                           meta-stmts
+///                           revision-stmts
+///                           body-stmts
+///                       "}" optsep
+/// ```
+/// AH: Made revision_stmts optional and revision_stmt in revision_stmts as +
+submodule_stmt = { submodule_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~ submodule_header_stmts ~ linkage_stmts? ~ meta_stmts? ~ revision_stmts? ~ body_stmts? ~ ^"}" }
+
+/// ```abnf
+/// module-header-stmts = ;; these stmts can appear in any order
+///                       yang-version-stmt
+///                       namespace-stmt
+///                       prefix-stmt
+/// ```
+// module_header_stmts         =  _{ module_header_stmts_inner }
+// module_header_stmts_inner   = _{ module_header_stmts_inner_0 | module_header_stmts_inner_1 | module_header_stmts_inner_2 | module_header_stmts_inner_3 | module_header_stmts_inner_4 | module_header_stmts_inner_5 }
+// module_header_stmts_inner_0 = _{ yang_version_stmt ~ namespace_stmt ~ prefix_stmt }
+// module_header_stmts_inner_1 = _{ yang_version_stmt ~ prefix_stmt ~ namespace_stmt }
+// module_header_stmts_inner_2 = _{ namespace_stmt ~ yang_version_stmt ~ prefix_stmt }
+// module_header_stmts_inner_3 = _{ namespace_stmt ~ prefix_stmt ~ yang_version_stmt }
+// module_header_stmts_inner_4 = _{ prefix_stmt ~ yang_version_stmt ~ namespace_stmt }
+// module_header_stmts_inner_5 = _{ prefix_stmt ~ namespace_stmt ~ yang_version_stmt }
+// module_header_stmts         =  { (namespace_stmt | prefix_stmt | yang_version_stmt){3, 3} }
+module_header_stmts = _{
+    yang_version_stmt ~ namespace_stmt ~ prefix_stmt
+  | yang_version_stmt ~ prefix_stmt ~ namespace_stmt
+  | namespace_stmt ~ yang_version_stmt ~ prefix_stmt
+  | namespace_stmt ~ prefix_stmt ~ yang_version_stmt
+  | prefix_stmt ~ yang_version_stmt ~ namespace_stmt
+  | prefix_stmt ~ namespace_stmt ~ yang_version_stmt
+}
+
+/// ```abnf
+/// submodule-header-stmts =
+///                       ;; these stmts can appear in any order
+///                       yang-version-stmt
+///                       belongs-to-stmt
+/// ```
+submodule_header_stmts = _{ (yang_version_stmt ~ belongs_to_stmt) | (belongs_to_stmt ~ yang_version_stmt) }
+
+/// ```abnf
+/// meta-stmts          = ;; these stmts can appear in any order
+///                       [organization-stmt]
+///                       [contact-stmt]
+///                       [description-stmt]
+///                       [reference-stmt]
+/// ```
+// meta_stmts = { (organization_stmt | contact_stmt | description_stmt | reference_stmt){0, 4} }
+meta_stmts = _{
+    organization_stmt ~ contact_stmt? ~ description_stmt? ~ reference_stmt?
+  | organization_stmt ~ contact_stmt? ~ reference_stmt? ~ description_stmt?
+  | organization_stmt ~ description_stmt? ~ contact_stmt? ~ reference_stmt?
+  | organization_stmt ~ description_stmt? ~ reference_stmt? ~ contact_stmt?
+  | organization_stmt ~ reference_stmt? ~ contact_stmt? ~ description_stmt?
+  | organization_stmt ~ reference_stmt? ~ description_stmt? ~ contact_stmt?
+  | contact_stmt ~ organization_stmt? ~ description_stmt? ~ reference_stmt?
+  | contact_stmt ~ organization_stmt? ~ reference_stmt? ~ description_stmt?
+  | contact_stmt ~ description_stmt? ~ organization_stmt? ~ reference_stmt?
+  | contact_stmt ~ description_stmt? ~ reference_stmt? ~ organization_stmt?
+  | contact_stmt ~ reference_stmt? ~ organization_stmt? ~ description_stmt?
+  | contact_stmt ~ reference_stmt? ~ description_stmt? ~ organization_stmt?
+  | description_stmt ~ organization_stmt? ~ contact_stmt? ~ reference_stmt?
+  | description_stmt ~ organization_stmt? ~ reference_stmt? ~ contact_stmt?
+  | description_stmt ~ contact_stmt? ~ organization_stmt? ~ reference_stmt?
+  | description_stmt ~ contact_stmt? ~ reference_stmt? ~ organization_stmt?
+  | description_stmt ~ reference_stmt? ~ organization_stmt? ~ contact_stmt?
+  | description_stmt ~ reference_stmt? ~ contact_stmt? ~ organization_stmt?
+  | reference_stmt ~ organization_stmt? ~ contact_stmt? ~ description_stmt?
+  | reference_stmt ~ organization_stmt? ~ description_stmt? ~ contact_stmt?
+  | reference_stmt ~ contact_stmt? ~ organization_stmt? ~ description_stmt?
+  | reference_stmt ~ contact_stmt? ~ description_stmt? ~ organization_stmt?
+  | reference_stmt ~ description_stmt? ~ organization_stmt? ~ contact_stmt?
+  | reference_stmt ~ description_stmt? ~ contact_stmt? ~ organization_stmt?
+}
+
+
+/// ```abnf
+/// linkage-stmts       = ;; these stmts can appear in any order
+///                       *import-stmt
+///                       *include-stmt
+/// ```
+/// AH: changed `linkage_stmt*` to `linkage_stmt+` because in
+/// module_stmt and submodule_stmt it is always used as optional with ?.
+linkage_stmts = _{ linkage_stmt+ }
+linkage_stmt  = { import_stmt | include_stmt }
+
+/// ```abnf
+/// revision-stmts      = *revision-stmt
+/// ```
+/// AH;: Change revision_stmt* to revision_stmt+ and made revision_stmts optinal everywhere 
+revision_stmts = _{ revision_stmt+ }
+
+/// ```abnf
+/// body-stmts          = *(extension-stmt /
+///                         feature-stmt /
+///                         identity-stmt /
+///                         typedef-stmt /
+///                         grouping-stmt /
+///                         data-def-stmt /
+///                         augment-stmt /
+///                         rpc-stmt /
+///                         notification-stmt /
+///                         deviation-stmt)
+/// ```
+body_stmts = _{ body_stmt+ }
+body_stmt  = { extension_stmt | feature_stmt | identity_stmt | typedef_stmt | grouping_stmt | data_def_stmt | augment_stmt | rpc_stmt | notification_stmt | deviation_stmt }
+
+/// ```abnf
+/// data-def-stmt       = container-stmt /
+///                       leaf-stmt /
+///                       leaf-list-stmt /
+///                       list-stmt /
+///                       choice-stmt /
+///                       anydata-stmt /
+///                       anyxml-stmt /
+///                       uses-stmt
+/// ```
+data_def_stmt = { container_stmt | leaf_stmt | leaf_list_stmt | list_stmt | choice_stmt | anydata_stmt | anyxml_stmt | uses_stmt }
+
+/// ```abnf
+/// yang-version-stmt   = yang-version-keyword sep yang-version-arg-str
+///                       stmten
+/// ```
+yang_version_stmt = { yang_version_keyword ~ yang_version_arg_str ~ stmtend }
+
+/// ```abnf
+/// yang-version-arg-str = < a string that matches the rule >
+///                        < yang-version-arg >
+/// ```
+yang_version_arg_str = _{ SQUOTE ~ yang_version_arg ~ SQUOTE | DQUOTE ~ yang_version_arg ~ DQUOTE | yang_version_arg }
+yang_version_arg     = { "1.1" }
+
+/// ```abnf
+/// import-stmt         = import-keyword sep identifier-arg-str optsep
+///                       "{" stmtsep
+///                           ;; these stmts can appear in any order
+///                           prefix-stmt
+///                           [revision-date-stmt]
+///                           [description-stmt]
+///                           [reference-stmt]
+///                       "}" stmtsep
+/// ```
+// import_stmt = {
+//     import_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~ (prefix_stmt | revision_date_stmt | description_stmt | reference_stmt){1, 4} ~ ^"}" ~ stmtsep
+// }
+import_stmt = {
+    import_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~
+    (
+        prefix_stmt ~ revision_date_stmt? ~ description_stmt? ~ reference_stmt?
+      | prefix_stmt ~ revision_date_stmt? ~ reference_stmt? ~ description_stmt?
+      | prefix_stmt ~ description_stmt? ~ revision_date_stmt? ~ reference_stmt?
+      | prefix_stmt ~ description_stmt? ~ reference_stmt? ~ revision_date_stmt?
+      | prefix_stmt ~ reference_stmt? ~ revision_date_stmt? ~ description_stmt?
+      | prefix_stmt ~ reference_stmt? ~ description_stmt? ~ revision_date_stmt?
+      | revision_date_stmt? ~ prefix_stmt ~ description_stmt? ~ reference_stmt?
+      | revision_date_stmt? ~ prefix_stmt ~ reference_stmt? ~ description_stmt?
+      | revision_date_stmt? ~ description_stmt? ~ prefix_stmt ~ reference_stmt?
+      | revision_date_stmt? ~ description_stmt? ~ reference_stmt? ~ prefix_stmt
+      | revision_date_stmt? ~ reference_stmt? ~ prefix_stmt ~ description_stmt?
+      | revision_date_stmt? ~ reference_stmt? ~ description_stmt? ~ prefix_stmt
+      | description_stmt? ~ prefix_stmt ~ revision_date_stmt? ~ reference_stmt?
+      | description_stmt? ~ prefix_stmt ~ reference_stmt? ~ revision_date_stmt?
+      | description_stmt? ~ revision_date_stmt? ~ prefix_stmt ~ reference_stmt?
+      | description_stmt? ~ revision_date_stmt? ~ reference_stmt? ~ prefix_stmt
+      | description_stmt? ~ reference_stmt? ~ prefix_stmt ~ revision_date_stmt?
+      | description_stmt? ~ reference_stmt? ~ revision_date_stmt? ~ prefix_stmt
+      | reference_stmt? ~ prefix_stmt ~ revision_date_stmt? ~ description_stmt?
+      | reference_stmt? ~ prefix_stmt ~ description_stmt? ~ revision_date_stmt?
+      | reference_stmt? ~ revision_date_stmt? ~ prefix_stmt ~ description_stmt?
+      | reference_stmt? ~ revision_date_stmt? ~ description_stmt? ~ prefix_stmt
+      | reference_stmt? ~ description_stmt? ~ prefix_stmt ~ revision_date_stmt?
+      | reference_stmt? ~ description_stmt? ~ revision_date_stmt? ~ prefix_stmt
+    )
+    ~ ^"}" ~ stmtsep
+}
+
+/// ```abnf
+/// include-stmt        = include-keyword sep identifier-arg-str optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            ;; these stmts can appear in any order
+///                            [revision-date-stmt]
+///                            [description-stmt]
+///                            [reference-stmt]
+///                        "}") stmtsep
+/// ```
+// include_stmt = { include_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (revision_date_stmt | description_stmt | reference_stmt){0, 3} ~ ^"}") ~ stmtsep }
+include_stmt = {
+    include_keyword ~ identifier_arg_str ~
+    (
+        ^";"
+      | ^"{" ~ stmtsep ~
+        (
+            revision_date_stmt ~ description_stmt? ~ reference_stmt?
+          | revision_date_stmt ~ reference_stmt? ~ description_stmt?
+          | description_stmt ~ revision_date_stmt? ~ reference_stmt?
+          | description_stmt ~ reference_stmt? ~ revision_date_stmt?
+          | reference_stmt ~ revision_date_stmt? ~ description_stmt?
+          | reference_stmt ~ description_stmt? ~ revision_date_stmt?
+        )?
+        ~ ^"}"
+    )
+    ~ stmtsep
+}
+
+/// ```abnf
+/// namespace-stmt      = namespace-keyword sep uri-str stmtend
+/// ```
+namespace_stmt = { namespace_keyword ~ uri_str ~ stmtend }
+
+/// The URI grammar is adapted from RFC 3986
+/// however it's not always working properly, so for now we just
+/// accept any string as URI and post-process it later in RUST.
+uri_str = _{ string }
+// uri_str       =  { DQUOTE ~ URI ~ DQUOTE | SQUOTE ~ URI ~ SQUOTE | URIA }
+// URI           = @{ scheme ~ ^":" ~ hier_part ~ (^"?" ~ query)? ~ (^"#" ~ fragment)? }
+// hier_part     =  { ^"//" ~ authority ~ path_abempty | path_absolute | path_rootless | path_empty }
+// URI_reference =  { URI | relative_ref }
+// absolute_URI  =  { scheme ~ ^":" ~ hier_part ~ (^"?" ~ query)? }
+// relative_ref  =  { relative_part ~ (^"?" ~ query)? ~ (^"#" ~ fragment)? }
+// relative_part =  { ^"//" ~ authority ~ path_abempty | path_absolute | path_noscheme | path_empty }
+// scheme        =  { ALPHA ~ (ALPHA | DIGIT | ^"+" | ^"-" | ^".")* }
+// authority     =  { (userinfo ~ ^"@")? ~ host ~ (^":" ~ port)? }
+// userinfo      =  { (unreserved | pct_encoded | sub_delims | ^":")* }
+// host          =  { IP_literal | IPv4address | reg_name }
+// port          =  { DIGIT* }
+// IP_literal    =  { ^"[" ~ (IPv6address | IPvFuture) ~ ^"]" }
+// IPvFuture     =  { ^"v" ~ HEXDIG+ ~ ^"." ~ (unreserved | sub_delims | ^":")+ }
+// IPv6address   =  { (h16 ~ ^":"){6} ~ ls32 | ^"::" ~ (h16 ~ ^":"){5} ~ ls32 | (h16)? ~ ^"::" ~ (h16 ~ ^":"){4} ~ ls32 | ((h16 ~ ^":")? ~ h16)? ~ ^"::" ~ (h16 ~ ^":"){3} ~ ls32 | ((h16 ~ ^":"){0, 2} ~ h16)? ~ ^"::" ~ (h16 ~ ^":"){2} ~ ls32 | ((h16 ~ ^":"){0, 3} ~ h16)? ~ ^"::" ~ h16 ~ ^":" ~ ls32 | ((h16 ~ ^":"){0, 4} ~ h16)? ~ ^"::" ~ ls32 | ((h16 ~ ^":"){0, 5} ~ h16)? ~ ^"::" ~ h16 | ((h16 ~ ^":"){0, 6} ~ h16)? ~ ^"::" }
+// h16           =  { HEXDIG{1, 4} }
+// ls32          =  { (h16 ~ ^":" ~ h16) | IPv4address }
+// IPv4address   =  { dec_octet ~ ^"." ~ dec_octet ~ ^"." ~ dec_octet ~ ^"." ~ dec_octet }
+// dec_octet     =  { DIGIT | '1'..'9' ~ DIGIT | ^"1" ~ DIGIT{2} | ^"2" ~ '0'..'4' ~ DIGIT | ^"25" ~ '0'..'5' }
+// reg_name      =  { (unreserved | pct_encoded | sub_delims)* }
+// path          =  { path_abempty | path_absolute | path_noscheme | path_rootless | path_empty }
+// path_abempty  =  { (^"/" ~ segment)+ }
+// // Changed   (^"/" ~ segment)* from to make it valid PEST
+// path_absolute = { ^"/" ~ (segment_nz ~ (^"/" ~ segment)*)? }
+// path_noscheme = { segment_nz_nc ~ (^"/" ~ segment)* }
+// path_rootless = { segment_nz ~ (^"/" ~ segment)* }
+// path_empty    = { (pchar)? }
+// segment       = { pchar* }
+// segment_nz    = { pchar+ }
+// segment_nz_nc = { (unreserved | pct_encoded | sub_delims | ^"@")+ }
+// pchar         = { unreserved | pct_encoded | sub_delims | ^":" | ^"@" }
+// query         = { (pchar | ^"/" | ^"?")* }
+// fragment      = { (pchar | ^"/" | ^"?")* }
+// pct_encoded   = { ^"%" ~ HEXDIG ~ HEXDIG }
+// unreserved    = { ALPHA | DIGIT | ^"-" | ^"." | ^"_" | ^"~" }
+// reserved      = { gen_delims | sub_delims }
+// gen_delims    = { ^":" | ^"/" | ^"?" | ^"#" | ^"[" | ^"]" | ^"@" }
+// sub_delims    = { ^"!" | ^"$" | ^"&" | ^"'" | ^"(" | ^")" | ^"*" | ^"+" | ^"," | ^";" | ^"=" }
+// // DUPLICATED URI definition that excluded the ";" from the grammar
+// URIA           = @{ scheme ~ ^":" ~ hier_partA ~ (^"?" ~ queryA)? ~ (^"#" ~ fragmentA)? }
+// hier_partA     =  { ^"//" ~ authorityA ~ path_abemptyA | path_absoluteA | path_rootlessA | path_emptyA }
+// URI_referenceA =  { URI | relative_refA }
+// absolute_URIA  =  { scheme ~ ^":" ~ hier_partA ~ (^"?" ~ queryA)? }
+// relative_refA  =  { relative_partA ~ (^"?" ~ query)? ~ (^"#" ~ fragmentA)? }
+// relative_partA =  { ^"//" ~ authorityA ~ path_abemptyA | path_absoluteA | path_noschemeA | path_emptyA }
+// authorityA     =  { (userinfoA ~ ^"@")? ~ hostA ~ (^":" ~ port)? }
+// userinfoA      =  { (unreserved | pct_encoded | sub_delimsA | ^":")* }
+// hostA          =  { IP_literalA | IPv4address | reg_name }
+// IP_literalA    =  { ^"[" ~ (IPv6address | IPvFutureA) ~ ^"]" }
+// IPvFutureA     =  { ^"v" ~ HEXDIG+ ~ ^"." ~ (unreserved | sub_delimsA | ^":")+ }
+// reg_nameA      =  { (unreserved | pct_encoded | sub_delimsA)* }
+// pathA          =  { path_abemptyA | path_absoluteA | path_noschemeA | path_rootlessA | path_emptyA }
+// path_abemptyA  =  { (^"/" ~ segmentA)+ }
+// // Changed   (^"/" ~ segment)* from to make it valid PEST
+// path_absoluteA    = { ^"/" ~ (segment_nzA ~ (^"/" ~ segmentA)*)? }
+// path_noschemeA    = { segment_nz_ncA ~ (^"/" ~ segmentA)* }
+// path_rootlessA    = { segment_nzA ~ (^"/" ~ segmentA)* }
+// path_emptyA       = { (pcharA)? }
+// segmentA          = { pcharA* }
+// segment_nzA       = { pcharA+ }
+// segment_nz_ncA    = { (unreserved | pct_encoded | sub_delimsA | ^"@")+ }
+// pcharA            = { unreserved | pct_encoded | sub_delimsA | ^":" | ^"@" }
+// queryA            = { (pcharA | ^"/" | ^"?")* }
+// fragmentA         = { (pcharA | ^"/" | ^"?")* }
+// reservedA         = { gen_delims | sub_delimsA }
+// sub_delimsA       = { ^"!" | ^"$" | ^"&" | ^"'" | ^"(" | ^")" | ^"*" | ^"+" | ^"," | ^"=" }
+
+/// ```abnf
+/// prefix-stmt         = prefix-keyword sep prefix-arg-str stmtend
+/// ```
+prefix_stmt       = { prefix_keyword ~ prefix_arg_str ~ stmtend }
+
+
+/// ```abnf
+/// belongs-to-stmt     = belongs-to-keyword sep identifier-arg-str
+///                       optsep
+///                       "{" stmtsep
+///                           prefix-stmt
+///                       "}" stmtsep
+/// ```
+belongs_to_stmt   = { belongs_to_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~ prefix_stmt ~ ^"}" ~ stmtsep }
+
+/// ```abnf
+/// organization-stmt   = organization-keyword sep string stmtend
+/// ```
+organization_stmt = { organization_keyword ~ string ~ stmtend }
+
+/// ```abnf
+/// contact-stmt        = contact-keyword sep string stmtend
+/// ```
+contact_stmt      = { contact_keyword ~ string ~ stmtend }
+
+/// ```abnf
+/// description-stmt    = description-keyword sep string stmtend
+/// ```
+description_stmt  = { description_keyword ~ string ~ stmtend }
+
+/// ```abnf
+/// reference-stmt      = reference-keyword sep string stmtend
+/// ```
+reference_stmt    = { reference_keyword ~ string ~ stmtend }
+
+/// ```abnf
+/// units-stmt          = units-keyword sep string stmtend
+/// ```
+units_stmt        = { units_keyword ~ string ~ stmtend }
+
+
+/// ```abnf
+/// revision-stmt       = revision-keyword sep revision-date optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            ;; these stmts can appear in any order
+///                            [description-stmt]
+///                            [reference-stmt]
+///                        "}") stmtsep
+/// ```
+revision_stmt       =  { revision_keyword ~ revision_date ~ (^";" | ^"{" ~ stmtsep ~ revision_stmt_inner? ~ ^"}") ~ stmtsep }
+revision_stmt_inner = _{ (description_stmt ~ reference_stmt?) | (reference_stmt ~ description_stmt?) }
+
+/// ```abnf
+/// revision-date       = date-arg-str
+/// ```
+revision_date      = _{ date_arg_str }
+
+/// ```abnf
+/// revision-date-stmt  = revision-date-keyword sep revision-date stmtend
+/// ```
+revision_date_stmt =  { revision_date_keyword ~ revision_date ~ stmtend }
+
+/// ```abnf
+/// extension-stmt      = extension-keyword sep identifier-arg-str optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            ;; these stmts can appear in any order
+///                            [argument-stmt]
+///                            [status-stmt]
+///                            [description-stmt]
+///                            [reference-stmt]
+///                        "}") stmtsep
+/// ```
+// extension_stmt = { extension_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (argument_stmt | status_stmt | description_stmt | reference_stmt){0, 4} ~ ^"}") ~ stmtsep }
+extension_stmt = {
+    extension_keyword ~ identifier_arg_str ~
+    (
+        ^";"
+      | ^"{" ~ stmtsep ~
+        (
+            argument_stmt ~ status_stmt? ~ description_stmt? ~ reference_stmt?
+          | argument_stmt ~ status_stmt? ~ reference_stmt? ~ description_stmt?
+          | argument_stmt ~ description_stmt? ~ status_stmt? ~ reference_stmt?
+          | argument_stmt ~ description_stmt? ~ reference_stmt? ~ status_stmt?
+          | argument_stmt ~ reference_stmt? ~ status_stmt? ~ description_stmt?
+          | argument_stmt ~ reference_stmt? ~ description_stmt? ~ status_stmt?
+          | status_stmt ~ argument_stmt? ~ description_stmt? ~ reference_stmt?
+          | status_stmt ~ argument_stmt? ~ reference_stmt? ~ description_stmt?
+          | status_stmt ~ description_stmt? ~ argument_stmt? ~ reference_stmt?
+          | status_stmt ~ description_stmt? ~ reference_stmt? ~ argument_stmt?
+          | status_stmt ~ reference_stmt? ~ argument_stmt? ~ description_stmt?
+          | status_stmt ~ reference_stmt? ~ description_stmt? ~ argument_stmt?
+          | description_stmt ~ argument_stmt? ~ status_stmt? ~ reference_stmt?
+          | description_stmt ~ argument_stmt? ~ reference_stmt? ~ status_stmt?
+          | description_stmt ~ status_stmt? ~ argument_stmt? ~ reference_stmt?
+          | description_stmt ~ status_stmt? ~ reference_stmt? ~ argument_stmt?
+          | description_stmt ~ reference_stmt? ~ argument_stmt? ~ status_stmt?
+          | description_stmt ~ reference_stmt? ~ status_stmt? ~ argument_stmt?
+          | reference_stmt ~ argument_stmt? ~ status_stmt? ~ description_stmt?
+          | reference_stmt ~ argument_stmt? ~ description_stmt? ~ status_stmt?
+          | reference_stmt ~ status_stmt? ~ argument_stmt? ~ description_stmt?
+          | reference_stmt ~ status_stmt? ~ description_stmt? ~ argument_stmt?
+          | reference_stmt ~ description_stmt? ~ argument_stmt? ~ status_stmt?
+          | reference_stmt ~ description_stmt? ~ status_stmt? ~ argument_stmt?
+        )?
+        ~ ^"}"
+    )
+    ~ stmtsep
+}
+
+/// ```abnf
+/// argument-stmt       = argument-keyword sep identifier-arg-str optsep
+///                      (";" /
+///                       "{" stmtsep
+///                           [yin-element-stmt]
+///                       "}") stmtsep
+/// ```
+argument_stmt       =  { argument_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (yin_element_stmt)? ~ ^"}") ~ stmtsep }
+
+
+/// ```abnf
+/// yin-element-stmt    = yin-element-keyword sep yin-element-arg-str
+///                       stmtend
+/// ```
+yin_element_stmt    =  { yin_element_keyword ~ yin_element_arg_str ~ stmtend }
+
+
+/// ```abnf
+/// yin-element-arg-str = < a string that matches the rule >
+///                       < yin-element-arg >
+/// 
+/// ```
+yin_element_arg_str = _{ SQUOTE ~ yin_element_arg ~ SQUOTE | DQUOTE ~ yin_element_arg ~ DQUOTE | yin_element_arg }
+
+
+/// ```abnf
+/// yin-element-arg     = true-keyword / false-keyword
+/// ```
+yin_element_arg     =  { true_keyword | false_keyword }
+
+
+/// ```abnf
+/// identity-stmt       = identity-keyword sep identifier-arg-str optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            ;; these stmts can appear in any order
+///                            *if-feature-stmt
+///                            *base-stmt
+///                            [status-stmt]
+///                            [description-stmt]
+///                            [reference-stmt]
+///                        "}") stmtsep
+/// ```
+/// AH: Requires post-processing
+identity_stmt = { identity_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (if_feature_stmt | base_stmt | status_stmt | description_stmt | reference_stmt)* ~ ^"}") ~ stmtsep }
+
+
+
+/// ```abnf
+/// base-stmt           = base-keyword sep identifier-ref-arg-str
+///                       stmtend
+/// ```
+base_stmt     = { base_keyword ~ identifier_ref_arg_str ~ stmtend }
+
+/// ```abnf
+/// feature-stmt        = feature-keyword sep identifier-arg-str optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            ;; these stmts can appear in any order
+///                            *if-feature-stmt
+///                            [status-stmt]
+///                            [description-stmt]
+///                            [reference-stmt]
+///                        "}") stmtsep
+/// ```
+/// AH: Requires post-processing
+feature_stmt        =  { feature_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (if_feature_stmt | status_stmt | description_stmt | reference_stmt)* ~ ^"}") ~ stmtsep }
+
+
+
+/// ```abnf
+/// if-feature-stmt     = if-feature-keyword sep if-feature-expr-str
+///                       stmtend
+/// ```
+if_feature_stmt     =  { if_feature_keyword ~ if_feature_expr_str ~ stmtend }
+
+
+/// ```abnf
+/// if-feature-expr-str = < a string that matches the rule >
+///                       < if-feature-expr >
+/// ```
+if_feature_expr_str = _{ SQUOTE ~ if_feature_expr ~ SQUOTE | DQUOTE ~ if_feature_expr ~ DQUOTE | if_feature_expr }
+
+
+
+/// ```abnf
+/// if-feature-expr     = if-feature-term
+///                         [sep or-keyword sep if-feature-expr]
+/// ```
+if_feature_expr     =  { if_feature_term ~ (or_keyword ~ if_feature_expr)? }
+
+
+/// ```abnf
+/// if-feature-term     = if-feature-factor
+///                         [sep and-keyword sep if-feature-term]
+/// ```
+if_feature_term     =  { if_feature_factor ~ (and_keyword ~ if_feature_term)? }
+
+
+/// ```abnf
+/// if-feature-factor   = not-keyword sep if-feature-factor /
+///                       "(" optsep if-feature-expr optsep ")" /
+///                       identifier-ref-arg
+/// ```
+if_feature_factor   =  { not_keyword ~ if_feature_factor | ^"(" ~ if_feature_expr ~ ^")" | identifier_ref_arg }
+
+/// ```abnf
+/// typedef-stmt        = typedef-keyword sep identifier-arg-str optsep
+///                       "{" stmtsep
+///                           ;; these stmts can appear in any order
+///                           type-stmt
+///                           [units-stmt]
+///                           [default-stmt]
+///                           [status-stmt]
+///                           [description-stmt]
+///                           [reference-stmt]
+///                        "}" stmtsep
+/// ```
+/// AH: Requires post-processing
+typedef_stmt           = { typedef_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~ (type_stmt | units_stmt | default_stmt | status_stmt | description_stmt | reference_stmt){1, 6} ~ ^"}" ~ stmtsep }
+
+
+/// ```abnf
+/// type-stmt           = type-keyword sep identifier-ref-arg-str optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            [type-body-stmts]
+///                        "}") stmtsep
+/// ```
+type_stmt              = { type_keyword ~ identifier_ref_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (type_body_stmts)? ~ ^"}") ~ stmtsep }
+
+
+/// ```abnf
+/// type-body-stmts     = numerical-restrictions /
+///                       decimal64-specification /
+///                       string-restrictions /
+///                       enum-specification /
+///                       leafref-specification /
+///                       identityref-specification /
+///                       instance-identifier-specification /
+///                       bits-specification /
+///                       union-specification /
+///                       binary-specification
+/// ```
+type_body_stmts        = { numerical_restrictions | decimal64_specification | string_restrictions | enum_specification | leafref_specification | identityref_specification | instance_identifier_specification | bits_specification | union_specification | binary_specification }
+
+/// ```abnf
+/// numerical-restrictions = [range-stmt]
+/// ```
+/// AH: changes range statement from optional to required
+numerical_restrictions = { range_stmt }
+
+/// ```abnf
+/// range-stmt          = range-keyword sep range-arg-str optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            ;; these stmts can appear in any order
+///                            [error-message-stmt]
+///                            [error-app-tag-stmt]
+///                            [description-stmt]
+///                            [reference-stmt]
+///                         "}") stmtsep
+/// ```
+// range_stmt = { range_keyword ~ range_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (error_message_stmt | error_app_tag_stmt | description_stmt | reference_stmt){0, 4} ~ ^"}") ~ stmtsep }
+range_stmt = { 
+    range_keyword ~ range_arg_str ~
+    (
+        ^";"
+      | ^"{" ~ stmtsep ~ error_inner? ~ ^"}"
+    )
+    ~ stmtsep
+}
+error_inner = _{
+            error_message_stmt ~ error_app_tag_stmt? ~ description_stmt? ~ reference_stmt?
+          | error_message_stmt ~ error_app_tag_stmt? ~ reference_stmt? ~ description_stmt?
+          | error_message_stmt ~ description_stmt? ~ error_app_tag_stmt? ~ reference_stmt?
+          | error_message_stmt ~ description_stmt? ~ reference_stmt? ~ error_app_tag_stmt?
+          | error_message_stmt ~ reference_stmt? ~ error_app_tag_stmt? ~ description_stmt?
+          | error_message_stmt ~ reference_stmt? ~ description_stmt? ~ error_app_tag_stmt?
+          | error_app_tag_stmt ~ error_message_stmt? ~ description_stmt? ~ reference_stmt?
+          | error_app_tag_stmt ~ error_message_stmt? ~ reference_stmt? ~ description_stmt?
+          | error_app_tag_stmt ~ description_stmt? ~ error_message_stmt? ~ reference_stmt?
+          | error_app_tag_stmt ~ description_stmt? ~ reference_stmt? ~ error_message_stmt?
+          | error_app_tag_stmt ~ reference_stmt? ~ error_message_stmt? ~ description_stmt?
+          | error_app_tag_stmt ~ reference_stmt? ~ description_stmt? ~ error_message_stmt?
+          | description_stmt ~ error_message_stmt? ~ error_app_tag_stmt? ~ reference_stmt?
+          | description_stmt ~ error_message_stmt? ~ reference_stmt? ~ error_app_tag_stmt?
+          | description_stmt ~ error_app_tag_stmt? ~ error_message_stmt? ~ reference_stmt?
+          | description_stmt ~ error_app_tag_stmt? ~ reference_stmt? ~ error_message_stmt?
+          | description_stmt ~ reference_stmt? ~ error_message_stmt? ~ error_app_tag_stmt?
+          | description_stmt ~ reference_stmt? ~ error_app_tag_stmt? ~ error_message_stmt?
+          | reference_stmt ~ error_message_stmt? ~ error_app_tag_stmt? ~ description_stmt?
+          | reference_stmt ~ error_message_stmt? ~ description_stmt? ~ error_app_tag_stmt?
+          | reference_stmt ~ error_app_tag_stmt? ~ error_message_stmt? ~ description_stmt?
+          | reference_stmt ~ error_app_tag_stmt? ~ description_stmt? ~ error_message_stmt?
+          | reference_stmt ~ description_stmt? ~ error_message_stmt? ~ error_app_tag_stmt?
+          | reference_stmt ~ description_stmt? ~ error_app_tag_stmt? ~ error_message_stmt?
+}
+
+/// ```abnf
+/// decimal64-specification = ;; these stmts can appear in any order
+///                           fraction-digits-stmt
+///                           [range-stmt]
+/// ```
+decimal64_specification         =  { decimal64_specification_inner }
+decimal64_specification_inner   = _{ decimal64_specification_inner_0 | decimal64_specification_inner_1 }
+decimal64_specification_inner_0 = _{ fraction_digits_stmt ~ range_stmt? }
+decimal64_specification_inner_1 = _{ range_stmt? ~ fraction_digits_stmt }
+
+/// ```abnf
+/// fraction-digits-stmt = fraction-digits-keyword sep
+///                        fraction-digits-arg-str stmtend
+/// ```
+fraction_digits_stmt    =  { fraction_digits_keyword ~ fraction_digits_arg_str ~ stmtend }
+fraction_digits_arg_str = _{ SQUOTE ~ fraction_digits_arg ~ SQUOTE | DQUOTE ~ fraction_digits_arg ~ DQUOTE | fraction_digits_arg }
+fraction_digits_arg     =  { (^"1" ~ (^"0" | ^"1" | ^"2" | ^"3" | ^"4" | ^"5" | ^"6" | ^"7" | ^"8")?) | ^"2" | ^"3" | ^"4" | ^"5" | ^"6" | ^"7" | ^"8" | ^"9" }
+
+/// ```abnf
+/// string-restrictions = ;; these stmts can appear in any order
+///                       [length-stmt]
+///                       *pattern-stmt
+/// ```
+/// AH: the patten-stmt is changed to patten-stmt+ to be valid PEST grammar
+// string_restrictions = { (length_stmt ~ pattern_stmt*) | (pattern_stmt+) | (pattern_stmt+ ~ length_stmt ~ pattern_stmt*) }
+string_restrictions = { (pattern_stmt* ~ length_stmt ~ pattern_stmt*) | (pattern_stmt+) }
+
+/// ```abnf
+/// length-stmt         = length-keyword sep length-arg-str optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            ;; these stmts can appear in any order
+///                            [error-message-stmt]
+///                            [error-app-tag-stmt]
+///                            [description-stmt]
+///                            [reference-stmt]
+///                         "}") stmtsep
+/// ```
+// length_stmt = { length_keyword ~ length_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (error_message_stmt | error_app_tag_stmt | description_stmt | reference_stmt){0, 4} ~ ^"}") ~ stmtsep }
+// length_stmt = { length_keyword ~ length_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (error_message_stmt | error_app_tag_stmt | description_stmt | reference_stmt){0, 4} ~ ^"}") ~ stmtsep }
+length_stmt = { length_keyword ~ length_arg_str ~ (^";" | ^"{" ~ stmtsep ~ error_inner? ~ ^"}") ~ stmtsep }
+
+/// pattern-stmt = pattern-keyword sep string optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [modifier-stmt]
+/// [error-message-stmt]
+/// [error-app-tag-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}") stmtsep
+pattern_stmt = { pattern_keyword ~ string ~ (^";" | ^"{" ~ stmtsep ~ (modifier_stmt | error_message_stmt | error_app_tag_stmt | description_stmt | reference_stmt){0, 5} ~ ^"}") ~ stmtsep }
+
+modifier_stmt      =  { modifier_keyword ~ modifier_arg_str ~ stmtend }
+modifier_arg_str   = _{ SQUOTE ~ modifier_arg ~ SQUOTE | DQUOTE ~ modifier_arg ~ DQUOTE | modifier_arg }
+modifier_arg       =  { invert_match_keyword }
+default_stmt       =  { default_keyword ~ string ~ stmtend }
+enum_specification =  { enum_stmt+ }
+
+/// enum-stmt = enum-keyword sep string optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// *if-feature-stmt
+/// [value-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}") stmtsep
+enum_stmt = { enum_keyword ~ string ~ (^";" | ^"{" ~ stmtsep ~ (if_feature_stmt | value_stmt | status_stmt | description_stmt | reference_stmt)* ~ ^"}") ~ stmtsep }
+
+/// leafref-specification =
+/// ;; these stmts can appear in any order
+/// path-stmt
+/// [require-instance-stmt]
+leafref_specification             =  { (path_stmt ~ require_instance_stmt?) | (require_instance_stmt ~ path_stmt) }
+path_stmt                         =  { path_keyword ~ path_arg_str ~ stmtend }
+require_instance_stmt             =  { require_instance_keyword ~ require_instance_arg_str ~ stmtend }
+require_instance_arg_str          = _{ SQUOTE ~ require_instance_arg ~ SQUOTE | DQUOTE ~ require_instance_arg ~ DQUOTE | require_instance_arg }
+require_instance_arg              =  { true_keyword | false_keyword }
+instance_identifier_specification =  { require_instance_stmt }
+// Changed to mandatory to work with PEST
+identityref_specification = { base_stmt+ }
+union_specification       = { type_stmt+ }
+binary_specification      = { (length_stmt)? }
+bits_specification        = { bit_stmt+ }
+
+/// bit-stmt = bit-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// *if-feature-stmt
+/// [position-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}") stmtsep
+bit_stmt               =  { bit_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (if_feature_stmt | position_stmt | status_stmt | description_stmt | reference_stmt)* ~ ^"}") ~ stmtsep }
+position_stmt          =  { position_keyword ~ position_value_arg_str ~ stmtend }
+position_value_arg_str = _{ SQUOTE ~ position_value_arg ~ SQUOTE | DQUOTE ~ position_value_arg ~ DQUOTE | position_value_arg }
+position_value_arg     =  { non_negative_integer_value }
+status_stmt            =  { status_keyword ~ status_arg_str ~ stmtend }
+status_arg_str         = _{ SQUOTE ~ status_arg ~ SQUOTE | DQUOTE ~ status_arg ~ DQUOTE | status_arg }
+status_arg             = _{ current_keyword | obsolete_keyword | deprecated_keyword }
+config_stmt            =  { config_keyword ~ config_arg_str ~ stmtend }
+config_arg_str         = _{ DQUOTE ~ config_arg ~ DQUOTE | SQUOTE ~ config_arg ~ SQUOTE | config_arg }
+config_arg             =  { true_keyword | false_keyword }
+mandatory_stmt         =  { mandatory_keyword ~ mandatory_arg_str ~ stmtend }
+mandatory_arg_str      = _{ DQUOTE ~ mandatory_arg ~ DQUOTE | SQUOTE ~ mandatory_arg ~ SQUOTE | mandatory_arg }
+mandatory_arg          =  { true_keyword | false_keyword }
+presence_stmt          =  { presence_keyword ~ string ~ stmtend }
+ordered_by_stmt        =  { ordered_by_keyword ~ ordered_by_arg_str ~ stmtend }
+ordered_by_arg_str     = _{ DQUOTE ~ ordered_by_arg ~ DQUOTE | SQUOTE ~ ordered_by_arg ~ SQUOTE | ordered_by_arg }
+ordered_by_arg         =  { user_keyword | system_keyword }
+
+/// must-stmt = must-keyword sep string optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order
+/// [error-message-stmt]
+/// [error-app-tag-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}") stmtsep
+// must_stmt = { must_keyword ~ string ~ (^";" | ^"{" ~ stmtsep ~ (error_message_stmt | error_app_tag_stmt | description_stmt | reference_stmt){0, 4} ~ ^"}") ~ stmtsep }
+must_stmt = { must_keyword ~ string ~ (^";" | ^"{" ~ stmtsep ~ error_inner?? ~ ^"}") ~ stmtsep }
+
+
+error_message_stmt =  { error_message_keyword ~ string ~ stmtend }
+error_app_tag_stmt =  { error_app_tag_keyword ~ string ~ stmtend }
+min_elements_stmt  =  { min_elements_keyword ~ min_value_arg_str ~ stmtend }
+min_value_arg_str  = _{ DQUOTE ~ min_value_arg ~ DQUOTE | SQUOTE ~ min_value_arg ~ SQUOTE | min_value_arg }
+min_value_arg      =  { non_negative_integer_value }
+max_elements_stmt  =  { max_elements_keyword ~ max_value_arg_str ~ stmtend }
+max_value_arg_str  = _{ DQUOTE ~ max_value_arg ~ DQUOTE | SQUOTE ~ max_value_arg ~ SQUOTE | max_value_arg }
+max_value_arg      =  { unbounded_keyword | positive_integer_value }
+value_stmt         =  { value_keyword ~ integer_value_str ~ stmtend }
+integer_value_str  = _{ DQUOTE ~ integer_value ~ DQUOTE | SQUOTE ~ integer_value ~ SQUOTE | integer_value }
+
+/// grouping-stmt = grouping-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *(typedef-stmt / grouping-stmt)
+/// *data-def-stmt
+/// *action-stmt
+/// *notification-stmt
+/// "}") stmtsep
+grouping_stmt = { grouping_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (status_stmt | description_stmt | reference_stmt | typedef_stmt | grouping_stmt | data_def_stmt | action_stmt | notification_stmt)* ~ ^"}") ~ stmtsep }
+
+/// container-stmt = container-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// *must-stmt
+/// [presence-stmt]
+/// [config-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *(typedef-stmt / grouping-stmt)
+/// *data-def-stmt
+/// *action-stmt
+/// *notification-stmt
+/// "}") stmtsep
+container_stmt = { container_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | must_stmt | presence_stmt | config_stmt | status_stmt | description_stmt | reference_stmt | typedef_stmt | grouping_stmt | data_def_stmt | action_stmt | notification_stmt)* ~ ^"}") ~ stmtsep }
+
+/// leaf-stmt  = leaf-keyword sep identifier-arg-str optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// type-stmt
+/// [units-stmt]
+/// *must-stmt
+/// [default-stmt]
+/// [config-stmt]
+/// [mandatory-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}" stmtsep
+leaf_stmt = { leaf_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | type_stmt | units_stmt | must_stmt | default_stmt | config_stmt | mandatory_stmt | status_stmt | description_stmt | reference_stmt)* ~ ^"}" ~ stmtsep }
+
+/// leaf-list-stmt = leaf-list-keyword sep identifier-arg-str optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// type-stmt stmtsep
+/// [units-stmt]
+/// *must-stmt
+/// *default-stmt
+/// [config-stmt]
+/// [min-elements-stmt]
+/// [max-elements-stmt]
+/// [ordered-by-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}" stmtsep
+leaf_list_stmt = { leaf_list_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | (type_stmt ~ stmtsep) | units_stmt | must_stmt | default_stmt | config_stmt | min_elements_stmt | max_elements_stmt | ordered_by_stmt | status_stmt | description_stmt | reference_stmt)* ~ ^"}" ~ stmtsep }
+
+/// list-stmt = list-keyword sep identifier-arg-str optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// *must-stmt
+/// [key-stmt]
+/// *unique-stmt
+/// [config-stmt]
+/// [min-elements-stmt]
+/// [max-elements-stmt]
+/// [ordered-by-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *(typedef-stmt / grouping-stmt)
+/// 1*data-def-stmt
+/// *action-stmt
+/// *notification-stmt
+/// "}" stmtsep
+list_stmt = { list_keyword ~ identifier_arg_str ~ ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | must_stmt | key_stmt | unique_stmt | config_stmt | min_elements_stmt | max_elements_stmt | ordered_by_stmt | status_stmt | description_stmt | reference_stmt | typedef_stmt | grouping_stmt | data_def_stmt | action_stmt | notification_stmt)+ ~ ^"}" ~ stmtsep }
+
+key_stmt       =  { key_keyword ~ key_arg_str ~ stmtend }
+key_arg_str    = _{ DQUOTE ~ key_arg ~ DQUOTE | SQUOTE ~ key_arg ~ SQUOTE | key_arg }
+key_arg        =  { node_identifier ~ (node_identifier)* }
+unique_stmt    =  { unique_keyword ~ unique_arg_str ~ stmtend }
+unique_arg_str = _{ DQUOTE ~ unique_arg ~ DQUOTE | SQUOTE ~ unique_arg ~ SQUOTE | unique_arg }
+unique_arg     =  { descendant_schema_nodeid ~ (descendant_schema_nodeid)* }
+
+/// choice-stmt = choice-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// [default-stmt]
+/// [config-stmt]
+/// [mandatory-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *(short-case-stmt / case-stmt)
+/// "}") stmtsep
+choice_stmt     = { choice_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | default_stmt | config_stmt | mandatory_stmt | status_stmt | description_stmt | reference_stmt | short_case_stmt | case_stmt)* ~ ^"}") ~ stmtsep }
+short_case_stmt = { choice_stmt | container_stmt | leaf_stmt | leaf_list_stmt | list_stmt | anydata_stmt | anyxml_stmt }
+
+/// case-stmt = case-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *data-def-stmt
+/// "}") stmtsep
+case_stmt = { case_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | status_stmt | description_stmt | reference_stmt | data_def_stmt)* ~ ^"}") ~ stmtsep }
+
+/// anydata-stmt        = anydata-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// *must-stmt
+/// [config-stmt]
+/// [mandatory-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}") stmtsep
+anydata_stmt = { anydata_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | must_stmt)* ~ (config_stmt)? ~ (mandatory_stmt)? ~ (status_stmt)? ~ (description_stmt)? ~ (reference_stmt)? ~ ^"}") ~ stmtsep }
+
+/// anyxml-stmt         = anyxml-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// *must-stmt
+/// [config-stmt]
+/// [mandatory-stmt]
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}") stmtsep
+anyxml_stmt = { anyxml_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | must_stmt | config_stmt | mandatory_stmt | status_stmt | description_stmt | reference_stmt)* ~ ^"}") ~ stmtsep }
+
+/// uses-stmt           = uses-keyword sep identifier-ref-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *refine-stmt
+/// *uses-augment-stmt
+/// "}") stmtsep
+uses_stmt = { uses_keyword ~ identifier_ref_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | status_stmt | description_stmt | reference_stmt | refine_stmt | uses_augment_stmt)* ~ ^"}") ~ stmtsep }
+
+/// refine-stmt         = refine-keyword sep refine-arg-str optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// *if-feature-stmt
+/// *must-stmt
+/// [presence-stmt]
+/// *default-stmt
+/// [config-stmt]
+/// [mandatory-stmt]
+/// [min-elements-stmt]
+/// [max-elements-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// "}" stmtsep
+refine_stmt    =  { refine_keyword ~ refine_arg_str ~ ^"{" ~ stmtsep ~ (if_feature_stmt | must_stmt | presence_stmt | default_stmt | config_stmt | mandatory_stmt | min_elements_stmt | max_elements_stmt | description_stmt | reference_stmt)* ~ ^"}" ~ stmtsep }
+refine_arg_str = _{ DQUOTE ~ refine_arg ~ DQUOTE | SQUOTE ~ refine_arg ~ SQUOTE | refine_arg }
+refine_arg     =  { descendant_schema_nodeid }
+
+/// uses-augment-stmt   = augment-keyword sep uses-augment-arg-str optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// 1*(data-def-stmt / case-stmt /
+/// action-stmt / notification-stmt)
+/// "}" stmtsep
+uses_augment_stmt    = { augment_keyword ~ uses_augment_arg_str ~ ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | status_stmt | description_stmt | reference_stmt | data_def_stmt | case_stmt | action_stmt | notification_stmt)* ~ ^"}" ~ stmtsep }
+uses_augment_arg_str = { DQUOTE ~ uses_augment_arg ~ DQUOTE | SQUOTE ~ uses_augment_arg ~ SQUOTE | uses_augment_arg }
+uses_augment_arg     = { descendant_schema_nodeid }
+
+/// augment-stmt        = augment-keyword sep augment-arg-str optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [when-stmt]
+/// *if-feature-stmt
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// 1*(data-def-stmt / case-stmt /
+/// action-stmt / notification-stmt)
+/// "}" stmtsep
+augment_stmt    =  { augment_keyword ~ augment_arg_str ~ ^"{" ~ stmtsep ~ (when_stmt | if_feature_stmt | status_stmt | description_stmt | reference_stmt | data_def_stmt | case_stmt | action_stmt | notification_stmt)* ~ ^"}" ~ stmtsep }
+augment_arg_str = _{ DQUOTE ~ augment_arg ~ DQUOTE | SQUOTE ~ augment_arg ~ SQUOTE | augment_arg }
+augment_arg     =  { absolute_schema_nodeid }
+
+/// 'abnf
+/// when-stmt           = when-keyword sep string optsep
+///                       (";" /
+///                        "{" stmtsep
+///                            ;; these stmts can appear in any order
+///                            [description-stmt]
+///                            [reference-stmt]
+///                         "}") stmtsep
+/// ```
+when_stmt = { when_keyword ~ string ~ (^";" | ^"{" ~ stmtsep ~ ((description_stmt ~ reference_stmt?) | (description_stmt? ~ reference_stmt))? ~ ^"}") ~ stmtsep }
+
+/// rpc-stmt            = rpc-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// *if-feature-stmt
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *(typedef-stmt / grouping-stmt)
+/// [input-stmt]
+/// [output-stmt]
+/// "}") stmtsep
+rpc_stmt = { rpc_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (if_feature_stmt | status_stmt | description_stmt | reference_stmt | typedef_stmt | grouping_stmt | input_stmt | output_stmt)* ~ ^"}") ~ stmtsep }
+
+/// action-stmt         = action-keyword sep identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// *if-feature-stmt
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *(typedef-stmt / grouping-stmt)
+/// [input-stmt]
+/// [output-stmt]
+/// "}") stmtsep
+///
+action_stmt = { action_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (if_feature_stmt | status_stmt | description_stmt | reference_stmt | typedef_stmt | grouping_stmt | input_stmt | output_stmt)* ~ ^"}") ~ stmtsep }
+
+/// input-stmt          = input-keyword optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// *must-stmt
+/// *(typedef-stmt / grouping-stmt)
+/// 1*data-def-stmt
+/// "}" stmtsep
+input_stmt = { input_keyword ~ ^"{" ~ stmtsep ~ (must_stmt | typedef_stmt | grouping_stmt | data_def_stmt)* ~ ^"}" ~ stmtsep }
+
+/// output-stmt         = output-keyword optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order  (needs post processing)
+/// *must-stmt
+/// *(typedef-stmt / grouping-stmt)
+/// 1*data-def-stmt
+/// "}" stmtsep
+output_stmt = { output_keyword ~ ^"{" ~ stmtsep ~ (must_stmt | typedef_stmt | grouping_stmt | data_def_stmt)* ~ ^"}" ~ stmtsep }
+
+/// notification-stmt   = notification-keyword sep
+/// identifier-arg-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// *if-feature-stmt
+/// *must-stmt
+/// [status-stmt]
+/// [description-stmt]
+/// [reference-stmt]
+/// *(typedef-stmt / grouping-stmt)
+/// *data-def-stmt
+/// "}") stmtsep
+notification_stmt = { notification_keyword ~ identifier_arg_str ~ (^";" | ^"{" ~ stmtsep ~ (if_feature_stmt | must_stmt | status_stmt | description_stmt | reference_stmt | typedef_stmt | grouping_stmt | data_def_stmt)* ~ ^"}") ~ stmtsep }
+
+/// deviation-stmt      = deviation-keyword sep
+/// deviation-arg-str optsep
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [description-stmt]
+/// [reference-stmt]
+/// (deviate-not-supported-stmt /
+/// 1*(deviate-add-stmt /
+/// deviate-replace-stmt /
+/// deviate-delete-stmt))
+/// "}" stmtsep
+deviation_stmt             =  { deviation_keyword ~ deviation_arg_str ~ ^"{" ~ stmtsep ~ (description_stmt | reference_stmt | deviate_not_supported_stmt | deviate_add_stmt | deviate_replace_stmt | deviate_delete_stmt)* ~ ^"}" ~ stmtsep }
+deviation_arg_str          = _{ DQUOTE ~ deviation_arg ~ DQUOTE | SQUOTE ~ deviation_arg ~ SQUOTE | deviation_arg }
+deviation_arg              =  { absolute_schema_nodeid }
+deviate_not_supported_stmt =  { deviate_keyword ~ not_supported_keyword_str ~ stmtend }
+
+/// deviate-add-stmt    = deviate-keyword sep add-keyword-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [units-stmt]
+/// *must-stmt
+/// *unique-stmt
+/// *default-stmt
+/// [config-stmt]
+/// [mandatory-stmt]
+/// [min-elements-stmt]
+/// [max-elements-stmt]
+/// "}") stmtsep
+deviate_add_stmt = { deviate_keyword ~ add_keyword_str ~ (^";" | ^"{" ~ stmtsep ~ (units_stmt | must_stmt | unique_stmt | default_stmt | config_stmt | mandatory_stmt | min_elements_stmt | max_elements_stmt)* ~ ^"}") ~ stmtsep }
+
+/// deviate-delete-stmt = deviate-keyword sep delete-keyword-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [units-stmt]
+/// *must-stmt
+/// *unique-stmt
+/// *default-stmt
+/// "}") stmtsep
+deviate_delete_stmt = { deviate_keyword ~ delete_keyword_str ~ (^";" | ^"{" ~ stmtsep ~ (units_stmt | must_stmt | unique_stmt | default_stmt)* ~ ^"}") ~ stmtsep }
+
+/// deviate-replace-stmt = deviate-keyword sep replace-keyword-str optsep
+/// (";" /
+/// "{" stmtsep
+/// ;; these stmts can appear in any order (needs post processing)
+/// [type-stmt]
+/// [units-stmt]
+/// [default-stmt]
+/// [config-stmt]
+/// [mandatory-stmt]
+/// [min-elements-stmt]
+/// [max-elements-stmt]
+/// "}") stmtsep
+deviate_replace_stmt = { deviate_keyword ~ replace_keyword_str ~ (^";" | ^"{" ~ stmtsep ~ (type_stmt | units_stmt | default_stmt | config_stmt | mandatory_stmt | min_elements_stmt | max_elements_stmt)* ~ ^"}") ~ stmtsep }
+
+not_supported_keyword_str = _{ DQUOTE ~ not_supported_keyword ~ DQUOTE | SQUOTE ~ not_supported_keyword ~ SQUOTE | not_supported_keyword }
+add_keyword_str           = _{ DQUOTE ~ add_keyword ~ DQUOTE | SQUOTE ~ add_keyword ~ SQUOTE | add_keyword }
+delete_keyword_str        = _{ DQUOTE ~ delete_keyword ~ DQUOTE | SQUOTE ~ delete_keyword ~ SQUOTE | delete_keyword }
+replace_keyword_str       = _{ DQUOTE ~ replace_keyword ~ DQUOTE | SQUOTE ~ replace_keyword ~ SQUOTE | replace_keyword }
+unknown_statement         =  { prefix ~ ^":" ~ identifier ~ (string)? ~ (^";" | ^"{" ~ ((yang_stmt | unknown_statement))* ~ ^"}") ~ stmtsep }
+yang_stmt                 =  { action_stmt | anydata_stmt | anyxml_stmt | argument_stmt | augment_stmt | base_stmt | belongs_to_stmt | bit_stmt | case_stmt | choice_stmt | config_stmt | contact_stmt | container_stmt | default_stmt | description_stmt | deviate_add_stmt | deviate_delete_stmt | deviate_not_supported_stmt | deviate_replace_stmt | deviation_stmt | enum_stmt | error_app_tag_stmt | error_message_stmt | extension_stmt | feature_stmt | fraction_digits_stmt | grouping_stmt | identity_stmt | if_feature_stmt | import_stmt | include_stmt | input_stmt | key_stmt | leaf_list_stmt | leaf_stmt | length_stmt | list_stmt | mandatory_stmt | max_elements_stmt | min_elements_stmt | modifier_stmt | module_stmt | must_stmt | namespace_stmt | notification_stmt | ordered_by_stmt | organization_stmt | output_stmt | path_stmt | pattern_stmt | position_stmt | prefix_stmt | presence_stmt | range_stmt | reference_stmt | refine_stmt | require_instance_stmt | revision_date_stmt | revision_stmt | rpc_stmt | status_stmt | submodule_stmt | typedef_stmt | type_stmt | unique_stmt | units_stmt | uses_augment_stmt | uses_stmt | value_stmt | when_stmt | yang_version_stmt | yin_element_stmt }
+
+/// ```abnf
+/// range-arg-str       = < a string that matches the rule >
+/// < range-arg >
+/// ```
+range_arg_str = _{ DQUOTE ~ range_arg ~ DQUOTE | SQUOTE ~ range_arg ~ SQUOTE | range_arg }
+
+/// ```abnf
+/// range-arg           = range-part *(optsep "|" optsep range-part)
+/// ```
+range_arg = { range_part ~ (^"|" ~ range_part)* }
+
+/// ```abnf
+/// range-part          = range-boundary
+/// [optsep ".." optsep range-boundary]
+/// ```
+range_part = { range_boundary ~ (^".." ~ range_boundary)? }
+
+/// ```abnf
+/// range-boundary      = min-keyword / max-keyword /
+/// integer-value / decimal-value
+/// ```
+range_boundary = { min_keyword | max_keyword | decimal_value | integer_value }
+
+length_arg_str           = _{ DQUOTE ~ length_arg ~ DQUOTE | SQUOTE ~ length_arg ~ SQUOTE | length_arg }
+length_arg               =  { length_part ~ (^"|" ~ length_part)* }
+length_part              =  { length_boundary ~ (^".." ~ length_boundary)? }
+length_boundary          =  { min_keyword | max_keyword | non_negative_integer_value }
+date_arg_str             = _{ DQUOTE ~ date_arg ~ DQUOTE | SQUOTE ~ date_arg ~ SQUOTE | date_arg }
+date_arg                 =  { DIGIT{4} ~ ^"-" ~ DIGIT{2} ~ ^"-" ~ DIGIT{2} }
+schema_nodeid            =  { absolute_schema_nodeid | descendant_schema_nodeid }
+absolute_schema_nodeid   =  { (^"/" ~ node_identifier)+ }
+descendant_schema_nodeid =  { node_identifier ~ (absolute_schema_nodeid)? }
+node_identifier          =  { (prefix ~ ":")? ~ identifier }
+instance_identifier      =  { (^"/" ~ (node_identifier ~ (key_predicate+ | leaf_list_predicate | pos)?))+ }
+key_predicate            =  { ^"[" ~ WSP* ~ key_predicate_expr ~ WSP* ~ ^"]" }
+key_predicate_expr       =  { node_identifier ~ WSP* ~ ^"=" ~ WSP* ~ quoted_string }
+leaf_list_predicate      =  { ^"[" ~ WSP* ~ leaf_list_predicate_expr ~ WSP* ~ ^"]" }
+leaf_list_predicate_expr =  { ^"." ~ WSP* ~ ^"=" ~ WSP* ~ quoted_string }
+pos                      =  { ^"[" ~ WSP* ~ positive_integer_value ~ WSP* ~ ^"]" }
+// quoted_string                     = _{ (DQUOTE ~ string ~ DQUOTE) | (SQUOTE ~ string ~ SQUOTE) }
+quoted_string               = _{ dstring | sstring }
+path_arg_str                = _{ DQUOTE ~ path_arg ~ DQUOTE | SQUOTE ~ path_arg ~ SQUOTE | path_arg }
+path_arg                    =  { absolute_path | relative_path }
+absolute_path               =  { (^"/" ~ (node_identifier ~ path_predicate*))+ }
+relative_path               =  { ("." ~ "." ~ "/")+ ~ descendant_path }
+descendant_path             =  { node_identifier ~ (path_predicate* ~ absolute_path)? }
+path_predicate              =  { ^"[" ~ WSP* ~ path_equality_expr ~ WSP* ~ ^"]" }
+path_equality_expr          =  { node_identifier ~ WSP* ~ ^"=" ~ WSP* ~ path_key_expr }
+path_key_expr               =  { current_function_invocation ~ WSP* ~ ^"/" ~ WSP* ~ rel_path_keyexpr }
+rel_path_keyexpr            =  { (^".." ~ WSP* ~ ^"/" ~ WSP*)+ ~ (node_identifier ~ WSP* ~ ^"/" ~ WSP*)* ~ node_identifier }
+action_keyword              = @{ ^"action" }
+anydata_keyword             = @{ ^"anydata" }
+anyxml_keyword              = @{ ^"anyxml" }
+argument_keyword            = @{ ^"argument" }
+augment_keyword             = @{ ^"augment" }
+base_keyword                = _{ ^"base" }
+belongs_to_keyword          = @{ ^"belongs-to" }
+bit_keyword                 = @{ ^"bit" }
+case_keyword                = @{ ^"case" }
+choice_keyword              = @{ ^"choice" }
+config_keyword              = _{ ^"config" }
+contact_keyword             = _{ ^"contact" }
+container_keyword           = _{ ^"container" }
+default_keyword             = @{ ^"default" }
+description_keyword         = _{ ^"description" }
+deviate_keyword             = @{ ^"deviate" }
+deviation_keyword           = @{ ^"deviation" }
+enum_keyword                = _{ ^"enum" }
+error_app_tag_keyword       = _{ ^"error-app-tag" }
+error_message_keyword       = _{ ^"error-message" }
+extension_keyword           = @{ ^"extension" }
+feature_keyword             = _{ ^"feature" }
+fraction_digits_keyword     = @{ ^"fraction-digits" }
+grouping_keyword            = @{ ^"grouping" }
+identity_keyword            = _{ ^"identity" }
+if_feature_keyword          = @{ ^"if-feature" }
+import_keyword              = _{ ^"import" }
+include_keyword             = _{ ^"include" }
+input_keyword               = @{ ^"input" }
+key_keyword                 = @{ ^"key" }
+leaf_keyword                = _{ ^"leaf" }
+leaf_list_keyword           = _{ ^"leaf-list" }
+length_keyword              = @{ ^"length" }
+list_keyword                = @{ ^"list" }
+mandatory_keyword           = _{ ^"mandatory" }
+max_elements_keyword        = @{ ^"max-elements" }
+min_elements_keyword        = @{ ^"min-elements" }
+modifier_keyword            = @{ ^"modifier" }
+module_keyword              = _{ ^"module" }
+must_keyword                = @{ ^"must" }
+namespace_keyword           = _{ ^"namespace" }
+notification_keyword        = @{ ^"notification" }
+ordered_by_keyword          = @{ ^"ordered-by" }
+organization_keyword        = _{ ^"organization" }
+output_keyword              = @{ ^"output" }
+path_keyword                = @{ ^"path" }
+pattern_keyword             = @{ ^"pattern" }
+position_keyword            = @{ ^"position" }
+prefix_keyword              = _{ ^"prefix" }
+presence_keyword            = @{ ^"presence" }
+range_keyword               = _{ ^"range" }
+reference_keyword           = _{ ^"reference" }
+refine_keyword              = @{ ^"refine" }
+require_instance_keyword    = @{ ^"require-instance" }
+revision_keyword            = _{ ^"revision" }
+revision_date_keyword       = _{ ^"revision-date" }
+rpc_keyword                 = @{ ^"rpc" }
+status_keyword              = _{ ^"status" }
+submodule_keyword           = @{ ^"submodule" }
+type_keyword                = _{ ^"type" }
+typedef_keyword             = _{ ^"typedef" }
+unique_keyword              = @{ ^"unique" }
+units_keyword               = @{ ^"units" }
+uses_keyword                = @{ ^"uses" }
+value_keyword               = _{ ^"value" }
+when_keyword                = _{ ^"when" }
+yang_version_keyword        = _{ ^"yang-version" }
+yin_element_keyword         = @{ ^"yin-element" }
+add_keyword                 = @{ ^"add" }
+current_keyword             = @{ ^"current" }
+delete_keyword              = @{ ^"delete" }
+deprecated_keyword          = @{ ^"deprecated" }
+false_keyword               = @{ ^"false" }
+invert_match_keyword        = @{ ^"invert-match" }
+max_keyword                 = @{ ^"max" }
+min_keyword                 = @{ ^"min" }
+not_supported_keyword       = @{ ^"not-supported" }
+obsolete_keyword            = @{ ^"obsolete" }
+replace_keyword             = @{ ^"replace" }
+system_keyword              = @{ ^"system" }
+true_keyword                = @{ ^"true" }
+unbounded_keyword           = @{ ^"unbounded" }
+user_keyword                = @{ ^"user" }
+and_keyword                 = @{ ^"and" }
+or_keyword                  = @{ ^"or" }
+not_keyword                 = @{ ^"not" }
+current_function_invocation =  { current_keyword ~ WSP* ~ ^"(" ~ WSP* ~ ^")" }
+
+prefix_arg_str = _{ DQUOTE ~ prefix_arg ~ DQUOTE | SQUOTE ~ prefix_arg ~ SQUOTE | prefix_arg }
+prefix_arg     = _{ prefix }
+prefix         = @{ identifier }
+
+identifier_arg_str = _{ DQUOTE ~ identifier_arg ~ DQUOTE | SQUOTE ~ identifier_arg ~ SQUOTE | identifier_arg }
+
+/// ```abnf
+/// identifier-arg      = identifier
+/// `
+identifier_arg = _{ identifier }
+
+/// ```abnf
+/// identifier          = (ALPHA / "_") *(ALPHA / DIGIT / "_" / "-" / ".")
+/// ```
+identifier = @{ (ALPHA | ^"_") ~ (ALPHA | DIGIT | ^"_" | ^"-" | ^".")* }
+
+/// ```abnf
+/// identifier-ref-arg-str = < a string that matches the rule >
+/// < identifier-ref-arg >
+/// ```
+identifier_ref_arg_str = _{ DQUOTE ~ identifier_ref_arg ~ DQUOTE | SQUOTE ~ identifier_ref_arg ~ SQUOTE | identifier_ref_arg }
+
+/// ```abnf
+/// identifier-ref-arg  = identifier-ref
+/// ```
+identifier_ref_arg = _{ identifier_ref }
+
+/// ```abnf
+/// identifier-ref      = [prefix ":"] identifier
+/// ```
+identifier_ref = { (prefix ~ ^":")? ~ identifier }
+
+// string                      =  { yang_string }
+// yang_string                 =  { yang_char* }
+yang_char     =  { "\u{09}" | "\u{0A}" | "\u{0D}" | '\u{20}'..'\u{D7FF}' | '\u{E000}'..'\u{FDCF}' | '\u{FDF0}'..'\u{FFFD}' | '\u{10000}'..'\u{1FFFD}' | '\u{20000}'..'\u{2FFFD}' | '\u{30000}'..'\u{3FFFD}' | '\u{40000}'..'\u{4FFFD}' | '\u{50000}'..'\u{5FFFD}' | '\u{60000}'..'\u{6FFFD}' | '\u{70000}'..'\u{7FFFD}' | '\u{80000}'..'\u{8FFFD}' | '\u{90000}'..'\u{9FFFD}' | '\u{A0000}'..'\u{AFFFD}' | '\u{B0000}'..'\u{BFFFD}' | '\u{C0000}'..'\u{CFFFD}' | '\u{D0000}'..'\u{DFFFD}' | '\u{E0000}'..'\u{EFFFD}' | '\u{F0000}'..'\u{FFFFD}' | '\u{100000}'..'\u{10FFFD}' }
+integer_value = @{ (^"-" ~ non_negative_integer_value) | non_negative_integer_value }
+// AH: We added the ^"+"? term to accept values with positive numbers
+non_negative_integer_value = @{ ^"0" | (^"+"? ~ positive_integer_value) }
+positive_integer_value     = @{ (non_zero_digit ~ DIGIT*) }
+zero_integer_value         = @{ DIGIT+ }
+stmtend                    = _{ (^";" | ^"{" ~ stmtsep ~ ^"}") ~ stmtsep }
+sep                        = _{ (WSP | line_break)+ }
+optsep                     = _{ (WSP | line_break)* }
+// stmtsep                     = _{ (WSP | line_break | unknown_statement)* }
+stmtsep        = _{ unknown_statement* }
+line_break     = _{ "\n" | "\r\n" }
+non_zero_digit = @{ '1'..'9' }
+decimal_value  = @{ integer_value ~ (^"." ~ zero_integer_value) }
+SQUOTE         = _{ "\u{27}" }
+ALPHA          = _{ 'A'..'Z' | 'a'..'z' }
+CR             = _{ "\u{0D}" }
+CRLF           = _{ CR ~ LF }
+DIGIT          = _{ '0'..'9' }
+DQUOTE         = _{ "\u{22}" }
+HTAB           = _{ "\u{09}" }
+LF             = _{ "\u{0A}" }
+SP             = _{ "\u{20}" }
+WSP            = _{ SP | HTAB }
+HEXDIG         = @{ DIGIT | ^"A" | ^"B" | ^"C" | ^"D" | ^"E" | ^"F" }
+
+/// Custom string rules that are more accurate
+// string         =  { dstring ~ (plus ~ dstring)* | sstring ~ (plus ~ string)* | unquoted }
+string = { dstring | sstring | unquoted }
+// multi_line_str =  { dstring ~ (plus ~ dstring)* }
+dplus         =  _{ ("\"" ~ (" " | line_break)* ~ "+" ~ (" " | line_break)* ~ "\"") }
+splus         =  _{ ("'" ~ (" " | line_break)* ~ "+" ~ (" " | line_break)* ~ "'") }
+unquoted      =  @{ unqouted_char* }
+unqouted_char =  { !(SP | "\t" | CR | LF | SQUOTE | DQUOTE | ";" | "{" | "}" | "//" | "/*" | "*/") ~ ANY }
+dstring       = ${ DQUOTE ~ dstring_inner ~ (dplus ~ dstring_inner)* ~ DQUOTE }
+dstring_inner = @{ dstring_char* }
+dstring_char  = _{ !("\"" | "\\") ~ ANY | "\\" ~ escape_char }
+sstring       = ${ SQUOTE ~ sstring_inner ~ (splus ~ sstring_inner)* ~ SQUOTE }
+sstring_inner = @{ sstring_char* }
+sstring_char  =  { !("\'") ~ ANY }
+escape_char   =  { "n" | "t" | "\"" | "\\" }
+
+// A single line comment.
+line_comment = _{ ("//" ~ (!line_break ~ ANY)*) }
+
+/// A multi-line comment.
+block_comment = _{ "/*" ~ (block_comment | !"*/" ~ ANY)* ~ "*/" }
+
+/// A grammar comment.
+COMMENT = _{ block_comment | line_comment }
+
+/// A whitespace character.
+// WHITESPACE = _{ " " | "\t" | line_break }
+WHITESPACE = _{
+    " "
+  | "\t"
+  | line_break
+  | dplus
+  | splus
+}

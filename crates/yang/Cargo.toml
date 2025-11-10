@@ -1,0 +1,28 @@
+[package]
+name = "netgauze-yang"
+version = "0.8.0"
+edition = "2024"
+authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/NetGauze/NetGauze"
+homepage = "https://github.com/NetGauze/NetGauze"
+description = """
+YANG implementation
+"""
+keywords = ["yang", "netconf", "parser"]
+categories = ["network-programming"]
+
+
+
+[dependencies]
+pest = "2.8"
+pest_derive = "2.8"
+serde = { workspace = true, features = ["derive", "rc"] }
+chrono = { workspace = true, features = ["serde"] }
+regex = { workspace = true }
+pest-ast = "0.3"
+from-pest = "0.3"
+
+[dev-dependencies]
+pretty_assertions = "1.4"
