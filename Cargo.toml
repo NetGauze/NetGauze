@@ -20,6 +20,7 @@ members = [
     "crates/pcap-decoder",
     "crates/netconf-proto",
     "fuzz",
+    "crates/yang",
 ]
 resolver = "2"
 
