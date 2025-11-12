@@ -14,13 +14,7 @@
 // limitations under the License.
 
 use clap::Parser;
-use netgauze_netconf_proto::{
-    client::{connect, NetconfSshConnectConfig, SshAuth, SshHandler},
-    protocol::{
-        RpcOperation, RpcReplyContent, RpcResponse, WellKnownOperation, WellKnownRpcResponse,
-        YangSchemaFormat,
-    },
-};
+use netgauze_netconf_proto::client::{connect, NetconfSshConnectConfig, SshAuth, SshHandler};
 use std::{sync::Arc, time::Duration};
 
 #[derive(clap::Parser, Debug)]
