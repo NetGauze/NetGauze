@@ -479,7 +479,7 @@ impl XmlSerialize for ConfigTarget {
     Eq, PartialEq, Default, Debug, Copy, Clone, Serialize, Deserialize, strum_macros::Display,
 )]
 pub enum ConfigUpdateDefaultOperation {
-    /// The configuration data in the <config> parameter is merged with the
+    /// The configuration data in the `<config>` parameter is merged with the
     /// configuration at the corresponding level in the target datastore.
     ///
     /// This is the default behavior.
@@ -487,20 +487,21 @@ pub enum ConfigUpdateDefaultOperation {
     #[strum(serialize = "merge")]
     Merge,
 
-    /// The configuration data in the <config> parameter completely replaces the
-    /// configuration in the target datastore.  This is useful for loading
-    /// previously saved configuration data.
+    /// The configuration data in the `<config>` parameter completely replaces
+    /// the configuration in the target datastore.  This is useful for
+    /// loading previously saved configuration data.
     #[strum(serialize = "replace")]
     Replace,
 
-    /// The target datastore is unaffected by the configuration in the <config>
-    /// parameter, unless and until the incoming configuration data uses the
-    /// "operation" attribute to request a different operation. If the
-    /// configuration in the <config> parameter contains data for
-    /// which there is not a corresponding level in the target datastore,
-    /// an <rpc-error> is returned with an <error-tag> value of data-missing.
-    /// Using "none" allows operations like "delete" to avoid unintentionally
-    /// creating the parent hierarchy of the element to be deleted.
+    /// The target datastore is unaffected by the configuration in the
+    /// `<config>` parameter, unless and until the incoming configuration
+    /// data uses the "operation" attribute to request a different
+    /// operation. If the configuration in the `<config>` parameter contains
+    /// data for which there is not a corresponding level in the target
+    /// datastore, an `<rpc-error>` is returned with an `<error-tag>` value
+    /// of data-missing. Using "none" allows operations like "delete" to
+    /// avoid unintentionally creating the parent hierarchy of the element
+    /// to be deleted.
     #[strum(serialize = "none")]
     None,
 }
@@ -548,7 +549,8 @@ impl XmlSerialize for ConfigUpdateDefaultOperation {
 )]
 pub enum ConfigEditTestOption {
     /// Perform a validation test before attempting to set.
-    /// If validation errors occur, do not perform the <edit-config> operation.
+    /// If validation errors occur, do not perform the `<edit-config>`
+    /// operation.
     ///
     /// This is the default test-option.
     #[strum(serialize = "test-then-set")]
