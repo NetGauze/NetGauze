@@ -319,7 +319,7 @@ impl EnrichmentStats {
             .build();
         let received_enrichment_ops = meter
             .u64_counter("netgauze.collector.flows.enrichment.received.enrichment.operations")
-            .with_description("Number of enrichment updates received from SONATA")
+            .with_description("Number of enrichment updates received")
             .build();
         let sent = meter
             .u64_counter("netgauze.collector.flows.enrichment.sent")
@@ -436,8 +436,7 @@ impl EnrichmentHandle<EnrichmentOperation> for FlowEnrichmentActorHandle {
     ///
     /// Updates are applied asynchronously and will affect subsequent
     /// flow enrichment operations. The operation can be either an
-    /// upsert (add/update) or delete. We also apply defensive filtering:
-    //  to be safe: drop operations with empty fields/IEs
+    /// upsert (add/update) or delete.
     fn update_enrichment(
         &self,
         op: EnrichmentOperation,

@@ -84,6 +84,7 @@ smallvec = { workspace = true }
 rustc-hash = { workspace = true }
 ipnet = { workspace = true, features = ["serde"] }
 notify = { workspace = true }
+sysinfo = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = [

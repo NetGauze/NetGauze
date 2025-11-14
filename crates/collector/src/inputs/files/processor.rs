@@ -171,7 +171,7 @@ mod tests {
     use super::*;
     use crate::{
         flow::enrichment::{DeletePayload, EnrichmentOperation, Scope},
-        inputs::files::handlers::JsonUpsertsHandler,
+        inputs::files::handlers::FlowUpsertsHandler,
     };
     use netgauze_flow_pkt::ie::IE;
     use std::{net::IpAddr, str::FromStr};
@@ -187,7 +187,7 @@ mod tests {
         let content = r#"{"ip":"192.168.1.1","scope":{"obs_domain_id":0},"weight":5,"fields":[{"applicationName":"test"}]}"#;
         fs::write(&path, content).await.unwrap();
 
-        let mut handler = JsonUpsertsHandler::new();
+        let mut handler = FlowUpsertsHandler::new();
 
         // First process to populate cache
         processor

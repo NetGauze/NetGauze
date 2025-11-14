@@ -42,9 +42,14 @@ pub struct KafkaConsumerConfig {
 
 #[derive(strum_macros::Display, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KafkaMessageFormat {
-    /// JSON-serialized upsert/delete messages
-    #[strum(to_string = "JSON EnrichmentOperation message")]
-    JsonOps,
+    /// JSON-serialized [`crate::flow::enrichment::EnrichmentOperation`]
+    /// messages
+    #[strum(to_string = "JSON Flow EnrichmentOperation message")]
+    FlowEnrichmentOps,
+
+    /// JSON-serialized [`crate::yang_push::EnrichmentOperation`] messages
+    #[strum(to_string = "JSON Yang-Push EnrichmentOperation message")]
+    YangPushEnrichmentOps,
 
     /// Swisscom custom SonataDB insert/update/delete messages
     #[strum(to_string = "Swisscom custom SonataDB message")]
@@ -73,7 +78,12 @@ mod tests {
             consumers: vec![
                 KafkaConsumerConfig {
                     topic: "enrichment-ops".to_string(),
-                    message_format: KafkaMessageFormat::JsonOps,
+                    message_format: KafkaMessageFormat::FlowEnrichmentOps,
+                    consumer_config: consumer_config.clone(),
+                },
+                KafkaConsumerConfig {
+                    topic: "yang-push-ops".to_string(),
+                    message_format: KafkaMessageFormat::YangPushEnrichmentOps,
                     consumer_config: consumer_config.clone(),
                 },
                 KafkaConsumerConfig {
@@ -95,7 +105,11 @@ mod tests {
 
         let expected = r#"consumers:
 - topic: enrichment-ops
-  message_format: JsonOps
+  message_format: FlowEnrichmentOps
+  consumer_config:
+    bootstrap.servers: localhost:9092
+- topic: yang-push-ops
+  message_format: YangPushEnrichmentOps
   consumer_config:
     bootstrap.servers: localhost:9092
 - topic: sonata-db
@@ -116,7 +130,12 @@ mod tests {
     fn test_kafkaconfig_deserialize_from_yaml() {
         let yaml = r#"consumers:
 - topic: enrichment-ops
-  message_format: JsonOps
+  message_format: !FlowEnrichmentOps
+  consumer_config:
+    bootstrap.servers: localhost:9092
+    group.id: test-group
+- topic: yang-push-ops
+  message_format: !YangPushEnrichmentOps
   consumer_config:
     bootstrap.servers: localhost:9092
     group.id: test-group
@@ -150,7 +169,12 @@ mod tests {
             consumers: vec![
                 KafkaConsumerConfig {
                     topic: "enrichment-ops".to_string(),
-                    message_format: KafkaMessageFormat::JsonOps,
+                    message_format: KafkaMessageFormat::FlowEnrichmentOps,
+                    consumer_config: consumer_config_1.clone(),
+                },
+                KafkaConsumerConfig {
+                    topic: "yang-push-ops".to_string(),
+                    message_format: KafkaMessageFormat::YangPushEnrichmentOps,
                     consumer_config: consumer_config_1,
                 },
                 KafkaConsumerConfig {

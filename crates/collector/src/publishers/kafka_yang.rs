@@ -79,19 +79,19 @@ where
     C: Serialize,
 {
     /// Target Kafka topic for publishing messages
-    topic: String,
+    pub topic: String,
 
     /// Key/Value producer configs are defined in librdkafka
-    producer_config: HashMap<String, String>,
+    pub producer_config: HashMap<String, String>,
 
     /// Unique identifier for this writer instance
-    writer_id: String,
+    pub writer_id: String,
 
     /// URL of the Confluent Schema Registry
-    schema_registry_url: String,
+    pub schema_registry_url: String,
 
     /// YANG converter implementation
-    yang_converter: C,
+    pub yang_converter: C,
 }
 
 // --- telemetry ---

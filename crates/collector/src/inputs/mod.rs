@@ -84,6 +84,9 @@ pub enum InputProcessingError {
 
     #[strum(to_string = "IO error in {context}: {reason}")]
     IoError { context: String, reason: String },
+
+    #[strum(to_string = "Unsupported operation in {handler}: {reason}")]
+    UnsupportedOperation { handler: String, reason: String },
 }
 
 impl std::error::Error for InputProcessingError {}
@@ -97,6 +100,7 @@ impl InputProcessingError {
             Self::Utf8Error { .. } => "utf8_error",
             Self::JsonError { .. } => "json_error",
             Self::IoError { .. } => "io_error",
+            Self::UnsupportedOperation { .. } => "unsupported_operation",
         }
     }
 }

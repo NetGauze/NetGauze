@@ -19,6 +19,23 @@ udp_notif:
   publishers:
     group1:
       buffer_size: 1000
+      enrichment:
+        inputs:
+          files:
+            poll_interval_seconds: 10
+            paths:
+              - path: assets/inputs/files/yang-push-upserts.jsonl
+                format: !YangPushUpserts
+          kafka:
+            consumers:
+              - topic: sonata
+                message_format: !Sonata
+                weight: 64 # default: 64
+                consumer_config:
+                  bootstrap.servers: localhost:49092
+                  group.id: taarole8-rocky8-avro
+                  enable.auto.commit: "false"
+                  auto.offset.reset: earliest
       custom_yang_schemas:
         192.168.100.0/24:
           content_id: FANO
@@ -37,7 +54,7 @@ udp_notif:
             bootstrap.servers: localhost:49092
             message.timeout.ms: "60000"
             queue.buffering.max.messages: "1000"
-          writer_id: test-udpnotif-telemetry # TODO: not considered yet, discuss...
+          writer_id: coll-netgauze-telemetry-json
         yang-endpoint: !TelemetryKafkaYang
           topic: telemetry-message-yang
           schema_registry_url: http://localhost:48081
@@ -45,6 +62,6 @@ udp_notif:
             bootstrap.servers: localhost:49092
             message.timeout.ms: "60000"
             queue.buffering.max.messages: "1000"
-          writer_id: test-udpnotif-telemetry # TODO: not considered yet, discuss...
+          writer_id: coll-netgauze-telemetry-yang
           yang_converter:
             root_schema: "assets/yang/telemetry-message/yang-push-telemetry-supplied-schema.json"

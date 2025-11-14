@@ -50,7 +50,9 @@
 //! - All formats support incremental change detection with line-based diffing
 use crate::inputs::{
     files::{
-        handlers::{FilesLineHandler, JsonUpsertsHandler, PmacctMapsHandler},
+        handlers::{
+            FilesLineHandler, FlowUpsertsHandler, PmacctMapsHandler, YangPushUpsertsHandler,
+        },
         processor::{FileProcessor, FileProcessorCallback},
         FilesConfig, InputFileFormat,
     },
@@ -574,21 +576,25 @@ impl FilesActorHandle {
     ) -> HashMap<InputFileFormat, Box<dyn FilesLineHandler<T>>>
     where
         T: std::fmt::Display + Clone + Send + Sync + 'static,
-        JsonUpsertsHandler: FilesLineHandler<T>,
         PmacctMapsHandler: FilesLineHandler<T>,
+        FlowUpsertsHandler: FilesLineHandler<T>,
+        YangPushUpsertsHandler: FilesLineHandler<T>,
     {
         let mut handlers: HashMap<InputFileFormat, Box<dyn FilesLineHandler<T>>> = HashMap::new();
 
         for input_file in &config.paths {
             match &input_file.format {
-                format @ InputFileFormat::JSONUpserts => {
-                    handlers.insert(format.clone(), Box::new(JsonUpsertsHandler::new()));
-                }
                 format @ InputFileFormat::PmacctMaps { id, weight } => {
                     handlers.insert(
                         format.clone(),
                         Box::new(PmacctMapsHandler::new(*id, *weight)),
                     );
+                }
+                format @ InputFileFormat::FlowUpserts => {
+                    handlers.insert(format.clone(), Box::new(FlowUpsertsHandler::new()));
+                }
+                format @ InputFileFormat::YangPushUpserts => {
+                    handlers.insert(format.clone(), Box::new(YangPushUpsertsHandler::new()));
                 }
             }
         }
@@ -603,8 +609,9 @@ impl FilesActorHandle {
     ) -> (JoinHandle<anyhow::Result<String>>, Self)
     where
         T: std::fmt::Display + Clone + Send + Sync + 'static,
-        JsonUpsertsHandler: FilesLineHandler<T>,
         PmacctMapsHandler: FilesLineHandler<T>,
+        FlowUpsertsHandler: FilesLineHandler<T>,
+        YangPushUpsertsHandler: FilesLineHandler<T>,
     {
         let handlers = Self::build_handlers_from_config(&config);
         Self::new(config, enrichment_handles, stats, handlers)

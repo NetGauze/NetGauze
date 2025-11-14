@@ -45,7 +45,10 @@
 //! corresponding message handlers implementing the `MessageHandler` trait.
 use crate::inputs::{
     kafka::{
-        handlers::{KafkaJsonOpsHandler, KafkaMessageHandler, KafkaSonataHandler},
+        handlers::{
+            FlowEnrichmentOperationHandler, KafkaMessageHandler, SonataHandler,
+            YangPushEnrichmentOperationHandler,
+        },
         KafkaConsumerConfig, KafkaMessageFormat,
     },
     EnrichmentHandle,
@@ -450,21 +453,28 @@ impl KafkaConsumerActorHandle {
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaConsumerActorError>
     where
         T: std::fmt::Display + Clone + Send + Sync + 'static,
-        KafkaJsonOpsHandler: KafkaMessageHandler<T>,
-        KafkaSonataHandler: KafkaMessageHandler<T>,
+        FlowEnrichmentOperationHandler: KafkaMessageHandler<T>,
+        YangPushEnrichmentOperationHandler: KafkaMessageHandler<T>,
+        SonataHandler: KafkaMessageHandler<T>,
     {
         match &consumer_config.message_format {
-            KafkaMessageFormat::JsonOps => Self::new(
+            KafkaMessageFormat::FlowEnrichmentOps => Self::new(
                 consumer_config.clone(),
                 enrichment_handles,
                 stats,
-                KafkaJsonOpsHandler::new(),
+                FlowEnrichmentOperationHandler::new(),
+            ),
+            KafkaMessageFormat::YangPushEnrichmentOps => Self::new(
+                consumer_config.clone(),
+                enrichment_handles,
+                stats,
+                YangPushEnrichmentOperationHandler::new(),
             ),
             KafkaMessageFormat::Sonata(sonata_config) => Self::new(
                 consumer_config.clone(),
                 enrichment_handles,
                 stats,
-                KafkaSonataHandler::new(sonata_config.clone()),
+                SonataHandler::new(sonata_config.clone()),
             ),
         }
     }
