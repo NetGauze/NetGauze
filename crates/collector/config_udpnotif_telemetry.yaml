@@ -65,4 +65,4 @@ udp_notif:
             queue.buffering.max.messages: "1000"
           writer_id: coll-netgauze-telemetry-yang
           yang_converter:
-            root_schema: "assets/yang/telemetry-message/yang-push-telemetry-supplied-schema.json"
+            root_schema: "assets/yang/yang-push-telemetry-message/supplied-schema.json"
