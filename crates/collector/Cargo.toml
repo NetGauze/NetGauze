@@ -101,3 +101,8 @@ chrono = { workspace = true, default-features = false, features = [
 tracing-subscriber = { workspace = true }
 bytes = { workspace = true }
 tempfile = { workspace = true }
+yang3 = { workspace = true}
+tokio-stream = { workspace = true, features = ["net"] }
+clap = { version = "4", features = ["derive"] }
+rand = { workspace = true }
+regex = { workspace = true }
