@@ -380,17 +380,17 @@ impl PmacctMapEntry {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        flow::enrichment::{DeletePayload, EnrichmentOperation, Scope, UpsertPayload},
-        inputs::files::{
-            handlers::{FlowUpsertsHandler, PmacctMapsHandler},
-            processor::{FileProcessor, FileProcessorCallback},
-        },
+    use crate::inputs::files::{
+        handlers::{FlowUpsertsHandler, PmacctMapsHandler, YangPushUpsertsHandler},
+        processor::{FileProcessor, FileProcessorCallback},
     };
     use netgauze_flow_pkt::ie::{netgauze, Field, IE};
+    use netgauze_yang_push::model::telemetry::{Label, LabelValue};
     use std::cell::RefCell;
     use tempfile::NamedTempFile;
     use tokio::fs;
+
+    // ** Tests with crate::flow::enrichment::EnrichmentOperation for Flow ** //
 
     #[tokio::test]
     async fn test_first_time_processing_json_upserts() {
@@ -411,18 +411,22 @@ mod tests {
         result.sort();
 
         let mut expected = vec![
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.1.1".parse().unwrap(),
-                scope: Scope::new(0, None),
-                weight: 5,
-                fields: vec![Field::applicationName("test-app".to_string().into())],
-            }),
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.1.2".parse().unwrap(),
-                scope: Scope::new(42, None),
-                weight: 10,
-                fields: vec![Field::samplerRandomInterval(100)],
-            }),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.1.1".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(0, None),
+                    weight: 5,
+                    fields: vec![Field::applicationName("test-app".to_string().into())],
+                },
+            ),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.1.2".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(42, None),
+                    weight: 10,
+                    fields: vec![Field::samplerRandomInterval(100)],
+                },
+            ),
         ];
         expected.sort();
 
@@ -440,12 +444,14 @@ mod tests {
         let content1 = r#"{"ip":"192.168.1.1","scope":{"obs_domain_id":0},"weight":5,"fields":[{"applicationName":"test-app"}]}"#;
         fs::write(&path, content1).await.unwrap();
 
-        let expected1 = vec![EnrichmentOperation::Upsert(UpsertPayload {
-            ip: "192.168.1.1".parse().unwrap(),
-            scope: Scope::new(0, None),
-            weight: 5,
-            fields: vec![Field::applicationName("test-app".to_string().into())],
-        })];
+        let expected1 = vec![crate::flow::enrichment::EnrichmentOperation::Upsert(
+            crate::flow::enrichment::UpsertPayload {
+                ip: "192.168.1.1".parse().unwrap(),
+                scope: crate::flow::enrichment::Scope::new(0, None),
+                weight: 5,
+                fields: vec![Field::applicationName("test-app".to_string().into())],
+            },
+        )];
         let result1 = processor
             .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
             .await
@@ -463,18 +469,22 @@ mod tests {
         result2.sort();
 
         let mut expected2 = vec![
-            EnrichmentOperation::Delete(DeletePayload {
-                ip: "192.168.1.1".parse().unwrap(),
-                scope: Scope::new(0, None),
-                weight: 5,
-                ies: vec![IE::applicationName],
-            }),
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.1.2".parse().unwrap(),
-                scope: Scope::new(42, None),
-                weight: 10,
-                fields: vec![Field::samplerRandomInterval(100)],
-            }),
+            crate::flow::enrichment::EnrichmentOperation::Delete(
+                crate::flow::enrichment::DeletePayload {
+                    ip: "192.168.1.1".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(0, None),
+                    weight: 5,
+                    ies: vec![IE::applicationName],
+                },
+            ),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.1.2".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(42, None),
+                    weight: 10,
+                    fields: vec![Field::samplerRandomInterval(100)],
+                },
+            ),
         ];
         expected2.sort();
 
@@ -501,26 +511,36 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
         result.sort();
 
         let mut expected = vec![
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.100.1".parse().unwrap(),
-                scope: Scope::new(0, Some(vec![Field::ingressInterface(537)])),
-                weight: 32,
-                fields: vec![Field::NetGauze(
-                    netgauze::Field::ingressMplsVpnRouteDistinguisher(
-                        [0, 0, 26, 181, 0, 0, 4, 30].into(),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.100.1".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(
+                        0,
+                        Some(vec![Field::ingressInterface(537)]),
                     ),
-                )],
-            }),
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.100.1".parse().unwrap(),
-                scope: Scope::new(0, Some(vec![Field::egressInterface(127)])),
-                weight: 32,
-                fields: vec![Field::NetGauze(
-                    netgauze::Field::egressMplsVpnRouteDistinguisher(
-                        [0, 2, 250, 89, 4, 80, 3, 235].into(),
+                    weight: 32,
+                    fields: vec![Field::NetGauze(
+                        netgauze::Field::ingressMplsVpnRouteDistinguisher(
+                            [0, 0, 26, 181, 0, 0, 4, 30].into(),
+                        ),
+                    )],
+                },
+            ),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.100.1".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(
+                        0,
+                        Some(vec![Field::egressInterface(127)]),
                     ),
-                )],
-            }),
+                    weight: 32,
+                    fields: vec![Field::NetGauze(
+                        netgauze::Field::egressMplsVpnRouteDistinguisher(
+                            [0, 2, 250, 89, 4, 80, 3, 235].into(),
+                        ),
+                    )],
+                },
+            ),
         ];
         expected.sort();
 
@@ -547,26 +567,36 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
         assert_eq!(result.len(), 2);
 
         let mut expected = vec![
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.100.1".parse().unwrap(),
-                scope: Scope::new(0, Some(vec![Field::ingressVRFID(18)])),
-                weight: 32,
-                fields: vec![Field::NetGauze(
-                    netgauze::Field::ingressMplsVpnRouteDistinguisher(
-                        [0, 0, 26, 181, 0, 0, 4, 30].into(),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.100.1".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(
+                        0,
+                        Some(vec![Field::ingressVRFID(18)]),
                     ),
-                )],
-            }),
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.100.1".parse().unwrap(),
-                scope: Scope::new(0, Some(vec![Field::egressVRFID(18)])),
-                weight: 32,
-                fields: vec![Field::NetGauze(
-                    netgauze::Field::egressMplsVpnRouteDistinguisher(
-                        [0, 0, 26, 181, 0, 0, 4, 30].into(),
+                    weight: 32,
+                    fields: vec![Field::NetGauze(
+                        netgauze::Field::ingressMplsVpnRouteDistinguisher(
+                            [0, 0, 26, 181, 0, 0, 4, 30].into(),
+                        ),
+                    )],
+                },
+            ),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.100.1".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(
+                        0,
+                        Some(vec![Field::egressVRFID(18)]),
                     ),
-                )],
-            }),
+                    weight: 32,
+                    fields: vec![Field::NetGauze(
+                        netgauze::Field::egressMplsVpnRouteDistinguisher(
+                            [0, 0, 26, 181, 0, 0, 4, 30].into(),
+                        ),
+                    )],
+                },
+            ),
         ];
         expected.sort();
 
@@ -595,18 +625,22 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
         result.sort();
 
         let mut expected = vec![
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.1.1".parse().unwrap(),
-                scope: Scope::new(0, None),
-                weight: 5,
-                fields: vec![Field::applicationName("test-app".to_string().into())],
-            }),
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.1.2".parse().unwrap(),
-                scope: Scope::new(42, None),
-                weight: 10,
-                fields: vec![Field::samplerRandomInterval(100)],
-            }),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.1.1".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(0, None),
+                    weight: 5,
+                    fields: vec![Field::applicationName("test-app".to_string().into())],
+                },
+            ),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.1.2".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(42, None),
+                    weight: 10,
+                    fields: vec![Field::samplerRandomInterval(100)],
+                },
+            ),
         ];
         expected.sort();
 
@@ -634,18 +668,22 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
 
         // Should only process valid JSON lines, skipping malformed ones
         let mut expected = vec![
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.1.1".parse().unwrap(),
-                scope: Scope::new(0, None),
-                weight: 5,
-                fields: vec![Field::applicationName("test-app".to_string().into())],
-            }),
-            EnrichmentOperation::Upsert(UpsertPayload {
-                ip: "192.168.1.2".parse().unwrap(),
-                scope: Scope::new(42, None),
-                weight: 10,
-                fields: vec![Field::samplerRandomInterval(100)],
-            }),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.1.1".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(0, None),
+                    weight: 5,
+                    fields: vec![Field::applicationName("test-app".to_string().into())],
+                },
+            ),
+            crate::flow::enrichment::EnrichmentOperation::Upsert(
+                crate::flow::enrichment::UpsertPayload {
+                    ip: "192.168.1.2".parse().unwrap(),
+                    scope: crate::flow::enrichment::Scope::new(42, None),
+                    weight: 10,
+                    fields: vec![Field::samplerRandomInterval(100)],
+                },
+            ),
         ];
         expected.sort();
 
@@ -669,12 +707,14 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
             .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
             .await
             .unwrap();
-        let expected1 = vec![EnrichmentOperation::Upsert(UpsertPayload {
-            ip: "192.168.1.1".parse().unwrap(),
-            scope: Scope::new(0, None),
-            weight: 5,
-            fields: vec![Field::applicationName("test-app".to_string().into())],
-        })];
+        let expected1 = vec![crate::flow::enrichment::EnrichmentOperation::Upsert(
+            crate::flow::enrichment::UpsertPayload {
+                ip: "192.168.1.1".parse().unwrap(),
+                scope: crate::flow::enrichment::Scope::new(0, None),
+                weight: 5,
+                fields: vec![Field::applicationName("test-app".to_string().into())],
+            },
+        )];
         assert_eq!(expected1, result1);
 
         // Second processing with same content
@@ -684,7 +724,7 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
             .unwrap();
 
         // Should return empty vec since no changes
-        let expected2: Vec<EnrichmentOperation> = vec![];
+        let expected2: Vec<crate::flow::enrichment::EnrichmentOperation> = vec![];
         assert_eq!(expected2, result2);
     }
 
@@ -721,5 +761,225 @@ id=2:4200137808:1003 ip=192.168.100.1 out=127"#;
         // Verify specific error content
         assert!(errors[0].contains("missing field `ip` at line"));
         assert!(errors[1].contains("key must be a string at line"));
+    }
+
+    // ** Tests with crate::yang_push::EnrichmentOperation for Yang-Push ** //
+
+    #[tokio::test]
+    async fn test_yang_push_first_time_processing() {
+        let mut processor = FileProcessor::new();
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path().to_path_buf();
+
+        let content = r#"{"ip":"1.1.1.1","weight":29,"labels":[{"name":"node_id","string-value":"n1"},{"name":"platform_id","string-value":"p1"}]}
+{"ip":"2.2.2.2","weight":30,"labels":[{"name":"node_id","string-value":"n2"}]}"#;
+
+        fs::write(&path, content).await.unwrap();
+
+        let mut handler = YangPushUpsertsHandler::new();
+        let result = processor
+            .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
+            .await
+            .unwrap();
+
+        let expected = vec![
+            crate::yang_push::EnrichmentOperation::Upsert(crate::yang_push::UpsertPayload {
+                ip: "1.1.1.1".parse().unwrap(),
+                weight: 29,
+                labels: vec![
+                    Label::new(
+                        "node_id".to_string(),
+                        LabelValue::StringValue {
+                            string_value: "n1".to_string(),
+                        },
+                    ),
+                    Label::new(
+                        "platform_id".to_string(),
+                        LabelValue::StringValue {
+                            string_value: "p1".to_string(),
+                        },
+                    ),
+                ],
+            }),
+            crate::yang_push::EnrichmentOperation::Upsert(crate::yang_push::UpsertPayload {
+                ip: "2.2.2.2".parse().unwrap(),
+                weight: 30,
+                labels: vec![Label::new(
+                    "node_id".to_string(),
+                    LabelValue::StringValue {
+                        string_value: "n2".to_string(),
+                    },
+                )],
+            }),
+        ];
+
+        assert_eq!(expected, result);
+    }
+
+    #[tokio::test]
+    async fn test_yang_push_incremental_processing() {
+        let mut processor = FileProcessor::new();
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path().to_path_buf();
+        let mut handler = YangPushUpsertsHandler::new();
+
+        // First processing - initial content
+        let content1 =
+            r#"{"ip":"1.1.1.1","weight":29,"labels":[{"name":"node_id","string-value":"n1"}]}"#;
+        fs::write(&path, content1).await.unwrap();
+
+        let expected1 = vec![crate::yang_push::EnrichmentOperation::Upsert(
+            crate::yang_push::UpsertPayload {
+                ip: "1.1.1.1".parse().unwrap(),
+                weight: 29,
+                labels: vec![Label::new(
+                    "node_id".to_string(),
+                    LabelValue::StringValue {
+                        string_value: "n1".to_string(),
+                    },
+                )],
+            },
+        )];
+        let result1 = processor
+            .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
+            .await
+            .unwrap();
+        assert_eq!(expected1, result1);
+
+        // Second processing - add one line, remove one line
+        let content2 =
+            r#"{"ip":"2.2.2.2","weight":30,"labels":[{"name":"platform_id","string-value":"p2"}]}"#;
+        fs::write(&path, content2).await.unwrap();
+
+        let result2 = processor
+            .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
+            .await
+            .unwrap();
+
+        let expected2 = vec![
+            crate::yang_push::EnrichmentOperation::Delete(crate::yang_push::DeletePayload {
+                ip: "1.1.1.1".parse().unwrap(),
+                weight: 29,
+                label_names: vec!["node_id".to_string()],
+            }),
+            crate::yang_push::EnrichmentOperation::Upsert(crate::yang_push::UpsertPayload {
+                ip: "2.2.2.2".parse().unwrap(),
+                weight: 30,
+                labels: vec![Label::new(
+                    "platform_id".to_string(),
+                    LabelValue::StringValue {
+                        string_value: "p2".to_string(),
+                    },
+                )],
+            }),
+        ];
+
+        assert_eq!(expected2, result2);
+    }
+
+    #[tokio::test]
+    async fn test_yang_push_no_changes_processing() {
+        let mut processor = FileProcessor::new();
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path().to_path_buf();
+
+        let content =
+            r#"{"ip":"1.1.1.1","weight":29,"labels":[{"name":"node_id","string-value":"n1"}]}"#;
+        fs::write(&path, content).await.unwrap();
+
+        let mut handler = YangPushUpsertsHandler::new();
+
+        // First processing
+        let result1 = processor
+            .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
+            .await
+            .unwrap();
+        let expected1 = vec![crate::yang_push::EnrichmentOperation::Upsert(
+            crate::yang_push::UpsertPayload {
+                ip: "1.1.1.1".parse().unwrap(),
+                weight: 29,
+                labels: vec![Label::new(
+                    "node_id".to_string(),
+                    LabelValue::StringValue {
+                        string_value: "n1".to_string(),
+                    },
+                )],
+            },
+        )];
+        assert_eq!(expected1, result1);
+
+        // Second processing with same content
+        let result2 = processor
+            .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
+            .await
+            .unwrap();
+
+        let expected2: Vec<crate::yang_push::EnrichmentOperation> = vec![];
+        assert_eq!(expected2, result2);
+    }
+
+    #[tokio::test]
+    async fn test_yang_push_anydata_value_labels() {
+        let mut processor = FileProcessor::new();
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path().to_path_buf();
+
+        let content = r#"{"ip":"1.1.1.1","weight":29,"labels":[{"name":"metadata","anydata-values":{"key1":"value1","key2":42}}]}"#;
+        fs::write(&path, content).await.unwrap();
+
+        let mut handler = YangPushUpsertsHandler::new();
+        let result = processor
+            .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
+            .await
+            .unwrap();
+
+        let expected = vec![crate::yang_push::EnrichmentOperation::Upsert(
+            crate::yang_push::UpsertPayload {
+                ip: "1.1.1.1".parse().unwrap(),
+                weight: 29,
+                labels: vec![Label::new(
+                    "metadata".to_string(),
+                    LabelValue::AnydataValue {
+                        anydata_values: serde_json::json!({"key1": "value1", "key2": 42}),
+                    },
+                )],
+            },
+        )];
+
+        assert_eq!(expected, result);
+    }
+
+    #[tokio::test]
+    async fn test_yang_push_empty_labels_filtering() {
+        let mut processor = FileProcessor::new();
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path().to_path_buf();
+
+        // Line with empty labels array should be filtered out
+        let content = r#"{"ip":"1.1.1.1","weight":29,"labels":[]}
+{"ip":"2.2.2.2","weight":30,"labels":[{"name":"node_id","string-value":"n2"}]}"#;
+
+        fs::write(&path, content).await.unwrap();
+
+        let mut handler = YangPushUpsertsHandler::new();
+        let result = processor
+            .process_file_changes(&path, &mut handler, None::<FileProcessorCallback>)
+            .await
+            .unwrap();
+
+        let expected = vec![crate::yang_push::EnrichmentOperation::Upsert(
+            crate::yang_push::UpsertPayload {
+                ip: "2.2.2.2".parse().unwrap(),
+                weight: 30,
+                labels: vec![Label::new(
+                    "node_id".to_string(),
+                    LabelValue::StringValue {
+                        string_value: "n2".to_string(),
+                    },
+                )],
+            },
+        )];
+
+        assert_eq!(expected, result);
     }
 }

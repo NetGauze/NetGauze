@@ -65,7 +65,7 @@ shadow!(build);
 pub type SubscriptionsCache = HashMap<SubscriptionId, YangPushSubscriptionMetadata>;
 
 /// Weighted Label for Enrichment Cache
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct WeightedLabel {
     label: Label,
     weight: Weight,
@@ -748,6 +748,7 @@ mod tests {
     use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
     use netgauze_yang_push::model::{
         notification::{CentiSeconds, Encoding, Target, Transport, UpdateTrigger},
+        telemetry::{Label, LabelValue},
         udp_notif::UdpNotifPacketDecoded,
     };
     use serde_json::json;
@@ -942,5 +943,167 @@ mod tests {
             result.unwrap_err(),
             YangPushEnrichmentActorError::NotificationWithoutContent
         );
+    }
+
+    #[test]
+    fn test_apply_enrichment_upsert_and_delete() {
+        let mut actor = create_actor();
+        let ip: IpAddr = "192.0.2.1".parse().unwrap();
+
+        // Upsert two labels with different weights
+        let label1 = Label::new(
+            "site".to_string(),
+            LabelValue::StringValue {
+                string_value: "Zurich".to_string(),
+            },
+        );
+        let label2 = Label::new(
+            "role".to_string(),
+            LabelValue::StringValue {
+                string_value: "core".to_string(),
+            },
+        );
+        actor.apply_enrichment(EnrichmentOperation::Upsert(UpsertPayload {
+            ip,
+            weight: 10,
+            labels: vec![label1.clone(), label2.clone()],
+        }));
+
+        // Upsert label1 again with higher weight (should replace)
+        let label1_updated = Label::new(
+            "site".to_string(),
+            LabelValue::StringValue {
+                string_value: "Bern".to_string(),
+            },
+        );
+        actor.apply_enrichment(EnrichmentOperation::Upsert(UpsertPayload {
+            ip,
+            weight: 20,
+            labels: vec![label1_updated.clone()],
+        }));
+
+        // Delete label2 with sufficient weight
+        actor.apply_enrichment(EnrichmentOperation::Delete(DeletePayload {
+            ip,
+            weight: 15,
+            label_names: vec!["role".to_string()],
+        }));
+
+        // Expected: only label1 ("site": "Bern", weight 20) remains
+        let mut expected = HashMap::new();
+        expected.insert(
+            "site".to_string(),
+            WeightedLabel {
+                label: label1_updated,
+                weight: 20,
+            },
+        );
+        assert_eq!(actor.labels.get(&ip).cloned().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_apply_enrichment_delete_all() {
+        let mut actor = create_actor();
+        let ip: IpAddr = "203.0.113.5".parse().unwrap();
+
+        // Upsert two labels
+        let label1 = Label::new(
+            "env".to_string(),
+            LabelValue::StringValue {
+                string_value: "PROD".to_string(),
+            },
+        );
+        let label2 = Label::new(
+            "rack".to_string(),
+            LabelValue::StringValue {
+                string_value: "A1".to_string(),
+            },
+        );
+        actor.apply_enrichment(EnrichmentOperation::Upsert(UpsertPayload {
+            ip,
+            weight: 5,
+            labels: vec![label1.clone(), label2.clone()],
+        }));
+
+        // Check that labels were added to the cache
+        let mut expected = HashMap::new();
+        expected.insert(
+            "env".to_string(),
+            WeightedLabel {
+                label: label1,
+                weight: 5,
+            },
+        );
+        expected.insert(
+            "rack".to_string(),
+            WeightedLabel {
+                label: label2,
+                weight: 5,
+            },
+        );
+        assert_eq!(actor.labels.get(&ip).cloned().unwrap(), expected);
+
+        // DeleteAll with higher weight (should remove all)
+        actor.apply_enrichment(EnrichmentOperation::DeleteAll(DeleteAllPayload {
+            ip,
+            weight: 10,
+        }));
+
+        // Expected: no labels for ip
+        assert_eq!(actor.labels.get(&ip), None);
+    }
+
+    #[test]
+    fn test_apply_enrichment_weight_precedence() {
+        let mut actor = create_actor();
+        let ip: IpAddr = "198.51.100.7".parse().unwrap();
+
+        // Upsert label with weight 10
+        let label = Label::new(
+            "region".to_string(),
+            LabelValue::StringValue {
+                string_value: "Switzerland".to_string(),
+            },
+        );
+        actor.apply_enrichment(EnrichmentOperation::Upsert(UpsertPayload {
+            ip,
+            weight: 10,
+            labels: vec![label.clone()],
+        }));
+
+        // Try to delete with lower weight (should not delete)
+        actor.apply_enrichment(EnrichmentOperation::Delete(DeletePayload {
+            ip,
+            weight: 5,
+            label_names: vec!["region".to_string()],
+        }));
+
+        // Expected: label still present
+        let mut expected = HashMap::new();
+        expected.insert("region".to_string(), WeightedLabel { label, weight: 10 });
+        assert_eq!(actor.labels.get(&ip).cloned().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_apply_enrichment_empty_upsert_and_delete() {
+        let mut actor = create_actor();
+        let ip: IpAddr = "192.0.2.55".parse().unwrap();
+
+        // Upsert with empty labels (should not modify cache)
+        actor.apply_enrichment(EnrichmentOperation::Upsert(UpsertPayload {
+            ip,
+            weight: 1,
+            labels: vec![],
+        }));
+
+        // Delete with empty label_names (should not modify cache)
+        actor.apply_enrichment(EnrichmentOperation::Delete(DeletePayload {
+            ip,
+            weight: 1,
+            label_names: vec![],
+        }));
+
+        // Expected: no labels for ip
+        assert_eq!(actor.labels.get(&ip), None);
     }
 }
