@@ -2052,7 +2052,6 @@ mod tests {
         tests::{test_parse_error, test_xml_value, test_xml_value_owned},
         yanglib::{Datastore, DatastoreName, Module, ModuleSet, Schema},
     };
-    use indexmap::IndexMap;
     use quick_xml::events::{BytesEnd, BytesStart};
 
     #[test]
@@ -3255,52 +3254,40 @@ mod tests {
 
         let expected_library = YangLibrary::new(
             "14782ab9bd56b92aacc156a2958fbe12312fb285".into(),
-            IndexMap::from([(
+            vec![ModuleSet::new(
                 "state-only-modules".into(),
-                ModuleSet::new(
-                    "state-only-modules".into(),
-                    IndexMap::from([
-                        (
-                            "ietf-hardware".into(),
-                            Module::new(
-                                "ietf-hardware".into(),
-                                Some("2018-03-13".into()),
-                                "urn:ietf:params:xml:ns:yang:ietf-hardware".into(),
-                                Box::new([]),
-                                Box::new(["example-vendor-hardware-deviations".into()]),
-                                Box::new([]),
-                                Box::new([]),
-                                Box::new([]),
-                            ),
-                        ),
-                        (
-                            "ietf-routing".into(),
-                            Module::new(
-                                "ietf-routing".into(),
-                                Some("2018-03-13".into()),
-                                "urn:ietf:params:xml:ns:yang:ietf-routing".into(),
-                                Box::new(["multiple-ribs".into(), "router-id".into()]),
-                                Box::new([]),
-                                Box::new([]),
-                                Box::new([]),
-                                Box::new([]),
-                            ),
-                        ),
-                    ]),
-                    IndexMap::new(),
-                ),
-            )]),
-            IndexMap::from([(
+                vec![
+                    Module::new(
+                        "ietf-hardware".into(),
+                        Some("2018-03-13".into()),
+                        "urn:ietf:params:xml:ns:yang:ietf-hardware".into(),
+                        Box::new([]),
+                        Box::new(["example-vendor-hardware-deviations".into()]),
+                        Box::new([]),
+                        Box::new([]),
+                        Box::new([]),
+                    ),
+                    Module::new(
+                        "ietf-routing".into(),
+                        Some("2018-03-13".into()),
+                        "urn:ietf:params:xml:ns:yang:ietf-routing".into(),
+                        Box::new(["multiple-ribs".into(), "router-id".into()]),
+                        Box::new([]),
+                        Box::new([]),
+                        Box::new([]),
+                        Box::new([]),
+                    ),
+                ],
+                vec![],
+            )],
+            vec![Schema::new(
                 "state-schema".into(),
-                Schema::new(
-                    "state-schema".into(),
-                    Box::new(["state-only-modules".into()]),
-                ),
-            )]),
-            IndexMap::from([(
+                Box::new(["state-only-modules".into()]),
+            )],
+            vec![Datastore::new(
                 DatastoreName::Operational,
-                Datastore::new(DatastoreName::Operational, "state-schema".into()),
-            )]),
+                "state-schema".into(),
+            )],
         );
         let expect_rpc_reply = RpcReplyContent::ErrorsAndData {
             errors: vec![],
