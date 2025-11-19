@@ -378,30 +378,18 @@ where
         let mut schema_id_cache = HashMap::new();
         let custom_supplied_schemas = Self::parse_custom_schemas(&custom_schemas)?;
 
-        for (content_id, schema) in custom_supplied_schemas {
-            // Extend root schema by adding custom schema as reference
-            let subject = Self::get_subject_from_schema_name(&schema, None, false)?;
-            let mut extended_root_schema = root_schema.clone();
-            extended_root_schema.references.push(SuppliedReference {
-                name: subject.clone(),
-                subject,
-                schema: schema.schema.clone(),
-                references: schema.references,
-                properties: schema.properties,
-                tags: schema.tags,
-            });
-
-            let extended_root_schema_subject =
-                Self::get_subject_from_schema_name(&extended_root_schema, Some(&content_id), true)?;
-            let schema_id = Self::register_schema_with_registry(
+        for (content_id, custom_schema) in custom_supplied_schemas {
+            let custom_schema_subject =
+                Self::get_subject_from_schema_name(&custom_schema, Some(&content_id), true)?;
+            let custom_schema_id = Self::register_schema_with_registry(
                 config.schema_registry_url.clone(),
-                &extended_root_schema,
-                extended_root_schema_subject,
+                &custom_schema,
+                custom_schema_subject,
             )
             .await?;
 
             // Store schema registry ID in cache
-            schema_id_cache.insert(content_id, schema_id);
+            schema_id_cache.insert(content_id, custom_schema_id);
         }
 
         info!("Root and custom schema loading and registering complete!");
