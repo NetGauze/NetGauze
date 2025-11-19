@@ -66,6 +66,31 @@ impl YangLibrary {
     pub const fn datastores(&self) -> &IndexMap<DatastoreName, Datastore> {
         &self.datastores
     }
+
+    /// Helper to find a YANG module by name
+    pub fn find_module(&self, name: &str) -> Option<&Module> {
+        for module_set in self.modules_set.values() {
+            if let Some(module) = module_set.modules().get(name) {
+                return Some(module);
+            }
+        }
+        None
+    }
+
+    /// Helper to find an import only YANG module by name returns list of import
+    /// only modules since YANG library allows multiple versions to co-exist.
+    pub fn find_import_module(&self, name: &str) -> Option<Vec<&ImportOnlyModule>> {
+        for module_set in self.modules_set.values() {
+            if let Some(import_only) = module_set.import_only_modules().get(name) {
+                let mut ret = Vec::with_capacity(import_only.len());
+                for module in import_only.values() {
+                    ret.push(module);
+                }
+                return Some(ret);
+            }
+        }
+        None
+    }
 }
 
 impl XmlDeserialize<YangLibrary> for YangLibrary {
