@@ -66,6 +66,46 @@ impl YangLibrary {
     pub const fn datastores(&self) -> &IndexMap<DatastoreName, Datastore> {
         &self.datastores
     }
+
+    /// Helper to find a YANG module by name
+    pub fn find_module(&self, name: &str) -> Option<&Module> {
+        for module_set in self.modules_set.values() {
+            if let Some(module) = module_set.modules().get(name) {
+                return Some(module);
+            }
+        }
+        None
+    }
+
+    /// Helper to find a YANG submodule by name
+    pub fn find_submodule(&self, name: &str) -> Option<&Submodule> {
+        for module_set in self.modules_set.values() {
+            for module in module_set.modules().values() {
+                for submodule in module.submodules() {
+                    if submodule.name() == name {
+                        return Some(submodule);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Helper to find an import-only YANG module by name returns a list of
+    /// import only modules since YANG library allows multiple versions to
+    /// co-exist.
+    pub fn find_import_module(&self, name: &str) -> Option<Vec<&ImportOnlyModule>> {
+        for module_set in self.modules_set.values() {
+            if let Some(import_only) = module_set.import_only_modules().get(name) {
+                let mut ret = Vec::with_capacity(import_only.len());
+                for module in import_only.values() {
+                    ret.push(module);
+                }
+                return Some(ret);
+            }
+        }
+        None
+    }
 }
 
 impl XmlDeserialize<YangLibrary> for YangLibrary {
@@ -253,6 +293,7 @@ impl XmlSerialize for ModuleSet {
         Ok(())
     }
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Module {
     name: Box<str>,
@@ -516,6 +557,7 @@ impl XmlDeserialize<Submodule> for Submodule {
         Ok(Submodule::new(name, revision, location))
     }
 }
+
 impl XmlSerialize for Submodule {
     fn xml_serialize<T: io::Write>(
         &self,
@@ -938,6 +980,7 @@ fn serialize_yang_lib_location<T: io::Write>(
     Ok(())
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1228,5 +1271,122 @@ mod tests {
             )],
         );
         test_xml_value(xml, expected).expect("failed");
+    }
+
+    #[test]
+    fn test_find_module_submodule() {
+        let ietf_hardware_module = Module::new(
+            "ietf-hardware".into(),
+            Some("2018-03-13".into()),
+            "urn:ietf:params:xml:ns:yang:ietf-hardware".into(),
+            Box::new([]),
+            Box::new(["example-vendor-hardware-deviations".into()]),
+            Box::new([]),
+            Box::new([]),
+            Box::new([]),
+        );
+        let ietf_routing_module = Module::new(
+            "ietf-routing".into(),
+            Some("2018-03-13".into()),
+            "urn:ietf:params:xml:ns:yang:ietf-routing".into(),
+            Box::new(["multiple-ribs".into(), "router-id".into()]),
+            Box::new([]),
+            Box::new([]),
+            Box::new([]),
+            Box::new([]),
+        );
+        let ietf_interfaces_module = Module::new(
+            "ietf-interfaces".into(),
+            Some("2018-02-20".into()),
+            "urn:ietf:params:xml:ns:yang:ietf-interfaces".into(),
+            Box::new(["if-mib".into(), "ethernet".into()]),
+            Box::new(["deviation1".into(), "deviation2".into()]),
+            Box::new([Submodule::new(
+                "ietf-interfaces-ext".into(),
+                Some("2018-02-20".into()),
+                Box::new(["https://example.com/ietf-interfaces-ext".into()]),
+            )]),
+            Box::new(["module1".into(), "module2".into()]),
+            Box::new(["https://example1.com".into(), "https://example2.com".into()]),
+        );
+        let example_submodule = Submodule::new(
+            "example-submodule".into(),
+            Some("2018-02-20".into()),
+            Box::new(["https://example.com/submodule1".into()]),
+        );
+        let example_module = Module::new(
+            "example".into(),
+            Some("2018-02-20".into()),
+            "urn:ietf:params:xml:ns:example".into(),
+            Box::new([]),
+            Box::new([]),
+            Box::new([example_submodule.clone()]),
+            Box::new(["module1".into(), "module2".into()]),
+            Box::new(["https://example1.com".into(), "https://example2.com".into()]),
+        );
+        let ietf_yang_types_module = ImportOnlyModule::new(
+            "ietf-yang-types".into(),
+            Some("2013-07-15".into()),
+            "urn:ietf:params:xml:ns:yang:ietf-yang-types".into(),
+            Box::new([]),
+            IndexMap::new(),
+        );
+        let ietf_inet_types_module = ImportOnlyModule::new(
+            "ietf-inet-types".into(),
+            None,
+            "urn:ietf:params:xml:ns:yang:ietf-inet-types".into(),
+            Box::new([]),
+            IndexMap::new(),
+        );
+        let input = YangLibrary::new(
+            "14782ab9bd56b92aacc156a2958fbe12312fb285".into(),
+            vec![
+                ModuleSet::new(
+                    "Set1".into(),
+                    vec![ietf_hardware_module.clone()],
+                    vec![ietf_yang_types_module.clone()],
+                ),
+                ModuleSet::new(
+                    "Set2".into(),
+                    vec![
+                        ietf_interfaces_module.clone(),
+                        ietf_routing_module.clone(),
+                        example_module.clone(),
+                    ],
+                    vec![
+                        ietf_yang_types_module.clone(),
+                        ietf_inet_types_module.clone(),
+                    ],
+                ),
+            ],
+            vec![Schema::new(
+                "ALLSchema".into(),
+                Box::new(["Set1".into(), "Set2".into()]),
+            )],
+            vec![Datastore::new(
+                DatastoreName::Operational,
+                "ALLSchema".into(),
+            )],
+        );
+
+        let found_ietf_routing = input.find_module("ietf-routing");
+        let found_ietf_interfaces = input.find_module("ietf-interfaces");
+        let found_example = input.find_module("example");
+        let not_found_module = input.find_module("ietf-yang-types");
+        let found_ietf_yang_types = input.find_import_module("ietf-yang-types");
+        let found_ietf_inet_types = input.find_import_module("ietf-inet-types");
+        let not_found_import_module = input.find_import_module("ietf-routing");
+        let found_submodule = input.find_submodule("example-submodule");
+        let not_found_submodule = input.find_submodule("non-existent-submodule");
+
+        assert_eq!(found_ietf_routing, Some(&ietf_routing_module));
+        assert_eq!(found_ietf_interfaces, Some(&ietf_interfaces_module));
+        assert_eq!(found_example, Some(&example_module));
+        assert_eq!(not_found_module, None);
+        assert_eq!(found_ietf_yang_types, Some(vec![&ietf_yang_types_module]));
+        assert_eq!(found_ietf_inet_types, Some(vec![&ietf_inet_types_module]));
+        assert_eq!(not_found_import_module, None);
+        assert_eq!(found_submodule, Some(&example_submodule));
+        assert_eq!(not_found_submodule, None);
     }
 }
