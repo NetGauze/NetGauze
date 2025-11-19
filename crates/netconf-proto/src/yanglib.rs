@@ -25,17 +25,29 @@ pub struct YangLibrary {
 }
 
 impl YangLibrary {
-    pub const fn new(
+    pub fn new(
         content_id: Box<str>,
-        modules_set: IndexMap<Box<str>, ModuleSet>,
-        schemas: IndexMap<Box<str>, Schema>,
-        datastores: IndexMap<DatastoreName, Datastore>,
+        modules_set: Vec<ModuleSet>,
+        schemas: Vec<Schema>,
+        datastores: Vec<Datastore>,
     ) -> Self {
+        let mut modules_set_map = IndexMap::with_capacity(modules_set.len());
+        let mut schemas_map = IndexMap::with_capacity(schemas.len());
+        let mut datastores_map = IndexMap::with_capacity(datastores.len());
+        for module in modules_set {
+            modules_set_map.insert(module.name.clone(), module);
+        }
+        for schema in schemas {
+            schemas_map.insert(schema.name.clone(), schema);
+        }
+        for datastore in datastores {
+            datastores_map.insert(datastore.name.clone(), datastore);
+        }
         Self {
             content_id,
-            modules_set,
-            schemas,
-            datastores,
+            modules_set: modules_set_map,
+            schemas: schemas_map,
+            datastores: datastores_map,
         }
     }
 
@@ -63,23 +75,23 @@ impl XmlDeserialize<YangLibrary> for YangLibrary {
         let yang_library_start = parser.open(Some(YANG_LIBRARY_NS), "yang-library")?;
         parser.skip_text()?;
 
-        let mut modules_set = IndexMap::new();
-        let mut schemas = IndexMap::new();
-        let mut datastores = IndexMap::new();
+        let mut modules_set = Vec::new();
+        let mut schemas = Vec::new();
+        let mut datastores = Vec::new();
         let mut content_id: Option<Box<str>> = None;
 
         while parser.peek() != &Event::End(yang_library_start.to_end()) {
             if parser.is_tag(Some(YANG_LIBRARY_NS), "module-set") {
                 let module_set = ModuleSet::xml_deserialize(parser)?;
-                modules_set.insert(module_set.name.clone(), module_set);
+                modules_set.push(module_set);
                 parser.skip_text()?;
             } else if parser.is_tag(Some(YANG_LIBRARY_NS), "schema") {
                 let schema = Schema::xml_deserialize(parser)?;
-                schemas.insert(schema.name.clone(), schema);
+                schemas.push(schema);
                 parser.skip_text()?;
             } else if parser.is_tag(Some(YANG_LIBRARY_NS), "datastore") {
                 let datastore = Datastore::xml_deserialize(parser)?;
-                datastores.insert(datastore.name.clone(), datastore);
+                datastores.push(datastore);
                 parser.skip_text()?;
             } else if parser.is_tag(Some(YANG_LIBRARY_NS), "content-id") {
                 parser.open(Some(YANG_LIBRARY_NS), "content-id")?;
@@ -148,15 +160,23 @@ pub struct ModuleSet {
 }
 
 impl ModuleSet {
-    pub const fn new(
+    pub fn new(
         name: Box<str>,
-        modules: IndexMap<Box<str>, Module>,
-        import_only_modules: IndexMap<Box<str>, IndexMap<Option<Box<str>>, ImportOnlyModule>>,
+        modules: Vec<Module>,
+        import_only_modules: Vec<ImportOnlyModule>,
     ) -> Self {
+        let modules_map = IndexMap::from_iter(modules.into_iter().map(|m| (m.name.clone(), m)));
+        let mut import_only_map = IndexMap::with_capacity(import_only_modules.len());
+        for import_only in import_only_modules {
+            let tmp = import_only_map
+                .entry(import_only.name.clone())
+                .or_insert(IndexMap::new());
+            tmp.insert(import_only.revision.clone(), import_only);
+        }
         Self {
             name,
-            modules,
-            import_only_modules,
+            modules: modules_map,
+            import_only_modules: import_only_map,
         }
     }
 
@@ -182,21 +202,17 @@ impl XmlDeserialize<ModuleSet> for ModuleSet {
         let name = parse_yang_lib_name(parser)?;
 
         parser.skip_text()?;
-        let mut modules = IndexMap::new();
+        let mut modules = Vec::new();
         while parser.is_tag(Some(YANG_LIBRARY_NS), "module") {
             let module = Module::xml_deserialize(parser)?;
-            modules.insert(module.name().into(), module);
+            modules.push(module);
             parser.skip_text()?;
         }
 
-        let mut import_only_modules = IndexMap::new();
+        let mut import_only_modules = Vec::new();
         while parser.is_tag(Some(YANG_LIBRARY_NS), "import-only-module") {
             let module = ImportOnlyModule::xml_deserialize(parser)?;
-            let name = module.name().into();
-            let entry = import_only_modules
-                .entry(name)
-                .or_insert_with(IndexMap::new);
-            entry.insert(module.revision.clone(), module);
+            import_only_modules.push(module);
             parser.skip_text()?;
         }
 
@@ -1045,11 +1061,31 @@ mod tests {
          <name>set1</name>
        </module-set>"#;
 
-        let mut import_only_modules = IndexMap::new();
-        import_only_modules.insert("ietf-yang-types".into(), {
-            let mut m = IndexMap::new();
-            m.insert(
-                Some("2013-07-15".into()),
+        let full = ModuleSet::new(
+            "config-modules".into(),
+            vec![
+                Module::new(
+                    "ietf-interfaces".into(),
+                    Some("2018-02-20".into()),
+                    "urn:ietf:params:xml:ns:yang:ietf-interfaces".into(),
+                    Box::new([]),
+                    Box::new([]),
+                    Box::new([]),
+                    Box::new([]),
+                    Box::new([]),
+                ),
+                Module::new(
+                    "ietf-ip".into(),
+                    Some("2018-02-22".into()),
+                    "urn:ietf:params:xml:ns:yang:ietf-ip".into(),
+                    Box::new([]),
+                    Box::new([]),
+                    Box::new([]),
+                    Box::new([]),
+                    Box::new([]),
+                ),
+            ],
+            vec![
                 ImportOnlyModule::new(
                     "ietf-yang-types".into(),
                     Some("2013-07-15".into()),
@@ -1057,13 +1093,6 @@ mod tests {
                     Box::new([]),
                     IndexMap::new(),
                 ),
-            );
-            m
-        });
-        import_only_modules.insert("ietf-inet-types".into(), {
-            let mut m = IndexMap::new();
-            m.insert(
-                None,
                 ImportOnlyModule::new(
                     "ietf-inet-types".into(),
                     None,
@@ -1071,45 +1100,9 @@ mod tests {
                     Box::new([]),
                     IndexMap::new(),
                 ),
-            );
-            m
-        });
-
-        let full = ModuleSet::new(
-            "config-modules".into(),
-            {
-                let mut m = IndexMap::new();
-                m.insert(
-                    "ietf-interfaces".into(),
-                    Module::new(
-                        "ietf-interfaces".into(),
-                        Some("2018-02-20".into()),
-                        "urn:ietf:params:xml:ns:yang:ietf-interfaces".into(),
-                        Box::new([]),
-                        Box::new([]),
-                        Box::new([]),
-                        Box::new([]),
-                        Box::new([]),
-                    ),
-                );
-                m.insert(
-                    "ietf-ip".into(),
-                    Module::new(
-                        "ietf-ip".into(),
-                        Some("2018-02-22".into()),
-                        "urn:ietf:params:xml:ns:yang:ietf-ip".into(),
-                        Box::new([]),
-                        Box::new([]),
-                        Box::new([]),
-                        Box::new([]),
-                        Box::new([]),
-                    ),
-                );
-                m
-            },
-            import_only_modules,
+            ],
         );
-        let min = ModuleSet::new("set1".into(), IndexMap::new(), IndexMap::new());
+        let min = ModuleSet::new("set1".into(), vec![], vec![]);
 
         test_xml_value(full_str, full).expect("failed to test full module-set");
         test_xml_value(min_str, min).expect("failed to test minimal module-set");
@@ -1199,52 +1192,40 @@ mod tests {
 
         let expected = YangLibrary::new(
             "14782ab9bd56b92aacc156a2958fbe12312fb285".into(),
-            IndexMap::from([(
+            vec![ModuleSet::new(
                 "state-only-modules".into(),
-                ModuleSet::new(
-                    "state-only-modules".into(),
-                    IndexMap::from([
-                        (
-                            "ietf-hardware".into(),
-                            Module::new(
-                                "ietf-hardware".into(),
-                                Some("2018-03-13".into()),
-                                "urn:ietf:params:xml:ns:yang:ietf-hardware".into(),
-                                Box::new([]),
-                                Box::new(["example-vendor-hardware-deviations".into()]),
-                                Box::new([]),
-                                Box::new([]),
-                                Box::new([]),
-                            ),
-                        ),
-                        (
-                            "ietf-routing".into(),
-                            Module::new(
-                                "ietf-routing".into(),
-                                Some("2018-03-13".into()),
-                                "urn:ietf:params:xml:ns:yang:ietf-routing".into(),
-                                Box::new(["multiple-ribs".into(), "router-id".into()]),
-                                Box::new([]),
-                                Box::new([]),
-                                Box::new([]),
-                                Box::new([]),
-                            ),
-                        ),
-                    ]),
-                    IndexMap::new(),
-                ),
-            )]),
-            IndexMap::from([(
+                vec![
+                    Module::new(
+                        "ietf-hardware".into(),
+                        Some("2018-03-13".into()),
+                        "urn:ietf:params:xml:ns:yang:ietf-hardware".into(),
+                        Box::new([]),
+                        Box::new(["example-vendor-hardware-deviations".into()]),
+                        Box::new([]),
+                        Box::new([]),
+                        Box::new([]),
+                    ),
+                    Module::new(
+                        "ietf-routing".into(),
+                        Some("2018-03-13".into()),
+                        "urn:ietf:params:xml:ns:yang:ietf-routing".into(),
+                        Box::new(["multiple-ribs".into(), "router-id".into()]),
+                        Box::new([]),
+                        Box::new([]),
+                        Box::new([]),
+                        Box::new([]),
+                    ),
+                ],
+                vec![],
+            )],
+            vec![Schema::new(
                 "state-schema".into(),
-                Schema::new(
-                    "state-schema".into(),
-                    Box::new(["state-only-modules".into()]),
-                ),
-            )]),
-            IndexMap::from([(
+                Box::new(["state-only-modules".into()]),
+            )],
+            vec![Datastore::new(
                 DatastoreName::Operational,
-                Datastore::new(DatastoreName::Operational, "state-schema".into()),
-            )]),
+                "state-schema".into(),
+            )],
         );
         test_xml_value(xml, expected).expect("failed");
     }
