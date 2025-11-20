@@ -264,7 +264,7 @@ pub(crate) fn explode(
     key_select: &[FieldRef],
     agg_select: &[AggFieldRef],
     collection_time: DateTime<Utc>,
-) -> impl Iterator<Item = AggFlowInfo> {
+) -> (usize, impl Iterator<Item = AggFlowInfo>) {
     // FlowInfo are not expected to contain more than 16 records
     let mut exploded = SmallVec::<[AggFlowInfo; 16]>::new();
 
@@ -333,7 +333,7 @@ pub(crate) fn explode(
             info!("Unsupported flow version for peer {}", peer);
         }
     }
-    exploded.into_iter()
+    (exploded.len(), exploded.into_iter())
 }
 
 #[cfg(test)]
