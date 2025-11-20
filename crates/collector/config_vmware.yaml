@@ -8,6 +8,7 @@ logging:
 
 telemetry:
   url: http://localhost:4317/v1/metrics
+  id: netgauze-vmware
   exporter_timeout: 3000
   reader_interval: 60000
   reader_timeout: 3000
