@@ -520,7 +520,7 @@ fn test_explode_simple_ipfix_packet() {
 
     // Call explode and compare
     let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
-    assert_eq!(result.collect::<Vec<AggFlowInfo>>(), expected);
+    assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
 }
 
 #[test]
@@ -610,7 +610,7 @@ fn test_explode_multiple_records() {
     // Call explode and compare
     let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
 
-    assert_eq!(result.collect::<Vec<AggFlowInfo>>(), expected);
+    assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
 }
 
 #[test]
@@ -683,7 +683,7 @@ fn test_explode_repeating_ie_fields() {
     // Call explode and compare
     let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
 
-    assert_eq!(result.collect::<Vec<AggFlowInfo>>(), expected);
+    assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
 }
 
 #[test]
@@ -747,7 +747,7 @@ fn test_explode_missing_fields() {
     // Call explode and compare
     let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
 
-    assert_eq!(result.collect::<Vec<AggFlowInfo>>(), expected);
+    assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
 }
 
 #[test]
@@ -796,5 +796,5 @@ fn test_explode_empty_selectors() {
     // Call explode and compare
     let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
 
-    assert_eq!(result.collect::<Vec<AggFlowInfo>>(), expected);
+    assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
 }
