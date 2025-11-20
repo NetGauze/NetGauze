@@ -94,7 +94,11 @@ fn init_open_telemetry(
         .with_interval(config.reader_interval)
         .build();
 
-    let resource = Resource::builder().with_service_name("NetGauze").build();
+    let resource = Resource::builder()
+        .with_service_name("NetGauze")
+        .with_attributes([opentelemetry::KeyValue::new("id", config.id.clone())])
+        .build();
+
     let provider = opentelemetry_sdk::metrics::SdkMeterProvider::builder()
         .with_reader(reader)
         .with_resource(resource)

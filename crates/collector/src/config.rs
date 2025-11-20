@@ -93,6 +93,9 @@ impl Default for LoggingConfig {
 pub struct TelemetryConfig {
     pub url: String,
 
+    /// Id to distinguish multiple instances running at the same site
+    pub id: String,
+
     /// Metrics exporter GRPC timeout
     #[serde(default = "default_telemetry_timeout")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
@@ -114,6 +117,9 @@ pub struct TelemetryConfig {
 impl TelemetryConfig {
     pub fn url(&self) -> &str {
         self.url.as_str()
+    }
+    pub fn id(&self) -> &str {
+        self.id.as_str()
     }
 }
 
