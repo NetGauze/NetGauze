@@ -119,28 +119,35 @@ impl FromStr for Capability {
                 StandardCapability::WithOperationalDefaults,
             )),
             cap if s.starts_with(CAP_URL) => {
-                let scheme_str = if let Some(scheme_str) = cap
+                let schemes_str = if let Some(schemes_str) = cap
                     .strip_prefix(CAP_URL)
                     .and_then(|x| x.strip_prefix("?scheme="))
                 {
-                    scheme_str
+                    schemes_str
                 } else {
                     return Err(CapabilityParsingError::UrlSchemeIsNotDefined);
                 };
-                let scheme = match scheme_str {
-                    "http" => UrlScheme::Http,
-                    "https" => UrlScheme::Https,
-                    "ftp" => UrlScheme::Ftp,
-                    "sftp" => UrlScheme::Sftp,
-                    "file" => UrlScheme::File,
-                    "scp" => UrlScheme::Scp,
-                    _ => {
-                        return Err(CapabilityParsingError::InvalidUrlScheme(
-                            scheme_str.to_string(),
-                        ));
-                    }
-                };
-                Ok(Capability::Standard(StandardCapability::Url(scheme)))
+                let mut supported_schemes = Vec::new();
+                for scheme_str in schemes_str.split(",") {
+                    let scheme = match scheme_str {
+                        "http" => UrlScheme::Http,
+                        "https" => UrlScheme::Https,
+                        "ftp" => UrlScheme::Ftp,
+                        "sftp" => UrlScheme::Sftp,
+                        "file" => UrlScheme::File,
+                        "scp" => UrlScheme::Scp,
+                        _ => {
+                            return Err(CapabilityParsingError::InvalidUrlScheme(
+                                scheme_str.to_string(),
+                            ));
+                        }
+                    };
+                    supported_schemes.push(scheme);
+                }
+
+                Ok(Capability::Standard(StandardCapability::Url(
+                    supported_schemes.into_boxed_slice(),
+                )))
             }
             cap if s.starts_with(CAP_YANG_LIBRARY_V_1_0) => {
                 let params = if let Some(params) = s
@@ -340,60 +347,81 @@ pub enum YangLibrary {
 
 /// Standard NETCONF capabilities as defined in
 /// [IANA Network Configuration Protocol (NETCONF) Capability URNs](https://www.iana.org/assignments/netconf-capability-urns/netconf-capability-urns.xhtml)
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, strum_macros::Display,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StandardCapability {
-    #[strum(serialize = "urn:ietf:params:netconf:capability:writable-running:1.0")]
     WritableRunning,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:candidate:1.0")]
     Candidate,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:confirmed-commit:1.0")]
     ConfirmedCommitV1_0,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:confirmed-commit:1.1")]
     ConfirmedCommitV1_1,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:rollback-on-error:1.0")]
     RollbackOnError,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:validate:1.0")]
     ValidateV1_0,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:validate:1.1")]
     ValidateV1_1,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:startup:1.0")]
     Startup,
-
-    #[strum(
-        serialize = "urn:ietf:params:netconf:capability:url:1.0",
-        to_string = "urn:ietf:params:netconf:capability:url:1.0?scheme={0}"
-    )]
-    Url(UrlScheme),
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:xpath:1.0")]
+    Url(Box<[UrlScheme]>),
     Xpath,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:notification:1.0")]
     Notification,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:interleave:1.0")]
     Interleave,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:partial-lock:1.0")]
     PartialLock,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:with-defaults:1.0")]
     WithDefaults,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:time:1.0")]
     Time,
-
-    #[strum(serialize = "urn:ietf:params:netconf:capability:with-operational-defaults:1.0")]
     WithOperationalDefaults,
+}
+
+impl std::fmt::Display for StandardCapability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::WritableRunning => {
+                write!(f, "urn:ietf:params:netconf:capability:writable-running:1.0")
+            }
+            Self::Candidate => write!(f, "urn:ietf:params:netconf:capability:candidate:1.0"),
+            Self::ConfirmedCommitV1_0 => {
+                write!(f, "urn:ietf:params:netconf:capability:confirmed-commit:1.0")
+            }
+
+            Self::ConfirmedCommitV1_1 => {
+                write!(f, "urn:ietf:params:netconf:capability:confirmed-commit:1.1")
+            }
+
+            Self::RollbackOnError => write!(
+                f,
+                "urn:ietf:params:netconf:capability:rollback-on-error:1.0"
+            ),
+
+            Self::ValidateV1_0 => write!(f, "urn:ietf:params:netconf:capability:validate:1.0"),
+
+            Self::ValidateV1_1 => write!(f, "urn:ietf:params:netconf:capability:validate:1.1"),
+
+            Self::Startup => write!(f, "urn:ietf:params:netconf:capability:startup:1.0"),
+
+            Self::Url(schemes) => write!(
+                f,
+                "urn:ietf:params:netconf:capability:url:1.0?scheme={}",
+                schemes
+                    .as_ref()
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",")
+            ),
+
+            Self::Xpath => write!(f, "urn:ietf:params:netconf:capability:xpath:1.0"),
+
+            Self::Notification => write!(f, "urn:ietf:params:netconf:capability:notification:1.0"),
+
+            Self::Interleave => write!(f, "urn:ietf:params:netconf:capability:interleave:1.0"),
+
+            Self::PartialLock => write!(f, "urn:ietf:params:netconf:capability:partial-lock:1.0"),
+
+            Self::WithDefaults => write!(f, "urn:ietf:params:netconf:capability:with-defaults:1.0"),
+
+            Self::Time => write!(f, "urn:ietf:params:netconf:capability:time:1.0"),
+
+            Self::WithOperationalDefaults => write!(
+                f,
+                "urn:ietf:params:netconf:capability:with-operational-defaults:1.0"
+            ),
+        }
+    }
 }
 
 #[derive(
@@ -527,7 +555,7 @@ mod tests {
         let cap_writeable_running_str = r#"<capability xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">urn:ietf:params:netconf:capability:writable-running:1.0</capability>"#;
 
         let writable_running = StandardCapability::WritableRunning;
-        let cap_writable_running = Capability::Standard(writable_running);
+        let cap_writable_running = Capability::Standard(writable_running.clone());
 
         assert_eq!(writable_running.to_string(), writeable_running_str);
         assert_eq!(cap_writable_running.to_string(), writeable_running_str);
