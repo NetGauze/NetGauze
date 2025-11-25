@@ -78,9 +78,9 @@ pcap-parser = { version = "0.17" }
 clap = { version = "4.5" }
 socket2 = { version = "0.6" }
 either = { version = "1.15" }
-opentelemetry = { version = "0.30" }
-opentelemetry_sdk = { version = "0.30" }
-opentelemetry-otlp = { version = "0.30" }
+opentelemetry = { version = "0.31" }
+opentelemetry_sdk = { version = "0.31" }
+opentelemetry-otlp = { version = "0.31" }
 anyhow = { version = "1" }
 serde_with = { version = "3.14" }
 indexmap = { version = "2.10" }
@@ -91,21 +91,21 @@ tracing-test = { version = "0.2" }
 syn = { version = "2.0" }
 quote = { version = "1.0" }
 trybuild = { version = "1.0" }
-regex = { version = "1.11" }
+regex = { version = "1.12" }
 pdu = { version = "1.4" }
 pin-utils = { version = "0.1" }
 serde_yaml = { version = "0.9" }
 ciborium = { version = "0.2" }
-ordered-float = { version = "5.0", default-features = false }
+ordered-float = { version = "5.1", default-features = false }
 proc-macro2 = { version = "1.0" }
 prettyplease = { version = "0.2" }
 sysinfo = { version = "0.37" }
-shadow-rs = { version = "1.2", default-features = false }
+shadow-rs = { version = "1.4", default-features = false }
 smallvec = { version = "1.15" }
 rustc-hash = { version = "2.1" }
 yang3 = { version = "0.19", features = ["bundled"] }
-tempfile = { version = "3.20.0" }
-quick-xml = { version = "0.38.3" }
+tempfile = { version = "3.23.0" }
+quick-xml = { version = "0.38" }
 russh = { version = "0.54" }
 secrecy = { version = "0.10" }
 notify = { version = "8.2" }
