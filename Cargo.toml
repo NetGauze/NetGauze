@@ -110,6 +110,7 @@ russh = { version = "0.54" }
 secrecy = { version = "0.10" }
 notify = { version = "8.2" }
 petgraph = { version = "0.8.3" }
+sha2 = { version = "0.10" }
 
 [profile.release]
 codegen-units = 1
