@@ -14,8 +14,12 @@
 // limitations under the License.
 
 use clap::Parser;
-use netgauze_netconf_proto::client::{connect, NetconfSshConnectConfig, SshAuth, SshHandler};
-use std::{sync::Arc, time::Duration};
+use netgauze_netconf_proto::{
+    client::{connect, NetconfSshConnectConfig, SshAuth, SshHandler},
+    xml_utils::{XmlSerialize, XmlWriter},
+    yanglib::PermissiveVersionChecker,
+};
+use std::{collections::HashSet, io, sync::Arc, time::Duration};
 
 #[derive(clap::Parser, Debug)]
 struct Args {
@@ -95,14 +99,46 @@ pub async fn main() -> anyhow::Result<()> {
 
     let config = NetconfSshConnectConfig::new(auth, host, ssh_handler, ssh_config);
     let mut client = connect(config).await?;
-    tracing::info!("Connected to server with caps: {:#?}", client.peer_caps());
+    tracing::info!("Connected to server with caps: {:?}", client.peer_caps());
 
-    let schema = client.get_schema("ietf-datastores", None).await?;
-    eprintln!("RPC YANG Schema response:\n==================\n{schema}\n================\n");
+    let (yang_lib, schemas) = client
+        .load_from_modules(&["ietf-interfaces", "ietf-ip"], &PermissiveVersionChecker)
+        .await
+        .expect("Failed to load dependency graph");
 
-    let yang_lib = client.get_yang_library().await?;
-    eprintln!("RPC YANG Schema response:\n==================\n{yang_lib:?}\n================\n");
+    eprintln!("Loaded YANG Library");
+    let writer = quick_xml::writer::Writer::new(io::Cursor::new(Vec::new()));
+    let mut writer = XmlWriter::new(writer);
+    yang_lib.xml_serialize(&mut writer)?;
+    let serialize_str = String::from_utf8(writer.into_inner().into_inner())
+        .expect("Serialized value is not valid UTF-8");
+    eprintln!("{serialize_str}");
+    eprintln!("-----------");
 
+    eprintln!("Topological sort");
+    let graph = yang_lib
+        .to_graph(&schemas)
+        .expect("convert yang library to graph");
+    println!(
+        "{:?}",
+        petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel])
+    );
+    let mut root_nodes = HashSet::new();
+    for node_idx in graph.node_indices() {
+        let in_degree: usize = graph
+            .neighbors_directed(node_idx, petgraph::Direction::Outgoing)
+            .count();
+        if in_degree == 0 {
+            root_nodes.insert(*graph.node_weight(node_idx).unwrap());
+        }
+    }
+    let topo_sorted = petgraph::algo::toposort(&graph, None).expect("Graph should be acyclic");
+    for module in topo_sorted {
+        eprintln!("Module {}", graph.node_weight(module).unwrap());
+    }
+    for root_node in root_nodes {
+        eprintln!("Root node {root_node}");
+    }
     client.close().await?;
     Ok(())
 }
