@@ -35,8 +35,6 @@ pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS_STR: &str =
 pub(crate) const YANG_LIBRARY_AUGMENTED_BY_NS: Namespace<'static> =
     Namespace(YANG_LIBRARY_AUGMENTED_BY_NS_STR.as_bytes());
 pub(crate) const YANG_DATASTORES_NS_STR: &str = "urn:ietf:params:xml:ns:yang:ietf-datastores";
-pub(crate) const YANG_DATASTORES_NS: Namespace<'static> =
-    Namespace(YANG_DATASTORES_NS_STR.as_bytes());
 
 #[cfg(test)]
 mod tests {
@@ -127,7 +125,7 @@ mod tests {
         let reader = NsReader::from_str(&serialize_str);
         let mut xml_parser = XmlParser::new(reader)?;
         let parsed = <T as XmlDeserialize<T>>::xml_deserialize(&mut xml_parser)?;
-        assert_eq!(parsed, expected);
+        assert_eq!(parsed, expected, "In second round of serialized value");
         Ok(())
     }
 }
