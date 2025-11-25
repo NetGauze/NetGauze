@@ -15,10 +15,7 @@
 
 //! Low-level XML parsing utils
 
-use crate::{
-    NETCONF_MONITORING_NS, NETCONF_NS, YANG_DATASTORES_NS, YANG_LIBRARY_AUGMENTED_BY_NS,
-    YANG_LIBRARY_NS,
-};
+use crate::NETCONF_NS;
 use indexmap::IndexMap;
 use quick_xml::{
     events::{BytesStart, Event},
@@ -72,13 +69,7 @@ pub struct XmlWriter<T: io::Write> {
 
 impl<T: io::Write> XmlWriter<T> {
     pub fn new(inner: quick_xml::writer::Writer<T>) -> Self {
-        let namespace_bindings = vec![IndexMap::from([
-            (NETCONF_NS, "".to_string()),
-            (NETCONF_MONITORING_NS, "ncm".to_string()),
-            (YANG_LIBRARY_NS, "yanglib".to_string()),
-            (YANG_LIBRARY_AUGMENTED_BY_NS, "yanglib-aug".to_string()),
-            (YANG_DATASTORES_NS, "ds".to_string()),
-        ])];
+        let namespace_bindings = vec![IndexMap::from([(NETCONF_NS, "".to_string())])];
         let ns_applied = false;
         Self {
             inner,
@@ -108,25 +99,26 @@ impl<T: io::Write> XmlWriter<T> {
         start
     }
 
+    pub fn get_namespace_prefix(&self, ns: Namespace<'static>) -> Option<&String> {
+        self.namespace_bindings
+            .iter()
+            .rev()
+            .find_map(|map| map.get(&ns))
+    }
+
     /// Create a new element with specific namespace prefix
     /// Note, the namespace must have been registered beforehand,
     /// either with [XmlWriter::new_with_custom_namespaces] or
     /// [XmlWriter::push_namespace_binding]
     pub fn create_ns_element(
         &mut self,
-        ns: Namespace<'_>,
+        ns: Namespace<'static>,
         name: &str,
     ) -> Result<BytesStart<'static>, XmlWriterError> {
         // the namespace must have been defined before
         // find the prefix binding for this namespace based
         // on the latest binding in the stack [self.namespace_bindings]
-
-        let prefix = self
-            .namespace_bindings
-            .iter()
-            .rev()
-            .find_map(|map| map.get(&ns));
-        let prefix = if let Some(prefix) = prefix {
+        let prefix = if let Some(prefix) = self.get_namespace_prefix(ns) {
             prefix
         } else {
             return Err(XmlWriterError::UndefinedNamespace(

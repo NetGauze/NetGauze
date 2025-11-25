@@ -21,6 +21,7 @@ use crate::{
     yanglib::YangLibrary,
     NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_NS,
 };
+use indexmap::IndexMap;
 use quick_xml::{
     events::{BytesStart, BytesText, Event},
     name::ResolveResult,
@@ -359,6 +360,14 @@ impl XmlSerialize for YangSchemaFormat {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(NETCONF_MONITORING_NS).is_none() {
+            ns_added = true;
+            writer.push_namespace_binding(IndexMap::from([(
+                NETCONF_MONITORING_NS,
+                "".to_string(),
+            )]))?;
+        }
         let start = writer.create_ns_element(NETCONF_MONITORING_NS, "format")?;
         writer.write_event(Event::Start(start.clone()))?;
         match self {
@@ -369,6 +378,9 @@ impl XmlSerialize for YangSchemaFormat {
             Self::Rnc => writer.write_event(Event::Text(BytesText::new("rnc")))?,
         }
         writer.write_event(Event::End(start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
         Ok(())
     }
 }
@@ -978,6 +990,14 @@ impl WellKnownOperation {
         version: &Option<Box<str>>,
         format: &Option<YangSchemaFormat>,
     ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(NETCONF_MONITORING_NS).is_none() {
+            ns_added = true;
+            writer.push_namespace_binding(IndexMap::from([(
+                NETCONF_MONITORING_NS,
+                "".to_string(),
+            )]))?;
+        }
         let get_schema_start = writer.create_ns_element(NETCONF_MONITORING_NS, "get-schema")?;
         writer.write_event(Event::Start(get_schema_start.clone()))?;
 
@@ -997,6 +1017,9 @@ impl WellKnownOperation {
             format.xml_serialize(writer)?;
         }
         writer.write_event(Event::End(get_schema_start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
         Ok(())
     }
 }
@@ -1329,10 +1352,21 @@ impl XmlSerialize for WellKnownRpcResponse {
     ) -> Result<(), quick_xml::Error> {
         match self {
             WellKnownRpcResponse::YangSchema { schema } => {
+                let mut ns_added = false;
+                if writer.get_namespace_prefix(NETCONF_MONITORING_NS).is_none() {
+                    ns_added = true;
+                    writer.push_namespace_binding(IndexMap::from([(
+                        NETCONF_MONITORING_NS,
+                        "".to_string(),
+                    )]))?;
+                }
                 let data_start = writer.create_ns_element(NETCONF_MONITORING_NS, "data")?;
                 writer.write_event(Event::Start(data_start.clone()))?;
                 writer.write_event(Event::Text(BytesText::new(schema.as_ref())))?;
                 writer.write_event(Event::End(data_start.to_end()))?;
+                if ns_added {
+                    writer.pop_namespace_binding();
+                }
             }
             Self::YangLibrary(library) => {
                 let data_start = writer.create_element("data");

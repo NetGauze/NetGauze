@@ -108,6 +108,11 @@ impl XmlSerialize for YangLibrary {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(YANG_LIBRARY_NS).is_none() {
+            ns_added = true;
+            writer.push_namespace_binding(IndexMap::from([(YANG_LIBRARY_NS, "".to_string())]))?;
+        }
         let lib_start = writer.create_ns_element(YANG_LIBRARY_NS, "yang-library")?;
         writer.write_event(Event::Start(lib_start.clone()))?;
         for module_set in self.modules_set.values() {
@@ -124,6 +129,9 @@ impl XmlSerialize for YangLibrary {
         writer.write_event(Event::Text(BytesText::new(self.content_id.as_ref())))?;
         writer.write_event(Event::End(start.to_end()))?;
         writer.write_event(Event::End(lib_start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
         Ok(())
     }
 }
@@ -203,6 +211,11 @@ impl XmlSerialize for ModuleSet {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(YANG_LIBRARY_NS).is_none() {
+            ns_added = true;
+            writer.push_namespace_binding(IndexMap::from([(YANG_LIBRARY_NS, "".to_string())]))?;
+        }
         let module_set_start = writer.create_ns_element(YANG_LIBRARY_NS, "module-set")?;
         writer.write_event(Event::Start(module_set_start.clone()))?;
 
@@ -218,6 +231,9 @@ impl XmlSerialize for ModuleSet {
             }
         }
         writer.write_event(Event::End(module_set_start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
         Ok(())
     }
 }
@@ -375,6 +391,11 @@ impl XmlSerialize for Module {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(YANG_LIBRARY_NS).is_none() {
+            ns_added = true;
+            writer.push_namespace_binding(IndexMap::from([(YANG_LIBRARY_NS, "".to_string())]))?;
+        }
         let module_start = writer.create_ns_element(YANG_LIBRARY_NS, "module")?;
         writer.write_event(Event::Start(module_start.clone()))?;
 
@@ -402,13 +423,30 @@ impl XmlSerialize for Module {
         }
 
         for augmented_by in &self.augmented_by {
+            let mut ns_added = false;
+            if writer
+                .get_namespace_prefix(YANG_LIBRARY_AUGMENTED_BY_NS)
+                .is_none()
+            {
+                ns_added = true;
+                writer.push_namespace_binding(IndexMap::from([(
+                    YANG_LIBRARY_AUGMENTED_BY_NS,
+                    "".to_string(),
+                )]))?;
+            }
             let start = writer.create_ns_element(YANG_LIBRARY_AUGMENTED_BY_NS, "augmented-by")?;
             writer.write_event(Event::Start(start.clone()))?;
             writer.write_event(Event::Text(BytesText::new(augmented_by.as_ref())))?;
             writer.write_event(Event::End(start.to_end()))?;
+            if ns_added {
+                writer.pop_namespace_binding();
+            }
         }
 
         writer.write_event(Event::End(module_start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
         Ok(())
     }
 }
@@ -467,6 +505,11 @@ impl XmlSerialize for Submodule {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(YANG_LIBRARY_NS).is_none() {
+            ns_added = true;
+            writer.push_namespace_binding(IndexMap::from([(YANG_LIBRARY_NS, "".to_string())]))?;
+        }
         let module_start = writer.create_ns_element(YANG_LIBRARY_NS, "submodule")?;
         writer.write_event(Event::Start(module_start.clone()))?;
 
@@ -475,6 +518,9 @@ impl XmlSerialize for Submodule {
         serialize_yang_lib_location(writer, &self.locations)?;
 
         writer.write_event(Event::End(module_start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
         Ok(())
     }
 }
@@ -617,6 +663,11 @@ impl XmlSerialize for Schema {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(YANG_LIBRARY_NS).is_none() {
+            ns_added = true;
+            writer.push_namespace_binding(IndexMap::from([(YANG_LIBRARY_NS, "".to_string())]))?;
+        }
         let schema_start = writer.create_ns_element(YANG_LIBRARY_NS, "schema")?;
         writer.write_event(Event::Start(schema_start.clone()))?;
         serialize_yang_lib_name(writer, &self.name)?;
@@ -627,6 +678,9 @@ impl XmlSerialize for Schema {
             writer.write_event(Event::End(start.to_end()))?;
         }
         writer.write_event(Event::End(schema_start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
         Ok(())
     }
 }
@@ -733,6 +787,11 @@ impl XmlSerialize for Datastore {
         &self,
         writer: &mut XmlWriter<T>,
     ) -> Result<(), quick_xml::Error> {
+        let mut ns_added = false;
+        if writer.get_namespace_prefix(YANG_LIBRARY_NS).is_none() {
+            ns_added = true;
+            writer.push_namespace_binding(IndexMap::from([(YANG_LIBRARY_NS, "".to_string())]))?;
+        }
         let schema_start = writer.create_ns_element(YANG_LIBRARY_NS, "datastore")?;
         writer.write_event(Event::Start(schema_start.clone()))?;
 
@@ -749,6 +808,9 @@ impl XmlSerialize for Datastore {
         writer.write_event(Event::End(start.to_end()))?;
 
         writer.write_event(Event::End(schema_start.to_end()))?;
+        if ns_added {
+            writer.pop_namespace_binding();
+        }
         Ok(())
     }
 }
