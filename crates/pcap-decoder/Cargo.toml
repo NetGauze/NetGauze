@@ -1,6 +1,6 @@
 [package]
 name = "netgauze-pcap-decoder"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Riccardo Negri <hello@riccardonegri.dev>"]
 license = "Apache-2.0"
