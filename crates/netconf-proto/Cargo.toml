@@ -27,6 +27,7 @@ futures-util = { workspace = true, features = ["sink"] }
 russh = { workspace = true }
 secrecy = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
+petgraph = { workspace = true }
 
 [dev-dependencies]
 clap = { workspace = true, features = ["derive"] }

@@ -1,5 +1,6 @@
 use crate::{
     xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
+    yangparser::extract_yang_dependencies,
     YANG_DATASTORES_NS_STR, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_NS,
 };
 use indexmap::IndexMap;
@@ -105,6 +106,167 @@ impl YangLibrary {
             }
         }
         None
+    }
+
+    /// Create a graph representation of the YANG library
+    /// that indicated the dependencies between the various modules listed
+    /// in the library.
+    pub fn to_graph(
+        &self,
+        yang_schemas: &HashMap<Box<str>, Box<str>>,
+    ) -> Result<petgraph::graph::DiGraph<&str, ()>, String> {
+        let mut graph = petgraph::Graph::<&str, ()>::new();
+        let mut node_indices = HashMap::new();
+        // Add nodes for all modules
+        self.construct_nodes(&mut graph, &mut node_indices);
+        for module_set in self.modules_set.values() {
+            for module in module_set.modules().values() {
+                let a = *node_indices.get(module.name()).unwrap();
+                let schema = yang_schemas
+                    .get(module.name())
+                    .ok_or(format!("No schema for module {}", module.name()))?;
+                let deps = extract_yang_dependencies(schema)?;
+                for import in &deps.imports {
+                    self.check_module_exists(import.module_name.as_str())?;
+                    let b = *node_indices
+                        .get(import.module_name.as_str())
+                        .ok_or(format!("No module {} found in graph", import.module_name))?;
+                    if !graph.contains_edge(b, a) {
+                        graph.add_edge(b, a, ());
+                    }
+                }
+                for include in &deps.includes {
+                    self.find_submodule(include.submodule_name.as_str())
+                        .ok_or(format!(
+                            "No submodule {} found in YANG Library",
+                            include.submodule_name
+                        ))?;
+                    let b = *node_indices
+                        .get(include.submodule_name.as_str())
+                        .ok_or(format!(
+                            "No submodule {} found in graph",
+                            include.submodule_name
+                        ))?;
+                    if !graph.contains_edge(b, a) {
+                        graph.add_edge(b, a, ());
+                    }
+                }
+                for augmented_by in module.augmented_by() {
+                    self.check_module_exists(augmented_by.as_ref())?;
+                    let b = *node_indices
+                        .get(augmented_by.as_ref())
+                        .ok_or(format!("No module {augmented_by} found in graph"))?;
+                    if !graph.contains_edge(a, b) {
+                        graph.add_edge(a, b, ());
+                    }
+                }
+                for deviation in module.deviations() {
+                    self.check_module_exists(deviation.as_ref())?;
+                    let b = *node_indices
+                        .get(deviation.as_ref())
+                        .ok_or(format!("No module {deviation} found in graph"))?;
+                    if !graph.contains_edge(a, b) {
+                        graph.add_edge(a, b, ());
+                    }
+                }
+            }
+            for import_modules in module_set.import_only_modules.values() {
+                for import_only_module in import_modules.values() {
+                    let a = *node_indices.get(import_only_module.name()).unwrap();
+                    let schema = yang_schemas.get(import_only_module.name()).ok_or(format!(
+                        "No schema for import only module {}",
+                        import_only_module.name()
+                    ))?;
+                    let deps = extract_yang_dependencies(schema)?;
+                    for import in &deps.imports {
+                        self.check_module_exists(import.module_name.as_str())?;
+                        let b = *node_indices
+                            .get(import.module_name.as_str())
+                            .ok_or(format!("No module {} found in graph", import.module_name))?;
+                        if !graph.contains_edge(b, a) {
+                            graph.add_edge(b, a, ());
+                        }
+                    }
+                    for include in &deps.includes {
+                        self.find_submodule(include.submodule_name.as_str())
+                            .ok_or(format!(
+                                "No submodule {} found in YANG Library",
+                                include.submodule_name
+                            ))?;
+                        let b =
+                            *node_indices
+                                .get(include.submodule_name.as_str())
+                                .ok_or(format!(
+                                    "No submodule {} found in graph",
+                                    include.submodule_name
+                                ))?;
+                        if !graph.contains_edge(b, a) {
+                            graph.add_edge(b, a, ());
+                        }
+                    }
+                }
+            }
+        }
+        Ok(graph)
+    }
+
+    /// Helper method to check if a module exists in the YANG Library.s
+    fn check_module_exists(&self, module_name: &str) -> Result<(), String> {
+        if self.find_module(module_name).is_none() && self.find_import_module(module_name).is_none()
+        {
+            Err(format!("No module {module_name} found in YANG Library"))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Add all modules/submodules/import-only modules to the graph and
+    /// construct a HashMap of module name to graph
+    /// [petgraph::prelude::NodeIndex].
+    fn construct_nodes<'a>(
+        &'a self,
+        graph: &mut petgraph::Graph<&'a str, ()>,
+        node_indices: &mut HashMap<&'a str, petgraph::prelude::NodeIndex>,
+    ) {
+        // Add nodes for all modules
+        for module_set in self.modules_set.values() {
+            for module in module_set.modules().values() {
+                if node_indices.contains_key(module.name()) {
+                    // Skip modules that are already in the graph.
+                    continue;
+                }
+                let idx = graph.add_node(module.name());
+                node_indices.insert(module.name(), idx);
+
+                for submodule in module.submodules() {
+                    if node_indices.contains_key(submodule.name()) {
+                        // Skip modules that are already in the graph.
+                        continue;
+                    }
+                    let idx = graph.add_node(submodule.name());
+                    node_indices.insert(submodule.name(), idx);
+                }
+            }
+            for (_, import_module_versions) in module_set.import_only_modules() {
+                for import_only in import_module_versions.values() {
+                    if node_indices.contains_key(import_only.name()) {
+                        // Skip modules that are already in the graph.
+                        continue;
+                    }
+                    let idx = graph.add_node(import_only.name());
+                    node_indices.insert(import_only.name(), idx);
+
+                    for (_, submodule) in import_only.submodules() {
+                        if node_indices.contains_key(submodule.name()) {
+                            // Skip modules that are already in the graph.
+                            continue;
+                        }
+                        let idx = graph.add_node(submodule.name());
+                        node_indices.insert(submodule.name(), idx);
+                    }
+                }
+            }
+        }
     }
 }
 
