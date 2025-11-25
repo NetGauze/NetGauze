@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
-  schedule: [ cron: "40 1 * * *" ]
+    branches: ["main"]
+  schedule: [cron: "40 1 * * *"]
   workflow_call:
 
 permissions:
@@ -52,7 +52,7 @@ jobs:
       fail-fast: false
       matrix:
         # TODO: enable msrv checks once NetGauze is more stable
-        rust: [ nightly, beta, stable ]
+        rust: [nightly, beta, stable]
     timeout-minutes: 45
     env:
       TRYBUILD: overwrite
@@ -280,22 +280,6 @@ jobs:
           RPM_FILE=$(find rpm-artifact -type f -name "*.rpm")
           echo "Installing RPM file: ${RPM_FILE}"
           dnf install -y "${RPM_FILE}"
-        # TODO: remove following step once the confing file has been merged
-      - name: Manually create config file
-        run: |
-          cat << EOF > crates/collector/config_ci_rpm_test.yaml
-          runtime:
-            threads: 4
-        
-          logging:
-            level: info
-        
-          telemetry:
-            url: http://localhost:4317/v1/metrics
-            exporter_timeout: 3000
-            reader_interval: 60000
-            reader_timeout: 3000
-          EOF
       - name: Run netgauze-collector (it should start and then exit without errors)
         run: netgauze-collector crates/collector/config_ci_rpm_test.yaml
 
@@ -366,6 +350,6 @@ jobs:
       - name: Upload pcap-decoder artifact
         uses: actions/upload-artifact@v4
         with:
-            name: ${{ steps.binary_filename.outputs.name }}
-            path: target/${{ matrix.target }}/release/${{ steps.binary_filename.outputs.name }}
-            retention-days: 30
+          name: ${{ steps.binary_filename.outputs.name }}
+          path: target/${{ matrix.target }}/release/${{ steps.binary_filename.outputs.name }}
+          retention-days: 30
