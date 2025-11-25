@@ -21,6 +21,7 @@ pub mod codec;
 pub mod protocol;
 pub mod xml_utils;
 pub mod yanglib;
+mod yangparser;
 
 pub(crate) const NETCONF_NS_STR: &str = "urn:ietf:params:xml:ns:netconf:base:1.0";
 pub(crate) const NETCONF_NS: Namespace<'static> = Namespace(NETCONF_NS_STR.as_bytes());
