@@ -8,7 +8,7 @@ use quick_xml::{
     name::{QName, ResolveResult},
 };
 use serde::{Deserialize, Serialize};
-use std::io;
+use std::{collections::HashMap, io};
 // ============================================================================
 // Core Structures
 // ============================================================================
@@ -980,6 +980,367 @@ fn serialize_yang_lib_location<T: io::Write>(
     Ok(())
 }
 
+/// Helper struct for building a `ModuleSet` with backward compatibility checks.
+/// Only the latest version of each module is allowed in the set.
+/// User can update the version of a module by adding a new module with the same
+/// name, and it will replace the existing module if the compatability check
+/// passes.
+///
+/// The module Builder records the latest version of each schema in a HashMap
+/// with as module name and value as the raw schema string.
+pub struct ModuleSetBuilder {
+    module_set: ModuleSet,
+    // The yang schema string indexed by name
+    yang_schemas: HashMap<Box<str>, Box<str>>,
+    // Keep track of submodule schemas separately for easier backward compatibility checks
+    submodules: HashMap<Box<str>, Submodule>,
+}
+
+impl ModuleSetBuilder {
+    pub fn new(name: Box<str>) -> Self {
+        Self {
+            module_set: ModuleSet::new(name, Vec::new(), Vec::new()),
+            yang_schemas: HashMap::new(),
+            submodules: HashMap::new(),
+        }
+    }
+
+    /// Adds a module to the builder and checks for backward compatibility.
+    pub fn add_module<C: BackwardCompatibilityChecker>(
+        &mut self,
+        module: Module,
+        schema: Box<str>,
+        checker: &C,
+    ) -> Result<AddResult, DependencyError> {
+        let name = module.name.clone();
+        let existing_module = if let Some(existing_module) = self.module_set.modules().get(&name) {
+            existing_module
+        } else {
+            // New module - just add it
+            self.yang_schemas.insert(name.clone(), schema);
+            self.module_set.modules.insert(name, module);
+            return Ok(AddResult::Added);
+        };
+
+        let compatability_result = checker.check_backward_compatible(
+            existing_module.name(),
+            existing_module.revision(),
+            module.revision(),
+            self.yang_schemas
+                .get(existing_module.name())
+                .unwrap_or(&schema),
+            &schema,
+        );
+        match compatability_result {
+            CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
+            CompatabilityResult::Compatible => {
+                // Backward compatible - update to the new version
+                let existing_version = existing_module.revision().map(|s| s.to_string());
+                let new_version = module.revision().map(|s| s.to_string());
+                self.yang_schemas.insert(name.clone(), schema);
+                self.module_set.modules.insert(name, module);
+                Ok(AddResult::Updated {
+                    old_version: existing_version,
+                    new_version,
+                })
+            }
+            CompatabilityResult::Incompatible => {
+                // Not backward compatible - conflict
+                Err(DependencyError::VersionConflict {
+                    module_name: name.to_string(),
+                    existing_version: existing_module.revision().map(|s| s.to_string()),
+                    new_version: module.revision().map(|s| s.to_string()),
+                })
+            }
+        }
+    }
+
+    /// Adds a submodule to the builder and checks for backward
+    /// compatibility. A submodule is always attached to a parent module, and it
+    /// should be declared a priori in the submodule list of the parent module.
+    pub fn add_submodule_for_module<C>(
+        &mut self,
+        module_name: &str,
+        submodule: Submodule,
+        schema: Box<str>,
+        checker: &C,
+    ) -> Result<AddResult, DependencyError>
+    where
+        C: BackwardCompatibilityChecker,
+    {
+        // Check the module which is the submodule is attached to is already defined in
+        // the module set.
+        let module = if let Some(module) = self.module_set.modules.get(module_name) {
+            module
+        } else {
+            return Err(DependencyError::ModuleNotFound {
+                module_name: module_name.to_string(),
+            });
+        };
+        let submodule_name = submodule.name.clone();
+        // Check that the submodule is already defined in the parent module
+        if !module
+            .submodule
+            .iter()
+            .any(|submodule| submodule.name == submodule_name)
+        {
+            return Err(DependencyError::SubmoduleNotFound {
+                module_name: module_name.to_string(),
+                submodule_name: submodule_name.to_string(),
+            });
+        }
+        let existing_submodule =
+            if let Some(existing) = self.submodules.get_mut(submodule_name.as_ref()) {
+                existing
+            } else {
+                self.yang_schemas.insert(submodule_name.clone(), schema);
+                self.submodules.insert(submodule_name, submodule);
+                return Ok(AddResult::Added);
+            };
+
+        let compatability_result = checker.check_backward_compatible(
+            &submodule_name,
+            existing_submodule.revision(),
+            submodule.revision(),
+            self.yang_schemas.get(&submodule_name).unwrap_or(&schema),
+            &schema,
+        );
+        match compatability_result {
+            CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
+            CompatabilityResult::Compatible => {
+                // Backward compatible - update to the new version
+                let old_version = existing_submodule.revision().map(|s| s.to_string());
+                let new_version = submodule.revision().map(|s| s.to_string());
+                self.yang_schemas.insert(submodule_name.clone(), schema);
+                self.submodules.insert(submodule_name, submodule);
+                Ok(AddResult::Updated {
+                    old_version,
+                    new_version,
+                })
+            }
+            CompatabilityResult::Incompatible => Err(DependencyError::VersionConflict {
+                module_name: submodule_name.to_string(),
+                existing_version: existing_submodule.revision().map(|s| s.to_string()),
+                new_version: submodule.revision().map(|s| s.to_string()),
+            }),
+        }
+    }
+
+    /// Adds an import-only module to the builder and checks for backward
+    /// compatibility. Only one version of import only modules is allowed by
+    /// this builder.
+    pub fn add_import_only_module<C>(
+        &mut self,
+        import_only_module: ImportOnlyModule,
+        schema: Box<str>,
+        checker: &C,
+    ) -> Result<AddResult, DependencyError>
+    where
+        C: BackwardCompatibilityChecker,
+    {
+        let name = import_only_module.name.clone();
+        let (_, existing) = if let Some(existing) = self.module_set.import_only_modules().get(&name)
+        {
+            let tmp = existing
+                .iter()
+                .find(|m| m.1.revision() == import_only_module.revision())
+                .ok_or(existing.first());
+            match tmp {
+                Ok(tmp) => tmp,
+                Err(_) => {
+                    return Err(DependencyError::ModuleNotFound {
+                        module_name: name.to_string(),
+                    })
+                }
+            }
+        } else {
+            self.yang_schemas.insert(name.clone(), schema);
+            self.module_set.import_only_modules.insert(
+                name,
+                IndexMap::from([(
+                    import_only_module.revision.clone(),
+                    import_only_module.clone(),
+                )]),
+            );
+            return Ok(AddResult::Added);
+        };
+
+        let compatability_result = checker.check_backward_compatible(
+            &name,
+            existing.revision(),
+            import_only_module.revision(),
+            self.yang_schemas.get(&name).unwrap_or(&schema),
+            &schema,
+        );
+        match compatability_result {
+            CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
+            CompatabilityResult::Compatible => {
+                // Backward compatible - update to the new version
+                let old_version = existing.revision().map(|s| s.to_string());
+                let new_version = import_only_module.revision().map(|s| s.to_string());
+                self.yang_schemas.insert(name.clone(), schema);
+                self.module_set.import_only_modules.insert(
+                    name,
+                    IndexMap::from([(
+                        import_only_module.revision.clone(),
+                        import_only_module.clone(),
+                    )]),
+                );
+                Ok(AddResult::Updated {
+                    old_version,
+                    new_version,
+                })
+            }
+            CompatabilityResult::Incompatible => {
+                // Not backward compatible - conflict
+                Err(DependencyError::VersionConflict {
+                    module_name: name.to_string(),
+                    existing_version: existing.revision().map(|s| s.to_string()),
+                    new_version: import_only_module.revision().map(|s| s.to_string()),
+                })
+            }
+        }
+    }
+
+    /// Add a submodule that is part of an import-only module.
+    ///
+    /// Submodule is only accepted if the import-only module is already added
+    /// and declares the submodule in its submodules list.
+    pub fn add_submodule_for_import_only_module<C>(
+        &mut self,
+        import_only_module_name: &str,
+        submodule: Submodule,
+        schema: Box<str>,
+        checker: &C,
+    ) -> Result<AddResult, DependencyError>
+    where
+        C: BackwardCompatibilityChecker,
+    {
+        if !self
+            .module_set
+            .import_only_modules
+            .contains_key(import_only_module_name)
+        {
+            return Err(DependencyError::ModuleNotFound {
+                module_name: import_only_module_name.to_string(),
+            });
+        };
+        let submodule_name = submodule.name.clone();
+        let existing = if let Some(existing) = self.submodules.get_mut(&submodule_name) {
+            existing
+        } else {
+            self.yang_schemas.insert(submodule_name.clone(), schema);
+            self.submodules.insert(submodule_name, submodule);
+            return Ok(AddResult::Added);
+        };
+
+        let compatability_result = checker.check_backward_compatible(
+            &submodule_name,
+            existing.revision(),
+            submodule.revision(),
+            self.yang_schemas.get(&submodule_name).unwrap_or(&schema),
+            &schema,
+        );
+        match compatability_result {
+            CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
+            CompatabilityResult::Compatible => {
+                // Backward compatible - update to the new version
+                let old_version = existing.revision().map(|s| s.to_string());
+                let new_version = submodule.revision().map(|s| s.to_string());
+                self.yang_schemas.insert(submodule_name.clone(), schema);
+                self.submodules.insert(submodule_name, submodule);
+                Ok(AddResult::Updated {
+                    old_version,
+                    new_version,
+                })
+            }
+            CompatabilityResult::Incompatible => Err(DependencyError::VersionConflict {
+                module_name: submodule_name.to_string(),
+                existing_version: existing.revision().map(|s| s.to_string()),
+                new_version: submodule.revision().map(|s| s.to_string()),
+            }),
+        }
+    }
+
+    pub fn build(self) -> (ModuleSet, HashMap<Box<str>, Box<str>>) {
+        (self.module_set, self.yang_schemas)
+    }
+}
+
+pub enum CompatabilityResult {
+    Same,
+    Compatible,
+    Incompatible,
+}
+
+/// Trait for checking backward compatibility between module versions
+/// Implement this trait to provide your own compatibility logic
+pub trait BackwardCompatibilityChecker {
+    /// Check if new_version is backward compatible with old_version
+    /// Returns [CompatabilityResult] indicating the result of the check
+    fn check_backward_compatible(
+        &self,
+        module_name: &str,
+        old_version: Option<&str>,
+        new_version: Option<&str>,
+        old_schema: &str,
+        new_schema: &str,
+    ) -> CompatabilityResult;
+}
+
+/// Permissive checker that always allows version updates
+pub struct PermissiveVersionChecker;
+
+impl BackwardCompatibilityChecker for PermissiveVersionChecker {
+    fn check_backward_compatible(
+        &self,
+        _module_name: &str,
+        old_version: Option<&str>,
+        new_version: Option<&str>,
+        old_schema: &str,
+        new_schema: &str,
+    ) -> CompatabilityResult {
+        if old_version.is_none() == new_version.is_none() && old_schema == new_schema {
+            CompatabilityResult::Same
+        } else {
+            CompatabilityResult::Compatible
+        }
+    }
+}
+
+/// Result of attempting to add a module
+#[derive(Debug)]
+pub enum AddResult {
+    Added,
+    Updated {
+        old_version: Option<String>,
+        new_version: Option<String>,
+    },
+    AlreadyExists,
+}
+
+#[derive(Debug, strum_macros::Display)]
+pub enum DependencyError {
+    #[strum(
+        to_string = "Version conflict for module '{module_name}': existing version {existing_version:?}, attempted to add incompatible version {new_version:?}"
+    )]
+    VersionConflict {
+        module_name: String,
+        existing_version: Option<String>,
+        new_version: Option<String>,
+    },
+
+    #[strum(to_string = "Module '{module_name}' not found")]
+    ModuleNotFound { module_name: String },
+
+    #[strum(to_string = "Submodule '{submodule_name}' not found in module '{module_name}'")]
+    SubmoduleNotFound {
+        module_name: String,
+        submodule_name: String,
+    },
+}
+
+impl std::error::Error for DependencyError {}
 
 #[cfg(test)]
 mod tests {
