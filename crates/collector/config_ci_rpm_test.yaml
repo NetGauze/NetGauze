@@ -1,12 +1,12 @@
 runtime:
   threads: 4
 
-  logging:
-    level: info
+logging:
+  level: info
 
-  telemetry:
-    url: http://localhost:4317/v1/metrics
-    id: netgauze-ci-rpm-test
-    exporter_timeout: 3000
-    reader_interval: 60000
-    reader_timeout: 3000
+telemetry:
+  url: http://localhost:4317/v1/metrics
+  id: netgauze-ci-rpm-test
+  exporter_timeout: 3000
+  reader_interval: 60000
+  reader_timeout: 3000
