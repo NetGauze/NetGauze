@@ -20,11 +20,21 @@ use crate::{
         Hello, NetConfMessage, Rpc, RpcOperation, RpcReply, RpcReplyContent, RpcResponse,
         WellKnownOperation, WellKnownRpcResponse, YangSchemaFormat,
     },
-    yanglib::YangLibrary,
+    yanglib::{
+        BackwardCompatibilityChecker, Datastore, DatastoreName, DependencyError, ImportOnlyModule,
+        Module, ModuleSetBuilder, Schema, Submodule, YangLibrary,
+    },
+    yangparser::extract_yang_dependencies,
 };
 use futures_util::{stream::StreamExt, SinkExt};
 use secrecy::ExposeSecret;
-use std::{collections::HashSet, io, net::SocketAddr, sync::Arc};
+use sha2::Digest;
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    io,
+    net::SocketAddr,
+    sync::Arc,
+};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::Framed;
 
@@ -69,6 +79,12 @@ pub enum NetConfSshClientError {
         to_string = "Session ID is not defined in the <hello> message received from the server"
     )]
     SessionIdIsNotDefined,
+
+    #[strum(to_string = "Encountered an error while parsing YANG Module {name}: {error}")]
+    YangSchemaParsingError { name: String, error: String },
+
+    #[strum(to_string = "Error computing the YANG dependency graph {0}")]
+    DependencyError(DependencyError),
 }
 
 impl std::error::Error for NetConfSshClientError {}
@@ -451,6 +467,225 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             })
         } else {
             Ok(())
+        }
+    }
+
+    /// Recursively load the dependency graph from a list of seed YANG modules,
+    /// then connect to the Device via NETCONF to load all the dependencies,
+    /// including the imports/include and  modules that deviate or augment any
+    /// of the modules in the dependency graph.
+    pub async fn load_from_modules(
+        &mut self,
+        seed: &[&str],
+        checker: &impl BackwardCompatibilityChecker,
+    ) -> Result<(YangLibrary, HashMap<Box<str>, Box<str>>), NetConfSshClientError> {
+        let default_name: Box<str> = "ALL".into();
+
+        let mut builder = ModuleSetBuilder::new(default_name.clone());
+        let mut to_process: VecDeque<ModuleType> = VecDeque::new();
+        let mut visited: HashSet<String> = HashSet::new();
+
+        // Get YANG Library once
+        let yang_lib = self.get_yang_library().await?;
+
+        // Add seed modules to the process queue
+        for name in seed {
+            if let Some(module) = yang_lib.find_module(name) {
+                to_process.push_back(ModuleType::Full(module.clone()));
+            } else if let Some(module) = yang_lib.find_import_module(name) {
+                for module in module {
+                    to_process.push_back(ModuleType::ImportOnly(module.clone()));
+                }
+            } else {
+                Err(NetConfSshClientError::DependencyError(
+                    DependencyError::ModuleNotFound {
+                        module_name: name.to_string(),
+                    },
+                ))?;
+            }
+        }
+
+        // Process modules breadth-first
+        while let Some(module) = to_process.pop_front() {
+            // Skip if already processed
+            if visited.contains(module.name()) {
+                continue;
+            }
+            visited.insert(module.name().to_string());
+
+            // Fetch the YANG schema
+            let schema = self.get_schema(module.name(), module.revision()).await?;
+            // Parse dependencies from schema
+            let deps = extract_yang_dependencies(&schema).map_err(|error| {
+                NetConfSshClientError::YangSchemaParsingError {
+                    name: module.name().to_string(),
+                    error,
+                }
+            })?;
+
+            // Add imports
+            for import in &deps.imports {
+                if let Some(dep_module) = yang_lib.find_module(&import.module_name) {
+                    if !visited.contains(dep_module.name()) {
+                        to_process.push_back(ModuleType::Full(dep_module.clone()));
+                    }
+                } else if let Some(dep_modules) = yang_lib.find_import_module(&import.module_name) {
+                    for dep_module in dep_modules {
+                        if !visited.contains(dep_module.name()) {
+                            to_process.push_back(ModuleType::ImportOnly(dep_module.clone()));
+                        }
+                    }
+                }
+            }
+
+            // Add includes
+            for include in &deps.includes {
+                if let Some(dep_module) = yang_lib.find_module(&include.submodule_name) {
+                    if !visited.contains(dep_module.name()) {
+                        to_process.push_back(ModuleType::Full(dep_module.clone()));
+                    }
+                } else if let Some(dep_module) = yang_lib.find_submodule(&include.submodule_name) {
+                    if !visited.contains(dep_module.name()) {
+                        if matches!(module, ModuleType::Full(_))
+                            || matches!(module, ModuleType::FullSubmodule(_, _))
+                        {
+                            to_process.push_back(ModuleType::FullSubmodule(
+                                module.name().into(),
+                                dep_module.clone(),
+                            ));
+                        } else {
+                            to_process.push_back(ModuleType::ImportOnlySubmodule(
+                                module.name().into(),
+                                dep_module.clone(),
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // Add deviations
+            for deviation_name in module.deviations() {
+                if let Some(dev_module) = yang_lib.find_module(deviation_name) {
+                    if !visited.contains(dev_module.name()) {
+                        to_process.push_back(ModuleType::Full(dev_module.clone()));
+                    }
+                }
+            }
+
+            // Add augmentations
+            for augmentation_name in module.augmented_by() {
+                if let Some(augmented_by) = yang_lib.find_module(augmentation_name) {
+                    if !visited.contains(augmented_by.name()) {
+                        to_process.push_back(ModuleType::Full(augmented_by.clone()));
+                    }
+                }
+            }
+            match module {
+                ModuleType::Full(module) => {
+                    builder
+                        .add_module(module, schema, checker)
+                        .map_err(NetConfSshClientError::DependencyError)?;
+                }
+                ModuleType::FullSubmodule(module_name, submodule) => {
+                    builder
+                        .add_submodule_for_module(module_name.as_ref(), submodule, schema, checker)
+                        .map_err(NetConfSshClientError::DependencyError)?;
+                }
+                ModuleType::ImportOnly(module) => {
+                    builder
+                        .add_import_only_module(module, schema, checker)
+                        .map_err(NetConfSshClientError::DependencyError)?;
+                }
+                ModuleType::ImportOnlySubmodule(module_name, submodule) => {
+                    builder
+                        .add_submodule_for_import_only_module(
+                            module_name.as_ref(),
+                            submodule,
+                            schema,
+                            checker,
+                        )
+                        .map_err(NetConfSshClientError::DependencyError)?;
+                }
+            }
+        }
+
+        let (module_set, schemas) = builder.build();
+        let mut content_id = sha2::Sha256::new();
+        for module in module_set.modules().values() {
+            for feature in module.features() {
+                content_id.update(feature.as_ref());
+            }
+            for submodule in module.submodules() {
+                content_id.update(schemas.get(submodule.name()).unwrap().as_ref());
+            }
+            content_id.update(schemas.get(module.name()).unwrap().as_ref());
+        }
+        for import_only_versions in module_set.import_only_modules().values() {
+            for module in import_only_versions.values() {
+                for (_, submodule) in module.submodules() {
+                    content_id.update(schemas.get(submodule.name()).unwrap().as_ref());
+                }
+                content_id.update(schemas.get(module.name()).unwrap().as_ref());
+            }
+        }
+        let content_id = content_id.finalize();
+        let content_id = format!("{content_id:x}");
+        let yang_lib_schema =
+            Schema::new(default_name.clone(), Box::new([module_set.name().into()]));
+        let yang_lib = YangLibrary::new(
+            content_id.into(),
+            vec![module_set],
+            vec![yang_lib_schema],
+            vec![Datastore::new(
+                DatastoreName::Operational,
+                default_name.clone(),
+            )],
+        );
+        Ok((yang_lib, schemas))
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+enum ModuleType {
+    Full(Module),
+    FullSubmodule(Box<str>, Submodule),
+    ImportOnly(ImportOnlyModule),
+    ImportOnlySubmodule(Box<str>, Submodule),
+}
+impl ModuleType {
+    const fn name(&self) -> &str {
+        match self {
+            ModuleType::Full(module) => module.name(),
+            ModuleType::FullSubmodule(_, submodule) => submodule.name(),
+            ModuleType::ImportOnly(module) => module.name(),
+            ModuleType::ImportOnlySubmodule(_, submodule) => submodule.name(),
+        }
+    }
+
+    fn revision(&self) -> Option<&str> {
+        match self {
+            ModuleType::Full(module) => module.revision(),
+            ModuleType::FullSubmodule(_, submodule) => submodule.revision(),
+            ModuleType::ImportOnly(module) => module.revision(),
+            ModuleType::ImportOnlySubmodule(_, submodule) => submodule.revision(),
+        }
+    }
+
+    const fn deviations(&self) -> &[Box<str>] {
+        match self {
+            ModuleType::Full(module) => module.deviations(),
+            ModuleType::FullSubmodule(_, _) => &[],
+            ModuleType::ImportOnly(_) => &[],
+            ModuleType::ImportOnlySubmodule(_, _) => &[],
+        }
+    }
+
+    const fn augmented_by(&self) -> &[Box<str>] {
+        match self {
+            ModuleType::Full(module) => module.augmented_by(),
+            ModuleType::FullSubmodule(_, _) => &[],
+            ModuleType::ImportOnly(_) => &[],
+            ModuleType::ImportOnlySubmodule(_, _) => &[],
         }
     }
 }
