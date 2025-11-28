@@ -72,7 +72,7 @@ use tracing::{debug, error, info, warn};
 /// - Control commands for lifecycle management
 /// - Enrichment operations for cache updates
 /// - Flow requests for metadata injection
-struct EnrichmentActor {
+pub struct EnrichmentActor {
     enrichment_cache: EnrichmentCache,
     cmd_rx: mpsc::Receiver<EnrichmentActorCommand>,
     enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
@@ -84,7 +84,9 @@ struct EnrichmentActor {
 }
 
 impl EnrichmentActor {
-    fn new(
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        enrichment_cache: Option<EnrichmentCache>,
         cmd_rx: mpsc::Receiver<EnrichmentActorCommand>,
         enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
         flow_rx: async_channel::Receiver<Arc<FlowRequest>>,
@@ -99,7 +101,7 @@ impl EnrichmentActor {
         ));
 
         Self {
-            enrichment_cache: EnrichmentCache::new(),
+            enrichment_cache: enrichment_cache.unwrap_or_else(EnrichmentCache::new),
             cmd_rx,
             enrichment_rx,
             flow_rx,
@@ -150,7 +152,7 @@ impl EnrichmentActor {
     /// dataCollectionManifestName field (writer_id from config). Template sets
     /// are as well as options data records filtered out and not processed
     /// further.
-    fn enrich_ipfix_packet(
+    pub fn enrich_ipfix_packet(
         &self,
         peer_ip: IpAddr,
         pkt: ipfix::IpfixPacket,
@@ -396,6 +398,7 @@ impl FlowEnrichmentActorHandle {
             either::Either::Right(stats) => stats,
         };
         let actor = EnrichmentActor::new(
+            None,
             cmd_recv,
             enrichment_rx,
             flow_rx,
