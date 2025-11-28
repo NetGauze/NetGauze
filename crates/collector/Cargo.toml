@@ -85,6 +85,7 @@ rustc-hash = { workspace = true }
 ipnet = { workspace = true, features = ["serde"] }
 notify = { workspace = true }
 sysinfo = { workspace = true }
+criterion = { workspace = true, optional = true } # dev-dependency for benchmarks
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = [
@@ -102,3 +103,11 @@ chrono = { workspace = true, default-features = false, features = [
 tracing-subscriber = { workspace = true }
 bytes = { workspace = true }
 tempfile = { workspace = true }
+
+[features]
+bench = ["criterion"]
+
+[[bench]]
+name = "enrich_ipfix_packet"
+harness = false
+required-features = ["bench"]

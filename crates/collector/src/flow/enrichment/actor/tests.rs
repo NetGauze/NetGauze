@@ -33,6 +33,7 @@ fn test_enrich_ipfix_with_cached_metadata() {
     let stats = EnrichmentStats::new(meter);
 
     let mut actor = EnrichmentActor::new(
+        None,                        // start with empty cache
         mpsc::channel(1).1,          // dummy cmd_recv
         async_channel::bounded(1).1, // dummy enrichment_rx
         async_channel::bounded(1).1, // dummy flow_rx
@@ -112,6 +113,7 @@ fn test_enrich_filters_templates_sets_and_options_records() {
     let stats = EnrichmentStats::new(meter);
 
     let actor = EnrichmentActor::new(
+        None,                        // start with empty cache
         mpsc::channel(1).1,          // dummy cmd_recv
         async_channel::bounded(1).1, // dummy enrichment_rx
         async_channel::bounded(1).1, // dummy flow_rx
@@ -179,6 +181,7 @@ fn test_enrich_multiple_records() {
     let stats = EnrichmentStats::new(meter);
 
     let mut actor = EnrichmentActor::new(
+        None,                        // start with empty cache
         mpsc::channel(1).1,          // dummy cmd_recv
         async_channel::bounded(1).1, // dummy enrichment_rx
         async_channel::bounded(1).1, // dummy flow_rx
