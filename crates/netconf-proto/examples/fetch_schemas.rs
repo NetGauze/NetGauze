@@ -24,7 +24,7 @@ use std::{collections::HashMap, io::Write, path::Path, sync::Arc, time::Duration
 
 #[derive(clap::Parser, Debug)]
 struct Args {
-    #[arg(help = "Host address (IP:port or domain:port)")]
+    #[arg(help = "Host address (IP:port or hostname:port)")]
     host: String,
 
     #[clap(short, long)]
@@ -35,11 +35,11 @@ struct Args {
     #[clap(short, long)]
     password: Option<String>,
 
-    /// Path of private key to be used in authentication
+    /// Path of the private key to be used in authentication
     #[clap(short, long)]
     key: Option<String>,
 
-    /// Output path to dump the YANAG schemas to.
+    /// Output path to dump the YANG schemas to.
     #[clap(short, long)]
     output: Option<String>,
 
