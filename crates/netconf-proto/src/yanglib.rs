@@ -9,6 +9,7 @@ use quick_xml::{
     events::{BytesText, Event},
     name::{QName, ResolveResult},
 };
+use russh::keys::signature::digest::Digest;
 use schema_registry_client::rest::{
     models::RegisteredSchema, schema_registry_client::Client as SRClient,
 };
@@ -1667,6 +1668,45 @@ impl ModuleSetBuilder {
 
     pub fn build(self) -> (ModuleSet, HashMap<Box<str>, Box<str>>) {
         (self.module_set, self.yang_schemas)
+    }
+
+    /// Produce a YANG library that contains only one module set
+    pub fn build_yang_lib(self) -> (YangLibrary, HashMap<Box<str>, Box<str>>) {
+        let default_name: Box<str> = "ALL".into();
+        let mut content_id = sha2::Sha256::new();
+        for module in self.module_set.modules().values() {
+            for feature in module.features() {
+                content_id.update(feature.as_ref());
+            }
+            for submodule in module.submodules() {
+                content_id.update(self.yang_schemas.get(submodule.name()).unwrap().as_ref());
+            }
+            content_id.update(self.yang_schemas.get(module.name()).unwrap().as_ref());
+        }
+        for import_only_versions in self.module_set.import_only_modules().values() {
+            for module in import_only_versions.values() {
+                for (_, submodule) in module.submodules() {
+                    content_id.update(self.yang_schemas.get(submodule.name()).unwrap().as_ref());
+                }
+                content_id.update(self.yang_schemas.get(module.name()).unwrap().as_ref());
+            }
+        }
+        let content_id = content_id.finalize();
+        let content_id = format!("{content_id:x}");
+        let yang_lib_schema = Schema::new(
+            default_name.clone(),
+            Box::new([self.module_set.name().into()]),
+        );
+        let yang_lib = YangLibrary::new(
+            content_id.into(),
+            vec![self.module_set],
+            vec![yang_lib_schema],
+            vec![Datastore::new(
+                DatastoreName::Operational,
+                default_name.clone(),
+            )],
+        );
+        (yang_lib, self.yang_schemas)
     }
 }
 
