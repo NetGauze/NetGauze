@@ -4,12 +4,19 @@ use crate::{
     YANG_DATASTORES_NS_STR, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_NS,
 };
 use indexmap::IndexMap;
+use petgraph::prelude::EdgeRef;
 use quick_xml::{
     events::{BytesText, Event},
     name::{QName, ResolveResult},
 };
+use schema_registry_client::rest::{
+    models::RegisteredSchema, schema_registry_client::Client as SRClient,
+};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, io};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    io,
+};
 // ============================================================================
 // Core Structures
 // ============================================================================
@@ -106,6 +113,223 @@ impl YangLibrary {
             }
         }
         None
+    }
+
+    /// Register the YANG Lib to in the Confluent Schema Registry.
+    /// Note: references are registered recursively.
+    pub async fn register_schema<T: SRClient>(
+        &self,
+        root_schema_name: &str,
+        schemas: &HashMap<Box<str>, Box<str>>,
+        client: &T,
+    ) -> Result<RegisteredSchema, SchemaConstructionError> {
+        if self.find_module(root_schema_name).is_none() {
+            return Err(SchemaConstructionError::ModuleNotFound {
+                module_name: root_schema_name.to_string(),
+            });
+        }
+        // Convert the YANG library into a dependency graph.
+        let graph = self
+            .to_graph(schemas)
+            .map_err(SchemaConstructionError::Graph)?;
+
+        let mut root_index = None;
+        let mut nodes_with_zero_outgoing_edges = HashSet::new();
+        for node_idx in graph.node_indices() {
+            // it's safe to unwrap here since we constructed the graph above
+            if root_schema_name == *graph.node_weight(node_idx).unwrap() {
+                root_index = Some(node_idx);
+            }
+            let in_degree: usize = graph
+                .neighbors_directed(node_idx, petgraph::Direction::Outgoing)
+                .count();
+            if in_degree == 0 {
+                nodes_with_zero_outgoing_edges.insert(*graph.node_weight(node_idx).unwrap());
+            }
+        }
+        let topo_sorted = petgraph::algo::toposort(&graph, None).map_err(|x| {
+            SchemaConstructionError::CycleDetected(
+                graph.node_weight(x.node_id()).unwrap().to_string(),
+            )
+        })?;
+
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            let topo_sort = topo_sorted
+                .iter()
+                .map(|idx| graph.node_weight(*idx).unwrap().to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+            tracing::debug!(
+                "topological sort to register schemas in the the schema registry: {}",
+                topo_sort
+            );
+        }
+        // safe to unwrap since we constructed the graph above and checked the root
+        // module exists
+        let root_index = root_index.unwrap();
+        let mut supplied_references: HashMap<
+            &str,
+            schema_registry_client::rest::models::SchemaReference,
+        > = HashMap::new();
+        for node_idx in topo_sorted {
+            let name = *graph.node_weight(node_idx).unwrap();
+            tracing::debug!("Starting process to register schema {name}");
+            self.find_module(root_schema_name)
+                .ok_or(SchemaConstructionError::ModuleNotFound {
+                    module_name: name.to_string(),
+                })?;
+            // Extract features if this is a module (not a submodule)
+            let tags = if let Some(module) = self.find_module(name) {
+                Self::get_features(module.features())
+            } else {
+                None
+            };
+            let mut references = Vec::new();
+            for incoming_edge in graph.edges_directed(node_idx, petgraph::Direction::Incoming) {
+                let dep_name = *graph.node_weight(incoming_edge.source()).unwrap();
+                let dep = supplied_references.get(dep_name).unwrap().clone();
+                if tracing::enabled!(tracing::Level::DEBUG) {
+                    let retrieved = client
+                        .get_version(dep_name, dep.version.unwrap(), false, None)
+                        .await
+                        .expect("Failed to get schema");
+                    let features = retrieved
+                        .metadata
+                        .unwrap_or_default()
+                        .tags
+                        .unwrap_or_default()
+                        .get("features")
+                        .unwrap_or(&vec![])
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(",");
+                    tracing::debug!("For schema `{name}` registering reference `{dep_name}` with features [{features}]");
+                }
+
+                references.push(dep);
+            }
+
+            let schema = schema_registry_client::rest::models::Schema {
+                schema_type: Some("YANG".to_string()),
+                references: Some(references),
+                metadata: Some(Box::new(schema_registry_client::rest::models::Metadata {
+                    properties: None,
+                    tags: tags.clone(),
+                    sensitive: None,
+                })),
+                rule_set: None,
+                schema: schemas.get(name).unwrap().to_string(),
+            };
+
+            if tracing::enabled!(tracing::Level::DEBUG) {
+                let schema_ref = &schema;
+                let features = schema_ref
+                    .metadata
+                    .as_ref()
+                    .unwrap_or(&Box::new(
+                        schema_registry_client::rest::models::Metadata::default(),
+                    ))
+                    .tags
+                    .as_ref()
+                    .unwrap_or(&BTreeMap::default())
+                    .get("features")
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",");
+                tracing::debug!("Registering schema `{name}` with features [{features}]");
+            }
+            let registered_schema = Self::register_with_retry(client, name, &schema).await?;
+            tracing::info!(
+                "registered schema {name} with subject `{:?}`, version `{:?}` and ID `{:?}`",
+                registered_schema.subject,
+                registered_schema.version,
+                registered_schema.id
+            );
+            let schema_reference = schema_registry_client::rest::models::SchemaReference {
+                name: Some(name.to_string()),
+                subject: Some(registered_schema.subject.clone().unwrap_or_default()),
+                version: Some(registered_schema.version.unwrap_or_default()),
+            };
+            supplied_references.insert(name, schema_reference);
+        }
+        let tags = if let Some(module) = self.find_module(root_schema_name) {
+            Self::get_features(module.features())
+        } else {
+            None
+        };
+        let mut refs = Vec::new();
+        let mut supplied_schema = schema_registry_client::rest::models::Schema {
+            schema_type: Some("YANG".to_string()),
+            references: None,
+            metadata: Some(Box::new(schema_registry_client::rest::models::Metadata {
+                tags,
+                properties: None,
+                sensitive: None,
+            })),
+            rule_set: None,
+            schema: schemas.get(root_schema_name).unwrap().to_string(),
+        };
+        for incoming_edge in graph.edges_directed(root_index, petgraph::Direction::Incoming) {
+            let dep = *graph.node_weight(incoming_edge.source()).unwrap();
+            tracing::debug!("Adding Root {dep} Depending on {root_schema_name}");
+            refs.push(supplied_references.get(dep).unwrap().clone());
+        }
+        // This part adds the deviations to the root scheme
+        for n in nodes_with_zero_outgoing_edges {
+            tracing::debug!("Adding Root {n} Depending on {root_schema_name}");
+            refs.push(supplied_references.get(n).unwrap().clone());
+        }
+        if !refs.is_empty() {
+            supplied_schema.references = Some(refs);
+        }
+        Self::register_with_retry(client, root_schema_name, &supplied_schema).await
+    }
+
+    async fn register_with_retry<T: SRClient>(
+        client: &T,
+        name: &str,
+        schema: &schema_registry_client::rest::models::Schema,
+    ) -> Result<RegisteredSchema, SchemaConstructionError> {
+        let registered_schema_result = client.register_schema(name, schema, false).await;
+        let registered_schema = match registered_schema_result {
+            Ok(registered_schema) => registered_schema,
+            Err(e) => {
+                tracing::warn!("Failed to register schema `{name}` with error `{e}`, trying again with disabling compatibility check");
+                let server_config = schema_registry_client::rest::models::ServerConfig {
+                    compatibility: Some(
+                        schema_registry_client::rest::models::CompatibilityLevel::None,
+                    ),
+                    ..Default::default()
+                };
+                client
+                    .update_config(name, &server_config)
+                    .await
+                    .map_err(SchemaConstructionError::RegistrationError)?;
+                client
+                    .register_schema(name, schema, false)
+                    .await
+                    .map_err(SchemaConstructionError::RegistrationError)?
+            }
+        };
+        tracing::info!(
+            "registered schema {name} with subject `{:?}`, version `{:?}` and ID `{:?}`",
+            registered_schema.subject,
+            registered_schema.version,
+            registered_schema.id,
+        );
+        Ok(registered_schema)
+    }
+
+    fn get_features(features: &[Box<str>]) -> Option<BTreeMap<String, Vec<String>>> {
+        let features = features.iter().map(|x| x.to_string()).collect::<Vec<_>>();
+        if features.is_empty() {
+            None
+        } else {
+            Some(BTreeMap::from([("features".to_string(), features)]))
+        }
     }
 
     /// Create a graph representation of the YANG library
@@ -1520,6 +1744,24 @@ pub enum DependencyError {
 }
 
 impl std::error::Error for DependencyError {}
+
+#[derive(Debug, strum_macros::Display)]
+pub enum SchemaConstructionError {
+    #[strum(to_string = "Failed to convert schema to graph {0}")]
+    Graph(String),
+
+    #[strum(to_string = "Module '{module_name}' not found")]
+    ModuleNotFound {
+        module_name: String,
+    },
+
+    #[strum(to_string = "Dependency cycle detected at node {0}")]
+    CycleDetected(String),
+
+    RegistrationError(schema_registry_client::rest::apis::Error),
+}
+
+impl std::error::Error for SchemaConstructionError {}
 
 #[cfg(test)]
 mod tests {
