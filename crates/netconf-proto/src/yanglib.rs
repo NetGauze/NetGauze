@@ -1,6 +1,6 @@
 use crate::{
     xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    yangparser::extract_yang_dependencies,
+    yangparser::{extract_yang_dependencies, YangDependencies},
     YANG_DATASTORES_NS_STR, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_NS,
 };
 use indexmap::IndexMap;
@@ -121,93 +121,110 @@ impl YangLibrary {
         self.construct_nodes(&mut graph, &mut node_indices);
         for module_set in self.modules_set.values() {
             for module in module_set.modules().values() {
-                let a = *node_indices.get(module.name()).unwrap();
-                let schema = yang_schemas
-                    .get(module.name())
-                    .ok_or(format!("No schema for module {}", module.name()))?;
-                let deps = extract_yang_dependencies(schema)?;
-                for import in &deps.imports {
-                    self.check_module_exists(import.module_name.as_str())?;
-                    let b = *node_indices
-                        .get(import.module_name.as_str())
-                        .ok_or(format!("No module {} found in graph", import.module_name))?;
-                    if !graph.contains_edge(b, a) {
-                        graph.add_edge(b, a, ());
-                    }
-                }
-                for include in &deps.includes {
-                    self.find_submodule(include.submodule_name.as_str())
-                        .ok_or(format!(
-                            "No submodule {} found in YANG Library",
-                            include.submodule_name
-                        ))?;
-                    let b = *node_indices
-                        .get(include.submodule_name.as_str())
-                        .ok_or(format!(
-                            "No submodule {} found in graph",
-                            include.submodule_name
-                        ))?;
-                    if !graph.contains_edge(b, a) {
-                        graph.add_edge(b, a, ());
-                    }
-                }
-                for augmented_by in module.augmented_by() {
-                    self.check_module_exists(augmented_by.as_ref())?;
-                    let b = *node_indices
-                        .get(augmented_by.as_ref())
-                        .ok_or(format!("No module {augmented_by} found in graph"))?;
-                    if !graph.contains_edge(a, b) {
-                        graph.add_edge(a, b, ());
-                    }
-                }
-                for deviation in module.deviations() {
-                    self.check_module_exists(deviation.as_ref())?;
-                    let b = *node_indices
-                        .get(deviation.as_ref())
-                        .ok_or(format!("No module {deviation} found in graph"))?;
-                    if !graph.contains_edge(a, b) {
-                        graph.add_edge(a, b, ());
-                    }
-                }
+                self.add_module_to_graph(module, &mut graph, &mut node_indices, yang_schemas)?;
             }
             for import_modules in module_set.import_only_modules.values() {
                 for import_only_module in import_modules.values() {
-                    let a = *node_indices.get(import_only_module.name()).unwrap();
-                    let schema = yang_schemas.get(import_only_module.name()).ok_or(format!(
-                        "No schema for import only module {}",
-                        import_only_module.name()
-                    ))?;
-                    let deps = extract_yang_dependencies(schema)?;
-                    for import in &deps.imports {
-                        self.check_module_exists(import.module_name.as_str())?;
-                        let b = *node_indices
-                            .get(import.module_name.as_str())
-                            .ok_or(format!("No module {} found in graph", import.module_name))?;
-                        if !graph.contains_edge(b, a) {
-                            graph.add_edge(b, a, ());
-                        }
-                    }
-                    for include in &deps.includes {
-                        self.find_submodule(include.submodule_name.as_str())
-                            .ok_or(format!(
-                                "No submodule {} found in YANG Library",
-                                include.submodule_name
-                            ))?;
-                        let b =
-                            *node_indices
-                                .get(include.submodule_name.as_str())
-                                .ok_or(format!(
-                                    "No submodule {} found in graph",
-                                    include.submodule_name
-                                ))?;
-                        if !graph.contains_edge(b, a) {
-                            graph.add_edge(b, a, ());
-                        }
-                    }
+                    self.add_import_only_module_to_graph(
+                        import_only_module,
+                        &mut graph,
+                        &mut node_indices,
+                        yang_schemas,
+                    )?;
                 }
             }
         }
         Ok(graph)
+    }
+
+    fn add_import_only_module_to_graph(
+        &self,
+        import_only_module: &ImportOnlyModule,
+        graph: &mut petgraph::Graph<&str, ()>,
+        node_indices: &mut HashMap<&str, petgraph::prelude::NodeIndex>,
+        yang_schemas: &HashMap<Box<str>, Box<str>>,
+    ) -> Result<(), String> {
+        let a = *node_indices.get(import_only_module.name()).unwrap();
+        let schema = yang_schemas.get(import_only_module.name()).ok_or(format!(
+            "No schema for import only module {}",
+            import_only_module.name()
+        ))?;
+        let deps = extract_yang_dependencies(schema)?;
+        self.add_deps_to_graph(&deps, graph, a, node_indices, yang_schemas)?;
+        Ok(())
+    }
+
+    fn add_deps_to_graph(
+        &self,
+        deps: &YangDependencies,
+        graph: &mut petgraph::Graph<&str, ()>,
+        current_node_idx: petgraph::prelude::NodeIndex,
+        node_indices: &mut HashMap<&str, petgraph::prelude::NodeIndex>,
+        schemas: &HashMap<Box<str>, Box<str>>,
+    ) -> Result<(), String> {
+        for import in &deps.imports {
+            self.check_module_exists(import.module_name.as_str())?;
+            let b = *node_indices
+                .get(import.module_name.as_str())
+                .ok_or(format!("No module {} found in graph", import.module_name))?;
+            if !graph.contains_edge(b, current_node_idx) {
+                graph.add_edge(b, current_node_idx, ());
+            }
+        }
+        for include in &deps.includes {
+            self.find_submodule(include.submodule_name.as_str())
+                .ok_or(format!(
+                    "No submodule {} found in YANG Library",
+                    include.submodule_name
+                ))?;
+            let b = *node_indices
+                .get(include.submodule_name.as_str())
+                .ok_or(format!(
+                    "No submodule {} found in graph",
+                    include.submodule_name
+                ))?;
+            if !graph.contains_edge(b, current_node_idx) {
+                graph.add_edge(b, current_node_idx, ());
+            }
+            let include_deps =
+                extract_yang_dependencies(schemas.get(include.submodule_name.as_str()).unwrap())?;
+            self.add_deps_to_graph(&include_deps, graph, b, node_indices, schemas)?;
+        }
+        Ok(())
+    }
+
+    fn add_module_to_graph(
+        &self,
+        module: &Module,
+        graph: &mut petgraph::Graph<&str, ()>,
+        node_indices: &mut HashMap<&str, petgraph::prelude::NodeIndex>,
+        yang_schemas: &HashMap<Box<str>, Box<str>>,
+    ) -> Result<(), String> {
+        let a = *node_indices.get(module.name()).unwrap();
+        let schema = yang_schemas
+            .get(module.name())
+            .ok_or(format!("No schema for module {}", module.name()))?;
+        let deps = extract_yang_dependencies(schema)?;
+        self.add_deps_to_graph(&deps, graph, a, node_indices, yang_schemas)?;
+        for augmented_by in module.augmented_by() {
+            self.check_module_exists(augmented_by.as_ref())?;
+            let b = *node_indices
+                .get(augmented_by.as_ref())
+                .ok_or(format!("No module {augmented_by} found in graph"))?;
+            if !graph.contains_edge(a, b) {
+                graph.add_edge(a, b, ());
+            }
+        }
+        for deviation in module.deviations() {
+            self.check_module_exists(deviation.as_ref())?;
+            let b = *node_indices
+                .get(deviation.as_ref())
+                .ok_or(format!("No module {deviation} found in graph"))?;
+            if !graph.contains_edge(a, b) {
+                graph.add_edge(a, b, ());
+            }
+        }
+        Ok(())
     }
 
     /// Helper method to check if a module exists in the YANG Library.s
