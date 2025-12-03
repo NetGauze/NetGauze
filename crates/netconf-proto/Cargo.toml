@@ -29,6 +29,7 @@ secrecy = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
 petgraph = { workspace = true }
 sha2 = { workspace = true }
+schema-registry-client = { workspace = true }
 
 [dev-dependencies]
 clap = { workspace = true, features = ["derive"] }
