@@ -21,14 +21,13 @@ use crate::{
         WellKnownOperation, WellKnownRpcResponse, YangSchemaFormat,
     },
     yanglib::{
-        BackwardCompatibilityChecker, Datastore, DatastoreName, DependencyError, ImportOnlyModule,
-        Module, ModuleSetBuilder, Schema, Submodule, YangLibrary,
+        BackwardCompatibilityChecker, DependencyError, ImportOnlyModule, Module, ModuleSetBuilder,
+        Submodule, YangLibrary,
     },
     yangparser::extract_yang_dependencies,
 };
 use futures_util::{stream::StreamExt, SinkExt};
 use secrecy::ExposeSecret;
-use sha2::Digest;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     io,
@@ -609,38 +608,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             }
         }
 
-        let (module_set, schemas) = builder.build();
-        let mut content_id = sha2::Sha256::new();
-        for module in module_set.modules().values() {
-            for feature in module.features() {
-                content_id.update(feature.as_ref());
-            }
-            for submodule in module.submodules() {
-                content_id.update(schemas.get(submodule.name()).unwrap().as_ref());
-            }
-            content_id.update(schemas.get(module.name()).unwrap().as_ref());
-        }
-        for import_only_versions in module_set.import_only_modules().values() {
-            for module in import_only_versions.values() {
-                for (_, submodule) in module.submodules() {
-                    content_id.update(schemas.get(submodule.name()).unwrap().as_ref());
-                }
-                content_id.update(schemas.get(module.name()).unwrap().as_ref());
-            }
-        }
-        let content_id = content_id.finalize();
-        let content_id = format!("{content_id:x}");
-        let yang_lib_schema =
-            Schema::new(default_name.clone(), Box::new([module_set.name().into()]));
-        let yang_lib = YangLibrary::new(
-            content_id.into(),
-            vec![module_set],
-            vec![yang_lib_schema],
-            vec![Datastore::new(
-                DatastoreName::Operational,
-                default_name.clone(),
-            )],
-        );
+        let (yang_lib, schemas) = builder.build_yang_lib();
         Ok((yang_lib, schemas))
     }
 }
