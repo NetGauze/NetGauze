@@ -637,6 +637,56 @@ impl ModuleSet {
     ) -> &IndexMap<Box<str>, IndexMap<Option<Box<str>>, ImportOnlyModule>> {
         &self.import_only_modules
     }
+
+    pub fn into_module_set_builder(
+        self,
+        yang_schemas: HashMap<Box<str>, Box<str>>,
+    ) -> Result<ModuleSetBuilder, String> {
+        let mut submodules = HashMap::new();
+        for module in self.modules.values() {
+            if !yang_schemas.contains_key(module.name()) {
+                return Err(format!("No schema for module {}", module.name()));
+            }
+            for submodule in module.submodules() {
+                if !yang_schemas.contains_key(submodule.name()) {
+                    return Err(format!("No schema for submodule {}", submodule.name()));
+                }
+                submodules.insert(submodule.name.clone(), submodule.clone());
+            }
+        }
+        for import_only_modules in self.import_only_modules.values() {
+            if import_only_modules.len() != 1 {
+                return Err(format!(
+                    "Import only module {} has multiple revisions",
+                    import_only_modules
+                        .values()
+                        .next()
+                        .map(|x| x.name())
+                        .unwrap_or("ZEROMODULES")
+                ));
+            }
+            for import_only_module in import_only_modules.values() {
+                if !yang_schemas.contains_key(import_only_module.name()) {
+                    return Err(format!(
+                        "No schema for import only module {}",
+                        import_only_module.name()
+                    ));
+                }
+                for (_, submodule) in import_only_module.submodules() {
+                    if !yang_schemas.contains_key(submodule.name()) {
+                        return Err(format!("No schema for submodule {}", submodule.name()));
+                    }
+                    submodules.insert(submodule.name.clone(), submodule.clone());
+                }
+            }
+        }
+        let builder = ModuleSetBuilder {
+            module_set: self,
+            yang_schemas,
+            submodules,
+        };
+        Ok(builder)
+    }
 }
 
 impl XmlDeserialize<ModuleSet> for ModuleSet {
