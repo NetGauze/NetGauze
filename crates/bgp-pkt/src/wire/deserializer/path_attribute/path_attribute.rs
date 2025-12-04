@@ -714,13 +714,11 @@ impl<'a>
         let (mp_buf, safi) =
             nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(mp_buf)?;
         match AddressType::from_afi_safi(afi, safi) {
-            Ok(AddressType::Ipv4Unicast) => {
+            Ok(addr_type @ AddressType::Ipv4Unicast) => {
                 let (mp_buf, (next_hop, next_hop_local)) =
-                    parse_ip4_or_ipv6_next_hop(mp_buf, AddressType::Ipv4Unicast)?;
+                    parse_ip4_or_ipv6_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv4Unicast)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((
                     buf,
@@ -731,13 +729,11 @@ impl<'a>
                     },
                 ))
             }
-            Ok(AddressType::Ipv4Multicast) => {
+            Ok(addr_type @ AddressType::Ipv4Multicast) => {
                 let (mp_buf, (next_hop, next_hop_local)) =
-                    parse_ip4_or_ipv6_next_hop(mp_buf, AddressType::Ipv4Unicast)?;
+                    parse_ip4_or_ipv6_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv4Multicast)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((
                     buf,
@@ -748,20 +744,16 @@ impl<'a>
                     },
                 ))
             }
-            Ok(AddressType::Ipv4NlriMplsLabels) => {
+            Ok(addr_type @ AddressType::Ipv4NlriMplsLabels) => {
                 let (mp_buf, (next_hop, next_hop_local)) =
-                    parse_ip4_or_ipv6_next_hop(mp_buf, AddressType::Ipv4NlriMplsLabels)?;
+                    parse_ip4_or_ipv6_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv4NlriMplsLabels)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
                     mp_buf,
                     add_path,
                     false,
-                    *multiple_labels
-                        .get(&AddressType::Ipv4NlriMplsLabels)
-                        .unwrap_or(&1),
+                    *multiple_labels.get(&addr_type).unwrap_or(&1),
                 )?;
                 Ok((
                     buf,
@@ -772,24 +764,19 @@ impl<'a>
                     },
                 ))
             }
-            Ok(AddressType::Ipv4MplsLabeledVpn) => {
-                let (mp_buf, next_hop) =
-                    parse_labeled_next_hop(mp_buf, AddressType::Ipv4MplsLabeledVpn)?;
+            Ok(addr_type @ AddressType::Ipv4MplsLabeledVpn) => {
+                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv4MplsLabeledVpn)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
                     mp_buf,
                     add_path,
                     false,
-                    *multiple_labels
-                        .get(&AddressType::Ipv4MplsLabeledVpn)
-                        .unwrap_or(&1),
+                    *multiple_labels.get(&addr_type).unwrap_or(&1),
                 )?;
                 Ok((buf, MpReach::Ipv4MplsVpnUnicast { next_hop, nlri }))
             }
-            Ok(AddressType::Ipv6Unicast) => {
+            Ok(addr_type @ AddressType::Ipv6Unicast) => {
                 let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
                 let (mp_buf, global) = be_u128(mp_buf)?;
                 let next_hop_global = Ipv6Addr::from(global);
@@ -800,9 +787,7 @@ impl<'a>
                     (mp_buf, None)
                 };
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv6Unicast)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((
                     buf,
@@ -813,7 +798,7 @@ impl<'a>
                     },
                 ))
             }
-            Ok(AddressType::Ipv6Multicast) => {
+            Ok(addr_type @ AddressType::Ipv6Multicast) => {
                 let (mp_buf, next_hop_len) = be_u8(mp_buf)?;
                 let (mp_buf, global) = be_u128(mp_buf)?;
                 let next_hop_global = Ipv6Addr::from(global);
@@ -824,9 +809,7 @@ impl<'a>
                     (mp_buf, None)
                 };
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv6Multicast)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((
                     buf,
@@ -837,20 +820,16 @@ impl<'a>
                     },
                 ))
             }
-            Ok(AddressType::Ipv6NlriMplsLabels) => {
+            Ok(addr_type @ AddressType::Ipv6NlriMplsLabels) => {
                 let (mp_buf, (next_hop, next_hop_local)) =
-                    parse_ip4_or_ipv6_next_hop(mp_buf, AddressType::Ipv4NlriMplsLabels)?;
+                    parse_ip4_or_ipv6_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv6NlriMplsLabels)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
                     mp_buf,
                     add_path,
                     false,
-                    *multiple_labels
-                        .get(&AddressType::Ipv6NlriMplsLabels)
-                        .unwrap_or(&1),
+                    *multiple_labels.get(&addr_type).unwrap_or(&1),
                 )?;
                 Ok((
                     buf,
@@ -861,53 +840,43 @@ impl<'a>
                     },
                 ))
             }
-            Ok(AddressType::Ipv6MplsLabeledVpn) => {
-                let (mp_buf, next_hop) =
-                    parse_labeled_next_hop(mp_buf, AddressType::Ipv6MplsLabeledVpn)?;
+            Ok(addr_type @ AddressType::Ipv6MplsLabeledVpn) => {
+                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv6MplsLabeledVpn)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
                     mp_buf,
                     add_path,
                     false,
-                    *multiple_labels
-                        .get(&AddressType::Ipv6MplsLabeledVpn)
-                        .unwrap_or(&1),
+                    *multiple_labels.get(&addr_type).unwrap_or(&1),
                 )?;
                 Ok((buf, MpReach::Ipv6MplsVpnUnicast { next_hop, nlri }))
             }
-            Ok(AddressType::L2VpnBgpEvpn) => {
-                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, AddressType::L2VpnBgpEvpn)?;
+            Ok(addr_type @ AddressType::L2VpnBgpEvpn) => {
+                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::L2VpnBgpEvpn)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::L2Evpn { next_hop, nlri }))
             }
-            Ok(AddressType::RouteTargetConstrains) => {
-                let (mp_buf, next_hop) =
-                    parse_ip_next_hop(mp_buf, AddressType::RouteTargetConstrains)?;
+            Ok(addr_type @ AddressType::RouteTargetConstrains) => {
+                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map
-                    .get(&AddressType::L2VpnBgpEvpn)
-                    .is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::RouteTargetMembership { next_hop, nlri }))
             }
-            Ok(AddressType::BgpLs) => {
-                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, AddressType::BgpLs)?;
+            Ok(addr_type @ AddressType::BgpLs) => {
+                let (mp_buf, next_hop) = parse_ip_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map.get(&AddressType::BgpLs).is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::BgpLs { next_hop, nlri }))
             }
-            Ok(AddressType::BgpLsVpn) => {
-                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, AddressType::BgpLsVpn)?;
+            Ok(addr_type @ AddressType::BgpLsVpn) => {
+                let (mp_buf, next_hop) = parse_labeled_next_hop(mp_buf, addr_type)?;
                 let (mp_buf, _) = be_u8(mp_buf)?;
-                let add_path = add_path_map.get(&AddressType::BgpLsVpn).is_some_and(|x| *x);
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpReach::BgpLsVpn { next_hop, nlri }))
             }
@@ -1090,111 +1059,83 @@ impl<'a>
         let (mp_buf, safi) =
             nom::combinator::map_res(be_u8, SubsequentAddressFamily::try_from)(mp_buf)?;
         match AddressType::from_afi_safi(afi, safi) {
-            Ok(AddressType::Ipv4Unicast) => {
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv4Unicast)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::Ipv4Unicast) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::Ipv4Unicast { nlri }))
             }
-            Ok(AddressType::Ipv4Multicast) => {
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv4Multicast)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::Ipv4Multicast) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::Ipv4Multicast { nlri }))
             }
-            Ok(AddressType::Ipv4NlriMplsLabels) => {
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv4NlriMplsLabels)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::Ipv4NlriMplsLabels) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
                     mp_buf,
                     add_path,
                     true,
-                    *multiple_labels
-                        .get(&AddressType::Ipv4NlriMplsLabels)
-                        .unwrap_or(&1),
+                    *multiple_labels.get(&addr_type).unwrap_or(&1),
                 )?;
                 Ok((buf, MpUnreach::Ipv4NlriMplsLabels { nlri }))
             }
-            Ok(AddressType::Ipv4MplsLabeledVpn) => {
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv4Multicast)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::Ipv4MplsLabeledVpn) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
                     mp_buf,
                     add_path,
                     true,
-                    *multiple_labels
-                        .get(&AddressType::Ipv4MplsLabeledVpn)
-                        .unwrap_or(&1),
+                    *multiple_labels.get(&addr_type).unwrap_or(&1),
                 )?;
                 Ok((buf, MpUnreach::Ipv4MplsVpnUnicast { nlri }))
             }
-            Ok(AddressType::Ipv6Unicast) => {
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv6Unicast)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::Ipv6Unicast) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::Ipv6Unicast { nlri }))
             }
-            Ok(AddressType::Ipv6Multicast) => {
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv6Multicast)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::Ipv6Multicast) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::Ipv6Multicast { nlri }))
             }
-            Ok(AddressType::Ipv6NlriMplsLabels) => {
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv6NlriMplsLabels)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::Ipv6NlriMplsLabels) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
                     mp_buf,
                     add_path,
                     true,
-                    *multiple_labels
-                        .get(&AddressType::Ipv6NlriMplsLabels)
-                        .unwrap_or(&1),
+                    *multiple_labels.get(&addr_type).unwrap_or(&1),
                 )?;
                 Ok((buf, MpUnreach::Ipv6NlriMplsLabels { nlri }))
             }
-            Ok(AddressType::Ipv6MplsLabeledVpn) => {
-                let add_path = add_path_map
-                    .get(&AddressType::Ipv6MplsLabeledVpn)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::Ipv6MplsLabeledVpn) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_three_inputs_located(
                     mp_buf,
                     add_path,
                     true,
-                    *multiple_labels
-                        .get(&AddressType::Ipv6MplsLabeledVpn)
-                        .unwrap_or(&1),
+                    *multiple_labels.get(&addr_type).unwrap_or(&1),
                 )?;
                 Ok((buf, MpUnreach::Ipv6MplsVpnUnicast { nlri }))
             }
-            Ok(AddressType::L2VpnBgpEvpn) => {
-                let add_path = add_path_map
-                    .get(&AddressType::L2VpnBgpEvpn)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::L2VpnBgpEvpn) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::L2Evpn { nlri }))
             }
-            Ok(AddressType::RouteTargetConstrains) => {
-                let add_path = add_path_map
-                    .get(&AddressType::RouteTargetConstrains)
-                    .is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::RouteTargetConstrains) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::L2Evpn { nlri }))
             }
-            Ok(AddressType::BgpLs) => {
-                let add_path = add_path_map.get(&AddressType::BgpLs).is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::BgpLs) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::BgpLs { nlri }))
             }
-            Ok(AddressType::BgpLsVpn) => {
-                let add_path = add_path_map.get(&AddressType::BgpLsVpn).is_some_and(|x| *x);
+            Ok(addr_type @ AddressType::BgpLsVpn) => {
+                let add_path = add_path_map.get(&addr_type).is_some_and(|x| *x);
                 let (_, nlri) = parse_till_empty_into_with_one_input_located(mp_buf, add_path)?;
                 Ok((buf, MpUnreach::BgpLsVpn { nlri }))
             }
