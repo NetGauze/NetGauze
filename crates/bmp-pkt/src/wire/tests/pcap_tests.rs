@@ -26,7 +26,7 @@ use std::{
 };
 use tokio_util::codec::Decoder;
 
-static BMP_PORTS: &[u16] = &[1790, 1791, 10240];
+static BMP_PORTS: &[u16] = &[1790, 1791, 10000, 10240];
 
 #[rstest]
 fn test_pmacct_bmp(#[files("../../assets/pcaps/pmacct-tests/*/*.pcap")] path: PathBuf) {
