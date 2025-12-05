@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     io,
+    path::Path,
 };
 // ============================================================================
 // Core Structures
@@ -509,6 +510,146 @@ impl YangLibrary {
                 }
             }
         }
+    }
+
+    /// Load schemas according the to location given in the YANG Library
+    /// for each module and submodule.
+    ///
+    /// Currently only file:// locations are supported, other locations are ignored.
+    /// If no valid location is found for a module/submodule, an error is
+    /// returned.
+    pub fn load_schemas(&self) -> Result<HashMap<Box<str>, Box<str>>, SchemaLoadingError> {
+        let mut schemas = HashMap::new();
+        for module_set in self.modules_set.values() {
+            for module in module_set.modules().values() {
+                let schema =
+                    Self::load_yang_schema_from_location(module.name(), module.locations())?;
+                schemas.insert(module.name.clone(), schema);
+                for submodule in module.submodules() {
+                    let schema = Self::load_yang_schema_from_location(
+                        submodule.name(),
+                        submodule.locations(),
+                    )?;
+                    schemas.insert(submodule.name.clone(), schema);
+                }
+            }
+            for import_modules in module_set.import_only_modules.values() {
+                for import_only_module in import_modules.values() {
+                    let schema = Self::load_yang_schema_from_location(
+                        import_only_module.name(),
+                        import_only_module.locations(),
+                    )?;
+                    schemas.insert(import_only_module.name.clone(), schema);
+                    for submodule in import_only_module.submodules().values() {
+                        let schema = Self::load_yang_schema_from_location(
+                            submodule.name(),
+                            submodule.locations(),
+                        )?;
+                        schemas.insert(submodule.name.clone(), schema);
+                    }
+                }
+            }
+        }
+        Ok(schemas)
+    }
+
+    /// Load schemas from a given search path using as first choice
+    /// module name and revision to locate the YANG schema files.
+    /// If no exact revision match is found, it tries to load the schema
+    /// without revision assuming the default version is the correct one.
+    pub fn load_schemas_from_search_path(
+        &self,
+        search_path: &Path,
+    ) -> Result<HashMap<Box<str>, Box<str>>, SchemaLoadingError> {
+        let mut schemas = HashMap::new();
+        for module_set in self.modules_set.values() {
+            for module in module_set.modules().values() {
+                let schema = Self::load_yang_schema_from_search_path(
+                    module.name(),
+                    module.revision(),
+                    search_path,
+                )?;
+                schemas.insert(module.name.clone(), schema);
+                for submodule in module.submodules() {
+                    let schema = Self::load_yang_schema_from_search_path(
+                        submodule.name(),
+                        submodule.revision(),
+                        search_path,
+                    )?;
+                    schemas.insert(submodule.name.clone(), schema);
+                }
+            }
+            for import_modules in module_set.import_only_modules.values() {
+                for import_only_module in import_modules.values() {
+                    let schema = Self::load_yang_schema_from_search_path(
+                        import_only_module.name(),
+                        import_only_module.revision(),
+                        search_path,
+                    )?;
+                    schemas.insert(import_only_module.name.clone(), schema);
+                    for submodule in import_only_module.submodules().values() {
+                        let schema = Self::load_yang_schema_from_search_path(
+                            submodule.name(),
+                            submodule.revision(),
+                            search_path,
+                        )?;
+                        schemas.insert(submodule.name.clone(), schema);
+                    }
+                }
+            }
+        }
+        Ok(schemas)
+    }
+
+    /// Helper function to load a single YANG schema from the given locations.
+    fn load_yang_schema_from_location(
+        module_name: &str,
+        locations: &[Box<str>],
+    ) -> Result<Box<str>, SchemaLoadingError> {
+        for location in locations {
+            if let Some(location) = location.strip_prefix("file://") {
+                let schema_path = Path::new(location);
+                return Ok(std::fs::read_to_string(schema_path)?.into_boxed_str());
+            }
+        }
+        // TODO: support other location types (http, https, etc)
+        Err(SchemaLoadingError::NoValidLocationFound {
+            module_name: module_name.to_string(),
+        })
+    }
+
+    /// Helper function to load a single YANG schema from the given search path.
+    fn load_yang_schema_from_search_path(
+        module_name: &str,
+        revision: Option<&str>,
+        search_path: &Path,
+    ) -> Result<Box<str>, SchemaLoadingError> {
+        // First try to find the exact revision of the schema
+        if let Some(revision) = revision {
+            let schema_path = Path::new(search_path).join(format!("{module_name}@{revision}.yang"));
+            tracing::debug!("loading yang schema {module_name} from {schema_path:?}");
+            if schema_path.exists() {
+                let schema = std::fs::read_to_string(schema_path)?.into_boxed_str();
+                return Ok(schema);
+            }
+            tracing::debug!(
+                "file doesn't exist to load yang schema {module_name} from {schema_path:?}"
+            );
+        }
+        // If not found, try to find the schema without revision
+        let schema_path = Path::new(search_path).join(format!("{module_name}.yang"));
+        tracing::debug!("loading yang schema {module_name} from {schema_path:?}");
+        if schema_path.exists() {
+            let schema = std::fs::read_to_string(schema_path)?.into_boxed_str();
+            return Ok(schema);
+        }
+        tracing::debug!(
+            "file doesn't exist to load yang schema {module_name} from {schema_path:?}"
+        );
+        Err(SchemaLoadingError::SchemaNotFoundInSearchPath {
+            module_name: module_name.to_string(),
+            search_path: search_path.to_string_lossy().to_string().to_string(),
+        })
     }
 }
 
@@ -1852,6 +1993,32 @@ pub enum SchemaConstructionError {
 }
 
 impl std::error::Error for SchemaConstructionError {}
+
+#[derive(Debug, strum_macros::Display)]
+pub enum SchemaLoadingError {
+    #[strum(to_string = "no valid location found to the schema of the module `{module_name}`")]
+    NoValidLocationFound {
+        module_name: String,
+    },
+
+    #[strum(
+        to_string = "failed find the schema of the module `{module_name}` from search path {search_path}"
+    )]
+    SchemaNotFoundInSearchPath {
+        module_name: String,
+        search_path: String,
+    },
+
+    IoError(io::Error),
+}
+
+impl std::error::Error for SchemaLoadingError {}
+
+impl From<io::Error> for SchemaLoadingError {
+    fn from(e: io::Error) -> Self {
+        Self::IoError(e)
+    }
+}
 
 #[cfg(test)]
 mod tests {
