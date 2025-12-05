@@ -91,6 +91,14 @@ impl<'a> YangParser<'a> {
                 imports.push(self.parse_import()?);
             } else if self.match_keyword("include") {
                 includes.push(self.parse_include()?);
+            } else if self.match_keyword("organization")
+                || self.match_keyword("contact")
+                || self.match_keyword("description")
+                || self.match_keyword("reference")
+            {
+                // once we reach the meta-stmt we can stop parsing for imports/includes
+                // since they are not allowed in meta-stmts or any statement after them.
+                break;
             } else {
                 // Skip one token at a time instead of entire statements
                 self.skip_one_token();
