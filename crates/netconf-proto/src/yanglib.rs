@@ -1685,14 +1685,22 @@ impl ModuleSetBuilder {
     }
 
     /// Adds a module to the builder and checks for backward compatibility.
+    ///
+    /// If the module with the same name already exists, it checks if the new
+    /// module is backward compatible with the existing one using the
+    /// provided checker. If compatible, it updates the module to the new
+    /// version and merges the features. If not compatible, it returns a
+    /// `DependencyError::VersionConflict`.
+    ///
+    /// If the module does not exist, it simply adds the new module.
     pub fn add_module<C: BackwardCompatibilityChecker>(
         &mut self,
-        module: Module,
+        mut module: Module,
         schema: Box<str>,
         checker: &C,
     ) -> Result<AddResult, DependencyError> {
         let name = module.name.clone();
-        let existing_module = if let Some(existing_module) = self.module_set.modules().get(&name) {
+        let existing_module = if let Some(existing_module) = self.module_set.modules.get(&name) {
             existing_module
         } else {
             // New module - just add it
@@ -1709,26 +1717,49 @@ impl ModuleSetBuilder {
                 .get(existing_module.name())
                 .unwrap_or(&schema),
             &schema,
+            existing_module.features(),
+            module.features(),
         );
         match compatability_result {
             CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
-            CompatabilityResult::Compatible => {
-                // Backward compatible - update to the new version
-                let existing_version = existing_module.revision().map(|s| s.to_string());
-                let new_version = module.revision().map(|s| s.to_string());
+            CompatabilityResult::Compatible | CompatabilityResult::SameCompatibleFeatures => {
+                let existing_features = existing_module.features().to_vec();
+                let new_features = module.features().to_vec();
+                let merged_features: HashSet<_> = existing_features
+                    .iter()
+                    .chain(new_features.iter())
+                    .cloned()
+                    .collect();
+                let merged_features: Vec<_> = merged_features.into_iter().collect();
+                module.feature = merged_features.clone().into_boxed_slice();
+                let result = AddResult::Updated {
+                    old_version: existing_module.revision().map(|s| s.to_string()),
+                    new_version: module.revision().map(|s| s.to_string()),
+                    old_features: existing_features,
+                    new_features,
+                };
                 self.yang_schemas.insert(name.clone(), schema);
                 self.module_set.modules.insert(name, module);
-                Ok(AddResult::Updated {
-                    old_version: existing_version,
-                    new_version,
-                })
+                Ok(result)
             }
-            CompatabilityResult::Incompatible => {
+            CompatabilityResult::Incompatible | CompatabilityResult::SameIncompatibleFeatures => {
                 // Not backward compatible - conflict
                 Err(DependencyError::VersionConflict {
                     module_name: name.to_string(),
                     existing_version: existing_module.revision().map(|s| s.to_string()),
                     new_version: module.revision().map(|s| s.to_string()),
+                    existing_features: existing_module
+                        .features()
+                        .iter()
+                        .map(|f| f.to_string())
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    new_features: module
+                        .features()
+                        .iter()
+                        .map(|f| f.to_string())
+                        .collect::<Vec<_>>()
+                        .join(","),
                 })
             }
         }
@@ -1783,10 +1814,12 @@ impl ModuleSetBuilder {
             submodule.revision(),
             self.yang_schemas.get(&submodule_name).unwrap_or(&schema),
             &schema,
+            &[],
+            &[],
         );
         match compatability_result {
             CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
-            CompatabilityResult::Compatible => {
+            CompatabilityResult::Compatible | CompatabilityResult::SameCompatibleFeatures => {
                 // Backward compatible - update to the new version
                 let old_version = existing_submodule.revision().map(|s| s.to_string());
                 let new_version = submodule.revision().map(|s| s.to_string());
@@ -1795,13 +1828,19 @@ impl ModuleSetBuilder {
                 Ok(AddResult::Updated {
                     old_version,
                     new_version,
+                    old_features: vec![],
+                    new_features: vec![],
                 })
             }
-            CompatabilityResult::Incompatible => Err(DependencyError::VersionConflict {
-                module_name: submodule_name.to_string(),
-                existing_version: existing_submodule.revision().map(|s| s.to_string()),
-                new_version: submodule.revision().map(|s| s.to_string()),
-            }),
+            CompatabilityResult::Incompatible | CompatabilityResult::SameIncompatibleFeatures => {
+                Err(DependencyError::VersionConflict {
+                    module_name: submodule_name.to_string(),
+                    existing_version: existing_submodule.revision().map(|s| s.to_string()),
+                    new_version: submodule.revision().map(|s| s.to_string()),
+                    existing_features: "".to_string(),
+                    new_features: "".to_string(),
+                })
+            }
         }
     }
 
@@ -1850,10 +1889,12 @@ impl ModuleSetBuilder {
             import_only_module.revision(),
             self.yang_schemas.get(&name).unwrap_or(&schema),
             &schema,
+            &[],
+            &[],
         );
         match compatability_result {
             CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
-            CompatabilityResult::Compatible => {
+            CompatabilityResult::Compatible | CompatabilityResult::SameCompatibleFeatures => {
                 // Backward compatible - update to the new version
                 let old_version = existing.revision().map(|s| s.to_string());
                 let new_version = import_only_module.revision().map(|s| s.to_string());
@@ -1868,14 +1909,18 @@ impl ModuleSetBuilder {
                 Ok(AddResult::Updated {
                     old_version,
                     new_version,
+                    old_features: vec![],
+                    new_features: vec![],
                 })
             }
-            CompatabilityResult::Incompatible => {
+            CompatabilityResult::Incompatible | CompatabilityResult::SameIncompatibleFeatures => {
                 // Not backward compatible - conflict
                 Err(DependencyError::VersionConflict {
                     module_name: name.to_string(),
                     existing_version: existing.revision().map(|s| s.to_string()),
                     new_version: import_only_module.revision().map(|s| s.to_string()),
+                    existing_features: "".to_string(),
+                    new_features: "".to_string(),
                 })
             }
         }
@@ -1919,10 +1964,12 @@ impl ModuleSetBuilder {
             submodule.revision(),
             self.yang_schemas.get(&submodule_name).unwrap_or(&schema),
             &schema,
+            &[],
+            &[],
         );
         match compatability_result {
             CompatabilityResult::Same => Ok(AddResult::AlreadyExists),
-            CompatabilityResult::Compatible => {
+            CompatabilityResult::Compatible | CompatabilityResult::SameCompatibleFeatures => {
                 // Backward compatible - update to the new version
                 let old_version = existing.revision().map(|s| s.to_string());
                 let new_version = submodule.revision().map(|s| s.to_string());
@@ -1931,13 +1978,19 @@ impl ModuleSetBuilder {
                 Ok(AddResult::Updated {
                     old_version,
                     new_version,
+                    old_features: vec![],
+                    new_features: vec![],
                 })
             }
-            CompatabilityResult::Incompatible => Err(DependencyError::VersionConflict {
-                module_name: submodule_name.to_string(),
-                existing_version: existing.revision().map(|s| s.to_string()),
-                new_version: submodule.revision().map(|s| s.to_string()),
-            }),
+            CompatabilityResult::Incompatible | CompatabilityResult::SameIncompatibleFeatures => {
+                Err(DependencyError::VersionConflict {
+                    module_name: submodule_name.to_string(),
+                    existing_version: existing.revision().map(|s| s.to_string()),
+                    new_version: submodule.revision().map(|s| s.to_string()),
+                    existing_features: "".to_string(),
+                    new_features: "".to_string(),
+                })
+            }
         }
     }
 
@@ -1986,8 +2039,19 @@ impl ModuleSetBuilder {
 }
 
 pub enum CompatabilityResult {
+    /// Everything is exactly the (features, schema, etc..)
     Same,
+
+    /// The modules is the same, but the features are different.
+    SameCompatibleFeatures,
+
+    /// The modules is the same, but the features are different.
+    SameIncompatibleFeatures,
+
+    /// The modules are backward compatible.
     Compatible,
+
+    /// The modules are not backward compatible.
     Incompatible,
 }
 
@@ -1996,6 +2060,7 @@ pub enum CompatabilityResult {
 pub trait BackwardCompatibilityChecker {
     /// Check if new_version is backward compatible with old_version
     /// Returns [CompatabilityResult] indicating the result of the check
+    #[allow(clippy::too_many_arguments)]
     fn check_backward_compatible(
         &self,
         module_name: &str,
@@ -2003,6 +2068,8 @@ pub trait BackwardCompatibilityChecker {
         new_version: Option<&str>,
         old_schema: &str,
         new_schema: &str,
+        old_features: &[Box<str>],
+        new_features: &[Box<str>],
     ) -> CompatabilityResult;
 }
 
@@ -2017,9 +2084,15 @@ impl BackwardCompatibilityChecker for PermissiveVersionChecker {
         new_version: Option<&str>,
         old_schema: &str,
         new_schema: &str,
+        old_features: &[Box<str>],
+        new_features: &[Box<str>],
     ) -> CompatabilityResult {
         if old_version.is_none() == new_version.is_none() && old_schema == new_schema {
-            CompatabilityResult::Same
+            if old_features == new_features {
+                CompatabilityResult::Same
+            } else {
+                CompatabilityResult::SameCompatibleFeatures
+            }
         } else {
             CompatabilityResult::Compatible
         }
@@ -2033,6 +2106,8 @@ pub enum AddResult {
     Updated {
         old_version: Option<String>,
         new_version: Option<String>,
+        old_features: Vec<Box<str>>,
+        new_features: Vec<Box<str>>,
     },
     AlreadyExists,
 }
@@ -2046,6 +2121,8 @@ pub enum DependencyError {
         module_name: String,
         existing_version: Option<String>,
         new_version: Option<String>,
+        existing_features: String,
+        new_features: String,
     },
 
     #[strum(to_string = "Module '{module_name}' not found")]
