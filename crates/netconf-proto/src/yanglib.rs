@@ -651,6 +651,90 @@ impl YangLibrary {
             search_path: search_path.to_string_lossy().to_string().to_string(),
         })
     }
+
+    /// Convert the YangLibrary into a ModuleSetBuilder
+    /// that can be used to build a ModuleSet with
+    /// the given yang_schemas and backward compatibility checker.
+    ///
+    /// If any module or submodule schema is not found in the
+    /// yang_schemas, a DependencyError is returned.
+    ///
+    /// All modules and submodules are added to one ModuleSetBuilder
+    /// named default_name, even if they are in different ModuleSets in the
+    /// YangLibrary.
+    pub fn into_module_set_builder<C: BackwardCompatibilityChecker>(
+        self,
+        yang_schemas: &HashMap<Box<str>, Box<str>>,
+        default_name: Box<str>,
+        checker: &C,
+    ) -> Result<ModuleSetBuilder, DependencyError> {
+        let mut module_set_builder = ModuleSetBuilder::new(default_name);
+        for module_set in self.modules_set.into_values() {
+            for module in module_set.modules.into_values() {
+                let module_name = module.name.clone();
+                let module_schema = yang_schemas
+                    .get(module.name())
+                    .ok_or(DependencyError::SchemaNotFound {
+                        module_name: module_name.to_string(),
+                    })?
+                    .clone();
+                let mut submodules = Vec::with_capacity(module.submodule.len());
+                for submodule in &module.submodule {
+                    let submodule_schema = yang_schemas
+                        .get(submodule.name())
+                        .ok_or(DependencyError::SchemaNotFound {
+                            module_name: submodule.name().to_string(),
+                        })?
+                        .clone();
+                    submodules.push((submodule.clone(), submodule_schema));
+                }
+                module_set_builder.add_module(module, module_schema, checker)?;
+                for (submodule, submodule_schema) in submodules {
+                    module_set_builder.add_submodule_for_module(
+                        &module_name,
+                        submodule,
+                        submodule_schema,
+                        checker,
+                    )?;
+                }
+            }
+            for import_modules in module_set.import_only_modules.into_values() {
+                for import_only_module in import_modules.into_values() {
+                    let module_name = import_only_module.name.clone();
+                    let module_schema = yang_schemas
+                        .get(import_only_module.name())
+                        .ok_or(DependencyError::SchemaNotFound {
+                            module_name: module_name.to_string(),
+                        })?
+                        .clone();
+                    let mut submodules = Vec::with_capacity(import_only_module.submodules.len());
+                    for (_, submodule) in &import_only_module.submodules {
+                        let submodule_schema = yang_schemas
+                            .get(submodule.name())
+                            .ok_or(DependencyError::SchemaNotFound {
+                                module_name: submodule.name().to_string(),
+                            })?
+                            .clone();
+                        submodules.push((submodule.clone(), submodule_schema));
+                    }
+                    module_set_builder.add_import_only_module(
+                        import_only_module,
+                        module_schema,
+                        checker,
+                    )?;
+                    for (submodule, submodule_schema) in submodules {
+                        module_set_builder.add_submodule_for_import_only_module(
+                            &module_name,
+                            submodule,
+                            submodule_schema,
+                            checker,
+                        )?;
+                    }
+                }
+            }
+        }
+        Ok(module_set_builder)
+    }
 }
 
 impl XmlDeserialize<YangLibrary> for YangLibrary {
@@ -1972,6 +2056,9 @@ pub enum DependencyError {
         module_name: String,
         submodule_name: String,
     },
+
+    #[strum(to_string = "YANG schema for module '{module_name}' is not found")]
+    SchemaNotFound { module_name: String },
 }
 
 impl std::error::Error for DependencyError {}
