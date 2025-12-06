@@ -82,7 +82,7 @@ opentelemetry = { version = "0.31" }
 opentelemetry_sdk = { version = "0.31" }
 opentelemetry-otlp = { version = "0.31" }
 anyhow = { version = "1" }
-serde_with = { version = "3.14" }
+serde_with = { version = "3.16" }
 indexmap = { version = "2.10" }
 apache-avro = { version = "0.21" }
 schema_registry_converter = { version = "4.7", default-features = false }
