@@ -17,9 +17,10 @@ use anyhow::anyhow;
 use clap::Parser;
 use netgauze_netconf_proto::{
     client::{connect, NetconfSshConnectConfig, SshAuth, SshHandler},
-    xml_utils::{XmlSerialize, XmlWriter},
+    xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter},
     yanglib::{PermissiveVersionChecker, YangLibrary},
 };
+use quick_xml::NsReader;
 use std::{collections::HashMap, io::Write, path::Path, sync::Arc, time::Duration};
 
 #[derive(clap::Parser, Debug)]
@@ -56,6 +57,16 @@ struct Args {
     /// Output inverted dependency graph in dot format
     #[clap(short, long, default_value = "false")]
     graph: bool,
+
+    /// A path of a YANG library file to extend with the loaded modules with.
+    /// For instance, adding the telemetry-message dependencies to an existing
+    /// YANG push subscription.
+    #[clap(short, long, default_value = "false")]
+    extend_yang_lib: Option<String>,
+
+    /// YANG search path
+    #[clap(long)]
+    yang_search_path: Option<String>,
 }
 
 fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
@@ -106,7 +117,7 @@ pub async fn main() -> anyhow::Result<()> {
         modules.join(","),
         args.host
     );
-    let (yang_lib, schemas) = client
+    let (mut yang_lib, mut schemas) = client
         .load_from_modules(modules.as_slice(), &PermissiveVersionChecker)
         .await
         .expect("Failed to load dependency graph");
@@ -114,6 +125,33 @@ pub async fn main() -> anyhow::Result<()> {
         "created a the yang library for the dependencies with {} schemas total",
         schemas.len()
     );
+
+    if let Some(yang_lib_path) = &args.extend_yang_lib {
+        tracing::info!("Loading existing yang library from {yang_lib_path}");
+        let reader = NsReader::from_file(yang_lib_path)?;
+        let mut xml_reader = netgauze_netconf_proto::xml_utils::XmlParser::new(reader)?;
+        let existing_yang_lib = YangLibrary::xml_deserialize(&mut xml_reader)?;
+        let existing_yang_schemas = if let Some(search_path) = &args.yang_search_path {
+            let search_path = Path::new(search_path);
+            tracing::info!("Loading schemas for existing yang library from {search_path:?}");
+            existing_yang_lib.load_schemas_from_search_path(search_path)?
+        } else {
+            existing_yang_lib.load_schemas()?
+        };
+        let mut builder = yang_lib.clone().into_module_set_builder(
+            &schemas,
+            "ALL".into(),
+            &PermissiveVersionChecker,
+        )?;
+        builder.extend_from_yang_lib(
+            existing_yang_lib,
+            &existing_yang_schemas,
+            &PermissiveVersionChecker,
+        )?;
+        let (yang_lib_extended, schemas_extended) = builder.build_yang_lib();
+        yang_lib = yang_lib_extended;
+        schemas = schemas_extended;
+    }
 
     if let Some(output) = &args.output {
         let output_path = Path::new(&output);
