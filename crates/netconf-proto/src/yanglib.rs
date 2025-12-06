@@ -2036,6 +2036,93 @@ impl ModuleSetBuilder {
         );
         (yang_lib, self.yang_schemas)
     }
+
+    pub fn extend_from_yang_lib<C: BackwardCompatibilityChecker>(
+        &mut self,
+        yang_lib: YangLibrary,
+        yang_schemas: &HashMap<Box<str>, Box<str>>,
+        checker: &C,
+    ) -> Result<HashMap<Box<str>, AddResult>, DependencyError> {
+        let mut results = HashMap::new();
+        for module_set in yang_lib.modules_set.into_values() {
+            for mut module in module_set.modules.into_values() {
+                let schema = yang_schemas
+                    .get(module.name())
+                    .ok_or(DependencyError::SchemaNotFound {
+                        module_name: module.name().to_string(),
+                    })?
+                    .clone();
+                if let Some(existing) = self.module_set.modules.get_mut(module.name()) {
+                    // Merge features if the module is already existing
+                    let mut features: HashSet<Box<str>> =
+                        HashSet::with_capacity(existing.features().len() + module.features().len());
+                    existing.features().iter().for_each(|f| {
+                        features.insert(f.clone());
+                    });
+                    module.features().iter().for_each(|f| {
+                        features.insert(f.clone());
+                    });
+                    module.feature = features.into_iter().collect();
+                }
+
+                let module_name = module.name.clone();
+                let submodules = module.submodule.clone();
+                let result = self.add_module(module, schema, checker)?;
+                results.insert(module_name.clone(), result);
+
+                for submodule in submodules {
+                    let submodule_name = submodule.name.clone();
+                    let schema = yang_schemas
+                        .get(submodule.name())
+                        .ok_or(DependencyError::SchemaNotFound {
+                            module_name: submodule.name().to_string(),
+                        })?
+                        .clone();
+                    let result = self.add_submodule_for_module(
+                        module_name.as_ref(),
+                        submodule,
+                        schema,
+                        checker,
+                    )?;
+                    results.insert(submodule_name, result);
+                }
+            }
+
+            for (_, import_only_modules) in module_set.import_only_modules {
+                // only one version of import-only module is allowed
+                if let Some(import_only_module) = import_only_modules.into_values().next() {
+                    let schema = yang_schemas
+                        .get(import_only_module.name())
+                        .ok_or(DependencyError::SchemaNotFound {
+                            module_name: import_only_module.name().to_string(),
+                        })?
+                        .clone();
+                    let result = self.add_import_only_module(
+                        import_only_module.clone(),
+                        schema.clone(),
+                        checker,
+                    )?;
+                    results.insert(import_only_module.name.clone(), result);
+
+                    for (_, submodule) in import_only_module.submodules() {
+                        let schema = yang_schemas.get(submodule.name()).ok_or(
+                            DependencyError::SchemaNotFound {
+                                module_name: submodule.name().to_string(),
+                            },
+                        )?;
+                        let result = self.add_submodule_for_import_only_module(
+                            import_only_module.name(),
+                            submodule.clone(),
+                            schema.clone(),
+                            checker,
+                        )?;
+                        results.insert(submodule.name.clone(), result);
+                    }
+                }
+            }
+        }
+        Ok(results)
+    }
 }
 
 pub enum CompatabilityResult {
