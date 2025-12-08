@@ -61,7 +61,7 @@ struct Args {
     /// A path of a YANG library file to extend with the loaded modules with.
     /// For instance, adding the telemetry-message dependencies to an existing
     /// YANG push subscription.
-    #[clap(short, long, default_value = "false")]
+    #[clap(short, long)]
     extend_yang_lib: Option<String>,
 
     /// YANG search path
