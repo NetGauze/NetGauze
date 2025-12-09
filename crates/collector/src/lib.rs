@@ -16,6 +16,7 @@
 use crate::config::{FlowConfig, NetconfConfig, PublisherEndpoint, UdpNotifConfig};
 use crate::flow::aggregation::AggregationActorHandle;
 use crate::flow::enrichment::FlowEnrichmentActorHandle;
+use crate::flow::renormalization::RenormalizationActorHandle;
 use crate::inputs::files::FilesActorHandle;
 use crate::inputs::flow_options::FlowOptionsActorHandle;
 use crate::inputs::kafka::KafkaConsumerActorHandle;
@@ -62,6 +63,7 @@ pub async fn init_flow_collection(
         FlowCollectorsSupervisorActorHandle::new(supervisor_config, meter.clone()).await?;
     let mut http_handles = Vec::new();
     let mut enrichment_handles = Vec::new();
+    let mut renormalization_handles = Vec::new();
     let mut agg_handles = Vec::new();
     let mut flow_options_input_handles = Vec::new();
     let mut files_input_handles = Vec::new();
@@ -122,10 +124,18 @@ pub async fn init_flow_collection(
                         );
 
                         if let Some(aggregation_config) = publisher_config.aggregation.as_ref() {
+                            let (renormalization_join, renormalization_handle) =
+                                RenormalizationActorHandle::new(
+                                    publisher_config.buffer_size,
+                                    enrichment_handle.subscribe(),
+                                    either::Left(meter.clone()),
+                                    shard_id,
+                                );
+
                             let (agg_join, agg_handle) = AggregationActorHandle::new(
                                 publisher_config.buffer_size,
                                 aggregation_config.clone(),
-                                enrichment_handle.subscribe(),
+                                renormalization_handle.subscribe(),
                                 either::Left(meter.clone()),
                                 shard_id,
                             );
@@ -139,9 +149,11 @@ pub async fn init_flow_collection(
                                 .await?;
 
                             join_set.push(enrichment_join);
+                            join_set.push(renormalization_join);
                             join_set.push(agg_join);
                             join_set.push(kafka_join);
                             enrichment_handles.push(enrichment_handle);
+                            renormalization_handles.push(renormalization_handle);
                             agg_handles.push(agg_handle);
                             kafka_avro_handles.push(kafka_handle);
                         }
@@ -211,10 +223,18 @@ pub async fn init_flow_collection(
                         );
 
                         if let Some(aggregation_config) = publisher_config.aggregation.as_ref() {
+                            let (renormalization_join, renormalization_handle) =
+                                RenormalizationActorHandle::new(
+                                    publisher_config.buffer_size,
+                                    enrichment_handle.subscribe(),
+                                    either::Left(meter.clone()),
+                                    shard_id,
+                                );
+
                             let (agg_join, agg_handle) = AggregationActorHandle::new(
                                 publisher_config.buffer_size,
                                 aggregation_config.clone(),
-                                enrichment_handle.subscribe(),
+                                renormalization_handle.subscribe(),
                                 either::Left(meter.clone()),
                                 shard_id,
                             );
@@ -228,9 +248,11 @@ pub async fn init_flow_collection(
                                 )?;
 
                             join_set.push(enrichment_join);
+                            join_set.push(renormalization_join);
                             join_set.push(agg_join);
                             join_set.push(kafka_join);
                             enrichment_handles.push(enrichment_handle);
+                            renormalization_handles.push(renormalization_handle);
                             agg_handles.push(agg_handle);
                             kafka_json_handles.push(kafka_handle);
                         }
@@ -341,6 +363,9 @@ pub async fn init_flow_collection(
             warn!("Flow publisher exited, shutting down flow collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
             for handle in enrichment_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in renormalization_handles {
                 let _ = handle.shutdown().await;
             }
             for handle in agg_handles {

@@ -108,6 +108,7 @@ chrono = { workspace = true, default-features = false, features = [
 tempfile = { workspace = true }
 yang4 = { workspace = true}
 clap = { workspace = true, features = ["derive"] }
+tracing-test = { workspace = true }
 
 [features]
 bench = ["criterion"]
