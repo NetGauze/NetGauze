@@ -2271,6 +2271,101 @@ mod tests {
     use super::*;
     use crate::tests::test_xml_value;
 
+    fn get_example_yang_lib() -> YangLibrary {
+        let ietf_hardware_module = Module::new(
+            "ietf-hardware".into(),
+            Some("2018-03-13".into()),
+            "urn:ietf:params:xml:ns:yang:ietf-hardware".into(),
+            Box::new([]),
+            Box::new(["example-vendor-hardware-deviations".into()]),
+            Box::new([]),
+            Box::new([]),
+            Box::new([]),
+        );
+        let ietf_routing_module = Module::new(
+            "ietf-routing".into(),
+            Some("2018-03-13".into()),
+            "urn:ietf:params:xml:ns:yang:ietf-routing".into(),
+            Box::new(["multiple-ribs".into(), "router-id".into()]),
+            Box::new([]),
+            Box::new([]),
+            Box::new([]),
+            Box::new([]),
+        );
+        let ietf_interfaces_module = Module::new(
+            "ietf-interfaces".into(),
+            Some("2018-02-20".into()),
+            "urn:ietf:params:xml:ns:yang:ietf-interfaces".into(),
+            Box::new(["if-mib".into(), "ethernet".into()]),
+            Box::new(["deviation1".into(), "deviation2".into()]),
+            Box::new([Submodule::new(
+                "ietf-interfaces-ext".into(),
+                Some("2018-02-20".into()),
+                Box::new(["https://example.com/ietf-interfaces-ext".into()]),
+            )]),
+            Box::new(["module1".into(), "module2".into()]),
+            Box::new(["https://example1.com".into(), "https://example2.com".into()]),
+        );
+        let example_submodule = Submodule::new(
+            "example-submodule".into(),
+            Some("2018-02-20".into()),
+            Box::new(["https://example.com/submodule1".into()]),
+        );
+        let example_module = Module::new(
+            "example".into(),
+            Some("2018-02-20".into()),
+            "urn:ietf:params:xml:ns:example".into(),
+            Box::new([]),
+            Box::new([]),
+            Box::new([example_submodule.clone()]),
+            Box::new(["module1".into(), "module2".into()]),
+            Box::new(["https://example1.com".into(), "https://example2.com".into()]),
+        );
+        let ietf_yang_types_module = ImportOnlyModule::new(
+            "ietf-yang-types".into(),
+            Some("2013-07-15".into()),
+            "urn:ietf:params:xml:ns:yang:ietf-yang-types".into(),
+            Box::new([]),
+            IndexMap::new(),
+        );
+        let ietf_inet_types_module = ImportOnlyModule::new(
+            "ietf-inet-types".into(),
+            None,
+            "urn:ietf:params:xml:ns:yang:ietf-inet-types".into(),
+            Box::new([]),
+            IndexMap::new(),
+        );
+        YangLibrary::new(
+            "14782ab9bd56b92aacc156a2958fbe12312fb285".into(),
+            vec![
+                ModuleSet::new(
+                    "Set1".into(),
+                    vec![ietf_hardware_module.clone()],
+                    vec![ietf_yang_types_module.clone()],
+                ),
+                ModuleSet::new(
+                    "Set2".into(),
+                    vec![
+                        ietf_interfaces_module.clone(),
+                        ietf_routing_module.clone(),
+                        example_module.clone(),
+                    ],
+                    vec![
+                        ietf_yang_types_module.clone(),
+                        ietf_inet_types_module.clone(),
+                    ],
+                ),
+            ],
+            vec![Schema::new(
+                "ALLSchema".into(),
+                Box::new(["Set1".into(), "Set2".into()]),
+            )],
+            vec![Datastore::new(
+                DatastoreName::Operational,
+                "ALLSchema".into(),
+            )],
+        )
+    }
     #[test]
     fn test_submodule_serde() {
         let full_str = r#"<submodule xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
@@ -2560,100 +2655,7 @@ mod tests {
 
     #[test]
     fn test_find_module_submodule_serde() {
-        let ietf_hardware_module = Module::new(
-            "ietf-hardware".into(),
-            Some("2018-03-13".into()),
-            "urn:ietf:params:xml:ns:yang:ietf-hardware".into(),
-            Box::new([]),
-            Box::new(["example-vendor-hardware-deviations".into()]),
-            Box::new([]),
-            Box::new([]),
-            Box::new([]),
-        );
-        let ietf_routing_module = Module::new(
-            "ietf-routing".into(),
-            Some("2018-03-13".into()),
-            "urn:ietf:params:xml:ns:yang:ietf-routing".into(),
-            Box::new(["multiple-ribs".into(), "router-id".into()]),
-            Box::new([]),
-            Box::new([]),
-            Box::new([]),
-            Box::new([]),
-        );
-        let ietf_interfaces_module = Module::new(
-            "ietf-interfaces".into(),
-            Some("2018-02-20".into()),
-            "urn:ietf:params:xml:ns:yang:ietf-interfaces".into(),
-            Box::new(["if-mib".into(), "ethernet".into()]),
-            Box::new(["deviation1".into(), "deviation2".into()]),
-            Box::new([Submodule::new(
-                "ietf-interfaces-ext".into(),
-                Some("2018-02-20".into()),
-                Box::new(["https://example.com/ietf-interfaces-ext".into()]),
-            )]),
-            Box::new(["module1".into(), "module2".into()]),
-            Box::new(["https://example1.com".into(), "https://example2.com".into()]),
-        );
-        let example_submodule = Submodule::new(
-            "example-submodule".into(),
-            Some("2018-02-20".into()),
-            Box::new(["https://example.com/submodule1".into()]),
-        );
-        let example_module = Module::new(
-            "example".into(),
-            Some("2018-02-20".into()),
-            "urn:ietf:params:xml:ns:example".into(),
-            Box::new([]),
-            Box::new([]),
-            Box::new([example_submodule.clone()]),
-            Box::new(["module1".into(), "module2".into()]),
-            Box::new(["https://example1.com".into(), "https://example2.com".into()]),
-        );
-        let ietf_yang_types_module = ImportOnlyModule::new(
-            "ietf-yang-types".into(),
-            Some("2013-07-15".into()),
-            "urn:ietf:params:xml:ns:yang:ietf-yang-types".into(),
-            Box::new([]),
-            IndexMap::new(),
-        );
-        let ietf_inet_types_module = ImportOnlyModule::new(
-            "ietf-inet-types".into(),
-            None,
-            "urn:ietf:params:xml:ns:yang:ietf-inet-types".into(),
-            Box::new([]),
-            IndexMap::new(),
-        );
-        let input = YangLibrary::new(
-            "14782ab9bd56b92aacc156a2958fbe12312fb285".into(),
-            vec![
-                ModuleSet::new(
-                    "Set1".into(),
-                    vec![ietf_hardware_module.clone()],
-                    vec![ietf_yang_types_module.clone()],
-                ),
-                ModuleSet::new(
-                    "Set2".into(),
-                    vec![
-                        ietf_interfaces_module.clone(),
-                        ietf_routing_module.clone(),
-                        example_module.clone(),
-                    ],
-                    vec![
-                        ietf_yang_types_module.clone(),
-                        ietf_inet_types_module.clone(),
-                    ],
-                ),
-            ],
-            vec![Schema::new(
-                "ALLSchema".into(),
-                Box::new(["Set1".into(), "Set2".into()]),
-            )],
-            vec![Datastore::new(
-                DatastoreName::Operational,
-                "ALLSchema".into(),
-            )],
-        );
-
+        let input = get_example_yang_lib();
         let found_ietf_routing = input.find_module("ietf-routing");
         let found_ietf_interfaces = input.find_module("ietf-interfaces");
         let found_example = input.find_module("example");
@@ -2664,14 +2666,23 @@ mod tests {
         let found_submodule = input.find_submodule("example-submodule");
         let not_found_submodule = input.find_submodule("non-existent-submodule");
 
-        assert_eq!(found_ietf_routing, Some(&ietf_routing_module));
-        assert_eq!(found_ietf_interfaces, Some(&ietf_interfaces_module));
-        assert_eq!(found_example, Some(&example_module));
+        assert_eq!(found_ietf_routing.map(|x| x.name()), Some("ietf-routing"));
+        assert_eq!(
+            found_ietf_interfaces.map(|x| x.name()),
+            Some("ietf-interfaces")
+        );
+        assert_eq!(found_example.map(|x| x.name()), Some("example"));
         assert_eq!(not_found_module, None);
-        assert_eq!(found_ietf_yang_types, Some(vec![&ietf_yang_types_module]));
-        assert_eq!(found_ietf_inet_types, Some(vec![&ietf_inet_types_module]));
+        assert_eq!(
+            found_ietf_yang_types.map(|x| x.iter().map(|i| i.name()).collect::<Vec<_>>()),
+            Some(vec!["ietf-yang-types"])
+        );
+        assert_eq!(
+            found_ietf_inet_types.map(|x| x.iter().map(|i| i.name()).collect::<Vec<_>>()),
+            Some(vec!["ietf-inet-types"])
+        );
         assert_eq!(not_found_import_module, None);
-        assert_eq!(found_submodule, Some(&example_submodule));
+        assert_eq!(found_submodule.map(|x| x.name()), Some("example-submodule"));
         assert_eq!(not_found_submodule, None);
     }
 }
