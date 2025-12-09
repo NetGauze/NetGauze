@@ -1661,6 +1661,7 @@ fn serialize_yang_lib_location<T: io::Write>(
 ///
 /// The module Builder records the latest version of each schema in a HashMap
 /// with as module name and value as the raw schema string.
+#[derive(Debug)]
 pub struct ModuleSetBuilder {
     module_set: ModuleSet,
     // The yang schema string indexed by name
