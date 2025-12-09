@@ -2584,6 +2584,7 @@ mod tests {
        xmlns:ds="urn:ietf:params:xml:ns:yang:ietf-datastores">
      <module-set>
        <name>state-only-modules</name>
+       <!-- Some comment -->
        <module>
          <name>ietf-hardware</name>
          <revision>2018-03-13</revision>
@@ -2598,6 +2599,7 @@ mod tests {
          <namespace>
            urn:ietf:params:xml:ns:yang:ietf-routing
          </namespace>
+         <!-- Some comment -->
          <feature>multiple-ribs</feature>
          <feature>router-id</feature>
        </module>
