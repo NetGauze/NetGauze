@@ -244,12 +244,6 @@ impl YangLibrary {
                 tracing::debug!("Registering schema `{name}` with features [{features}]");
             }
             let registered_schema = Self::register_with_retry(client, name, &schema).await?;
-            tracing::info!(
-                "registered schema {name} with subject `{:?}`, version `{:?}` and ID `{:?}`",
-                registered_schema.subject,
-                registered_schema.version,
-                registered_schema.id
-            );
             let schema_reference = schema_registry_client::rest::models::SchemaReference {
                 name: Some(name.to_string()),
                 subject: Some(registered_schema.subject.clone().unwrap_or_default()),
