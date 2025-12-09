@@ -2272,7 +2272,7 @@ mod tests {
     use crate::tests::test_xml_value;
 
     #[test]
-    fn test_submodule() {
+    fn test_submodule_serde() {
         let full_str = r#"<submodule xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
              <name>submodule1</name>
              <revision>2023-01-11</revision>
@@ -2297,7 +2297,7 @@ mod tests {
     }
 
     #[test]
-    fn test_module() {
+    fn test_module_serde() {
         let full_str = r#"<module xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
          <name>ietf-interfaces</name>
          <revision>2018-02-20</revision>
@@ -2355,7 +2355,7 @@ mod tests {
     }
 
     #[test]
-    fn test_module_set() {
+    fn test_module_set_serde() {
         let full_str = r#"<module-set xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
                <name>config-modules</name>
                <module>
@@ -2437,7 +2437,7 @@ mod tests {
     }
 
     #[test]
-    fn test_schema() {
+    fn test_schema_serde() {
         let full_str = r#"<schema xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
            <name>All</name>
            <module-set>mod-set-1</module-set>
@@ -2457,7 +2457,7 @@ mod tests {
     }
 
     #[test]
-    fn test_datastore() {
+    fn test_datastore_serde() {
         let ds1_str = r#"<datastore xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
             <name xmlns:idx="urn:ietf:params:xml:ns:yang:ietf-datastores">idx:running</name>
             <schema>All</schema>
@@ -2482,7 +2482,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rfc8525_appendix_c_advanced_server() {
+    fn test_rfc8525_appendix_c_advanced_server_serde() {
         // RFC 8525 Appendix C - Example YANG Library Instance for an Advanced Server
         let xml = r#"<yang-library
        xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library"
@@ -2559,7 +2559,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_module_submodule() {
+    fn test_find_module_submodule_serde() {
         let ietf_hardware_module = Module::new(
             "ietf-hardware".into(),
             Some("2018-03-13".into()),
