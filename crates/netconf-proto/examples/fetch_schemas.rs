@@ -24,6 +24,20 @@ use quick_xml::NsReader;
 use std::{collections::HashMap, io::Write, path::Path, sync::Arc, time::Duration};
 
 #[derive(clap::Parser, Debug)]
+#[command(
+    group(
+        clap::ArgGroup::new("schema-registry")
+            .args(&["registry_url"])
+            .requires_all(&["registry_url", "subject"])
+            .multiple(false)
+    ),
+    group(
+        clap::ArgGroup::new("extend-yang-lib")
+            .args(&["extend_yang_lib", "yang_dep_path"])
+            .requires_all(&["extend_yang_lib", "yang_dep_path", "subject"])
+            .multiple(true)
+    ),
+)]
 struct Args {
     #[arg(help = "Host address (IP:port or hostname:port)")]
     host: String,
@@ -45,12 +59,17 @@ struct Args {
     output: Option<String>,
 
     /// Kafka Schema registry URL to register to
+    /// If --extend-yang-lib is enabled, then the extended YANG library
+    /// is registered, otherwise only the schemas retrieved from the router are
+    /// registered.
     #[clap(short, long)]
     registry_url: Option<String>,
 
     /// List of initial YANG modules to load (typically the ones in the
-    /// subscription started) When registering with the schema registry, the
-    /// first module is considered the root and main schema.
+    /// subscription started).
+    ///
+    /// When registering with the schema registry, the
+    /// module defined by --main-module is considered the root and main schema.
     #[clap(short, long)]
     modules: Vec<String>,
 
@@ -64,9 +83,14 @@ struct Args {
     #[clap(short, long)]
     extend_yang_lib: Option<String>,
 
-    /// YANG search path
-    #[clap(long)]
-    yang_search_path: Option<String>,
+    /// YANG dependencies search path
+    #[clap(short = 'd', long)]
+    yang_dep_path: Option<String>,
+
+    /// The main module to be used as the subject of the subscription
+    /// in the schema registry; e.g., ietf-telemetry-message.
+    #[clap(short, long)]
+    subject: Option<String>,
 }
 
 fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
@@ -106,6 +130,12 @@ pub async fn main() -> anyhow::Result<()> {
     let mut client = connect(config).await?;
     tracing::info!("connected to {}", args.host);
 
+    tracing::info!(
+        "loading router yang library from {} to obtain the seed modules",
+        args.host
+    );
+    let router_yang_lib = client.get_yang_library().await?;
+
     let modules = args
         .modules
         .as_slice()
@@ -117,6 +147,7 @@ pub async fn main() -> anyhow::Result<()> {
         modules.join(","),
         args.host
     );
+
     let (mut yang_lib, mut schemas) = client
         .load_from_modules(modules.as_slice(), &PermissiveVersionChecker)
         .await
@@ -126,16 +157,33 @@ pub async fn main() -> anyhow::Result<()> {
         schemas.len()
     );
 
+    if let Some(output) = &args.output {
+        let output_path = Path::new(output).join("router-schemas");
+        if !output_path.exists() {
+            std::fs::create_dir_all(&output_path)?;
+        }
+        let yang_lib_path = output_path.join("router-yanglib.xml");
+        tracing::info!("writing yang library obtained from the router to {yang_lib_path:?}");
+        let file = std::fs::File::create(&yang_lib_path)?;
+        let writer = std::io::BufWriter::new(file);
+        let quick_xml_writer = quick_xml::writer::Writer::new_with_indent(writer, 32, 2);
+        let mut xml_writer = XmlWriter::new(quick_xml_writer);
+        router_yang_lib.xml_serialize(&mut xml_writer)?;
+        xml_writer.into_inner().flush()?;
+        save_modules_to_disk(&yang_lib, &schemas, &output_path)?;
+    }
+
     if let Some(yang_lib_path) = &args.extend_yang_lib {
-        tracing::info!("Loading existing yang library from {yang_lib_path}");
+        tracing::info!("Extending subscription yang library with schemas from {yang_lib_path}");
         let reader = NsReader::from_file(yang_lib_path)?;
         let mut xml_reader = netgauze_netconf_proto::xml_utils::XmlParser::new(reader)?;
         let existing_yang_lib = YangLibrary::xml_deserialize(&mut xml_reader)?;
-        let existing_yang_schemas = if let Some(search_path) = &args.yang_search_path {
+        let existing_yang_schemas = if let Some(search_path) = &args.yang_dep_path {
             let search_path = Path::new(search_path);
             tracing::info!("Loading schemas for existing yang library from {search_path:?}");
             existing_yang_lib.load_schemas_from_search_path(search_path)?
         } else {
+            tracing::info!("Loading schemas for based on the location defined in the yang library");
             existing_yang_lib.load_schemas()?
         };
         let mut builder = yang_lib.clone().into_module_set_builder(
@@ -150,17 +198,16 @@ pub async fn main() -> anyhow::Result<()> {
         )?;
         let (yang_lib_extended, schemas_extended) = builder.build_yang_lib();
         yang_lib = yang_lib_extended;
+
         schemas = schemas_extended;
-    }
-
-    if let Some(output) = &args.output {
-        let output_path = Path::new(&output);
-        if !output_path.exists() {
-            std::fs::create_dir_all(output_path)?;
+        if let Some(output) = &args.output {
+            let output_path = Path::new(output).join("extended-schemas");
+            if !output_path.exists() {
+                std::fs::create_dir_all(&output_path)?;
+            }
+            save_modules_to_disk(&yang_lib, &schemas, &output_path)?;
         }
-        save_modules_to_disk(&yang_lib, &schemas, output_path)?;
     }
-
     if args.graph {
         let graph = yang_lib.to_graph(&schemas).map_err(|x| anyhow!(x))?;
         let dot = petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
@@ -176,13 +223,18 @@ pub async fn main() -> anyhow::Result<()> {
 
     if let Some(url) = &args.registry_url {
         use schema_registry_client::rest::schema_registry_client::Client;
-        let root_schema_name = args
-            .modules
-            .first()
-            .ok_or(anyhow!("no schemas defined to obtain from the router"))?;
-        tracing::info!(
-            "writing schemas to registry URL {url} with root schema `{root_schema_name}`"
-        );
+        if args.modules.is_empty() {
+            return Err(anyhow!("no schemas defined to obtain from the router"));
+        }
+        let subject = args
+            .subject
+            .ok_or(anyhow!("no subject schema is defined for the subscription"))?;
+        if yang_lib.find_module(&subject).is_none() {
+            return Err(anyhow!(
+                "the subject schema `{subject}` does not exist in the yang library"
+            ));
+        }
+        tracing::info!("writing schemas to registry URL {url} with root schema `{subject}`");
         // Setup connection to schema registry
         let client_conf =
             schema_registry_client::rest::client_config::ClientConfig::new(vec![url.to_string()]);
@@ -191,12 +243,12 @@ pub async fn main() -> anyhow::Result<()> {
                 client_conf,
             );
         let registered_schema = yang_lib
-            .register_schema(root_schema_name, &schemas, &sr_client)
+            .register_schema(&subject, &schemas, &sr_client)
             .await
             .map_err(|x| anyhow!(x))?;
 
         tracing::info!(
-            "registered schemas for {root_schema_name} with subject `{:?}` and ID `{:?}`",
+            "registered schemas for {subject} with subject `{:?}` and ID `{:?}`",
             registered_schema.subject,
             registered_schema.id
         );
@@ -236,7 +288,7 @@ fn save_modules_to_disk(
     output_path: &Path,
 ) -> anyhow::Result<()> {
     let yang_lib_path = output_path.join("yanglib.xml");
-    tracing::info!("writing yang library of dependence to {yang_lib_path:?}");
+    tracing::info!("writing yang library of dependencies to {yang_lib_path:?}");
     let file = std::fs::File::create(&yang_lib_path)?;
     let writer = std::io::BufWriter::new(file);
     let quick_xml_writer = quick_xml::writer::Writer::new_with_indent(writer, 32, 2);
