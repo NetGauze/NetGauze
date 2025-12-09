@@ -357,7 +357,7 @@ impl<R: io::BufRead> XmlParser<R> {
     }
 
     pub fn skip_text(&mut self) -> Result<(), ParsingError> {
-        while let Event::Text(_) = self.peek() {
+        while matches!(self.peek(), Event::Text(_)) || matches!(self.peek(), Event::Comment(_)) {
             self.skip()?;
         }
         Ok(())
