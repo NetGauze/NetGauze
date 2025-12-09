@@ -256,5 +256,23 @@
       <date>2025-08-26</date>
     </record>
 
+    <record>
+      <name>isRenormalized</name>
+      <dataType>boolean</dataType>
+      <dataTypeSemantics>default</dataTypeSemantics>
+      <elementId>16</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph>
+            A boolean value indicating whether the flow record has been renormalized.
+            A value of true indicates that renormalization has occurred, while false
+            indicates that it has not. Renormalization refers to the process of adjusting
+            flow record values to account for packet sampling and flow sampling.
+        </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2025-12-09</date>
+    </record>
   </registry>
 </registry>
