@@ -439,6 +439,11 @@ impl DataRecord {
         &self.fields
     }
 
+    /// Deconstruct the data record into its parts
+    pub fn into_parts(self) -> (Box<[Field]>, Box<[Field]>) {
+        (self.scope_fields, self.fields)
+    }
+
     /// Add multiple fields
     pub fn with_fields_added(self, add_fields: &[Field]) -> Self {
         let mut fields = self.fields.into_vec();

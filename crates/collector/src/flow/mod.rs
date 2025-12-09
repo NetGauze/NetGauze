@@ -16,6 +16,7 @@
 pub mod aggregation;
 pub mod config;
 pub mod enrichment;
+pub mod renormalization;
 pub mod types;
 
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
