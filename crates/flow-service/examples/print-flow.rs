@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
     init_tracing();
     let listen_addr = "0.0.0.0:8080";
     let socket = UdpSocket::bind(&listen_addr).await?;
-    println!("Listening on addr: {}", listen_addr);
+    println!("Listening on addr: {listen_addr}");
 
     let framed = UdpFramed::new(socket, BytesCodec::default());
     let (_tx, mut stream): (SplitSink<_, (Bytes, _)>, _) = framed.split();

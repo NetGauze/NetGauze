@@ -11,7 +11,7 @@ fn main() {
 
     // IPFIX template packet
     let ipfix_template = IpfixPacket::new(
-        Utc.with_ymd_and_hms(2024, 7, 08, 10, 0, 0).unwrap(),
+        Utc.with_ymd_and_hms(2024, 7, 8, 10, 0, 0).unwrap(),
         0,
         0,
         Box::new([Set::Template(Box::new([TemplateRecord::new(
@@ -114,9 +114,7 @@ fn main() {
 
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
-    ipfix_data
-        .write(&mut cursor, Some(&mut templates_map))
-        .unwrap();
+    ipfix_data.write(&mut cursor, Some(&templates_map)).unwrap();
     assert_eq!(
         buf,
         vec![
