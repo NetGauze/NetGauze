@@ -157,7 +157,7 @@ pub async fn main() -> anyhow::Result<()> {
     let (mut yang_lib, mut schemas) = client
         .load_from_modules(modules.as_slice(), &PermissiveVersionChecker)
         .await
-        .expect("Failed to load dependency graph");
+        .expect("Failed to load dependency graph from router");
     tracing::info!(
         "created a the yang library for the dependencies with {} schemas total",
         schemas.len()
