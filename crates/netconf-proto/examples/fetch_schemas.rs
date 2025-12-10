@@ -223,7 +223,7 @@ pub async fn main() -> anyhow::Result<()> {
         if let Some(output) = &args.output {
             let output_path = Path::new(&output).join("inverted_graph.dot");
             tracing::info!("writing inverted dependency graph in DOT format to {output_path:?}");
-            std::fs::write(output_path, format!("{:?}\n", dot))?;
+            std::fs::write(output_path, format!("{dot:?}\n"))?;
         } else {
             tracing::info!("writing inverted dependency graph to stdout in DOT format");
             println!("{dot:?}");
@@ -313,15 +313,14 @@ fn save_modules_to_disk(
         if let Some(module) = yang_lib.find_module(name.as_ref()) {
             revision = module.revision();
         } else if let Some(import_only_modules) = yang_lib.find_import_module(name.as_ref()) {
-            for import_only_module in import_only_modules {
+            if let Some(import_only_module) = import_only_modules.into_iter().next() {
                 revision = import_only_module.revision();
-                break;
             }
         } else if let Some(submodule) = yang_lib.find_submodule(name.as_ref()) {
             revision = submodule.revision();
         }
         let filename = if let Some(revision) = revision {
-            format!("{}@{}.yang", name, revision)
+            format!("{name}@{revision}.yang")
         } else {
             name.to_string()
         };
