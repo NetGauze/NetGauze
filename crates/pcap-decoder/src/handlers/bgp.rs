@@ -17,9 +17,9 @@ use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_bgp_pkt::{
+    BgpMessage,
     codec::{BgpCodec, BgpCodecDecoderError},
     wire::deserializer::{BgpParsingContext, BgpParsingIgnoredErrors},
-    BgpMessage,
 };
 use netgauze_pcap_reader::TransportProtocol;
 use std::{collections::HashMap, io, net::IpAddr};
@@ -101,9 +101,9 @@ mod tests {
         open::BgpOpenMessage,
         path_attribute::UndefinedOrigin,
         wire::deserializer::{
+            BgpMessageParsingError,
             path_attribute::{OriginParsingError, PathAttributeParsingError},
             update::BgpUpdateMessageParsingError,
-            BgpMessageParsingError,
         },
     };
     use serde_json::json;

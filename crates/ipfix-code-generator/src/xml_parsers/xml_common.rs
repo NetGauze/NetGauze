@@ -161,10 +161,10 @@ pub fn xml_string_to_enum_type(input: &str) -> (usize, String) {
         .collect::<String>();
 
     // Replace first numeric char if we have one
-    if let Some(first_char) = str_without_spaces.chars().next() {
-        if first_char.is_numeric() {
-            str_without_spaces = replace_first_numeric_char(&str_without_spaces);
-        }
+    if let Some(first_char) = str_without_spaces.chars().next()
+        && first_char.is_numeric()
+    {
+        str_without_spaces = replace_first_numeric_char(&str_without_spaces);
     }
 
     (str_words_amount, str_without_spaces)
@@ -179,10 +179,10 @@ pub fn parse_simple_description_string(node: &Node<'_, '_>) -> Option<String> {
         let mut desc_text = String::new();
         let body = description.text().map(|txt| txt.trim().to_string());
 
-        if let Some(body) = body {
-            if !body.trim().is_empty() {
-                desc_text.push_str(body.trim());
-            }
+        if let Some(body) = body
+            && !body.trim().is_empty()
+        {
+            desc_text.push_str(body.trim());
         }
         let re = Regex::new(r"\[RFC(?<RFCNUM>\d+)]").unwrap();
         let desc_text = re.replace(&desc_text, RfcLinkSwapper).to_string();

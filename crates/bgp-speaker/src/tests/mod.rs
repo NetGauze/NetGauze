@@ -19,7 +19,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::{io, io::Cursor, net::SocketAddr, time::Duration};
 
 use crate::connection::ActiveConnect;
-use netgauze_bgp_pkt::{codec::BgpCodec, BgpMessage};
+use netgauze_bgp_pkt::{BgpMessage, codec::BgpCodec};
 use netgauze_parse_utils::WritablePdu;
 
 mod connection;

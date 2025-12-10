@@ -26,7 +26,7 @@ use crate::{
     },
     yangparser::extract_yang_dependencies,
 };
-use futures_util::{stream::StreamExt, SinkExt};
+use futures_util::{SinkExt, stream::StreamExt};
 use secrecy::ExposeSecret;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -543,40 +543,40 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
                     if !visited.contains(dep_module.name()) {
                         to_process.push_back(ModuleType::Full(dep_module.clone()));
                     }
-                } else if let Some(dep_module) = yang_lib.find_submodule(&include.submodule_name) {
-                    if !visited.contains(dep_module.name()) {
-                        if matches!(module, ModuleType::Full(_))
-                            || matches!(module, ModuleType::FullSubmodule(_, _))
-                        {
-                            to_process.push_back(ModuleType::FullSubmodule(
-                                module.name().into(),
-                                dep_module.clone(),
-                            ));
-                        } else {
-                            to_process.push_back(ModuleType::ImportOnlySubmodule(
-                                module.name().into(),
-                                dep_module.clone(),
-                            ));
-                        }
+                } else if let Some(dep_module) = yang_lib.find_submodule(&include.submodule_name)
+                    && !visited.contains(dep_module.name())
+                {
+                    if matches!(module, ModuleType::Full(_))
+                        || matches!(module, ModuleType::FullSubmodule(_, _))
+                    {
+                        to_process.push_back(ModuleType::FullSubmodule(
+                            module.name().into(),
+                            dep_module.clone(),
+                        ));
+                    } else {
+                        to_process.push_back(ModuleType::ImportOnlySubmodule(
+                            module.name().into(),
+                            dep_module.clone(),
+                        ));
                     }
                 }
             }
 
             // Add deviations
             for deviation_name in module.deviations() {
-                if let Some(dev_module) = yang_lib.find_module(deviation_name) {
-                    if !visited.contains(dev_module.name()) {
-                        to_process.push_back(ModuleType::Full(dev_module.clone()));
-                    }
+                if let Some(dev_module) = yang_lib.find_module(deviation_name)
+                    && !visited.contains(dev_module.name())
+                {
+                    to_process.push_back(ModuleType::Full(dev_module.clone()));
                 }
             }
 
             // Add augmentations
             for augmentation_name in module.augmented_by() {
-                if let Some(augmented_by) = yang_lib.find_module(augmentation_name) {
-                    if !visited.contains(augmented_by.name()) {
-                        to_process.push_back(ModuleType::Full(augmented_by.clone()));
-                    }
+                if let Some(augmented_by) = yang_lib.find_module(augmentation_name)
+                    && !visited.contains(augmented_by.name())
+                {
+                    to_process.push_back(ModuleType::Full(augmented_by.clone()));
                 }
             }
             match module {

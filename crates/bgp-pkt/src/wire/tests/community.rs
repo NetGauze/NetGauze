@@ -22,10 +22,10 @@ use crate::{
     },
 };
 use netgauze_parse_utils::{
+    Span,
     test_helpers::{
         test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input, test_write,
     },
-    Span,
 };
 use nom::error::ErrorKind;
 use std::net::Ipv4Addr;
@@ -52,8 +52,8 @@ fn test_community() -> Result<(), CommunityWritingError> {
 }
 
 #[test]
-fn test_transitive_four_octet_extended_community(
-) -> Result<(), TransitiveFourOctetExtendedCommunityWritingError> {
+fn test_transitive_four_octet_extended_community()
+-> Result<(), TransitiveFourOctetExtendedCommunityWritingError> {
     let good_wire = [0x03, 0x00, 0x63, 0xdc, 0x3c, 0x00, 0x01];
     let good = TransitiveFourOctetExtendedCommunity::RouteOrigin {
         global_admin: 6544444,
@@ -65,8 +65,8 @@ fn test_transitive_four_octet_extended_community(
     Ok(())
 }
 #[test]
-fn test_transitive_two_extended_community(
-) -> Result<(), TransitiveTwoOctetExtendedCommunityWritingError> {
+fn test_transitive_two_extended_community()
+-> Result<(), TransitiveTwoOctetExtendedCommunityWritingError> {
     let good_wire = [0x02, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01];
     let good = TransitiveTwoOctetExtendedCommunity::RouteTarget {
         global_admin: 1,
@@ -79,8 +79,8 @@ fn test_transitive_two_extended_community(
 }
 
 #[test]
-fn test_non_transitive_two_extended_community(
-) -> Result<(), NonTransitiveTwoOctetExtendedCommunityWritingError> {
+fn test_non_transitive_two_extended_community()
+-> Result<(), NonTransitiveTwoOctetExtendedCommunityWritingError> {
     let good_wire = [0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01];
     let good = NonTransitiveTwoOctetExtendedCommunity::LinkBandwidth {
         global_admin: 1,
@@ -93,8 +93,8 @@ fn test_non_transitive_two_extended_community(
 }
 
 #[test]
-fn test_transitive_ipv4_extended_community(
-) -> Result<(), TransitiveIpv4ExtendedCommunityWritingError> {
+fn test_transitive_ipv4_extended_community()
+-> Result<(), TransitiveIpv4ExtendedCommunityWritingError> {
     let good_wire = [0x02, 0x0a, 0x0b, 0x0c, 0x08, 0x00, 0x2d];
     let good = TransitiveIpv4ExtendedCommunity::RouteTarget {
         global_admin: Ipv4Addr::new(10, 11, 12, 8),

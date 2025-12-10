@@ -61,12 +61,11 @@
 //!   with multiple flow collectors.
 
 use crate::{
-    create_flow_channel,
+    ActorId, FlowReceiver, FlowSender, SubscriberId, Subscription, create_flow_channel,
     flow_actor::{
         FlowCollectorActorCommand, FlowCollectorActorError, FlowCollectorActorHandle,
         FlowCollectorActorStats, PeerTemplateIds,
     },
-    ActorId, FlowReceiver, FlowSender, SubscriberId, Subscription,
 };
 use netgauze_flow_pkt::{ipfix, netflow};
 use serde::{Deserialize, Serialize};
@@ -154,7 +153,9 @@ impl FlowCollectorsSupervisorActor {
                     // AH: if we did our job correctly, this should never happen
                     error!("[Supervisor] Unrecoverable error in worker: {:?}", err);
                     if rest.is_empty() {
-                        info!("[Supervisor] Supervisor is shutting down, no remaining workers are still running");
+                        info!(
+                            "[Supervisor] Supervisor is shutting down, no remaining workers are still running"
+                        );
                         return;
                     }
                     rest
@@ -373,7 +374,9 @@ impl FlowCollectorsSupervisorActorHandle {
         &self,
         pkt_tx: FlowSender,
     ) -> Result<Vec<Subscription>, FlowCollectorsSupervisorActorHandleError> {
-        trace!("[SupervisorHandle] Sending new subscription with pre-created channel request to supervisor");
+        trace!(
+            "[SupervisorHandle] Sending new subscription with pre-created channel request to supervisor"
+        );
         let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
         if let Err(err) = self
             .cmd_tx
@@ -396,7 +399,9 @@ impl FlowCollectorsSupervisorActorHandle {
         &self,
         pkt_tx: Vec<FlowSender>,
     ) -> Result<Vec<Subscription>, FlowCollectorsSupervisorActorHandleError> {
-        trace!("[SupervisorHandle] Sending new subscription with pre-created channel request to supervisor");
+        trace!(
+            "[SupervisorHandle] Sending new subscription with pre-created channel request to supervisor"
+        );
         let (tx, mut rx) = mpsc::channel(self.cmd_buffer_size);
         if let Err(err) = self
             .cmd_tx
@@ -587,10 +592,10 @@ mod test {
     use super::*;
     use bytes::{Buf, BytesMut};
     use chrono::{TimeZone, Utc};
-    use netgauze_flow_pkt::{codec::FlowInfoCodec, ie, ipfix::*, FieldSpecifier, FlowInfo};
+    use netgauze_flow_pkt::{FieldSpecifier, FlowInfo, codec::FlowInfoCodec, ie, ipfix::*};
     use tokio::{
         net::UdpSocket,
-        time::{timeout, Duration},
+        time::{Duration, timeout},
     };
     use tokio_util::codec::Encoder;
 

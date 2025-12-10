@@ -20,18 +20,17 @@ mod netflow;
 pub mod pcap_tests;
 
 use chrono::{TimeZone, Timelike, Utc};
-use netgauze_parse_utils::{test_helpers::*, Span};
+use netgauze_parse_utils::{Span, test_helpers::*};
 use std::{collections::HashMap, net::Ipv4Addr};
 
 use crate::{
-    ie,
+    FieldSpecifier, ie,
     ie::Field,
     ipfix::*,
     wire::{
         deserializer::{ie as ie_desr, ipfix::*},
         serializer::{ie as ie_ser, ipfix::*, *},
     },
-    FieldSpecifier,
 };
 
 #[test]

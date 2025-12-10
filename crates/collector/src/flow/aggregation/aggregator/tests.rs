@@ -17,9 +17,9 @@ use crate::flow::aggregation::aggregator::*;
 use chrono::{TimeZone, Utc};
 use netgauze_analytics::aggregation::Aggregator;
 use netgauze_flow_pkt::{
-    ie::{protocolIdentifier, Field, IE},
-    ipfix::{DataRecord, IpfixPacket, Set},
     DataSetId, FlowInfo,
+    ie::{Field, IE, protocolIdentifier},
+    ipfix::{DataRecord, IpfixPacket, Set},
 };
 use netgauze_iana::tcp::TCPHeaderFlags;
 use rustc_hash::FxHashMap;

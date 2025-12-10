@@ -16,19 +16,19 @@
 //! Deserializer for BGP Update message
 
 use crate::{
+    BgpUpdateMessage,
     wire::deserializer::path_attribute::{
         LocatedPathAttributeParsingError, PathAttributeParsingError,
     },
-    BgpUpdateMessage,
 };
 use ipnet::Ipv4Net;
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
-    parse_into_located, LocatedParsingError, ReadablePduWithOneInput, Span,
+    LocatedParsingError, ReadablePduWithOneInput, Span, parse_into_located,
 };
 use nom::{
-    number::complete::{be_u16, be_u32, be_u8},
     IResult,
+    number::complete::{be_u8, be_u16, be_u32},
 };
 use serde::{Deserialize, Serialize};
 
@@ -37,8 +37,8 @@ use crate::{
     notification::UpdateMessageError,
     path_attribute::PathAttribute,
     wire::deserializer::{
-        path_attribute::{OriginParsingError, EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK},
         BgpParsingContext, Ipv4PrefixParsingError,
+        path_attribute::{EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK, OriginParsingError},
     },
 };
 use netgauze_parse_utils::ErrorKindSerdeDeref;

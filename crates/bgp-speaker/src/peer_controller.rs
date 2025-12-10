@@ -20,10 +20,10 @@ use crate::{
     peer::*,
 };
 use netgauze_bgp_pkt::{
+    BgpMessage,
     capabilities::BgpCapability,
     codec::{BgpCodecDecoderError, BgpCodecInitializer},
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
-    BgpMessage,
 };
 use std::{
     error::Error,
@@ -50,10 +50,10 @@ pub struct PeerController<K, A, I: AsyncWrite + AsyncRead> {
 }
 
 impl<
-        K: Display + Copy + Send + Sync + 'static,
-        A: Display + Debug + Copy + Send + Sync + 'static,
-        I: AsyncWrite + AsyncRead + Send + Unpin + 'static,
-    > PeerController<K, A, I>
+    K: Display + Copy + Send + Sync + 'static,
+    A: Display + Debug + Copy + Send + Sync + 'static,
+    I: AsyncWrite + AsyncRead + Send + Unpin + 'static,
+> PeerController<K, A, I>
 {
     pub fn new<
         D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
@@ -172,15 +172,21 @@ impl<
         match bgp_event {
             Ok(event) => {
                 if let Err(err) = rec_tx.send(Ok((fsm_state, event))) {
-                    log::error!("[{peer_key}][{fsm_state}] Couldn't send BGP event message, terminating the connection: {err:?}");
+                    log::error!(
+                        "[{peer_key}][{fsm_state}] Couldn't send BGP event message, terminating the connection: {err:?}"
+                    );
                     return Err(());
                 }
                 Ok(())
             }
             Err(err) => {
-                log::error!("[{peer_key}][{fsm_state}] Terminating Peer due to error in handling BgpEvent: {err}");
+                log::error!(
+                    "[{peer_key}][{fsm_state}] Terminating Peer due to error in handling BgpEvent: {err}"
+                );
                 if let Err(err) = rec_tx.send(Err(err)) {
-                    log::error!("[{peer_key}][{fsm_state}] Couldn't report error in handling BgpEvent: {err:?}");
+                    log::error!(
+                        "[{peer_key}][{fsm_state}] Couldn't report error in handling BgpEvent: {err:?}"
+                    );
                     return Err(());
                 }
                 Err(())

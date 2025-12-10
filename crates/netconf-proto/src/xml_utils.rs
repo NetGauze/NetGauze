@@ -530,10 +530,10 @@ impl<R: io::BufRead> XmlParser<R> {
         let mut writer = quick_xml::writer::Writer::new(cursor);
         let mut wrote_ns = false;
         loop {
-            if let Event::End(b) = self.peek() {
-                if b.local_name().into_inner() == tag {
-                    break;
-                }
+            if let Event::End(b) = self.peek()
+                && b.local_name().into_inner() == tag
+            {
+                break;
             }
             if let Event::Eof = self.peek() {
                 return Err(ParsingError::Eof);

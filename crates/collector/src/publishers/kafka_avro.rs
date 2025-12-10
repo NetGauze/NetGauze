@@ -23,7 +23,7 @@ use rdkafka::{
 use schema_registry_converter::{
     async_impl::{
         avro::AvroEncoder,
-        schema_registry::{post_schema, SrSettings},
+        schema_registry::{SrSettings, post_schema},
     },
     avro_common::get_supplied_schema,
     error::SRCError,
@@ -381,9 +381,11 @@ where
                                     );
                                     errors.push(KafkaAvroPublisherActorError::KafkaError(err));
                                     break; // exit retry loop and move to next
-                                           // avro_value
+                                    // avro_value
                                 }
-                                debug!("Kafka message queue is full, sleeping for {polling_interval:?}");
+                                debug!(
+                                    "Kafka message queue is full, sleeping for {polling_interval:?}"
+                                );
                                 self.stats.send_retries.add(1, &[]);
                                 tokio::time::sleep(polling_interval).await;
                                 polling_interval *= 2;
@@ -401,7 +403,7 @@ where
                                 );
                                 errors.push(KafkaAvroPublisherActorError::KafkaError(err));
                                 break; // exit retry loop and move to next
-                                       // avro_value
+                                // avro_value
                             }
                         }
                     }
@@ -416,7 +418,9 @@ where
             }
             (0, _, None) => {
                 // This should never happen, but handle gracefully
-                error!("Unexpected state: no successful sends in the batch but also no errors recorded");
+                error!(
+                    "Unexpected state: no successful sends in the batch but also no errors recorded"
+                );
                 Err(KafkaAvroPublisherActorError::UnexpectedState(
                     "no successful sends in the batch but also no errors recorded".to_string(),
                 ))

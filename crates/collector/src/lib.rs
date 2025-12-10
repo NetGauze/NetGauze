@@ -29,11 +29,11 @@ use crate::{
     yang_push::enrichment::YangPushEnrichmentActorHandle,
 };
 
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use netgauze_flow_pkt::FlowInfo;
-use netgauze_flow_service::{flow_supervisor::FlowCollectorsSupervisorActorHandle, FlowRequest};
+use netgauze_flow_service::{FlowRequest, flow_supervisor::FlowCollectorsSupervisorActorHandle};
 use netgauze_udp_notif_pkt::MediaType;
-use netgauze_udp_notif_service::{supervisor::UdpNotifSupervisorHandle, UdpNotifRequest};
+use netgauze_udp_notif_service::{UdpNotifRequest, supervisor::UdpNotifSupervisorHandle};
 use netgauze_yang_push::{
     model::telemetry::TelemetryMessageWrapper,
     schema_cache::SchemaCacheActorHandle,
@@ -721,7 +721,7 @@ fn serialize_udp_notif(
 ) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
     let (peer, msg) = input.as_ref();
     let mut value = serde_json::to_value(msg)?;
-    if let serde_json::Value::Object(ref mut val) = &mut value {
+    if let serde_json::Value::Object(val) = &mut value {
         // Add the writer ID to the message
         val.insert(
             "writer_id".to_string(),

@@ -16,14 +16,14 @@
 //! Codecs to decode and encode BMP Protocol messages from byte streams
 
 use crate::{
+    BmpMessage, BmpPeerType, PeerKey,
     iana::BmpVersion,
     v3, v4,
     wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
-    BmpMessage, BmpPeerType, PeerKey,
 };
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
-use netgauze_bgp_pkt::{capabilities::BgpCapability, BgpMessage};
+use netgauze_bgp_pkt::{BgpMessage, capabilities::BgpCapability};
 use std::collections::HashSet;
 
 use crate::wire::deserializer::BmpParsingContext;

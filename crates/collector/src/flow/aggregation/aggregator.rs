@@ -50,13 +50,14 @@ use crate::flow::{aggregation::config::*, types::FieldRef};
 use chrono::{DateTime, Utc};
 use netgauze_analytics::aggregation::*;
 use netgauze_flow_pkt::{
+    DataSetId, FlowInfo,
     ie::{Field, *},
-    ipfix, DataSetId, FlowInfo,
+    ipfix,
 };
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::{
-    collections::{hash_map::Entry, HashSet},
+    collections::{HashSet, hash_map::Entry},
     net::{IpAddr, SocketAddr},
 };
 use tracing::{error, info};
@@ -264,7 +265,7 @@ pub(crate) fn explode(
     key_select: &[FieldRef],
     agg_select: &[AggFieldRef],
     collection_time: DateTime<Utc>,
-) -> (usize, impl Iterator<Item = AggFlowInfo>) {
+) -> (usize, impl Iterator<Item = AggFlowInfo> + use<>) {
     // FlowInfo are not expected to contain more than 16 records
     let mut exploded = SmallVec::<[AggFlowInfo; 16]>::new();
 

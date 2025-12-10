@@ -15,12 +15,12 @@
 
 use crate::{MediaType, MediaTypeNames, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use bytes::Bytes;
-use netgauze_parse_utils::{parse_into_located, ReadablePdu, Span};
+use netgauze_parse_utils::{ReadablePdu, Span, parse_into_located};
 use netgauze_serde_macros::LocatedError;
 use nom::{
+    IResult,
     error::ErrorKind,
     number::complete::{be_u16, be_u32},
-    IResult,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -15,8 +15,8 @@
 
 use clap::{Parser, ValueEnum};
 use netgauze_pcap_decoder::{
-    load_pcap_and_process, BgpProtocolHandler, BmpProtocolHandler, Config, FlowProtocolHandler,
-    UdpNotifProtocolHandler,
+    BgpProtocolHandler, BmpProtocolHandler, Config, FlowProtocolHandler, UdpNotifProtocolHandler,
+    load_pcap_and_process,
 };
 use std::path::PathBuf;
 

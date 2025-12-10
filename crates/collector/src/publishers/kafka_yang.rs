@@ -39,7 +39,7 @@ use rdkafka::{
     producer::{BaseRecord, Producer, ThreadedProducer},
 };
 use schema_registry_converter::{
-    async_impl::schema_registry::{post_schema, SrSettings},
+    async_impl::schema_registry::{SrSettings, post_schema},
     error::SRCError,
     schema_registry_common::{SchemaType, SuppliedReference, SuppliedSchema},
 };
@@ -463,11 +463,17 @@ where
                 let schema = match tokio::time::timeout(Duration::from_secs(5), response_rx).await {
                     Ok(Ok(schema)) => schema,
                     Ok(Err(_)) => {
-                        warn!("Schema request channel closed for content ID '{}', fallback to using root schema (id={})", id, self.root_schema_id);
+                        warn!(
+                            "Schema request channel closed for content ID '{}', fallback to using root schema (id={})",
+                            id, self.root_schema_id
+                        );
                         return Ok(self.root_schema_id);
                     }
                     Err(_) => {
-                        warn!("Schema request timeout for content ID '{}', fallback to using root schema (id={})", id, self.root_schema_id);
+                        warn!(
+                            "Schema request timeout for content ID '{}', fallback to using root schema (id={})",
+                            id, self.root_schema_id
+                        );
                         return Ok(self.root_schema_id);
                     }
                 };
@@ -477,8 +483,7 @@ where
                     Ok(schema_id) => {
                         trace!(
                             "Registered new schema ID {} for content ID '{}'",
-                            schema_id,
-                            id
+                            schema_id, id
                         );
                         self.schema_id_cache.insert(id.to_string(), schema_id);
                         Ok(schema_id)

@@ -17,6 +17,7 @@ use std::cmp::Ordering;
 use tokio::sync::mpsc;
 
 use netgauze_bgp_pkt::{
+    BgpMessage,
     notification::{
         BgpNotificationMessage, MessageHeaderError, OpenMessageError, RouteRefreshError,
         UpdateMessageError,
@@ -25,9 +26,8 @@ use netgauze_bgp_pkt::{
     route_refresh::BgpRouteRefreshMessage,
     update::BgpUpdateMessage,
     wire::deserializer::{
-        notification::BgpNotificationMessageParsingError, BgpMessageParsingError,
+        BgpMessageParsingError, notification::BgpNotificationMessageParsingError,
     },
-    BgpMessage,
 };
 
 use netgauze_bgp_pkt::codec::BgpCodecDecoderError;
