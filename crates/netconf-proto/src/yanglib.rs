@@ -2040,7 +2040,7 @@ impl ModuleSetBuilder {
     ) -> Result<HashMap<Box<str>, AddResult>, DependencyError> {
         let mut results = HashMap::new();
         for module_set in yang_lib.modules_set.into_values() {
-            for mut module in module_set.modules.into_values() {
+            for module in module_set.modules.into_values() {
                 let schema = yang_schemas
                     .get(module.name())
                     .ok_or(DependencyError::SchemaNotFound {
@@ -2048,16 +2048,8 @@ impl ModuleSetBuilder {
                     })?
                     .clone();
                 if let Some(existing) = self.module_set.modules.get_mut(module.name()) {
-                    // Merge features if the module is already existing
-                    let mut features: HashSet<Box<str>> =
-                        HashSet::with_capacity(existing.features().len() + module.features().len());
-                    existing.features().iter().for_each(|f| {
-                        features.insert(f.clone());
-                    });
-                    module.features().iter().for_each(|f| {
-                        features.insert(f.clone());
-                    });
-                    module.feature = features.into_iter().collect();
+                    // Prefer the features selected by the new YANG library
+                    existing.feature = module.feature.clone();
                 }
 
                 let module_name = module.name.clone();
