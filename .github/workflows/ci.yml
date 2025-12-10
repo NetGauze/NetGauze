@@ -26,8 +26,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Install stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install nightly
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
       - name: cargo fmt --check
@@ -134,7 +134,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@clippy
         with:
           toolchain: beta
-      - run: cargo clippy --tests -- -Dclippy::all -A clippy::too-long-first-doc-paragraph
+      - run: cargo clippy --tests
 
   coverage:
     # use llvm-cov to build and collect coverage and outputs in a format that is compatible with

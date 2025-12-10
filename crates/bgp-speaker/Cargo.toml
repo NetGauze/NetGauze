@@ -1,3 +1,5 @@
+lints.workspace = true
+
 [package]
 name = "netgauze-bgp-speaker"
 version = "0.8.0"

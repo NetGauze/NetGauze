@@ -6,23 +6,4 @@
 rustflags = [
     "--cfg",
     "tokio_unstable",
-    # lints
-    # TODO: use lint configuration in cargo https://github.com/rust-lang/cargo/issues/5034
-    "-Funused_must_use",
-    "-Dclippy::uninlined_format_args",
-    "-Dclippy::dbg_macro",
-    "-Dclippy::disallowed_methods",
-    "-Dclippy::disallowed_types",
-    #"-Wclippy::doc_markdown",
-    "-Dclippy::explicit_into_iter_loop",
-    "-Dclippy::explicit_iter_loop",
-    "-Dclippy::inconsistent_struct_constructor",
-    "-Dclippy::unused_async",
-    "-Dclippy::map_flatten",
-    "-Dclippy::no_effect_underscore_binding",
-    "-Dclippy::await_holding_lock",
-    "-Wrustdoc::broken_intra_doc_links",
-    "-Dfuture_incompatible",
-    "-Dnonstandard_style",
-    "-Drust_2018_idioms",
 ]
