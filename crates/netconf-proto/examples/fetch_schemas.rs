@@ -23,6 +23,12 @@ use netgauze_netconf_proto::{
 use quick_xml::NsReader;
 use std::{collections::HashMap, io::Write, path::Path, sync::Arc, time::Duration};
 
+const MODULE_STATE: &str = r#"
+<modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+    <module-set-id>ALL</module-set-id>
+</modules-state>
+"#;
+
 #[derive(clap::Parser, Debug)]
 #[command(
     group(
@@ -169,7 +175,10 @@ pub async fn main() -> anyhow::Result<()> {
         let quick_xml_writer = quick_xml::writer::Writer::new_with_indent(writer, 32, 2);
         let mut xml_writer = XmlWriter::new(quick_xml_writer);
         router_yang_lib.xml_serialize(&mut xml_writer)?;
-        xml_writer.into_inner().flush()?;
+        let mut inner = xml_writer.into_inner();
+        inner.write_all(MODULE_STATE.as_bytes())?;
+        inner.flush()?;
+        drop(inner);
         save_modules_to_disk(&yang_lib, &schemas, &output_path)?;
     }
 
@@ -294,7 +303,10 @@ fn save_modules_to_disk(
     let quick_xml_writer = quick_xml::writer::Writer::new_with_indent(writer, 32, 2);
     let mut xml_writer = XmlWriter::new(quick_xml_writer);
     yang_lib.xml_serialize(&mut xml_writer)?;
-    xml_writer.into_inner().flush()?;
+    let mut inner = xml_writer.into_inner();
+    inner.write_all(MODULE_STATE.as_bytes())?;
+    inner.flush()?;
+    drop(inner);
 
     for (name, schema) in schemas {
         let mut revision = None;
