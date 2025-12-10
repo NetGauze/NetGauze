@@ -506,7 +506,7 @@ impl YangLibrary {
         }
     }
 
-    /// Load schemas according the to location given in the YANG Library
+    /// Load schemas according to the location given in the YANG Library
     /// for each module and submodule.
     ///
     /// Currently only file:// locations are supported, other locations are ignored.
@@ -881,7 +881,7 @@ impl ModuleSet {
                         .values()
                         .next()
                         .map(|x| x.name())
-                        .unwrap_or("ZEROMODULES")
+                        .unwrap_or("ZERO-MODULES")
                 ));
             }
             for import_only_module in import_only_modules.values() {
@@ -2113,13 +2113,13 @@ impl ModuleSetBuilder {
 }
 
 pub enum CompatabilityResult {
-    /// Everything is exactly the (features, schema, etc..)
+    /// Everything is exactly the same (features, schema, etc.)
     Same,
 
-    /// The modules is the same, but the features are different.
+    /// The module is the same, but the features are different.
     SameCompatibleFeatures,
 
-    /// The modules is the same, but the features are different.
+    /// The module is the same, but the features are different.
     SameIncompatibleFeatures,
 
     /// The modules are backward compatible.
