@@ -12,7 +12,7 @@ fn main() {
     // NetFlow v9 template packet
     let netflow_template = NetFlowV9Packet::new(
         120,
-        Utc.with_ymd_and_hms(2024, 7, 08, 13, 0, 0).unwrap(),
+        Utc.with_ymd_and_hms(2024, 7, 8, 13, 0, 0).unwrap(),
         0,
         0,
         Box::new([Set::Template(Box::new([TemplateRecord::new(
@@ -138,7 +138,7 @@ fn main() {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
     netflow_data
-        .write(&mut cursor, Some(&mut templates_map))
+        .write(&mut cursor, Some(&templates_map))
         .unwrap();
     assert_eq!(
         buf,

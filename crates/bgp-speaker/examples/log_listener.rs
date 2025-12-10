@@ -62,7 +62,7 @@ fn create_peer(
     peer_handle.start().unwrap();
     tokio::spawn(async move {
         while let Some(event) = received_rx.recv().await {
-            log::info!("[LISTENER] GOT EVENT: {:?}", event);
+            log::info!("[LISTENER] GOT EVENT: {event:?}");
         }
     });
     peer_handle

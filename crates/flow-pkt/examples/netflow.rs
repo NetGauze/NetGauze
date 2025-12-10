@@ -73,7 +73,7 @@ fn main() {
     let mut buf: Vec<u8> = vec![];
     let mut cursor = Cursor::new(&mut buf);
     netflow_data
-        .write(&mut cursor, Some(&mut templates_map))
+        .write(&mut cursor, Some(&templates_map))
         .unwrap();
     assert_eq!(
         buf,
