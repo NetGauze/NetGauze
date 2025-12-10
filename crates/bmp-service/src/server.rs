@@ -20,9 +20,9 @@ use tokio_util::codec::Framed;
 use tower::ServiceExt;
 use tower_service::Service;
 
-use netgauze_bmp_pkt::{codec::BmpCodec, BmpMessage};
+use netgauze_bmp_pkt::{BmpMessage, codec::BmpCodec};
 
-use crate::{handle::BmpServerHandle, AddrInfo, BmpCodecDecoderError, TaggedData};
+use crate::{AddrInfo, BmpCodecDecoderError, TaggedData, handle::BmpServerHandle};
 
 /// Tagged BMP Protocol request
 pub type BmpRequest =
@@ -180,7 +180,7 @@ mod tests {
     use netgauze_bmp_pkt::v3::{BmpMessageValue, InitiationMessage};
     use rand::Rng;
     use tokio::task::JoinHandle;
-    use tower::{service_fn, ServiceBuilder};
+    use tower::{ServiceBuilder, service_fn};
 
     #[tokio::test]
     async fn test_start() {

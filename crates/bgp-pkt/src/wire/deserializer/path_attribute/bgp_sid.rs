@@ -1,13 +1,13 @@
 use nom::{
-    number::complete::{be_u128, be_u16, be_u32, be_u8},
     IResult,
+    number::complete::{be_u8, be_u16, be_u32, be_u128},
 };
 use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithOneInput, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
+    parse_till_empty_into_located,
 };
 use netgauze_serde_macros::LocatedError;
 
@@ -89,7 +89,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidTlvParsingError<'a>> for BgpSidAttri
                         code,
                         value: data.to_vec(),
                     },
-                ))
+                ));
             }
             Err(error) => {
                 return Err(nom::Err::Error(LocatedBgpPrefixSidTlvParsingError::new(
@@ -144,7 +144,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubTlvParsingError<'a>> for SRv6Serv
                         code,
                         value: data.to_vec(),
                     },
-                ))
+                ));
             }
             Err(error) => {
                 return Err(nom::Err::Error(LocatedBgpPrefixSidSubTlvParsingError::new(
@@ -193,7 +193,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpPrefixSidSubSubTlvParsingError<'a>> for SRv6S
                         code,
                         value: data.to_vec(),
                     },
-                ))
+                ));
             }
             Err(error) => {
                 return Err(nom::Err::Error(

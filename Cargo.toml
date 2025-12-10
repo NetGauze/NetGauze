@@ -122,6 +122,7 @@ unused_must_use = { level = "forbid", priority = 1 }
 future_incompatible = { level = "deny", priority = 2 }
 nonstandard_style = { level = "deny", priority = 3 }
 rust_2018_idioms = { level = "deny", priority = 4 }
+rust-2024-compatibility = { level = "warn", priority = 6 }
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

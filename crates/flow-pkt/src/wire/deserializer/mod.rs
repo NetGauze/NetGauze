@@ -14,9 +14,9 @@
 // limitations under the License.
 
 use nom::{
+    IResult,
     error::ErrorKind,
     number::complete::{be_u16, be_u32},
-    IResult,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +24,7 @@ use crate::{FieldSpecifier, FieldSpecifierError};
 use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePdu, Span};
 use netgauze_serde_macros::LocatedError;
 
-use crate::ie::{IEError, IE};
+use crate::ie::{IE, IEError};
 
 pub mod ie;
 pub mod ipfix;
@@ -114,7 +114,7 @@ impl<'a> ReadablePdu<'a, LocatedFieldSpecifierParsingError<'a>> for FieldSpecifi
                 return Err(nom::Err::Error(LocatedFieldSpecifierParsingError::new(
                     input,
                     FieldSpecifierParsingError::FieldSpecifierError(err),
-                )))
+                )));
             }
         };
         Ok((buf, spec))

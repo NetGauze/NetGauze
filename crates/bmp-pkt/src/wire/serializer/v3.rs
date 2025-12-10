@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    BmpPeerType, PeerHeader,
     iana::{
         PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2, PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6,
         PEER_FLAGS_IS_POST_POLICY,
@@ -24,11 +25,10 @@ use crate::{
         RouteMirroringMessage, RouteMirroringValue, RouteMonitoringMessage, StatisticsCounter,
         StatisticsReportMessage, TerminationInformation, TerminationMessage,
     },
-    BmpPeerType, PeerHeader,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::wire::serializer::{
-    nlri::RouteDistinguisherWritingError, BgpMessageWritingError,
+    BgpMessageWritingError, nlri::RouteDistinguisherWritingError,
 };
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;

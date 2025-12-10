@@ -49,14 +49,14 @@
 //!   `!`)
 //! - All formats support incremental change detection with line-based diffing
 use crate::inputs::{
+    EnrichmentHandle,
     files::{
+        FilesConfig, InputFileFormat,
         handlers::{
             FilesLineHandler, FlowUpsertsHandler, PmacctMapsHandler, YangPushUpsertsHandler,
         },
         processor::{FileProcessor, FileProcessorCallback},
-        FilesConfig, InputFileFormat,
     },
-    EnrichmentHandle,
 };
 use notify::{Config, Event, PollWatcher, RecursiveMode, Watcher};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
@@ -278,10 +278,13 @@ where
 
         // Watch all configured paths
         for (path_str, path, format) in paths {
-            if let Err(e) = self.add_file_to_watcher(path, format).await {
-                error!("Failed to watch configured path {}: {}", path_str, e);
-            } else {
-                debug!("File watcher initialized for path {}", path_str);
+            match self.add_file_to_watcher(path, format).await {
+                Err(e) => {
+                    error!("Failed to watch configured path {}: {}", path_str, e);
+                }
+                _ => {
+                    debug!("File watcher initialized for path {}", path_str);
+                }
             }
         }
 

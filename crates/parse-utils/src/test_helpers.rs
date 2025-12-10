@@ -38,7 +38,10 @@ where
     E: Debug,
 {
     let parsed = <T as ReadablePdu<E>>::from_wire(Span::new(input));
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     (span, value)
@@ -51,7 +54,10 @@ where
     E: Debug,
 {
     let parsed = <T as ReadablePdu<E>>::from_wire(Span::new(input));
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     assert_eq!(
@@ -73,7 +79,10 @@ where
     E: Debug,
 {
     let parsed = <T as ReadablePduWithOneInput<I, E>>::from_wire(Span::new(input), parser_input);
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     assert_eq!(
@@ -100,7 +109,10 @@ where
         parser_input1,
         parser_input2,
     );
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     assert_eq!(
@@ -129,7 +141,10 @@ where
         parser_input2,
         parser_input3,
     );
-    assert!(parsed.is_ok(), "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}");
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
     let (span, value) = parsed.unwrap();
     assert_eq!(&value, expected);
     assert_eq!(

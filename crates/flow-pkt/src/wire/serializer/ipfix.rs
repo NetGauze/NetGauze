@@ -20,7 +20,7 @@ use std::io::Write;
 
 use crate::{
     ipfix::*,
-    wire::serializer::{ie::FieldWritingError, FieldSpecifierWritingError},
+    wire::serializer::{FieldSpecifierWritingError, ie::FieldWritingError},
 };
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]

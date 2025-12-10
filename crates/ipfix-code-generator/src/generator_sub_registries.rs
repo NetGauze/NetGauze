@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    generator::generate_xref_link, xml_parsers::sub_registries::SubRegistry,
-    InformationElementSubRegistry,
+    InformationElementSubRegistry, generator::generate_xref_link,
+    xml_parsers::sub_registries::SubRegistry,
 };
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;

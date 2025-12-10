@@ -22,8 +22,8 @@ use crate::{
         IpReachabilityInformationData,
     },
     wire::serializer::{
-        nlri::nlri::RouteDistinguisherWritingError, write_tlv_header_t16_l16,
-        MultiTopologyIdWritingError,
+        MultiTopologyIdWritingError, nlri::nlri::RouteDistinguisherWritingError,
+        write_tlv_header_t16_l16,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};

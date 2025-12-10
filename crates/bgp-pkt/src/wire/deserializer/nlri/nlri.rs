@@ -26,15 +26,15 @@ use crate::{
 };
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
     ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs,
-    ReadablePduWithTwoInputs, Span,
+    ReadablePduWithTwoInputs, Span, parse_into_located, parse_into_located_one_input,
+    parse_into_located_two_inputs,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
-    error::ErrorKind,
-    number::complete::{be_u128, be_u16, be_u32, be_u8},
     IResult,
+    error::ErrorKind,
+    number::complete::{be_u8, be_u16, be_u32, be_u128},
 };
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -884,7 +884,7 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv4PrefixRouteParsingError<'a>> for L2Evp
                             Ipv4PrefixParsingError::InvalidIpv4PrefixLen(prefix_len),
                         ),
                     ),
-                ))
+                ));
             }
         };
         let (buf, gateway) = be_u32(buf)?;
@@ -930,7 +930,7 @@ impl<'a> ReadablePdu<'a, LocatedL2EvpnIpv6PrefixRouteParsingError<'a>> for L2Evp
                             Ipv6PrefixParsingError::InvalidIpv6PrefixLen(prefix_len),
                         ),
                     ),
-                ))
+                ));
             }
         };
         let (buf, gateway) = be_u128(buf)?;

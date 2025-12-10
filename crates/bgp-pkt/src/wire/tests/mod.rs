@@ -24,13 +24,14 @@ use nom::error::ErrorKind;
 
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
+    Span,
     test_helpers::{
         combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
     },
-    Span,
 };
 
 use crate::{
+    BgpMessage, BgpNotificationMessage, BgpOpenMessage, BgpRouteRefreshMessage,
     capabilities::{
         AddPathAddressFamily, AddPathCapability, BgpCapability, BgpRoleCapability,
         ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
@@ -46,11 +47,12 @@ use crate::{
     },
     nlri::*,
     notification::CeaseError,
-    open::{BgpOpenMessageParameter, BGP_VERSION},
+    open::{BGP_VERSION, BgpOpenMessageParameter},
     path_attribute::*,
     update::BgpUpdateMessage,
     wire::{
         deserializer::{
+            BgpMessageParsingError, BgpParsingContext, LocatedBgpMessageParsingError,
             notification::{BgpNotificationMessageParsingError, CeaseErrorParsingError},
             path_attribute::{
                 AsPathParsingError, LocalPreferenceParsingError,
@@ -58,11 +60,9 @@ use crate::{
                 PathAttributeParsingError,
             },
             route_refresh::BgpRouteRefreshMessageParsingError,
-            BgpMessageParsingError, BgpParsingContext, LocatedBgpMessageParsingError,
         },
         serializer::BgpMessageWritingError,
     },
-    BgpMessage, BgpNotificationMessage, BgpOpenMessage, BgpRouteRefreshMessage,
 };
 
 mod bgp_ls;
@@ -499,24 +499,26 @@ fn test_rd_withdraw() -> Result<(), BgpMessageWritingError> {
 
     let good = BgpMessage::Update(BgpUpdateMessage::new(
         vec![],
-        vec![PathAttribute::from(
-            true,
-            false,
-            false,
-            true,
-            PathAttributeValue::MpUnreach(MpUnreach::Ipv4MplsVpnUnicast {
-                nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
-                    RouteDistinguisher::As4Administrator {
-                        asn4: 6553800,
-                        number: 300,
-                    },
-                    vec![MplsLabel::new([22, 152, 145])],
-                    Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(1, 1, 1, 1), 32).unwrap())
-                        .unwrap(),
-                )],
-            }),
-        )
-        .unwrap()],
+        vec![
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                true,
+                PathAttributeValue::MpUnreach(MpUnreach::Ipv4MplsVpnUnicast {
+                    nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
+                        RouteDistinguisher::As4Administrator {
+                            asn4: 6553800,
+                            number: 300,
+                        },
+                        vec![MplsLabel::new([22, 152, 145])],
+                        Ipv4Unicast::from_net(Ipv4Net::new(Ipv4Addr::new(1, 1, 1, 1), 32).unwrap())
+                            .unwrap(),
+                    )],
+                }),
+            )
+            .unwrap(),
+        ],
         vec![],
     ));
 
@@ -1010,80 +1012,82 @@ fn test_evpn_withdraw() -> Result<(), BgpMessageWritingError> {
 
     let good = BgpMessage::Update(BgpUpdateMessage::new(
         vec![],
-        vec![PathAttribute::from(
-            true,
-            false,
-            false,
-            true,
-            PathAttributeValue::MpUnreach(MpUnreach::L2Evpn {
-                nlri: vec![
-                    L2EvpnAddress::new(
-                        None,
-                        L2EvpnRoute::EthernetAutoDiscovery(EthernetAutoDiscovery::new(
-                            RouteDistinguisher::Ipv4Administrator {
-                                ip: Ipv4Addr::new(120, 0, 2, 1),
-                                number: 100,
-                            },
-                            EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 16, 0, 0, 5]),
-                            EthernetTag(0),
-                            MplsLabel::new([0, 0, 0]),
-                        )),
-                    ),
-                    L2EvpnAddress::new(
-                        None,
-                        L2EvpnRoute::EthernetSegmentRoute(EthernetSegmentRoute::new(
-                            RouteDistinguisher::Ipv4Administrator {
-                                ip: Ipv4Addr::new(120, 0, 2, 1),
-                                number: 0,
-                            },
-                            EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 16, 0, 0, 5]),
-                            IpAddr::V4(Ipv4Addr::new(120, 0, 2, 1)),
-                        )),
-                    ),
-                    L2EvpnAddress::new(
-                        None,
-                        L2EvpnRoute::EthernetAutoDiscovery(EthernetAutoDiscovery::new(
-                            RouteDistinguisher::Ipv4Administrator {
-                                ip: Ipv4Addr::new(120, 0, 2, 1),
-                                number: 0,
-                            },
-                            EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 16, 0, 0, 5]),
-                            EthernetTag(4294967295),
-                            MplsLabel::new([0, 0, 0]),
-                        )),
-                    ),
-                    L2EvpnAddress::new(
-                        None,
-                        L2EvpnRoute::InclusiveMulticastEthernetTagRoute(
-                            InclusiveMulticastEthernetTagRoute::new(
+        vec![
+            PathAttribute::from(
+                true,
+                false,
+                false,
+                true,
+                PathAttributeValue::MpUnreach(MpUnreach::L2Evpn {
+                    nlri: vec![
+                        L2EvpnAddress::new(
+                            None,
+                            L2EvpnRoute::EthernetAutoDiscovery(EthernetAutoDiscovery::new(
                                 RouteDistinguisher::Ipv4Administrator {
                                     ip: Ipv4Addr::new(120, 0, 2, 1),
                                     number: 100,
                                 },
-                                EthernetTag(100),
+                                EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 16, 0, 0, 5]),
+                                EthernetTag(0),
+                                MplsLabel::new([0, 0, 0]),
+                            )),
+                        ),
+                        L2EvpnAddress::new(
+                            None,
+                            L2EvpnRoute::EthernetSegmentRoute(EthernetSegmentRoute::new(
+                                RouteDistinguisher::Ipv4Administrator {
+                                    ip: Ipv4Addr::new(120, 0, 2, 1),
+                                    number: 0,
+                                },
+                                EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 16, 0, 0, 5]),
                                 IpAddr::V4(Ipv4Addr::new(120, 0, 2, 1)),
+                            )),
+                        ),
+                        L2EvpnAddress::new(
+                            None,
+                            L2EvpnRoute::EthernetAutoDiscovery(EthernetAutoDiscovery::new(
+                                RouteDistinguisher::Ipv4Administrator {
+                                    ip: Ipv4Addr::new(120, 0, 2, 1),
+                                    number: 0,
+                                },
+                                EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 16, 0, 0, 5]),
+                                EthernetTag(4294967295),
+                                MplsLabel::new([0, 0, 0]),
+                            )),
+                        ),
+                        L2EvpnAddress::new(
+                            None,
+                            L2EvpnRoute::InclusiveMulticastEthernetTagRoute(
+                                InclusiveMulticastEthernetTagRoute::new(
+                                    RouteDistinguisher::Ipv4Administrator {
+                                        ip: Ipv4Addr::new(120, 0, 2, 1),
+                                        number: 100,
+                                    },
+                                    EthernetTag(100),
+                                    IpAddr::V4(Ipv4Addr::new(120, 0, 2, 1)),
+                                ),
                             ),
                         ),
-                    ),
-                    L2EvpnAddress::new(
-                        None,
-                        L2EvpnRoute::MacIpAdvertisement(MacIpAdvertisement::new(
-                            RouteDistinguisher::Ipv4Administrator {
-                                ip: Ipv4Addr::new(120, 0, 2, 1),
-                                number: 100,
-                            },
-                            EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-                            EthernetTag(100),
-                            MacAddress([76, 150, 20, 112, 25, 128]),
+                        L2EvpnAddress::new(
                             None,
-                            MplsLabel::new([0, 0, 0]),
-                            None,
-                        )),
-                    ),
-                ],
-            }),
-        )
-        .unwrap()],
+                            L2EvpnRoute::MacIpAdvertisement(MacIpAdvertisement::new(
+                                RouteDistinguisher::Ipv4Administrator {
+                                    ip: Ipv4Addr::new(120, 0, 2, 1),
+                                    number: 100,
+                                },
+                                EthernetSegmentIdentifier([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+                                EthernetTag(100),
+                                MacAddress([76, 150, 20, 112, 25, 128]),
+                                None,
+                                MplsLabel::new([0, 0, 0]),
+                                None,
+                            )),
+                        ),
+                    ],
+                }),
+            )
+            .unwrap(),
+        ],
         vec![],
     ));
 

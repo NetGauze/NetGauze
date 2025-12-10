@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use futures_util::{stream::SplitSink, StreamExt};
+use futures_util::{StreamExt, stream::SplitSink};
 use std::collections::HashMap;
 use tokio::net::UdpSocket;
 use tokio_util::{

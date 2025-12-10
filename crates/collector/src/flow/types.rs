@@ -257,7 +257,7 @@ impl From<IndexedDataRecord> for ipfix::DataRecord {
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
-    use netgauze_flow_pkt::ie::{protocolIdentifier, Field, IE};
+    use netgauze_flow_pkt::ie::{Field, IE, protocolIdentifier};
     use netgauze_iana::tcp::TCPHeaderFlags;
     use rustc_hash::{FxBuildHasher, FxHashMap};
     use std::{
@@ -596,18 +596,26 @@ mod tests {
         assert!(record.contains_ie(IE::sourceIPv4Address));
 
         // Test FxHashMap<FieldRef, V> getter methods
-        assert!(record
-            .scope_fields()
-            .contains_field_ref(FieldRef::new(IE::exportingProcessId, 0)));
-        assert!(record
-            .scope_fields()
-            .contains_field_ref(FieldRef::new(IE::exportingProcessId, 1)));
-        assert!(record
-            .scope_fields()
-            .contains_field_ref(FieldRef::new(IE::exportingProcessId, 2)));
-        assert!(record
-            .fields()
-            .contains_field_ref(FieldRef::new(IE::sourceIPv4Address, 0)));
+        assert!(
+            record
+                .scope_fields()
+                .contains_field_ref(FieldRef::new(IE::exportingProcessId, 0))
+        );
+        assert!(
+            record
+                .scope_fields()
+                .contains_field_ref(FieldRef::new(IE::exportingProcessId, 1))
+        );
+        assert!(
+            record
+                .scope_fields()
+                .contains_field_ref(FieldRef::new(IE::exportingProcessId, 2))
+        );
+        assert!(
+            record
+                .fields()
+                .contains_field_ref(FieldRef::new(IE::sourceIPv4Address, 0))
+        );
 
         assert!(record.scope_fields().contains_ie(IE::exportingProcessId));
         assert!(record.fields().contains_ie(IE::sourceIPv4Address));

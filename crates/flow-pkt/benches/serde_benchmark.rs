@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Cursor};
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use netgauze_flow_pkt::{ipfix, ipfix::IpfixPacket};
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};

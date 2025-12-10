@@ -15,7 +15,7 @@
 
 use crate::model::notification::{NotificationEnvelope, NotificationLegacy};
 use netgauze_udp_notif_pkt::{
-    MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket, UDP_NOTIF_V1,
+    MediaType, UDP_NOTIF_V1, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

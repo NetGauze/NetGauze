@@ -27,7 +27,7 @@ use opentelemetry::global;
 use serde_yaml::from_reader;
 use shadow_rs::shadow;
 use std::{env, fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr};
-use tracing::{info, Level};
+use tracing::{Level, info};
 
 shadow!(build);
 

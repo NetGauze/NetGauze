@@ -14,11 +14,12 @@
 // limitations under the License.
 
 use crate::{
+    PeerHeader,
     iana::{BmpMessageType, InitiationInformationTlvType},
-    v3, PeerHeader,
+    v3,
 };
 use either::Either;
-use netgauze_bgp_pkt::{capabilities::BgpCapability, iana::BgpMessageType, BgpMessage};
+use netgauze_bgp_pkt::{BgpMessage, capabilities::BgpCapability, iana::BgpMessageType};
 use serde::{Deserialize, Serialize};
 use std::ops::BitOr;
 use strum_macros::{Display, FromRepr};

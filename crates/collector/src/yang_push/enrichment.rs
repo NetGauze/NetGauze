@@ -241,7 +241,10 @@ impl YangPushEnrichmentActor {
             }) => {
                 // Early return if no labels are provided
                 if incoming_labels.is_empty() {
-                    debug!("Empty labels vector provided for upsert operation for ip={} - cache not modified", ip);
+                    debug!(
+                        "Empty labels vector provided for upsert operation for ip={} - cache not modified",
+                        ip
+                    );
                     return;
                 }
 
@@ -295,7 +298,10 @@ impl YangPushEnrichmentActor {
             }) => {
                 // Early return if no label names are provided
                 if label_names.is_empty() {
-                    debug!("Empty label_names vector provided for delete operation for ip={} - cache not modified", ip);
+                    debug!(
+                        "Empty label_names vector provided for delete operation for ip={} - cache not modified",
+                        ip
+                    );
                     return;
                 }
                 if let Some(labels) = self.labels.get_mut(&ip) {
@@ -309,12 +315,9 @@ impl YangPushEnrichmentActor {
                                 labels.remove(&name);
                             } else {
                                 debug!(
-                                "Ignoring delete for label '{}' (lower weight) for ip={}, weight: {}<{}",
-                                name,
-                                ip,
-                                weight,
-                                current.weight
-                            );
+                                    "Ignoring delete for label '{}' (lower weight) for ip={}, weight: {}<{}",
+                                    name, ip, weight, current.weight
+                                );
                             }
                         }
                         {

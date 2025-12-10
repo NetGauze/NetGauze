@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
     NETCONF_NS,
+    xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
 };
 use quick_xml::events::{BytesText, Event};
 use serde::{Deserialize, Serialize};

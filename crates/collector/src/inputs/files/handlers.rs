@@ -13,13 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::inputs::{
-    files::{
-        formats::pmacct_maps::{PmacctMapEntry, PmacctMapEntryScope, PmacctMapError},
-        LineChangeType,
-    },
     InputProcessingError,
+    files::{
+        LineChangeType,
+        formats::pmacct_maps::{PmacctMapEntry, PmacctMapEntryScope, PmacctMapError},
+    },
 };
-use netgauze_flow_pkt::ie::{netgauze, Field, HasIE, IE};
+use netgauze_flow_pkt::ie::{Field, HasIE, IE, netgauze};
 use std::{net::IpAddr, path::Path};
 
 /// **Generic Files Line Handler Trait**
@@ -384,7 +384,7 @@ mod tests {
         handlers::{FlowUpsertsHandler, PmacctMapsHandler, YangPushUpsertsHandler},
         processor::{FileProcessor, FileProcessorCallback},
     };
-    use netgauze_flow_pkt::ie::{netgauze, Field, IE};
+    use netgauze_flow_pkt::ie::{Field, IE, netgauze};
     use netgauze_yang_push::model::telemetry::{Label, LabelValue};
     use std::cell::RefCell;
     use tempfile::NamedTempFile;

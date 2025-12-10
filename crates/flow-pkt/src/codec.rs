@@ -26,17 +26,16 @@ use tokio_util::codec::{Decoder, Encoder};
 use tracing::instrument;
 
 use crate::{
-    ipfix, netflow,
+    FlowInfo, ipfix, netflow,
     wire::{
         deserializer::{
-            ipfix::{IpfixPacketParsingError, IPFIX_HEADER_LENGTH},
+            ipfix::{IPFIX_HEADER_LENGTH, IpfixPacketParsingError},
             netflow::NetFlowV9PacketParsingError,
         },
         serializer::{
-            ipfix::IpfixPacketWritingError, netflow::NetFlowV9WritingError, FlowWritingError,
+            FlowWritingError, ipfix::IpfixPacketWritingError, netflow::NetFlowV9WritingError,
         },
     },
-    FlowInfo,
 };
 use netgauze_parse_utils::{
     LocatedParsingError, ReadablePduWithOneInput, Span, WritablePduWithOneInput,

@@ -19,11 +19,11 @@ use crate::{
 };
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_parse_utils::{
+    Span,
     test_helpers::{
         test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input,
         test_parsed_completely_with_three_inputs, test_write,
     },
-    Span,
 };
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -326,8 +326,8 @@ fn test_mac_ip_advertisement() -> Result<(), MacIpAdvertisementWritingError> {
 }
 
 #[test]
-fn test_inclusive_multicast_ethernet_tag_route(
-) -> Result<(), InclusiveMulticastEthernetTagRouteWritingError> {
+fn test_inclusive_multicast_ethernet_tag_route()
+-> Result<(), InclusiveMulticastEthernetTagRouteWritingError> {
     let good_wire = [
         0x00, 0x01, 0xac, 0x10, 0x00, 0xc8, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x20, 0xac, 0x10,
         0x00, 0xc8,

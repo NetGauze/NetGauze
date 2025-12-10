@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use quote::{format_ident, quote, TokenStreamExt};
-use syn::{parse::Parse, spanned::Spanned, Expr, Lit};
+use quote::{TokenStreamExt, format_ident, quote};
+use syn::{Expr, Lit, parse::Parse, spanned::Spanned};
 
 #[derive(Debug)]
 struct AttributeNameValue {
@@ -30,18 +30,16 @@ struct Attribute {
 fn parse_attribute(attr: &syn::Attribute) -> Result<Option<Attribute>, syn::Error> {
     let mut out = vec![];
     let expr = attr.parse_args_with(syn::Expr::parse)?;
-    if let Expr::Assign(assign) = expr {
-        if let (Expr::Path(left_path), Expr::Lit(right_lit)) =
+    if let Expr::Assign(assign) = expr
+        && let (Expr::Path(left_path), Expr::Lit(right_lit)) =
             (assign.left.as_ref(), assign.right.as_ref())
-        {
-            if let (Some(ident), Lit::Str(str_lit)) = (left_path.path.get_ident(), &right_lit.lit) {
-                let attr = AttributeNameValue {
-                    ident: ident.clone(),
-                    value: str_lit.value(),
-                };
-                out.push(attr);
-            }
-        }
+        && let (Some(ident), Lit::Str(str_lit)) = (left_path.path.get_ident(), &right_lit.lit)
+    {
+        let attr = AttributeNameValue {
+            ident: ident.clone(),
+            value: str_lit.value(),
+        };
+        out.push(attr);
     }
     Ok(Some(Attribute { value: out }))
 }
@@ -184,35 +182,36 @@ impl LocatedError {
                                     "'module' must be defined",
                                 ));
                             }
-                            Some(parsed_attr) => {
-                                match parsed_attr.value.first() {
-                                    None => {
+                            Some(parsed_attr) => match parsed_attr.value.first() {
+                                None => {
+                                    return Err(syn::Error::new(
+                                        attr.span(),
+                                        "'module' of the Located error is not defined",
+                                    ));
+                                }
+                                Some(name_value) => {
+                                    if name_value.ident != format_ident!("module") {
                                         return Err(syn::Error::new(
                                             attr.span(),
-                                            "'module' of the Located error is not defined",
+                                            format!(
+                                                "Only accepts one attribute 'module', found {:?}",
+                                                name_value.ident
+                                            ),
                                         ));
                                     }
-                                    Some(name_value) => {
-                                        if name_value.ident != format_ident!("module") {
-                                            return Err(syn::Error::new(
-                                                attr.span(),
-                                                format!("Only accepts one attribute 'module', found {:?}", name_value.ident),
-                                            ));
+                                    let mut module_path = name_value.value.clone();
+                                    if let Some(path) = ident_module {
+                                        if !module_path.is_empty() {
+                                            module_path.push_str("::");
                                         }
-                                        let mut module_path = name_value.value.clone();
-                                        if let Some(path) = ident_module {
-                                            if !module_path.is_empty() {
-                                                module_path.push_str("::");
-                                            }
-                                            module_path.push_str(path.as_str());
-                                        }
-                                        module_path
-                                            .split("::")
-                                            .map(|part| format_ident!("{}", part))
-                                            .collect()
+                                        module_path.push_str(path.as_str());
                                     }
+                                    module_path
+                                        .split("::")
+                                        .map(|part| format_ident!("{}", part))
+                                        .collect()
                                 }
-                            }
+                            },
                         };
                         ret.push((located_variants, located_ident, located_module));
                     }

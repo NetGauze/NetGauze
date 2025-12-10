@@ -20,13 +20,13 @@ use crate::{
     nlri::*,
     path_attribute::*,
     wire::{
+        ACCUMULATED_IGP_METRIC,
         serializer::{
+            IpAddrWritingError,
             community::*,
             nlri::*,
-            path_attribute::{bgp_sid::SegmentIdentifierWritingError, BgpLsAttributeWritingError},
-            IpAddrWritingError,
+            path_attribute::{BgpLsAttributeWritingError, bgp_sid::SegmentIdentifierWritingError},
         },
-        ACCUMULATED_IGP_METRIC,
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};

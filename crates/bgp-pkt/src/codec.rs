@@ -21,12 +21,12 @@ use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::{
+    BgpMessage,
     capabilities::BgpCapability,
     wire::{
         deserializer::{BgpMessageParsingError, BgpParsingContext, BgpParsingIgnoredErrors},
         serializer::BgpMessageWritingError,
     },
-    BgpMessage,
 };
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 

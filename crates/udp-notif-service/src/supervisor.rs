@@ -60,9 +60,9 @@
 //!   with multiple udp-notif collectors.
 
 use crate::{
+    ActorId, SubscriberId, Subscription, UdpNotifReceiver, UdpNotifSender,
     actor::{ActorCommand, ActorHandle, UdpNotifActorError, UdpNotifCollectorStats},
-    create_udp_notif_channel, ActorId, SubscriberId, Subscription, UdpNotifReceiver,
-    UdpNotifSender,
+    create_udp_notif_channel,
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr, str::FromStr, time::Duration};
@@ -499,7 +499,7 @@ mod test {
     use std::io::Cursor;
     use tokio::{
         net::UdpSocket,
-        time::{timeout, Duration},
+        time::{Duration, timeout},
     };
 
     // Helper function to create a test configuration

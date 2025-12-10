@@ -19,13 +19,13 @@
 //! ```no_run
 //! use futures_util::StreamExt;
 //! use netgauze_bmp_pkt::{
-//!     codec::{BmpCodec, BmpCodecDecoderError},
 //!     BmpMessage,
+//!     codec::{BmpCodec, BmpCodecDecoderError},
 //! };
 //! use netgauze_bmp_service::{
+//!     AddrInfo,
 //!     server::BmpServerResponse,
 //!     transport::{TaggedFramedReadStream, TaggedFramedReadStreamResult},
-//!     AddrInfo,
 //! };
 //! use std::net::SocketAddr;
 //! use tokio::net::TcpListener;
@@ -94,13 +94,13 @@ pub struct TaggedFramedReadStream<
 }
 
 impl<
-        RX: AsyncRead + Unpin,
-        TX: AsyncWrite,
-        Tag: Copy,
-        Data,
-        Error,
-        Codec: Decoder<Item = Data, Error = Error>,
-    > TaggedFramedReadStream<RX, TX, Tag, Data, Error, Codec>
+    RX: AsyncRead + Unpin,
+    TX: AsyncWrite,
+    Tag: Copy,
+    Data,
+    Error,
+    Codec: Decoder<Item = Data, Error = Error>,
+> TaggedFramedReadStream<RX, TX, Tag, Data, Error, Codec>
 {
     pub const fn new(tag: Tag, framed: FramedRead<RX, Codec>, tx: Option<TX>) -> Self {
         Self {
@@ -116,13 +116,13 @@ impl<
 }
 
 impl<
-        RX: AsyncRead + Unpin,
-        TX: AsyncWrite,
-        Tag: Debug + Copy,
-        Data,
-        Error,
-        Codec: Decoder<Item = Data, Error = Error>,
-    > Stream for TaggedFramedReadStream<RX, TX, Tag, Data, Error, Codec>
+    RX: AsyncRead + Unpin,
+    TX: AsyncWrite,
+    Tag: Debug + Copy,
+    Data,
+    Error,
+    Codec: Decoder<Item = Data, Error = Error>,
+> Stream for TaggedFramedReadStream<RX, TX, Tag, Data, Error, Codec>
 where
     Self: Unpin,
 {

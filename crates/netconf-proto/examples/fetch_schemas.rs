@@ -16,7 +16,7 @@
 use anyhow::anyhow;
 use clap::Parser;
 use netgauze_netconf_proto::{
-    client::{connect, NetconfSshConnectConfig, SshAuth, SshHandler},
+    client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect},
     xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter},
     yanglib::{PermissiveVersionChecker, YangLibrary},
 };
@@ -100,7 +100,7 @@ struct Args {
 }
 
 fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
-    use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))

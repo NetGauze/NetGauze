@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::flow::enrichment::{cache::*, EnrichmentOperation, Scope, Weight};
+use crate::flow::enrichment::{EnrichmentOperation, Scope, Weight, cache::*};
 use netgauze_flow_pkt::ie::{Field, IE};
 use std::{
     collections::HashSet,
