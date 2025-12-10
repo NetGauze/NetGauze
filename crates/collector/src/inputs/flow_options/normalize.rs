@@ -21,7 +21,7 @@
 
 use crate::flow::types::{FieldRefLookup, IndexedDataRecord};
 use netgauze_flow_pkt::{
-    ie::{netgauze, Field, IE},
+    ie::{Field, IE, netgauze},
     ipfix,
 };
 use std::string::ToString;

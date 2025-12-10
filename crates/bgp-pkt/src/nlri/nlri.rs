@@ -235,10 +235,10 @@ impl Ipv4Unicast {
         if net.addr().is_broadcast() || net.addr().is_multicast() {
             return Err(InvalidIpv4UnicastNetwork(net));
         }
-        if let Some(addr) = net.hosts().last() {
-            if addr.is_broadcast() || addr.is_multicast() {
-                return Err(InvalidIpv4UnicastNetwork(net));
-            }
+        if let Some(addr) = net.hosts().last()
+            && (addr.is_broadcast() || addr.is_multicast())
+        {
+            return Err(InvalidIpv4UnicastNetwork(net));
         }
         Ok(Self(net))
     }
@@ -581,10 +581,10 @@ impl Ipv6Multicast {
         if !net.addr().is_multicast() {
             return Err(InvalidIpv6MulticastNetwork(net));
         }
-        if let Some(addr) = net.hosts().last() {
-            if !addr.is_multicast() {
-                return Err(InvalidIpv6MulticastNetwork(net));
-            }
+        if let Some(addr) = net.hosts().last()
+            && !addr.is_multicast()
+        {
+            return Err(InvalidIpv6MulticastNetwork(net));
         }
         Ok(Self(net))
     }

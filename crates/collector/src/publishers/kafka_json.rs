@@ -148,10 +148,10 @@ struct KafkaJsonPublisherActor<T, F> {
 }
 
 impl<
-        T,
-        E: std::error::Error + Send + Sync + 'static,
-        F: Fn(T, String) -> Result<(Option<serde_json::Value>, serde_json::Value), E>,
-    > KafkaJsonPublisherActor<T, F>
+    T,
+    E: std::error::Error + Send + Sync + 'static,
+    F: Fn(T, String) -> Result<(Option<serde_json::Value>, serde_json::Value), E>,
+> KafkaJsonPublisherActor<T, F>
 {
     fn get_producer(
         stats: &KafkaJsonPublisherStats,

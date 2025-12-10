@@ -31,6 +31,7 @@ use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 use crate::{
+    BgpMessage,
     nlri::{MultiTopologyId, MultiTopologyIdData},
     wire::{
         deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
@@ -42,7 +43,6 @@ use crate::{
             update::BgpUpdateMessageWritingError,
         },
     },
-    BgpMessage,
 };
 
 /// Helper method to round up the number of bytes based on a given length

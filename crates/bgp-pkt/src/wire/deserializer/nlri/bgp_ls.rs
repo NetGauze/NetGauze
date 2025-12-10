@@ -29,21 +29,21 @@ use crate::{
         UnknownOspfRouteType,
     },
     wire::deserializer::{
-        nlri::RouteDistinguisherParsingError, read_tlv_header_t16_l16, Ipv4PrefixParsingError,
-        Ipv6PrefixParsingError,
+        Ipv4PrefixParsingError, Ipv6PrefixParsingError, nlri::RouteDistinguisherParsingError,
+        read_tlv_header_t16_l16,
     },
 };
 use ipnet::IpNet;
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
-    parse_till_empty_into_with_one_input_located, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithOneInput, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
+    parse_into_located_one_input, parse_till_empty_into_located,
+    parse_till_empty_into_with_one_input_located,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
-    error::ErrorKind,
-    number::complete::{be_u128, be_u16, be_u32, be_u64, be_u8},
     IResult,
+    error::ErrorKind,
+    number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128},
 };
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -200,7 +200,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsLinkDescript
                         code: value,
                         value: data.to_vec(),
                     },
-                ))
+                ));
             }
             Err(error) => {
                 return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
@@ -326,7 +326,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsNlriParsingError<'a>> for BgpLsNodeDescript
                         code: value,
                         value: data.to_vec(),
                     },
-                ))
+                ));
             }
             Err(error) => {
                 return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(
@@ -410,7 +410,7 @@ impl<'a> ReadablePduWithOneInput<'a, BgpLsNlriType, LocatedBgpLsNlriParsingError
                         code: value,
                         value: data.to_vec(),
                     },
-                ))
+                ));
             }
             Err(error) => {
                 return Err(nom::Err::Error(LocatedBgpLsNlriParsingError::new(

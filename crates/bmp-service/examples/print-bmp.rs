@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use std::{convert::Infallible, net::SocketAddr};
-use tower::{service_fn, ServiceBuilder};
+use tower::{ServiceBuilder, service_fn};
 
 use netgauze_bmp_service::server::{BmpRequest, BmpServer, BmpServerResponse};
 use tower::buffer::Buffer;

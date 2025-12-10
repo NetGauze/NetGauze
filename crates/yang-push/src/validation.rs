@@ -27,12 +27,12 @@ use yang3::{
 use netgauze_udp_notif_pkt::UdpNotifPacket;
 
 use crate::{
+    ContentId, CustomSchema,
     model::{
         notification::SubscriptionId,
         udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
     },
     schema_cache::{SchemaInfo, SchemaRequest},
-    ContentId, CustomSchema,
 };
 
 // Cache for YangPush subscriptions
@@ -347,8 +347,7 @@ impl ValidationActor {
         subscription_info.subscription_id = Some(subscr_id);
         trace!(
             "Processing Yang Push notification for peer: {}, subscription ID: {}",
-            peer_addr,
-            subscr_id
+            peer_addr, subscr_id
         );
         let msg = match serde_json::to_string(content) {
             Ok(msg) => msg,
@@ -365,9 +364,7 @@ impl ValidationActor {
             Ok(subscription) => {
                 trace!(
                     "Yang Push message validated successfully for peer: {}, subscription ID: {}, content ID: {}",
-                    peer_addr,
-                    subscr_id,
-                    subscription.content_id,
+                    peer_addr, subscr_id, subscription.content_id,
                 );
                 subscription_info.content_id = Some(subscription.content_id.clone());
             }
@@ -386,8 +383,7 @@ impl ValidationActor {
     ) -> Result<&SubscriptionData, ValidationActorError> {
         trace!(
             "Validating Yang Push message for peer: {}, subscription ID: {}",
-            &peer.address,
-            &peer.subscription_id
+            &peer.address, &peer.subscription_id
         );
         // Retrieve or create the context for the given peer and subscription ID
         let subscription = match self.get_or_create_subscription(peer.clone()) {
@@ -448,9 +444,7 @@ impl ValidationActor {
             Some(content_id) => {
                 trace!(
                     "Found content ID: {} for peer {}, subscription ID {}",
-                    content_id,
-                    peer.address,
-                    peer.subscription_id
+                    content_id, peer.address, peer.subscription_id
                 );
                 content_id
             }
@@ -458,8 +452,7 @@ impl ValidationActor {
                 // TODO: add peer
                 trace!(
                     "No context found for peer {}, subscription ID {}",
-                    peer.address,
-                    peer.subscription_id
+                    peer.address, peer.subscription_id
                 );
                 return None;
             }

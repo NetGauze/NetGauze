@@ -52,7 +52,7 @@ use netgauze_flow_pkt::ie::{Field, HasIE, IE};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{btree_map, hash_map, BTreeMap},
+    collections::{BTreeMap, btree_map, hash_map},
     net::IpAddr,
 };
 use tracing::debug;
@@ -135,11 +135,17 @@ impl EnrichmentCache {
         // Early returns if no fields are provided
         let incoming_fields = match incoming_fields {
             None => {
-                debug!("No fields provided for upsert operation for ip={}, scope={} - cache not modified", ip, scope);
+                debug!(
+                    "No fields provided for upsert operation for ip={}, scope={} - cache not modified",
+                    ip, scope
+                );
                 return;
             }
             Some(fields) if fields.is_empty() => {
-                debug!("Empty fields vector provided for upsert operation for ip={}, scope={} - cache not modified", ip, scope);
+                debug!(
+                    "Empty fields vector provided for upsert operation for ip={}, scope={} - cache not modified",
+                    ip, scope
+                );
                 return;
             }
             Some(fields) => fields,
@@ -223,7 +229,10 @@ impl EnrichmentCache {
         // as delete all for scope (given weight precedence)
         let (scope_delete_all, ies) = match ies {
             Some(ies) if ies.is_empty() => {
-                debug!("Empty IEs vector provided for delete operation for ip={}, scope={} - cache not modified", ip, scope);
+                debug!(
+                    "Empty IEs vector provided for delete operation for ip={}, scope={} - cache not modified",
+                    ip, scope
+                );
                 return;
             }
             Some(ies) => (false, ies),
@@ -614,7 +623,8 @@ impl std::fmt::Display for PeerMetadata {
                         "".to_string()
                     };
 
-                    writeln!(f,
+                    writeln!(
+                        f,
                         "| {:<width_scope$} | {:<width_field$} | {:<width_index$} | {:<width_weight$} |",
                         scope_display,
                         field_truncated,

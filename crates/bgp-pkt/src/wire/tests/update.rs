@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    BgpMessage, BgpUpdateMessage,
     nlri::{InvalidIpv4UnicastNetwork, Ipv4Unicast, Ipv4UnicastAddress},
     path_attribute::{
         As4PathSegment, AsPath, AsPathSegmentType, NextHop, Origin, PathAttribute,
@@ -21,25 +22,24 @@ use crate::{
     },
     wire::{
         deserializer::{
+            BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
+            LocatedBgpMessageParsingError,
             nlri::{
                 Ipv4UnicastAddressParsingError, Ipv4UnicastParsingError,
                 LocatedIpv4UnicastAddressParsingError,
             },
             update::BgpUpdateMessageParsingError,
-            BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
-            LocatedBgpMessageParsingError,
         },
-        serializer::{nlri::Ipv4UnicastAddressWritingError, BgpMessageWritingError},
+        serializer::{BgpMessageWritingError, nlri::Ipv4UnicastAddressWritingError},
     },
-    BgpMessage, BgpUpdateMessage,
 };
 use ipnet::Ipv4Net;
 use netgauze_parse_utils::{
+    Span,
     test_helpers::{
         test_parse_error_with_one_input, test_parsed_completely,
         test_parsed_completely_with_one_input, test_write,
     },
-    Span,
 };
 use nom::error::ErrorKind;
 use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};

@@ -128,7 +128,7 @@ impl<Key: Eq + Hash + Clone, AggInit: Clone, AggregatorImpl>
         item: Input,
     ) -> (
         impl Iterator<Item = (Window, AggValue)> + '_,
-        impl Iterator<Item = Input>,
+        impl Iterator<Item = Input> + use<Input, AggValue, Key, AggInit, AggregatorImpl>,
     )
     where
         Input: TimeSeriesData<Key>,
@@ -211,13 +211,13 @@ pub struct WindowedAggregationAdaptor<
 }
 
 impl<
-        Key: Eq + Hash + Clone,
-        Input,
-        AggInit: Clone,
-        AggValue,
-        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
-        I: Iterator<Item = Input>,
-    > WindowedAggregationAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
+    Key: Eq + Hash + Clone,
+    Input,
+    AggInit: Clone,
+    AggValue,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
+    I: Iterator<Item = Input>,
+> WindowedAggregationAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
 {
     fn new(
         source: I,
@@ -250,13 +250,13 @@ impl<
 }
 
 impl<
-        Key: Eq + Hash + Clone,
-        Input: TimeSeriesData<Key>,
-        AggInit: Clone,
-        AggValue,
-        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
-        I: Iterator<Item = Input>,
-    > Iterator for WindowedAggregationAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
+    Key: Eq + Hash + Clone,
+    Input: TimeSeriesData<Key>,
+    AggInit: Clone,
+    AggValue,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
+    I: Iterator<Item = Input>,
+> Iterator for WindowedAggregationAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
 {
     type Item = either::Either<(Window, AggValue), Input>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -309,13 +309,13 @@ pub trait AggregationWindowingExt<
 }
 
 impl<
-        Key: Eq + Hash + Clone,
-        Input: TimeSeriesData<Key>,
-        AggInit: Clone,
-        AggValue,
-        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
-        I: Iterator<Item = Input>,
-    > AggregationWindowingExt<Key, Input, AggInit, AggValue, AggregatorImpl> for I
+    Key: Eq + Hash + Clone,
+    Input: TimeSeriesData<Key>,
+    AggInit: Clone,
+    AggValue,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
+    I: Iterator<Item = Input>,
+> AggregationWindowingExt<Key, Input, AggInit, AggValue, AggregatorImpl> for I
 {
 }
 
@@ -342,13 +342,13 @@ pub struct WindowedAggregationStreamAdaptor<
 }
 
 impl<
-        Key: Eq + Hash + Clone,
-        Input,
-        AggInit: Clone,
-        AggValue,
-        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
-        I: Stream<Item = Input>,
-    > WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
+    Key: Eq + Hash + Clone,
+    Input,
+    AggInit: Clone,
+    AggValue,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
+    I: Stream<Item = Input>,
+> WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
 {
     pub fn new(
         source: I,
@@ -369,14 +369,13 @@ impl<
 }
 
 impl<
-        Key: Eq + Hash + Clone + Unpin,
-        Input: TimeSeriesData<Key> + Unpin,
-        AggInit: Clone + Unpin,
-        AggValue: Unpin,
-        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
-        I: Stream<Item = Input>,
-    > Stream
-    for WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
+    Key: Eq + Hash + Clone + Unpin,
+    Input: TimeSeriesData<Key> + Unpin,
+    AggInit: Clone + Unpin,
+    AggValue: Unpin,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
+    I: Stream<Item = Input>,
+> Stream for WindowedAggregationStreamAdaptor<Key, Input, AggInit, AggValue, AggregatorImpl, I>
 {
     type Item = either::Either<(Window, AggValue), Input>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -446,13 +445,13 @@ pub trait AggregationWindowStreamExt<
 }
 
 impl<
-        Key: Eq + Hash + Clone + Unpin,
-        Input: TimeSeriesData<Key> + Unpin,
-        AggInit: Clone + Unpin,
-        AggValue,
-        AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
-        I: Stream<Item = Input>,
-    > AggregationWindowStreamExt<Key, Input, AggInit, AggValue, AggregatorImpl> for I
+    Key: Eq + Hash + Clone + Unpin,
+    Input: TimeSeriesData<Key> + Unpin,
+    AggInit: Clone + Unpin,
+    AggValue,
+    AggregatorImpl: Aggregator<AggInit, Input, AggValue>,
+    I: Stream<Item = Input>,
+> AggregationWindowStreamExt<Key, Input, AggInit, AggValue, AggregatorImpl> for I
 {
 }
 
@@ -460,7 +459,7 @@ impl<
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use futures::{stream, StreamExt};
+    use futures::{StreamExt, stream};
     use std::ops::Add;
 
     // Test item that can be time-windowed

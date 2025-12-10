@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    BgpRouteRefreshMessage,
     iana::{RouteRefreshSubcode, UndefinedRouteRefreshSubcode},
     wire::{
         deserializer::route_refresh::{
@@ -21,12 +22,11 @@ use crate::{
         },
         serializer::route_refresh::BgpRouteRefreshMessageWritingError,
     },
-    BgpRouteRefreshMessage,
 };
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
-    test_helpers::{test_parse_error, test_parsed_completely, test_write},
     Span,
+    test_helpers::{test_parse_error, test_parsed_completely, test_write},
 };
 use nom::error::ErrorKind;
 

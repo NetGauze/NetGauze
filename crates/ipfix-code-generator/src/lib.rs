@@ -16,7 +16,7 @@
 use crate::{
     generator::*,
     xml_parsers::{
-        ipfix::{parse_iana_common_values, parse_information_elements, ID_IE},
+        ipfix::{ID_IE, parse_iana_common_values, parse_information_elements},
         xml_common::find_node_by_id,
     },
 };

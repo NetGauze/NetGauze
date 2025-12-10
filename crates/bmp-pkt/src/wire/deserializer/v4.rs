@@ -14,17 +14,17 @@
 // limitations under the License.
 
 use crate::{
+    PeerHeader, PeerKey,
     iana::{BmpMessageType, UndefinedBmpMessageType},
     v3, v4,
     wire::deserializer::BmpParsingContext,
-    PeerHeader, PeerKey,
 };
 use netgauze_bgp_pkt::{
-    wire::deserializer::{
-        capabilities::BgpCapabilityParsingError, read_tlv_header_t16_l16, BgpMessageParsingError,
-        BgpParsingContext,
-    },
     BgpMessage,
+    wire::deserializer::{
+        BgpMessageParsingError, BgpParsingContext, capabilities::BgpCapabilityParsingError,
+        read_tlv_header_t16_l16,
+    },
 };
 
 use crate::wire::deserializer::v3::{
@@ -33,14 +33,14 @@ use crate::wire::deserializer::v3::{
     StatisticsReportMessageParsingError, TerminationMessageParsingError,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
+    parse_into_located_one_input, parse_till_empty_into_located,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
-    error::{ErrorKind, FromExternalError},
-    number::complete::{be_u16, be_u32, be_u8},
     IResult,
+    error::{ErrorKind, FromExternalError},
+    number::complete::{be_u8, be_u16, be_u32},
 };
 use serde::{Deserialize, Serialize};
 use std::string::FromUtf8Error;
@@ -211,7 +211,7 @@ impl<'a>
                         buf = after_pdu;
                         bgp_pdu = Some(bgp_pdu_buf);
                         continue; // Check again that we should still be parsing
-                                  // (buf is empty?)
+                        // (buf is empty?)
                     }
                     _ => {}
                 }
@@ -234,7 +234,7 @@ impl<'a>
                             input,
                             RouteMonitoringMessageParsingError::MissingBgpPdu,
                         ),
-                    ))
+                    ));
                 }
             }
         };
@@ -417,7 +417,7 @@ impl<'a> ReadablePdu<'a, LocatedPathMarkingParsingError<'a>> for v4::PathMarking
                 return Err(nom::Err::Error(LocatedPathMarkingParsingError::new(
                     data,
                     PathMarkingParsingError::ReasonCodeBadLength(reason_code_len),
-                )))
+                )));
             }
         };
 

@@ -14,10 +14,10 @@
 // limitations under the License.
 
 use crate::{
+    BgpMessage,
     wire::{
         deserializer::BgpParsingContext, serializer::BgpMessageWritingError, tests::BGP_MARKER,
     },
-    BgpMessage,
 };
 use netgauze_parse_utils::test_helpers::{
     combine, test_parsed_completely_with_one_input, test_write,

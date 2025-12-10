@@ -19,8 +19,8 @@
 //! enrichment data, tracking line changes and generating appropriate
 //! enrichment operations.
 use crate::inputs::{
-    files::{handlers::FilesLineHandler, LineChangeType},
     InputProcessingError,
+    files::{LineChangeType, handlers::FilesLineHandler},
 };
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::path::PathBuf;

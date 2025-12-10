@@ -192,50 +192,58 @@ mod tests {
         let ipv4_eor = BgpUpdateMessage::new(vec![], vec![], vec![]);
         let ipv4_unicast_eor = BgpUpdateMessage::new(
             vec![],
-            vec![PathAttribute::from(
-                true,
-                false,
-                false,
-                false,
-                PathAttributeValue::MpUnreach(MpUnreach::Ipv4Unicast { nlri: vec![] }),
-            )
-            .unwrap()],
+            vec![
+                PathAttribute::from(
+                    true,
+                    false,
+                    false,
+                    false,
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv4Unicast { nlri: vec![] }),
+                )
+                .unwrap(),
+            ],
             vec![],
         );
         let ipv6_eor = BgpUpdateMessage::new(
             vec![],
-            vec![PathAttribute::from(
-                true,
-                false,
-                false,
-                false,
-                PathAttributeValue::MpUnreach(MpUnreach::Ipv6Unicast { nlri: vec![] }),
-            )
-            .unwrap()],
+            vec![
+                PathAttribute::from(
+                    true,
+                    false,
+                    false,
+                    false,
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv6Unicast { nlri: vec![] }),
+                )
+                .unwrap(),
+            ],
             vec![],
         );
         let ipv4_multicast_eor = BgpUpdateMessage::new(
             vec![],
-            vec![PathAttribute::from(
-                true,
-                false,
-                false,
-                false,
-                PathAttributeValue::MpUnreach(MpUnreach::Ipv4Multicast { nlri: vec![] }),
-            )
-            .unwrap()],
+            vec![
+                PathAttribute::from(
+                    true,
+                    false,
+                    false,
+                    false,
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv4Multicast { nlri: vec![] }),
+                )
+                .unwrap(),
+            ],
             vec![],
         );
         let ipv6_multicast_eor = BgpUpdateMessage::new(
             vec![],
-            vec![PathAttribute::from(
-                true,
-                false,
-                false,
-                false,
-                PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast { nlri: vec![] }),
-            )
-            .unwrap()],
+            vec![
+                PathAttribute::from(
+                    true,
+                    false,
+                    false,
+                    false,
+                    PathAttributeValue::MpUnreach(MpUnreach::Ipv6Multicast { nlri: vec![] }),
+                )
+                .unwrap(),
+            ],
             vec![],
         );
 
@@ -255,25 +263,27 @@ mod tests {
         );
         let with_mp_reach = BgpUpdateMessage::new(
             vec![],
-            vec![PathAttribute::from(
-                true,
-                false,
-                false,
-                true,
-                PathAttributeValue::MpReach(MpReach::Ipv4MplsVpnUnicast {
-                    next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
-                        RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
-                        "fc00::1".parse().unwrap(),
-                        None,
-                    )),
-                    nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
-                        RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
-                        vec![MplsLabel::new([0, 65, 0]), MplsLabel::new([0, 65, 1])],
-                        Ipv4Unicast::from_net("192.168.1.0/24".parse().unwrap()).unwrap(),
-                    )],
-                }),
-            )
-            .unwrap()],
+            vec![
+                PathAttribute::from(
+                    true,
+                    false,
+                    false,
+                    true,
+                    PathAttributeValue::MpReach(MpReach::Ipv4MplsVpnUnicast {
+                        next_hop: LabeledNextHop::Ipv6(LabeledIpv6NextHop::new(
+                            RouteDistinguisher::As2Administrator { asn2: 0, number: 0 },
+                            "fc00::1".parse().unwrap(),
+                            None,
+                        )),
+                        nlri: vec![Ipv4MplsVpnUnicastAddress::new_no_path_id(
+                            RouteDistinguisher::As2Administrator { asn2: 1, number: 1 },
+                            vec![MplsLabel::new([0, 65, 0]), MplsLabel::new([0, 65, 1])],
+                            Ipv4Unicast::from_net("192.168.1.0/24".parse().unwrap()).unwrap(),
+                        )],
+                    }),
+                )
+                .unwrap(),
+            ],
             vec![],
         );
 

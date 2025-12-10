@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Cursor, net::Ipv4Addr};
 
 use chrono::{TimeZone, Utc};
 
-use netgauze_flow_pkt::{ie, netflow::*, DataSetId, FieldSpecifier};
+use netgauze_flow_pkt::{DataSetId, FieldSpecifier, ie, netflow::*};
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};
 
 fn main() {

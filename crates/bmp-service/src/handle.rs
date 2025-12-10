@@ -15,8 +15,8 @@
 
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
@@ -185,9 +185,11 @@ mod test {
 
         notify_once.notify_waiters();
         assert!(notify_once.is_notified());
-        assert!(tokio::time::timeout(Duration::from_millis(1), notified)
-            .await
-            .is_ok());
+        assert!(
+            tokio::time::timeout(Duration::from_millis(1), notified)
+                .await
+                .is_ok()
+        );
     }
 
     #[tokio::test]

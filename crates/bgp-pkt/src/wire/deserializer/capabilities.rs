@@ -22,13 +22,13 @@ use netgauze_iana::address_family::{
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_till_empty, parse_till_empty_into_located, ErrorKindSerdeDeref,
-    ReadablePdu, Span,
+    ErrorKindSerdeDeref, ReadablePdu, Span, parse_into_located, parse_till_empty,
+    parse_till_empty_into_located,
 };
 use nom::{
-    error::{ErrorKind, FromExternalError, ParseError},
-    number::complete::{be_u16, be_u32, be_u8},
     IResult,
+    error::{ErrorKind, FromExternalError, ParseError},
+    number::complete::{be_u8, be_u16, be_u32},
 };
 use serde::{Deserialize, Serialize};
 
@@ -315,7 +315,7 @@ impl<'a> ReadablePdu<'a, LocatedMultiProtocolExtensionsCapabilityParsingError<'a
                         input,
                         MultiProtocolExtensionsCapabilityParsingError::AddressTypeError(err),
                     ),
-                ))
+                ));
             }
         };
         Ok((buf, MultiProtocolExtensionsCapability::new(address_type)))
@@ -373,7 +373,7 @@ impl<'a> ReadablePdu<'a, LocatedGracefulRestartCapabilityParsingError<'a>>
                         input,
                         GracefulRestartCapabilityParsingError::AddressTypeError(err),
                     ),
-                ))
+                ));
             }
         };
         let (_, flags) = be_u8(ehe_buf)?;
@@ -422,7 +422,7 @@ impl<'a> ReadablePdu<'a, LocatedAddPathCapabilityParsingError<'a>> for AddPathAd
                 return Err(nom::Err::Error(LocatedAddPathCapabilityParsingError::new(
                     input,
                     AddPathCapabilityParsingError::AddressTypeError(err),
-                )))
+                )));
             }
         };
         let (buf, (receive, send)) = nom::combinator::map_res(be_u8, |send_receive| {
@@ -487,7 +487,7 @@ impl<'a> ReadablePdu<'a, LocatedExtendedNextHopEncodingCapabilityParsingError<'a
                         input,
                         ExtendedNextHopEncodingCapabilityParsingError::AddressTypeError(err),
                     ),
-                ))
+                ));
             }
         };
 
@@ -520,7 +520,7 @@ impl<'a> ReadablePdu<'a, LocatedMultipleLabelParsingError<'a>> for MultipleLabel
                 return Err(nom::Err::Error(LocatedMultipleLabelParsingError::new(
                     input,
                     MultipleLabelParsingError::AddressTypeError(err),
-                )))
+                )));
             }
         };
         let (buf, count) = be_u8(buf)?;

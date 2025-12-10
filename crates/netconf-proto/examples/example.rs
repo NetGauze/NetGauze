@@ -15,7 +15,7 @@
 
 use clap::Parser;
 use netgauze_netconf_proto::{
-    client::{connect, NetconfSshConnectConfig, SshAuth, SshHandler},
+    client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect},
     xml_utils::{XmlSerialize, XmlWriter},
     yanglib::PermissiveVersionChecker,
 };
@@ -43,7 +43,7 @@ struct Args {
 }
 
 fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
-    use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
     // Set up the log -> tracing bridge first
     // tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");

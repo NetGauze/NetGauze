@@ -184,7 +184,7 @@ impl Decoder for SshCodec {
                     return Err(SshCodecError::IO(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
                         "Chunk size is not properly terminated with a newline",
-                    )))
+                    )));
                 }
             };
 

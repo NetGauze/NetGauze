@@ -17,7 +17,7 @@ use crate::{
     v4::*,
     wire::{
         deserializer::{
-            v4::*, BmpMessageParsingError, BmpParsingContext, LocatedBmpMessageParsingError,
+            BmpMessageParsingError, BmpParsingContext, LocatedBmpMessageParsingError, v4::*,
         },
         serializer::BmpMessageWritingError,
     },
@@ -27,6 +27,7 @@ use crate::{
 use chrono::TimeZone;
 use ipnet::Ipv4Net;
 use netgauze_bgp_pkt::{
+    BgpMessage,
     capabilities::{AddPathAddressFamily, AddPathCapability, BgpCapability},
     nlri::{Ipv4Unicast, Ipv4UnicastAddress},
     path_attribute::{
@@ -35,17 +36,16 @@ use netgauze_bgp_pkt::{
     },
     update::BgpUpdateMessage,
     wire::deserializer::{
-        update::BgpUpdateMessageParsingError, BgpMessageParsingError, BgpParsingContext,
-        Ipv4PrefixParsingError,
+        BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
+        update::BgpUpdateMessageParsingError,
     },
-    BgpMessage,
 };
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
+    Span,
     test_helpers::{
         test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
     },
-    Span,
 };
 use nom::error::ErrorKind;
 use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
@@ -285,17 +285,19 @@ fn test_bmp_v4_route_monitoring_with_stateless_parsing() -> Result<(), BmpMessag
                     .unwrap(),
                 )],
             )),
-            vec![RouteMonitoringTlv::build(
-                0,
-                RouteMonitoringTlvValue::StatelessParsing(BgpCapability::AddPath(
-                    AddPathCapability::new(vec![AddPathAddressFamily::new(
-                        AddressType::Ipv4Unicast,
-                        true,
-                        true,
-                    )]),
-                )),
-            )
-            .unwrap()],
+            vec![
+                RouteMonitoringTlv::build(
+                    0,
+                    RouteMonitoringTlvValue::StatelessParsing(BgpCapability::AddPath(
+                        AddPathCapability::new(vec![AddPathAddressFamily::new(
+                            AddressType::Ipv4Unicast,
+                            true,
+                            true,
+                        )]),
+                    )),
+                )
+                .unwrap(),
+            ],
         )
         .unwrap(),
     ));

@@ -19,24 +19,24 @@ use crate::{
     peer::*,
     peer_controller::PeerController,
     tests::{
-        BgpIoMockBuilder, MockActiveConnect, HOLD_TIME, MY_AS, MY_BGP_ID, PEER_ADDR, PEER_AS,
+        BgpIoMockBuilder, HOLD_TIME, MY_AS, MY_BGP_ID, MockActiveConnect, PEER_ADDR, PEER_AS,
         PEER_BGP_ID, PEER_KEY, POLICY, PROPERTIES,
     },
 };
 use netgauze_bgp_pkt::{
+    BgpMessage,
     capabilities::{BgpCapability, FourOctetAsCapability, MultiProtocolExtensionsCapability},
     iana::AS_TRANS,
     notification::{BgpNotificationMessage, CeaseError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
-    BgpMessage,
 };
 use netgauze_iana::address_family::AddressType;
 use std::{net::SocketAddr, time::Duration};
 use tokio::sync::mpsc;
 
 #[test_log::test(tokio::test)]
-async fn test_start_stop(
-) -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
+async fn test_start_stop()
+-> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
     let config = PeerConfigBuilder::default().build();
     let (tx, mut rx) = mpsc::unbounded_channel();
     let mut io_builder = BgpIoMockBuilder::new();
@@ -85,8 +85,8 @@ async fn test_start_stop(
 }
 
 #[test_log::test(tokio::test)]
-async fn test_start_stop_with_passive_tcp(
-) -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
+async fn test_start_stop_with_passive_tcp()
+-> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
     let config = PeerConfigBuilder::default()
         .passive_tcp_establishment(true)
         .build();
@@ -116,8 +116,8 @@ async fn test_start_stop_with_passive_tcp(
 }
 
 #[test_log::test(tokio::test)]
-async fn test_get_exchanged_capabilities(
-) -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
+async fn test_get_exchanged_capabilities()
+-> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
     let my_asn = 66_000;
     let extended_msg_cap = BgpCapability::ExtendedMessage;
     let route_refresh_cap = BgpCapability::RouteRefresh;
@@ -240,8 +240,8 @@ async fn test_get_exchanged_capabilities(
 }
 
 #[test_log::test(tokio::test)]
-async fn test_get_exchanged_capabilities_tracked_connection(
-) -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
+async fn test_get_exchanged_capabilities_tracked_connection()
+-> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
     let my_asn = 66_000;
     let extended_msg_cap = BgpCapability::ExtendedMessage;
     let route_refresh_cap = BgpCapability::RouteRefresh;

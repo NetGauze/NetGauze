@@ -11,9 +11,9 @@ use chrono::{TimeZone, Utc};
 
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bmp_pkt::{
+    BmpMessage, BmpPeerType, PeerHeader,
     iana::RouteMirroringInformation,
     v3::{BmpMessageValue, MirroredBgpMessage, RouteMirroringMessage, RouteMirroringValue},
-    BmpMessage, BmpPeerType, PeerHeader,
 };
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
 

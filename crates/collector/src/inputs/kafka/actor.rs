@@ -44,22 +44,22 @@
 //! Additional formats can be added via the `MessageFormat` enum and
 //! corresponding message handlers implementing the `MessageHandler` trait.
 use crate::inputs::{
+    EnrichmentHandle,
     kafka::{
+        KafkaConsumerConfig, KafkaMessageFormat,
         handlers::{
             FlowEnrichmentOperationHandler, KafkaMessageHandler, SonataHandler,
             YangPushEnrichmentOperationHandler,
         },
-        KafkaConsumerConfig, KafkaMessageFormat,
     },
-    EnrichmentHandle,
 };
 use rdkafka::{
+    ClientContext, Message, TopicPartitionList,
     config::ClientConfig,
     consumer::{
-        stream_consumer::StreamConsumer, BaseConsumer, Consumer, ConsumerContext, Rebalance,
+        BaseConsumer, Consumer, ConsumerContext, Rebalance, stream_consumer::StreamConsumer,
     },
     error::{KafkaError, KafkaResult, RDKafkaErrorCode},
-    ClientContext, Message, TopicPartitionList,
 };
 use std::{str::Utf8Error, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};

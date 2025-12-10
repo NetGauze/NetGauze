@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    BgpNotificationMessage,
     iana::{
         BgpErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
         MessageHeaderErrorSubCode, OpenMessageErrorSubCode, RouteRefreshMessageErrorSubCode,
@@ -23,7 +24,6 @@ use crate::{
         CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
-    BgpNotificationMessage,
 };
 use byteorder::WriteBytesExt;
 use netgauze_parse_utils::WritablePdu;

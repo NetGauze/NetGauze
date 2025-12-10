@@ -16,8 +16,8 @@
 //! Deserializer for BGP Route Refresh message
 
 use crate::{
-    iana::{RouteRefreshSubcode, UndefinedRouteRefreshSubcode},
     BgpRouteRefreshMessage,
+    iana::{RouteRefreshSubcode, UndefinedRouteRefreshSubcode},
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
@@ -25,9 +25,9 @@ use netgauze_iana::address_family::{
 };
 use netgauze_parse_utils::{ReadablePdu, Span};
 use nom::{
-    error::ErrorKind,
-    number::complete::{be_u16, be_u8},
     IResult,
+    error::ErrorKind,
+    number::complete::{be_u8, be_u16},
 };
 use serde::{Deserialize, Serialize};
 
@@ -63,7 +63,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpRouteRefreshMessageParsingError<'a>> for BgpR
                         input,
                         BgpRouteRefreshMessageParsingError::InvalidAddressType(err),
                     ),
-                ))
+                ));
             }
         };
         Ok((buf, BgpRouteRefreshMessage::new(address_type, op)))

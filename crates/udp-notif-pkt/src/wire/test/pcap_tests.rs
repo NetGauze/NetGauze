@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{codec::UdpPacketCodec, MediaType};
+use crate::{MediaType, codec::UdpPacketCodec};
 use bytes::{Buf, BytesMut};
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 use pcap_parser::LegacyPcapReader;
@@ -105,7 +105,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                         MediaType::YangDataJson => {
                             match serde_json::from_slice(msg.payload()) {
                                 Ok(payload) => {
-                                    if let Value::Object(ref mut val) = &mut udp_notif_value {
+                                    if let Value::Object(val) = &mut udp_notif_value {
                                         val.insert("payload".to_string(), payload);
                                     }
                                 }
@@ -121,7 +121,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                                         .map(|byte| format!("{byte:02x}"))
                                         .collect::<Vec<String>>()
                                         .join(" ");
-                                    if let Value::Object(ref mut val) = &mut udp_notif_value {
+                                    if let Value::Object(val) = &mut udp_notif_value {
                                         val.insert(
                                             "payload".to_string(),
                                             Value::String(payload_hexdump),
@@ -138,7 +138,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                         MediaType::YangDataXml => {
                             let payload = std::str::from_utf8(msg.payload())
                                 .expect("Couldn't deserialize XML payload into an UTF-8 string");
-                            if let Value::Object(ref mut val) = &mut udp_notif_value {
+                            if let Value::Object(val) = &mut udp_notif_value {
                                 val.insert(
                                     "payload".to_string(),
                                     Value::String(payload.to_string()),
@@ -149,7 +149,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                             let payload: Value =
                                 ciborium::de::from_reader(std::io::Cursor::new(msg.payload()))
                                     .expect("Couldn't deserialize CBOR payload into a CBOR object");
-                            if let Value::Object(ref mut val) = &mut udp_notif_value {
+                            if let Value::Object(val) = &mut udp_notif_value {
                                 val.insert("payload".to_string(), payload);
                             }
                         }

@@ -32,18 +32,19 @@ use std::{
 
 use netgauze_iana::address_family::AddressType;
 use nom::{
-    error::ErrorKind,
-    number::complete::{be_u128, be_u16, be_u32, be_u8},
     IResult,
+    error::ErrorKind,
+    number::complete::{be_u8, be_u16, be_u32, be_u128},
 };
 use serde::{Deserialize, Serialize};
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
+    parse_into_located, parse_into_located_one_input,
 };
 
 use crate::{
+    BgpMessage,
     capabilities::BgpCapability,
     iana::{BgpMessageType, UndefinedBgpMessageType},
     notification::{BgpNotificationMessage, FiniteStateMachineError, MessageHeaderError},
@@ -57,7 +58,6 @@ use crate::{
         },
         serializer::nlri::{IPV4_LEN, IPV6_LEN},
     },
-    BgpMessage,
 };
 use netgauze_serde_macros::LocatedError;
 

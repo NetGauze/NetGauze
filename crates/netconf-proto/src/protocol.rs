@@ -16,10 +16,10 @@
 //! NETCONF representation in Rust with XML encoding and decoding capabilities.
 
 use crate::{
+    NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_NS,
     capabilities::Capability,
     xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
     yanglib::YangLibrary,
-    NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_NS,
 };
 use indexmap::IndexMap;
 use quick_xml::{
@@ -258,13 +258,13 @@ fn extract_attribute(bytes_start: &BytesStart<'_>, attribute_name: &[u8]) -> Opt
 /// ```
 fn extract_message_id(open: &BytesStart<'_>) -> Result<Option<Box<str>>, ParsingError> {
     let msg_id_attr = extract_attribute(open, b"message-id");
-    if let Some(msg_id) = &msg_id_attr {
-        if msg_id.len() > 4095 {
-            return Err(ParsingError::InvalidValue(format!(
-                "message-id length: {} is larger than max 4095",
-                msg_id.len()
-            )));
-        }
+    if let Some(msg_id) = &msg_id_attr
+        && msg_id.len() > 4095
+    {
+        return Err(ParsingError::InvalidValue(format!(
+            "message-id length: {} is larger than max 4095",
+            msg_id.len()
+        )));
     }
     Ok(msg_id_attr)
 }
@@ -347,7 +347,7 @@ impl XmlDeserialize<YangSchemaFormat> for YangSchemaFormat {
             _ => {
                 return Err(ParsingError::InvalidValue(format!(
                     "unknown YANG schema format `{value_str}`"
-                )))
+                )));
             }
         };
         parser.close()?;
@@ -530,7 +530,7 @@ impl XmlDeserialize<ConfigUpdateDefaultOperation> for ConfigUpdateDefaultOperati
             _ => {
                 return Err(ParsingError::InvalidValue(format!(
                     "unknown default-operation `{value_str}`"
-                )))
+                )));
             }
         };
         parser.close()?;
@@ -590,7 +590,7 @@ impl XmlDeserialize<ConfigEditTestOption> for ConfigEditTestOption {
             _ => {
                 return Err(ParsingError::InvalidValue(format!(
                     "unknown test-option `{value_str}`"
-                )))
+                )));
             }
         };
         parser.close()?;
@@ -644,7 +644,7 @@ impl XmlDeserialize<ConfigErrorOption> for ConfigErrorOption {
             _ => {
                 return Err(ParsingError::InvalidValue(format!(
                     "unknown error-option `{value_str}`"
-                )))
+                )));
             }
         };
         parser.close()?;
@@ -698,8 +698,8 @@ impl XmlDeserialize<Filter> for Filter {
             }
             _ => {
                 return Err(ParsingError::InvalidValue(format!(
-                "not supported filter type `{filter_type}`, only subtree and xpath are supported"
-            )))
+                    "not supported filter type `{filter_type}`, only subtree and xpath are supported"
+                )));
             }
         };
         // Close filter

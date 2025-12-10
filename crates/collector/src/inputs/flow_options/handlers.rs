@@ -18,7 +18,7 @@ use crate::{
         enrichment::{EnrichmentOperation, Scope, UpsertPayload},
         types::IndexedDataRecord,
     },
-    inputs::{flow_options::normalize::OptionsDataRecord, InputProcessingError},
+    inputs::{InputProcessingError, flow_options::normalize::OptionsDataRecord},
 };
 use std::net::IpAddr;
 
@@ -148,7 +148,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(ops.len(), 2); // Should create 2 operations (ingress +
-                                  // egress)
+        // egress)
     }
 
     #[test]

@@ -96,10 +96,10 @@ where
 
     for (src_ip, src_port, dst_ip, dst_port, protocol, packet_data) in PcapIter::new(pcap_reader) {
         packet_counter += 1;
-        if let Some(max_packets) = config.input_size {
-            if packet_counter > max_packets {
-                break;
-            }
+        if let Some(max_packets) = config.input_size
+            && packet_counter > max_packets
+        {
+            break;
         }
 
         let flow_key = (src_ip, src_port, dst_ip, dst_port);

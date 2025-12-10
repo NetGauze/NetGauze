@@ -17,8 +17,8 @@ use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_flow_pkt::{
-    codec::{FlowInfoCodec, FlowInfoCodecDecoderError},
     FlowInfo,
+    codec::{FlowInfoCodec, FlowInfoCodecDecoderError},
 };
 use netgauze_pcap_reader::TransportProtocol;
 use std::{collections::HashMap, io, net::IpAddr};
@@ -78,11 +78,11 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use ipfix::IpfixPacket;
     use netgauze_flow_pkt::{
+        DataSetId, FlowInfo,
         ie::{Field, IE},
         ipfix,
         ipfix::{DataRecord, OptionsTemplateRecord, Set},
         wire::deserializer::ipfix::IpfixPacketParsingError,
-        DataSetId, FlowInfo,
     };
     use serde_json::json;
     use std::net::Ipv4Addr;
