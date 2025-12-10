@@ -18,7 +18,7 @@ use crate::{
     netflow::*,
     wire::{
         deserializer::netflow::NETFLOW_V9_HEADER_LENGTH,
-        serializer::{ie::FieldWritingError, FieldSpecifierWritingError},
+        serializer::{FieldSpecifierWritingError, ie::FieldWritingError},
     },
 };
 use byteorder::{NetworkEndian, WriteBytesExt};

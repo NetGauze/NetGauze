@@ -36,14 +36,14 @@
 //! - **NetFlowV9** - Not yet implemented
 
 use crate::inputs::{
+    EnrichmentHandle,
     flow_options::{
+        FlowOptionsConfig,
         handlers::{FlowEnrichmentOptionsHandler, FlowOptionsHandler},
         normalize::OptionsDataRecord,
-        FlowOptionsConfig,
     },
-    EnrichmentHandle,
 };
-use netgauze_flow_pkt::{ipfix, FlowInfo};
+use netgauze_flow_pkt::{FlowInfo, ipfix};
 use netgauze_flow_service::FlowRequest;
 use std::{string::ToString, sync::Arc, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};

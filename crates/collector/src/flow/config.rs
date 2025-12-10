@@ -27,19 +27,19 @@
 //! field selection, renaming, and type conversions.
 
 use crate::{
-    flow::{types::FieldRef, RawValue},
+    flow::{RawValue, types::FieldRef},
     publishers::kafka_avro::{AvroConverter, KafkaAvroPublisherActorError},
 };
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use netgauze_flow_pkt::{
+    FlowInfo,
     ie::{
-        self, Field, FieldConversionError, HasIE, InformationElementDataType,
-        InformationElementTemplate, IE,
+        self, Field, FieldConversionError, HasIE, IE, InformationElementDataType,
+        InformationElementTemplate,
     },
     ipfix::{DataRecord, Set},
-    FlowInfo,
 };
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -426,11 +426,7 @@ impl FieldSelect for MultiSelect {
             .flatten()
             .collect();
 
-        if ret.is_empty() {
-            None
-        } else {
-            Some(ret)
-        }
+        if ret.is_empty() { None } else { Some(ret) }
     }
 }
 

@@ -13,11 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::inputs::{
-    kafka::{
-        formats::sonata::{SonataData, SonataOperation},
-        SonataConfig,
-    },
     InputProcessingError,
+    kafka::{
+        SonataConfig,
+        formats::sonata::{SonataData, SonataOperation},
+    },
 };
 use netgauze_flow_pkt::ie::{Field, IE};
 use std::{collections::HashMap, net::IpAddr};
@@ -243,22 +243,20 @@ impl KafkaMessageHandler<crate::flow::enrichment::EnrichmentOperation> for Sonat
                     let sonata_id_node = sonata_data.id_node;
 
                     // Check if we have a cached entry for this node_id
-                    if let Some(&old_loopback) = self.id_cache().get(&sonata_id_node) {
-                        if loopback != old_loopback {
-                            operations.push(crate::flow::enrichment::EnrichmentOperation::Delete(
-                                crate::flow::enrichment::DeletePayload {
-                                    ip: old_loopback,
-                                    scope: crate::flow::enrichment::Scope::new(0, None),
-                                    weight: self.config().weight,
-                                    ies: vec![
-                                        IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
-                                        IE::NetGauze(
-                                            netgauze_flow_pkt::ie::netgauze::IE::platformId,
-                                        ),
-                                    ],
-                                },
-                            ));
-                        }
+                    if let Some(&old_loopback) = self.id_cache().get(&sonata_id_node)
+                        && loopback != old_loopback
+                    {
+                        operations.push(crate::flow::enrichment::EnrichmentOperation::Delete(
+                            crate::flow::enrichment::DeletePayload {
+                                ip: old_loopback,
+                                scope: crate::flow::enrichment::Scope::new(0, None),
+                                weight: self.config().weight,
+                                ies: vec![
+                                    IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::nodeId),
+                                    IE::NetGauze(netgauze_flow_pkt::ie::netgauze::IE::platformId),
+                                ],
+                            },
+                        ));
                     }
 
                     // Update cache with new loopback address
@@ -338,19 +336,16 @@ impl KafkaMessageHandler<crate::yang_push::EnrichmentOperation> for SonataHandle
                     let sonata_id_node = sonata_data.id_node;
 
                     // Check if we have a cached entry for this node_id
-                    if let Some(&old_loopback) = self.id_cache().get(&sonata_id_node) {
-                        if loopback != old_loopback {
-                            operations.push(crate::yang_push::EnrichmentOperation::Delete(
-                                crate::yang_push::DeletePayload {
-                                    ip: old_loopback,
-                                    weight: self.config().weight,
-                                    label_names: vec![
-                                        "node_id".to_string(),
-                                        "platform_id".to_string(),
-                                    ],
-                                },
-                            ));
-                        }
+                    if let Some(&old_loopback) = self.id_cache().get(&sonata_id_node)
+                        && loopback != old_loopback
+                    {
+                        operations.push(crate::yang_push::EnrichmentOperation::Delete(
+                            crate::yang_push::DeletePayload {
+                                ip: old_loopback,
+                                weight: self.config().weight,
+                                label_names: vec!["node_id".to_string(), "platform_id".to_string()],
+                            },
+                        ));
                     }
 
                     // Update cache with new loopback address
@@ -413,11 +408,11 @@ impl KafkaMessageHandler<crate::yang_push::EnrichmentOperation> for SonataHandle
 mod tests {
     use super::*;
     use crate::inputs::{
-        kafka::{
-            handlers::{KafkaMessageHandler, SonataHandler},
-            SonataConfig,
-        },
         InputProcessingError,
+        kafka::{
+            SonataConfig,
+            handlers::{KafkaMessageHandler, SonataHandler},
+        },
     };
     use netgauze_yang_push::model::telemetry::{Label, LabelValue};
 

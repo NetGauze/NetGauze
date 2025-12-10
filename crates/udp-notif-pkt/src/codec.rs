@@ -14,11 +14,11 @@
 // limitations under the License.
 
 use crate::{
+    UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
     wire::{
         deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError},
         serialize::UdpNotifPacketWritingError,
     },
-    UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
 };
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};

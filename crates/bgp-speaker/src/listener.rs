@@ -75,9 +75,9 @@ pub struct BgpListener<A: Display, I: AsyncWrite + AsyncRead> {
 }
 
 impl<
-        A: Clone + Display + Debug + Send + Sync + 'static,
-        I: AsyncWrite + AsyncRead + Send + Unpin + 'static,
-    > BgpListener<A, I>
+    A: Clone + Display + Debug + Send + Sync + 'static,
+    I: AsyncWrite + AsyncRead + Send + Unpin + 'static,
+> BgpListener<A, I>
 {
     pub fn new(sockets: Vec<SocketAddr>, allow_dynamic_peers: bool) -> Self {
         Self {
@@ -121,13 +121,19 @@ impl BgpListener<SocketAddr, TcpStream> {
                         }
                         rx.recv().await;
                         if let Err(err) = peer_handle.accept_connection(peer_addr, stream) {
-                            log::error!("[{peer_addr}] Dynamic connection error sending event to peer: {err:?}");
+                            log::error!(
+                                "[{peer_addr}] Dynamic connection error sending event to peer: {err:?}"
+                            );
                             return;
                         }
                         while let Some(Ok((state, event))) = rx.recv().await {
-                            log::info!("[{peer_addr}] Dynamic connection at state {state} GOT EVENT: {event:?}");
+                            log::info!(
+                                "[{peer_addr}] Dynamic connection at state {state} GOT EVENT: {event:?}"
+                            );
                             if state == FsmState::Idle {
-                                log::warn!("[{peer_addr}] Dynamic Connection failed before reaching OpenConfirm state");
+                                log::warn!(
+                                    "[{peer_addr}] Dynamic Connection failed before reaching OpenConfirm state"
+                                );
                                 return;
                             }
                             if state == FsmState::OpenConfirm {

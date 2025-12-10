@@ -17,7 +17,7 @@ pub mod ie;
 pub mod ipfix;
 pub mod netflow;
 
-use crate::{ie::InformationElementTemplate, FieldSpecifier};
+use crate::{FieldSpecifier, ie::InformationElementTemplate};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;

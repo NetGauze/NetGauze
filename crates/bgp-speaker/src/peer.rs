@@ -23,7 +23,7 @@ use std::{
 
 use futures::StreamExt;
 use futures_util::SinkExt;
-use rand::{rngs::SmallRng, Rng, RngCore, SeedableRng};
+use rand::{Rng, RngCore, SeedableRng, rngs::SmallRng};
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     sync::oneshot,
@@ -32,13 +32,13 @@ use tokio::{
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
 use netgauze_bgp_pkt::{
+    BgpMessage,
     capabilities::{BgpCapability, FourOctetAsCapability},
     codec::{BgpCodecDecoderError, BgpCodecInitializer},
-    iana::{BgpCapabilityCode, AS_TRANS},
+    iana::{AS_TRANS, BgpCapabilityCode},
     notification::{BgpNotificationMessage, CeaseError, OpenMessageError},
     open::{BgpOpenMessage, BgpOpenMessageParameter},
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
-    BgpMessage,
 };
 
 use crate::{
@@ -134,13 +134,13 @@ impl<A, I, D> EchoCapabilitiesPolicy<A, I, D> {
 }
 
 impl<
-        A: Send + Sync + 'static,
-        I: AsyncWrite + AsyncRead + Send + Sync + 'static,
-        D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
-            + Encoder<BgpMessage, Error = BgpMessageWritingError>
-            + Send
-            + Sync,
-    > PeerPolicy<A, I, D> for EchoCapabilitiesPolicy<A, I, D>
+    A: Send + Sync + 'static,
+    I: AsyncWrite + AsyncRead + Send + Sync + 'static,
+    D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
+        + Encoder<BgpMessage, Error = BgpMessageWritingError>
+        + Send
+        + Sync,
+> PeerPolicy<A, I, D> for EchoCapabilitiesPolicy<A, I, D>
 {
     async fn open_message(&mut self) -> BgpOpenMessage {
         // ASN in BGP header is always 2-octets,
@@ -567,15 +567,15 @@ pub struct Peer<
 }
 
 impl<
-        K: Display + Copy,
-        A: Display + Copy + Debug + Clone,
-        I: AsyncWrite + AsyncRead + Unpin,
-        D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
-            + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
-            + Encoder<BgpMessage, Error = BgpMessageWritingError>,
-        C: ActiveConnect<A, I, D>,
-        P: PeerPolicy<A, I, D>,
-    > Peer<K, A, I, D, C, P>
+    K: Display + Copy,
+    A: Display + Copy + Debug + Clone,
+    I: AsyncWrite + AsyncRead + Unpin,
+    D: BgpCodecInitializer<Peer<K, A, I, D, C, P>>
+        + Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
+        + Encoder<BgpMessage, Error = BgpMessageWritingError>,
+    C: ActiveConnect<A, I, D>,
+    P: PeerPolicy<A, I, D>,
+> Peer<K, A, I, D, C, P>
 {
     pub fn new(
         peer_key: K,
@@ -742,18 +742,18 @@ impl<
     }
 
     pub async fn send_bgp_message(&mut self, msg: BgpMessage) -> Result<(), FsmStateError<A>> {
-        if let Some(tracked) = self.tracked_connection.as_mut() {
-            if let Err(err) = tracked.send(msg.clone()).await {
-                // Errors writing to a tracked connection are ignored and we assume that the
-                // connection is not good anymore.
-                log::info!(
-                    "[{}][{}] Error writing to tracked connection at state {} : {err:?}",
-                    self.peer_key,
-                    self.fsm_state,
-                    tracked.state()
-                );
-                self.tracked_connection.take();
-            }
+        if let Some(tracked) = self.tracked_connection.as_mut()
+            && let Err(err) = tracked.send(msg.clone()).await
+        {
+            // Errors writing to a tracked connection are ignored and we assume that the
+            // connection is not good anymore.
+            log::info!(
+                "[{}][{}] Error writing to tracked connection at state {} : {err:?}",
+                self.peer_key,
+                self.fsm_state,
+                tracked.state()
+            );
+            self.tracked_connection.take();
         }
         if let Some(connection) = self.connection.as_mut() {
             connection.send(msg).await?;
@@ -1508,7 +1508,10 @@ impl<
                     let new_state = Self::fsm_state_from_tracked(self.fsm_state, &tracked)?;
                     log::info!(
                         "[{}][{}] BGP Collision replacing main connection with tracked connection: {}",
-                        self.peer_key, self.fsm_state, tracked.peer_addr());
+                        self.peer_key,
+                        self.fsm_state,
+                        tracked.peer_addr()
+                    );
                     self.fsm_transition(new_state);
                     if let Some(mut connection) = self.connection.take() {
                         let _ = connection

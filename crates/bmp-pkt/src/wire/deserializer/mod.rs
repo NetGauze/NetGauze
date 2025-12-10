@@ -19,18 +19,18 @@ pub mod v3;
 pub mod v4;
 
 use crate::{
-    iana::{BmpVersion, UndefinedBmpVersion},
     BmpMessage, PeerKey,
+    iana::{BmpVersion, UndefinedBmpVersion},
 };
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_parse_utils::{
-    parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePduWithOneInput, Span,
+    ErrorKindSerdeDeref, ReadablePduWithOneInput, Span, parse_into_located_one_input,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
-    error::ErrorKind,
-    number::complete::{be_u32, be_u8},
     IResult,
+    error::ErrorKind,
+    number::complete::{be_u8, be_u32},
 };
 use serde::{Deserialize, Serialize};
 use std::{

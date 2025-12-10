@@ -20,10 +20,10 @@ use std::{
 
 use chrono::{TimeZone, Utc};
 use netgauze_iana::tcp::*;
-use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span, test_helpers::*};
 
 use crate::{
-    ie,
+    DataSetId, FieldSpecifier, ie,
     netflow::*,
     wire::{
         deserializer::netflow::{
@@ -31,7 +31,6 @@ use crate::{
         },
         serializer::netflow::*,
     },
-    DataSetId, FieldSpecifier,
 };
 
 #[test]

@@ -14,29 +14,29 @@
 // limitations under the License.
 
 use netgauze_parse_utils::{
+    Span,
     test_helpers::{
         combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
     },
-    Span,
 };
 use std::{collections::HashMap, net::Ipv4Addr};
 
 use crate::{
+    BgpOpenMessage,
     capabilities::BgpCapability,
-    open::{BgpOpenMessageParameter, BGP_VERSION},
+    open::{BGP_VERSION, BgpOpenMessageParameter},
     wire::{
         deserializer::{
+            BgpParsingContext,
             capabilities::BgpCapabilityParsingError,
             open::{
                 BgpOpenMessageParsingError, BgpParameterParsingError,
                 LocatedBgpOpenMessageParsingError,
             },
-            BgpParsingContext,
         },
         serializer::open::BgpOpenMessageWritingError,
         tests::{BGP_ID, HOLD_TIME, MY_AS},
     },
-    BgpOpenMessage,
 };
 
 #[test]

@@ -241,17 +241,17 @@ impl<'a> YangParser<'a> {
     fn match_keyword(&mut self, keyword: &str) -> bool {
         let start = self.position;
 
-        if let Some(ident) = self.peek_identifier() {
-            if ident == keyword {
-                self.position += keyword.len();
-                // Make sure it's followed by whitespace or separator
-                if let Some(c) = self.peek_char() {
-                    if c.is_whitespace() || c == '{' || c == ';' || c == '"' || c == '\'' {
-                        return true;
-                    }
-                } else {
-                    return true; // EOF
+        if let Some(ident) = self.peek_identifier()
+            && ident == keyword
+        {
+            self.position += keyword.len();
+            // Make sure it's followed by whitespace or separator
+            if let Some(c) = self.peek_char() {
+                if c.is_whitespace() || c == '{' || c == ';' || c == '"' || c == '\'' {
+                    return true;
                 }
+            } else {
+                return true; // EOF
             }
         }
 

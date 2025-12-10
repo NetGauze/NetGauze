@@ -16,26 +16,26 @@
 use chrono::{LocalResult, TimeZone, Utc};
 
 use netgauze_bgp_pkt::{
+    BgpMessage,
     iana::BgpMessageType,
     nlri::RouteDistinguisher,
     wire::deserializer::{
-        nlri::RouteDistinguisherParsingError, BgpMessageParsingError, BgpParsingContext,
+        BgpMessageParsingError, BgpParsingContext, nlri::RouteDistinguisherParsingError,
     },
-    BgpMessage,
 };
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
+    parse_into_located_one_input, parse_till_empty_into_located,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
-    error::{ErrorKind, FromExternalError},
-    number::complete::{be_u128, be_u16, be_u32, be_u64, be_u8},
     IResult,
+    error::{ErrorKind, FromExternalError},
+    number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -44,8 +44,8 @@ use std::{
 };
 
 use crate::{
-    iana::*, v3, wire::deserializer::BmpParsingContext, BmpPeerType, CounterU32, GaugeU64,
-    PeerHeader, PeerKey,
+    BmpPeerType, CounterU32, GaugeU64, PeerHeader, PeerKey, iana::*, v3,
+    wire::deserializer::BmpParsingContext,
 };
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
@@ -428,7 +428,7 @@ impl<'a>
                         input,
                         PeerUpNotificationMessageParsingError::UnexpectedPeerType(code),
                     ),
-                ))
+                ));
             }
         };
         let (buf, address) = be_u128(buf)?;
@@ -851,7 +851,7 @@ fn parse_address_type(
             return Err(nom::Err::Error(LocatedStatisticsCounterParsingError::new(
                 input,
                 StatisticsCounterParsingError::InvalidAddressType(err),
-            )))
+            )));
         }
     };
     Ok((buf, address_type))

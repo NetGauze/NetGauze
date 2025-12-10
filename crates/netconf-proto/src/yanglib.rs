@@ -1,7 +1,7 @@
 use crate::{
-    xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    yangparser::{extract_yang_dependencies, YangDependencies},
     YANG_DATASTORES_NS_STR, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_NS,
+    xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
+    yangparser::{YangDependencies, extract_yang_dependencies},
 };
 use indexmap::IndexMap;
 use petgraph::prelude::EdgeRef;
@@ -206,7 +206,9 @@ impl YangLibrary {
                         .map(|x| x.to_string())
                         .collect::<Vec<String>>()
                         .join(",");
-                    tracing::debug!("For schema `{name}` registering reference `{dep_name}` with features [{features}]");
+                    tracing::debug!(
+                        "For schema `{name}` registering reference `{dep_name}` with features [{features}]"
+                    );
                 }
 
                 references.push(dep);
@@ -293,7 +295,9 @@ impl YangLibrary {
         let registered_schema = match registered_schema_result {
             Ok(registered_schema) => registered_schema,
             Err(e) => {
-                tracing::warn!("Failed to register schema `{name}` with error `{e}`, trying again with disabling compatibility check");
+                tracing::warn!(
+                    "Failed to register schema `{name}` with error `{e}`, trying again with disabling compatibility check"
+                );
                 let server_config = schema_registry_client::rest::models::ServerConfig {
                     compatibility: Some(
                         schema_registry_client::rest::models::CompatibilityLevel::None,
@@ -1863,7 +1867,7 @@ impl ModuleSetBuilder {
                 Err(_) => {
                     return Err(DependencyError::ModuleNotFound {
                         module_name: name.to_string(),
-                    })
+                    });
                 }
             }
         } else {

@@ -29,7 +29,7 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use futures_core::{ready, Stream};
+use futures_core::{Stream, ready};
 use netgauze_bgp_pkt::codec::BgpCodec;
 use netgauze_bgp_speaker::{connection::ActiveConnect, events::BgpEvent, fsm::FsmState};
 use std::{

@@ -114,10 +114,10 @@
 //! ```
 
 use crate::{
-    create_flow_channel, ActorId, FlowReceiver, FlowRequest, FlowSender, SubscriberId, Subscription,
+    ActorId, FlowReceiver, FlowRequest, FlowSender, SubscriberId, Subscription, create_flow_channel,
 };
 use bytes::{Bytes, BytesMut};
-use futures_util::{stream::SplitSink, StreamExt};
+use futures_util::{StreamExt, stream::SplitSink};
 use netgauze_flow_pkt::{codec::FlowInfoCodec, ipfix, netflow};
 use std::{
     collections::HashMap,
@@ -391,8 +391,7 @@ impl FlowCollectorActor {
             Ok(None) => {
                 trace!(
                     "[Actor {}-{}] Needs more data to decode the packet",
-                    self.actor_id,
-                    self.socket_addr
+                    self.actor_id, self.socket_addr
                 );
                 None
             }
@@ -405,8 +404,7 @@ impl FlowCollectorActor {
                 attrs.pop();
                 trace!(
                     "[Actor {}-{}] Dropping packet due to an error in decoding packet: {err:?}",
-                    self.actor_id,
-                    self.socket_addr
+                    self.actor_id, self.socket_addr
                 );
                 None
             }
@@ -464,7 +462,9 @@ impl FlowCollectorActor {
         },
         ).await;
         if timeout_ret.is_err() {
-            warn!("[Actor {actor_id}-{socket_addr}] Subscriber {id} is experiencing backpressure and possibly dropping packets");
+            warn!(
+                "[Actor {actor_id}-{socket_addr}] Subscriber {id} is experiencing backpressure and possibly dropping packets"
+            );
             drop_counter_clone.add(
                 1,
                 &[
@@ -511,7 +511,10 @@ impl FlowCollectorActor {
                     format!("{actor_id}"),
                 )],
             );
-            trace!("[Actor {actor_id}-{socket_addr}] Sending flow packet received from {peer} to a total of {} subscribers", self.subscribers.len());
+            trace!(
+                "[Actor {actor_id}-{socket_addr}] Sending flow packet received from {peer} to a total of {} subscribers",
+                self.subscribers.len()
+            );
             let mut send_handlers = vec![];
             let flow_request = Arc::new((peer, pkt));
             for (id, senders) in &self.subscribers {
@@ -579,7 +582,10 @@ impl FlowCollectorActor {
                     format!("{}", self.actor_id),
                 )],
             );
-            warn!("[Actor {}-{}] New subscriber {id} is removed, unable to send back the subscriber id", self.actor_id, self.socket_addr);
+            warn!(
+                "[Actor {}-{}] New subscriber {id} is removed, unable to send back the subscriber id",
+                self.actor_id, self.socket_addr
+            );
         }
         self.stats.subscribers.record(
             self.subscribers.len() as u64,
@@ -692,7 +698,10 @@ impl FlowCollectorActor {
             cleared_peers.len()
         );
         if let Err(_err) = ret_tx.send(cleared_peers).await {
-            error!("[Actor {}-{}] communicating back the list of peers whom templates cache is cleared", self.actor_id, self.socket_addr);
+            error!(
+                "[Actor {}-{}] communicating back the list of peers whom templates cache is cleared",
+                self.actor_id, self.socket_addr
+            );
         }
         false
     }
@@ -1158,7 +1167,7 @@ mod tests {
     use super::*;
     use bytes::{Buf, BytesMut};
     use chrono::{TimeZone, Utc};
-    use netgauze_flow_pkt::{codec::FlowInfoCodec, ie, ipfix, netflow, FieldSpecifier, FlowInfo};
+    use netgauze_flow_pkt::{FieldSpecifier, FlowInfo, codec::FlowInfoCodec, ie, ipfix, netflow};
     use tokio::{net::UdpSocket, time::Duration};
     use tokio_util::codec::Encoder;
 

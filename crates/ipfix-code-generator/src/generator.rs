@@ -16,8 +16,8 @@
 //! Generate Rust code for the given Netflow/IPFIX definitions
 
 use crate::{
-    generator_sub_registries::*, InformationElement, InformationElementSubRegistry, SimpleRegistry,
-    Xref,
+    InformationElement, InformationElementSubRegistry, SimpleRegistry, Xref,
+    generator_sub_registries::*,
 };
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;

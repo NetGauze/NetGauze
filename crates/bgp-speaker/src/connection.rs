@@ -34,6 +34,7 @@ use tokio::{
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
 use netgauze_bgp_pkt::{
+    BgpMessage,
     capabilities::BgpCapability,
     codec::{BgpCodec, BgpCodecDecoderError},
     iana::PathAttributeType,
@@ -46,14 +47,13 @@ use netgauze_bgp_pkt::{
     update::BgpUpdateMessage,
     wire::{
         deserializer::{
+            BgpParsingIgnoredErrors,
             path_attribute::{
                 MpReachParsingError, MpUnreachParsingError, PathAttributeParsingError,
             },
-            BgpParsingIgnoredErrors,
         },
         serializer::BgpMessageWritingError,
     },
-    BgpMessage,
 };
 use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 
@@ -329,11 +329,11 @@ pub struct Connection<
 }
 
 impl<
-        A: Clone + Display,
-        I: AsyncRead + AsyncWrite + Unpin,
-        D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
-            + Encoder<BgpMessage, Error = BgpMessageWritingError>,
-    > Connection<A, I, D>
+    A: Clone + Display,
+    I: AsyncRead + AsyncWrite + Unpin,
+    D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
+        + Encoder<BgpMessage, Error = BgpMessageWritingError>,
+> Connection<A, I, D>
 {
     pub fn new(
         peer_properties: &PeerProperties<A>,
@@ -1242,15 +1242,15 @@ fn handle_open_message<A>(
     delay_timer_running: bool,
 ) -> (Ipv4Addr, ConnectionEvent<A>) {
     // Check Peer ASN number
-    if let Some(peer_asn) = peer_asn {
-        if peer_asn != open.my_asn4() {
-            return (
-                open.bgp_id(),
-                ConnectionEvent::BGPOpenMsgErr(OpenMessageError::BadPeerAs {
-                    value: peer_asn.to_be_bytes().to_vec(),
-                }),
-            );
-        }
+    if let Some(peer_asn) = peer_asn
+        && peer_asn != open.my_asn4()
+    {
+        return (
+            open.bgp_id(),
+            ConnectionEvent::BGPOpenMsgErr(OpenMessageError::BadPeerAs {
+                value: peer_asn.to_be_bytes().to_vec(),
+            }),
+        );
     }
     // TODO: check BGP ID according to RFC4271: If the BGP Identifier field of the
     // OPEN message is syntactically incorrect, then the Error Subcode MUST be set
@@ -1339,11 +1339,11 @@ fn handle_update_message<A>(
 }
 
 impl<
-        A: Display,
-        I: AsyncRead + AsyncWrite,
-        D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
-            + Encoder<BgpMessage, Error = BgpMessageWritingError>,
-    > Stream for Connection<A, I, D>
+    A: Display,
+    I: AsyncRead + AsyncWrite,
+    D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
+        + Encoder<BgpMessage, Error = BgpMessageWritingError>,
+> Stream for Connection<A, I, D>
 where
     Self: Unpin,
 {
@@ -1440,11 +1440,11 @@ where
 }
 
 impl<
-        A: Clone + Display,
-        I: AsyncRead + AsyncWrite,
-        D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
-            + Encoder<BgpMessage, Error = BgpMessageWritingError>,
-    > Sink<BgpMessage> for Connection<A, I, D>
+    A: Clone + Display,
+    I: AsyncRead + AsyncWrite,
+    D: Decoder<Item = (BgpMessage, BgpParsingIgnoredErrors), Error = BgpCodecDecoderError>
+        + Encoder<BgpMessage, Error = BgpMessageWritingError>,
+> Sink<BgpMessage> for Connection<A, I, D>
 {
     type Error = BgpMessageWritingError;
 

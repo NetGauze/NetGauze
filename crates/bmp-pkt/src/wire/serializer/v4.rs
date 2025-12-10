@@ -27,7 +27,7 @@ use crate::{
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_bgp_pkt::wire::serializer::{
-    capabilities::BGPCapabilityWritingError, write_tlv_header_t16_l16, BgpMessageWritingError,
+    BgpMessageWritingError, capabilities::BGPCapabilityWritingError, write_tlv_header_t16_l16,
 };
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;

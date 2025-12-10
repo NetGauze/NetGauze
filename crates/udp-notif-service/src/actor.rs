@@ -112,11 +112,11 @@
 //! ```
 
 use crate::{
-    create_udp_notif_channel, ActorId, SubscriberId, Subscription, UdpNotifReceiver,
-    UdpNotifRequest, UdpNotifSender,
+    ActorId, SubscriberId, Subscription, UdpNotifReceiver, UdpNotifRequest, UdpNotifSender,
+    create_udp_notif_channel,
 };
 use bytes::{Bytes, BytesMut};
-use futures_util::{stream::SplitSink, StreamExt};
+use futures_util::{StreamExt, stream::SplitSink};
 use netgauze_udp_notif_pkt::codec::UdpPacketCodec;
 use std::{
     collections::HashMap,
@@ -450,8 +450,10 @@ impl UdpNotifActor {
         })
         .await;
         if timeout_ret.is_err() {
-            warn!("[Actor {}-{}] subscriber {} is experiencing backpressure and possibly dropping packets",
-                actor_id, socket_addr, id);
+            warn!(
+                "[Actor {}-{}] subscriber {} is experiencing backpressure and possibly dropping packets",
+                actor_id, socket_addr, id
+            );
             drop_counter_clone.add(
                 1,
                 &[
@@ -502,9 +504,13 @@ impl UdpNotifActor {
                     format!("{}", self.actor_id),
                 )],
             );
-            debug!("[Actor {}-{}] sending udp-notif packet received from {} to a total of {} subscribers",
-                self.actor_id, self.socket_addr, peer,
-                self.subscribers.len());
+            debug!(
+                "[Actor {}-{}] sending udp-notif packet received from {} to a total of {} subscribers",
+                self.actor_id,
+                self.socket_addr,
+                peer,
+                self.subscribers.len()
+            );
             let mut send_handlers = vec![];
             let udp_notif_request = Arc::new((peer, msg));
             for (id, tx) in &self.subscribers {

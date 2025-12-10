@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use crate::{
+    BgpNotificationMessage,
     iana::{
         UndefinedBgpErrorNotificationCode, UndefinedCeaseErrorSubCode,
         UndefinedFiniteStateMachineErrorSubCode, UndefinedMessageHeaderErrorSubCode,
@@ -25,11 +26,10 @@ use crate::{
         OpenMessageError, RouteRefreshError, UpdateMessageError,
     },
     wire::{deserializer::notification::*, serializer::notification::*},
-    BgpNotificationMessage,
 };
 use netgauze_parse_utils::{
-    test_helpers::{test_parse_error, test_parsed_completely, test_write},
     Span,
+    test_helpers::{test_parse_error, test_parsed_completely, test_write},
 };
 use nom::error::ErrorKind;
 

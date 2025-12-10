@@ -25,14 +25,14 @@ use crate::{
     },
 };
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, parse_till_empty_into_located,
-    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
+    parse_into_located_one_input, parse_till_empty_into_located,
 };
 use netgauze_serde_macros::LocatedError;
 use nom::{
-    error::{ErrorKind, FromExternalError},
-    number::complete::{be_f32, be_u128, be_u16, be_u32, be_u64, be_u8},
     IResult,
+    error::{ErrorKind, FromExternalError},
+    number::complete::{be_f32, be_u8, be_u16, be_u32, be_u64, be_u128},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -99,7 +99,7 @@ impl<'a> ReadablePdu<'a, LocatedBgpLsAttributeParsingError<'a>> for BgpLsAttribu
                         code: value,
                         value: data.to_vec(),
                     },
-                ))
+                ));
             }
             Err(error) => {
                 return Err(nom::Err::Error(LocatedBgpLsAttributeParsingError::new(

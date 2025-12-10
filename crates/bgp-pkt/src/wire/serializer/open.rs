@@ -21,8 +21,8 @@ use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
 use crate::{
-    capabilities::BgpCapability, iana::BgpOpenMessageParameterType, open::BgpOpenMessageParameter,
-    wire::serializer::capabilities::BGPCapabilityWritingError, BgpOpenMessage,
+    BgpOpenMessage, capabilities::BgpCapability, iana::BgpOpenMessageParameterType,
+    open::BgpOpenMessageParameter, wire::serializer::capabilities::BGPCapabilityWritingError,
 };
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]

@@ -15,9 +15,9 @@
 
 use crate::{connection::ActiveConnect, peer::*, peer_controller::*};
 use netgauze_bgp_pkt::{
+    BgpMessage,
     codec::{BgpCodecDecoderError, BgpCodecInitializer},
     wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
-    BgpMessage,
 };
 use std::{
     collections::HashMap,
@@ -47,10 +47,10 @@ pub struct PeersSupervisor<K: Hash + Eq + PartialEq, A, I: AsyncWrite + AsyncRea
 }
 
 impl<
-        K: Display + Hash + Eq + PartialEq + Copy + Send + Sync + 'static,
-        A: Copy + Display + Debug + Send + Sync + 'static,
-        I: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static,
-    > PeersSupervisor<K, A, I>
+    K: Display + Hash + Eq + PartialEq + Copy + Send + Sync + 'static,
+    A: Copy + Display + Debug + Send + Sync + 'static,
+    I: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static,
+> PeersSupervisor<K, A, I>
 {
     pub fn new(my_asn: u32, my_bgp_id: Ipv4Addr) -> Self {
         Self {

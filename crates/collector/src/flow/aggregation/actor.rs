@@ -34,16 +34,16 @@ use either::Either;
 use futures::stream::{self, StreamExt};
 use netgauze_analytics::aggregation::{AggregationWindowStreamExt, Aggregator, TimeSeriesData};
 use netgauze_flow_pkt::{
-    ie::{netgauze, Field},
     FlowInfo,
+    ie::{Field, netgauze},
 };
 use opentelemetry::metrics::{Counter, Meter};
 use pin_utils::pin_mut;
 use std::{
     net::{IpAddr, SocketAddr},
     sync::{
-        atomic::{AtomicU32, Ordering},
         Arc,
+        atomic::{AtomicU32, Ordering},
     },
     time::Duration,
 };

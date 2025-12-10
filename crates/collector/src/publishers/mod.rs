@@ -14,9 +14,9 @@
 // limitations under the License.
 
 use rdkafka::{
+    ClientContext,
     message::DeliveryResult,
     producer::{NoCustomPartitioner, ProducerContext},
-    ClientContext,
 };
 use tracing::{trace, warn};
 

@@ -14,16 +14,16 @@
 // limitations under the License.
 
 use nom::{
-    error::ErrorKind,
-    number::complete::{be_u128, be_u16, be_u32, be_u8},
     IResult,
+    error::ErrorKind,
+    number::complete::{be_u8, be_u16, be_u32, be_u128},
 };
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
 use netgauze_parse_utils::{
-    parse_into_located, parse_into_located_one_input, ErrorKindSerdeDeref, ReadablePdu,
-    ReadablePduWithOneInput, Span,
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
+    parse_into_located_one_input,
 };
 use netgauze_serde_macros::LocatedError;
 

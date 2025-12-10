@@ -22,8 +22,8 @@ use netgauze_iana::address_family::{
     AddressFamily, AddressType, UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
 use netgauze_parse_utils::{
-    test_helpers::{test_parse_error, test_parsed_completely, test_write},
     Span,
+    test_helpers::{test_parse_error, test_parsed_completely, test_write},
 };
 use nom::error::ErrorKind;
 

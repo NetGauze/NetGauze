@@ -2993,8 +2993,8 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
 }
 
 #[test_log::test(tokio::test)]
-async fn test_open_confirm_collision_dump_tracked_connection(
-) -> Result<(), FsmStateError<SocketAddr>> {
+async fn test_open_confirm_collision_dump_tracked_connection()
+-> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
     let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
@@ -3962,8 +3962,8 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
 }
 
 #[test_log::test(tokio::test)]
-async fn test_established_collision_dump_tracked_connection(
-) -> Result<(), FsmStateError<SocketAddr>> {
+async fn test_established_collision_dump_tracked_connection()
+-> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
     let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;
@@ -4059,8 +4059,8 @@ async fn test_established_collision_dump_tracked_connection(
 }
 
 #[test_log::test(tokio::test)]
-async fn test_established_reject_connection_tracking_disabled(
-) -> Result<(), FsmStateError<SocketAddr>> {
+async fn test_established_reject_connection_tracking_disabled()
+-> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
     let properties = PeerProperties::new(MY_AS, PEER_AS, MY_BGP_ID, PEER_ADDR, false);
     let mut passive_addr = PEER_ADDR;

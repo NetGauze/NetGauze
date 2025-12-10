@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    xml_parsers::{sub_registries::parse_subregistry, xml_common::*},
     InformationElement, InformationElementSubRegistry, SimpleRegistry, SubRegistryType,
+    xml_parsers::{sub_registries::parse_subregistry, xml_common::*},
 };
 use regex::Regex;
 use roxmltree::Node;
@@ -113,10 +113,10 @@ pub fn parse_description_string(node: &Node<'_, '_>) -> Option<String> {
             }
             if cc.tag_name() == (IANA_NAMESPACE, "paragraph").into() {
                 let body = cc.text().map(|txt| txt.trim().to_string());
-                if let Some(body) = body {
-                    if !body.trim().is_empty() {
-                        desc_text.push_str(body.trim());
-                    }
+                if let Some(body) = body
+                    && !body.trim().is_empty()
+                {
+                    desc_text.push_str(body.trim());
                 }
             }
             if cc.tag_name() == (IANA_NAMESPACE, "artwork").into() {
@@ -227,14 +227,15 @@ pub(crate) fn parse_information_elements(
         let revision = if let Some(revision) =
             get_string_child(child, (IANA_NAMESPACE, "revision").into())
         {
-            let rev = match revision.as_str().parse::<u32>() {
+            match revision.as_str().parse::<u32>() {
                 Ok(rev) => rev,
                 Err(err) => {
-                    log::info!("Skipping {name} a child with invalid revision defined `{err:?}`: {child:?}");
+                    log::info!(
+                        "Skipping {name} a child with invalid revision defined `{err:?}`: {child:?}"
+                    );
                     continue;
                 }
-            };
-            rev
+            }
         } else {
             log::info!("Skipping {name} a child with no revision defined: {child:?}");
             continue;

@@ -115,10 +115,10 @@ pub struct FieldSpecifier {
 
 impl FieldSpecifier {
     pub fn new(element_id: IE, length: u16) -> Result<Self, FieldSpecifierError> {
-        if let Some(range) = element_id.length_range() {
-            if !range.contains(&length) {
-                return Err(FieldSpecifierError::InvalidLength(length, element_id));
-            }
+        if let Some(range) = element_id.length_range()
+            && !range.contains(&length)
+        {
+            return Err(FieldSpecifierError::InvalidLength(length, element_id));
         };
         Ok(Self { element_id, length })
     }

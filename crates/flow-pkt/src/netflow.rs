@@ -14,11 +14,11 @@
 // limitations under the License.
 
 use crate::{
+    DataSetId, FieldSpecifier,
     ie::{
         Field, InformationElementDataType, InformationElementSemantics, InformationElementTemplate,
         InformationElementUnits,
     },
-    DataSetId, FieldSpecifier,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

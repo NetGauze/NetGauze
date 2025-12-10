@@ -50,12 +50,13 @@
 //! - **NetFlowV9** - Not yet supported
 
 use crate::{
-    flow::enrichment::{cache::EnrichmentCache, EnrichmentOperation},
+    flow::enrichment::{EnrichmentOperation, cache::EnrichmentCache},
     inputs::EnrichmentHandle,
 };
 use netgauze_flow_pkt::{
-    ie::{netgauze, Field},
-    ipfix, FlowInfo,
+    FlowInfo,
+    ie::{Field, netgauze},
+    ipfix,
 };
 use netgauze_flow_service::FlowRequest;
 use std::{

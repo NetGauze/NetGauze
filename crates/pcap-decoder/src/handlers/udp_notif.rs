@@ -18,8 +18,8 @@ use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_pcap_reader::TransportProtocol;
 use netgauze_udp_notif_pkt::{
-    codec::{UdpPacketCodec, UdpPacketCodecError},
     MediaType, UdpNotifPacket,
+    codec::{UdpPacketCodec, UdpPacketCodecError},
 };
 use std::{collections::HashMap, net::IpAddr};
 

@@ -14,14 +14,13 @@
 // limitations under the License.
 
 use crate::{
-    ie,
+    DataSetId, FieldSpecifier, ie,
     ipfix::*,
     wire::{deserializer::ipfix::*, serializer::ipfix::*},
-    DataSetId, FieldSpecifier,
 };
 use chrono::{TimeZone, Timelike, Utc};
 use netgauze_iana::tcp::*;
-use netgauze_parse_utils::{test_helpers::*, ReadablePduWithOneInput, Span};
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span, test_helpers::*};
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, Ipv6Addr},

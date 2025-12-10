@@ -14,17 +14,18 @@
 // limitations under the License.
 
 use crate::{
+    BmpMessage, BmpPeerType, CounterU32, GaugeU64, PeerHeader,
     iana::*,
     v3::*,
     wire::{
-        deserializer::{v3::*, BmpParsingContext},
-        serializer::{v3::*, BmpMessageWritingError},
+        deserializer::{BmpParsingContext, v3::*},
+        serializer::{BmpMessageWritingError, v3::*},
     },
-    BmpMessage, BmpPeerType, CounterU32, GaugeU64, PeerHeader,
 };
 use chrono::{TimeZone, Utc};
 use ipnet::Ipv4Net;
 use netgauze_bgp_pkt::{
+    BgpMessage,
     capabilities::{
         BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
         FourOctetAsCapability, MultiProtocolExtensionsCapability,
@@ -43,17 +44,16 @@ use netgauze_bgp_pkt::{
     },
     update::BgpUpdateMessage,
     wire::deserializer::{
-        nlri::RouteDistinguisherParsingError, BgpMessageParsingError, BgpParsingContext,
+        BgpMessageParsingError, BgpParsingContext, nlri::RouteDistinguisherParsingError,
     },
-    BgpMessage,
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType};
 use netgauze_parse_utils::{
+    Span,
     test_helpers::{
         test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
         test_parsed_completely_with_one_input, test_write,
     },
-    Span,
 };
 use nom::error::ErrorKind;
 use std::{
@@ -1651,12 +1651,14 @@ fn test_bmp_route_monitoring_unaligned_prefix() -> Result<(), BmpMessageWritingE
                         PathAttributeValue::MpReach(MpReach::Ipv4NlriMplsLabels {
                             next_hop: IpAddr::V4(Ipv4Addr::new(198, 51, 100, 71)),
                             next_hop_local: None,
-                            nlri: vec![Ipv4NlriMplsLabelsAddress::from(
-                                None,
-                                vec![MplsLabel::new([16, 3, 49])],
-                                Ipv4Net::from_str("203.0.113.254/31").unwrap(),
-                            )
-                            .unwrap()],
+                            nlri: vec![
+                                Ipv4NlriMplsLabelsAddress::from(
+                                    None,
+                                    vec![MplsLabel::new([16, 3, 49])],
+                                    Ipv4Net::from_str("203.0.113.254/31").unwrap(),
+                                )
+                                .unwrap(),
+                            ],
                         }),
                     )
                     .unwrap(),

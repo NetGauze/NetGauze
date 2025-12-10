@@ -21,7 +21,7 @@
 //! JSON format.
 use crate::publishers::kafka_yang::YangConverter;
 use netgauze_yang_push::{
-    model::telemetry::TelemetryMessageWrapper, validation::SubscriptionInfo, ContentId,
+    ContentId, model::telemetry::TelemetryMessageWrapper, validation::SubscriptionInfo,
 };
 use schema_registry_converter::schema_registry_common::SuppliedSchema;
 use serde::{Deserialize, Serialize};

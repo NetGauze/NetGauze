@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use netgauze_ipfix_code_generator::{
-    generate, Config, ExternalSubRegistrySource, RegistrySource, RegistryType, SourceConfig,
-    SubRegistryType,
+    Config, ExternalSubRegistrySource, RegistrySource, RegistryType, SourceConfig, SubRegistryType,
+    generate,
 };
 use std::{env, path::Path};
 

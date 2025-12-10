@@ -292,7 +292,7 @@ impl PmacctMapEntry {
                     _ => {
                         return Err(PmacctMapError::InvalidRD {
                             reason: "invalid type field (must be 0, 1, or 2".to_string(),
-                        })
+                        });
                     }
                 }
 

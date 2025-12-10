@@ -15,22 +15,22 @@
 
 use chrono::{LocalResult, TimeZone, Utc};
 use nom::{
-    error::ErrorKind,
-    number::complete::{be_u16, be_u32, be_u8},
     IResult, InputIter, InputLength, Slice,
+    error::ErrorKind,
+    number::complete::{be_u8, be_u16, be_u32},
 };
 use serde::{Deserialize, Serialize};
 
 use netgauze_parse_utils::{
+    ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, ReadablePduWithTwoInputs, Span,
     parse_into_located, parse_into_located_one_input, parse_into_located_two_inputs,
-    parse_till_empty_into_located, ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput,
-    ReadablePduWithTwoInputs, Span,
+    parse_till_empty_into_located,
 };
 use netgauze_serde_macros::LocatedError;
 
 use crate::{
-    ie::InformationElementTemplate, netflow::*, wire::deserializer::FieldSpecifierParsingError,
-    DataSetId, FieldSpecifier, DATA_SET_MIN_ID,
+    DATA_SET_MIN_ID, DataSetId, FieldSpecifier, ie::InformationElementTemplate, netflow::*,
+    wire::deserializer::FieldSpecifierParsingError,
 };
 
 /// 2-octets version, 2-octets count, 4-octets * 4 (sysUpTime, UNIX time, seq

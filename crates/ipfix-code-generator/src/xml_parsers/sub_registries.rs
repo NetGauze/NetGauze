@@ -14,8 +14,8 @@
 // limitations under the License.
 
 use crate::{
-    xml_parsers::xml_common::*, InformationElementSubRegistry, ReasonCodeNestedRegistry,
-    SubRegistryType, ValueNameDescRegistry, Xref,
+    InformationElementSubRegistry, ReasonCodeNestedRegistry, SubRegistryType,
+    ValueNameDescRegistry, Xref, xml_parsers::xml_common::*,
 };
 
 use regex::Regex;

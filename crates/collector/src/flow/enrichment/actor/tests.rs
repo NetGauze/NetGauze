@@ -13,12 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::flow::enrichment::{actor::*, EnrichmentOperation, Scope, UpsertPayload};
+use crate::flow::enrichment::{EnrichmentOperation, Scope, UpsertPayload, actor::*};
 use chrono::{TimeZone, Utc};
 use netgauze_flow_pkt::{
-    ie::{netgauze, Field},
-    ipfix::{DataRecord, IpfixPacket, Set},
     DataSetId, FlowInfo,
+    ie::{Field, netgauze},
+    ipfix::{DataRecord, IpfixPacket, Set},
 };
 use std::net::SocketAddr;
 

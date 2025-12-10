@@ -59,7 +59,7 @@ where
     ///
     /// Returns a boxed future to enable trait methods without `async_trait`.
     fn update_enrichment(&self, op: T)
-        -> futures::future::BoxFuture<'_, Result<(), anyhow::Error>>;
+    -> futures::future::BoxFuture<'_, Result<(), anyhow::Error>>;
 }
 
 /// Categorized errors from input processing operations.
