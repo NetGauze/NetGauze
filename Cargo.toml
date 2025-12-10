@@ -116,3 +116,28 @@ schema-registry-client = { version = "0.4" }
 [profile.release]
 codegen-units = 1
 lto = true
+
+[workspace.lints.rust]
+unused_must_use = { level = "forbid", priority = 1 }
+future_incompatible = { level = "deny", priority = 2 }
+nonstandard_style = { level = "deny", priority = 3 }
+rust_2018_idioms = { level = "deny", priority = 4 }
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+uninlined_format_args = { level = "deny", priority = 0 }
+dbg_macro = { level = "deny", priority = 0 }
+disallowed_methods = { level = "deny", priority = 0 }
+disallowed_types = { level = "deny", priority = 0 }
+explicit_into_iter_loop = { level = "deny", priority = 0 }
+explicit_iter_loop = { level = "deny", priority = 0 }
+inconsistent_struct_constructor = { level = "deny", priority = 0 }
+unused_async = { level = "deny", priority = 0 }
+map_flatten = { level = "deny", priority = 0 }
+no_effect_underscore_binding = { level = "deny", priority = 0 }
+await_holding_lock = { level = "deny", priority = 0 }
+too_long_first_doc_paragraph = { level = "allow", priority = 0 }
+new_without_default = { level = "allow", priority = 1 }
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = { level = "warn", priority = 0 }
