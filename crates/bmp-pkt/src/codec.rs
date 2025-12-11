@@ -143,16 +143,29 @@ impl BmpParsingContext {
                 bgp_ctx.add_path_mut().clear();
                 bgp_ctx.multiple_labels_mut().clear();
             }
+            // Determine if we need to track Adj-RIB-Out based on Peer Type,
+            // which is useful to select ADD-Path behavior for either sending or receive
+            let adj_rib_out = match peer_up.peer_header().peer_type() {
+                BmpPeerType::GlobalInstancePeer { adj_rib_out, .. }
+                | BmpPeerType::RdInstancePeer { adj_rib_out, .. }
+                | BmpPeerType::LocalInstancePeer { adj_rib_out, .. } => adj_rib_out,
+                _ => false,
+            };
+
             for add_path in &common_add_path_caps {
-                bgp_ctx.update_capabilities(&BgpCapability::AddPath((*add_path).clone()))
+                bgp_ctx
+                    .update_capabilities(&BgpCapability::AddPath((*add_path).clone()), adj_rib_out)
             }
-            bgp_ctx.update_capabilities(&BgpCapability::MultipleLabels(
-                common_multiple_labels_caps
-                    .iter()
-                    .copied()
-                    .cloned()
-                    .collect(),
-            ));
+            bgp_ctx.update_capabilities(
+                &BgpCapability::MultipleLabels(
+                    common_multiple_labels_caps
+                        .iter()
+                        .copied()
+                        .cloned()
+                        .collect(),
+                ),
+                adj_rib_out,
+            );
 
             // Add a key for the BGP Peer of the first router
             // In Loc-Rib the bgp open message is duplicated, no need to go through it
@@ -166,16 +179,30 @@ impl BmpParsingContext {
                     received_open.bgp_id(),
                 );
                 let bgp_ctx = ctx.entry(peer_key).or_default();
+                // Determine if we need to track Adj-RIB-Out based on Peer Type,
+                // which is useful to select ADD-Path behavior for either sending or receive
+                let adj_rib_out = match peer_up.peer_header().peer_type() {
+                    BmpPeerType::GlobalInstancePeer { adj_rib_out, .. }
+                    | BmpPeerType::RdInstancePeer { adj_rib_out, .. }
+                    | BmpPeerType::LocalInstancePeer { adj_rib_out, .. } => adj_rib_out,
+                    _ => false,
+                };
                 for add_path in &common_add_path_caps {
-                    bgp_ctx.update_capabilities(&BgpCapability::AddPath((*add_path).clone()))
+                    bgp_ctx.update_capabilities(
+                        &BgpCapability::AddPath((*add_path).clone()),
+                        adj_rib_out,
+                    )
                 }
-                bgp_ctx.update_capabilities(&BgpCapability::MultipleLabels(
-                    common_multiple_labels_caps
-                        .iter()
-                        .copied()
-                        .cloned()
-                        .collect(),
-                ));
+                bgp_ctx.update_capabilities(
+                    &BgpCapability::MultipleLabels(
+                        common_multiple_labels_caps
+                            .iter()
+                            .copied()
+                            .cloned()
+                            .collect(),
+                    ),
+                    adj_rib_out,
+                );
             }
         }
 

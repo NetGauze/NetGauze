@@ -168,12 +168,17 @@ impl BgpParsingContext {
     }
 
     #[inline]
-    pub fn update_capabilities(&mut self, capability: &BgpCapability) {
+    pub fn update_capabilities(&mut self, capability: &BgpCapability, adj_rib_out: bool) {
         match capability {
             BgpCapability::AddPath(add_path) => {
                 for address_family in add_path.address_families() {
+                    let add_path_support = if adj_rib_out {
+                        address_family.send()
+                    } else {
+                        address_family.receive()
+                    };
                     self.add_path_mut()
-                        .insert(address_family.address_type(), address_family.receive());
+                        .insert(address_family.address_type(), add_path_support);
                 }
             }
             BgpCapability::MultipleLabels(multiple_labels) => {
