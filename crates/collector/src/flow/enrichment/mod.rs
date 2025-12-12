@@ -36,6 +36,11 @@ mod config;
 pub use actor::FlowEnrichmentActorHandle;
 pub use config::EnrichmentConfig;
 
+#[cfg(feature = "bench")]
+pub use actor::{EnrichmentActor, EnrichmentStats};
+#[cfg(feature = "bench")]
+pub use cache::EnrichmentCache;
+
 use netgauze_flow_pkt::ie::{Field, HasIE, IE};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
