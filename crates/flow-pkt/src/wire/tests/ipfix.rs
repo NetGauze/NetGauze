@@ -13,19 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    DataSetId, FieldSpecifier, ie,
-    ipfix::*,
-    wire::{deserializer::ipfix::*, serializer::ipfix::*},
-};
+use crate::ipfix::*;
+use crate::wire::deserializer::ipfix::*;
+use crate::wire::serializer::ipfix::*;
+use crate::{DataSetId, FieldSpecifier, ie};
 use chrono::{TimeZone, Timelike, Utc};
 use netgauze_iana::tcp::*;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span, test_helpers::*};
-use std::{
-    collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use netgauze_parse_utils::test_helpers::*;
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
+use std::collections::HashMap;
+use std::net::{Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
 
 #[test]
 fn test_ipfix_header() -> Result<(), IpfixPacketWritingError> {

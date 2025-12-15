@@ -15,9 +15,10 @@
 
 //! Representations for normal, extended, and large BGP Communities.
 
+use crate::iana::WellKnownCommunity;
+use crate::nlri::MacAddress;
 #[cfg(feature = "fuzz")]
 use crate::{arbitrary_ipv4, arbitrary_ipv6};
-use crate::{iana::WellKnownCommunity, nlri::MacAddress};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 

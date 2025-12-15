@@ -13,13 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    NETCONF_NS,
-    xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-};
+use crate::NETCONF_NS;
+use crate::xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter};
 use quick_xml::events::{BytesText, Event};
 use serde::{Deserialize, Serialize};
-use std::{fmt, io, str::FromStr};
+use std::str::FromStr;
+use std::{fmt, io};
 
 const CAP_WRITABLE: &str = "urn:ietf:params:netconf:capability:writable-running:1.0";
 const CAP_CANDIDATE: &str = "urn:ietf:params:netconf:capability:candidate:1.0";
@@ -523,7 +522,8 @@ impl fmt::Display for YangCapability {
 mod tests {
     use super::*;
     use crate::tests::test_xml_value;
-    use std::{str::FromStr, string::ToString};
+    use std::str::FromStr;
+    use std::string::ToString;
 
     #[test]
     fn test_netconf_base_capability() -> Result<(), ParsingError> {

@@ -16,10 +16,8 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use netgauze_flow_pkt::codec::FlowInfoCodec;
-use tokio_util::{
-    bytes::BytesMut,
-    codec::{Decoder, Encoder},
-};
+use tokio_util::bytes::BytesMut;
+use tokio_util::codec::{Decoder, Encoder};
 
 fuzz_target!(|data: &[u8]| {
     let mut codec = FlowInfoCodec::default();

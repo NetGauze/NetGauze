@@ -59,17 +59,17 @@
 //! - The supervisor provides a centralized point for managing and interacting
 //!   with multiple udp-notif collectors.
 
+use crate::actor::{ActorCommand, ActorHandle, UdpNotifActorError, UdpNotifCollectorStats};
 use crate::{
-    ActorId, SubscriberId, Subscription, UdpNotifReceiver, UdpNotifSender,
-    actor::{ActorCommand, ActorHandle, UdpNotifActorError, UdpNotifCollectorStats},
-    create_udp_notif_channel,
+    ActorId, SubscriberId, Subscription, UdpNotifReceiver, UdpNotifSender, create_udp_notif_channel,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, time::Duration};
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::time::Duration;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -497,10 +497,8 @@ mod test {
     use netgauze_parse_utils::WritablePdu;
     use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
     use std::io::Cursor;
-    use tokio::{
-        net::UdpSocket,
-        time::{Duration, timeout},
-    };
+    use tokio::net::UdpSocket;
+    use tokio::time::{Duration, timeout};
 
     // Helper function to create a test configuration
     fn create_test_config() -> SupervisorConfig {

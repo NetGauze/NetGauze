@@ -13,24 +13,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    BgpNotificationMessage,
-    iana::{
-        UndefinedBgpErrorNotificationCode, UndefinedCeaseErrorSubCode,
-        UndefinedFiniteStateMachineErrorSubCode, UndefinedMessageHeaderErrorSubCode,
-        UndefinedOpenMessageErrorSubCode, UndefinedRouteRefreshMessageError,
-        UndefinedUpdateMessageErrorSubCode,
-    },
-    notification::{
-        CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
-        OpenMessageError, RouteRefreshError, UpdateMessageError,
-    },
-    wire::{deserializer::notification::*, serializer::notification::*},
+use crate::BgpNotificationMessage;
+use crate::iana::{
+    UndefinedBgpErrorNotificationCode, UndefinedCeaseErrorSubCode,
+    UndefinedFiniteStateMachineErrorSubCode, UndefinedMessageHeaderErrorSubCode,
+    UndefinedOpenMessageErrorSubCode, UndefinedRouteRefreshMessageError,
+    UndefinedUpdateMessageErrorSubCode,
 };
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{test_parse_error, test_parsed_completely, test_write},
+use crate::notification::{
+    CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
+    OpenMessageError, RouteRefreshError, UpdateMessageError,
 };
+use crate::wire::deserializer::notification::*;
+use crate::wire::serializer::notification::*;
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{test_parse_error, test_parsed_completely, test_write};
 use nom::error::ErrorKind;
 
 #[test]

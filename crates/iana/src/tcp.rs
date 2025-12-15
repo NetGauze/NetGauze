@@ -33,10 +33,8 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt::{Display, Formatter},
-    ops::{BitOr, BitOrAssign},
-};
+use std::fmt::{Display, Formatter};
+use std::ops::{BitOr, BitOrAssign};
 
 /// TCP Header Flags registered at IANA
 /// [TCP Parameters](https://www.iana.org/assignments/tcp-parameters/tcp-parameters.xml)

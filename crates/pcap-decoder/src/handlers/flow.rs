@@ -16,12 +16,12 @@
 use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
-use netgauze_flow_pkt::{
-    FlowInfo,
-    codec::{FlowInfoCodec, FlowInfoCodecDecoderError},
-};
+use netgauze_flow_pkt::FlowInfo;
+use netgauze_flow_pkt::codec::{FlowInfoCodec, FlowInfoCodecDecoderError};
 use netgauze_pcap_reader::TransportProtocol;
-use std::{collections::HashMap, io, net::IpAddr};
+use std::collections::HashMap;
+use std::io;
+use std::net::IpAddr;
 
 pub struct FlowProtocolHandler {
     ports: Vec<u16>,
@@ -77,13 +77,10 @@ mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
     use ipfix::IpfixPacket;
-    use netgauze_flow_pkt::{
-        DataSetId, FlowInfo,
-        ie::{Field, IE},
-        ipfix,
-        ipfix::{DataRecord, OptionsTemplateRecord, Set},
-        wire::deserializer::ipfix::IpfixPacketParsingError,
-    };
+    use netgauze_flow_pkt::ie::{Field, IE};
+    use netgauze_flow_pkt::ipfix::{DataRecord, OptionsTemplateRecord, Set};
+    use netgauze_flow_pkt::wire::deserializer::ipfix::IpfixPacketParsingError;
+    use netgauze_flow_pkt::{DataSetId, FlowInfo, ipfix};
     use serde_json::json;
     use std::net::Ipv4Addr;
 

@@ -13,23 +13,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{connection::ActiveConnect, peer::*, peer_controller::*};
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    codec::{BgpCodecDecoderError, BgpCodecInitializer},
-    wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
-};
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-    hash::Hash,
-    net::Ipv4Addr,
-};
+use crate::connection::ActiveConnect;
+use crate::peer::*;
+use crate::peer_controller::*;
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::codec::{BgpCodecDecoderError, BgpCodecInitializer};
+use netgauze_bgp_pkt::wire::deserializer::BgpParsingIgnoredErrors;
+use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
+use std::collections::HashMap;
+use std::fmt::{Debug, Display};
+use std::hash::Hash;
+use std::net::Ipv4Addr;
 
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    sync::{mpsc, mpsc::UnboundedReceiver},
-};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

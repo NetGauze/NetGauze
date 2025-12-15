@@ -13,16 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    generator::*,
-    xml_parsers::{
-        ipfix::{ID_IE, parse_iana_common_values, parse_information_elements},
-        xml_common::find_node_by_id,
-    },
-};
+use crate::generator::*;
+use crate::xml_parsers::ipfix::{ID_IE, parse_iana_common_values, parse_information_elements};
+use crate::xml_parsers::xml_common::find_node_by_id;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use std::{collections::HashMap, ffi::OsString, fs, path::Path};
+use std::collections::HashMap;
+use std::ffi::OsString;
+use std::fs;
+use std::path::Path;
 use thiserror::Error;
 use xml_parsers::sub_registries::parse_subregistry;
 

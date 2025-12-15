@@ -20,10 +20,11 @@ use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
-use crate::{
-    BgpOpenMessage, capabilities::BgpCapability, iana::BgpOpenMessageParameterType,
-    open::BgpOpenMessageParameter, wire::serializer::capabilities::BGPCapabilityWritingError,
-};
+use crate::BgpOpenMessage;
+use crate::capabilities::BgpCapability;
+use crate::iana::BgpOpenMessageParameterType;
+use crate::open::BgpOpenMessageParameter;
+use crate::wire::serializer::capabilities::BGPCapabilityWritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BgpOpenMessageWritingError {

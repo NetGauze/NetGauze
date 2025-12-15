@@ -18,10 +18,9 @@ use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 use std::io::Write;
 
-use crate::{
-    ipfix::*,
-    wire::serializer::{FieldSpecifierWritingError, ie::FieldWritingError},
-};
+use crate::ipfix::*;
+use crate::wire::serializer::FieldSpecifierWritingError;
+use crate::wire::serializer::ie::FieldWritingError;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum IpfixPacketWritingError {

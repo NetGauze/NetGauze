@@ -13,23 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
-    wire::{
-        deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError},
-        serialize::UdpNotifPacketWritingError,
-    },
-};
+use crate::wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError};
+use crate::wire::serialize::UdpNotifPacketWritingError;
+use crate::{UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePdu, Span, WritablePdu};
 use nom::error::ErrorKind;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap},
-    io,
-    time::{Duration, Instant},
-};
+use std::collections::{BTreeMap, HashMap};
+use std::io;
+use std::time::{Duration, Instant};
 use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug, strum_macros::Display, Eq, PartialEq, Clone, Serialize, Deserialize)]

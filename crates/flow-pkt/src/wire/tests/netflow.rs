@@ -13,25 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    collections::HashMap,
-    net::{Ipv4Addr, Ipv6Addr},
-};
+use std::collections::HashMap;
+use std::net::{Ipv4Addr, Ipv6Addr};
 
 use chrono::{TimeZone, Utc};
 use netgauze_iana::tcp::*;
-use netgauze_parse_utils::{ReadablePduWithOneInput, Span, test_helpers::*};
+use netgauze_parse_utils::test_helpers::*;
+use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
-use crate::{
-    DataSetId, FieldSpecifier, ie,
-    netflow::*,
-    wire::{
-        deserializer::netflow::{
-            LocatedNetFlowV9PacketParsingError, NetFlowV9PacketParsingError, SetParsingError,
-        },
-        serializer::netflow::*,
-    },
+use crate::netflow::*;
+use crate::wire::deserializer::netflow::{
+    LocatedNetFlowV9PacketParsingError, NetFlowV9PacketParsingError, SetParsingError,
 };
+use crate::wire::serializer::netflow::*;
+use crate::{DataSetId, FieldSpecifier, ie};
 
 #[test]
 fn test_netflow9_template_record() -> Result<(), NetFlowV9WritingError> {

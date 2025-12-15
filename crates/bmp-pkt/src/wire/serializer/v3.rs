@@ -13,26 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    BmpPeerType, PeerHeader,
-    iana::{
-        PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2, PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6,
-        PEER_FLAGS_IS_POST_POLICY,
-    },
-    v3::{
-        BmpMessageValue, InitiationInformation, InitiationMessage, MirroredBgpMessage,
-        PeerDownNotificationMessage, PeerDownNotificationReason, PeerUpNotificationMessage,
-        RouteMirroringMessage, RouteMirroringValue, RouteMonitoringMessage, StatisticsCounter,
-        StatisticsReportMessage, TerminationInformation, TerminationMessage,
-    },
+use crate::iana::{
+    PEER_FLAGS_IS_ADJ_RIB_OUT, PEER_FLAGS_IS_ASN2, PEER_FLAGS_IS_FILTERED, PEER_FLAGS_IS_IPV6,
+    PEER_FLAGS_IS_POST_POLICY,
 };
+use crate::v3::{
+    BmpMessageValue, InitiationInformation, InitiationMessage, MirroredBgpMessage,
+    PeerDownNotificationMessage, PeerDownNotificationReason, PeerUpNotificationMessage,
+    RouteMirroringMessage, RouteMirroringValue, RouteMonitoringMessage, StatisticsCounter,
+    StatisticsReportMessage, TerminationInformation, TerminationMessage,
+};
+use crate::{BmpPeerType, PeerHeader};
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_bgp_pkt::wire::serializer::{
-    BgpMessageWritingError, nlri::RouteDistinguisherWritingError,
-};
+use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
+use netgauze_bgp_pkt::wire::serializer::nlri::RouteDistinguisherWritingError;
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
-use std::{io::Write, net::IpAddr};
+use std::io::Write;
+use std::net::IpAddr;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageValueWritingError {

@@ -14,19 +14,15 @@
 // limitations under the License.
 
 use clap::Parser;
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
-    vec,
-};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::vec;
 use tokio::net::TcpStream;
 
-use netgauze_bgp_speaker::{
-    connection::TcpActiveConnect,
-    listener::BgpListener,
-    peer::{EchoCapabilitiesPolicy, PeerConfigBuilder, PeerProperties},
-    peer_controller::PeerHandle,
-    supervisor::PeersSupervisor,
-};
+use netgauze_bgp_speaker::connection::TcpActiveConnect;
+use netgauze_bgp_speaker::listener::BgpListener;
+use netgauze_bgp_speaker::peer::{EchoCapabilitiesPolicy, PeerConfigBuilder, PeerProperties};
+use netgauze_bgp_speaker::peer_controller::PeerHandle;
+use netgauze_bgp_speaker::supervisor::PeersSupervisor;
 
 #[derive(clap::Parser, Debug)]
 struct Args {

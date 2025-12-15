@@ -1,24 +1,17 @@
-use crate::{
-    YANG_DATASTORES_NS_STR, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_NS,
-    xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    yangparser::{YangDependencies, extract_yang_dependencies},
-};
+use crate::xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter};
+use crate::yangparser::{YangDependencies, extract_yang_dependencies};
+use crate::{YANG_DATASTORES_NS_STR, YANG_LIBRARY_AUGMENTED_BY_NS, YANG_LIBRARY_NS};
 use indexmap::IndexMap;
 use petgraph::prelude::EdgeRef;
-use quick_xml::{
-    events::{BytesText, Event},
-    name::{QName, ResolveResult},
-};
+use quick_xml::events::{BytesText, Event};
+use quick_xml::name::{QName, ResolveResult};
 use russh::keys::signature::digest::Digest;
-use schema_registry_client::rest::{
-    models::RegisteredSchema, schema_registry_client::Client as SRClient,
-};
+use schema_registry_client::rest::models::RegisteredSchema;
+use schema_registry_client::rest::schema_registry_client::Client as SRClient;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    io,
-    path::Path,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::io;
+use std::path::Path;
 // ============================================================================
 // Core Structures
 // ============================================================================

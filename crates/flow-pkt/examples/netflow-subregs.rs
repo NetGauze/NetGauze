@@ -1,8 +1,11 @@
-use std::{collections::HashMap, io::Cursor, net::Ipv4Addr};
+use std::collections::HashMap;
+use std::io::Cursor;
+use std::net::Ipv4Addr;
 
 use chrono::{TimeZone, Utc};
 
-use netgauze_flow_pkt::{DataSetId, FieldSpecifier, ie, netflow::*};
+use netgauze_flow_pkt::netflow::*;
+use netgauze_flow_pkt::{DataSetId, FieldSpecifier, ie};
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};
 
 fn main() {

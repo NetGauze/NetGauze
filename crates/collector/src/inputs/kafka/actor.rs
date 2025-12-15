@@ -43,26 +43,21 @@
 //!
 //! Additional formats can be added via the `MessageFormat` enum and
 //! corresponding message handlers implementing the `MessageHandler` trait.
-use crate::inputs::{
-    EnrichmentHandle,
-    kafka::{
-        KafkaConsumerConfig, KafkaMessageFormat,
-        handlers::{
-            FlowEnrichmentOperationHandler, KafkaMessageHandler, SonataHandler,
-            YangPushEnrichmentOperationHandler,
-        },
-    },
+use crate::inputs::EnrichmentHandle;
+use crate::inputs::kafka::handlers::{
+    FlowEnrichmentOperationHandler, KafkaMessageHandler, SonataHandler,
+    YangPushEnrichmentOperationHandler,
 };
-use rdkafka::{
-    ClientContext, Message, TopicPartitionList,
-    config::ClientConfig,
-    consumer::{
-        BaseConsumer, Consumer, ConsumerContext, Rebalance, stream_consumer::StreamConsumer,
-    },
-    error::{KafkaError, KafkaResult, RDKafkaErrorCode},
-};
-use std::{str::Utf8Error, time::Duration};
-use tokio::{sync::mpsc, task::JoinHandle};
+use crate::inputs::kafka::{KafkaConsumerConfig, KafkaMessageFormat};
+use rdkafka::config::ClientConfig;
+use rdkafka::consumer::stream_consumer::StreamConsumer;
+use rdkafka::consumer::{BaseConsumer, Consumer, ConsumerContext, Rebalance};
+use rdkafka::error::{KafkaError, KafkaResult, RDKafkaErrorCode};
+use rdkafka::{ClientContext, Message, TopicPartitionList};
+use std::str::Utf8Error;
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace, warn};
 
 const MAX_BACKOFF_TIME: Duration = Duration::from_secs(10);

@@ -13,13 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    PeerHeader,
-    iana::{BmpMessageType, InitiationInformationTlvType},
-    v3,
-};
+use crate::iana::{BmpMessageType, InitiationInformationTlvType};
+use crate::{PeerHeader, v3};
 use either::Either;
-use netgauze_bgp_pkt::{BgpMessage, capabilities::BgpCapability, iana::BgpMessageType};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::capabilities::BgpCapability;
+use netgauze_bgp_pkt::iana::BgpMessageType;
 use serde::{Deserialize, Serialize};
 use std::ops::BitOr;
 use strum_macros::{Display, FromRepr};

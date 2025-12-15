@@ -13,13 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    flow::{
-        enrichment::{EnrichmentOperation, Scope, UpsertPayload},
-        types::IndexedDataRecord,
-    },
-    inputs::{InputProcessingError, flow_options::normalize::OptionsDataRecord},
-};
+use crate::flow::enrichment::{EnrichmentOperation, Scope, UpsertPayload};
+use crate::flow::types::IndexedDataRecord;
+use crate::inputs::InputProcessingError;
+use crate::inputs::flow_options::normalize::OptionsDataRecord;
 use std::net::IpAddr;
 
 /// **Generic Flow Options Handler Trait**

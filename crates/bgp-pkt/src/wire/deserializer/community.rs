@@ -13,11 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u16, be_u32, be_u128},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u16, be_u32, be_u128};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 
@@ -27,7 +25,9 @@ use netgauze_parse_utils::{
 };
 use netgauze_serde_macros::LocatedError;
 
-use crate::{community::*, iana::*, wire::deserializer::nlri::MacAddressParsingError};
+use crate::community::*;
+use crate::iana::*;
+use crate::wire::deserializer::nlri::MacAddressParsingError;
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum CommunityParsingError {

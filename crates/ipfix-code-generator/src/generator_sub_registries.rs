@@ -13,10 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    InformationElementSubRegistry, generator::generate_xref_link,
-    xml_parsers::sub_registries::SubRegistry,
-};
+use crate::InformationElementSubRegistry;
+use crate::generator::generate_xref_link;
+use crate::xml_parsers::sub_registries::SubRegistry;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 

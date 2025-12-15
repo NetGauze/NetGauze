@@ -13,31 +13,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{
-        combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
-    },
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{
+    combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
 };
-use std::{collections::HashMap, net::Ipv4Addr};
+use std::collections::HashMap;
+use std::net::Ipv4Addr;
 
-use crate::{
-    BgpOpenMessage,
-    capabilities::BgpCapability,
-    open::{BGP_VERSION, BgpOpenMessageParameter},
-    wire::{
-        deserializer::{
-            BgpParsingContext,
-            capabilities::BgpCapabilityParsingError,
-            open::{
-                BgpOpenMessageParsingError, BgpParameterParsingError,
-                LocatedBgpOpenMessageParsingError,
-            },
-        },
-        serializer::open::BgpOpenMessageWritingError,
-        tests::{BGP_ID, HOLD_TIME, MY_AS},
-    },
+use crate::BgpOpenMessage;
+use crate::capabilities::BgpCapability;
+use crate::open::{BGP_VERSION, BgpOpenMessageParameter};
+use crate::wire::deserializer::BgpParsingContext;
+use crate::wire::deserializer::capabilities::BgpCapabilityParsingError;
+use crate::wire::deserializer::open::{
+    BgpOpenMessageParsingError, BgpParameterParsingError, LocatedBgpOpenMessageParsingError,
 };
+use crate::wire::serializer::open::BgpOpenMessageWritingError;
+use crate::wire::tests::{BGP_ID, HOLD_TIME, MY_AS};
 
 #[test]
 fn test_parse_bgp_open_with_wrong_bpg_version() {

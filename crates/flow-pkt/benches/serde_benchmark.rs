@@ -1,8 +1,10 @@
-use std::{collections::HashMap, io::Cursor};
+use std::collections::HashMap;
+use std::io::Cursor;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use netgauze_flow_pkt::{ipfix, ipfix::IpfixPacket};
+use netgauze_flow_pkt::ipfix;
+use netgauze_flow_pkt::ipfix::IpfixPacket;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePduWithOneInput};
 
 const IPFIX_PKT_TEMPLATE_RAW: &[u8] = &[

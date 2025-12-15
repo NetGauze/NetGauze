@@ -14,7 +14,9 @@
 // limitations under the License.
 
 use quote::{TokenStreamExt, format_ident, quote};
-use syn::{Expr, Lit, parse::Parse, spanned::Spanned};
+use syn::parse::Parse;
+use syn::spanned::Spanned;
+use syn::{Expr, Lit};
 
 #[derive(Debug)]
 struct AttributeNameValue {

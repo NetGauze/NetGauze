@@ -13,36 +13,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    BgpMessage, BgpUpdateMessage,
-    nlri::{InvalidIpv4UnicastNetwork, Ipv4Unicast, Ipv4UnicastAddress},
-    path_attribute::{
-        As4PathSegment, AsPath, AsPathSegmentType, NextHop, Origin, PathAttribute,
-        PathAttributeValue,
-    },
-    wire::{
-        deserializer::{
-            BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
-            LocatedBgpMessageParsingError,
-            nlri::{
-                Ipv4UnicastAddressParsingError, Ipv4UnicastParsingError,
-                LocatedIpv4UnicastAddressParsingError,
-            },
-            update::BgpUpdateMessageParsingError,
-        },
-        serializer::{BgpMessageWritingError, nlri::Ipv4UnicastAddressWritingError},
-    },
+use crate::nlri::{InvalidIpv4UnicastNetwork, Ipv4Unicast, Ipv4UnicastAddress};
+use crate::path_attribute::{
+    As4PathSegment, AsPath, AsPathSegmentType, NextHop, Origin, PathAttribute, PathAttributeValue,
 };
+use crate::wire::deserializer::nlri::{
+    Ipv4UnicastAddressParsingError, Ipv4UnicastParsingError, LocatedIpv4UnicastAddressParsingError,
+};
+use crate::wire::deserializer::update::BgpUpdateMessageParsingError;
+use crate::wire::deserializer::{
+    BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
+    LocatedBgpMessageParsingError,
+};
+use crate::wire::serializer::BgpMessageWritingError;
+use crate::wire::serializer::nlri::Ipv4UnicastAddressWritingError;
+use crate::{BgpMessage, BgpUpdateMessage};
 use ipnet::Ipv4Net;
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{
-        test_parse_error_with_one_input, test_parsed_completely,
-        test_parsed_completely_with_one_input, test_write,
-    },
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{
+    test_parse_error_with_one_input, test_parsed_completely, test_parsed_completely_with_one_input,
+    test_write,
 };
 use nom::error::ErrorKind;
-use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
+use std::collections::HashMap;
+use std::net::Ipv4Addr;
+use std::str::FromStr;
 
 #[test]
 fn test_withdraw_route() -> Result<(), Ipv4UnicastAddressWritingError> {

@@ -1,11 +1,10 @@
 use bytes::Bytes;
-use futures_util::{StreamExt, stream::SplitSink};
+use futures_util::StreamExt;
+use futures_util::stream::SplitSink;
 use std::collections::HashMap;
 use tokio::net::UdpSocket;
-use tokio_util::{
-    codec::{BytesCodec, Decoder},
-    udp::UdpFramed,
-};
+use tokio_util::codec::{BytesCodec, Decoder};
+use tokio_util::udp::UdpFramed;
 
 use netgauze_flow_pkt::codec::FlowInfoCodec;
 

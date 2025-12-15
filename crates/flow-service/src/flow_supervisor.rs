@@ -60,20 +60,19 @@
 //! - The supervisor provides a centralized point for managing and interacting
 //!   with multiple flow collectors.
 
-use crate::{
-    ActorId, FlowReceiver, FlowSender, SubscriberId, Subscription, create_flow_channel,
-    flow_actor::{
-        FlowCollectorActorCommand, FlowCollectorActorError, FlowCollectorActorHandle,
-        FlowCollectorActorStats, PeerTemplateIds,
-    },
+use crate::flow_actor::{
+    FlowCollectorActorCommand, FlowCollectorActorError, FlowCollectorActorHandle,
+    FlowCollectorActorStats, PeerTemplateIds,
 };
+use crate::{ActorId, FlowReceiver, FlowSender, SubscriberId, Subscription, create_flow_channel};
 use netgauze_flow_pkt::{ipfix, netflow};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, time::Duration};
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::time::Duration;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -592,11 +591,11 @@ mod test {
     use super::*;
     use bytes::{Buf, BytesMut};
     use chrono::{TimeZone, Utc};
-    use netgauze_flow_pkt::{FieldSpecifier, FlowInfo, codec::FlowInfoCodec, ie, ipfix::*};
-    use tokio::{
-        net::UdpSocket,
-        time::{Duration, timeout},
-    };
+    use netgauze_flow_pkt::codec::FlowInfoCodec;
+    use netgauze_flow_pkt::ipfix::*;
+    use netgauze_flow_pkt::{FieldSpecifier, FlowInfo, ie};
+    use tokio::net::UdpSocket;
+    use tokio::time::{Duration, timeout};
     use tokio_util::codec::Encoder;
 
     // Helper function to create a test configuration

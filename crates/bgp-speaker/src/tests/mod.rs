@@ -16,10 +16,14 @@
 use crate::peer::{EchoCapabilitiesPolicy, PeerProperties};
 use std::net::{IpAddr, Ipv4Addr};
 
-use std::{io, io::Cursor, net::SocketAddr, time::Duration};
+use std::io;
+use std::io::Cursor;
+use std::net::SocketAddr;
+use std::time::Duration;
 
 use crate::connection::ActiveConnect;
-use netgauze_bgp_pkt::{BgpMessage, codec::BgpCodec};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::codec::BgpCodec;
 use netgauze_parse_utils::WritablePdu;
 
 mod connection;

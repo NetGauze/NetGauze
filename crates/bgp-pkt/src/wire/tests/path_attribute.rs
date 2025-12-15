@@ -13,51 +13,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    BgpMessage,
-    path_attribute::*,
-    wire::{deserializer::path_attribute::*, serializer::path_attribute::*},
-};
+use crate::BgpMessage;
+use crate::path_attribute::*;
+use crate::wire::deserializer::path_attribute::*;
+use crate::wire::serializer::path_attribute::*;
 
-use crate::{
-    nlri::*,
-    wire::deserializer::{
-        Ipv4PrefixParsingError,
-        nlri::{
-            Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
-            Ipv6UnicastParsingError,
-        },
-    },
+use crate::nlri::*;
+use crate::wire::deserializer::Ipv4PrefixParsingError;
+use crate::wire::deserializer::nlri::{
+    Ipv4MulticastParsingError, Ipv4UnicastParsingError, Ipv6MulticastParsingError,
+    Ipv6UnicastParsingError,
 };
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, SubsequentAddressFamily, UndefinedAddressFamily,
     UndefinedSubsequentAddressFamily,
 };
-use netgauze_parse_utils::{Span, test_helpers::*};
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::*;
 
-use crate::{
-    community::*,
-    iana::{BgpSidAttributeTypeError, IanaValueError, UndefinedRouteDistinguisherTypeCode},
-    update::BgpUpdateMessage,
-    wire::{
-        deserializer::{
-            BgpParsingContext,
-            nlri::{
-                Ipv4MplsVpnUnicastAddressParsingError, Ipv4MulticastAddressParsingError,
-                Ipv4UnicastAddressParsingError, Ipv6MulticastAddressParsingError,
-                Ipv6UnicastAddressParsingError, RouteDistinguisherParsingError,
-            },
-        },
-        serializer::BgpMessageWritingError,
-    },
+use crate::community::*;
+use crate::iana::{BgpSidAttributeTypeError, IanaValueError, UndefinedRouteDistinguisherTypeCode};
+use crate::update::BgpUpdateMessage;
+use crate::wire::deserializer::BgpParsingContext;
+use crate::wire::deserializer::nlri::{
+    Ipv4MplsVpnUnicastAddressParsingError, Ipv4MulticastAddressParsingError,
+    Ipv4UnicastAddressParsingError, Ipv6MulticastAddressParsingError,
+    Ipv6UnicastAddressParsingError, RouteDistinguisherParsingError,
 };
+use crate::wire::serializer::BgpMessageWritingError;
 use nom::error::ErrorKind;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
 
 #[test]
 fn test_origin_value() -> Result<(), OriginWritingError> {

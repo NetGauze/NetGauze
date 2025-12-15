@@ -19,14 +19,17 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use anyhow::anyhow;
 use futures::Future;
-use netgauze_collector::{
-    config::{CollectorConfig, TelemetryConfig},
-    init_flow_collection, init_udp_notif_collection,
-};
+use netgauze_collector::config::{CollectorConfig, TelemetryConfig};
+use netgauze_collector::{init_flow_collection, init_udp_notif_collection};
 use opentelemetry::global;
 use serde_yaml::from_reader;
 use shadow_rs::shadow;
-use std::{env, fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr};
+use std::env;
+use std::fs::File;
+use std::io::BufReader;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::str::FromStr;
 use tracing::{Level, info};
 
 shadow!(build);

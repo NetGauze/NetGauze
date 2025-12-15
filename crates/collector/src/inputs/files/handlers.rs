@@ -12,15 +12,14 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::inputs::{
-    InputProcessingError,
-    files::{
-        LineChangeType,
-        formats::pmacct_maps::{PmacctMapEntry, PmacctMapEntryScope, PmacctMapError},
-    },
+use crate::inputs::InputProcessingError;
+use crate::inputs::files::LineChangeType;
+use crate::inputs::files::formats::pmacct_maps::{
+    PmacctMapEntry, PmacctMapEntryScope, PmacctMapError,
 };
 use netgauze_flow_pkt::ie::{Field, HasIE, IE, netgauze};
-use std::{net::IpAddr, path::Path};
+use std::net::IpAddr;
+use std::path::Path;
 
 /// **Generic Files Line Handler Trait**
 ///
@@ -380,10 +379,10 @@ impl PmacctMapEntry {
 
 #[cfg(test)]
 mod tests {
-    use crate::inputs::files::{
-        handlers::{FlowUpsertsHandler, PmacctMapsHandler, YangPushUpsertsHandler},
-        processor::{FileProcessor, FileProcessorCallback},
+    use crate::inputs::files::handlers::{
+        FlowUpsertsHandler, PmacctMapsHandler, YangPushUpsertsHandler,
     };
+    use crate::inputs::files::processor::{FileProcessor, FileProcessorCallback};
     use netgauze_flow_pkt::ie::{Field, IE, netgauze};
     use netgauze_yang_push::model::telemetry::{Label, LabelValue};
     use std::cell::RefCell;

@@ -13,7 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{env, fs, process::Command};
+use std::process::Command;
+use std::{env, fs};
 use tempfile::NamedTempFile;
 
 fn run_pcap_decoder_test(

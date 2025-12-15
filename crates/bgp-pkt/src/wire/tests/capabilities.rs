@@ -13,18 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    capabilities::*,
-    iana::{BgpRoleValue, UndefinedBgpRoleValue},
-    wire::{deserializer::capabilities::*, serializer::capabilities::*},
-};
+use crate::capabilities::*;
+use crate::iana::{BgpRoleValue, UndefinedBgpRoleValue};
+use crate::wire::deserializer::capabilities::*;
+use crate::wire::serializer::capabilities::*;
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
 };
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{test_parse_error, test_parsed_completely, test_write},
-};
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{test_parse_error, test_parsed_completely, test_write};
 use nom::error::ErrorKind;
 
 #[test]

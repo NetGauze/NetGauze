@@ -13,19 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    community::*,
-    nlri::MacAddress,
-    wire::{
-        deserializer::community::{CommunityParsingError, LocatedCommunityParsingError},
-        serializer::community::*,
-    },
-};
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{
-        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input, test_write,
-    },
+use crate::community::*;
+use crate::nlri::MacAddress;
+use crate::wire::deserializer::community::{CommunityParsingError, LocatedCommunityParsingError};
+use crate::wire::serializer::community::*;
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{
+    test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input, test_write,
 };
 use nom::error::ErrorKind;
 use std::net::Ipv4Addr;

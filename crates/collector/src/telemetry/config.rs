@@ -20,12 +20,13 @@
 //! `YangConverter` trait to transform telemetry messages into YANG-compliant
 //! JSON format.
 use crate::publishers::kafka_yang::YangConverter;
-use netgauze_yang_push::{
-    ContentId, model::telemetry::TelemetryMessageWrapper, validation::SubscriptionInfo,
-};
+use netgauze_yang_push::ContentId;
+use netgauze_yang_push::model::telemetry::TelemetryMessageWrapper;
+use netgauze_yang_push::validation::SubscriptionInfo;
 use schema_registry_converter::schema_registry_common::SuppliedSchema;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::fs;
+use std::path::PathBuf;
 use tracing::error;
 
 #[derive(Debug, strum_macros::Display)]
@@ -117,10 +118,8 @@ impl YangConverter<(SubscriptionInfo, TelemetryMessageWrapper), TelemetryYangCon
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use std::{
-        io::Write,
-        net::{IpAddr, Ipv4Addr, SocketAddr},
-    };
+    use std::io::Write;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use tempfile::NamedTempFile;
 
     fn create_test_schema_file() -> NamedTempFile {

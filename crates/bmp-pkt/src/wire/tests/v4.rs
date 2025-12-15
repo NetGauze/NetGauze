@@ -13,42 +13,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    v4::*,
-    wire::{
-        deserializer::{
-            BmpMessageParsingError, BmpParsingContext, LocatedBmpMessageParsingError, v4::*,
-        },
-        serializer::BmpMessageWritingError,
-    },
-    *,
+use crate::v4::*;
+use crate::wire::deserializer::v4::*;
+use crate::wire::deserializer::{
+    BmpMessageParsingError, BmpParsingContext, LocatedBmpMessageParsingError,
 };
+use crate::wire::serializer::BmpMessageWritingError;
+use crate::*;
 #[cfg(not(feature = "fuzz"))]
 use chrono::TimeZone;
 use ipnet::Ipv4Net;
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    capabilities::{AddPathAddressFamily, AddPathCapability, BgpCapability},
-    nlri::{Ipv4Unicast, Ipv4UnicastAddress},
-    path_attribute::{
-        As4PathSegment, AsPath, AsPathSegmentType, MultiExitDiscriminator, NextHop, Origin,
-        PathAttribute, PathAttributeValue,
-    },
-    update::BgpUpdateMessage,
-    wire::deserializer::{
-        BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
-        update::BgpUpdateMessageParsingError,
-    },
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::capabilities::{AddPathAddressFamily, AddPathCapability, BgpCapability};
+use netgauze_bgp_pkt::nlri::{Ipv4Unicast, Ipv4UnicastAddress};
+use netgauze_bgp_pkt::path_attribute::{
+    As4PathSegment, AsPath, AsPathSegmentType, MultiExitDiscriminator, NextHop, Origin,
+    PathAttribute, PathAttributeValue,
+};
+use netgauze_bgp_pkt::update::BgpUpdateMessage;
+use netgauze_bgp_pkt::wire::deserializer::update::BgpUpdateMessageParsingError;
+use netgauze_bgp_pkt::wire::deserializer::{
+    BgpMessageParsingError, BgpParsingContext, Ipv4PrefixParsingError,
 };
 use netgauze_iana::address_family::AddressType;
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{
-        test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
-    },
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{
+    test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
 };
 use nom::error::ErrorKind;
-use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
+use std::collections::HashMap;
+use std::net::Ipv6Addr;
+use std::str::FromStr;
 
 #[test]
 fn test_bmp_v4_route_monitoring() -> Result<(), BmpMessageWritingError> {

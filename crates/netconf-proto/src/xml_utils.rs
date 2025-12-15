@@ -17,15 +17,11 @@
 
 use crate::NETCONF_NS;
 use indexmap::IndexMap;
-use quick_xml::{
-    events::{BytesStart, Event},
-    name::{Namespace, NamespaceError, ResolveResult},
-    reader::NsReader,
-};
-use std::{
-    collections::{HashMap, HashSet},
-    fmt, io,
-};
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, NamespaceError, ResolveResult};
+use quick_xml::reader::NsReader;
+use std::collections::{HashMap, HashSet};
+use std::{fmt, io};
 
 /// XML Serialization trait
 pub trait XmlSerialize {

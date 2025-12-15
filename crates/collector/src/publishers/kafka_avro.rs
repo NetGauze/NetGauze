@@ -15,24 +15,21 @@
 
 use crate::publishers::LoggingProducerContext;
 use apache_avro::types::Value as AvroValue;
-use rdkafka::{
-    config::{ClientConfig, FromClientConfigAndContext},
-    error::{KafkaError, RDKafkaErrorCode},
-    producer::{BaseRecord, Producer, ThreadedProducer},
-};
-use schema_registry_converter::{
-    async_impl::{
-        avro::AvroEncoder,
-        schema_registry::{SrSettings, post_schema},
-    },
-    avro_common::get_supplied_schema,
-    error::SRCError,
-    schema_registry_common::{SubjectNameStrategy, SuppliedSchema},
-};
+use rdkafka::config::{ClientConfig, FromClientConfigAndContext};
+use rdkafka::error::{KafkaError, RDKafkaErrorCode};
+use rdkafka::producer::{BaseRecord, Producer, ThreadedProducer};
+use schema_registry_converter::async_impl::avro::AvroEncoder;
+use schema_registry_converter::async_impl::schema_registry::{SrSettings, post_schema};
+use schema_registry_converter::avro_common::get_supplied_schema;
+use schema_registry_converter::error::SRCError;
+use schema_registry_converter::schema_registry_common::{SubjectNameStrategy, SuppliedSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::{collections::HashMap, marker::PhantomData, time::Duration};
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::collections::HashMap;
+use std::marker::PhantomData;
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);

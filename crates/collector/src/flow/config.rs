@@ -26,29 +26,24 @@
 //! Flow records can be transformed into AVRO or JSON formats with customizable
 //! field selection, renaming, and type conversions.
 
-use crate::{
-    flow::{RawValue, types::FieldRef},
-    publishers::kafka_avro::{AvroConverter, KafkaAvroPublisherActorError},
-};
+use crate::flow::RawValue;
+use crate::flow::types::FieldRef;
+use crate::publishers::kafka_avro::{AvroConverter, KafkaAvroPublisherActorError};
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use netgauze_flow_pkt::{
-    FlowInfo,
-    ie::{
-        self, Field, FieldConversionError, HasIE, IE, InformationElementDataType,
-        InformationElementTemplate,
-    },
-    ipfix::{DataRecord, Set},
+use netgauze_flow_pkt::FlowInfo;
+use netgauze_flow_pkt::ie::{
+    self, Field, FieldConversionError, HasIE, IE, InformationElementDataType,
+    InformationElementTemplate,
 };
+use netgauze_flow_pkt::ipfix::{DataRecord, Set};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use smallvec::SmallVec;
-use std::{
-    collections::{HashMap, HashSet},
-    net::IpAddr,
-};
+use std::collections::{HashMap, HashSet};
+use std::net::IpAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowOutputConfig {

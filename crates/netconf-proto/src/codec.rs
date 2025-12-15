@@ -17,16 +17,12 @@
 //!
 //! This codec IS NOT backward compatible with the obsoleted [RFC 4742](https://datatracker.ietf.org/doc/html/rfc4742).
 
-use crate::{
-    capabilities::{Capability, NetconfVersion},
-    protocol::{Hello, NetConfMessage},
-    xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-};
+use crate::capabilities::{Capability, NetconfVersion};
+use crate::protocol::{Hello, NetConfMessage};
+use crate::xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter};
 use quick_xml::NsReader;
-use tokio_util::{
-    bytes::{Buf, BytesMut},
-    codec::{Decoder, Encoder},
-};
+use tokio_util::bytes::{Buf, BytesMut};
+use tokio_util::codec::{Decoder, Encoder};
 
 const XML_HEADER: &str = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
 const HELLO_TERMINATOR: &str = "]]>]]>";
@@ -262,10 +258,8 @@ impl Encoder<NetConfMessage> for SshCodec {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        capabilities::StandardCapability,
-        protocol::{Rpc, RpcOperation, WellKnownOperation},
-    };
+    use crate::capabilities::StandardCapability;
+    use crate::protocol::{Rpc, RpcOperation, WellKnownOperation};
     use std::collections::HashSet;
 
     #[test]

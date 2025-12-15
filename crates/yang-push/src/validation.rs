@@ -13,27 +13,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow;
-use async_channel;
 use ipnet::IpNet;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace, warn};
-use yang3::{
-    context::{Context, ContextFlags},
-    data::{DataFormat, DataOperation, DataTree},
-};
+use yang3::context::{Context, ContextFlags};
+use yang3::data::{DataFormat, DataOperation, DataTree};
+use {anyhow, async_channel};
 
 use netgauze_udp_notif_pkt::UdpNotifPacket;
 
-use crate::{
-    ContentId, CustomSchema,
-    model::{
-        notification::SubscriptionId,
-        udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
-    },
-    schema_cache::{SchemaInfo, SchemaRequest},
-};
+use crate::model::notification::SubscriptionId;
+use crate::model::udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload};
+use crate::schema_cache::{SchemaInfo, SchemaRequest};
+use crate::{ContentId, CustomSchema};
 
 // Cache for YangPush subscriptions
 type PeerCache = HashMap<Peer, ContentId>;
@@ -75,10 +71,8 @@ impl SubscriptionData {
         }
     }
     fn get_hash(&self) -> ContentId {
-        use std::{
-            collections::hash_map::DefaultHasher,
-            hash::{Hash, Hasher},
-        };
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
         self.yanglib_path.hash(&mut hasher);

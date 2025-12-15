@@ -20,14 +20,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::{
-    BgpMessage,
-    capabilities::BgpCapability,
-    wire::{
-        deserializer::{BgpMessageParsingError, BgpParsingContext, BgpParsingIgnoredErrors},
-        serializer::BgpMessageWritingError,
-    },
+use crate::BgpMessage;
+use crate::capabilities::BgpCapability;
+use crate::wire::deserializer::{
+    BgpMessageParsingError, BgpParsingContext, BgpParsingIgnoredErrors,
 };
+use crate::wire::serializer::BgpMessageWritingError;
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
 
 pub trait BgpCodecInitializer<Peer> {

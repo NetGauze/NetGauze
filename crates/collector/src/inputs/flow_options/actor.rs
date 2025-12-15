@@ -35,18 +35,17 @@
 //! - **IPFIX** - Full options template and data record support
 //! - **NetFlowV9** - Not yet implemented
 
-use crate::inputs::{
-    EnrichmentHandle,
-    flow_options::{
-        FlowOptionsConfig,
-        handlers::{FlowEnrichmentOptionsHandler, FlowOptionsHandler},
-        normalize::OptionsDataRecord,
-    },
-};
+use crate::inputs::EnrichmentHandle;
+use crate::inputs::flow_options::FlowOptionsConfig;
+use crate::inputs::flow_options::handlers::{FlowEnrichmentOptionsHandler, FlowOptionsHandler};
+use crate::inputs::flow_options::normalize::OptionsDataRecord;
 use netgauze_flow_pkt::{FlowInfo, ipfix};
 use netgauze_flow_service::FlowRequest;
-use std::{string::ToString, sync::Arc, time::Duration};
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::string::ToString;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 const MAX_BACKOFF_TIME: Duration = Duration::from_secs(10);

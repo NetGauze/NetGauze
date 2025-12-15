@@ -18,50 +18,38 @@ use futures::{Sink, Stream, StreamExt};
 use futures_util::{FutureExt, SinkExt};
 
 use pin_project::pin_project;
-use std::{
-    fmt::{Debug, Display},
-    future::Future,
-    io,
-    net::{Ipv4Addr, SocketAddr},
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::TcpStream,
-};
+use std::fmt::{Debug, Display};
+use std::future::Future;
+use std::io;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::TcpStream;
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    capabilities::BgpCapability,
-    codec::{BgpCodec, BgpCodecDecoderError},
-    iana::PathAttributeType,
-    notification::{
-        BgpNotificationMessage, FiniteStateMachineError, HoldTimerExpiredError, OpenMessageError,
-        UpdateMessageError,
-    },
-    open::BgpOpenMessage,
-    path_attribute::{InvalidPathAttribute, PathAttributeValue},
-    update::BgpUpdateMessage,
-    wire::{
-        deserializer::{
-            BgpParsingIgnoredErrors,
-            path_attribute::{
-                MpReachParsingError, MpUnreachParsingError, PathAttributeParsingError,
-            },
-        },
-        serializer::BgpMessageWritingError,
-    },
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::capabilities::BgpCapability;
+use netgauze_bgp_pkt::codec::{BgpCodec, BgpCodecDecoderError};
+use netgauze_bgp_pkt::iana::PathAttributeType;
+use netgauze_bgp_pkt::notification::{
+    BgpNotificationMessage, FiniteStateMachineError, HoldTimerExpiredError, OpenMessageError,
+    UpdateMessageError,
 };
+use netgauze_bgp_pkt::open::BgpOpenMessage;
+use netgauze_bgp_pkt::path_attribute::{InvalidPathAttribute, PathAttributeValue};
+use netgauze_bgp_pkt::update::BgpUpdateMessage;
+use netgauze_bgp_pkt::wire::deserializer::BgpParsingIgnoredErrors;
+use netgauze_bgp_pkt::wire::deserializer::path_attribute::{
+    MpReachParsingError, MpUnreachParsingError, PathAttributeParsingError,
+};
+use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
 use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
 
-use crate::{
-    events::{ConnectionEvent, UpdateTreatment},
-    fsm::FsmStateError,
-    peer::{PeerConfig, PeerPolicy, PeerProperties},
-};
+use crate::events::{ConnectionEvent, UpdateTreatment};
+use crate::fsm::FsmStateError;
+use crate::peer::{PeerConfig, PeerPolicy, PeerProperties};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ConnectionStats {

@@ -13,16 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    community::*,
-    iana::{
-        BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, EvpnExtendedCommunitySubType,
-        NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
-        TransitiveIpv4ExtendedCommunitySubType, TransitiveIpv6ExtendedCommunitySubType,
-        TransitiveOpaqueExtendedCommunitySubType, TransitiveTwoOctetExtendedCommunitySubType,
-    },
-    wire::serializer::nlri::MacAddressWritingError,
+use crate::community::*;
+use crate::iana::{
+    BgpExtendedCommunityIpv6Type, BgpExtendedCommunityType, EvpnExtendedCommunitySubType,
+    NonTransitiveTwoOctetExtendedCommunitySubType, TransitiveFourOctetExtendedCommunitySubType,
+    TransitiveIpv4ExtendedCommunitySubType, TransitiveIpv6ExtendedCommunitySubType,
+    TransitiveOpaqueExtendedCommunitySubType, TransitiveTwoOctetExtendedCommunitySubType,
 };
+use crate::wire::serializer::nlri::MacAddressWritingError;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;

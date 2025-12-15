@@ -16,12 +16,12 @@
 use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
-use netgauze_bmp_pkt::{
-    BmpMessage,
-    codec::{BmpCodec, BmpCodecDecoderError},
-};
+use netgauze_bmp_pkt::BmpMessage;
+use netgauze_bmp_pkt::codec::{BmpCodec, BmpCodecDecoderError};
 use netgauze_pcap_reader::TransportProtocol;
-use std::{collections::HashMap, io, net::IpAddr};
+use std::collections::HashMap;
+use std::io;
+use std::net::IpAddr;
 
 pub struct BmpProtocolHandler {
     ports: Vec<u16>,
@@ -75,10 +75,8 @@ impl ProtocolHandler<BmpMessage, BmpCodec, BmpCodecDecoderError> for BmpProtocol
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netgauze_bmp_pkt::{
-        v3::{BmpMessageValue, InitiationInformation, InitiationMessage},
-        wire::deserializer::BmpMessageParsingError,
-    };
+    use netgauze_bmp_pkt::v3::{BmpMessageValue, InitiationInformation, InitiationMessage};
+    use netgauze_bmp_pkt::wire::deserializer::BmpMessageParsingError;
     use serde_json::json;
     use std::net::Ipv4Addr;
 

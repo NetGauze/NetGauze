@@ -13,16 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    iana::{BgpLsAttributeType, BgpLsSidAttributeFlags},
-    nlri::{MplsLabel, MultiTopologyIdData, SharedRiskLinkGroupValue},
-    path_attribute::PathAttributeValueProperties,
-};
+use crate::iana::{BgpLsAttributeType, BgpLsSidAttributeFlags};
+use crate::nlri::{MplsLabel, MultiTopologyIdData, SharedRiskLinkGroupValue};
+use crate::path_attribute::PathAttributeValueProperties;
 use serde::{Deserialize, Serialize};
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    ops::{BitAnd, BitOr},
-};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::ops::{BitAnd, BitOr};
 use strum_macros::{Display, FromRepr};
 
 /// The BGP Link-State Attribute. see [RFC7752 Section 3.3](https://www.rfc-editor.org/rfc/rfc7752#section-3.3)

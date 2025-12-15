@@ -16,18 +16,14 @@
 use crate::flow::aggregation::aggregator::*;
 use chrono::{TimeZone, Utc};
 use netgauze_analytics::aggregation::Aggregator;
-use netgauze_flow_pkt::{
-    DataSetId, FlowInfo,
-    ie::{Field, IE, protocolIdentifier},
-    ipfix::{DataRecord, IpfixPacket, Set},
-};
+use netgauze_flow_pkt::ie::{Field, IE, protocolIdentifier};
+use netgauze_flow_pkt::ipfix::{DataRecord, IpfixPacket, Set};
+use netgauze_flow_pkt::{DataSetId, FlowInfo};
 use netgauze_iana::tcp::TCPHeaderFlags;
 use rustc_hash::FxHashMap;
-use std::{
-    collections::HashSet,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    time::Duration,
-};
+use std::collections::HashSet;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::time::Duration;
 
 fn create_test_config(
     key_select: Box<[FieldRef]>,

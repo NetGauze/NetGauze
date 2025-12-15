@@ -21,7 +21,8 @@ use std::collections::HashMap;
 use libfuzzer_sys::fuzz_target;
 
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
-use netgauze_bmp_pkt::{BmpMessage, PeerKey, wire::deserializer::BmpParsingContext};
+use netgauze_bmp_pkt::wire::deserializer::BmpParsingContext;
+use netgauze_bmp_pkt::{BmpMessage, PeerKey};
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 

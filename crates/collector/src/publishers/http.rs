@@ -15,8 +15,10 @@
 
 use opentelemetry::KeyValue;
 use serde::{Deserialize, Serialize};
-use std::{sync::Arc, time::Duration};
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
 
 #[derive(Debug, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]

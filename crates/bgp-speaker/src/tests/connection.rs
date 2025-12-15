@@ -21,7 +21,10 @@ use netgauze_bgp_pkt::notification::{
 use tokio_test::io::Mock;
 use tokio_util::codec::Framed;
 
-use crate::{connection::ConnectionConfig, events::ConnectionEvent, fsm::FsmStateError, tests::*};
+use crate::connection::ConnectionConfig;
+use crate::events::ConnectionEvent;
+use crate::fsm::FsmStateError;
+use crate::tests::*;
 use netgauze_bgp_pkt::open::BgpOpenMessage;
 
 async fn get_connection(

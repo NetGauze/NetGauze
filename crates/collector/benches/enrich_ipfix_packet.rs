@@ -17,12 +17,11 @@ use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use netgauze_collector::flow::enrichment::{
     EnrichmentActor, EnrichmentCache, EnrichmentOperation, EnrichmentStats, Scope, UpsertPayload,
 };
-use netgauze_flow_pkt::{
-    DataSetId,
-    ie::{Field, netgauze},
-    ipfix::{DataRecord, IpfixPacket, Set},
-};
-use std::{hint::black_box, net::IpAddr};
+use netgauze_flow_pkt::DataSetId;
+use netgauze_flow_pkt::ie::{Field, netgauze};
+use netgauze_flow_pkt::ipfix::{DataRecord, IpfixPacket, Set};
+use std::hint::black_box;
+use std::net::IpAddr;
 use tokio::sync::mpsc;
 
 /// Helper to create data records with realistic field sets (10-15 fields each)

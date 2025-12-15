@@ -13,39 +13,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    fmt::{Debug, Display, Formatter},
-    marker::PhantomData,
-    net::Ipv4Addr,
-    ops::Add,
-    time::Duration,
-};
+use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
+use std::net::Ipv4Addr;
+use std::ops::Add;
+use std::time::Duration;
 
 use futures::StreamExt;
 use futures_util::SinkExt;
-use rand::{Rng, RngCore, SeedableRng, rngs::SmallRng};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    sync::oneshot,
-    time::Interval,
-};
+use rand::rngs::SmallRng;
+use rand::{Rng, RngCore, SeedableRng};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::oneshot;
+use tokio::time::Interval;
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    capabilities::{BgpCapability, FourOctetAsCapability},
-    codec::{BgpCodecDecoderError, BgpCodecInitializer},
-    iana::{AS_TRANS, BgpCapabilityCode},
-    notification::{BgpNotificationMessage, CeaseError, OpenMessageError},
-    open::{BgpOpenMessage, BgpOpenMessageParameter},
-    wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
-};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::capabilities::{BgpCapability, FourOctetAsCapability};
+use netgauze_bgp_pkt::codec::{BgpCodecDecoderError, BgpCodecInitializer};
+use netgauze_bgp_pkt::iana::{AS_TRANS, BgpCapabilityCode};
+use netgauze_bgp_pkt::notification::{BgpNotificationMessage, CeaseError, OpenMessageError};
+use netgauze_bgp_pkt::open::{BgpOpenMessage, BgpOpenMessageParameter};
+use netgauze_bgp_pkt::wire::deserializer::BgpParsingIgnoredErrors;
+use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
 
-use crate::{
-    connection::{ActiveConnect, Connection, ConnectionState, ConnectionStats, ConnectionType},
-    events::{BgpEvent, ConnectionEvent},
-    fsm::{FsmState, FsmStateError},
+use crate::connection::{
+    ActiveConnect, Connection, ConnectionState, ConnectionStats, ConnectionType,
 };
+use crate::events::{BgpEvent, ConnectionEvent};
+use crate::fsm::{FsmState, FsmStateError};
 
 pub type PeerResult<A> = Result<BgpEvent<A>, FsmStateError<A>>;
 

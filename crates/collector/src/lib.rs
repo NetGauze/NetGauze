@@ -13,33 +13,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    config::{FlowConfig, PublisherEndpoint, UdpNotifConfig},
-    flow::{aggregation::AggregationActorHandle, enrichment::FlowEnrichmentActorHandle},
-    inputs::{
-        files::FilesActorHandle, flow_options::FlowOptionsActorHandle,
-        kafka::KafkaConsumerActorHandle,
-    },
-    publishers::{
-        http::{HttpPublisherActorHandle, Message},
-        kafka_avro::KafkaAvroPublisherActorHandle,
-        kafka_json::KafkaJsonPublisherActorHandle,
-        kafka_yang::KafkaYangPublisherActorHandle,
-    },
-    yang_push::enrichment::YangPushEnrichmentActorHandle,
-};
+use crate::config::{FlowConfig, PublisherEndpoint, UdpNotifConfig};
+use crate::flow::aggregation::AggregationActorHandle;
+use crate::flow::enrichment::FlowEnrichmentActorHandle;
+use crate::inputs::files::FilesActorHandle;
+use crate::inputs::flow_options::FlowOptionsActorHandle;
+use crate::inputs::kafka::KafkaConsumerActorHandle;
+use crate::publishers::http::{HttpPublisherActorHandle, Message};
+use crate::publishers::kafka_avro::KafkaAvroPublisherActorHandle;
+use crate::publishers::kafka_json::KafkaJsonPublisherActorHandle;
+use crate::publishers::kafka_yang::KafkaYangPublisherActorHandle;
+use crate::yang_push::enrichment::YangPushEnrichmentActorHandle;
 
-use futures_util::{StreamExt, stream::FuturesUnordered};
+use futures_util::StreamExt;
+use futures_util::stream::FuturesUnordered;
 use netgauze_flow_pkt::FlowInfo;
-use netgauze_flow_service::{FlowRequest, flow_supervisor::FlowCollectorsSupervisorActorHandle};
+use netgauze_flow_service::FlowRequest;
+use netgauze_flow_service::flow_supervisor::FlowCollectorsSupervisorActorHandle;
 use netgauze_udp_notif_pkt::MediaType;
-use netgauze_udp_notif_service::{UdpNotifRequest, supervisor::UdpNotifSupervisorHandle};
-use netgauze_yang_push::{
-    model::telemetry::TelemetryMessageWrapper,
-    schema_cache::SchemaCacheActorHandle,
-    validation::{SubscriptionInfo, ValidationActorHandle},
-};
-use std::{net::IpAddr, str::Utf8Error, sync::Arc};
+use netgauze_udp_notif_service::UdpNotifRequest;
+use netgauze_udp_notif_service::supervisor::UdpNotifSupervisorHandle;
+use netgauze_yang_push::model::telemetry::TelemetryMessageWrapper;
+use netgauze_yang_push::schema_cache::SchemaCacheActorHandle;
+use netgauze_yang_push::validation::{SubscriptionInfo, ValidationActorHandle};
+use std::net::IpAddr;
+use std::str::Utf8Error;
+use std::sync::Arc;
 use tracing::{info, warn};
 
 pub mod config;
@@ -807,10 +806,8 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use netgauze_udp_notif_pkt::UdpNotifPacket;
-    use std::{
-        collections::HashMap,
-        net::{IpAddr, Ipv4Addr, SocketAddr},
-    };
+    use std::collections::HashMap;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     #[test]
     fn test_serialize_udp_notif_unknown_media_type() {

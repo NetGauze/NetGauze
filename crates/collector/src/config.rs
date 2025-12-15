@@ -13,19 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    flow::{
-        aggregation::AggregationConfig, config::FlowOutputConfig, enrichment::EnrichmentConfig,
-    },
-    publishers::{http::HttpPublisherEndpoint, kafka_avro, kafka_json, kafka_yang},
-    telemetry::config::TelemetryYangConverter,
-};
+use crate::flow::aggregation::AggregationConfig;
+use crate::flow::config::FlowOutputConfig;
+use crate::flow::enrichment::EnrichmentConfig;
+use crate::publishers::http::HttpPublisherEndpoint;
+use crate::publishers::{kafka_avro, kafka_json, kafka_yang};
+use crate::telemetry::config::TelemetryYangConverter;
 use ipnet::IpNet;
 use netgauze_flow_service::flow_supervisor;
 use netgauze_udp_notif_service::supervisor as udp_notif_supervisor;
 use netgauze_yang_push::CustomSchema;
 use serde_with::serde_as;
-use std::{collections::HashMap, net::SocketAddr, time::Duration};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::time::Duration;
 
 const NUM_WORKERS_DEFAULT: usize = 1;
 

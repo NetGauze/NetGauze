@@ -17,7 +17,10 @@ pub mod flow_actor;
 pub mod flow_supervisor;
 
 use netgauze_flow_pkt::FlowInfo;
-use std::{fmt::Display, io, net::SocketAddr, sync::Arc};
+use std::fmt::Display;
+use std::io;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 pub type ActorId = u32;
 pub type SubscriberId = u32;

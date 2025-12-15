@@ -1,5 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use netgauze_bgp_pkt::{BgpMessage, wire::deserializer::BgpParsingContext};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 
 const OPEN_COMPLEX_NO_PARAMS: [u8; 29] = [

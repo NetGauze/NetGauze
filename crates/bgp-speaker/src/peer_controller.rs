@@ -13,28 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    connection::{ActiveConnect, ConnectionStats},
-    events::BgpEvent,
-    fsm::{FsmState, FsmStateError},
-    peer::*,
-};
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    capabilities::BgpCapability,
-    codec::{BgpCodecDecoderError, BgpCodecInitializer},
-    wire::{deserializer::BgpParsingIgnoredErrors, serializer::BgpMessageWritingError},
-};
-use std::{
-    error::Error,
-    fmt::{Debug, Display},
-    marker::PhantomData,
-};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    sync::{mpsc, mpsc::error::SendError, oneshot},
-    task::JoinHandle,
-};
+use crate::connection::{ActiveConnect, ConnectionStats};
+use crate::events::BgpEvent;
+use crate::fsm::{FsmState, FsmStateError};
+use crate::peer::*;
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::capabilities::BgpCapability;
+use netgauze_bgp_pkt::codec::{BgpCodecDecoderError, BgpCodecInitializer};
+use netgauze_bgp_pkt::wire::deserializer::BgpParsingIgnoredErrors;
+use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
+use std::error::Error;
+use std::fmt::{Debug, Display};
+use std::marker::PhantomData;
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 use tokio_util::codec::{Decoder, Encoder};
 
 pub type PeerStateResult<A> = Result<(FsmState, BgpEvent<A>), FsmStateError<A>>;

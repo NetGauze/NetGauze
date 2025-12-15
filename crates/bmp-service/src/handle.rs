@@ -13,13 +13,9 @@
 //! Utils to handle [`crate::server::BmpServer`] lifecycle
 //! This module is heavily influenced by [axum-server](https://github.com/programatik29/axum-server/blob/84bc67b/src/handle.rs)
 
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-    },
-    time::Duration,
-};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::Duration;
 
 use tokio::sync::Notify;
 

@@ -23,13 +23,11 @@ pub mod protocol_handler;
 
 use crate::protocol_handler::ProtocolHandler;
 use netgauze_pcap_reader::PcapIter;
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{self, BufWriter, Write},
-    net::IpAddr,
-    path::PathBuf,
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{self, BufWriter, Write};
+use std::net::IpAddr;
+use std::path::PathBuf;
 
 // Define constants
 pub const PCAP_BUFFER_SIZE: usize = 165536;

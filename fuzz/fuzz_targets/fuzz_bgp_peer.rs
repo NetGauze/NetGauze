@@ -22,26 +22,22 @@ use netgauze_bgp_speaker::peer::{
     EchoCapabilitiesPolicy, Peer, PeerAdminEvents, PeerConfig, PeerProperties,
 };
 
-use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
-    sync::mpsc,
-    time::{self, Duration, Instant, Sleep},
-};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::sync::mpsc;
+use tokio::time::{self, Duration, Instant, Sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use futures_core::{Stream, ready};
 use netgauze_bgp_pkt::codec::BgpCodec;
-use netgauze_bgp_speaker::{connection::ActiveConnect, events::BgpEvent, fsm::FsmState};
-use std::{
-    cmp,
-    collections::VecDeque,
-    fmt,
-    future::Future,
-    io,
-    pin::Pin,
-    sync::Arc,
-    task::{self, Poll, Waker},
-};
+use netgauze_bgp_speaker::connection::ActiveConnect;
+use netgauze_bgp_speaker::events::BgpEvent;
+use netgauze_bgp_speaker::fsm::FsmState;
+use std::collections::VecDeque;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{self, Poll, Waker};
+use std::{cmp, fmt, io};
 
 /// A modified version of [tokio_test::io::Mock] with a predefined script for
 /// I/O reads, and writes are discarded.

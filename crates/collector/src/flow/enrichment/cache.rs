@@ -46,19 +46,15 @@
 //! - Higher weight fields override lower weight fields
 //! - Equal weights prefer more specific (later processed) scopes
 
-use crate::flow::{
-    enrichment::{
-        DeleteAllPayload, DeletePayload, EnrichmentOperation, Scope, UpsertPayload, Weight,
-    },
-    types::FieldRef,
+use crate::flow::enrichment::{
+    DeleteAllPayload, DeletePayload, EnrichmentOperation, Scope, UpsertPayload, Weight,
 };
+use crate::flow::types::FieldRef;
 use netgauze_flow_pkt::ie::{Field, HasIE, IE};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, btree_map, hash_map},
-    net::IpAddr,
-};
+use std::collections::{BTreeMap, btree_map, hash_map};
+use std::net::IpAddr;
 use tracing::debug;
 
 /// Main enrichment cache storing peer metadata indexed by IP address.

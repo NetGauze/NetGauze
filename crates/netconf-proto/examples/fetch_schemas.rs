@@ -15,13 +15,15 @@
 
 use anyhow::anyhow;
 use clap::Parser;
-use netgauze_netconf_proto::{
-    client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect},
-    xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter},
-    yanglib::{PermissiveVersionChecker, YangLibrary},
-};
+use netgauze_netconf_proto::client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect};
+use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter};
+use netgauze_netconf_proto::yanglib::{PermissiveVersionChecker, YangLibrary};
 use quick_xml::NsReader;
-use std::{collections::HashMap, io::Write, path::Path, sync::Arc, time::Duration};
+use std::collections::HashMap;
+use std::io::Write;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 
 const MODULE_STATE: &str = r#"
 <modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
@@ -100,7 +102,9 @@ struct Args {
 }
 
 fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
-    use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::{EnvFilter, fmt};
 
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))

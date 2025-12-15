@@ -17,7 +17,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{DataSetId, FieldSpecifier, ie::Field};
+use crate::ie::Field;
+use crate::{DataSetId, FieldSpecifier};
 
 pub const IPFIX_VERSION: u16 = 10;
 

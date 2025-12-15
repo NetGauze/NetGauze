@@ -18,25 +18,19 @@
 pub mod v3;
 pub mod v4;
 
-use crate::{
-    BmpMessage, PeerKey,
-    iana::{BmpVersion, UndefinedBmpVersion},
-};
+use crate::iana::{BmpVersion, UndefinedBmpVersion};
+use crate::{BmpMessage, PeerKey};
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_parse_utils::{
     ErrorKindSerdeDeref, ReadablePduWithOneInput, Span, parse_into_located_one_input,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u32},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u32};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    ops::{Deref, DerefMut},
-};
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpMessageParsingError {

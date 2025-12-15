@@ -14,18 +14,14 @@
 // limitations under the License.
 
 use chrono::{LocalResult, TimeZone, Utc};
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u16, be_u32},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u16, be_u32};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    DATA_SET_MIN_ID, DataSetId,
-    ipfix::*,
-    wire::deserializer::{FieldSpecifierParsingError, ie},
-};
+use crate::ipfix::*;
+use crate::wire::deserializer::{FieldSpecifierParsingError, ie};
+use crate::{DATA_SET_MIN_ID, DataSetId};
 use netgauze_parse_utils::{
     ErrorKindSerdeDeref, ReadablePduWithOneInput, Span, parse_into_located,
     parse_into_located_one_input, parse_into_located_two_inputs,

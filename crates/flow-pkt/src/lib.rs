@@ -186,7 +186,9 @@ fn arbitrary_datetime(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ie::protocolIdentifier, ipfix::IpfixPacket, netflow::NetFlowV9Packet};
+    use crate::ie::protocolIdentifier;
+    use crate::ipfix::IpfixPacket;
+    use crate::netflow::NetFlowV9Packet;
     use chrono::{TimeZone, Utc};
     use netgauze_iana::tcp::TCPHeaderFlags;
 

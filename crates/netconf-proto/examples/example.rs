@@ -14,12 +14,13 @@
 // limitations under the License.
 
 use clap::Parser;
-use netgauze_netconf_proto::{
-    client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect},
-    xml_utils::{XmlSerialize, XmlWriter},
-    yanglib::PermissiveVersionChecker,
-};
-use std::{collections::HashSet, io, sync::Arc, time::Duration};
+use netgauze_netconf_proto::client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect};
+use netgauze_netconf_proto::xml_utils::{XmlSerialize, XmlWriter};
+use netgauze_netconf_proto::yanglib::PermissiveVersionChecker;
+use std::collections::HashSet;
+use std::io;
+use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(clap::Parser, Debug)]
 struct Args {
@@ -43,7 +44,9 @@ struct Args {
 }
 
 fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
-    use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::{EnvFilter, fmt};
 
     // Set up the log -> tracing bridge first
     // tracing_log::LogTracer::init().expect("Failed to initialize tracing logger");

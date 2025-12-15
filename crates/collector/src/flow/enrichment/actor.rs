@@ -49,21 +49,16 @@
 //! - **IPFIX** - Full enrichment support
 //! - **NetFlowV9** - Not yet supported
 
-use crate::{
-    flow::enrichment::{EnrichmentOperation, cache::EnrichmentCache},
-    inputs::EnrichmentHandle,
-};
-use netgauze_flow_pkt::{
-    FlowInfo,
-    ie::{Field, netgauze},
-    ipfix,
-};
+use crate::flow::enrichment::EnrichmentOperation;
+use crate::flow::enrichment::cache::EnrichmentCache;
+use crate::inputs::EnrichmentHandle;
+use netgauze_flow_pkt::ie::{Field, netgauze};
+use netgauze_flow_pkt::{FlowInfo, ipfix};
 use netgauze_flow_service::FlowRequest;
-use std::{
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-};
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 /// Core enrichment actor that processes flow requests using cached metadata.

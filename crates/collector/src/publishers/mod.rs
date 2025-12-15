@@ -13,11 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rdkafka::{
-    ClientContext,
-    message::DeliveryResult,
-    producer::{NoCustomPartitioner, ProducerContext},
-};
+use rdkafka::ClientContext;
+use rdkafka::message::DeliveryResult;
+use rdkafka::producer::{NoCustomPartitioner, ProducerContext};
 use tracing::{trace, warn};
 
 pub mod http;

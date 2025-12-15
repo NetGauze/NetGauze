@@ -28,26 +28,22 @@
 //! parallel processing through multiple worker shards and provides
 //! comprehensive telemetry.
 
-use crate::flow::aggregation::{aggregator::*, config::*};
+use crate::flow::aggregation::aggregator::*;
+use crate::flow::aggregation::config::*;
 use chrono::Utc;
 use either::Either;
 use futures::stream::{self, StreamExt};
 use netgauze_analytics::aggregation::{AggregationWindowStreamExt, Aggregator, TimeSeriesData};
-use netgauze_flow_pkt::{
-    FlowInfo,
-    ie::{Field, netgauze},
-};
+use netgauze_flow_pkt::FlowInfo;
+use netgauze_flow_pkt::ie::{Field, netgauze};
 use opentelemetry::metrics::{Counter, Meter};
 use pin_utils::pin_mut;
-use std::{
-    net::{IpAddr, SocketAddr},
-    sync::{
-        Arc,
-        atomic::{AtomicU32, Ordering},
-    },
-    time::Duration,
-};
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, Clone)]

@@ -22,7 +22,8 @@ use crate::{
 };
 use netgauze_locate::BinarySpan;
 use nom::IResult;
-use std::{fmt::Debug, io::Cursor};
+use std::fmt::Debug;
+use std::io::Cursor;
 
 /// Helper method to combine multiple vectors into one
 pub fn combine(v: Vec<&[u8]>) -> Vec<u8> {

@@ -117,20 +117,19 @@ use crate::{
     ActorId, FlowReceiver, FlowRequest, FlowSender, SubscriberId, Subscription, create_flow_channel,
 };
 use bytes::{Bytes, BytesMut};
-use futures_util::{StreamExt, stream::SplitSink};
-use netgauze_flow_pkt::{codec::FlowInfoCodec, ipfix, netflow};
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
-    net::SocketAddr,
-    sync::Arc,
-    time::{Duration, Instant},
-};
-use tokio::{sync::mpsc, task::JoinHandle};
-use tokio_util::{
-    codec::{BytesCodec, Decoder},
-    udp::UdpFramed,
-};
+use futures_util::StreamExt;
+use futures_util::stream::SplitSink;
+use netgauze_flow_pkt::codec::FlowInfoCodec;
+use netgauze_flow_pkt::{ipfix, netflow};
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use tokio_util::codec::{BytesCodec, Decoder};
+use tokio_util::udp::UdpFramed;
 use tracing::{debug, error, info, trace, warn};
 
 /// Represents the IDs of templates received from a specific peer.
@@ -1167,8 +1166,10 @@ mod tests {
     use super::*;
     use bytes::{Buf, BytesMut};
     use chrono::{TimeZone, Utc};
-    use netgauze_flow_pkt::{FieldSpecifier, FlowInfo, codec::FlowInfoCodec, ie, ipfix, netflow};
-    use tokio::{net::UdpSocket, time::Duration};
+    use netgauze_flow_pkt::codec::FlowInfoCodec;
+    use netgauze_flow_pkt::{FieldSpecifier, FlowInfo, ie, ipfix, netflow};
+    use tokio::net::UdpSocket;
+    use tokio::time::Duration;
     use tokio_util::codec::Encoder;
 
     async fn setup_actor() -> (

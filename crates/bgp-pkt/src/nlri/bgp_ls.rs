@@ -13,20 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    iana::{
-        BgpLsLinkDescriptorType, BgpLsNlriType, BgpLsNodeDescriptorSubType,
-        BgpLsPrefixDescriptorType, BgpLsProtocolId,
-    },
-    nlri::RouteDistinguisher,
+use crate::iana::{
+    BgpLsLinkDescriptorType, BgpLsNlriType, BgpLsNodeDescriptorSubType, BgpLsPrefixDescriptorType,
+    BgpLsProtocolId,
 };
+use crate::nlri::RouteDistinguisher;
 use ipnet::IpNet;
 use netgauze_parse_utils::WritablePdu;
 use serde::{Deserialize, Serialize};
-use std::{
-    net::{Ipv4Addr, Ipv6Addr},
-    ops::BitAnd,
-};
+use std::net::{Ipv4Addr, Ipv6Addr};
+use std::ops::BitAnd;
 use strum_macros::{Display, FromRepr};
 
 /// ```text

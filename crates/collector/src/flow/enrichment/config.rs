@@ -12,7 +12,9 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::inputs::{files::FilesConfig, flow_options::FlowOptionsConfig, kafka::KafkaConfig};
+use crate::inputs::files::FilesConfig;
+use crate::inputs::flow_options::FlowOptionsConfig;
+use crate::inputs::kafka::KafkaConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

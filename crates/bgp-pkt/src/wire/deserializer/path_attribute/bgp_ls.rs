@@ -13,33 +13,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    iana::{BgpLsAttributeType, BgpLsAttributeTypeError, BgpLsNodeFlagsBits, IanaValueError},
-    nlri::{
-        IgpFlags, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, SharedRiskLinkGroupValue,
-    },
-    path_attribute::{BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, LinkProtectionType},
-    wire::{
-        deserializer::{nlri::MplsLabelParsingError, read_tlv_header_t16_l16},
-        serializer::nlri::{IPV4_LEN, IPV6_LEN},
-    },
+use crate::iana::{
+    BgpLsAttributeType, BgpLsAttributeTypeError, BgpLsNodeFlagsBits, IanaValueError,
 };
+use crate::nlri::{
+    IgpFlags, MplsProtocolMask, MultiTopologyId, MultiTopologyIdData, SharedRiskLinkGroupValue,
+};
+use crate::path_attribute::{
+    BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, LinkProtectionType,
+};
+use crate::wire::deserializer::nlri::MplsLabelParsingError;
+use crate::wire::deserializer::read_tlv_header_t16_l16;
+use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
 use netgauze_parse_utils::{
     ErrorKindSerdeDeref, ReadablePdu, ReadablePduWithOneInput, Span, parse_into_located,
     parse_into_located_one_input, parse_till_empty_into_located,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::{
-    IResult,
-    error::{ErrorKind, FromExternalError},
-    number::complete::{be_f32, be_u8, be_u16, be_u32, be_u64, be_u128},
-};
+use nom::IResult;
+use nom::error::{ErrorKind, FromExternalError};
+use nom::number::complete::{be_f32, be_u8, be_u16, be_u32, be_u64, be_u128};
 use serde::{Deserialize, Serialize};
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    ops::BitAnd,
-    string::FromUtf8Error,
-};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::ops::BitAnd;
+use std::string::FromUtf8Error;
 
 /// BGP Link-State Attribute Parsing Errors
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]

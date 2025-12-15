@@ -13,17 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
-    wire::{
-        deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError},
-        serialize::UdpNotifPacketWritingError,
-    },
-};
+use crate::wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError};
+use crate::wire::serialize::UdpNotifPacketWritingError;
+use crate::{MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use bytes::Bytes;
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{test_parse_error, test_parsed, test_parsed_completely, test_write},
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{
+    test_parse_error, test_parsed, test_parsed_completely, test_write,
 };
 use nom::AsBytes;
 use std::collections::HashMap;

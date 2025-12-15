@@ -29,34 +29,27 @@
 //!   actor and subscribing to enriched messages.
 //! - `YangPushEnrichmentStats` - Metrics for tracking the performance and
 //!   behavior of the enrichment process.
-use crate::{
-    inputs::EnrichmentHandle,
-    yang_push::{DeleteAllPayload, DeletePayload, EnrichmentOperation, UpsertPayload, Weight},
+use crate::inputs::EnrichmentHandle;
+use crate::yang_push::{
+    DeleteAllPayload, DeletePayload, EnrichmentOperation, UpsertPayload, Weight,
 };
 use chrono::Utc;
-use netgauze_yang_push::{
-    model::{
-        notification::{
-            NotificationVariant, SubscriptionId, SubscriptionStartedModified,
-            SubscriptionTerminated,
-        },
-        telemetry::{
-            FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol,
-            TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
-            YangPushSubscriptionMetadata,
-        },
-        udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload},
-    },
-    validation::SubscriptionInfo,
+use netgauze_yang_push::model::notification::{
+    NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
 };
+use netgauze_yang_push::model::telemetry::{
+    FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol, TelemetryMessage,
+    TelemetryMessageMetadata, TelemetryMessageWrapper, YangPushSubscriptionMetadata,
+};
+use netgauze_yang_push::model::udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload};
+use netgauze_yang_push::validation::SubscriptionInfo;
 use serde_json::Value;
 use shadow_rs::shadow;
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-};
+use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
 use sysinfo::System;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 shadow!(build);
@@ -749,13 +742,14 @@ mod tests {
     use super::*;
     use bytes::Bytes;
     use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
-    use netgauze_yang_push::model::{
-        notification::{CentiSeconds, Encoding, Target, Transport, UpdateTrigger},
-        telemetry::{Label, LabelValue},
-        udp_notif::UdpNotifPacketDecoded,
+    use netgauze_yang_push::model::notification::{
+        CentiSeconds, Encoding, Target, Transport, UpdateTrigger,
     };
+    use netgauze_yang_push::model::telemetry::{Label, LabelValue};
+    use netgauze_yang_push::model::udp_notif::UdpNotifPacketDecoded;
     use serde_json::json;
-    use std::{collections::HashMap, net::SocketAddr};
+    use std::collections::HashMap;
+    use std::net::SocketAddr;
 
     fn create_subscription_started_modified(
         id: SubscriptionId,

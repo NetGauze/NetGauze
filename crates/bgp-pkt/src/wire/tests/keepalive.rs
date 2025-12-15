@@ -13,12 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    BgpMessage,
-    wire::{
-        deserializer::BgpParsingContext, serializer::BgpMessageWritingError, tests::BGP_MARKER,
-    },
-};
+use crate::BgpMessage;
+use crate::wire::deserializer::BgpParsingContext;
+use crate::wire::serializer::BgpMessageWritingError;
+use crate::wire::tests::BGP_MARKER;
 use netgauze_parse_utils::test_helpers::{
     combine, test_parsed_completely_with_one_input, test_write,
 };

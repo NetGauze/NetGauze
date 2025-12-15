@@ -18,12 +18,10 @@ use bytes::{Buf, BytesMut};
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 use pcap_parser::LegacyPcapReader;
 use rstest::*;
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{BufRead, BufReader, Write},
-    path::PathBuf,
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use tokio_util::codec::Decoder;
 
 static BMP_PORTS: &[u16] = &[1790, 1791, 10000, 10240];

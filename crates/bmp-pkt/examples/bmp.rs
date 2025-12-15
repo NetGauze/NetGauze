@@ -1,20 +1,18 @@
 //! Simple example of constructing BMP packet
 //! in addition to serializing and deserializing BMP packet from wire format.
 
-use std::{
-    io::Cursor,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use std::io::Cursor;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
 
 use chrono::{TimeZone, Utc};
 
 use netgauze_bgp_pkt::BgpMessage;
-use netgauze_bmp_pkt::{
-    BmpMessage, BmpPeerType, PeerHeader,
-    iana::RouteMirroringInformation,
-    v3::{BmpMessageValue, MirroredBgpMessage, RouteMirroringMessage, RouteMirroringValue},
+use netgauze_bmp_pkt::iana::RouteMirroringInformation;
+use netgauze_bmp_pkt::v3::{
+    BmpMessageValue, MirroredBgpMessage, RouteMirroringMessage, RouteMirroringValue,
 };
+use netgauze_bmp_pkt::{BmpMessage, BmpPeerType, PeerHeader};
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
 
 fn main() {
