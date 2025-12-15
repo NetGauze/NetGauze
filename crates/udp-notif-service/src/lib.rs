@@ -14,7 +14,10 @@
 // limitations under the License.
 
 use netgauze_udp_notif_pkt::UdpNotifPacket;
-use std::{fmt::Display, io, net::SocketAddr, sync::Arc};
+use std::fmt::Display;
+use std::io;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 pub mod actor;
 pub mod supervisor;

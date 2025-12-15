@@ -17,11 +17,10 @@ use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_pcap_reader::TransportProtocol;
-use netgauze_udp_notif_pkt::{
-    MediaType, UdpNotifPacket,
-    codec::{UdpPacketCodec, UdpPacketCodecError},
-};
-use std::{collections::HashMap, net::IpAddr};
+use netgauze_udp_notif_pkt::codec::{UdpPacketCodec, UdpPacketCodecError};
+use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
+use std::collections::HashMap;
+use std::net::IpAddr;
 
 pub struct UdpNotifProtocolHandler {
     ports: Vec<u16>,

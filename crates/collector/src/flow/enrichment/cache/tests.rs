@@ -13,12 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::flow::enrichment::{EnrichmentOperation, Scope, Weight, cache::*};
+use crate::flow::enrichment::cache::*;
+use crate::flow::enrichment::{EnrichmentOperation, Scope, Weight};
 use netgauze_flow_pkt::ie::{Field, IE};
-use std::{
-    collections::HashSet,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-};
+use std::collections::HashSet;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 #[test]
 fn test_enrichment_cache_upsert_new_entry() {

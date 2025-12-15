@@ -13,24 +13,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    BgpOpenMessage,
-    capabilities::BgpCapability,
-    iana::{BgpOpenMessageParameterType, UndefinedBgpOpenMessageParameterType},
-    notification::OpenMessageError,
-    open::{BGP_VERSION, BgpOpenMessageParameter},
-    wire::deserializer::{BgpParsingContext, capabilities::BgpCapabilityParsingError},
-};
+use crate::BgpOpenMessage;
+use crate::capabilities::BgpCapability;
+use crate::iana::{BgpOpenMessageParameterType, UndefinedBgpOpenMessageParameterType};
+use crate::notification::OpenMessageError;
+use crate::open::{BGP_VERSION, BgpOpenMessageParameter};
+use crate::wire::deserializer::BgpParsingContext;
+use crate::wire::deserializer::capabilities::BgpCapabilityParsingError;
 use netgauze_parse_utils::{
     ErrorKindSerdeDeref, LocatedParsingError, ReadablePdu, ReadablePduWithOneInput, Span,
     parse_into_located_one_input,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u16, be_u32},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u16, be_u32};
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 

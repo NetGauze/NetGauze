@@ -19,7 +19,8 @@
 use libfuzzer_sys::fuzz_target;
 use std::collections::HashMap;
 
-use netgauze_bgp_pkt::{BgpMessage, wire::deserializer::BgpParsingContext};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span};
 

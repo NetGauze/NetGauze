@@ -13,23 +13,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    iana::BgpLsNodeDescriptorType,
-    nlri::{
-        BgpLsLinkDescriptor, BgpLsLocalNodeDescriptors, BgpLsNlri, BgpLsNlriIpPrefix,
-        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-        BgpLsNodeDescriptors, BgpLsPrefixDescriptor, BgpLsRemoteNodeDescriptors, BgpLsVpnNlri,
-        IpReachabilityInformationData,
-    },
-    wire::serializer::{
-        MultiTopologyIdWritingError, nlri::nlri::RouteDistinguisherWritingError,
-        write_tlv_header_t16_l16,
-    },
+use crate::iana::BgpLsNodeDescriptorType;
+use crate::nlri::{
+    BgpLsLinkDescriptor, BgpLsLocalNodeDescriptors, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink,
+    BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptors,
+    BgpLsPrefixDescriptor, BgpLsRemoteNodeDescriptors, BgpLsVpnNlri, IpReachabilityInformationData,
 };
+use crate::wire::serializer::nlri::nlri::RouteDistinguisherWritingError;
+use crate::wire::serializer::{MultiTopologyIdWritingError, write_tlv_header_t16_l16};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
-use std::{io::Write, net::IpAddr};
+use std::io::Write;
+use std::net::IpAddr;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BgpLsNlriWritingError {

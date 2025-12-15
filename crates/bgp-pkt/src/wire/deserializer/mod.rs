@@ -25,17 +25,13 @@ pub mod route_refresh;
 pub mod update;
 
 use ipnet::{Ipv4Net, Ipv6Net};
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-};
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use netgauze_iana::address_family::AddressType;
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u16, be_u32, be_u128},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u16, be_u32, be_u128};
 use serde::{Deserialize, Serialize};
 
 use netgauze_parse_utils::{
@@ -43,22 +39,17 @@ use netgauze_parse_utils::{
     parse_into_located, parse_into_located_one_input,
 };
 
-use crate::{
-    BgpMessage,
-    capabilities::BgpCapability,
-    iana::{BgpMessageType, UndefinedBgpMessageType},
-    notification::{BgpNotificationMessage, FiniteStateMachineError, MessageHeaderError},
-    wire::{
-        deserializer::{
-            capabilities::BgpCapabilityParsingError,
-            notification::BgpNotificationMessageParsingError, open::BgpOpenMessageParsingError,
-            path_attribute::PathAttributeParsingError,
-            route_refresh::BgpRouteRefreshMessageParsingError,
-            update::BgpUpdateMessageParsingError,
-        },
-        serializer::nlri::{IPV4_LEN, IPV6_LEN},
-    },
-};
+use crate::BgpMessage;
+use crate::capabilities::BgpCapability;
+use crate::iana::{BgpMessageType, UndefinedBgpMessageType};
+use crate::notification::{BgpNotificationMessage, FiniteStateMachineError, MessageHeaderError};
+use crate::wire::deserializer::capabilities::BgpCapabilityParsingError;
+use crate::wire::deserializer::notification::BgpNotificationMessageParsingError;
+use crate::wire::deserializer::open::BgpOpenMessageParsingError;
+use crate::wire::deserializer::path_attribute::PathAttributeParsingError;
+use crate::wire::deserializer::route_refresh::BgpRouteRefreshMessageParsingError;
+use crate::wire::deserializer::update::BgpUpdateMessageParsingError;
+use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
 use netgauze_serde_macros::LocatedError;
 
 /// Min message size in BGP is 19 octets. They're counted from

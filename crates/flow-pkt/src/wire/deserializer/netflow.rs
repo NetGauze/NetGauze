@@ -14,11 +14,9 @@
 // limitations under the License.
 
 use chrono::{LocalResult, TimeZone, Utc};
-use nom::{
-    IResult, InputIter, InputLength, Slice,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u16, be_u32},
-};
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u16, be_u32};
+use nom::{IResult, InputIter, InputLength, Slice};
 use serde::{Deserialize, Serialize};
 
 use netgauze_parse_utils::{
@@ -28,10 +26,10 @@ use netgauze_parse_utils::{
 };
 use netgauze_serde_macros::LocatedError;
 
-use crate::{
-    DATA_SET_MIN_ID, DataSetId, FieldSpecifier, ie::InformationElementTemplate, netflow::*,
-    wire::deserializer::FieldSpecifierParsingError,
-};
+use crate::ie::InformationElementTemplate;
+use crate::netflow::*;
+use crate::wire::deserializer::FieldSpecifierParsingError;
+use crate::{DATA_SET_MIN_ID, DataSetId, FieldSpecifier};
 
 /// 2-octets version, 2-octets count, 4-octets * 4 (sysUpTime, UNIX time, seq
 /// no, source id)

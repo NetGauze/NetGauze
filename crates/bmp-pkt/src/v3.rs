@@ -13,15 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    CounterU32, GaugeU64, PeerHeader,
-    iana::{
-        BmpMessageType, BmpStatisticsType, InitiationInformationTlvType, PeerDownReasonCode,
-        PeerTerminationCode, RouteMirroringInformation, RouteMirroringTlvType,
-        TerminationInformationTlvType,
-    },
+use crate::iana::{
+    BmpMessageType, BmpStatisticsType, InitiationInformationTlvType, PeerDownReasonCode,
+    PeerTerminationCode, RouteMirroringInformation, RouteMirroringTlvType,
+    TerminationInformationTlvType,
 };
-use netgauze_bgp_pkt::{BgpMessage, iana::BgpMessageType};
+use crate::{CounterU32, GaugeU64, PeerHeader};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::iana::BgpMessageType;
 use netgauze_iana::address_family::AddressType;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;

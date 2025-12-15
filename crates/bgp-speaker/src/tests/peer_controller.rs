@@ -13,25 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    events::BgpEvent,
-    fsm::FsmState,
-    peer::*,
-    peer_controller::PeerController,
-    tests::{
-        BgpIoMockBuilder, HOLD_TIME, MY_AS, MY_BGP_ID, MockActiveConnect, PEER_ADDR, PEER_AS,
-        PEER_BGP_ID, PEER_KEY, POLICY, PROPERTIES,
-    },
+use crate::events::BgpEvent;
+use crate::fsm::FsmState;
+use crate::peer::*;
+use crate::peer_controller::PeerController;
+use crate::tests::{
+    BgpIoMockBuilder, HOLD_TIME, MY_AS, MY_BGP_ID, MockActiveConnect, PEER_ADDR, PEER_AS,
+    PEER_BGP_ID, PEER_KEY, POLICY, PROPERTIES,
 };
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    capabilities::{BgpCapability, FourOctetAsCapability, MultiProtocolExtensionsCapability},
-    iana::AS_TRANS,
-    notification::{BgpNotificationMessage, CeaseError},
-    open::{BgpOpenMessage, BgpOpenMessageParameter},
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::capabilities::{
+    BgpCapability, FourOctetAsCapability, MultiProtocolExtensionsCapability,
 };
+use netgauze_bgp_pkt::iana::AS_TRANS;
+use netgauze_bgp_pkt::notification::{BgpNotificationMessage, CeaseError};
+use netgauze_bgp_pkt::open::{BgpOpenMessage, BgpOpenMessageParameter};
 use netgauze_iana::address_family::AddressType;
-use std::{net::SocketAddr, time::Duration};
+use std::net::SocketAddr;
+use std::time::Duration;
 use tokio::sync::mpsc;
 
 #[test_log::test(tokio::test)]

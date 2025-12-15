@@ -58,10 +58,8 @@
 //! ```
 //!
 use netgauze_flow_pkt::ie::{Field, IE};
-use std::{
-    net::{IpAddr, Ipv4Addr},
-    str::FromStr,
-};
+use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, strum_macros::Display)]
 pub enum PmacctMapError {
@@ -318,7 +316,8 @@ impl PmacctMapEntry {
 mod tests {
     use super::*;
     use netgauze_flow_pkt::ie::IE;
-    use std::{net::IpAddr, str::FromStr};
+    use std::net::IpAddr;
+    use std::str::FromStr;
 
     #[test]
     fn parse_line_empty_and_comments() {

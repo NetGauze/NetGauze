@@ -19,7 +19,8 @@ use netgauze_udp_notif_pkt::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, fmt};
+use std::collections::HashMap;
+use std::fmt;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum UdpNotifPayload {
@@ -139,12 +140,12 @@ impl TryFrom<&UdpNotifPacket> for UdpNotifPacketDecoded {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::{
-        notification::{
-            Encoding, NotificationEnvelope, NotificationLegacy, NotificationVariant,
-            SubscriptionStartedModified, Target, UpdateTrigger, YangPushModuleVersion,
-        },
-        udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload, UdpNotifPayloadConversionError},
+    use crate::model::notification::{
+        Encoding, NotificationEnvelope, NotificationLegacy, NotificationVariant,
+        SubscriptionStartedModified, Target, UpdateTrigger, YangPushModuleVersion,
+    };
+    use crate::model::udp_notif::{
+        UdpNotifPacketDecoded, UdpNotifPayload, UdpNotifPayloadConversionError,
     };
     use bytes::Bytes;
     use chrono::{DateTime, Utc};

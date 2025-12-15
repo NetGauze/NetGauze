@@ -16,24 +16,19 @@
 
 //! Deserializer for BGP Path Attributes
 
-use crate::{
-    iana::{
-        AigpAttributeType, PathAttributeType, UndefinedAigpAttributeType,
-        UndefinedPathAttributeType,
-    },
-    nlri::LabeledNextHop,
-    path_attribute::*,
-    wire::{
-        ACCUMULATED_IGP_METRIC,
-        deserializer::{
-            BgpParsingContext, IpAddrParsingError,
-            community::*,
-            nlri::*,
-            path_attribute::{BgpLsAttributeParsingError, SegmentIdentifierParsingError},
-        },
-        serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN},
-    },
+use crate::iana::{
+    AigpAttributeType, PathAttributeType, UndefinedAigpAttributeType, UndefinedPathAttributeType,
 };
+use crate::nlri::LabeledNextHop;
+use crate::path_attribute::*;
+use crate::wire::ACCUMULATED_IGP_METRIC;
+use crate::wire::deserializer::community::*;
+use crate::wire::deserializer::nlri::*;
+use crate::wire::deserializer::path_attribute::{
+    BgpLsAttributeParsingError, SegmentIdentifierParsingError,
+};
+use crate::wire::deserializer::{BgpParsingContext, IpAddrParsingError};
+use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN};
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, SubsequentAddressFamily, UndefinedAddressFamily,
     UndefinedSubsequentAddressFamily,
@@ -46,16 +41,12 @@ use netgauze_parse_utils::{
     parse_till_empty_into_with_three_inputs_located,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-};
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 const OPTIONAL_PATH_ATTRIBUTE_MASK: u8 = 0x80;
 const TRANSITIVE_PATH_ATTRIBUTE_MASK: u8 = 0x40;

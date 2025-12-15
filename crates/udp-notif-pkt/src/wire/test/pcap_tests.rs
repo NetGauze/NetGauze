@@ -13,18 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{MediaType, codec::UdpPacketCodec};
+use crate::MediaType;
+use crate::codec::UdpPacketCodec;
 use bytes::{Buf, BytesMut};
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 use pcap_parser::LegacyPcapReader;
 use rstest::*;
 use serde_json::Value;
-use std::{
-    collections::HashMap,
-    fs::File,
-    io::{BufRead, BufReader, Write},
-    path::PathBuf,
-};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use tokio_util::codec::Decoder;
 
 #[rstest]

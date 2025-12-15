@@ -1,9 +1,13 @@
 //! Simple example of constructing BGP packet
 //! in addition to serializing and deserializing BGP packet from wire format.
 
-use std::{io::Cursor, net::Ipv4Addr};
+use std::io::Cursor;
+use std::net::Ipv4Addr;
 
-use netgauze_bgp_pkt::{capabilities::*, open::*, wire::deserializer::BgpParsingContext, *};
+use netgauze_bgp_pkt::capabilities::*;
+use netgauze_bgp_pkt::open::*;
+use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
+use netgauze_bgp_pkt::*;
 use netgauze_iana::address_family::*;
 use netgauze_parse_utils::{ReadablePduWithOneInput, Span, WritablePdu};
 

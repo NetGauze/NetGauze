@@ -14,14 +14,14 @@
 // limitations under the License.
 
 use crate::publishers::LoggingProducerContext;
-use rdkafka::{
-    config::{ClientConfig, FromClientConfigAndContext},
-    error::{KafkaError, RDKafkaErrorCode},
-    producer::{BaseRecord, Producer, ThreadedProducer},
-};
+use rdkafka::config::{ClientConfig, FromClientConfigAndContext};
+use rdkafka::error::{KafkaError, RDKafkaErrorCode};
+use rdkafka::producer::{BaseRecord, Producer, ThreadedProducer};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::collections::HashMap;
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);

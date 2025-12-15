@@ -53,7 +53,9 @@
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use pcap_parser::{data::PacketData, traits::PcapReaderIterator, *};
+use pcap_parser::data::PacketData;
+use pcap_parser::traits::PcapReaderIterator;
+use pcap_parser::*;
 use pdu::{Ethernet, Ipv4, Ipv4Pdu, Ipv6, Ipv6Pdu, Tcp, Udp};
 
 /// Transport Protocol

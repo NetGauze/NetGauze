@@ -13,12 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    connection::TcpActiveConnect,
-    peer::{EchoCapabilitiesPolicy, PeerConfig},
-    supervisor::{PeersSupervisor, PeersSupervisorError},
-    tests::{HOLD_TIME, MY_AS, MY_BGP_ID, PEER_ADDR, PROPERTIES},
-};
+use crate::connection::TcpActiveConnect;
+use crate::peer::{EchoCapabilitiesPolicy, PeerConfig};
+use crate::supervisor::{PeersSupervisor, PeersSupervisorError};
+use crate::tests::{HOLD_TIME, MY_AS, MY_BGP_ID, PEER_ADDR, PROPERTIES};
 use netgauze_bgp_pkt::codec::BgpCodec;
 use std::net::SocketAddr;
 

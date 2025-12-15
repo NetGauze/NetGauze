@@ -18,10 +18,9 @@
 //! This module provides functionality to monitor and process files containing
 //! enrichment data, tracking line changes and generating appropriate
 //! enrichment operations.
-use crate::inputs::{
-    InputProcessingError,
-    files::{LineChangeType, handlers::FilesLineHandler},
-};
+use crate::inputs::InputProcessingError;
+use crate::inputs::files::LineChangeType;
+use crate::inputs::files::handlers::FilesLineHandler;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::path::PathBuf;
 use tokio::fs;
@@ -169,12 +168,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        flow::enrichment::{DeletePayload, EnrichmentOperation, Scope},
-        inputs::files::handlers::FlowUpsertsHandler,
-    };
+    use crate::flow::enrichment::{DeletePayload, EnrichmentOperation, Scope};
+    use crate::inputs::files::handlers::FlowUpsertsHandler;
     use netgauze_flow_pkt::ie::IE;
-    use std::{net::IpAddr, str::FromStr};
+    use std::net::IpAddr;
+    use std::str::FromStr;
     use tempfile::NamedTempFile;
     use tokio::fs;
 

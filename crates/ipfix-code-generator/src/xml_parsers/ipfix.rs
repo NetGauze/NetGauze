@@ -13,10 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    InformationElement, InformationElementSubRegistry, SimpleRegistry, SubRegistryType,
-    xml_parsers::{sub_registries::parse_subregistry, xml_common::*},
-};
+use crate::xml_parsers::sub_registries::parse_subregistry;
+use crate::xml_parsers::xml_common::*;
+use crate::{InformationElement, InformationElementSubRegistry, SimpleRegistry, SubRegistryType};
 use regex::Regex;
 use roxmltree::Node;
 use std::collections::HashMap;

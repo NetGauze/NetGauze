@@ -13,10 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    capabilities::*,
-    iana::{BgpCapabilityCode, UndefinedBgpCapabilityCode},
-};
+use crate::capabilities::*;
+use crate::iana::{BgpCapabilityCode, UndefinedBgpCapabilityCode};
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
@@ -25,21 +23,17 @@ use netgauze_parse_utils::{
     ErrorKindSerdeDeref, ReadablePdu, Span, parse_into_located, parse_till_empty,
     parse_till_empty_into_located,
 };
-use nom::{
-    IResult,
-    error::{ErrorKind, FromExternalError, ParseError},
-    number::complete::{be_u8, be_u16, be_u32},
-};
+use nom::IResult;
+use nom::error::{ErrorKind, FromExternalError, ParseError};
+use nom::number::complete::{be_u8, be_u16, be_u32};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    iana::{BgpRoleValue, UndefinedBgpRoleValue},
-    wire::{
-        BGP_ROLE_CAPABILITY_LENGTH, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
-        EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
-        FOUR_OCTET_AS_CAPABILITY_LENGTH, GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH,
-        MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
-    },
+use crate::iana::{BgpRoleValue, UndefinedBgpRoleValue};
+use crate::wire::{
+    BGP_ROLE_CAPABILITY_LENGTH, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH,
+    EXTENDED_MESSAGE_CAPABILITY_LENGTH, EXTENDED_NEXT_HOP_ENCODING_LENGTH,
+    FOUR_OCTET_AS_CAPABILITY_LENGTH, GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH,
+    MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH, ROUTE_REFRESH_CAPABILITY_LENGTH,
 };
 use netgauze_serde_macros::LocatedError;
 

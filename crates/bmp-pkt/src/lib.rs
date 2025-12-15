@@ -16,11 +16,9 @@
 #[cfg(feature = "fuzz")]
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
-use std::{
-    hash::{Hash, Hasher},
-    net::{IpAddr, Ipv4Addr},
-    ops::Deref,
-};
+use std::hash::{Hash, Hasher};
+use std::net::{IpAddr, Ipv4Addr};
+use std::ops::Deref;
 
 use netgauze_bgp_pkt::nlri::RouteDistinguisher;
 

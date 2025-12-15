@@ -13,9 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::xml_parsers::xml_common::*;
 use crate::{
     InformationElementSubRegistry, ReasonCodeNestedRegistry, SubRegistryType,
-    ValueNameDescRegistry, Xref, xml_parsers::xml_common::*,
+    ValueNameDescRegistry, Xref,
 };
 
 use regex::Regex;

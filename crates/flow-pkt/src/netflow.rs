@@ -13,16 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    DataSetId, FieldSpecifier,
-    ie::{
-        Field, InformationElementDataType, InformationElementSemantics, InformationElementTemplate,
-        InformationElementUnits,
-    },
+use crate::ie::{
+    Field, InformationElementDataType, InformationElementSemantics, InformationElementTemplate,
+    InformationElementUnits,
 };
+use crate::{DataSetId, FieldSpecifier};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ops::Range};
+use std::collections::HashMap;
+use std::ops::Range;
 
 pub const NETFLOW_V9_VERSION: u16 = 9;
 

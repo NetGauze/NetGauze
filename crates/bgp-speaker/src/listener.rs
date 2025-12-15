@@ -14,24 +14,22 @@
 // limitations under the License.
 
 use futures_core::Stream;
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-    io,
-    net::{IpAddr, SocketAddr},
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::collections::HashMap;
+use std::fmt::{Debug, Display};
+use std::io;
+use std::net::{IpAddr, SocketAddr};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use crate::connection::TcpActiveConnect;
 use futures_util::stream::FuturesUnordered;
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::{TcpListener, TcpStream},
-};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::StreamExt;
 
-use crate::{fsm::FsmState, peer_controller::PeerHandle, supervisor::PeersSupervisor};
+use crate::fsm::FsmState;
+use crate::peer_controller::PeerHandle;
+use crate::supervisor::PeersSupervisor;
 
 /// A modified version of Tokio's TcpListenerStream wrapper that returns the
 /// peer socket along the incoming stream

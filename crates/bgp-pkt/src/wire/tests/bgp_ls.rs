@@ -13,17 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    iana::{BgpLsProtocolId, BgpLsSidAttributeFlags},
-    nlri::{
-        BgpLsLinkDescriptor, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
-        BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsPrefixDescriptor, BgpLsVpnNlri,
-        IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
-    },
-    path_attribute::{
-        BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, MpReach, MpUnreach, PathAttribute,
-        PathAttributeValue,
-    },
+use crate::iana::{BgpLsProtocolId, BgpLsSidAttributeFlags};
+use crate::nlri::{
+    BgpLsLinkDescriptor, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink, BgpLsNlriNode,
+    BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsPrefixDescriptor, BgpLsVpnNlri,
+    IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
+};
+use crate::path_attribute::{
+    BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, MpReach, MpUnreach, PathAttribute,
+    PathAttributeValue,
 };
 use netgauze_parse_utils::test_helpers::{
     test_parsed_completely_with_one_input, test_parsed_completely_with_three_inputs, test_write,
@@ -31,27 +29,20 @@ use netgauze_parse_utils::test_helpers::{
 };
 use std::collections::HashMap;
 
-use crate::{
-    nlri::MplsLabel,
-    wire::{
-        deserializer::BgpParsingContext, serializer::path_attribute::PathAttributeWritingError,
-    },
-};
+use crate::nlri::MplsLabel;
+use crate::wire::deserializer::BgpParsingContext;
+use crate::wire::serializer::path_attribute::PathAttributeWritingError;
 use netgauze_iana::address_family::AddressType;
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
 
-use crate::{
-    nlri::{
-        BgpLsLocalNodeDescriptors, BgpLsNodeDescriptors, BgpLsRemoteNodeDescriptors,
-        LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher,
-    },
-    wire::serializer::{
-        nlri::BgpLsNlriWritingError,
-        path_attribute::{BgpLsAttributeWritingError, MpReachWritingError, MpUnreachWritingError},
-    },
+use crate::nlri::{
+    BgpLsLocalNodeDescriptors, BgpLsNodeDescriptors, BgpLsRemoteNodeDescriptors,
+    LabeledIpv4NextHop, LabeledNextHop, RouteDistinguisher,
+};
+use crate::wire::serializer::nlri::BgpLsNlriWritingError;
+use crate::wire::serializer::path_attribute::{
+    BgpLsAttributeWritingError, MpReachWritingError, MpUnreachWritingError,
 };
 use ipnet::{IpNet, Ipv4Net, Ipv6Net};
 

@@ -16,13 +16,13 @@
 use super::{decode_buffer, serialize_error, serialize_success};
 use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    codec::{BgpCodec, BgpCodecDecoderError},
-    wire::deserializer::{BgpParsingContext, BgpParsingIgnoredErrors},
-};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::codec::{BgpCodec, BgpCodecDecoderError};
+use netgauze_bgp_pkt::wire::deserializer::{BgpParsingContext, BgpParsingIgnoredErrors};
 use netgauze_pcap_reader::TransportProtocol;
-use std::{collections::HashMap, io, net::IpAddr};
+use std::collections::HashMap;
+use std::io;
+use std::net::IpAddr;
 
 pub struct BgpProtocolHandler {
     ports: Vec<u16>,
@@ -97,15 +97,13 @@ impl ProtocolHandler<(BgpMessage, BgpParsingIgnoredErrors), BgpCodec, BgpCodecDe
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netgauze_bgp_pkt::{
-        open::BgpOpenMessage,
-        path_attribute::UndefinedOrigin,
-        wire::deserializer::{
-            BgpMessageParsingError,
-            path_attribute::{OriginParsingError, PathAttributeParsingError},
-            update::BgpUpdateMessageParsingError,
-        },
+    use netgauze_bgp_pkt::open::BgpOpenMessage;
+    use netgauze_bgp_pkt::path_attribute::UndefinedOrigin;
+    use netgauze_bgp_pkt::wire::deserializer::BgpMessageParsingError;
+    use netgauze_bgp_pkt::wire::deserializer::path_attribute::{
+        OriginParsingError, PathAttributeParsingError,
     };
+    use netgauze_bgp_pkt::wire::deserializer::update::BgpUpdateMessageParsingError;
     use serde_json::json;
     use std::net::Ipv4Addr;
 

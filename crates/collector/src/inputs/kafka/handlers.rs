@@ -12,15 +12,12 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use crate::inputs::{
-    InputProcessingError,
-    kafka::{
-        SonataConfig,
-        formats::sonata::{SonataData, SonataOperation},
-    },
-};
+use crate::inputs::InputProcessingError;
+use crate::inputs::kafka::SonataConfig;
+use crate::inputs::kafka::formats::sonata::{SonataData, SonataOperation};
 use netgauze_flow_pkt::ie::{Field, IE};
-use std::{collections::HashMap, net::IpAddr};
+use std::collections::HashMap;
+use std::net::IpAddr;
 
 /// **Generic Kafka Message Handler Trait**
 ///
@@ -407,13 +404,9 @@ impl KafkaMessageHandler<crate::yang_push::EnrichmentOperation> for SonataHandle
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::inputs::{
-        InputProcessingError,
-        kafka::{
-            SonataConfig,
-            handlers::{KafkaMessageHandler, SonataHandler},
-        },
-    };
+    use crate::inputs::InputProcessingError;
+    use crate::inputs::kafka::SonataConfig;
+    use crate::inputs::kafka::handlers::{KafkaMessageHandler, SonataHandler};
     use netgauze_yang_push::model::telemetry::{Label, LabelValue};
 
     // ** Tests with crate::flow::enrichment::EnrichmentOperation for Flow ** //

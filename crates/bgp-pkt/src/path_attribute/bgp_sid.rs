@@ -1,8 +1,6 @@
-use crate::{
-    iana::{BgpSidAttributeType, BgpSrv6ServiceSubSubTlvType, BgpSrv6ServiceSubTlvType},
-    nlri::MplsLabel,
-    path_attribute::PathAttributeValueProperties,
-};
+use crate::iana::{BgpSidAttributeType, BgpSrv6ServiceSubSubTlvType, BgpSrv6ServiceSubTlvType};
+use crate::nlri::MplsLabel;
+use crate::path_attribute::PathAttributeValueProperties;
 use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
 use strum_macros::Display;

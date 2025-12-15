@@ -13,22 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    nlri::*,
-    wire::{deserializer::nlri::*, serializer::nlri::*},
-};
+use crate::nlri::*;
+use crate::wire::deserializer::nlri::*;
+use crate::wire::serializer::nlri::*;
 use ipnet::{Ipv4Net, Ipv6Net};
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{
-        test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input,
-        test_parsed_completely_with_three_inputs, test_write,
-    },
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{
+    test_parse_error, test_parsed_completely, test_parsed_completely_with_one_input,
+    test_parsed_completely_with_three_inputs, test_write,
 };
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
 
 #[test]
 fn test_ipv6_unicast() -> Result<(), Ipv6UnicastWritingError> {

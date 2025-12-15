@@ -51,14 +51,12 @@
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use futures_core::Stream;
 use pin_project::pin_project;
-use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
-    hash::Hash,
-    marker::PhantomData,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::hash::Hash;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 /// A time window defined by a start and (noninclusive) end timestamp
 pub type Window = (DateTime<Utc>, DateTime<Utc>);

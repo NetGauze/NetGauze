@@ -179,13 +179,11 @@ impl BgpUpdateMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        nlri::{
-            Ipv4MplsVpnUnicastAddress, Ipv4Unicast, LabeledIpv6NextHop, LabeledNextHop, MplsLabel,
-            RouteDistinguisher,
-        },
-        path_attribute::MpReach,
+    use crate::nlri::{
+        Ipv4MplsVpnUnicastAddress, Ipv4Unicast, LabeledIpv6NextHop, LabeledNextHop, MplsLabel,
+        RouteDistinguisher,
     };
+    use crate::path_attribute::MpReach;
 
     #[test]
     fn test_end_of_rib() {

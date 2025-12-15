@@ -13,7 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{connection::ConnectionState, events::BgpEvent};
+use crate::connection::ConnectionState;
+use crate::events::BgpEvent;
 use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
 use std::fmt::{Debug, Display, Formatter};
 

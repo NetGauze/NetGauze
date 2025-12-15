@@ -5,15 +5,13 @@ use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;
 
-use crate::{
-    path_attribute::{
-        BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv,
-        SegmentRoutingGlobalBlock,
-    },
-    wire::serializer::{
-        nlri::MplsLabelWritingError, path_attribute::write_length, write_tlv_header_t8_l16,
-    },
+use crate::path_attribute::{
+    BgpSidAttribute, PrefixSegmentIdentifier, SRv6ServiceSubSubTlv, SRv6ServiceSubTlv,
+    SegmentRoutingGlobalBlock,
 };
+use crate::wire::serializer::nlri::MplsLabelWritingError;
+use crate::wire::serializer::path_attribute::write_length;
+use crate::wire::serializer::write_tlv_header_t8_l16;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum SegmentIdentifierWritingError {

@@ -16,10 +16,8 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use netgauze_netconf_proto::{
-    protocol::NetConfMessage,
-    xml_utils::{XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-};
+use netgauze_netconf_proto::protocol::NetConfMessage;
+use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlParser, XmlSerialize, XmlWriter};
 use quick_xml::NsReader;
 use std::io;
 

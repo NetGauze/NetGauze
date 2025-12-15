@@ -15,10 +15,11 @@
 
 //! BGP PDU data representation
 
-use crate::{
-    iana::BgpMessageType, notification::BgpNotificationMessage, open::BgpOpenMessage,
-    route_refresh::BgpRouteRefreshMessage, update::BgpUpdateMessage,
-};
+use crate::iana::BgpMessageType;
+use crate::notification::BgpNotificationMessage;
+use crate::open::BgpOpenMessage;
+use crate::route_refresh::BgpRouteRefreshMessage;
+use crate::update::BgpUpdateMessage;
 use ::serde::{Deserialize, Serialize};
 
 pub mod capabilities;

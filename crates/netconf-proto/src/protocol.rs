@@ -15,19 +15,18 @@
 
 //! NETCONF representation in Rust with XML encoding and decoding capabilities.
 
-use crate::{
-    NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_NS,
-    capabilities::Capability,
-    xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter},
-    yanglib::YangLibrary,
-};
+use crate::capabilities::Capability;
+use crate::xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, XmlWriter};
+use crate::yanglib::YangLibrary;
+use crate::{NETCONF_MONITORING_NS, NETCONF_NS, YANG_LIBRARY_NS};
 use indexmap::IndexMap;
-use quick_xml::{
-    events::{BytesStart, BytesText, Event},
-    name::ResolveResult,
-};
+use quick_xml::events::{BytesStart, BytesText, Event};
+use quick_xml::name::ResolveResult;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, io, str::FromStr, sync::Arc};
+use std::collections::HashSet;
+use std::io;
+use std::str::FromStr;
+use std::sync::Arc;
 
 pub(crate) fn decode_html_entities(s: &str) -> String {
     s.replace("&quot;", "\"")
@@ -2047,11 +2046,9 @@ impl XmlSerialize for ErrorInfoValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        capabilities::{NetconfVersion, StandardCapability, YangCapability},
-        tests::{test_parse_error, test_xml_value, test_xml_value_owned},
-        yanglib::{Datastore, DatastoreName, Module, ModuleSet, Schema},
-    };
+    use crate::capabilities::{NetconfVersion, StandardCapability, YangCapability};
+    use crate::tests::{test_parse_error, test_xml_value, test_xml_value_owned};
+    use crate::yanglib::{Datastore, DatastoreName, Module, ModuleSet, Schema};
     use quick_xml::events::{BytesEnd, BytesStart};
 
     #[test]

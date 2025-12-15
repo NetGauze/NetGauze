@@ -15,15 +15,14 @@
 
 //! Codecs to decode and encode BMP Protocol messages from byte streams
 
-use crate::{
-    BmpMessage, BmpPeerType, PeerKey,
-    iana::BmpVersion,
-    v3, v4,
-    wire::{deserializer::BmpMessageParsingError, serializer::BmpMessageWritingError},
-};
+use crate::iana::BmpVersion;
+use crate::wire::deserializer::BmpMessageParsingError;
+use crate::wire::serializer::BmpMessageWritingError;
+use crate::{BmpMessage, BmpPeerType, PeerKey, v3, v4};
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
-use netgauze_bgp_pkt::{BgpMessage, capabilities::BgpCapability};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::capabilities::BgpCapability;
 use std::collections::HashSet;
 
 use crate::wire::deserializer::BmpParsingContext;
@@ -307,20 +306,18 @@ impl Decoder for BmpCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        v3::{InitiationInformation, PeerDownNotificationReason, TerminationInformation},
-        *,
-    };
+    use crate::v3::{InitiationInformation, PeerDownNotificationReason, TerminationInformation};
+    use crate::*;
     use chrono::TimeZone;
-    use netgauze_bgp_pkt::{
-        capabilities::{
-            ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
-            MultiProtocolExtensionsCapability,
-        },
-        open::{BgpOpenMessage, BgpOpenMessageParameter},
+    use netgauze_bgp_pkt::capabilities::{
+        ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
+        MultiProtocolExtensionsCapability,
     };
+    use netgauze_bgp_pkt::open::{BgpOpenMessage, BgpOpenMessageParameter};
     use netgauze_iana::address_family::{AddressFamily, AddressType};
-    use std::{collections::HashMap, net::Ipv6Addr, str::FromStr};
+    use std::collections::HashMap;
+    use std::net::Ipv6Addr;
+    use std::str::FromStr;
 
     #[test]
     fn test_codec() -> Result<(), BmpMessageWritingError> {

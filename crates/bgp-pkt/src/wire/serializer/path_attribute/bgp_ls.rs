@@ -13,14 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    iana::BgpLsNodeFlagsBits,
-    nlri::{IgpFlags, MplsProtocolMask},
-    path_attribute::{BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, LinkProtectionType},
-    wire::serializer::{
-        IpAddrWritingError, MultiTopologyIdWritingError, nlri::MplsLabelWritingError,
-        path_attribute::write_length, write_tlv_header_t16_l16,
-    },
+use crate::iana::BgpLsNodeFlagsBits;
+use crate::nlri::{IgpFlags, MplsProtocolMask};
+use crate::path_attribute::{
+    BgpLsAttribute, BgpLsAttributeValue, BgpLsPeerSid, LinkProtectionType,
+};
+use crate::wire::serializer::nlri::MplsLabelWritingError;
+use crate::wire::serializer::path_attribute::write_length;
+use crate::wire::serializer::{
+    IpAddrWritingError, MultiTopologyIdWritingError, write_tlv_header_t16_l16,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};

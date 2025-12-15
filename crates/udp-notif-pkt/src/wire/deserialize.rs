@@ -17,11 +17,9 @@ use crate::{MediaType, MediaTypeNames, UdpNotifOption, UdpNotifOptionCode, UdpNo
 use bytes::Bytes;
 use netgauze_parse_utils::{ReadablePdu, Span, parse_into_located};
 use netgauze_serde_macros::LocatedError;
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u16, be_u32},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u16, be_u32};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

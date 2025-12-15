@@ -16,10 +16,8 @@
 use serde::{Deserialize, Serialize};
 
 use netgauze_bmp_pkt::codec::BmpCodecDecoderError;
-use std::{
-    fmt::{Display, Formatter},
-    net::SocketAddr,
-};
+use std::fmt::{Display, Formatter};
+use std::net::SocketAddr;
 
 pub mod handle;
 pub mod server;

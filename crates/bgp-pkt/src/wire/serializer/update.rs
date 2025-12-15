@@ -15,12 +15,9 @@
 
 //! Serializer for BGP Update message
 
-use crate::{
-    BgpUpdateMessage,
-    wire::serializer::{
-        nlri::Ipv4UnicastAddressWritingError, path_attribute::PathAttributeWritingError,
-    },
-};
+use crate::BgpUpdateMessage;
+use crate::wire::serializer::nlri::Ipv4UnicastAddressWritingError;
+use crate::wire::serializer::path_attribute::PathAttributeWritingError;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;

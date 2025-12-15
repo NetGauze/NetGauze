@@ -13,27 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    capabilities::{Capability, NetconfVersion},
-    codec::{SshCodec, SshCodecError},
-    protocol::{
-        Hello, NetConfMessage, Rpc, RpcOperation, RpcReply, RpcReplyContent, RpcResponse,
-        WellKnownOperation, WellKnownRpcResponse, YangSchemaFormat,
-    },
-    yanglib::{
-        BackwardCompatibilityChecker, DependencyError, ImportOnlyModule, Module, ModuleSetBuilder,
-        Submodule, YangLibrary,
-    },
-    yangparser::extract_yang_dependencies,
+use crate::capabilities::{Capability, NetconfVersion};
+use crate::codec::{SshCodec, SshCodecError};
+use crate::protocol::{
+    Hello, NetConfMessage, Rpc, RpcOperation, RpcReply, RpcReplyContent, RpcResponse,
+    WellKnownOperation, WellKnownRpcResponse, YangSchemaFormat,
 };
-use futures_util::{SinkExt, stream::StreamExt};
+use crate::yanglib::{
+    BackwardCompatibilityChecker, DependencyError, ImportOnlyModule, Module, ModuleSetBuilder,
+    Submodule, YangLibrary,
+};
+use crate::yangparser::extract_yang_dependencies;
+use futures_util::SinkExt;
+use futures_util::stream::StreamExt;
 use secrecy::ExposeSecret;
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    io,
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::io;
+use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::Framed;
 

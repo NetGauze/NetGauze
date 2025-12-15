@@ -15,20 +15,15 @@
 
 //! Serializer for BGP Path Attributes
 
-use crate::{
-    iana::AigpAttributeType,
-    nlri::*,
-    path_attribute::*,
-    wire::{
-        ACCUMULATED_IGP_METRIC,
-        serializer::{
-            IpAddrWritingError,
-            community::*,
-            nlri::*,
-            path_attribute::{BgpLsAttributeWritingError, bgp_sid::SegmentIdentifierWritingError},
-        },
-    },
-};
+use crate::iana::AigpAttributeType;
+use crate::nlri::*;
+use crate::path_attribute::*;
+use crate::wire::ACCUMULATED_IGP_METRIC;
+use crate::wire::serializer::IpAddrWritingError;
+use crate::wire::serializer::community::*;
+use crate::wire::serializer::nlri::*;
+use crate::wire::serializer::path_attribute::BgpLsAttributeWritingError;
+use crate::wire::serializer::path_attribute::bgp_sid::SegmentIdentifierWritingError;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput};
 use netgauze_serde_macros::WritingError;

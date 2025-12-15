@@ -32,23 +32,21 @@
 use crate::publishers::LoggingProducerContext;
 use ipnet::IpNet;
 use netgauze_yang_push::{ContentId, CustomSchema};
-use rdkafka::{
-    config::{ClientConfig, FromClientConfigAndContext},
-    error::{KafkaError, RDKafkaErrorCode},
-    message::{Header, OwnedHeaders},
-    producer::{BaseRecord, Producer, ThreadedProducer},
-};
-use schema_registry_converter::{
-    async_impl::schema_registry::{SrSettings, post_schema},
-    error::SRCError,
-    schema_registry_common::{SchemaType, SuppliedReference, SuppliedSchema},
+use rdkafka::config::{ClientConfig, FromClientConfigAndContext};
+use rdkafka::error::{KafkaError, RDKafkaErrorCode};
+use rdkafka::message::{Header, OwnedHeaders};
+use rdkafka::producer::{BaseRecord, Producer, ThreadedProducer};
+use schema_registry_converter::async_impl::schema_registry::{SrSettings, post_schema};
+use schema_registry_converter::error::SRCError;
+use schema_registry_converter::schema_registry_common::{
+    SchemaType, SuppliedReference, SuppliedSchema,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, time::Duration};
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use std::collections::HashMap;
+use std::fs;
+use std::time::Duration;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace, warn};
 
 /// Maximum polling interval when Kafka message queue is full

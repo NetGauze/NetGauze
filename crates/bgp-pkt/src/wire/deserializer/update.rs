@@ -15,32 +15,26 @@
 
 //! Deserializer for BGP Update message
 
-use crate::{
-    BgpUpdateMessage,
-    wire::deserializer::path_attribute::{
-        LocatedPathAttributeParsingError, PathAttributeParsingError,
-    },
+use crate::BgpUpdateMessage;
+use crate::wire::deserializer::path_attribute::{
+    LocatedPathAttributeParsingError, PathAttributeParsingError,
 };
 use ipnet::Ipv4Net;
 use netgauze_iana::address_family::AddressType;
 use netgauze_parse_utils::{
     LocatedParsingError, ReadablePduWithOneInput, Span, parse_into_located,
 };
-use nom::{
-    IResult,
-    number::complete::{be_u8, be_u16, be_u32},
-};
+use nom::IResult;
+use nom::number::complete::{be_u8, be_u16, be_u32};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    nlri::{InvalidIpv4UnicastNetwork, Ipv4Unicast, Ipv4UnicastAddress},
-    notification::UpdateMessageError,
-    path_attribute::PathAttribute,
-    wire::deserializer::{
-        BgpParsingContext, Ipv4PrefixParsingError,
-        path_attribute::{EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK, OriginParsingError},
-    },
+use crate::nlri::{InvalidIpv4UnicastNetwork, Ipv4Unicast, Ipv4UnicastAddress};
+use crate::notification::UpdateMessageError;
+use crate::path_attribute::PathAttribute;
+use crate::wire::deserializer::path_attribute::{
+    EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK, OriginParsingError,
 };
+use crate::wire::deserializer::{BgpParsingContext, Ipv4PrefixParsingError};
 use netgauze_parse_utils::ErrorKindSerdeDeref;
 use netgauze_serde_macros::LocatedError;
 

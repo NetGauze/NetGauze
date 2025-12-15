@@ -25,25 +25,20 @@ pub mod route_refresh;
 pub mod update;
 
 use byteorder::{NetworkEndian, WriteBytesExt};
-use std::{io::Write, net::IpAddr};
+use std::io::Write;
+use std::net::IpAddr;
 
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
 
-use crate::{
-    BgpMessage,
-    nlri::{MultiTopologyId, MultiTopologyIdData},
-    wire::{
-        deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH},
-        serializer::{
-            nlri::{IPV4_LEN, IPV6_LEN},
-            notification::BgpNotificationMessageWritingError,
-            open::BgpOpenMessageWritingError,
-            route_refresh::BgpRouteRefreshMessageWritingError,
-            update::BgpUpdateMessageWritingError,
-        },
-    },
-};
+use crate::BgpMessage;
+use crate::nlri::{MultiTopologyId, MultiTopologyIdData};
+use crate::wire::deserializer::{BGP_MAX_MESSAGE_LENGTH, BGP_MIN_MESSAGE_LENGTH};
+use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
+use crate::wire::serializer::notification::BgpNotificationMessageWritingError;
+use crate::wire::serializer::open::BgpOpenMessageWritingError;
+use crate::wire::serializer::route_refresh::BgpRouteRefreshMessageWritingError;
+use crate::wire::serializer::update::BgpUpdateMessageWritingError;
 
 /// Helper method to round up the number of bytes based on a given length
 #[inline]

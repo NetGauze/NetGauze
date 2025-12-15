@@ -13,7 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{convert::Infallible, net::SocketAddr};
+use std::convert::Infallible;
+use std::net::SocketAddr;
 use tower::{ServiceBuilder, service_fn};
 
 use netgauze_bmp_service::server::{BmpRequest, BmpServer, BmpServerResponse};

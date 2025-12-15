@@ -13,16 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{fmt::Debug, io, net::SocketAddr};
+use std::fmt::Debug;
+use std::io;
+use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 use tower::ServiceExt;
 use tower_service::Service;
 
-use netgauze_bmp_pkt::{BmpMessage, codec::BmpCodec};
+use netgauze_bmp_pkt::BmpMessage;
+use netgauze_bmp_pkt::codec::BmpCodec;
 
-use crate::{AddrInfo, BmpCodecDecoderError, TaggedData, handle::BmpServerHandle};
+use crate::handle::BmpServerHandle;
+use crate::{AddrInfo, BmpCodecDecoderError, TaggedData};
 
 /// Tagged BMP Protocol request
 pub type BmpRequest =
@@ -169,11 +173,9 @@ impl BmpServer {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        convert::Infallible,
-        net::{IpAddr, Ipv4Addr},
-        time::Duration,
-    };
+    use std::convert::Infallible;
+    use std::net::{IpAddr, Ipv4Addr};
+    use std::time::Duration;
 
     use super::*;
     use futures_util::SinkExt;

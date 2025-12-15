@@ -18,12 +18,10 @@
 
 #[cfg(feature = "fuzz")]
 use crate::arbitrary_ip;
-use crate::{
-    community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity},
-    iana::PathAttributeType,
-    nlri::*,
-    path_attribute::{BgpLsAttribute, PrefixSegmentIdentifier},
-};
+use crate::community::{Community, ExtendedCommunity, ExtendedCommunityIpv6, LargeCommunity};
+use crate::iana::PathAttributeType;
+use crate::nlri::*;
+use crate::path_attribute::{BgpLsAttribute, PrefixSegmentIdentifier};
 use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};

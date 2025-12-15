@@ -13,14 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    ie::InformationElementTemplate,
-    netflow::*,
-    wire::{
-        deserializer::netflow::NETFLOW_V9_HEADER_LENGTH,
-        serializer::{FieldSpecifierWritingError, ie::FieldWritingError},
-    },
-};
+use crate::ie::InformationElementTemplate;
+use crate::netflow::*;
+use crate::wire::deserializer::netflow::NETFLOW_V9_HEADER_LENGTH;
+use crate::wire::serializer::FieldSpecifierWritingError;
+use crate::wire::serializer::ie::FieldWritingError;
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::{WritablePdu, WritablePduWithOneInput, WritablePduWithTwoInputs};
 use netgauze_serde_macros::WritingError;

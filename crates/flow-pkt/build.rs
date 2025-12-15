@@ -17,7 +17,8 @@ use netgauze_ipfix_code_generator::{
     Config, ExternalSubRegistrySource, RegistrySource, RegistryType, SourceConfig, SubRegistryType,
     generate,
 };
-use std::{env, path::Path};
+use std::env;
+use std::path::Path;
 
 const IPFIX_URL: &str = "https://www.iana.org/assignments/ipfix/ipfix.xml";
 const PROTOCOL_NUMBERS_URL: &str =

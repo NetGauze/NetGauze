@@ -116,19 +116,17 @@ use crate::{
     create_udp_notif_channel,
 };
 use bytes::{Bytes, BytesMut};
-use futures_util::{StreamExt, stream::SplitSink};
+use futures_util::StreamExt;
+use futures_util::stream::SplitSink;
 use netgauze_udp_notif_pkt::codec::UdpPacketCodec;
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::Arc,
-    time::{Duration, Instant},
-};
-use tokio::{sync::mpsc, task::JoinHandle};
-use tokio_util::{
-    codec::{BytesCodec, Decoder},
-    udp::UdpFramed,
-};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
+use tokio_util::codec::{BytesCodec, Decoder};
+use tokio_util::udp::UdpFramed;
 use tracing::{debug, error, info, warn};
 
 /// Commands that can be sent to the [UdpNotifActor].
@@ -982,7 +980,8 @@ mod tests {
     use netgauze_parse_utils::WritablePdu;
     use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
     use std::io::Cursor;
-    use tokio::{net::UdpSocket, time::Duration};
+    use tokio::net::UdpSocket;
+    use tokio::time::Duration;
 
     async fn setup_actor() -> (
         SocketAddr,

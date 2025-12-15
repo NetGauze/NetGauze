@@ -19,10 +19,8 @@ pub mod enrichment;
 pub mod types;
 
 use apache_avro::types::{Value as AvroValue, ValueKind as AvroValueKind};
-use netgauze_flow_pkt::{
-    ie,
-    ie::{HasIE, InformationElementDataType, InformationElementTemplate},
-};
+use netgauze_flow_pkt::ie;
+use netgauze_flow_pkt::ie::{HasIE, InformationElementDataType, InformationElementTemplate};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;

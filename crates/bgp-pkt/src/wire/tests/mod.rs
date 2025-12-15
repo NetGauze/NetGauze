@@ -13,57 +13,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
 
 use ipnet::{Ipv4Net, Ipv6Net};
 use nom::error::ErrorKind;
 
 use netgauze_iana::address_family::{AddressFamily, AddressType};
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{
-        combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
-    },
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{
+    combine, test_parse_error_with_one_input, test_parsed_completely_with_one_input, test_write,
 };
 
-use crate::{
-    BgpMessage, BgpNotificationMessage, BgpOpenMessage, BgpRouteRefreshMessage,
-    capabilities::{
-        AddPathAddressFamily, AddPathCapability, BgpCapability, BgpRoleCapability,
-        ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
-        GracefulRestartCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
-    },
-    community::{
-        ExtendedCommunity, TransitiveFourOctetExtendedCommunity,
-        TransitiveTwoOctetExtendedCommunity,
-    },
-    iana::{
-        BgpRoleValue, RouteRefreshSubcode, UndefinedBgpErrorNotificationCode,
-        UndefinedBgpMessageType, UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
-    },
-    nlri::*,
-    notification::CeaseError,
-    open::{BGP_VERSION, BgpOpenMessageParameter},
-    path_attribute::*,
-    update::BgpUpdateMessage,
-    wire::{
-        deserializer::{
-            BgpMessageParsingError, BgpParsingContext, LocatedBgpMessageParsingError,
-            notification::{BgpNotificationMessageParsingError, CeaseErrorParsingError},
-            path_attribute::{
-                AsPathParsingError, LocalPreferenceParsingError,
-                MultiExitDiscriminatorParsingError, NextHopParsingError, OriginParsingError,
-                PathAttributeParsingError,
-            },
-            route_refresh::BgpRouteRefreshMessageParsingError,
-        },
-        serializer::BgpMessageWritingError,
-    },
+use crate::capabilities::{
+    AddPathAddressFamily, AddPathCapability, BgpCapability, BgpRoleCapability,
+    ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability, FourOctetAsCapability,
+    GracefulRestartCapability, MultiProtocolExtensionsCapability, UnrecognizedCapability,
 };
+use crate::community::{
+    ExtendedCommunity, TransitiveFourOctetExtendedCommunity, TransitiveTwoOctetExtendedCommunity,
+};
+use crate::iana::{
+    BgpRoleValue, RouteRefreshSubcode, UndefinedBgpErrorNotificationCode, UndefinedBgpMessageType,
+    UndefinedCeaseErrorSubCode, UndefinedRouteRefreshSubcode,
+};
+use crate::nlri::*;
+use crate::notification::CeaseError;
+use crate::open::{BGP_VERSION, BgpOpenMessageParameter};
+use crate::path_attribute::*;
+use crate::update::BgpUpdateMessage;
+use crate::wire::deserializer::notification::{
+    BgpNotificationMessageParsingError, CeaseErrorParsingError,
+};
+use crate::wire::deserializer::path_attribute::{
+    AsPathParsingError, LocalPreferenceParsingError, MultiExitDiscriminatorParsingError,
+    NextHopParsingError, OriginParsingError, PathAttributeParsingError,
+};
+use crate::wire::deserializer::route_refresh::BgpRouteRefreshMessageParsingError;
+use crate::wire::deserializer::{
+    BgpMessageParsingError, BgpParsingContext, LocatedBgpMessageParsingError,
+};
+use crate::wire::serializer::BgpMessageWritingError;
+use crate::{BgpMessage, BgpNotificationMessage, BgpOpenMessage, BgpRouteRefreshMessage};
 
 mod bgp_ls;
 mod capabilities;

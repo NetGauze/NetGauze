@@ -13,53 +13,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    BmpMessage, BmpPeerType, CounterU32, GaugeU64, PeerHeader,
-    iana::*,
-    v3::*,
-    wire::{
-        deserializer::{BmpParsingContext, v3::*},
-        serializer::{BmpMessageWritingError, v3::*},
-    },
-};
+use crate::iana::*;
+use crate::v3::*;
+use crate::wire::deserializer::BmpParsingContext;
+use crate::wire::deserializer::v3::*;
+use crate::wire::serializer::BmpMessageWritingError;
+use crate::wire::serializer::v3::*;
+use crate::{BmpMessage, BmpPeerType, CounterU32, GaugeU64, PeerHeader};
 use chrono::{TimeZone, Utc};
 use ipnet::Ipv4Net;
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    capabilities::{
-        BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
-        FourOctetAsCapability, MultiProtocolExtensionsCapability,
-    },
-    community::{Community, ExtendedCommunity, TransitiveTwoOctetExtendedCommunity},
-    iana::{BgpMessageType, UndefinedBgpMessageType},
-    nlri::{
-        Ipv4NlriMplsLabelsAddress, Ipv4Unicast, Ipv4UnicastAddress, MplsLabel, RouteDistinguisher,
-    },
-    notification::{BgpNotificationMessage, CeaseError},
-    open::{BgpOpenMessage, BgpOpenMessageParameter},
-    path_attribute::{
-        As4PathSegment, AsPath, AsPathSegmentType, Communities, ExtendedCommunities,
-        LocalPreference, MpReach, MultiExitDiscriminator, NextHop, Origin, PathAttribute,
-        PathAttributeValue,
-    },
-    update::BgpUpdateMessage,
-    wire::deserializer::{
-        BgpMessageParsingError, BgpParsingContext, nlri::RouteDistinguisherParsingError,
-    },
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::capabilities::{
+    BgpCapability, ExtendedNextHopEncoding, ExtendedNextHopEncodingCapability,
+    FourOctetAsCapability, MultiProtocolExtensionsCapability,
 };
+use netgauze_bgp_pkt::community::{
+    Community, ExtendedCommunity, TransitiveTwoOctetExtendedCommunity,
+};
+use netgauze_bgp_pkt::iana::{BgpMessageType, UndefinedBgpMessageType};
+use netgauze_bgp_pkt::nlri::{
+    Ipv4NlriMplsLabelsAddress, Ipv4Unicast, Ipv4UnicastAddress, MplsLabel, RouteDistinguisher,
+};
+use netgauze_bgp_pkt::notification::{BgpNotificationMessage, CeaseError};
+use netgauze_bgp_pkt::open::{BgpOpenMessage, BgpOpenMessageParameter};
+use netgauze_bgp_pkt::path_attribute::{
+    As4PathSegment, AsPath, AsPathSegmentType, Communities, ExtendedCommunities, LocalPreference,
+    MpReach, MultiExitDiscriminator, NextHop, Origin, PathAttribute, PathAttributeValue,
+};
+use netgauze_bgp_pkt::update::BgpUpdateMessage;
+use netgauze_bgp_pkt::wire::deserializer::nlri::RouteDistinguisherParsingError;
+use netgauze_bgp_pkt::wire::deserializer::{BgpMessageParsingError, BgpParsingContext};
 use netgauze_iana::address_family::{AddressFamily, AddressType};
-use netgauze_parse_utils::{
-    Span,
-    test_helpers::{
-        test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
-        test_parsed_completely_with_one_input, test_write,
-    },
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::{
+    test_parse_error, test_parse_error_with_one_input, test_parsed_completely,
+    test_parsed_completely_with_one_input, test_write,
 };
 use nom::error::ErrorKind;
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    str::FromStr,
-};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::str::FromStr;
 
 #[test]
 fn test_peer_type() -> Result<(), PeerHeaderWritingError> {

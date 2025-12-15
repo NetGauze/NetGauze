@@ -15,24 +15,24 @@
 
 //! Deserializer for BGP Notification message
 
-use crate::{
-    BgpNotificationMessage,
-    iana::{
-        BgpErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
-        MessageHeaderErrorSubCode, OpenMessageErrorSubCode, RouteRefreshMessageErrorSubCode,
-        UndefinedBgpErrorNotificationCode, UndefinedCeaseErrorSubCode,
-        UndefinedFiniteStateMachineErrorSubCode, UndefinedMessageHeaderErrorSubCode,
-        UndefinedOpenMessageErrorSubCode, UndefinedRouteRefreshMessageError,
-        UndefinedUpdateMessageErrorSubCode, UpdateMessageErrorSubCode,
-    },
-    notification::{
-        CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
-        OpenMessageError, RouteRefreshError, UpdateMessageError,
-    },
+use crate::BgpNotificationMessage;
+use crate::iana::{
+    BgpErrorNotificationCode, CeaseErrorSubCode, FiniteStateMachineErrorSubCode,
+    MessageHeaderErrorSubCode, OpenMessageErrorSubCode, RouteRefreshMessageErrorSubCode,
+    UndefinedBgpErrorNotificationCode, UndefinedCeaseErrorSubCode,
+    UndefinedFiniteStateMachineErrorSubCode, UndefinedMessageHeaderErrorSubCode,
+    UndefinedOpenMessageErrorSubCode, UndefinedRouteRefreshMessageError,
+    UndefinedUpdateMessageErrorSubCode, UpdateMessageErrorSubCode,
+};
+use crate::notification::{
+    CeaseError, FiniteStateMachineError, HoldTimerExpiredError, MessageHeaderError,
+    OpenMessageError, RouteRefreshError, UpdateMessageError,
 };
 use netgauze_parse_utils::{ErrorKindSerdeDeref, ReadablePdu, Span, parse_into_located};
 use netgauze_serde_macros::LocatedError;
-use nom::{IResult, error::ErrorKind, number::complete::be_u8};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::be_u8;
 use serde::{Deserialize, Serialize};
 
 /// BGP Notification Message Parsing errors

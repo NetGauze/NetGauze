@@ -16,11 +16,9 @@
 use bytes::BytesMut;
 use netgauze_pcap_reader::TransportProtocol;
 use serde::Serialize;
-use std::{
-    collections::HashMap,
-    io,
-    net::{IpAddr, SocketAddr},
-};
+use std::collections::HashMap;
+use std::io;
+use std::net::{IpAddr, SocketAddr};
 
 #[derive(Debug, serde::Serialize)]
 pub struct SerializableInfo<I> {

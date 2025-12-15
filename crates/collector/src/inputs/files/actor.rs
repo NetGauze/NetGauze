@@ -48,25 +48,20 @@
 //! - All formats support comment filtering (lines starting with `#`, `//`, or
 //!   `!`)
 //! - All formats support incremental change detection with line-based diffing
-use crate::inputs::{
-    EnrichmentHandle,
-    files::{
-        FilesConfig, InputFileFormat,
-        handlers::{
-            FilesLineHandler, FlowUpsertsHandler, PmacctMapsHandler, YangPushUpsertsHandler,
-        },
-        processor::{FileProcessor, FileProcessorCallback},
-    },
+use crate::inputs::EnrichmentHandle;
+use crate::inputs::files::handlers::{
+    FilesLineHandler, FlowUpsertsHandler, PmacctMapsHandler, YangPushUpsertsHandler,
 };
+use crate::inputs::files::processor::{FileProcessor, FileProcessorCallback};
+use crate::inputs::files::{FilesConfig, InputFileFormat};
 use notify::{Config, Event, PollWatcher, RecursiveMode, Watcher};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    string::ToString,
-    time::Duration,
-};
-use tokio::{sync::mpsc, task::JoinHandle};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::string::ToString;
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 const MAX_BACKOFF_TIME: Duration = Duration::from_secs(10);

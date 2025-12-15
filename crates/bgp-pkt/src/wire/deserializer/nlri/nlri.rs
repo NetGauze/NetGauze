@@ -13,16 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    iana::{L2EvpnRouteTypeCode, RouteDistinguisherTypeCode, UndefinedRouteDistinguisherTypeCode},
-    nlri::*,
-    wire::{
-        deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError},
-        serializer::nlri::{
-            IPV4_LEN_BITS, IPV6_LEN, IPV6_LEN_BITS, LABELED_IPV4_LEN, LABELED_IPV6_LEN,
-            MAC_ADDRESS_LEN_BITS, MPLS_LABEL_LEN_BITS, RD_LEN,
-        },
-    },
+use crate::iana::{
+    L2EvpnRouteTypeCode, RouteDistinguisherTypeCode, UndefinedRouteDistinguisherTypeCode,
+};
+use crate::nlri::*;
+use crate::wire::deserializer::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
+use crate::wire::serializer::nlri::{
+    IPV4_LEN_BITS, IPV6_LEN, IPV6_LEN_BITS, LABELED_IPV4_LEN, LABELED_IPV6_LEN,
+    MAC_ADDRESS_LEN_BITS, MPLS_LABEL_LEN_BITS, RD_LEN,
 };
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_parse_utils::{
@@ -31,11 +29,9 @@ use netgauze_parse_utils::{
     parse_into_located_two_inputs,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u16, be_u32, be_u128},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u16, be_u32, be_u128};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 

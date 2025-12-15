@@ -18,15 +18,11 @@
 //! Example
 //! ```no_run
 //! use futures_util::StreamExt;
-//! use netgauze_bmp_pkt::{
-//!     BmpMessage,
-//!     codec::{BmpCodec, BmpCodecDecoderError},
-//! };
-//! use netgauze_bmp_service::{
-//!     AddrInfo,
-//!     server::BmpServerResponse,
-//!     transport::{TaggedFramedReadStream, TaggedFramedReadStreamResult},
-//! };
+//! use netgauze_bmp_pkt::BmpMessage;
+//! use netgauze_bmp_pkt::codec::{BmpCodec, BmpCodecDecoderError};
+//! use netgauze_bmp_service::AddrInfo;
+//! use netgauze_bmp_service::server::BmpServerResponse;
+//! use netgauze_bmp_service::transport::{TaggedFramedReadStream, TaggedFramedReadStreamResult};
 //! use std::net::SocketAddr;
 //! use tokio::net::TcpListener;
 //! use tokio_util::codec::FramedRead;
@@ -56,11 +52,9 @@
 use crate::TaggedData;
 use futures_core::{Stream, TryStream};
 use pin_project::pin_project;
-use std::{
-    fmt::Debug,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::fmt::Debug;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{Decoder, FramedRead};
 
@@ -146,13 +140,11 @@ where
 mod tests {
     use super::*;
     use futures::StreamExt;
-    use netgauze_bmp_pkt::{
-        codec::{BmpCodec, BmpCodecDecoderError},
-        iana::UndefinedBmpVersion,
-        v3::*,
-        wire::deserializer::BmpMessageParsingError,
-        *,
-    };
+    use netgauze_bmp_pkt::codec::{BmpCodec, BmpCodecDecoderError};
+    use netgauze_bmp_pkt::iana::UndefinedBmpVersion;
+    use netgauze_bmp_pkt::v3::*;
+    use netgauze_bmp_pkt::wire::deserializer::BmpMessageParsingError;
+    use netgauze_bmp_pkt::*;
     use tokio_test::io::Builder;
 
     #[tokio::test]

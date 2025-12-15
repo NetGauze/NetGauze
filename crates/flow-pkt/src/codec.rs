@@ -25,18 +25,12 @@ use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 use tracing::instrument;
 
-use crate::{
-    FlowInfo, ipfix, netflow,
-    wire::{
-        deserializer::{
-            ipfix::{IPFIX_HEADER_LENGTH, IpfixPacketParsingError},
-            netflow::NetFlowV9PacketParsingError,
-        },
-        serializer::{
-            FlowWritingError, ipfix::IpfixPacketWritingError, netflow::NetFlowV9WritingError,
-        },
-    },
-};
+use crate::wire::deserializer::ipfix::{IPFIX_HEADER_LENGTH, IpfixPacketParsingError};
+use crate::wire::deserializer::netflow::NetFlowV9PacketParsingError;
+use crate::wire::serializer::FlowWritingError;
+use crate::wire::serializer::ipfix::IpfixPacketWritingError;
+use crate::wire::serializer::netflow::NetFlowV9WritingError;
+use crate::{FlowInfo, ipfix, netflow};
 use netgauze_parse_utils::{
     LocatedParsingError, ReadablePduWithOneInput, Span, WritablePduWithOneInput,
 };

@@ -13,25 +13,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    iana,
-    iana::{
-        BgpLsLinkDescriptorType, BgpLsNlriType, BgpLsNodeDescriptorSubType,
-        BgpLsNodeDescriptorType, BgpLsNodeDescriptorTypeError, BgpLsPrefixDescriptorType,
-        BgpLsProtocolIdError, IanaValueError, LinkDescriptorTypeError, NodeDescriptorSubTypeError,
-        PrefixDescriptorTypeError, UnknownBgpLsNlriType,
-    },
-    nlri::{
-        BgpLsLinkDescriptor, BgpLsLocalNodeDescriptors, BgpLsNlri, BgpLsNlriIpPrefix,
-        BgpLsNlriLink, BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv,
-        BgpLsNodeDescriptors, BgpLsPrefixDescriptor, BgpLsRemoteNodeDescriptors, BgpLsVpnNlri,
-        IpReachabilityInformationData, MultiTopologyId, MultiTopologyIdData, OspfRouteType,
-        UnknownOspfRouteType,
-    },
-    wire::deserializer::{
-        Ipv4PrefixParsingError, Ipv6PrefixParsingError, nlri::RouteDistinguisherParsingError,
-        read_tlv_header_t16_l16,
-    },
+use crate::iana;
+use crate::iana::{
+    BgpLsLinkDescriptorType, BgpLsNlriType, BgpLsNodeDescriptorSubType, BgpLsNodeDescriptorType,
+    BgpLsNodeDescriptorTypeError, BgpLsPrefixDescriptorType, BgpLsProtocolIdError, IanaValueError,
+    LinkDescriptorTypeError, NodeDescriptorSubTypeError, PrefixDescriptorTypeError,
+    UnknownBgpLsNlriType,
+};
+use crate::nlri::{
+    BgpLsLinkDescriptor, BgpLsLocalNodeDescriptors, BgpLsNlri, BgpLsNlriIpPrefix, BgpLsNlriLink,
+    BgpLsNlriNode, BgpLsNlriValue, BgpLsNodeDescriptorSubTlv, BgpLsNodeDescriptors,
+    BgpLsPrefixDescriptor, BgpLsRemoteNodeDescriptors, BgpLsVpnNlri, IpReachabilityInformationData,
+    MultiTopologyId, MultiTopologyIdData, OspfRouteType, UnknownOspfRouteType,
+};
+use crate::wire::deserializer::nlri::RouteDistinguisherParsingError;
+use crate::wire::deserializer::{
+    Ipv4PrefixParsingError, Ipv6PrefixParsingError, read_tlv_header_t16_l16,
 };
 use ipnet::IpNet;
 use netgauze_parse_utils::{
@@ -40,11 +37,9 @@ use netgauze_parse_utils::{
     parse_till_empty_into_with_one_input_located,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 

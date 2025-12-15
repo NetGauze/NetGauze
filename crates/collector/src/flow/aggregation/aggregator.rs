@@ -46,20 +46,17 @@
 //! The aggregator maintains efficient in-memory state and handles reduction
 //! operations for optimal performance across large flow volumes.
 
-use crate::flow::{aggregation::config::*, types::FieldRef};
+use crate::flow::aggregation::config::*;
+use crate::flow::types::FieldRef;
 use chrono::{DateTime, Utc};
 use netgauze_analytics::aggregation::*;
-use netgauze_flow_pkt::{
-    DataSetId, FlowInfo,
-    ie::{Field, *},
-    ipfix,
-};
+use netgauze_flow_pkt::ie::{Field, *};
+use netgauze_flow_pkt::{DataSetId, FlowInfo, ipfix};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
-use std::{
-    collections::{HashSet, hash_map::Entry},
-    net::{IpAddr, SocketAddr},
-};
+use std::collections::HashSet;
+use std::collections::hash_map::Entry;
+use std::net::{IpAddr, SocketAddr};
 use tracing::{error, info};
 
 #[derive(Clone, Debug)]

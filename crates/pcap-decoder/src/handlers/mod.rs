@@ -21,10 +21,8 @@ pub mod udp_notif;
 use crate::protocol_handler::{DecodeOutcome, SerializableInfo};
 use bytes::{Buf, BytesMut};
 use serde::Serialize;
-use std::{
-    io,
-    net::{IpAddr, SocketAddr},
-};
+use std::io;
+use std::net::{IpAddr, SocketAddr};
 use tokio_util::codec::Decoder;
 
 /// Decodes a buffer and pushes the results into a vector.

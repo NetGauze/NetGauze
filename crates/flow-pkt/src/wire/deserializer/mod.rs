@@ -13,11 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use nom::{
-    IResult,
-    error::ErrorKind,
-    number::complete::{be_u16, be_u32},
-};
+use nom::IResult;
+use nom::error::ErrorKind;
+use nom::number::complete::{be_u16, be_u32};
 use serde::{Deserialize, Serialize};
 
 use crate::{FieldSpecifier, FieldSpecifierError};

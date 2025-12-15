@@ -20,10 +20,8 @@
 //! - Converting records to enrichment operations
 
 use crate::flow::types::{FieldRefLookup, IndexedDataRecord};
-use netgauze_flow_pkt::{
-    ie::{Field, IE, netgauze},
-    ipfix,
-};
+use netgauze_flow_pkt::ie::{Field, IE, netgauze};
+use netgauze_flow_pkt::ipfix;
 use std::string::ToString;
 use tracing::debug;
 

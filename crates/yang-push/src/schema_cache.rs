@@ -15,11 +15,10 @@
 
 use crate::ContentId;
 use schema_registry_converter::schema_registry_common::SuppliedSchema;
-use std::{collections::HashMap, net::SocketAddr};
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
 // Cache for YangPush schemas and metadata

@@ -23,10 +23,8 @@
 //!
 //! Note: This module/functions may be relocated in the future.
 
-use netgauze_flow_pkt::{
-    ie::{Field, HasIE, IE},
-    ipfix,
-};
+use netgauze_flow_pkt::ie::{Field, HasIE, IE};
+use netgauze_flow_pkt::ipfix;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::{Deserialize, Serialize};
 
@@ -260,10 +258,8 @@ mod tests {
     use netgauze_flow_pkt::ie::{Field, IE, protocolIdentifier};
     use netgauze_iana::tcp::TCPHeaderFlags;
     use rustc_hash::{FxBuildHasher, FxHashMap};
-    use std::{
-        collections::HashMap,
-        net::{Ipv4Addr, Ipv6Addr},
-    };
+    use std::collections::HashMap;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
     #[test]
     fn test_field_ref_equality_and_ordering() {

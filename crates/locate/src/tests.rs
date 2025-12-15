@@ -1,8 +1,6 @@
 use super::BinarySpan;
-use nom::{
-    Compare, CompareResult, FindSubstring, FindToken, InputIter, Offset, Slice,
-    bytes::complete::take,
-};
+use nom::bytes::complete::take;
+use nom::{Compare, CompareResult, FindSubstring, FindToken, InputIter, Offset, Slice};
 
 type StrSpan<'a> = BinarySpan<&'a str>;
 type BytesSpan<'a> = BinarySpan<&'a [u8]>;
@@ -163,7 +161,8 @@ fn it_should_calculate_offset_for_str() {
 
 #[test]
 fn it_should_capture_position() {
-    use nom::{IResult, bytes::complete::tag};
+    use nom::IResult;
+    use nom::bytes::complete::tag;
 
     fn parser(s: BytesSpan<'_>) -> IResult<BytesSpan<'_>, (BytesSpan<'_>, &[u8])> {
         let (s, _) = take(2usize)(s)?;

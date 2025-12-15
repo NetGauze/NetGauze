@@ -13,25 +13,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    v4::{
-        BmpMessageValue, PeerDownNotificationMessage, PeerDownTlv, RouteMonitoringMessage,
-        RouteMonitoringTlv, RouteMonitoringTlvValue,
-    },
-    wire::serializer::v3::{
-        InitiationInformationWritingError, InitiationMessageWritingError,
-        PeerDownNotificationReasonWritingError, PeerHeaderWritingError,
-        PeerUpNotificationMessageWritingError, RouteMirroringMessageWritingError,
-        StatisticsReportMessageWritingError, TerminationMessageWritingError,
-    },
+use crate::v4::{
+    BmpMessageValue, PeerDownNotificationMessage, PeerDownTlv, RouteMonitoringMessage,
+    RouteMonitoringTlv, RouteMonitoringTlvValue,
+};
+use crate::wire::serializer::v3::{
+    InitiationInformationWritingError, InitiationMessageWritingError,
+    PeerDownNotificationReasonWritingError, PeerHeaderWritingError,
+    PeerUpNotificationMessageWritingError, RouteMirroringMessageWritingError,
+    StatisticsReportMessageWritingError, TerminationMessageWritingError,
 };
 use byteorder::{NetworkEndian, WriteBytesExt};
-use netgauze_bgp_pkt::wire::serializer::{
-    BgpMessageWritingError, capabilities::BGPCapabilityWritingError, write_tlv_header_t16_l16,
-};
+use netgauze_bgp_pkt::wire::serializer::capabilities::BGPCapabilityWritingError;
+use netgauze_bgp_pkt::wire::serializer::{BgpMessageWritingError, write_tlv_header_t16_l16};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
-use std::{convert::identity, io::Write};
+use std::convert::identity;
+use std::io::Write;
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
 pub enum BmpMessageValueWritingError {

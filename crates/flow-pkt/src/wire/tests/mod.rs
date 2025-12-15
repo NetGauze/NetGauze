@@ -20,18 +20,18 @@ mod netflow;
 pub mod pcap_tests;
 
 use chrono::{TimeZone, Timelike, Utc};
-use netgauze_parse_utils::{Span, test_helpers::*};
-use std::{collections::HashMap, net::Ipv4Addr};
+use netgauze_parse_utils::Span;
+use netgauze_parse_utils::test_helpers::*;
+use std::collections::HashMap;
+use std::net::Ipv4Addr;
 
-use crate::{
-    FieldSpecifier, ie,
-    ie::Field,
-    ipfix::*,
-    wire::{
-        deserializer::{ie as ie_desr, ipfix::*},
-        serializer::{ie as ie_ser, ipfix::*, *},
-    },
-};
+use crate::ie::Field;
+use crate::ipfix::*;
+use crate::wire::deserializer::ie as ie_desr;
+use crate::wire::deserializer::ipfix::*;
+use crate::wire::serializer::ipfix::*;
+use crate::wire::serializer::{ie as ie_ser, *};
+use crate::{FieldSpecifier, ie};
 
 #[test]
 fn test_template_record() -> Result<(), TemplateRecordWritingError> {

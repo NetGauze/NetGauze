@@ -15,14 +15,11 @@
 
 use chrono::{LocalResult, TimeZone, Utc};
 
-use netgauze_bgp_pkt::{
-    BgpMessage,
-    iana::BgpMessageType,
-    nlri::RouteDistinguisher,
-    wire::deserializer::{
-        BgpMessageParsingError, BgpParsingContext, nlri::RouteDistinguisherParsingError,
-    },
-};
+use netgauze_bgp_pkt::BgpMessage;
+use netgauze_bgp_pkt::iana::BgpMessageType;
+use netgauze_bgp_pkt::nlri::RouteDistinguisher;
+use netgauze_bgp_pkt::wire::deserializer::nlri::RouteDistinguisherParsingError;
+use netgauze_bgp_pkt::wire::deserializer::{BgpMessageParsingError, BgpParsingContext};
 use netgauze_iana::address_family::{
     AddressFamily, AddressType, InvalidAddressType, SubsequentAddressFamily,
     UndefinedAddressFamily, UndefinedSubsequentAddressFamily,
@@ -32,21 +29,16 @@ use netgauze_parse_utils::{
     parse_into_located_one_input, parse_till_empty_into_located,
 };
 use netgauze_serde_macros::LocatedError;
-use nom::{
-    IResult,
-    error::{ErrorKind, FromExternalError},
-    number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128},
-};
+use nom::IResult;
+use nom::error::{ErrorKind, FromExternalError};
+use nom::number::complete::{be_u8, be_u16, be_u32, be_u64, be_u128};
 use serde::{Deserialize, Serialize};
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    string::FromUtf8Error,
-};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::string::FromUtf8Error;
 
-use crate::{
-    BmpPeerType, CounterU32, GaugeU64, PeerHeader, PeerKey, iana::*, v3,
-    wire::deserializer::BmpParsingContext,
-};
+use crate::iana::*;
+use crate::wire::deserializer::BmpParsingContext;
+use crate::{BmpPeerType, CounterU32, GaugeU64, PeerHeader, PeerKey, v3};
 
 #[derive(LocatedError, PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub enum BmpMessageValueParsingError {
