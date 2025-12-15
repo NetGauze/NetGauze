@@ -18,31 +18,208 @@
 //! This module defines data structures and serialization logic for handling
 //! YANG notifications as specified in:
 //! - [RFC 8639](https://datatracker.ietf.org/doc/html/rfc8639): Subscription to
-//!   YANG Notifications
+//!   YANG Notifications: Defines the base subscription mechanism including
+//!   subscription lifecycle (start, modify, terminate) and notification
+//!   delivery.
 //! - [RFC 8641](https://datatracker.ietf.org/doc/html/rfc8641): Subscription to
-//!   YANG Notifications for Datastore Updates
-//! - [Notification Versioning Draft](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-yang-notifications-versioning-08)
-//! - [Notification Envelope Draft](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-notif-envelope-01)
+//!   YANG Notifications for Datastore Updates: Extends RFC 8639 specifically
+//!   for datastore monitoring with periodic and on-change update triggers.
+//! - [Notification Versioning Draft](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-yang-notifications-versioning-10):
+//!   Adds module versioning information to notifications, allowing receivers to
+//!   understand which YANG module versions generated the data.
+//! - [Notification Envelope Draft](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-notif-envelope):
+//!   Defines an extensible notification envelope format with metadata like
+//!   hostname and sequence numbers.
 //!
-//! ## Key components:
-//! - **NotificationEnvelope**: Extensible wrapper for Yang-Push notification
-//!   messages with metadata like hostname and sequence number.
-//! - **NotificationLegacy**: Legacy notification wrapper (deprecated).
-//! - **NotificationVariant**: Enumerates specific notification types (e.g.,
-//!   subscription started/modified/terminated, YANG push updates, etc.).
+//! ## Message Structure
+//!
+//! ### New Notification Envelope Format (draft-ietf-netconf-notif-envelope)
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────────────┐
+//! │                    NotificationEnvelope                         │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │  event-time: DateTime<Utc>          (required)                  │
+//! │  hostname: Option<String>           (optional)                  │
+//! │  sequence-number: Option<u32>       (optional, RFC 9187)        │
+//! │  contents: Option<NotificationVariant>                          │
+//! │  extra_fields: Value                (YANG augmentations)        │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │               contents: NotificationVariant                     │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │  One of the following notification types:                       │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │                                                                 │
+//! │  ┌───────────────────────────────────────────────────────────┐  │
+//! │  │ SubscriptionStarted / SubscriptionModified (RFC 8639)     │  │
+//! │  ├───────────────────────────────────────────────────────────┤  │
+//! │  │  id: SubscriptionId                  (required)           │  │
+//! │  │  target: Target                      (required)           │  │
+//! │  │  stop-time: Option<DateTime<Utc>>    (optional)           │  │
+//! │  │  transport: Option<Transport>        (optional)           │  │
+//! │  │  encoding: Option<Encoding>          (optional)           │  │
+//! │  │  purpose: Option<String>             (optional)           │  │
+//! │  │  update_trigger: Option<UpdateTrigger> (optional)         │  │
+//! │  │  module_version: Option<Vec<YangPushModuleVersion>>       │  │
+//! │  │  yang_library_content_id: Option<String>                  │  │
+//! │  │  extra_fields: Value                 (YANG augmentations) │  │
+//! │  └───────────────────────────────────────────────────────────┘  │
+//! │                                                                 │
+//! │  ┌───────────────────────────────────────────────────────────┐  │
+//! │  │ SubscriptionTerminated (RFC 8639)                         │  │
+//! │  ├───────────────────────────────────────────────────────────┤  │
+//! │  │  id: SubscriptionId                  (required)           │  │
+//! │  │  reason: String                      (required)           │  │
+//! │  │  extra_fields: Value                 (YANG augmentations) │  │
+//! │  └───────────────────────────────────────────────────────────┘  │
+//! │                                                                 │
+//! │  ┌───────────────────────────────────────────────────────────┐  │
+//! │  │ YangPushUpdate (RFC 8641 - push-update)                   │  │
+//! │  ├───────────────────────────────────────────────────────────┤  │
+//! │  │  id: SubscriptionId                  (required)           │  │
+//! │  │  datastore-contents: Value           (required)           │  │
+//! │  │  extra_fields: Value                 (YANG augmentations) │  │
+//! │  └───────────────────────────────────────────────────────────┘  │
+//! │                                                                 │
+//! │  ┌───────────────────────────────────────────────────────────┐  │
+//! │  │ YangPushChangeUpdate (RFC 8641 - push-change-update)      │  │
+//! │  ├───────────────────────────────────────────────────────────┤  │
+//! │  │  id: SubscriptionId                  (required)           │  │
+//! │  │  datastore-changes: Value            (required)           │  │
+//! │  │  extra_fields: Value                 (YANG augmentations) │  │
+//! │  └───────────────────────────────────────────────────────────┘  │
+//! │                                                                 │
+//! └─────────────────────────────────────────────────────────────────┘
+//! ```
+//!
+//! ### Legacy Notification Format (RFC 8639/8641)
+//!
+//!
+//! //! The `NotificationLegacy` structure wraps notifications using the
+//! original RFC 8639/8641 format with `eventTime` and optional sequencing
+//! extension.
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────────────┐
+//! │                    NotificationLegacy                           │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │  eventTime: DateTime<Utc>           (required)                  │
+//! │  sysName: Option<String>            (optional, sequencing ext)  │
+//! │  notification: Option<NotificationVariant>                      │
+//! │  extra_fields: Value                (YANG augmentations)        │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │               notification: NotificationVariant                 │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │  One of the following notification types:                       │
+//! ├─────────────────────────────────────────────────────────────────┤
+//! │                                                                 │
+//! │  ┌───────────────────────────────────────────────────────────┐  │
+//! │  │ SubscriptionStarted / SubscriptionModified (RFC 8639)     │  │
+//! │  ├───────────────────────────────────────────────────────────┤  │
+//! │  │  id: SubscriptionId                  (required)           │  │
+//! │  │  target: Target                      (required)           │  │
+//! │  │  stop-time: Option<DateTime<Utc>>    (optional)           │  │
+//! │  │  transport: Option<Transport>        (optional)           │  │
+//! │  │  encoding: Option<Encoding>          (optional)           │  │
+//! │  │  purpose: Option<String>             (optional)           │  │
+//! │  │  update_trigger: Option<UpdateTrigger> (optional)         │  │
+//! │  │  module_version: Option<Vec<YangPushModuleVersion>>       │  │
+//! │  │  yang_library_content_id: Option<String>                  │  │
+//! │  │  extra_fields: Value                 (YANG augmentations) │  │
+//! │  └───────────────────────────────────────────────────────────┘  │
+//! │                                                                 │
+//! │  ┌───────────────────────────────────────────────────────────┐  │
+//! │  │ SubscriptionTerminated (RFC 8639)                         │  │
+//! │  ├───────────────────────────────────────────────────────────┤  │
+//! │  │  id: SubscriptionId                  (required)           │  │
+//! │  │  reason: String                      (required)           │  │
+//! │  │  extra_fields: Value                 (YANG augmentations) │  │
+//! │  └───────────────────────────────────────────────────────────┘  │
+//! │                                                                 │
+//! │  ┌───────────────────────────────────────────────────────────┐  │
+//! │  │ YangPushUpdate (RFC 8641 - push-update)                   │  │
+//! │  ├───────────────────────────────────────────────────────────┤  │
+//! │  │  id: SubscriptionId                  (required)           │  │
+//! │  │  datastore-contents: Value           (required)           │  │
+//! │  │  extra_fields: Value                 (YANG augmentations) │  │
+//! │  └───────────────────────────────────────────────────────────┘  │
+//! │                                                                 │
+//! │  ┌───────────────────────────────────────────────────────────┐  │
+//! │  │ YangPushChangeUpdate (RFC 8641 - push-change-update)      │  │
+//! │  ├───────────────────────────────────────────────────────────┤  │
+//! │  │  id: SubscriptionId                  (required)           │  │
+//! │  │  datastore-changes: Value            (required)           │  │
+//! │  │  extra_fields: Value                 (YANG augmentations) │  │
+//! │  └───────────────────────────────────────────────────────────┘  │
+//! │                                                                 │
+//! └─────────────────────────────────────────────────────────────────┘
+//! ```
+//!
+//! ## Notification Types
+//!
+//! ### Subscription Lifecycle Notifications (RFC 8639)
+//!
+//! - **SubscriptionStarted**: Sent when a subscription is successfully
+//!   established
+//! - **SubscriptionModified**: Sent when subscription parameters are changed
+//! - **SubscriptionTerminated**: Sent when a subscription ends (with reason)
+//!
+//! ### Data Update Notifications (RFC 8641)
+//!
+//! - **YangPushUpdate (push-update)**: Contains a complete snapshot of the
+//!   subscribed datastore subtree. Used for periodic subscriptions and initial
+//!   sync in on-change subscriptions.
+//!
+//! - **YangPushChangeUpdate (push-change-update)**: Contains only the changes
+//!   (delta via YANG Patch) since the last update. Used for on-change
+//!   subscriptions.
+//!
+//!
+//! ### New Envelope Format
+//! ```json
+//! {
+//!   "event-time": "2025-03-04T07:31:36.806Z",
+//!   "hostname": "router1.example.com",
+//!   "sequence-number": 12345,
+//!   "contents": {
+//!     "ietf-yang-push:push-update": {
+//!       "id": 100,
+//!       "datastore-contents": { ... }
+//!     }
+//!   }
+//! }
+//! ```
+//!
+//! ### Legacy Format
+//! ```json
+//! {
+//!   "eventTime": "2025-03-04T07:31:36.806Z",
+//!   "ietf-notification-sequencing:sysName": "router1",
+//!   "ietf-yang-push:push-update": {
+//!     "id": 100,
+//!     "datastore-contents": { ... }
+//!   }
+//! }
+//! ```
 //!
 //! ## Notes:
 //! - `extra_fields` with serde(flatten) annotations is used for handling
 //!   additional fields to ensure compatibility with YANG augmentations
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use strum_macros::Display;
 
+/// Subscription ID defined as uint32 in [RFC 8639](https://datatracker.ietf.org/doc/html/rfc8639)
 pub type SubscriptionId = u32;
 
 /// Yang-Push Notification Envelope
-/// This is an extensible wrapper for Yang-Push notification messages.
+/// [draft-ietf-netconf-notif-envelope](https://datatracker.ietf.org/doc/draft-ietf-netconf-notif-envelope)
+/// which is an extensible wrapper for Yang-Push notification messages.
+///
+/// Support deserializing -01, -02, -03 versions.
+/// Support serializing content in the -03 version.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct NotificationEnvelope {
@@ -65,7 +242,7 @@ pub struct NotificationEnvelope {
 }
 
 impl NotificationEnvelope {
-    pub fn new(
+    pub const fn new(
         event_time: DateTime<Utc>,
         hostname: Option<String>,
         sequence_number: Option<u32>,
@@ -80,17 +257,35 @@ impl NotificationEnvelope {
             extra_fields,
         }
     }
-    pub fn event_time(&self) -> DateTime<Utc> {
+
+    /// The date and time the event was generated by the network node.
+    pub const fn event_time(&self) -> DateTime<Utc> {
         self.event_time
     }
+
+    /// The hostname of the network node.
+    /// This value is usually configured on the node by the administrator to
+    /// identify the node in the network uniquely.
     pub fn hostname(&self) -> Option<&str> {
         self.hostname.as_deref()
     }
-    pub fn sequence_number(&self) -> Option<u32> {
+
+    /// Unique sequence number as described in
+    /// [RFC9187](https://datatracker.ietf.org/doc/html/rfc9187) for each published message.
+    pub const fn sequence_number(&self) -> Option<u32> {
         self.sequence_number
     }
-    pub fn contents(&self) -> Option<&NotificationVariant> {
+
+    /// This contains the values defined by the 'notification' statement
+    /// unchanged.
+    pub const fn contents(&self) -> Option<&NotificationVariant> {
         self.contents.as_ref()
+    }
+
+    /// used for handling additional fields to ensure compatibility with YANG
+    /// augmentations
+    pub const fn extra_fields(&self) -> &Value {
+        &self.extra_fields
     }
 }
 
@@ -113,7 +308,7 @@ pub struct NotificationLegacy {
 }
 
 impl NotificationLegacy {
-    pub fn new(
+    pub const fn new(
         event_time: DateTime<Utc>,
         sys_name: Option<String>,
         notification: Option<NotificationVariant>,
@@ -126,14 +321,20 @@ impl NotificationLegacy {
             extra_fields,
         }
     }
-    pub fn event_time(&self) -> DateTime<Utc> {
+    pub const fn event_time(&self) -> DateTime<Utc> {
         self.event_time
     }
     pub fn sys_name(&self) -> Option<&str> {
         self.sys_name.as_deref()
     }
-    pub fn notification(&self) -> Option<&NotificationVariant> {
+    pub const fn notification(&self) -> Option<&NotificationVariant> {
         self.notification.as_ref()
+    }
+
+    /// used for handling additional fields to ensure compatibility with YANG
+    /// augmentations
+    pub const fn extra_fields(&self) -> &Value {
+        &self.extra_fields
     }
 }
 
@@ -157,7 +358,7 @@ pub enum NotificationVariant {
 }
 
 impl NotificationVariant {
-    pub fn subscription_id(&self) -> SubscriptionId {
+    pub const fn subscription_id(&self) -> SubscriptionId {
         match self {
             NotificationVariant::SubscriptionStarted(sub_started) => sub_started.id(),
             NotificationVariant::SubscriptionModified(sub_modified) => sub_modified.id(),
@@ -208,7 +409,7 @@ pub struct SubscriptionStartedModified {
 
 impl SubscriptionStartedModified {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         id: SubscriptionId,
         target: Target,
         stop_time: Option<DateTime<Utc>>,
@@ -233,32 +434,47 @@ impl SubscriptionStartedModified {
             extra_fields,
         }
     }
-    pub fn id(&self) -> SubscriptionId {
+
+    pub const fn id(&self) -> SubscriptionId {
         self.id
     }
-    pub fn target(&self) -> &Target {
+
+    pub const fn target(&self) -> &Target {
         &self.target
     }
-    pub fn stop_time(&self) -> Option<&DateTime<Utc>> {
+
+    pub const fn stop_time(&self) -> Option<&DateTime<Utc>> {
         self.stop_time.as_ref()
     }
-    pub fn transport(&self) -> Option<&Transport> {
+
+    pub const fn transport(&self) -> Option<&Transport> {
         self.transport.as_ref()
     }
-    pub fn encoding(&self) -> Option<&Encoding> {
+
+    pub const fn encoding(&self) -> Option<&Encoding> {
         self.encoding.as_ref()
     }
+
     pub fn purpose(&self) -> Option<&str> {
         self.purpose.as_deref()
     }
-    pub fn update_trigger(&self) -> Option<&UpdateTrigger> {
+
+    pub const fn update_trigger(&self) -> Option<&UpdateTrigger> {
         self.update_trigger.as_ref()
     }
-    pub fn module_version(&self) -> Option<&Vec<YangPushModuleVersion>> {
+
+    pub const fn module_version(&self) -> Option<&Vec<YangPushModuleVersion>> {
         self.module_version.as_ref()
     }
+
     pub fn yang_library_content_id(&self) -> Option<&str> {
         self.yang_library_content_id.as_deref()
+    }
+
+    /// used for handling additional fields to ensure compatibility with YANG
+    /// augmentations
+    pub const fn extra_fields(&self) -> &Value {
+        &self.extra_fields
     }
 }
 
@@ -273,21 +489,29 @@ pub struct SubscriptionTerminated {
 }
 
 impl SubscriptionTerminated {
-    pub fn new(id: SubscriptionId, reason: String, extra_fields: Value) -> Self {
+    pub const fn new(id: SubscriptionId, reason: String, extra_fields: Value) -> Self {
         Self {
             id,
             reason,
             extra_fields,
         }
     }
-    pub fn id(&self) -> SubscriptionId {
+
+    pub const fn id(&self) -> SubscriptionId {
         self.id
     }
+
     pub fn reason(&self) -> &str {
         &self.reason
     }
+
+    pub const fn extra_fields(&self) -> &Value {
+        &self.extra_fields
+    }
 }
 
+/// Contains a complete snapshot of the subscribed datastore subtree.
+/// Used for periodic subscriptions and initial sync in on-change subscriptions.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct YangPushUpdate {
@@ -300,18 +524,27 @@ pub struct YangPushUpdate {
 }
 
 impl YangPushUpdate {
-    pub fn new(id: SubscriptionId, datastore_contents: Value, extra_fields: Value) -> Self {
+    pub const fn new(id: SubscriptionId, datastore_contents: Value, extra_fields: Value) -> Self {
         Self {
             id,
             datastore_contents,
             extra_fields,
         }
     }
-    pub fn id(&self) -> SubscriptionId {
+
+    pub const fn id(&self) -> SubscriptionId {
         self.id
+    }
+
+    /// used for handling additional fields to ensure compatibility with YANG
+    /// augmentations
+    pub const fn extra_fields(&self) -> &Value {
+        &self.extra_fields
     }
 }
 
+/// Contains only the changes (delta via YANG Patch) since the last update. Used
+/// for on-change subscriptions.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct YangPushChangeUpdate {
@@ -324,15 +557,22 @@ pub struct YangPushChangeUpdate {
 }
 
 impl YangPushChangeUpdate {
-    pub fn new(id: SubscriptionId, datastore_changes: Value, extra_fields: Value) -> Self {
+    pub const fn new(id: SubscriptionId, datastore_changes: Value, extra_fields: Value) -> Self {
         Self {
             id,
             datastore_changes,
             extra_fields,
         }
     }
-    pub fn id(&self) -> SubscriptionId {
+
+    pub const fn id(&self) -> SubscriptionId {
         self.id
+    }
+
+    /// used for handling additional fields to ensure compatibility with YANG
+    /// augmentations
+    pub const fn extra_fields(&self) -> &Value {
+        &self.extra_fields
     }
 }
 
@@ -368,7 +608,7 @@ pub struct Target {
 }
 
 impl Target {
-    pub fn new(
+    pub const fn new(
         stream: Option<String>,
         stream_subtree_filter: Option<Value>,
         stream_xpath_filter: Option<String>,
@@ -390,19 +630,19 @@ impl Target {
     pub fn stream(&self) -> Option<&str> {
         self.stream.as_deref()
     }
-    pub fn stream_subtree_filter(&self) -> Option<&Value> {
+    pub const fn stream_subtree_filter(&self) -> Option<&Value> {
         self.stream_subtree_filter.as_ref()
     }
     pub fn stream_xpath_filter(&self) -> Option<&str> {
         self.stream_xpath_filter.as_deref()
     }
-    pub fn replay_start_time(&self) -> Option<&DateTime<Utc>> {
+    pub const fn replay_start_time(&self) -> Option<&DateTime<Utc>> {
         self.replay_start_time.as_ref()
     }
     pub fn datastore(&self) -> Option<&str> {
         self.datastore.as_deref()
     }
-    pub fn datastore_subtree_filter(&self) -> Option<&Value> {
+    pub const fn datastore_subtree_filter(&self) -> Option<&Value> {
         self.datastore_subtree_filter.as_ref()
     }
     pub fn datastore_xpath_filter(&self) -> Option<&str> {
@@ -411,12 +651,16 @@ impl Target {
 }
 
 /// Transport protocol used to deliver the notification message to the data
-/// collection
+/// collection.
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Transport {
+    /// UDP-based notification transport
+    /// [ietf-udp-notif-transport](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif)
     #[serde(rename = "ietf-udp-notif-transport:udp-notif")]
     UDPNotif,
 
+    /// HTTPS-based notification transport
+    /// [draft-ietf-netconf-https-notif](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-https-notif)
     #[serde(rename = "ietf-https-notif:https")]
     HTTPSNotif,
 
@@ -426,7 +670,7 @@ pub enum Transport {
     Unknown,
 }
 
-// Encoding used for the notification payload
+/// Encoding used for the notification payload
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Encoding {
     #[serde(rename = "ietf-subscribed-notifications:encode-xml")]
@@ -447,6 +691,23 @@ pub enum Encoding {
     Unknown,
 }
 
+/// Update Trigger
+/// ```text
+/// UpdateTrigger
+/// ├── Periodic
+/// │   ├── period: CentiSeconds (update interval in 1/100 seconds)
+/// │   └── anchor-time: DateTime (optional reference time)
+/// │
+/// └── OnChange
+///     ├── dampening-period: CentiSeconds (minimum time between updates)
+///     ├── sync-on-start: bool (send initial snapshot)
+///     └── excluded-change: Vec<ChangeType> (filter change types)
+///         ├── Create
+///         ├── Delete
+///         ├── Insert
+///         ├── Move
+///         └── Replace
+/// ```
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum UpdateTrigger {
     #[serde(rename = "ietf-yang-push:periodic")]
@@ -483,6 +744,13 @@ pub enum ChangeType {
     Replace,
 }
 
+/// Module Versioning (draft-ietf-netconf-yang-notifications-versioning)
+///
+/// The `YangPushModuleVersion` structure provides information about YANG
+/// modules:
+/// - `name`: Module name
+/// - `revision`: Module revision date (e.g., "2025-04-25")
+/// - `version`: Semantic version label
 #[derive(Default, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct YangPushModuleVersion {
@@ -502,15 +770,15 @@ pub struct YangPushModuleVersion {
 }
 
 impl YangPushModuleVersion {
-    pub fn new(name: String, revision: Option<String>, version: Option<String>) -> Self {
+    pub const fn new(name: String, revision: Option<String>, version: Option<String>) -> Self {
         Self {
             name,
             revision,
             version,
         }
     }
-    pub fn name(&self) -> &str {
-        &self.name
+    pub const fn name(&self) -> &str {
+        self.name.as_str()
     }
     pub fn revision(&self) -> Option<&str> {
         self.revision.as_deref()
@@ -524,13 +792,15 @@ impl YangPushModuleVersion {
 pub struct CentiSeconds(u32);
 
 impl CentiSeconds {
-    pub fn new(value: u32) -> Self {
+    pub const fn new(value: u32) -> Self {
         CentiSeconds(value)
     }
-    pub fn as_u32(&self) -> u32 {
+
+    pub const fn as_u32(&self) -> u32 {
         self.0
     }
-    pub fn to_milliseconds(&self) -> u32 {
+
+    pub const fn to_milliseconds(&self) -> u32 {
         self.0 * 10
     }
 }

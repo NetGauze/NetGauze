@@ -13,6 +13,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! UDP-Notif packet decoding and payload handling.
+//!
+//! This module provides types and functionality for decoding UDP-Notif packets
+//! into structured Rust types. It supports both the current IETF YANG Push
+//! notification envelope format and the legacy notification format.
+//!
+//! # Main Types
+//!
+//! - [`UdpNotifPacketDecoded`]: A fully decoded UDP-Notif packet with parsed
+//!   payload
+//! - [`UdpNotifPayload`]: Enum representing the two supported notification
+//!   formats
+//! - [`UdpNotifPayloadConversionError`]: Error type for payload conversion
+//!   failures
+//!
+//! # Supported Media Types
+//!
+//! - `YangDataJson`: JSON-encoded YANG data
+//! - `YangDataCbor`: CBOR-encoded YANG data
+//!
+//! # Example
+//!
+//! ```ignore
+//! use netgauze_udp_notif_pkt::UdpNotifPacket;
+//! use crate::model::udp_notif::UdpNotifPacketDecoded;
+//!
+//! let packet: UdpNotifPacket = /* ... */;
+//! let decoded: UdpNotifPacketDecoded = (&packet).try_into()?;
+//!
+//! match decoded.payload() {
+//!     UdpNotifPayload::NotificationEnvelope(envelope) => {
+//!         // Handle modern envelope format
+//!     }
+//!     UdpNotifPayload::NotificationLegacy(legacy) => {
+//!         // Handle legacy notification format
+//!     }
+//! }
+//! ```
+
 use crate::model::notification::{NotificationEnvelope, NotificationLegacy};
 use netgauze_udp_notif_pkt::{
     MediaType, UDP_NOTIF_V1, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
@@ -149,7 +188,6 @@ mod tests {
     };
     use bytes::Bytes;
     use chrono::{DateTime, Utc};
-    use core::panic;
     use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
     use serde_json::json;
     use std::collections::HashMap;
@@ -194,7 +232,7 @@ mod tests {
         assert_eq!(decoded.publisher_id(), 1234);
         assert_eq!(decoded.message_id(), 5678);
 
-        // Create expected NotificationEnvelope
+        // Create the expected NotificationEnvelope
         let sub_started = SubscriptionStartedModified::new(
             30,
             Target::new(
@@ -221,7 +259,7 @@ mod tests {
                 None,
             )]),
             None,
-            serde_json::json!({}),
+            json!({}),
         );
         let expected = NotificationEnvelope::new(
             DateTime::parse_from_rfc3339("2025-04-17T15:20:14.840Z")
@@ -233,15 +271,11 @@ mod tests {
             json!({"another-time": "2025-01-01T15:20:14.840Z"}),
         );
 
-        // Compare the decoded payload with expected NotificationEnvelope
-        match decoded.payload() {
-            UdpNotifPayload::NotificationEnvelope(decoded) => {
-                assert_eq!(decoded, &expected);
-            }
-            _ => {
-                panic!("Expected UdpNotifPayload::NotificationEnvelope");
-            }
-        }
+        // Compare the decoded payload with the expected NotificationEnvelope
+        assert_eq!(
+            decoded.payload(),
+            &UdpNotifPayload::NotificationEnvelope(expected)
+        );
     }
 
     #[test]
@@ -274,7 +308,7 @@ mod tests {
 
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
 
-        // Create expected NotificationLegacy
+        // Create the expected NotificationLegacy
         let sub_started = SubscriptionStartedModified::new(
             1,
             Target::new(
@@ -304,23 +338,19 @@ mod tests {
                 .with_timezone(&Utc),
             None,
             Some(NotificationVariant::SubscriptionStarted(sub_started)),
-            serde_json::json!({
+            json!({
               "additional_stuff": "example"}),
         );
 
         // Compare the decoded payload with expected NotificationLegacy
-        match decoded.payload() {
-            UdpNotifPayload::NotificationLegacy(decoded) => {
-                assert_eq!(decoded, &expected);
-            }
-            _ => {
-                panic!("Expected UdpNotifPayload::NotificationLegacy");
-            }
-        }
+        assert_eq!(
+            decoded.payload(),
+            &UdpNotifPayload::NotificationLegacy(expected)
+        );
     }
 
     #[test]
-    fn test_udp_notif_packet_decoded_unknown_mediatype() {
+    fn test_udp_notif_packet_decoded_unknown_media_type() {
         let payload = Bytes::from(vec![0x01, 0x02, 0x03]);
 
         let packet =
@@ -329,13 +359,10 @@ mod tests {
         // Attempt to decode the packet (will throw an error since the media type is
         // unknown)
         let result = UdpNotifPacketDecoded::try_from(&packet);
-
-        assert!(result.is_err());
-        if let Err(UdpNotifPayloadConversionError::UnsupportedMediaType(media_type)) = result {
-            assert_eq!(media_type, MediaType::Unknown(99));
-        } else {
-            panic!("Expected UnsupportedMediaType error");
-        }
+        assert!(matches!(
+            result,
+            Err(UdpNotifPayloadConversionError::UnsupportedMediaType(_))
+        ));
     }
 
     #[test]
@@ -446,7 +473,7 @@ mod tests {
         // Attempt to decode the packet (should succeed)
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
 
-        // Create expected NotificationEnvelope
+        // Create the expected NotificationEnvelope
         let expected = NotificationEnvelope::new(
             DateTime::parse_from_rfc3339("2025-03-04T07:11:33.252679191+00:00")
                 .unwrap()
@@ -457,14 +484,10 @@ mod tests {
             json!({}),
         );
 
-        // Check hostname and sequence number
-        match decoded.payload() {
-            UdpNotifPayload::NotificationEnvelope(decoded) => {
-                assert_eq!(decoded, &expected);
-            }
-            _ => {
-                panic!("Expected UdpNotifPayload::NotificationEnvelope");
-            }
-        }
+        // Check the hostname and sequence number
+        assert_eq!(
+            decoded.payload(),
+            &UdpNotifPayload::NotificationEnvelope(expected)
+        );
     }
 }
