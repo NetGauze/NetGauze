@@ -57,10 +57,10 @@ pub struct TelemetryMessageWrapper {
 }
 
 impl TelemetryMessageWrapper {
-    pub fn new(message: TelemetryMessage) -> Self {
+    pub const fn new(message: TelemetryMessage) -> Self {
         Self { message }
     }
-    pub fn message(&self) -> &TelemetryMessage {
+    pub const fn message(&self) -> &TelemetryMessage {
         &self.message
     }
 }
@@ -85,7 +85,7 @@ pub struct TelemetryMessage {
 }
 
 impl TelemetryMessage {
-    pub fn new(
+    pub const fn new(
         network_node_manifest: Option<Manifest>,
         telemetry_message_metadata: TelemetryMessageMetadata,
         data_collection_manifest: Option<Manifest>,
@@ -100,19 +100,19 @@ impl TelemetryMessage {
             payload,
         }
     }
-    pub fn network_node_manifest(&self) -> Option<&Manifest> {
+    pub const fn network_node_manifest(&self) -> Option<&Manifest> {
         self.network_node_manifest.as_ref()
     }
-    pub fn data_collection_manifest(&self) -> Option<&Manifest> {
+    pub const fn data_collection_manifest(&self) -> Option<&Manifest> {
         self.data_collection_manifest.as_ref()
     }
-    pub fn telemetry_message_metadata(&self) -> &TelemetryMessageMetadata {
+    pub const fn telemetry_message_metadata(&self) -> &TelemetryMessageMetadata {
         &self.telemetry_message_metadata
     }
-    pub fn network_operator_metadata(&self) -> Option<&NetworkOperatorMetadata> {
+    pub const fn network_operator_metadata(&self) -> Option<&NetworkOperatorMetadata> {
         self.network_operator_metadata.as_ref()
     }
-    pub fn payload(&self) -> Option<&Value> {
+    pub const fn payload(&self) -> Option<&Value> {
         self.payload.as_ref()
     }
 }
@@ -162,7 +162,7 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    pub fn new(
+    pub const fn new(
         name: Option<String>,
         vendor: Option<String>,
         vendor_pen: Option<u32>,
@@ -212,7 +212,7 @@ pub struct TelemetryMessageMetadata {
 
 impl TelemetryMessageMetadata {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         node_export_timestamp: Option<DateTime<Utc>>,
         collection_timestamp: DateTime<Utc>,
         session_protocol: SessionProtocol,
@@ -233,28 +233,28 @@ impl TelemetryMessageMetadata {
             yang_push_subscription,
         }
     }
-    pub fn node_export_timestamp(&self) -> Option<DateTime<Utc>> {
+    pub const fn node_export_timestamp(&self) -> Option<DateTime<Utc>> {
         self.node_export_timestamp
     }
-    pub fn collection_timestamp(&self) -> DateTime<Utc> {
+    pub const fn collection_timestamp(&self) -> DateTime<Utc> {
         self.collection_timestamp
     }
-    pub fn session_protocol(&self) -> &SessionProtocol {
+    pub const fn session_protocol(&self) -> &SessionProtocol {
         &self.session_protocol
     }
-    pub fn export_address(&self) -> IpAddr {
+    pub const fn export_address(&self) -> IpAddr {
         self.export_address
     }
-    pub fn export_port(&self) -> Option<u16> {
+    pub const fn export_port(&self) -> Option<u16> {
         self.export_port
     }
-    pub fn collection_address(&self) -> Option<IpAddr> {
+    pub const fn collection_address(&self) -> Option<IpAddr> {
         self.collection_address
     }
-    pub fn collection_port(&self) -> Option<u16> {
+    pub const fn collection_port(&self) -> Option<u16> {
         self.collection_port
     }
-    pub fn yang_push_subscription(&self) -> Option<&YangPushSubscriptionMetadata> {
+    pub const fn yang_push_subscription(&self) -> Option<&YangPushSubscriptionMetadata> {
         self.yang_push_subscription.as_ref()
     }
 }
@@ -291,7 +291,7 @@ pub struct YangPushSubscriptionMetadata {
 
 impl YangPushSubscriptionMetadata {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         id: Option<SubscriptionId>,
         filter_spec: FilterSpec,
         stop_time: Option<DateTime<Utc>>,
@@ -314,25 +314,25 @@ impl YangPushSubscriptionMetadata {
             yang_library_content_id,
         }
     }
-    pub fn id(&self) -> Option<SubscriptionId> {
+    pub const fn id(&self) -> Option<SubscriptionId> {
         self.id
     }
-    pub fn filter_spec(&self) -> &FilterSpec {
+    pub const fn filter_spec(&self) -> &FilterSpec {
         &self.filter_spec
     }
-    pub fn stop_time(&self) -> Option<DateTime<Utc>> {
+    pub const fn stop_time(&self) -> Option<DateTime<Utc>> {
         self.stop_time
     }
-    pub fn transport(&self) -> Option<&Transport> {
+    pub const fn transport(&self) -> Option<&Transport> {
         self.transport.as_ref()
     }
-    pub fn encoding(&self) -> Option<&Encoding> {
+    pub const fn encoding(&self) -> Option<&Encoding> {
         self.encoding.as_ref()
     }
     pub fn purpose(&self) -> Option<&str> {
         self.purpose.as_deref()
     }
-    pub fn update_trigger(&self) -> Option<&UpdateTrigger> {
+    pub const fn update_trigger(&self) -> Option<&UpdateTrigger> {
         self.update_trigger.as_ref()
     }
     pub fn module(&self) -> &[YangPushModuleVersion] {
@@ -360,7 +360,7 @@ pub struct FilterSpec {
 }
 
 impl FilterSpec {
-    pub fn new(
+    pub const fn new(
         stream: Option<String>,
         datastore: Option<String>,
         xpath_filter: Option<String>,
@@ -382,7 +382,7 @@ impl FilterSpec {
     pub fn xpath_filter(&self) -> Option<&str> {
         self.xpath_filter.as_deref()
     }
-    pub fn subtree_filter(&self) -> Option<&Value> {
+    pub const fn subtree_filter(&self) -> Option<&Value> {
         self.subtree_filter.as_ref()
     }
 }
@@ -414,6 +414,7 @@ pub enum UpdateTrigger {
         excluded_change: Option<Vec<ChangeType>>,
     },
 }
+
 impl From<crate::model::notification::UpdateTrigger> for UpdateTrigger {
     fn from(trigger: crate::model::notification::UpdateTrigger) -> Self {
         match trigger {
@@ -445,7 +446,7 @@ pub struct NetworkOperatorMetadata {
 }
 
 impl NetworkOperatorMetadata {
-    pub fn new(labels: Vec<Label>) -> Self {
+    pub const fn new(labels: Vec<Label>) -> Self {
         Self { labels }
     }
     pub fn labels(&self) -> &[Label] {
@@ -462,13 +463,15 @@ pub struct Label {
 }
 
 impl Label {
-    pub fn new(name: String, value: LabelValue) -> Self {
+    pub const fn new(name: String, value: LabelValue) -> Self {
         Self { name, value }
     }
-    pub fn name(&self) -> &str {
-        &self.name
+
+    pub const fn name(&self) -> &str {
+        self.name.as_str()
     }
-    pub fn value(&self) -> &LabelValue {
+
+    pub const fn value(&self) -> &LabelValue {
         &self.value
     }
 }
@@ -487,13 +490,13 @@ pub enum LabelValue {
 }
 
 impl LabelValue {
-    pub fn as_string(&self) -> Option<&str> {
+    pub const fn as_string(&self) -> Option<&str> {
         match self {
             LabelValue::StringValue { string_value } => Some(string_value.as_str()),
             _ => None,
         }
     }
-    pub fn as_anydata(&self) -> Option<&Value> {
+    pub const fn as_anydata(&self) -> Option<&Value> {
         match self {
             LabelValue::AnydataValue { anydata_values } => Some(anydata_values),
             _ => None,
