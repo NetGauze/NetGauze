@@ -13,14 +13,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use netgauze_collector::flow::enrichment::{
     EnrichmentActor, EnrichmentCache, EnrichmentOperation, EnrichmentStats, Scope, UpsertPayload,
 };
 use netgauze_flow_pkt::{
-    ie::{netgauze, Field},
-    ipfix::{DataRecord, IpfixPacket, Set},
     DataSetId,
+    ie::{Field, netgauze},
+    ipfix::{DataRecord, IpfixPacket, Set},
 };
 use std::{hint::black_box, net::IpAddr};
 use tokio::sync::mpsc;
