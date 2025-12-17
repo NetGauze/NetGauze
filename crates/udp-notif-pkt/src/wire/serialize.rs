@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{MediaTypeNames, UdpNotifOption, UdpNotifPacket};
+use crate::raw::{MediaTypeNames, UdpNotifOption, UdpNotifPacket};
 use byteorder::{NetworkEndian, WriteBytesExt};
 use netgauze_parse_utils::WritablePdu;
 use netgauze_serde_macros::WritingError;
@@ -80,16 +80,16 @@ impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
                 .values()
                 .map(UdpNotifOption::len)
                 .sum::<usize>()
-            + self.payload.len()
+            + self.payload().len()
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), UdpNotifPacketWritingError> {
         let version: u8 = 0x01;
         let mut first_byte: u8 = version << 5;
-        if MediaTypeNames::from(self.media_type) == MediaTypeNames::Unknown {
+        if MediaTypeNames::from(self.media_type()) == MediaTypeNames::Unknown {
             first_byte |= 0x10;
         }
-        let mt: u8 = self.media_type.into();
+        let mt: u8 = self.media_type().into();
         first_byte |= mt;
         writer.write_u8(first_byte)?;
         let header_len = 12
@@ -114,7 +114,7 @@ impl WritablePdu<UdpNotifPacketWritingError> for UdpNotifPacket {
         for option in self.options() {
             option.1.write(writer)?;
         }
-        writer.write_all(self.payload())?;
+        writer.write_all(&self.payload())?;
         Ok(())
     }
 }

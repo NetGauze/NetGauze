@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::MediaType;
 use crate::codec::UdpPacketCodec;
+use crate::raw::MediaType;
 use bytes::{Buf, BytesMut};
 use netgauze_pcap_reader::{PcapIter, TransportProtocol};
 use pcap_parser::LegacyPcapReader;
@@ -100,9 +100,9 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                     let mut udp_notif_value = serde_json::to_value(&msg)
                         .expect("Couldn't serialize UDP-Notif message to json");
                     // Convert when possible inner payload into human-readable format
-                    match msg.media_type {
+                    match msg.media_type() {
                         MediaType::YangDataJson => {
-                            match serde_json::from_slice(msg.payload()) {
+                            match serde_json::from_slice(&msg.payload()) {
                                 Ok(payload) => {
                                     if let Value::Object(val) = &mut udp_notif_value {
                                         val.insert("payload".to_string(), payload);
@@ -115,7 +115,7 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                                         .collect::<Vec<String>>()
                                         .join(" ");
                                     let payload_hexdump = msg
-                                        .payload
+                                        .payload()
                                         .iter()
                                         .map(|byte| format!("{byte:02x}"))
                                         .collect::<Vec<String>>()
@@ -135,7 +135,8 @@ fn test_udp_notif_pcap(overwrite: bool, pcap_path: PathBuf) {
                             };
                         }
                         MediaType::YangDataXml => {
-                            let payload = std::str::from_utf8(msg.payload())
+                            let payload = msg.payload();
+                            let payload = std::str::from_utf8(&payload)
                                 .expect("Couldn't deserialize XML payload into an UTF-8 string");
                             if let Value::Object(val) = &mut udp_notif_value {
                                 val.insert(

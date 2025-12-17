@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::raw::{UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use crate::wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError};
 use crate::wire::serialize::UdpNotifPacketWritingError;
-use crate::{UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePdu, Span, WritablePdu};
@@ -80,7 +80,7 @@ impl ReassemblyBuffer {
             return Err(ReassemblyBufferError::IncorrectSegments);
         }
         let (_, first_segment) = self.segments.pop_first().unwrap();
-        let mut assembled_payload = BytesMut::from(first_segment.payload);
+        let mut assembled_payload = BytesMut::from(first_segment.payload());
         let mut options = HashMap::new();
         self.segments.into_iter().for_each(|(_, pkt)| {
             for (k, opt) in pkt.options() {
@@ -88,12 +88,12 @@ impl ReassemblyBuffer {
                     options.insert(k.clone(), opt.clone());
                 }
             }
-            assembled_payload.unsplit(BytesMut::from(pkt.payload))
+            assembled_payload.unsplit(BytesMut::from(pkt.payload()))
         });
         Ok(UdpNotifPacket::new(
-            first_segment.media_type,
-            first_segment.publisher_id,
-            first_segment.message_id,
+            first_segment.media_type(),
+            first_segment.publisher_id(),
+            first_segment.message_id(),
             options,
             assembled_payload.freeze(),
         ))
@@ -280,7 +280,7 @@ impl Encoder<UdpNotifPacket> for UdpPacketCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MediaType;
+    use crate::raw::MediaType;
     use bytes::Bytes;
     #[test]
     fn test_decode() {
@@ -338,7 +338,7 @@ mod tests {
             0x00, 0x14, // Message length
             0x01, 0x00, 0x00, 0x01, // Publisher ID
             0x02, 0x00, 0x00, 0x02, // Message ID
-            0x01, 0x04, 0x00, 0x00, // segment 0, not last segment
+            0x01, 0x04, 0x00, 0x00, // segment 0, not the last segment
             0xff, 0xff, 0xff, 0xff, // dummy payload
         ];
         let value_wire2: Vec<u8> = vec![
@@ -367,8 +367,8 @@ mod tests {
                 HashMap::new(),
                 Bytes::from(
                     &[
-                        0xff, 0xff, 0xff, 0xff, // payload from first segment
-                        0xee, 0xee, 0xee, 0xee, // payload from second segment
+                        0xff, 0xff, 0xff, 0xff, // payload from the first segment
+                        0xee, 0xee, 0xee, 0xee, // payload from the second segment
                         0xdd, 0xdd, 0xdd, 0xdd,
                     ][..]
                 ),
@@ -395,7 +395,7 @@ mod tests {
             0x00, 0x14, // Message length
             0x01, 0x00, 0x00, 0x01, // Publisher ID
             0x02, 0x00, 0x00, 0x02, // Message ID
-            0x01, 0x04, 0x00, 0x00, // segment 0, not last segment
+            0x01, 0x04, 0x00, 0x00, // segment 0, not the last segment
             0xff, 0xff, 0xff, 0xff, // dummy payload
         ];
 
@@ -416,8 +416,8 @@ mod tests {
                 HashMap::new(),
                 Bytes::from(
                     &[
-                        0xff, 0xff, 0xff, 0xff, // payload from first segment
-                        0xee, 0xee, 0xee, 0xee, // payload from second segment
+                        0xff, 0xff, 0xff, 0xff, // payload from the first segment
+                        0xee, 0xee, 0xee, 0xee, // payload from the second segment
                         0xdd, 0xdd, 0xdd, 0xdd,
                     ][..]
                 ),

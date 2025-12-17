@@ -24,12 +24,12 @@ use yang3::context::{Context, ContextFlags};
 use yang3::data::{DataFormat, DataOperation, DataTree};
 use {anyhow, async_channel};
 
-use netgauze_udp_notif_pkt::UdpNotifPacket;
+use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
 
-use crate::model::notification::SubscriptionId;
-use crate::model::udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload};
 use crate::schema_cache::{SchemaInfo, SchemaRequest};
 use crate::{ContentId, CustomSchema};
+use netgauze_udp_notif_pkt::decoded::{UdpNotifPacketDecoded, UdpNotifPayload};
+use netgauze_udp_notif_pkt::notification::SubscriptionId;
 
 // Cache for YangPush subscriptions
 type PeerCache = HashMap<Peer, ContentId>;
@@ -573,7 +573,7 @@ mod tests {
 
     use super::*;
     use bytes::Bytes;
-    use netgauze_udp_notif_pkt::MediaType;
+    use netgauze_udp_notif_pkt::raw::MediaType;
     use serde_json::json;
 
     fn create_actor() -> ValidationActor {

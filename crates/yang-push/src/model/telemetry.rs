@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::IpAddr;
 
-use crate::model::notification::{
+use netgauze_udp_notif_pkt::notification::{
     CentiSeconds, ChangeType, Encoding, SubscriptionId, Transport, YangPushModuleVersion,
 };
 
@@ -415,17 +415,17 @@ pub enum UpdateTrigger {
     },
 }
 
-impl From<crate::model::notification::UpdateTrigger> for UpdateTrigger {
-    fn from(trigger: crate::model::notification::UpdateTrigger) -> Self {
+impl From<netgauze_udp_notif_pkt::notification::UpdateTrigger> for UpdateTrigger {
+    fn from(trigger: netgauze_udp_notif_pkt::notification::UpdateTrigger) -> Self {
         match trigger {
-            crate::model::notification::UpdateTrigger::Periodic {
+            netgauze_udp_notif_pkt::notification::UpdateTrigger::Periodic {
                 period,
                 anchor_time,
             } => UpdateTrigger::Periodic {
                 period,
                 anchor_time,
             },
-            crate::model::notification::UpdateTrigger::OnChange {
+            netgauze_udp_notif_pkt::notification::UpdateTrigger::OnChange {
                 dampening_period,
                 sync_on_start,
                 excluded_change,
@@ -507,8 +507,8 @@ impl LabelValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::notification::CentiSeconds;
     use chrono::{TimeZone, Utc};
+    use netgauze_udp_notif_pkt::notification::CentiSeconds;
     use serde_json;
     use std::vec;
 

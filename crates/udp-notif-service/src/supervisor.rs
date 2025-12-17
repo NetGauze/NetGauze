@@ -495,7 +495,7 @@ mod test {
     use super::*;
     use bytes::{Buf, Bytes, BytesMut};
     use netgauze_parse_utils::WritablePdu;
-    use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
+    use netgauze_udp_notif_pkt::raw::{MediaType, UdpNotifPacket};
     use std::io::Cursor;
     use tokio::net::UdpSocket;
     use tokio::time::{Duration, timeout};

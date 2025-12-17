@@ -30,7 +30,7 @@ use futures_util::stream::FuturesUnordered;
 use netgauze_flow_pkt::FlowInfo;
 use netgauze_flow_service::FlowRequest;
 use netgauze_flow_service::flow_supervisor::FlowCollectorsSupervisorActorHandle;
-use netgauze_udp_notif_pkt::MediaType;
+use netgauze_udp_notif_pkt::raw::MediaType;
 use netgauze_udp_notif_service::UdpNotifRequest;
 use netgauze_udp_notif_service::supervisor::UdpNotifSupervisorHandle;
 use netgauze_yang_push::model::telemetry::TelemetryMessageWrapper;
@@ -726,15 +726,16 @@ fn serialize_udp_notif(
             "writer_id".to_string(),
             serde_json::Value::String(writer_id.to_string()),
         );
-        // Convert inner payload into human-readable format when possible
+        // Convert the inner payload into human-readable format when possible
+        let payload = msg.payload();
         match msg.media_type() {
             MediaType::YangDataJson => {
                 // Deserialize the payload into a JSON object
-                let payload = serde_json::from_slice(msg.payload())?;
+                let payload = serde_json::from_slice(&payload)?;
                 val.insert("payload".to_string(), payload);
             }
             MediaType::YangDataXml => {
-                let payload = std::str::from_utf8(msg.payload())?;
+                let payload = std::str::from_utf8(&payload)?;
                 val.insert(
                     "payload".to_string(),
                     serde_json::Value::String(payload.to_string()),
@@ -742,7 +743,7 @@ fn serialize_udp_notif(
             }
             MediaType::YangDataCbor => {
                 let payload: serde_json::Value =
-                    ciborium::de::from_reader(std::io::Cursor::new(msg.payload()))?;
+                    ciborium::de::from_reader(std::io::Cursor::new(payload))?;
                 val.insert("payload".to_string(), payload);
             }
             media_type => {
@@ -805,7 +806,7 @@ fn serialize_flow(
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use netgauze_udp_notif_pkt::UdpNotifPacket;
+    use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
     use std::collections::HashMap;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 

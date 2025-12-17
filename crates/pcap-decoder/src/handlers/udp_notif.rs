@@ -18,7 +18,7 @@ use crate::protocol_handler::{DecodeOutcome, ProtocolHandler};
 use bytes::BytesMut;
 use netgauze_pcap_reader::TransportProtocol;
 use netgauze_udp_notif_pkt::codec::{UdpPacketCodec, UdpPacketCodecError};
-use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
+use netgauze_udp_notif_pkt::raw::{MediaType, UdpNotifPacket};
 use std::collections::HashMap;
 use std::net::IpAddr;
 
@@ -73,14 +73,15 @@ impl ProtocolHandler<UdpNotifPacket, UdpPacketCodec, UdpPacketCodecError>
                 // Convert when possible inner payload into human-readable format
                 match udp_notif_packet.media_type() {
                     MediaType::YangDataJson => {
-                        let payload = serde_json::from_slice(udp_notif_packet.payload())
+                        let payload = serde_json::from_slice(&udp_notif_packet.payload())
                             .expect("Couldn't deserialize JSON payload into a JSON object");
                         if let serde_json::Value::Object(val) = &mut value {
                             val.insert("payload".to_string(), payload);
                         }
                     }
                     MediaType::YangDataXml => {
-                        let payload = std::str::from_utf8(udp_notif_packet.payload())
+                        let payload = udp_notif_packet.payload();
+                        let payload = std::str::from_utf8(&payload)
                             .expect("Couldn't deserialize XML payload into an UTF-8 string");
                         if let serde_json::Value::Object(val) = &mut value {
                             val.insert(

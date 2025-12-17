@@ -10,9 +10,9 @@ readme = "README.md"
 repository = "https://github.com/NetGauze/NetGauze"
 homepage = "https://github.com/NetGauze/NetGauze"
 description = """
-UDP NOTIF packet representation as defind by https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif
+UDP-Notif (draft-ietf-netconf-udp-notif) packet library for YANG Push streaming telemetry. Provides zero-copy wire format handling, automatic JSON/CBOR deserialization, and type-safe access to RFC 8639/8641 subscription notifications.
 """
-keywords = ["udp-notif", "netconf", "yang", "parser", "protocol"]
+keywords = ["udp-notif", "netconf", "yang", "yang-push", "parser", "protocol"]
 categories = ["network-programming", "parsing"]
 
 
