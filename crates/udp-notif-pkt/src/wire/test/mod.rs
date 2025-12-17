@@ -13,9 +13,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::raw::{MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use crate::wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError};
 use crate::wire::serialize::UdpNotifPacketWritingError;
-use crate::{MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use bytes::Bytes;
 use netgauze_parse_utils::Span;
 use netgauze_parse_utils::test_helpers::{

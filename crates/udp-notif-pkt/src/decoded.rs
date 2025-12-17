@@ -15,9 +15,10 @@
 
 //! UDP-Notif packet decoding and payload handling.
 //!
-//! This module provides types and functionality for decoding UDP-Notif packets
-//! into structured Rust types. It supports both the current IETF YANG Push
-//! notification envelope format and the legacy notification format.
+//! This module provides types and functionality for decoding [crate::raw]
+//! UDP-Notif packets into structured Rust types. It supports both the current
+//! IETF YANG Push notification envelope format and the legacy notification
+//! format.
 //!
 //! # Main Types
 //!
@@ -28,7 +29,7 @@
 //! - [`UdpNotifPayloadConversionError`]: Error type for payload conversion
 //!   failures
 //!
-//! # Supported Media Types
+//! # Supported Media Types (all other media types will result in an error)
 //!
 //! - `YangDataJson`: JSON-encoded YANG data
 //! - `YangDataCbor`: CBOR-encoded YANG data
@@ -36,8 +37,8 @@
 //! # Example
 //!
 //! ```ignore
-//! use netgauze_udp_notif_pkt::UdpNotifPacket;
-//! use crate::model::udp_notif::UdpNotifPacketDecoded;
+//! use crate::UdpNotifPacket;
+//! use crate::dp_notif::UdpNotifPacketDecoded;
 //!
 //! let packet: UdpNotifPacket = /* ... */;
 //! let decoded: UdpNotifPacketDecoded = (&packet).try_into()?;
@@ -52,10 +53,8 @@
 //! }
 //! ```
 
-use crate::model::notification::{NotificationEnvelope, NotificationLegacy};
-use netgauze_udp_notif_pkt::{
-    MediaType, UDP_NOTIF_V1, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket,
-};
+use crate::notification::{NotificationEnvelope, NotificationLegacy};
+use crate::raw::{MediaType, UDP_NOTIF_V1, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -155,7 +154,7 @@ impl TryFrom<&UdpNotifPacket> for UdpNotifPacketDecoded {
 
     fn try_from(pkt: &UdpNotifPacket) -> Result<Self, UdpNotifPayloadConversionError> {
         let payload = match pkt.media_type() {
-            MediaType::YangDataJson => serde_json::from_slice(pkt.payload())?,
+            MediaType::YangDataJson => serde_json::from_slice(&pkt.payload())?,
             MediaType::YangDataCbor => {
                 let val: Value = ciborium::de::from_reader(std::io::Cursor::new(pkt.payload()))?;
                 serde_json::from_value(val)?
@@ -179,16 +178,13 @@ impl TryFrom<&UdpNotifPacket> for UdpNotifPacketDecoded {
 
 #[cfg(test)]
 mod tests {
-    use crate::model::notification::{
+    use super::*;
+    use crate::notification::{
         Encoding, NotificationEnvelope, NotificationLegacy, NotificationVariant,
         SubscriptionStartedModified, Target, UpdateTrigger, YangPushModuleVersion,
     };
-    use crate::model::udp_notif::{
-        UdpNotifPacketDecoded, UdpNotifPayload, UdpNotifPayloadConversionError,
-    };
     use bytes::Bytes;
     use chrono::{DateTime, Utc};
-    use netgauze_udp_notif_pkt::{MediaType, UdpNotifPacket};
     use serde_json::json;
     use std::collections::HashMap;
 

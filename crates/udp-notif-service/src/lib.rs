@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use netgauze_udp_notif_pkt::UdpNotifPacket;
+use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
 use std::fmt::Display;
 use std::io;
 use std::net::SocketAddr;

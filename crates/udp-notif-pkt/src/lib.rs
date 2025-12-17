@@ -13,156 +13,77 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! # UDP-Notif Packet Library
+//!
+//! This crate provides a complete implementation of
+//! [draft-ietf-netconf-udp-notif](https://datatracker.ietf.org/doc/html/draft-ietf-netconf-udp-notif),
+//! supporting both low-level packet manipulation and high-level decoded
+//! notification handling for YANG-Push telemetry.
+//!
+//! ## Module Overview
+//!
+//! The library is organized into three main layers, each serving a specific
+//! purpose:
+//!
+//! ### [`raw`] - Wire Format Layer
+//!
+//! The foundational layer providing direct access to UDP-Notif packet structure
+//! with unparsed payload bytes. Use this when you need:
+//! - Maximum performance with zero-copy operations
+//! - Custom payload processing
+//! - Protocol-level inspection or manipulation
+//! - Building custom transport layers
+//!
+//! Key types: [`raw::UdpNotifPacket`], [`raw::MediaType`],
+//! [`raw::UdpNotifOption`]
+//!
+//! ### [`decoded`] - Parsed Notification Layer
+//!
+//! Higher-level layer that deserializes JSON/CBOR payloads into structured Rust
+//! types. Use this when you want:
+//! - Type-safe access to notification contents
+//! - Automatic format handling (JSON/CBOR)
+//! - Direct access to subscription metadata
+//!
+//! Key types: [`decoded::UdpNotifPacketDecoded`], [`decoded::UdpNotifPayload`]
+//!
+//! ### [`notification`] - YANG Data Structures
+//!
+//! Domain model layer containing all YANG Push notification types as defined
+//! in:
+//! - [RFC 8639 - Subscription to YANG Notifications](https://datatracker.ietf.org/doc/html/rfc8639)
+//! - [RFC 8641 - Subscription to YANG Notifications for Datastore Updates](https://datatracker.ietf.org/doc/html/rfc8641)
+//!
+//! Key types: [`notification::NotificationEnvelope`],
+//! [`notification::NotificationVariant`], [`notification::YangPushUpdate`]
+//!
+//! ### Optional Features
+//!
+//! - [`codec`] - Tokio codec for async stream processing (requires `codec`
+//!   feature)
+//! - [`wire`] - Serialization/deserialization for UDP-Notif packets from the
+//!   wire (requires `serde` feature)
+//!
+//! ## Performance Considerations
+//!
+//! - [`raw::UdpNotifPacket`] uses `Bytes` for zero-copy payload handling
+//! - Payload deserialization is lazy - only performed when converting to
+//!   [`decoded::UdpNotifPacketDecoded`]
+//! - For high-throughput scenarios, consider processing at the `raw` layer and
+//!   only decoding packets that match your subscription interests
+
 #[cfg(feature = "codec")]
 pub mod codec;
+pub mod decoded;
+pub mod notification;
+pub mod raw;
 #[cfg(feature = "serde")]
 pub mod wire;
 
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use strum_macros::Display;
-
-pub const UDP_NOTIF_V1: u8 = 1;
-
-#[derive(
-    Display,
-    Debug,
-    Copy,
-    Clone,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::EnumDiscriminants,
-)]
-#[strum_discriminants(name(MediaTypeNames))]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum MediaType {
-    Reserved,
-    YangDataJson,
-    YangDataXml,
-    YangDataCbor,
-    Unknown(u8),
-}
-
-impl From<u8> for MediaType {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => MediaType::Reserved,
-            1 => MediaType::YangDataJson,
-            2 => MediaType::YangDataXml,
-            3 => MediaType::YangDataCbor,
-            value => MediaType::Unknown(value),
-        }
-    }
-}
-
-impl From<MediaType> for u8 {
-    fn from(value: MediaType) -> Self {
-        match value {
-            MediaType::Reserved => 0,
-            MediaType::YangDataJson => 1,
-            MediaType::YangDataXml => 2,
-            MediaType::YangDataCbor => 3,
-            MediaType::Unknown(value) => value,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-#[repr(u8)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum UdpNotifOptionCode {
-    Segment = 1,
-    PrivateEncoding = 2,
-    Unknown(u8),
-}
-
-impl From<u8> for UdpNotifOptionCode {
-    fn from(value: u8) -> Self {
-        match value {
-            1 => Self::Segment,
-            2 => Self::PrivateEncoding,
-            v => Self::Unknown(v),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum UdpNotifOption {
-    Segment { number: u16, last: bool },
-    PrivateEncoding(Vec<u8>),
-    Unknown { typ: u8, value: Vec<u8> },
-}
-
-impl UdpNotifOption {
-    pub const fn code(&self) -> UdpNotifOptionCode {
-        match self {
-            Self::Segment { .. } => UdpNotifOptionCode::Segment,
-            Self::PrivateEncoding(_) => UdpNotifOptionCode::PrivateEncoding,
-            Self::Unknown { typ, .. } => UdpNotifOptionCode::Unknown(*typ),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub struct UdpNotifPacket {
-    media_type: MediaType,
-    publisher_id: u32,
-    message_id: u32,
-    options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
-    #[cfg_attr(feature = "fuzz", arbitrary(with = crate::arbitrary_bytes))]
-    payload: Bytes,
-}
-
-impl UdpNotifPacket {
-    pub const fn new(
-        media_type: MediaType,
-        publisher_id: u32,
-        message_id: u32,
-        options: HashMap<UdpNotifOptionCode, UdpNotifOption>,
-        payload: Bytes,
-    ) -> Self {
-        Self {
-            media_type,
-            publisher_id,
-            message_id,
-            options,
-            payload,
-        }
-    }
-
-    pub const fn version(&self) -> u8 {
-        UDP_NOTIF_V1
-    }
-
-    pub const fn media_type(&self) -> MediaType {
-        self.media_type
-    }
-
-    pub const fn publisher_id(&self) -> u32 {
-        self.publisher_id
-    }
-
-    pub const fn message_id(&self) -> u32 {
-        self.message_id
-    }
-
-    pub const fn options(&self) -> &HashMap<UdpNotifOptionCode, UdpNotifOption> {
-        &self.options
-    }
-
-    pub const fn payload(&self) -> &Bytes {
-        &self.payload
-    }
-}
-
 #[cfg(feature = "fuzz")]
-pub(crate) fn arbitrary_bytes(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Bytes> {
+pub(crate) fn arbitrary_bytes(
+    u: &mut arbitrary::Unstructured<'_>,
+) -> arbitrary::Result<bytes::Bytes> {
     let value: Vec<u8> = u.arbitrary()?;
-    Ok(Bytes::from(value))
+    Ok(bytes::Bytes::from(value))
 }

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{MediaType, MediaTypeNames, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
+use crate::raw::{MediaType, MediaTypeNames, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use bytes::Bytes;
 use netgauze_parse_utils::{ReadablePdu, Span, parse_into_located};
 use netgauze_serde_macros::LocatedError;
