@@ -12,8 +12,8 @@
 // implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 use ipnet::IpNet;
+use quick_xml::NsReader;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -24,12 +24,13 @@ use yang3::context::{Context, ContextFlags};
 use yang3::data::{DataFormat, DataOperation, DataTree};
 use {anyhow, async_channel};
 
-use netgauze_udp_notif_pkt::UdpNotifPacket;
-
 use crate::model::notification::SubscriptionId;
 use crate::model::udp_notif::{UdpNotifPacketDecoded, UdpNotifPayload};
-use crate::schema_cache::{SchemaInfo, SchemaRequest};
-use crate::{ContentId, CustomSchema};
+use crate::schema_cache::{ContentId, SchemaInfo, SchemaRequest};
+
+use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlParser};
+use netgauze_netconf_proto::yanglib::YangLibrary;
+use netgauze_udp_notif_pkt::UdpNotifPacket;
 
 // Cache for YangPush subscriptions
 type PeerCache = HashMap<Peer, ContentId>;
@@ -193,7 +194,7 @@ impl ValidationStats {
 struct ValidationActor {
     cmd_rx: mpsc::Receiver<ValidationActorCommand>,
     #[allow(dead_code)] // TODO: use this to pre-populate the subscription cache
-    custom_schemas: HashMap<IpNet, CustomSchema>,
+    custom_schemas: HashMap<IpNet, SchemaInfo>,
     udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
     validated_tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
     #[allow(dead_code)] // TODO: send schema requests
@@ -207,7 +208,7 @@ struct ValidationActor {
 impl ValidationActor {
     fn new(
         cmd_rx: mpsc::Receiver<ValidationActorCommand>,
-        custom_schemas: HashMap<IpNet, CustomSchema>,
+        custom_schemas: HashMap<IpNet, SchemaInfo>,
         udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
         validated_tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
         schema_req_tx: async_channel::Sender<SchemaRequest>,
@@ -326,7 +327,8 @@ impl ValidationActor {
                 envelope
             }
             UdpNotifPayload::NotificationLegacy(_) => {
-                warn!("Received unsupported UDP-Notif payload type: {:?}", payload);
+                //TODO: discuss here what we should do...
+                trace!("Received unsupported UDP-Notif payload type: {:?}", payload);
                 return Ok(Some((subscription_info, decoded)));
             }
         };
@@ -418,9 +420,53 @@ impl ValidationActor {
         };
 
         self.stats.subscription_cache_miss.add(1, &[]);
-        // TODO
-        let content_id: ContentId = "E96CB84D-F02B-4FBF-BE86-3580300CD964".into();
-        match self.create_subscription(peer.clone(), content_id) {
+
+        // Get schema info from custom_schemas based on peer IP
+        let schema_info = self
+            .custom_schemas
+            .iter()
+            .find(|(subnet, _)| subnet.contains(&peer.address.ip()))
+            .map(|(_, schema)| schema)
+            .ok_or_else(|| {
+                error!(
+                    "No schema configuration found for peer IP: {}",
+                    peer.address.ip()
+                );
+                ValidationActorError::PayloadValidationError
+            })?;
+
+        // Get content_id from schema_info, or extract from yanglib if not provided
+        let content_id = match schema_info.content_id() {
+            Some(id) => id.to_string(),
+            None => {
+                // Extract content_id from yanglib file
+                let reader = NsReader::from_file(schema_info.yanglib_path()).map_err(|err| {
+                    error!(
+                        "Failed to read yanglib file {}: {}",
+                        schema_info.yanglib_path(),
+                        err
+                    );
+                    ValidationActorError::PayloadValidationError
+                })?;
+                let mut xml_reader = XmlParser::new(reader).map_err(|err| {
+                    error!("Failed to create XML parser: {}", err);
+                    ValidationActorError::PayloadValidationError
+                })?;
+                let yanglib: YangLibrary =
+                    YangLibrary::xml_deserialize(&mut xml_reader).map_err(|err| {
+                        error!("Failed to deserialize yanglib: {}", err);
+                        ValidationActorError::PayloadValidationError
+                    })?;
+
+                debug!(
+                    "Extracted content_id from yanglib: {}",
+                    yanglib.content_id()
+                );
+                yanglib.content_id().to_string()
+            }
+        };
+
+        match self.create_subscription(peer.clone(), content_id, schema_info.clone()) {
             Ok(subscription) => Ok(subscription),
             Err(err) => {
                 error!(
@@ -473,16 +519,17 @@ impl ValidationActor {
         &mut self,
         peer: Peer,
         content_id: ContentId,
+        schema_info: SchemaInfo,
     ) -> Result<&SubscriptionData, ValidationActorError> {
-        // Initialize context
-        let top_dir = "../../assets/yang/".to_string() + &content_id + "/";
-        let search_dir = top_dir.clone() + "models";
-        let yanglib_path = top_dir.clone() + "yanglib.json";
-        let format = DataFormat::JSON;
+        let search_dir = schema_info.search_dir();
+        let yanglib_path = schema_info.yanglib_path();
+        let format = DataFormat::XML;
+
         debug!(
             "Creating context from Yang Library file: {}, search dir: {}, content ID: {}",
             yanglib_path, search_dir, content_id
         );
+
         let flags = ContextFlags::empty();
         match Context::new_from_yang_library_file(&yanglib_path, format, &search_dir, flags) {
             Ok(context) => {
@@ -527,7 +574,7 @@ pub struct ValidationActorHandle {
 impl ValidationActorHandle {
     pub fn new(
         buffer_size: usize,
-        custom_schemas: HashMap<IpNet, CustomSchema>,
+        custom_schemas: HashMap<IpNet, SchemaInfo>,
         udp_notif_rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
         schema_req_tx: async_channel::Sender<SchemaRequest>,
         schema_resp_rx: async_channel::Receiver<(SchemaRequest, SchemaInfo)>,

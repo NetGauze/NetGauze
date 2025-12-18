@@ -14,7 +14,7 @@ telemetry:
 udp_notif:
   subscriber_timeout: 100
   listeners:
-    - address: 0.0.0.0:10000
+    - address: "[::]:10000"
       workers: 2
 
   publishers:
@@ -38,24 +38,18 @@ udp_notif:
                   enable.auto.commit: "false"
                   auto.offset.reset: earliest
       custom_yang_schemas:
-        192.168.100.0/24:
-          content_id: FANO
-          search_dir: assets/yang/FANO/models
-          yanglib: assets/yang/FANO/yanglib.json
-          schema: assets/yang/FANO/supplied-schema.json
-        10.10.10.1/24:
-          content_id: E96CB84D-F02B-4FBF-BE86-3580300CD964
-          search_dir: assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/models
-          yanglib: assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/yanglib.json
-          schema: assets/yang/E96CB84D-F02B-4FBF-BE86-3580300CD964/supplied-schema.json
+        "::/0":
+          content_id: ietf-telemetry-message-FANO-19-SUB-53
+          yanglib_path: assets/yang/ietf-telemetry-message-FANO-19-SUB-53/extended-schemas/yanglib.xml
+          search_dir: assets/yang/ietf-telemetry-message-FANO-19-SUB-53/extended-schemas
       endpoints:
-        json-endpoint: !TelemetryKafkaJson
-          topic: telemetry-message-json
-          producer_config:
-            bootstrap.servers: localhost:49092
-            message.timeout.ms: "60000"
-            queue.buffering.max.messages: "1000"
-          writer_id: coll-netgauze-telemetry-json
+        # json-endpoint: !TelemetryKafkaJson
+        #   topic: telemetry-message-json
+        #   producer_config:
+        #     bootstrap.servers: localhost:49092
+        #     message.timeout.ms: "60000"
+        #     queue.buffering.max.messages: "1000"
+        #   writer_id: coll-netgauze-telemetry-json
         yang-endpoint: !TelemetryKafkaYang
           topic: telemetry-message-yang
           schema_registry_url: http://localhost:48081
@@ -65,4 +59,9 @@ udp_notif:
             queue.buffering.max.messages: "1000"
           writer_id: coll-netgauze-telemetry-yang
           yang_converter:
-            root_schema: "assets/yang/yang-push-telemetry-message/supplied-schema.json"
+            subject_prefix: daisy.dev
+            root_schema_name: ietf-telemetry-message
+            root_schema:
+              content_id: ietf-telemetry-message-ROOT
+              yanglib_path: assets/yang/ietf-telemetry-message/yanglib.xml
+              search_dir: assets/yang/ietf-telemetry-message/schemas

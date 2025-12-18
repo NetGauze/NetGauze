@@ -115,6 +115,7 @@ impl YangLibrary {
     pub async fn register_schema<T: SRClient>(
         &self,
         root_schema_name: &str,
+        subject_prefix: Option<&str>,
         schemas: &HashMap<Box<str>, Box<str>>,
         client: &T,
     ) -> Result<RegisteredSchema, SchemaConstructionError> {
@@ -238,7 +239,8 @@ impl YangLibrary {
                     .join(",");
                 tracing::debug!("Registering schema `{name}` with features [{features}]");
             }
-            let registered_schema = Self::register_with_retry(client, name, &schema).await?;
+            let registered_schema =
+                Self::register_with_retry(client, name, subject_prefix, &schema).await?;
             let schema_reference = schema_registry_client::rest::models::SchemaReference {
                 name: Some(name.to_string()),
                 subject: Some(registered_schema.subject.clone().unwrap_or_default()),
@@ -276,15 +278,22 @@ impl YangLibrary {
         if !refs.is_empty() {
             supplied_schema.references = Some(refs);
         }
-        Self::register_with_retry(client, root_schema_name, &supplied_schema).await
+        Self::register_with_retry(client, root_schema_name, subject_prefix, &supplied_schema).await
     }
 
     async fn register_with_retry<T: SRClient>(
         client: &T,
         name: &str,
+        subject_prefix: Option<&str>,
         schema: &schema_registry_client::rest::models::Schema,
     ) -> Result<RegisteredSchema, SchemaConstructionError> {
-        let registered_schema_result = client.register_schema(name, schema, false).await;
+        let subject = if let Some(prefix) = subject_prefix {
+            format!("{prefix}.{name}")
+        } else {
+            name.to_string()
+        };
+
+        let registered_schema_result = client.register_schema(&subject, schema, false).await;
         let registered_schema = match registered_schema_result {
             Ok(registered_schema) => registered_schema,
             Err(e) => {
@@ -298,11 +307,11 @@ impl YangLibrary {
                     ..Default::default()
                 };
                 client
-                    .update_config(name, &server_config)
+                    .update_config(&subject, &server_config)
                     .await
                     .map_err(SchemaConstructionError::RegistrationError)?;
                 client
-                    .register_schema(name, schema, false)
+                    .register_schema(&subject, schema, false)
                     .await
                     .map_err(SchemaConstructionError::RegistrationError)?
             }

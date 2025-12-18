@@ -19,6 +19,7 @@ build = "build.rs"
 
 [dependencies]
 netgauze-udp-notif-pkt = { workspace = true }
+netgauze-netconf-proto = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 strum = { workspace = true }
@@ -35,9 +36,8 @@ ciborium = { workspace = true }
 async-channel = { workspace = true }
 anyhow = { workspace = true }
 yang3 = { workspace = true }
-# TEMP to use SuppliedSchema, until we have the native Schema structs
-schema_registry_converter = { workspace = true, default-features = false }
 ipnet = { workspace = true, features = ["serde"] }
+quick-xml = { workspace = true, features = ["serialize", "async-tokio"] }
 
 [build-dependencies]
 shadow-rs = { workspace = true, default-features = true }

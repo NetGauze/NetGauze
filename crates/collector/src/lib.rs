@@ -45,7 +45,6 @@ pub mod config;
 pub mod flow;
 pub mod inputs;
 pub mod publishers;
-pub mod telemetry;
 pub mod yang_push;
 
 pub async fn init_flow_collection(
