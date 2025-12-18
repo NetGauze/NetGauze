@@ -111,10 +111,19 @@ impl YangLibrary {
     }
 
     /// Register the YANG Lib to in the Confluent Schema Registry.
+    ///
+    /// `root_schema_name` is the name of the root module to register.
+    /// `subject_prefix` optional prefix to use for the subject name in the
+    /// schema registry. When it is set to None, the module name is used as the
+    /// subject. When it is set to a string, the string is prepended to the
+    /// module name `{subject_prefix}{module_name}`. `client` is the
+    /// Confluent Schema Registry client to use to register the schema.
+    ///
     /// Note: references are registered recursively.
     pub async fn register_schema<T: SRClient>(
         &self,
         root_schema_name: &str,
+        subject_prefix: Option<&str>,
         schemas: &HashMap<Box<str>, Box<str>>,
         client: &T,
     ) -> Result<RegisteredSchema, SchemaConstructionError> {
@@ -238,7 +247,8 @@ impl YangLibrary {
                     .join(",");
                 tracing::debug!("Registering schema `{name}` with features [{features}]");
             }
-            let registered_schema = Self::register_with_retry(client, name, &schema).await?;
+            let registered_schema =
+                Self::register_with_retry(client, name, subject_prefix, &schema).await?;
             let schema_reference = schema_registry_client::rest::models::SchemaReference {
                 name: Some(name.to_string()),
                 subject: Some(registered_schema.subject.clone().unwrap_or_default()),
@@ -276,20 +286,22 @@ impl YangLibrary {
         if !refs.is_empty() {
             supplied_schema.references = Some(refs);
         }
-        Self::register_with_retry(client, root_schema_name, &supplied_schema).await
+        Self::register_with_retry(client, root_schema_name, subject_prefix, &supplied_schema).await
     }
 
     async fn register_with_retry<T: SRClient>(
         client: &T,
         name: &str,
+        subject_prefix: Option<&str>,
         schema: &schema_registry_client::rest::models::Schema,
     ) -> Result<RegisteredSchema, SchemaConstructionError> {
-        let registered_schema_result = client.register_schema(name, schema, false).await;
+        let subject = format!("{}{}", subject_prefix.unwrap_or(""), name);
+        let registered_schema_result = client.register_schema(&subject, schema, false).await;
         let registered_schema = match registered_schema_result {
             Ok(registered_schema) => registered_schema,
             Err(e) => {
                 tracing::warn!(
-                    "Failed to register schema `{name}` with error `{e}`, trying again with disabling compatibility check"
+                    "Failed to register schema `{name}` as subject `{subject}` with error `{e}`, trying again with disabling compatibility check"
                 );
                 let server_config = schema_registry_client::rest::models::ServerConfig {
                     compatibility: Some(
@@ -298,11 +310,11 @@ impl YangLibrary {
                     ..Default::default()
                 };
                 client
-                    .update_config(name, &server_config)
+                    .update_config(&subject, &server_config)
                     .await
                     .map_err(SchemaConstructionError::RegistrationError)?;
                 client
-                    .register_schema(name, schema, false)
+                    .register_schema(&subject, schema, false)
                     .await
                     .map_err(SchemaConstructionError::RegistrationError)?
             }

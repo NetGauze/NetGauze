@@ -73,6 +73,10 @@ struct Args {
     #[clap(short, long)]
     registry_url: Option<String>,
 
+    /// Subject prefix to be used when registering to the schema registry.
+    /// Then {subject_prefix}{subject} is used as the subject name.
+    subject_prefix: Option<String>,
+
     /// List of initial YANG modules to load (typically the ones in the
     /// subscription started).
     ///
@@ -256,7 +260,12 @@ pub async fn main() -> anyhow::Result<()> {
                 client_conf,
             );
         let registered_schema = yang_lib
-            .register_schema(&subject, &schemas, &sr_client)
+            .register_schema(
+                &subject,
+                args.subject_prefix.as_deref(),
+                &schemas,
+                &sr_client,
+            )
             .await
             .map_err(|x| anyhow!(x))?;
 
