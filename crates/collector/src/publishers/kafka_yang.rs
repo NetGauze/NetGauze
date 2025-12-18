@@ -31,19 +31,19 @@
 //!   actor
 use crate::publishers::LoggingProducerContext;
 use ipnet::IpNet;
-use netgauze_yang_push::{ContentId, CustomSchema};
+use netgauze_netconf_proto::xml_utils::{ParsingError, XmlDeserialize, XmlParser};
+use netgauze_netconf_proto::yanglib::{
+    DependencyError, PermissiveVersionChecker, SchemaConstructionError, YangLibrary,
+};
+use netgauze_yang_push::schema_cache::{ContentId, SchemaInfo, SchemaInfoError};
+use quick_xml::NsReader;
 use rdkafka::config::{ClientConfig, FromClientConfigAndContext};
 use rdkafka::error::{KafkaError, RDKafkaErrorCode};
 use rdkafka::message::{Header, OwnedHeaders};
 use rdkafka::producer::{BaseRecord, Producer, ThreadedProducer};
-use schema_registry_converter::async_impl::schema_registry::{SrSettings, post_schema};
-use schema_registry_converter::error::SRCError;
-use schema_registry_converter::schema_registry_common::{
-    SchemaType, SuppliedReference, SuppliedSchema,
-};
+use schema_registry_client::rest::schema_registry_client::{Client, SchemaRegistryClient};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -56,9 +56,14 @@ const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Trait for converting input data to YANG-compliant JSON format
 pub trait YangConverter<T, E: std::error::Error> {
-    /// Returns the YANG schema definition for the telemetry message
-    /// with references being (augmented)imports
-    fn get_root_schema(&self) -> Result<SuppliedSchema, E>;
+    /// Get root schema name (e.g. ietf-telemetry-message)
+    fn get_root_schema_name(&self) -> &str;
+
+    /// Get optional subject prefix for schema registry
+    fn get_subject_prefix(&self) -> Option<&str>;
+
+    // Get root telemetry-message schema
+    fn get_root_schema(&self) -> SchemaInfo;
 
     // Get ContentId from input message
     fn get_content_id(&self, input: &T) -> Option<ContentId>;
@@ -155,21 +160,13 @@ pub enum KafkaYangPublisherActorError<E: std::error::Error> {
     #[strum(to_string = "KafkaError: {0}")]
     KafkaError(KafkaError),
 
-    /// Error encoding [serde_json::Value] into `Vec<u8>` to send to kafka
-    #[strum(to_string = "EncodingError: {0}")]
-    EncodingError(serde_json::Error),
+    /// Serde JSON Error
+    #[strum(to_string = "JSON Error: {0}")]
+    JsonError(serde_json::Error),
 
     /// Error receiving incoming messages from input async_channel
     #[strum(to_string = "Error receiving messages from upstream producer")]
     ReceiveErr,
-
-    /// Schema registry error
-    #[strum(to_string = "SchemaRegistryError: {0}")]
-    SchemaRegistryError(SRCError),
-
-    /// SuppliedSchema format error
-    #[strum(to_string = "SuppliedSchemaError: {0}")]
-    SuppliedSchemaError(String),
 
     /// YANG converter error
     #[strum(to_string = "YangConverterError: {0}")]
@@ -177,15 +174,35 @@ pub enum KafkaYangPublisherActorError<E: std::error::Error> {
 
     /// Error sending schema request
     #[strum(to_string = "SchemaRequestError: {0}")]
-    SchemaRequestError(async_channel::SendError<(String, oneshot::Sender<SuppliedSchema>)>),
+    SchemaRequestError(async_channel::SendError<(String, oneshot::Sender<SchemaInfo>)>),
 
-    // Error reading from file
+    /// Error reading from file
     #[strum(to_string = "Failed to read from file: {0}")]
     IoError(std::io::Error),
 
-    // Serde JSON Error
-    #[strum(to_string = "JSON Error: {0}")]
-    JsonError(serde_json::Error),
+    /// XML parsing error
+    #[strum(to_string = "XML Error: {0}")]
+    XmlParsingError(quick_xml::Error),
+
+    /// YANG library parsing error
+    #[strum(to_string = "YANG Library Parsing Error: {0}")]
+    YangLibParsingError(ParsingError),
+
+    /// YANG Library schema construction error
+    #[strum(to_string = "YANG Library Schema Construction Error: {0}")]
+    YangLibSchemaError(SchemaConstructionError),
+
+    /// Yang Library dependency error
+    #[strum(to_string = "YANG Library Dependency Error: {0}")]
+    YangLibDependencyError(DependencyError),
+
+    /// Schema Reading Errors
+    #[strum(to_string = "Schema Info Error: {0}")]
+    SchemaInfoError(SchemaInfoError),
+
+    /// Schema Registration Error
+    #[strum(to_string = "Schema Registration Error: {0}")]
+    SchemaRegistrationError(String),
 }
 
 impl<E: std::error::Error> std::error::Error for KafkaYangPublisherActorError<E> {}
@@ -195,15 +212,10 @@ impl<E: std::error::Error> From<KafkaError> for KafkaYangPublisherActorError<E> 
         Self::KafkaError(e)
     }
 }
-impl<E: std::error::Error> From<SRCError> for KafkaYangPublisherActorError<E> {
-    fn from(e: SRCError) -> Self {
-        Self::SchemaRegistryError(e)
-    }
-}
-impl<E: std::error::Error> From<async_channel::SendError<(String, oneshot::Sender<SuppliedSchema>)>>
+impl<E: std::error::Error> From<async_channel::SendError<(String, oneshot::Sender<SchemaInfo>)>>
     for KafkaYangPublisherActorError<E>
 {
-    fn from(e: async_channel::SendError<(String, oneshot::Sender<SuppliedSchema>)>) -> Self {
+    fn from(e: async_channel::SendError<(String, oneshot::Sender<SchemaInfo>)>) -> Self {
         Self::SchemaRequestError(e)
     }
 }
@@ -215,6 +227,31 @@ impl<E: std::error::Error> From<std::io::Error> for KafkaYangPublisherActorError
 impl<E: std::error::Error> From<serde_json::Error> for KafkaYangPublisherActorError<E> {
     fn from(e: serde_json::Error) -> Self {
         Self::JsonError(e)
+    }
+}
+impl<E: std::error::Error> From<quick_xml::Error> for KafkaYangPublisherActorError<E> {
+    fn from(e: quick_xml::Error) -> Self {
+        Self::XmlParsingError(e)
+    }
+}
+impl<E: std::error::Error> From<ParsingError> for KafkaYangPublisherActorError<E> {
+    fn from(e: ParsingError) -> Self {
+        Self::YangLibParsingError(e)
+    }
+}
+impl<E: std::error::Error> From<SchemaConstructionError> for KafkaYangPublisherActorError<E> {
+    fn from(e: SchemaConstructionError) -> Self {
+        Self::YangLibSchemaError(e)
+    }
+}
+impl<E: std::error::Error> From<DependencyError> for KafkaYangPublisherActorError<E> {
+    fn from(e: DependencyError) -> Self {
+        Self::YangLibDependencyError(e)
+    }
+}
+impl<E: std::error::Error> From<SchemaInfoError> for KafkaYangPublisherActorError<E> {
+    fn from(e: SchemaInfoError) -> Self {
+        Self::SchemaInfoError(e)
     }
 }
 
@@ -242,10 +279,12 @@ where
     producer: ThreadedProducer<LoggingProducerContext>,
     msg_recv: async_channel::Receiver<T>,
     stats: KafkaYangPublisherStats,
-    root_schema: SuppliedSchema, // telemetry message root schema
-    root_schema_id: u32,         // schema-registry ID for root schema
-    schema_id_cache: HashMap<ContentId, u32>, // content_id -> schema_id map
-    schema_req_tx: async_channel::Sender<(ContentId, oneshot::Sender<SuppliedSchema>)>,
+    sr_client: SchemaRegistryClient,
+    root_yanglib: YangLibrary,                 // root yang library
+    root_schemas: HashMap<Box<str>, Box<str>>, // root schemas
+    root_schema_id: i32,                       // schema-registry ID for root schema
+    schema_id_cache: HashMap<ContentId, i32>,  // content_id -> schema_id map
+    schema_req_tx: async_channel::Sender<(ContentId, oneshot::Sender<SchemaInfo>)>,
     _phantom: std::marker::PhantomData<(T, E)>,
 }
 
@@ -278,116 +317,80 @@ where
         }
     }
 
-    /// Construct a subject name from schema name + optional a contentID
-    fn get_subject_from_schema_name(
-        schema: &SuppliedSchema,
-        content_id: Option<&str>,
-        root: bool,
-    ) -> Result<String, KafkaYangPublisherActorError<E>> {
-        // Ensure schema type is set to YANG
-        if !matches!(schema.schema_type, SchemaType::Other(ref s) if s == "YANG") {
-            return Err(KafkaYangPublisherActorError::SuppliedSchemaError(format!(
-                "Schema type must be 'YANG', found: {:?}",
-                schema.schema_type
-            )));
-        }
-
-        // Extract schema name
-        let schema_name = schema.name.as_ref().ok_or_else(|| {
-            KafkaYangPublisherActorError::SuppliedSchemaError("Schema name is required".to_string())
-        })?;
-
-        // Create subject name based on schema name and content_id
-        match (content_id, root) {
-            (Some(content_id), true) => Ok(format!("{schema_name}-{content_id}-root")),
-            (Some(content_id), false) => Ok(format!("{schema_name}-{content_id}")),
-            (None, true) => Ok(format!("{schema_name}-root")),
-            (None, false) => Ok(schema_name.to_string()),
-        }
-    }
-
-    /// Register a YANG schema with the schema registry
-    async fn register_schema_with_registry(
-        schema_registry_url: String,
-        schema: &SuppliedSchema,
-        subject: String,
-    ) -> Result<u32, KafkaYangPublisherActorError<E>> {
-        let sr_settings = SrSettings::new(schema_registry_url);
-
-        info!("Registering YANG schema with subject '{}'", subject);
-
-        match post_schema(&sr_settings, subject.clone(), schema.clone()).await {
-            Ok(schema_result) => {
-                info!(
-                    "Registered YANG schema with subject '{}' and id {}",
-                    subject, schema_result.id
-                );
-                Ok(schema_result.id)
-            }
-            Err(err) => {
-                error!(
-                    "Failed to register YANG schema with subject '{}': {}",
-                    subject, err
-                );
-                Err(KafkaYangPublisherActorError::SchemaRegistryError(err))
-            }
-        }
-    }
-
-    fn parse_custom_schemas(
-        custom_schemas: &HashMap<IpNet, CustomSchema>,
-    ) -> Result<Vec<(ContentId, SuppliedSchema)>, KafkaYangPublisherActorError<E>> {
-        let mut schemas = Vec::new();
-
-        for custom_schema in custom_schemas.values() {
-            let schema_content = fs::read_to_string(&custom_schema.schema)?;
-            let supplied_schema: SuppliedSchema = serde_json::from_str(&schema_content)?;
-            schemas.push((custom_schema.content_id.clone(), supplied_schema));
-        }
-
-        Ok(schemas)
-    }
-
     /// Create a new actor instance from configuration
     async fn from_config(
         cmd_rx: mpsc::Receiver<KafkaYangPublisherActorCommand>,
         config: KafkaConfig<C>,
-        custom_schemas: HashMap<IpNet, CustomSchema>,
+        custom_schemas: HashMap<IpNet, SchemaInfo>,
         msg_recv: async_channel::Receiver<T>,
         stats: KafkaYangPublisherStats,
-        schema_req_tx: async_channel::Sender<(String, oneshot::Sender<SuppliedSchema>)>,
+        schema_req_tx: async_channel::Sender<(String, oneshot::Sender<SchemaInfo>)>,
     ) -> Result<Self, KafkaYangPublisherActorError<E>> {
         let producer = Self::get_producer(&stats, &config)?;
 
-        // Load and register root schema
-        let root_schema = config
-            .yang_converter
-            .get_root_schema()
-            .map_err(|err| KafkaYangPublisherActorError::YangConverterError(err))?;
-        let root_schema_subject = Self::get_subject_from_schema_name(&root_schema, None, true)?;
-        let root_schema_id = Self::register_schema_with_registry(
+        // Create schema registry Client
+        let client_conf = schema_registry_client::rest::client_config::ClientConfig::new(vec![
             config.schema_registry_url.clone(),
-            &root_schema,
-            root_schema_subject,
-        )
-        .await?;
+        ]);
+        let sr_client = SchemaRegistryClient::new(client_conf);
 
-        // Load and register provided custom schemas
-        let mut schema_id_cache = HashMap::new();
-        let custom_supplied_schemas = Self::parse_custom_schemas(&custom_schemas)?;
+        // Load and register provided root schema
+        let root_schema_info = config.yang_converter.get_root_schema();
+        let root_schemas = root_schema_info.read_modules_from_disk()?;
 
-        for (content_id, custom_schema) in custom_supplied_schemas {
-            let custom_schema_subject =
-                Self::get_subject_from_schema_name(&custom_schema, Some(&content_id), true)?;
-            let custom_schema_id = Self::register_schema_with_registry(
-                config.schema_registry_url.clone(),
-                &custom_schema,
-                custom_schema_subject,
+        let reader = NsReader::from_file(root_schema_info.yanglib_path())?;
+        let mut xml_reader = XmlParser::new(reader)?;
+        let root_yanglib: YangLibrary = YangLibrary::xml_deserialize(&mut xml_reader)?;
+
+        let root_content_id = root_schema_info
+            .content_id()
+            .unwrap_or(root_yanglib.content_id());
+
+        let registered_root_schema = root_yanglib
+            .register_schema(
+                config.yang_converter.get_root_schema_name(),
+                config.yang_converter.get_subject_prefix(),
+                &root_schemas,
+                &sr_client,
             )
             .await?;
 
+        let root_schema_id = registered_root_schema.id.ok_or_else(|| {
+            KafkaYangPublisherActorError::SchemaRegistrationError(
+                format!("Schema ID not found in registered schema response for content_id: {root_content_id}"),
+            )
+        })?;
+
+        // Load and register provided custom schemas
+        // (custom schema are already extended with telemetry-message)
+        let mut schema_id_cache = HashMap::new();
+
+        for schema_info in custom_schemas.values() {
+            let schemas = schema_info.read_modules_from_disk()?;
+
+            let reader = NsReader::from_file(schema_info.yanglib_path())?;
+            let mut xml_reader = XmlParser::new(reader)?;
+            let yanglib: YangLibrary = YangLibrary::xml_deserialize(&mut xml_reader)?;
+
+            let content_id = schema_info.content_id().unwrap_or(yanglib.content_id());
+
+            let registered_schema = yanglib
+                .register_schema(
+                    config.yang_converter.get_root_schema_name(),
+                    config.yang_converter.get_subject_prefix(),
+                    &schemas,
+                    &sr_client,
+                )
+                .await?;
+
+            let schema_id = registered_schema.id.ok_or_else(|| {
+                KafkaYangPublisherActorError::SchemaRegistrationError(format!(
+                    "Schema ID not found in registered schema response for content_id: {content_id}"
+                ))
+            })?;
+
             // Store schema registry ID in cache
-            schema_id_cache.insert(content_id, custom_schema_id);
+            schema_id_cache.insert(content_id.to_string(), schema_id);
         }
 
         info!("Root and custom schema loading and registering complete!");
@@ -399,7 +402,9 @@ where
             producer,
             msg_recv,
             stats,
-            root_schema,
+            sr_client,
+            root_yanglib,
+            root_schemas,
             root_schema_id,
             schema_id_cache,
             schema_req_tx,
@@ -407,40 +412,12 @@ where
         })
     }
 
-    /// Extend the telemetry message root schema by appending incoming
-    /// message schema to its references
-    async fn construct_and_register_schema(
-        &self,
-        content_id: &str,
-        schema: SuppliedSchema,
-    ) -> Result<u32, KafkaYangPublisherActorError<E>> {
-        let subject = Self::get_subject_from_schema_name(&schema, None, false)?;
-        let mut root_schema = self.root_schema.clone();
-        root_schema.references.push(SuppliedReference {
-            name: subject.clone(),
-            subject,
-            schema: schema.schema.clone(),
-            references: schema.references,
-            properties: schema.properties,
-            tags: schema.tags,
-        });
-
-        let root_schema_subject =
-            Self::get_subject_from_schema_name(&root_schema, Some(content_id), true)?;
-        Self::register_schema_with_registry(
-            self.config.schema_registry_url.clone(),
-            &root_schema,
-            root_schema_subject,
-        )
-        .await
-    }
-
     /// Get schema ID from cache or by registering the schema to the schema
     /// registry
     async fn register_schema(
         &mut self,
         content_id: Option<&str>,
-    ) -> Result<u32, KafkaYangPublisherActorError<E>> {
+    ) -> Result<i32, KafkaYangPublisherActorError<E>> {
         match content_id {
             Some(id) => {
                 // Check if we already have this schema registered
@@ -458,8 +435,10 @@ where
                 }
 
                 // TODO: expose timeout to config
-                let schema = match tokio::time::timeout(Duration::from_secs(5), response_rx).await {
-                    Ok(Ok(schema)) => schema,
+                let schema_info = match tokio::time::timeout(Duration::from_secs(5), response_rx)
+                    .await
+                {
+                    Ok(Ok(schema_info)) => schema_info,
                     Ok(Err(_)) => {
                         warn!(
                             "Schema request channel closed for content ID '{}', fallback to using root schema (id={})",
@@ -476,21 +455,42 @@ where
                     }
                 };
 
-                // Handle schema_cache response and register schema
-                match self.construct_and_register_schema(id, schema).await {
-                    Ok(schema_id) => {
-                        trace!(
-                            "Registered new schema ID {} for content ID '{}'",
-                            schema_id, id
-                        );
-                        self.schema_id_cache.insert(id.to_string(), schema_id);
-                        Ok(schema_id)
-                    }
-                    Err(err) => {
-                        error!("Failed to register schema for content ID '{}': {}", id, err);
-                        Err(err)
-                    }
-                }
+                // Handle schema_cache response, extend and register schema
+                let schemas = schema_info.read_modules_from_disk()?;
+
+                let reader = NsReader::from_file(schema_info.yanglib_path())?;
+                let mut xml_reader = XmlParser::new(reader)?;
+                let yanglib: YangLibrary = YangLibrary::xml_deserialize(&mut xml_reader)?;
+
+                let mut builder = yanglib.into_module_set_builder(
+                    &schemas,
+                    "ALL".into(),
+                    &PermissiveVersionChecker,
+                )?;
+                builder.extend_from_yang_lib(
+                    self.root_yanglib.clone(),
+                    &self.root_schemas,
+                    &PermissiveVersionChecker,
+                )?;
+
+                let (yanglib_extended, schemas_extended) = builder.build_yang_lib();
+
+                let registered_schema = yanglib_extended
+                    .register_schema(
+                        self.config.yang_converter.get_root_schema_name(),
+                        self.config.yang_converter.get_subject_prefix(),
+                        &schemas_extended,
+                        &self.sr_client,
+                    )
+                    .await?;
+
+                let schema_id = registered_schema.id.ok_or_else(|| {
+                    KafkaYangPublisherActorError::SchemaRegistrationError(format!(
+                        "Schema ID not found in registered schema response for content_id: {id}"
+                    ))
+                })?;
+
+                Ok(schema_id)
             }
             None => {
                 warn!(
@@ -545,7 +545,7 @@ where
                         err.to_string(),
                     )],
                 );
-                return Err(KafkaYangPublisherActorError::EncodingError(err));
+                return Err(KafkaYangPublisherActorError::JsonError(err));
             }
         };
 
@@ -561,7 +561,7 @@ where
                             err.to_string(),
                         )],
                     );
-                    return Err(KafkaYangPublisherActorError::EncodingError(err));
+                    return Err(KafkaYangPublisherActorError::JsonError(err));
                 }
             },
             None => None,
@@ -694,10 +694,10 @@ where
 {
     pub async fn from_config(
         config: KafkaConfig<C>,
-        custom_schemas: HashMap<IpNet, CustomSchema>,
+        custom_schemas: HashMap<IpNet, SchemaInfo>,
         msg_recv: async_channel::Receiver<T>,
         stats: either::Either<opentelemetry::metrics::Meter, KafkaYangPublisherStats>,
-        schema_req_tx: async_channel::Sender<(ContentId, oneshot::Sender<SuppliedSchema>)>,
+        schema_req_tx: async_channel::Sender<(ContentId, oneshot::Sender<SchemaInfo>)>,
     ) -> Result<(JoinHandle<anyhow::Result<String>>, Self), KafkaYangPublisherActorError<E>> {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);
         let stats = match stats {

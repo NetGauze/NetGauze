@@ -13,19 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ContentId;
-use schema_registry_converter::schema_registry_common::SuppliedSchema;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, warn};
 
+use std::path::PathBuf;
+
+pub type ContentId = String;
+
 // Cache for YangPush schemas and metadata
 type SchemaLookupCache = HashMap<SchemaIdx, ContentId>;
 type SchemaInfoCache = HashMap<ContentId, SchemaInfo>;
-// TODO: move to native schema struct and integrate in single cache
-type SchemaCache = HashMap<ContentId, SuppliedSchema>;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct SchemaIdx {
@@ -43,11 +44,34 @@ impl SchemaIdx {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, strum_macros::Display)]
+pub enum SchemaInfoError {
+    #[strum(to_string = "Failed to read from file: {0}")]
+    IoError(std::io::Error),
+
+    #[strum(to_string = "Path does not exist: {0}")]
+    PathNotFound(String),
+
+    #[strum(to_string = "Path is not a directory: {0}")]
+    NotADirectory(String),
+
+    #[strum(to_string = "Invalid filename: {0}")]
+    InvalidFilename(String),
+}
+
+impl From<std::io::Error> for SchemaInfoError {
+    fn from(value: std::io::Error) -> Self {
+        Self::IoError(value)
+    }
+}
+
+impl std::error::Error for SchemaInfoError {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchemaInfo {
+    content_id: Option<ContentId>,
     yanglib_path: String,
     search_dir: String,
-    content_id: Option<ContentId>,
 }
 impl SchemaInfo {
     fn new() -> Self {
@@ -61,14 +85,65 @@ impl SchemaInfo {
             content_id: Some(content_id),
         }
     }
-    pub fn yanglib_path(&self) -> String {
-        self.yanglib_path.clone()
+    pub fn yanglib_path(&self) -> &str {
+        self.yanglib_path.as_ref()
     }
-    pub fn search_dir(&self) -> String {
-        self.search_dir.clone()
+    pub fn search_dir(&self) -> &str {
+        self.search_dir.as_ref()
     }
-    pub fn content_id(&self) -> Option<ContentId> {
-        self.content_id.clone()
+    pub fn content_id(&self) -> Option<&str> {
+        self.content_id.as_deref()
+    }
+
+    // TODO: move logs to debug
+    /// Loads YANG modules from the search directory into a HashMap
+    pub fn read_modules_from_disk(&self) -> Result<HashMap<Box<str>, Box<str>>, SchemaInfoError> {
+        let search_path = PathBuf::from(&self.search_dir);
+        let mut schemas = HashMap::new();
+
+        if !search_path.exists() {
+            return Err(SchemaInfoError::PathNotFound(format!("{search_path:?}")));
+        }
+
+        if !search_path.is_dir() {
+            return Err(SchemaInfoError::NotADirectory(format!("{search_path:?}")));
+        }
+
+        tracing::debug!("loading yang modules from {search_path:?}");
+
+        for entry in std::fs::read_dir(&search_path)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            // Skip folders
+            if !path.is_file() {
+                continue;
+            }
+
+            let filename = path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .ok_or_else(|| SchemaInfoError::InvalidFilename(format!("{path:?}")))?;
+
+            // Only process .yang files
+            if !filename.ends_with(".yang") {
+                continue;
+            }
+
+            // Extract module name (remove @revision.yang or .yang suffix)
+            let module_name = if let Some(at_pos) = filename.find('@') {
+                &filename[..at_pos]
+            } else {
+                filename.strip_suffix(".yang").unwrap_or(filename)
+            };
+
+            tracing::debug!("loading yang module `{module_name}` from `{path:?}`");
+            let content = std::fs::read_to_string(&path)?;
+            schemas.insert(module_name.into(), content.into());
+        }
+
+        tracing::info!("loaded {} yang modules from {search_path:?}", schemas.len());
+        Ok(schemas)
     }
 }
 
@@ -154,10 +229,9 @@ struct SchemaCacheActor {
     cmd_rx: mpsc::Receiver<SchemaCacheActorCommand>,
     validation_req_rx: async_channel::Receiver<SchemaRequest>,
     validation_resp_tx: async_channel::Sender<(SchemaRequest, SchemaInfo)>,
-    kafka_yang_req_rx: async_channel::Receiver<(ContentId, oneshot::Sender<SuppliedSchema>)>,
+    kafka_yang_req_rx: async_channel::Receiver<(ContentId, oneshot::Sender<SchemaInfo>)>,
     schema_idx: SchemaLookupCache,
     schema_info: SchemaInfoCache,
-    schema_cache: SchemaCache,
     stats: SchemaCacheStats,
 }
 
@@ -166,7 +240,7 @@ impl SchemaCacheActor {
         cmd_rx: mpsc::Receiver<SchemaCacheActorCommand>,
         validation_req_rx: async_channel::Receiver<SchemaRequest>,
         validation_resp_tx: async_channel::Sender<(SchemaRequest, SchemaInfo)>,
-        kafka_yang_req_rx: async_channel::Receiver<(ContentId, oneshot::Sender<SuppliedSchema>)>,
+        kafka_yang_req_rx: async_channel::Receiver<(ContentId, oneshot::Sender<SchemaInfo>)>,
         stats: SchemaCacheStats,
     ) -> Self {
         info!("Creating schema cache actor");
@@ -177,17 +251,12 @@ impl SchemaCacheActor {
             kafka_yang_req_rx,
             schema_idx: HashMap::new(),
             schema_info: HashMap::new(),
-            schema_cache: HashMap::new(),
             stats,
         }
     }
 
     fn get_schema_info(&self, content_id: &ContentId) -> Option<SchemaInfo> {
         self.schema_info.get(content_id).cloned()
-    }
-
-    fn get_schema(&self, content_id: &ContentId) -> Option<SuppliedSchema> {
-        self.schema_cache.get(content_id).cloned()
     }
 
     // Retrieves subscription metadata from the cache based on the peer address
@@ -241,9 +310,9 @@ impl SchemaCacheActor {
                           debug!("Received Schema Request from KafkaYang for content_id {}",
                               content_id
                           );
-                          match self.get_schema(&content_id) {
-                              Some(supplied_schema) => {
-                                  if oneshot_tx.send(supplied_schema).is_err() {
+                          match self.get_schema_info(&content_id) {
+                              Some(schema_info) => {
+                                  if oneshot_tx.send(schema_info).is_err() {
                                       warn!("Failed to send schema response: receiver dropped for content ID {}", content_id);
                                   }
                               },
@@ -313,7 +382,7 @@ pub struct SchemaCacheActorHandle {
     cmd_tx: mpsc::Sender<SchemaCacheActorCommand>,
     pub validation_req_tx: async_channel::Sender<SchemaRequest>,
     pub validation_resp_rx: async_channel::Receiver<(SchemaRequest, SchemaInfo)>,
-    pub kafka_yang_req_tx: async_channel::Sender<(ContentId, oneshot::Sender<SuppliedSchema>)>,
+    pub kafka_yang_req_tx: async_channel::Sender<(ContentId, oneshot::Sender<SchemaInfo>)>,
 }
 
 impl SchemaCacheActorHandle {

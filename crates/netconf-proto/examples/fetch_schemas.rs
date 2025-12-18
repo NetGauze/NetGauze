@@ -256,7 +256,7 @@ pub async fn main() -> anyhow::Result<()> {
                 client_conf,
             );
         let registered_schema = yang_lib
-            .register_schema(&subject, &schemas, &sr_client)
+            .register_schema(&subject, None, &schemas, &sr_client)
             .await
             .map_err(|x| anyhow!(x))?;
 
