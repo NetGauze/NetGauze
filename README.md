@@ -42,7 +42,7 @@ To generate the expected output for pcap tests the OVERWRITE env var must be set
 
 ## Running code formatting and clippy checks
 
-```cargo fmt -- --config format_code_in_doc_comments=true --config wrap_comments=true --config imports_granularity=Crate```
+```cargo +nightly fmt -- --config format_code_in_doc_comments=true --config wrap_comments=true --config imports_granularity=Module```
 
 NetGauze uses nightly rust build for clippy checks just to anticipate what's coming in new rust releases.
 
