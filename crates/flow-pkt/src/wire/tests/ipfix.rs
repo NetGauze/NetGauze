@@ -1319,3 +1319,156 @@ fn test_with_unknown_pen_complex() -> Result<(), IpfixPacketWritingError> {
 
     Ok(())
 }
+
+#[test]
+fn test_octet_array_variable_len() -> Result<(), IpfixPacketWritingError> {
+    let template_fixed_size_wire = [
+        // Header
+        0x00, 0x0a, // Version = 10
+        0x00, 0x24, // Length = 36
+        0x67, 0x6f, 0x12, 0x34, // Export Time
+        0x00, 0x00, 0x00, 0x01, // Sequence Number = 1
+        0x00, 0x00, 0x30, 0x39, // Observation Domain ID = 12345
+        // Template Set
+        0x00, 0x02, // Set ID = 2 (Template)
+        0x00, 0x14, // Length = 20
+        0x01, 0x00, // Template ID = 256
+        0x00, 0x03, // Field Count = 3
+        0x00, 0x08, 0x00, 0x04, // sourceIPv4Address (IE 8)
+        0x00, 0x0c, 0x00, 0x04, // destinationIPv4Address (IE 12)
+        0x00, 0x5f, 0x00, 0x04, // applicationId (IE 95) with length = 4
+    ];
+    let template_variable_size_wire = [
+        // Header
+        0x00, 0x0a, // Version = 10
+        0x00, 0x24, // Length = 36
+        0x67, 0x6f, 0x12, 0x34, // Export Time
+        0x00, 0x00, 0x00, 0x01, // Sequence Number = 1
+        0x00, 0x00, 0x30, 0x39, // Observation Domain ID = 12345
+        // Template Set
+        0x00, 0x02, // Set ID = 2 (Template)
+        0x00, 0x14, // Length = 20
+        0x01, 0x00, // Template ID = 256
+        0x00, 0x03, // Field Count = 3
+        0x00, 0x08, 0x00, 0x04, // sourceIPv4Address (IE 8)
+        0x00, 0x0c, 0x00, 0x04, // destinationIPv4Address (IE 12)
+        0x00, 0x5f, 0xff, 0xff, // applicationId (IE 95) with variable length
+    ];
+    let template_fixed_size = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 12, 27, 20, 46, 44).unwrap(),
+        1,
+        12345,
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
+            256,
+            Box::new([
+                FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::applicationId, 4).unwrap(),
+            ]),
+        )]))]),
+    );
+    let template_variable_size = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 12, 27, 20, 46, 44).unwrap(),
+        1,
+        12345,
+        Box::new([Set::Template(Box::new([TemplateRecord::new(
+            256,
+            Box::new([
+                FieldSpecifier::new(ie::IE::sourceIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::destinationIPv4Address, 4).unwrap(),
+                FieldSpecifier::new(ie::IE::applicationId, u16::MAX).unwrap(),
+            ]),
+        )]))]),
+    );
+
+    // Data is the same if encoded wtih a specific length or variable length.
+    let data = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2024, 12, 27, 20, 46, 45).unwrap(),
+        2,
+        12345,
+        Box::new([Set::Data {
+            id: DataSetId::new(256).unwrap(),
+            records: Box::new([DataRecord::new(
+                Box::new([]),
+                Box::new([
+                    ie::Field::sourceIPv4Address(Ipv4Addr::new(192, 168, 1, 100)),
+                    ie::Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
+                    ie::Field::applicationId(Box::new([0x03, 0x00, 0x00, 0x09])),
+                ]),
+            )]),
+        }]),
+    );
+
+    let data_fixed_wire = [
+        // Header
+        0x00, 0x0a, // Version = 10
+        0x00, 0x20, // Length = 32
+        0x67, 0x6f, 0x12, 0x35, // Export Time
+        0x00, 0x00, 0x00, 0x02, // Sequence Number = 2
+        0x00, 0x00, 0x30, 0x39, // Observation Domain ID = 12345
+        // Data Set
+        0x01, 0x00, // Set ID = 256 (Template ID)
+        0x00, 0x10, // Length = 16
+        0xc0, 0xa8, 0x01, 0x64, // 192.168.1.100
+        0x0a, 0x00, 0x00, 0x01, // 10.0.0.1
+        0x03, 0x00, 0x00, 0x09, // applicationId: Proprietary, PEN=9
+    ];
+    let data_variable_wire = [
+        // Header
+        0x00, 0x0a, // Version = 10
+        0x00, 0x22, // Length = 34
+        0x67, 0x6f, 0x12, 0x35, // Export Time
+        0x00, 0x00, 0x00, 0x02, // Sequence Number = 2
+        0x00, 0x00, 0x30, 0x39, // Observation Domain ID = 12345
+        // Data Set
+        0x01, 0x00, // Set ID = 256 (Template ID)
+        0x00, 0x12, // Length = 18
+        0xc0, 0xa8, 0x01, 0x64, // 192.168.1.100
+        0x0a, 0x00, 0x00, 0x01, // 10.0.0.1
+        0x04, // length for the variable length field
+        0x03, 0x00, 0x00, 0x09, // applicationId: Proprietary, PEN=9
+        0x00, // padding
+    ];
+
+    let templates_map_empty = HashMap::new();
+    let mut templates_map_fixed = HashMap::new();
+    let mut templates_map_variable = HashMap::new();
+
+    test_parsed_completely_with_one_input(
+        &template_fixed_size_wire,
+        &mut templates_map_fixed,
+        &template_fixed_size,
+    );
+    test_parsed_completely_with_one_input(
+        &template_variable_size_wire,
+        &mut templates_map_variable,
+        &template_variable_size,
+    );
+
+    test_parsed_completely_with_one_input(
+        &template_variable_size_wire,
+        &mut templates_map_variable,
+        &template_variable_size,
+    );
+
+    test_write_with_one_input(
+        &template_fixed_size,
+        Some(&templates_map_fixed),
+        &template_fixed_size_wire,
+    )?;
+    test_write_with_one_input(
+        &template_variable_size,
+        Some(&templates_map_variable),
+        &template_variable_size_wire,
+    )?;
+
+    test_parsed_completely_with_one_input(&data_fixed_wire, &mut templates_map_fixed, &data);
+    test_parsed_completely_with_one_input(&data_variable_wire, &mut templates_map_variable, &data);
+
+    // with no template, then assume fixed size not variable length.
+    test_write_with_one_input(&data, Some(&templates_map_empty), &data_fixed_wire)?;
+    test_write_with_one_input(&data, Some(&templates_map_fixed), &data_fixed_wire)?;
+    test_write_with_one_input(&data, Some(&templates_map_variable), &data_variable_wire)?;
+
+    Ok(())
+}
