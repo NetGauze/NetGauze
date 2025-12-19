@@ -2044,7 +2044,10 @@ pub(crate) fn generate_pkg_ie_serializers(
                 quote! {
                     Self::#ident(value) => {
                         match length {
-                            Some(u16::MAX) | None => {
+                            None => {
+                                writer.write_all(value)?
+                            }
+                            Some(u16::MAX) => {
                                 if value.len() < u8::MAX as usize {
                                     writer.write_u8(value.len() as u8)?;
                                 } else {
@@ -3108,7 +3111,10 @@ pub(crate) fn generate_ie_ser_main(
                 quote! {
                     Self::#ident(value) => {
                         match length {
-                            Some(u16::MAX) | None => {
+                            None => {
+                                writer.write_all(value)?;
+                            }
+                            Some(u16::MAX) => {
                                 if value.len() < u8::MAX as usize {
                                     writer.write_u8(value.len() as u8)?;
                                 } else {
