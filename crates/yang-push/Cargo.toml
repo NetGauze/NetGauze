@@ -19,6 +19,7 @@ build = "build.rs"
 
 [dependencies]
 netgauze-udp-notif-pkt = { workspace = true }
+netgauze-netconf-proto = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 strum = { workspace = true }
@@ -29,19 +30,21 @@ tokio = { workspace = true, features = ["full", "tracing", "rt-multi-thread"] }
 tracing = { workspace = true }
 opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
 bytes = { workspace = true }
-sysinfo = { workspace = true }
 either = { workspace = true }
-ciborium = { workspace = true }
 async-channel = { workspace = true }
 anyhow = { workspace = true }
 yang3 = { workspace = true }
 # TEMP to use SuppliedSchema, until we have the native Schema structs
 schema_registry_converter = { workspace = true, default-features = false }
 ipnet = { workspace = true, features = ["serde"] }
+rustc-hash = { workspace = true }
+quick-xml = { workspace = true }
+futures-util = { workspace = true }
+russh = { workspace = true }
 
 [build-dependencies]
 shadow-rs = { workspace = true, default-features = true }
 
 [dev-dependencies]
-tracing-subscriber = { workspace = true }
 tracing-test = { workspace = true }
+tempfile = { workspace = true }
