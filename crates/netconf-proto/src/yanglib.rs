@@ -743,7 +743,11 @@ impl YangLibrary {
 impl XmlDeserialize<YangLibrary> for YangLibrary {
     fn xml_deserialize(parser: &mut XmlParser<impl io::BufRead>) -> Result<Self, ParsingError> {
         // Parse yang-library children in any order
+        if matches!(parser.peek(), Event::Decl(_)) {
+            parser.skip()?;
+        }
         parser.skip_text()?;
+
         let yang_library_start = parser.open(Some(YANG_LIBRARY_NS), "yang-library")?;
         parser.skip_text()?;
 
