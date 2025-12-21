@@ -22,7 +22,7 @@
 use crate::publishers::kafka_yang::YangConverter;
 use netgauze_yang_push::ContentId;
 use netgauze_yang_push::model::telemetry::TelemetryMessageWrapper;
-use netgauze_yang_push::validation::SubscriptionInfo;
+use netgauze_yang_push::validation_back::SubscriptionInfo;
 use schema_registry_converter::schema_registry_common::SuppliedSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
