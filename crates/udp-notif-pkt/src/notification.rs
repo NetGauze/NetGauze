@@ -576,7 +576,7 @@ impl YangPushChangeUpdate {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Target {
     #[serde(rename = "stream")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -627,6 +627,27 @@ impl Target {
             datastore_xpath_filter,
         }
     }
+
+    /// Creates a new Target for a datastore subscription.
+    ///
+    /// Simplifies instantiating the target without having to specify the
+    /// stream-specific fields.
+    pub fn new_datastore(datastore: String, filter: either::Either<Value, String>) -> Self {
+        let (datastore_subtree_filter, datastore_xpath_filter) = match filter {
+            either::Either::Left(value) => (Some(value), None),
+            either::Either::Right(xpath_filter) => (None, Some(xpath_filter)),
+        };
+        Self {
+            stream: None,
+            stream_subtree_filter: None,
+            stream_xpath_filter: None,
+            replay_start_time: None,
+            datastore: Some(datastore),
+            datastore_subtree_filter,
+            datastore_xpath_filter,
+        }
+    }
+
     pub fn stream(&self) -> Option<&str> {
         self.stream.as_deref()
     }
@@ -647,6 +668,48 @@ impl Target {
     }
     pub fn datastore_xpath_filter(&self) -> Option<&str> {
         self.datastore_xpath_filter.as_deref()
+    }
+
+    /// Returns true if the target specifies a datastore-only subscription.
+    /// This is the case if no stream or stream-xpath-filter is specified.
+    pub const fn is_datastore_only(&self) -> bool {
+        self.stream.is_none()
+            && self.stream_subtree_filter.is_none()
+            && self.stream_xpath_filter.is_none()
+            && self.replay_start_time.is_none()
+            && (self.datastore.is_some()
+                || self.datastore_subtree_filter.is_some()
+                || self.datastore_xpath_filter.is_some())
+    }
+}
+
+impl std::fmt::Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut result = Vec::with_capacity(7);
+        if let Some(stream) = &self.stream {
+            result.push(format!("stream: {stream}"));
+        }
+        if let Some(stream_subtree_filter) = &self.stream_subtree_filter {
+            result.push(format!("stream-subtree-filter: {stream_subtree_filter}"));
+        }
+        if let Some(stream_xpath_filter) = &self.stream_xpath_filter {
+            result.push(format!("stream-xpath-filter: {stream_xpath_filter}"));
+        }
+        if let Some(replay_start_time) = &self.replay_start_time {
+            result.push(format!("replay-start-time: {replay_start_time}"));
+        }
+        if let Some(datastore) = &self.datastore {
+            result.push(format!("datastore: {datastore}"));
+        }
+        if let Some(datastore_subtree_filter) = &self.datastore_subtree_filter {
+            result.push(format!(
+                "datastore-subtree-filter: {datastore_subtree_filter}"
+            ));
+        }
+        if let Some(datastore_xpath_filter) = &self.datastore_xpath_filter {
+            result.push(format!("datastore-xpath-filter: {datastore_xpath_filter}"));
+        }
+        write!(f, "{{ {} }}", result.join(", "))
     }
 }
 
@@ -1258,5 +1321,26 @@ mod tests {
 
         // YangPushUpdate getters
         assert_eq!(yang_push_update.id(), 798798779);
+    }
+
+    #[test]
+    fn test_target_is_datastore() {
+        let stream_target = Target::new(
+            Some("example-stream".to_string()),
+            None,
+            Some("/example/xpath/filter".to_string()),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let datastore_target = Target::new_datastore(
+            "ds:operational".to_string(),
+            either::Either::Right("/example/xpath/filter".to_string()),
+        );
+
+        assert!(!stream_target.is_datastore_only());
+        assert!(datastore_target.is_datastore_only());
     }
 }
