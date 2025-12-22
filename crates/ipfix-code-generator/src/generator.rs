@@ -1985,7 +1985,13 @@ pub(crate) fn generate_pkg_ie_serializers(
                 quote! {
                     Self::#name(value) => {
                         match length {
-                            None => value.len(),
+                            None => if value.len() < u8::MAX as usize {
+                                // One octet for the length field
+                                value.len() + 1
+                            } else {
+                                // 4 octets for the length field, first is 255 and other three carries the len
+                                value.len() + 4
+                            }
                             Some(len) => if len == u16::MAX {
                                 if value.len() < u8::MAX as usize {
                                     // One octet for the length field
@@ -2052,7 +2058,8 @@ pub(crate) fn generate_pkg_ie_serializers(
                                     writer.write_u8(value.len() as u8)?;
                                 } else {
                                     writer.write_u8(u8::MAX)?;
-                                    writer.write_all(&value.len().to_be_bytes()[1..])?;
+                                    let len = value.len() as u32;
+                                    writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
                                 writer.write_all(value)?;
                             }
@@ -2297,7 +2304,8 @@ pub(crate) fn generate_pkg_ie_serializers(
                                     writer.write_u8(bytes.len() as u8)?;
                                 } else {
                                     writer.write_u8(u8::MAX)?;
-                                    writer.write_all(&bytes.len().to_be_bytes()[1..])?;
+                                    let len = bytes.len() as u32;
+                                    writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
                                 writer.write_all(value.as_bytes())?;
                             }
@@ -2442,7 +2450,8 @@ pub(crate) fn generate_pkg_ie_serializers(
                                     writer.write_u8(value.len() as u8)?;
                                 } else {
                                     writer.write_u8(u8::MAX)?;
-                                    writer.write_all(&value.len().to_be_bytes()[1..])?;
+                                    let len = value.len() as u32;
+                                    writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
                                 writer.write_all(value)?;
                             }
@@ -3119,7 +3128,8 @@ pub(crate) fn generate_ie_ser_main(
                                     writer.write_u8(value.len() as u8)?;
                                 } else {
                                     writer.write_u8(u8::MAX)?;
-                                    writer.write_all(&value.len().to_be_bytes()[1..])?;
+                                    let len = value.len() as u32;
+                                    writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
                                 writer.write_all(value)?;
                             }
@@ -3364,7 +3374,8 @@ pub(crate) fn generate_ie_ser_main(
                                     writer.write_u8(bytes.len() as u8)?;
                                 } else {
                                     writer.write_u8(u8::MAX)?;
-                                    writer.write_all(&bytes.len().to_be_bytes()[1..])?;
+                                    let len = bytes.len() as u32;
+                                    writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
                                 writer.write_all(value.as_bytes())?;
                             }
@@ -3525,7 +3536,13 @@ pub(crate) fn generate_ie_ser_main(
                 quote! {
                     Self::#name(value) => {
                         match length {
-                            None => value.len(),
+                            None => if value.len() < u8::MAX as usize {
+                                // One octet for the length field
+                                value.len() + 1
+                            } else {
+                                // 4 octets for the length field, first is 255 and other three carries the len
+                                value.len() + 4
+                            }
                             Some(len) => if len == u16::MAX {
                                 if value.len() < u8::MAX as usize {
                                     // One octet for the length field
@@ -3633,7 +3650,8 @@ pub(crate) fn generate_ie_ser_main(
                                     writer.write_u8(value.len() as u8)?;
                                 } else {
                                     writer.write_u8(u8::MAX)?;
-                                    writer.write_all(&value.len().to_be_bytes()[1..])?;
+                                    let len = value.len() as u32;
+                                    writer.write_all(&len.to_be_bytes()[1..])?;
                                 }
                                 writer.write_all(value)?;
                             }
