@@ -23,7 +23,7 @@
 //! The YANG Library Cache is designed to:
 //! - Store and retrieve YANG library references indexed by content ID
 //! - Associate YANG libraries with subscription information (peer address,
-//!   XPath filters, module sets)
+//!   Target filters, module sets)
 //! - Persist YANG libraries and schemas to disk for durability
 //! - Load cached YANG libraries from disk on startup
 //!
@@ -37,7 +37,7 @@
 //!   modules.
 //!
 //! - [`SubscriptionInfo`]: Metadata about a YANG Push subscription, including
-//!   peer address, content ID, XPath filter, and associated YANG modules.
+//!   peer address, content ID, Target filter, and associated YANG modules.
 //!
 //! # Storage Layout
 //!
@@ -93,6 +93,7 @@
 use crate::ContentId;
 use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter};
 use netgauze_netconf_proto::yanglib::{SchemaLoadingError, YangLibrary};
+use netgauze_udp_notif_pkt::notification::Target;
 use quick_xml::NsReader;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
@@ -404,7 +405,7 @@ impl YangLibraryReference {
 ///   subscription. This links the subscription to a specific version of the
 ///   device's YANG schema set.
 ///
-/// - **xpath**: The XPath filter expression that defines what data the
+/// - **target**: The [Target] filter expression that defines what data the
 ///   subscription monitors. This determines which parts of the YANG data tree
 ///   are included in notifications.
 ///
@@ -430,21 +431,24 @@ impl YangLibraryReference {
 /// let subscription_info = SubscriptionInfo::new(
 ///     "192.168.1.100:830".parse().unwrap(),
 ///     ContentId::from("2024-01-15-content-id"),
-///     "/interfaces/interface[name='eth0']/statistics".to_string(),
+///     Target::new_datastore(
+///         "ds:operational".to_string(),
+///         either::Right("/ietf-interfaces:interfaces/ietf-interfaces/statistics".to_string()),
+///     ),
 ///     vec!["ietf-interfaces".to_string(), "ietf-ip".to_string()],
 /// );
 ///
 /// // Access subscription details
 /// println!("Peer: {}", subscription_info.peer());
 /// println!("Content ID: {}", subscription_info.content_id());
-/// println!("XPath: {}", subscription_info.xpath());
+/// println!("Subscription Target: {}", subscription_info.target());
 /// println!("Models: {:?}", subscription_info.models());
 /// ```
 #[derive(Clone, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SubscriptionInfo {
     peer: SocketAddr,
     content_id: ContentId,
-    xpath: String,
+    target: Target,
     // TODO: add Module revision
     models: Vec<String>,
 }
@@ -453,13 +457,13 @@ impl SubscriptionInfo {
     pub fn new(
         peer: SocketAddr,
         content_id: ContentId,
-        xpath: String,
+        target: Target,
         models: Vec<String>,
     ) -> Self {
         Self {
             peer,
             content_id,
-            xpath,
+            target,
             models,
         }
     }
@@ -476,9 +480,9 @@ impl SubscriptionInfo {
         &self.content_id
     }
 
-    /// The XPath filter associated with the subscription.
-    pub const fn xpath(&self) -> &str {
-        self.xpath.as_str()
+    /// The [Target] associated with the subscription.
+    pub const fn target(&self) -> &Target {
+        &self.target
     }
 
     /// The list of YANG modules associated with the subscription.
@@ -491,8 +495,8 @@ impl std::fmt::Display for SubscriptionInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "SubscriptionInfo {{ peer: {}, content_id: {}, xpath: {}, models: {:?} }}",
-            self.peer, self.content_id, self.xpath, self.models
+            "SubscriptionInfo {{ peer: {}, content_id: {}, target: {}, models: {:?} }}",
+            self.peer, self.content_id, self.target, self.models
         )
     }
 }
@@ -755,7 +759,10 @@ mod tests {
         SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
             ContentId::from(content_id.to_string()),
-            "/interfaces/interface".to_string(),
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+            ),
             vec!["ietf-interfaces".to_string(), "ietf-ip".to_string()],
         )
     }
@@ -934,14 +941,20 @@ mod tests {
     fn test_subscription_info_new() {
         let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 8080);
         let content_id = ContentId::from("content-123".to_string());
-        let xpath = "/test/path".to_string();
+        let target = Target::new_datastore(
+            "ds:operational".to_string(),
+            either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+        );
         let models = vec!["model1".to_string(), "model2".to_string()];
 
-        let info = SubscriptionInfo::new(peer, content_id.clone(), xpath.clone(), models.clone());
+        let info = SubscriptionInfo::new(peer, content_id.clone(), Target::new_datastore(
+            "ds:operational".to_string(),
+            either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+        ), models.clone());
 
         assert_eq!(info.peer(), peer);
         assert_eq!(info.content_id(), &content_id);
-        assert_eq!(info.xpath(), xpath);
+        assert_eq!(info.target(), &target);
         assert_eq!(info.models(), models.as_slice());
     }
 
@@ -953,7 +966,7 @@ mod tests {
 
         assert!(display.contains("192.168.1.100:830"));
         assert!(display.contains("test-id"));
-        assert!(display.contains("/interfaces/interface"));
+        assert!(display.contains("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics"));
         assert!(display.contains("ietf-interfaces"));
     }
 
