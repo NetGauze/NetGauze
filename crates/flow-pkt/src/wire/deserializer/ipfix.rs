@@ -254,7 +254,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                     .iter()
                     .map(|x| {
                         if x.length() == 65535 {
-                            0
+                            1
                         } else {
                             x.length() as usize
                         }
@@ -265,7 +265,7 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         .iter()
                         .map(|x| {
                             if x.length() == 65535 {
-                                0
+                                1
                             } else {
                                 x.length() as usize
                             }
