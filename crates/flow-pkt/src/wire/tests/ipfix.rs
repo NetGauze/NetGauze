@@ -1794,3 +1794,57 @@ fn test_octet_array_variable_length() -> Result<(), IpfixPacketWritingError> {
 
     Ok(())
 }
+
+#[test]
+fn test_padding_min_length_issue_360() -> Result<(), IpfixPacketWritingError> {
+    // data packet with one padding byte after an u8 field, and 3 variable lengths
+    // strings. This test ensures that the padding byte is correctly handled
+    // when calculating the min record value and the single padding octet is not
+    // considered a new data record.
+    let data_wire = [
+        0x00, 0x0a, 0x00, 0x52, 0x69, 0x49, 0x2a, 0x58, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0xf4, 0x00, 0x42, 0xee, 0x07, 0x73, 0x6f, 0x6d, 0x65, 0x2d, 0x69, 0x64, 0x17,
+        0x6e, 0x61, 0x6d, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x20, 0x69, 0x64, 0x3a, 0x20, 0x32, 0x34,
+        0x32, 0x36, 0x39, 0x34, 0x35, 0x39, 0x38, 0x34, 0x1b, 0x63, 0x61, 0x74, 0x65, 0x67, 0x6f,
+        0x72, 0x79, 0x20, 0x66, 0x6f, 0x72, 0x20, 0x69, 0x64, 0x3a, 0x20, 0x34, 0x32, 0x38, 0x35,
+        0x35, 0x38, 0x31, 0x35, 0x31, 0x30, 0x00,
+    ];
+    let data = IpfixPacket::new(
+        Utc.with_ymd_and_hms(2025, 12, 22, 11, 24, 8).unwrap(),
+        10,
+        0,
+        Box::new([Set::Data {
+            id: DataSetId::new(500).unwrap(),
+            records: Box::new([DataRecord::new(
+                Box::new([
+                    ie::Field::VMWare(ie::vmware::Field::sessionFlags(0xee)),
+                    ie::Field::VMWare(ie::vmware::Field::vifId("some-id".into())),
+                ]),
+                Box::new([
+                    ie::Field::applicationName("name for id: 2426945984".into()),
+                    ie::Field::applicationCategoryName("category for id: 4285581510".into()),
+                ]),
+            )]),
+        }]),
+    );
+
+    let mut templates_map = HashMap::new();
+    templates_map.insert(
+        500,
+        DecodingTemplate::new(
+            Box::new([
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::sessionFlags), 1).unwrap(),
+                FieldSpecifier::new(ie::IE::VMWare(ie::vmware::IE::vifId), u16::MAX).unwrap(),
+            ]),
+            Box::new([
+                FieldSpecifier::new(ie::IE::applicationName, u16::MAX).unwrap(),
+                FieldSpecifier::new(ie::IE::applicationCategoryName, u16::MAX).unwrap(),
+            ]),
+        ),
+    );
+
+    test_parsed_completely_with_one_input(&data_wire, &mut templates_map, &data);
+    test_write_with_one_input(&data, None, &data_wire)?;
+    test_write_with_one_input(&data, Some(&templates_map), &data_wire)?;
+    Ok(())
+}
