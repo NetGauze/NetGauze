@@ -35,7 +35,7 @@ use netgauze_udp_notif_service::UdpNotifRequest;
 use netgauze_udp_notif_service::supervisor::UdpNotifSupervisorHandle;
 use netgauze_yang_push::model::telemetry::TelemetryMessageWrapper;
 use netgauze_yang_push::schema_cache::SchemaCacheActorHandle;
-use netgauze_yang_push::validation::{SubscriptionInfo, ValidationActorHandle};
+use netgauze_yang_push::validation_back::{SubscriptionInfo, ValidationActorHandle};
 use std::net::IpAddr;
 use std::str::Utf8Error;
 use std::sync::Arc;

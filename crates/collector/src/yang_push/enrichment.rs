@@ -42,7 +42,7 @@ use netgauze_yang_push::model::telemetry::{
     FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol, TelemetryMessage,
     TelemetryMessageMetadata, TelemetryMessageWrapper, YangPushSubscriptionMetadata,
 };
-use netgauze_yang_push::validation::SubscriptionInfo;
+use netgauze_yang_push::validation_back::SubscriptionInfo;
 use serde_json::Value;
 use shadow_rs::shadow;
 use std::collections::HashMap;

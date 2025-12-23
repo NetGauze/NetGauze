@@ -33,6 +33,7 @@ arbitrary_ext = { workspace = true, optional = true }
 serde_json = { workspace = true }
 chrono = { workspace = true, default-features = true, features = ["serde"] }
 ciborium = { workspace = true }
+either = { workspace = true }
 
 [features]
 default = ["serde", "codec"]
