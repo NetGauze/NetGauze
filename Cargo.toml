@@ -109,7 +109,7 @@ quick-xml = { version = "0.38" }
 russh = { version = "0.56" }
 secrecy = { version = "0.10" }
 notify = { version = "8.2" }
-petgraph = { version = "0.8.3" }
+petgraph = { version = "0.8" }
 sha2 = { version = "0.10" }
 schema-registry-client = { version = "0.4" }
 
