@@ -53,7 +53,7 @@
 //! }
 //! ```
 
-use crate::notification::{NotificationEnvelope, NotificationLegacy};
+use crate::notification::{NotificationEnvelope, NotificationLegacy, NotificationVariant};
 use crate::raw::{MediaType, UDP_NOTIF_V1, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -67,6 +67,15 @@ pub enum UdpNotifPayload {
 
     #[serde(rename = "ietf-notification:notification")]
     NotificationLegacy(NotificationLegacy), // deprecated
+}
+
+impl UdpNotifPayload {
+    pub fn notification_contents(&self) -> Option<&NotificationVariant> {
+        match self {
+            UdpNotifPayload::NotificationEnvelope(envelope) => envelope.contents(),
+            UdpNotifPayload::NotificationLegacy(legacy) => legacy.notification(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
