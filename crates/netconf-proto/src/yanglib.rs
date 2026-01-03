@@ -215,7 +215,8 @@ impl YangLibrary {
 
                 references.push(dep);
             }
-
+            // Sort references for consistent schema registration
+            references.sort_by(|a, b| a.subject.cmp(&b.subject));
             let schema = schema_registry_client::rest::models::Schema {
                 schema_type: Some("YANG".to_string()),
                 references: Some(references),
