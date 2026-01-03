@@ -216,7 +216,12 @@ impl YangLibrary {
                 references.push(dep);
             }
             // Sort references for consistent schema registration
-            references.sort_by(|a, b| a.subject.cmp(&b.subject));
+            references.sort_by(|a, b| match (&a.name, &b.name) {
+                (Some(a), Some(b)) => a.cmp(b),
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (None, None) => std::cmp::Ordering::Equal,
+            });
             let schema = schema_registry_client::rest::models::Schema {
                 schema_type: Some("YANG".to_string()),
                 references: Some(references),
@@ -285,6 +290,13 @@ impl YangLibrary {
             refs.push(supplied_references.get(n).unwrap().clone());
         }
         if !refs.is_empty() {
+            // Sort references for consistent schema registration
+            refs.sort_by(|a, b| match (&a.name, &b.name) {
+                (Some(a), Some(b)) => a.cmp(b),
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (None, None) => std::cmp::Ordering::Equal,
+            });
             supplied_schema.references = Some(refs);
         }
         Self::register_with_retry(client, root_schema_name, subject_prefix, &supplied_schema).await
