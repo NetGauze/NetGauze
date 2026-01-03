@@ -17,6 +17,7 @@ use netgauze_yang_push::model::telemetry::Label;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 
+pub mod config;
 pub mod enrichment;
 
 /// Weight helper type

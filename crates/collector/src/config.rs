@@ -18,11 +18,11 @@ use crate::flow::config::FlowOutputConfig;
 use crate::flow::enrichment::EnrichmentConfig;
 use crate::publishers::http::HttpPublisherEndpoint;
 use crate::publishers::{kafka_avro, kafka_json, kafka_yang};
-use crate::telemetry::config::TelemetryYangConverter;
+use crate::yang_push::config::TelemetryYangConverter;
 use ipnet::IpNet;
 use netgauze_flow_service::flow_supervisor;
 use netgauze_udp_notif_service::supervisor as udp_notif_supervisor;
-use netgauze_yang_push::CustomSchema;
+use netgauze_yang_push::cache::storage::YangLibraryReference;
 use serde_with::serde_as;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -58,6 +58,18 @@ pub(crate) const fn default_buffer_size() -> usize {
 
 pub(crate) const fn default_shards() -> usize {
     1
+}
+
+pub(crate) const fn default_max_cached_packets_per_peer() -> usize {
+    1000
+}
+
+pub(crate) const fn default_max_cached_packets_per_subscription() -> usize {
+    100
+}
+
+pub(crate) const fn default_netconf_port() -> u16 {
+    830
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -165,6 +177,17 @@ pub struct UdpNotifConfig {
 
     pub listeners: Vec<Binding>,
 
+    /// Location of the cached YANG schemas
+    pub cache_location: String,
+
+    #[serde(default = "default_max_cached_packets_per_peer")]
+    pub max_cached_packets_per_peer: usize,
+
+    #[serde(default = "default_max_cached_packets_per_subscription")]
+    pub max_cached_packets_per_subscription: usize,
+
+    pub netconf: NetconfConfig,
+
     pub publishers: HashMap<String, PublisherConfig>,
 }
 
@@ -176,6 +199,17 @@ impl UdpNotifConfig {
             cmd_buffer_size: self.cmd_buffer_size,
         }
     }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NetconfConfig {
+    pub username: String,
+    pub private_key_path: String,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub password: Option<String>,
+    #[serde(default = "default_netconf_port")]
+    pub port: u16,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -222,7 +256,7 @@ pub struct PublisherConfig {
     pub aggregation: Option<AggregationConfig>,
 
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
-    pub custom_yang_schemas: Option<HashMap<IpNet, CustomSchema>>,
+    pub custom_yang_schemas: Option<HashMap<IpNet, YangLibraryReference>>,
 
     pub endpoints: HashMap<String, PublisherEndpoint>,
 }
