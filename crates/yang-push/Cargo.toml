@@ -29,15 +29,9 @@ shadow-rs = { workspace = true, features = ["default", "metadata", "build"]  }
 tokio = { workspace = true, features = ["full", "tracing", "rt-multi-thread"] }
 tracing = { workspace = true }
 opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
-bytes = { workspace = true }
 either = { workspace = true }
 async-channel = { workspace = true }
-anyhow = { workspace = true }
-yang3 = { workspace = true }
 yang4 = { workspace = true }
-# TEMP to use SuppliedSchema, until we have the native Schema structs
-schema_registry_converter = { workspace = true, default-features = false }
-ipnet = { workspace = true, features = ["serde"] }
 rustc-hash = { workspace = true }
 quick-xml = { workspace = true }
 futures-util = { workspace = true }

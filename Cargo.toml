@@ -103,7 +103,6 @@ sysinfo = { version = "0.37" }
 shadow-rs = { version = "1.5", default-features = false }
 smallvec = { version = "1.15" }
 rustc-hash = { version = "2.1" }
-yang3 = { version = "0.19", features = ["bundled"] }
 yang4 = { version = "0.1", features = ["bundled"] }
 tempfile = { version = "3.23.0" }
 quick-xml = { version = "0.38" }
