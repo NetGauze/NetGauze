@@ -198,6 +198,7 @@ pub enum ParsingError {
     Recoverable,
 
     /// Unexpected XML token found
+    #[strum(to_string = "Wrong token, expecting `{expecting}` found `{found:?}`")]
     WrongToken {
         expecting: String,
         found: Event<'static>,
@@ -209,24 +210,30 @@ pub enum ParsingError {
     MissingElement(String),
 
     /// Invalid value error when converting from XML provided value to Rust type
+    #[strum(to_string = "Invalid value: `{0}`")]
     InvalidValue(String),
 
     /// Error when trying to skip a node
+    #[strum(to_string = "Skip error: {0}")]
     SkipError(String),
 
     /// Error when trying to decode UTF-8
+    #[strum(to_string = "{0}")]
     Utf8Error(std::str::Utf8Error),
 
     /// Error from quick-xml
+    #[strum(to_string = "{0}")]
     QuickXml(quick_xml::Error),
 
     /// Error when parsing an integer
+    #[strum(to_string = "{0}")]
     Int(std::num::ParseIntError),
 
     #[strum(to_string = "Found EOF while expecting data")]
     Eof,
 
     /// Error from quick-xml encoding
+    #[strum(to_string = "{0}")]
     EncodingError(quick_xml::encoding::EncodingError),
 }
 
