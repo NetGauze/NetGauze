@@ -1,0 +1,197 @@
+<yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+  <module-set>
+    <name>complete</name>
+    <!-- Main IETF telemetry message and the YANG push augmentation -->
+    <module>
+      <name>ietf-telemetry-message</name>
+      <revision>2025-06-10</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-telemetry-message</namespace>
+      <feature>network-node-manifest</feature>
+      <feature>data-collection-manifest</feature>
+    </module>
+    <module>
+      <name>ietf-yang-push-telemetry-message</name>
+      <revision>2025-08-15</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-push-telemetry-message</namespace>
+    </module>
+    <!-- Direct imports by ietf-telemetry-message -->
+    <module>
+      <name>ietf-yang-types</name>
+      <revision>2013-07-15</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-types</namespace>
+    </module>
+    <module>
+      <name>ietf-inet-types</name>
+      <revision>2021-02-22</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-inet-types</namespace>
+    </module>
+    <module>
+      <name>ietf-platform-manifest</name>
+      <revision>2025-02-21</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-platform-manifest</namespace>
+    </module>
+    <module>
+      <name>ietf-yang-structure-ext</name>
+      <revision>2020-06-17</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext</namespace>
+    </module>
+    <!-- Direct imports by ietf-yang-push-telemetry-message -->
+    <module>
+      <name>ietf-subscribed-notifications</name>
+      <revision>2019-09-09</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-subscribed-notifications</namespace>
+      <!-- We are premissive with the features for testing purposes -->
+      <feature>encode-json</feature>
+      <feature>encode-xml</feature>
+      <feature>configured</feature>
+      <feature>subtree</feature>
+      <feature>xpath</feature>
+    </module>
+    <module>
+      <name>ietf-yang-push</name>
+      <revision>2019-09-09</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-push</namespace>
+      <!-- We are premissive with the features for testing purposes -->
+      <feature>on-change</feature>
+    </module>
+    <module>
+      <name>ietf-datastores</name>
+      <revision>2018-02-14</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-datastores</namespace>
+    </module>
+    <module>
+      <name>ietf-yang-revisions</name>
+      <revision>2024-06-04</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-revisions</namespace>
+    </module>
+    <module>
+      <name>ietf-yang-semver</name>
+      <revision>2024-07-02</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-semver</namespace>
+    </module>
+    <!-- Direct import by ietf-platform-manifest -->
+    <module>
+      <name>ietf-yang-library</name>
+      <revision>2019-01-04</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-library</namespace>
+    </module>
+    <!-- Direct import by ietf-subscribed-notifications -->
+    <module>
+      <name>ietf-interfaces</name>
+      <revision>2018-02-20</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-interfaces</namespace>
+    </module>
+    <module>
+      <name>ietf-netconf-acm</name>
+      <revision>2018-02-14</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-netconf-acm</namespace>
+    </module>
+    <module>
+      <name>ietf-network-instance</name>
+      <revision>2019-01-21</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-network-instance</namespace>
+    </module>
+    <module>
+      <name>ietf-restconf</name>
+      <revision>2017-01-26</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-restconf</namespace>
+    </module>
+    <!-- Direct imports by ietf-yang-push -->
+    <module>
+      <name>ietf-yang-patch</name>
+      <revision>2017-02-22</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-patch</namespace>
+    </module>
+    <!-- Direct import by ietf-network-instance -->
+    <module>
+      <name>ietf-ip</name>
+      <revision>2018-02-22</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-ip</namespace>
+    </module>
+    <module>
+      <name>ietf-yang-schema-mount</name>
+      <revision>2019-01-14</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-schema-mount</namespace>
+    </module>
+    <!-- start the ietf-yp-notification -->
+    <module>
+      <name>ietf-yp-notification</name>
+      <revision>2025-02-24</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yp-notification</namespace>
+    </module>
+    <!-- Direct import by ietf-yp-notification -->
+    <module>
+      <name>ietf-system-capabilities</name>
+      <revision>2022-02-17</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-system-capabilities</namespace>
+    </module>
+    <module>
+      <name>ietf-notification-capabilities</name>
+      <revision>2022-02-17</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-notification-capabilities</namespace>
+    </module>
+    <!-- Direct used to define the transport in yang-push-subscription -->
+    <module>
+      <name>ietf-udp-notif-transport</name>
+      <revision>2025-02-14</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-udp-notif-transport</namespace>
+    </module>
+    <!-- Direct import by ietf-udp-notif-transport -->
+    <module>
+      <name>ietf-subscribed-notif-receivers</name>
+      <revision>2024-02-01</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-subscribed-notif-receivers</namespace>
+    </module>
+    <module>
+      <name>ietf-udp-client</name>
+      <revision>2025-02-24</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-subscribed-notif-receivers</namespace>
+    </module>
+    <module>
+      <name>ietf-tls-client</name>
+      <revision>2024-10-10</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-tls-client</namespace>
+    </module>
+    <!-- Used for interface type -->
+    <module>
+      <name>iana-if-type</name>
+      <revision>2014-05-08</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:iana-if-type</namespace>
+    </module>
+    <!-- Direct import by ietf-tls-client -->
+    <module>
+      <name>ietf-crypto-types</name>
+      <revision>2024-10-10</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-crypto-types</namespace>
+    </module>
+    <module>
+      <name>ietf-truststore</name>
+      <revision>2024-10-10</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-truststore</namespace>
+    </module>
+    <module>
+      <name>ietf-keystore</name>
+      <revision>2024-10-10</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-keystore</namespace>
+    </module>
+    <module>
+      <name>ietf-tls-common</name>
+      <revision>2024-10-10</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-tls-common</namespace>
+    </module>
+    <!-- Direct import by ietf-tls-commont -->
+    <module>
+      <name>iana-tls-cipher-suite-algs</name>
+      <revision>2024-10-16</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:iana-tls-cipher-suite-algs</namespace>
+    </module>
+  </module-set>
+  <schema>
+    <name>complete</name>
+    <module-set>complete</module-set>
+  </schema>
+  <content-id>ietf-telemetry-message-full</content-id>
+</yang-library>
+<modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+<module-set-id>34</module-set-id>
+</modules-state>
