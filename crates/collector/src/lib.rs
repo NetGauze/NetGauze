@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::config::{FlowConfig, PublisherEndpoint, UdpNotifConfig};
+use crate::config::{FlowConfig, NetconfConfig, PublisherEndpoint, UdpNotifConfig};
 use crate::flow::aggregation::AggregationActorHandle;
 use crate::flow::enrichment::FlowEnrichmentActorHandle;
 use crate::inputs::files::FilesActorHandle;
@@ -33,19 +33,22 @@ use netgauze_flow_service::flow_supervisor::FlowCollectorsSupervisorActorHandle;
 use netgauze_udp_notif_pkt::raw::MediaType;
 use netgauze_udp_notif_service::UdpNotifRequest;
 use netgauze_udp_notif_service::supervisor::UdpNotifSupervisorHandle;
+use netgauze_yang_push::cache::actor::CacheActorHandle;
+use netgauze_yang_push::cache::fetcher::NetconfYangLibraryFetcher;
+use netgauze_yang_push::cache::storage::SubscriptionInfo;
 use netgauze_yang_push::model::telemetry::TelemetryMessageWrapper;
-use netgauze_yang_push::schema_cache::SchemaCacheActorHandle;
-use netgauze_yang_push::validation_back::{SubscriptionInfo, ValidationActorHandle};
+use netgauze_yang_push::validation::ValidationActorHandle;
 use std::net::IpAddr;
+use std::path::PathBuf;
 use std::str::Utf8Error;
 use std::sync::Arc;
+use std::time::Duration;
 use tracing::{info, warn};
 
 pub mod config;
 pub mod flow;
 pub mod inputs;
 pub mod publishers;
-pub mod telemetry;
 pub mod yang_push;
 
 pub async fn init_flow_collection(
@@ -384,14 +387,20 @@ pub async fn init_udp_notif_collection(
     let (supervisor_join_handle, supervisor_handle) =
         UdpNotifSupervisorHandle::new(supervisor_config, meter.clone()).await;
     let mut join_set = FuturesUnordered::new();
-    let mut schema_handles = Vec::new();
+    let mut validation_join_set = FuturesUnordered::new();
     let mut validation_handles = Vec::new();
     let mut enrichment_handles = Vec::new();
     let mut files_input_handles = Vec::new();
     let mut kafka_input_handles = Vec::new();
-    let mut http_handles = Vec::new();
     let mut kafka_json_handles = Vec::new();
     let mut kafka_yang_handles = Vec::new();
+
+    // Only one schema cache is needed for all publishers
+    let cache_location: PathBuf = udp_notif_config.cache_location.into();
+    let netconf_fetcher = netconf_fetcher(&udp_notif_config.netconf)?;
+    let (_schema_join, schema_handle) =
+        CacheActorHandle::new(10000, either::Right(cache_location), netconf_fetcher)?;
+
     for (group_name, publisher_config) in udp_notif_config.publishers {
         info!("Starting publishers group '{group_name}'");
         let (udp_notif_recv, _) = supervisor_handle
@@ -400,23 +409,10 @@ pub async fn init_udp_notif_collection(
         for (endpoint_name, endpoint) in publisher_config.endpoints {
             info!("Creating publisher '{endpoint_name}'");
             match &endpoint {
-                PublisherEndpoint::Http(config) => {
-                    let (http_join, http_handle) = HttpPublisherActorHandle::new(
-                        endpoint_name.clone(),
-                        config.clone(),
-                        |x: Arc<UdpNotifRequest>, writer_id: String| {
-                            vec![Message::insert {
-                                ts: format!("{}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
-                                peer_src: format!("{}", x.0.ip()),
-                                writer_id,
-                                payload: x.1.clone(),
-                            }]
-                        },
-                        udp_notif_recv.clone(),
-                        meter.clone(),
-                    )?;
-                    join_set.push(http_join);
-                    http_handles.push(http_handle);
+                PublisherEndpoint::Http(_) => {
+                    return Err(anyhow::anyhow!(
+                        "HTTP publisher not supported for UDP Notif"
+                    ));
                 }
                 PublisherEndpoint::KafkaJson(config) => {
                     let hdl = KafkaJsonPublisherActorHandle::from_config(
@@ -448,30 +444,22 @@ pub async fn init_udp_notif_collection(
                     ));
                 }
                 PublisherEndpoint::TelemetryKafkaJson(config) => {
-                    let (schema_join, schema_handle) = SchemaCacheActorHandle::new(
-                        publisher_config.buffer_size,
-                        either::Left(meter.clone()),
-                    );
-                    join_set.push(schema_join);
-                    schema_handles.push(schema_handle.clone());
-
+                    let (validated_tx, validated_rx) =
+                        async_channel::bounded(publisher_config.buffer_size);
                     let (validation_join, validation_handle) = ValidationActorHandle::new(
                         publisher_config.buffer_size,
-                        publisher_config
-                            .custom_yang_schemas
-                            .clone()
-                            .unwrap_or_default(),
+                        udp_notif_config.max_cached_packets_per_peer,
+                        udp_notif_config.max_cached_packets_per_subscription,
                         udp_notif_recv.clone(),
-                        schema_handle.validation_req_tx.clone(),
-                        schema_handle.validation_resp_rx.clone(),
-                        either::Left(meter.clone()),
-                    );
-                    join_set.push(validation_join);
+                        validated_tx,
+                        schema_handle.request_tx(),
+                    )?;
+                    validation_join_set.push(validation_join);
                     validation_handles.push(validation_handle.clone());
 
                     let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
                         publisher_config.buffer_size,
-                        validation_handle.subscribe(),
+                        validated_rx,
                         either::Left(meter.clone()),
                         config.writer_id.clone(),
                     );
@@ -530,31 +518,22 @@ pub async fn init_udp_notif_collection(
                     }
                 }
                 PublisherEndpoint::TelemetryKafkaYang(config) => {
-                    let (schema_join, schema_handle) = SchemaCacheActorHandle::new(
-                        publisher_config.buffer_size, /* TODO: different buffer sizes for these
-                                                       * communication channels... */
-                        either::Left(meter.clone()),
-                    );
-                    join_set.push(schema_join);
-                    schema_handles.push(schema_handle.clone());
-
+                    let (validated_tx, validated_rx) =
+                        async_channel::bounded(publisher_config.buffer_size);
                     let (validation_join, validation_handle) = ValidationActorHandle::new(
                         publisher_config.buffer_size,
-                        publisher_config
-                            .custom_yang_schemas
-                            .clone()
-                            .unwrap_or_default(),
+                        udp_notif_config.max_cached_packets_per_peer,
+                        udp_notif_config.max_cached_packets_per_subscription,
                         udp_notif_recv.clone(),
-                        schema_handle.validation_req_tx.clone(),
-                        schema_handle.validation_resp_rx.clone(),
-                        either::Left(meter.clone()),
-                    );
-                    join_set.push(validation_join);
+                        validated_tx,
+                        schema_handle.request_tx(),
+                    )?;
+                    validation_join_set.push(validation_join);
                     validation_handles.push(validation_handle.clone());
 
                     let (enrichment_join, enrichment_handle) = YangPushEnrichmentActorHandle::new(
                         publisher_config.buffer_size,
-                        validation_handle.subscribe(),
+                        validated_rx,
                         either::Left(meter.clone()),
                         config.writer_id.clone(),
                     );
@@ -569,7 +548,7 @@ pub async fn init_udp_notif_collection(
                             .unwrap_or_default(),
                         enrichment_handle.subscribe(),
                         either::Left(meter.clone()),
-                        schema_handle.kafka_yang_req_tx.clone(),
+                        schema_handle.request_tx(),
                     )
                     .await;
 
@@ -623,15 +602,6 @@ pub async fn init_udp_notif_collection(
     let ret = tokio::select! {
         supervisor_ret = supervisor_join_handle => {
             info!("udp-notif supervisor exited, shutting down all publishers");
-           for handle in http_handles {
-                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown()).await;
-                if shutdown_result.is_err() {
-                    warn!("Timeout shutting down udp-notif http publisher {}", handle.name())
-                }
-                if let Ok(Err(err)) = shutdown_result {
-                    warn!("Error in shutting down udp-notif http publisher {}: {}", handle.name(), err)
-                }
-            }
             for handle in kafka_json_handles {
                 let _ = handle.shutdown().await;
             }
@@ -643,26 +613,43 @@ pub async fn init_udp_notif_collection(
                 Err(err) => Err(anyhow::anyhow!(err)),
             }
         },
-        join_ret = join_set.next() => {
+        join_ret = validation_join_set.next() => {
             warn!("udp-notif http publisher exited, shutting down udp-notif collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
-            for handle in schema_handles {
-                let _ = handle.shutdown().await;
-            }
+            let _ = schema_handle.shutdown().await;
             for handle in validation_handles {
                 let _ = handle.shutdown().await;
             }
             for handle in enrichment_handles {
                 let _ = handle.shutdown().await;
             }
-            for handle in http_handles {
-                let shutdown_result = tokio::time::timeout(std::time::Duration::from_secs(1), handle.shutdown()).await;
-                if shutdown_result.is_err() {
-                    warn!("Timeout shutting down udp-notif http publisher {}", handle.name())
-                }
-                if let Ok(Err(err)) = shutdown_result {
-                    warn!("Error in shutting down udp-notif http publisher {}: {}", handle.name(), err)
-                }
+            for handle in kafka_json_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_yang_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in files_input_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_input_handles {
+                let _ = handle.shutdown().await;
+            }
+            match join_ret {
+                None | Some(Ok(Ok(_))) => Ok(()),
+                Some(Err(err)) => Err(anyhow::anyhow!(err)),
+                Some(Ok(Err(err))) => Err(anyhow::anyhow!(err)),
+            }
+        },
+        join_ret = join_set.next() => {
+            warn!("udp-notif http publisher exited, shutting down udp-notif collection and publishers");
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
+            let _ = schema_handle.shutdown().await;
+            for handle in validation_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in enrichment_handles {
+                let _ = handle.shutdown().await;
             }
             for handle in kafka_json_handles {
                 let _ = handle.shutdown().await;
@@ -800,6 +787,35 @@ fn serialize_flow(
     let value = serde_json::to_value(msg)?;
     let key = serde_json::Value::String(ip.to_string());
     Ok((Some(key), value))
+}
+
+fn netconf_fetcher(config: &NetconfConfig) -> Result<NetconfYangLibraryFetcher, std::io::Error> {
+    let user = &config.username;
+    let private_key_path: PathBuf = (&config.private_key_path).into();
+
+    let private_key_string = match std::fs::read_to_string(&private_key_path) {
+        Ok(key) => key,
+        Err(err) => {
+            return Err(std::io::Error::other(format!(
+                "Failed to read private key: {err}"
+            )));
+        }
+    };
+    let private_key =
+        russh::keys::decode_secret_key(&private_key_string, config.password.as_deref())
+            .map_err(|err| std::io::Error::other(format!("Failed to decode private key: {err}")))?;
+    let ssh_config = russh::client::Config {
+        inactivity_timeout: Some(Duration::from_secs(60)),
+        ..<_>::default()
+    };
+    let fetcher = NetconfYangLibraryFetcher::new(
+        user.to_string(),
+        Arc::new(private_key),
+        ssh_config,
+        config.port,
+        Duration::from_secs(100),
+    );
+    Ok(fetcher)
 }
 
 #[cfg(test)]

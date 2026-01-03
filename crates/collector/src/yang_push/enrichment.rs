@@ -38,11 +38,11 @@ use netgauze_udp_notif_pkt::decoded::{UdpNotifPacketDecoded, UdpNotifPayload};
 use netgauze_udp_notif_pkt::notification::{
     NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
 };
+use netgauze_yang_push::cache::storage::SubscriptionInfo;
 use netgauze_yang_push::model::telemetry::{
     FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol, TelemetryMessage,
     TelemetryMessageMetadata, TelemetryMessageWrapper, YangPushSubscriptionMetadata,
 };
-use netgauze_yang_push::validation_back::SubscriptionInfo;
 use serde_json::Value;
 use shadow_rs::shadow;
 use std::collections::HashMap;
@@ -617,7 +617,7 @@ impl YangPushEnrichmentActor {
                     match msg {
                         Ok(msg) => {
                             let (subscription_info, pkt) = msg;
-                            let peer = subscription_info.peer_addr();
+                            let peer = subscription_info.peer();
                             let peer_tags = [
                                 opentelemetry::KeyValue::new(
                                     "network.peer.address",
