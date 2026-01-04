@@ -69,7 +69,11 @@ udp_notif:
           yang_converter:
             subject_prefix: daisy.dev
             root_schema_name: ietf-telemetry-message
-            root_yang_lib_ref:
-              content_id: ietf-telemetry-message-ROOT
-              yang_library_path: assets/yang/ietf-telemetry-message/yanglib.xml
-              dir: assets/yang/ietf-telemetry-message/schemas
+            default_yang_lib_ref:
+              content_id: ietf-telemetry-message-full
+              yang_library_path: assets/yang/ietf-telemetry-message/yang-lib-full.xml
+              dir: assets/yang/ietf-telemetry-message/
+            extension_yang_lib_ref:
+              content_id: ietf-telemetry-message-min
+              yang_library_path: assets/yang/ietf-telemetry-message/yang-lib-min.xml
+              dir: assets/yang/ietf-telemetry-message

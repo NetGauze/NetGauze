@@ -19,6 +19,7 @@
 //! data to be published to Kafka using YANG schemas. It implements the
 //! `YangConverter` trait to transform telemetry messages into YANG-compliant
 //! JSON format.
+
 use crate::publishers::kafka_yang::YangConverter;
 use netgauze_yang_push::ContentId;
 use netgauze_yang_push::cache::storage::{SubscriptionInfo, YangLibraryReference};
@@ -53,17 +54,29 @@ impl std::error::Error for TelemetryYangConverterError {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TelemetryYangConverter {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub subject_prefix: Option<String>,
+
     pub root_schema_name: String,
-    pub root_yang_lib_ref: YangLibraryReference,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub default_yang_lib_ref: Option<YangLibraryReference>,
+
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub extension_yang_lib_ref: Option<YangLibraryReference>,
 }
 
 impl TelemetryYangConverter {
-    pub fn new(root_yang_lib_ref: YangLibraryReference, root_schema_name: String) -> Self {
+    pub fn new(
+        root_schema_name: String,
+        default_yang_lib_ref: Option<YangLibraryReference>,
+        extension_yang_lib_ref: Option<YangLibraryReference>,
+    ) -> Self {
         Self {
             subject_prefix: None,
             root_schema_name,
-            root_yang_lib_ref,
+            default_yang_lib_ref,
+            extension_yang_lib_ref,
         }
     }
 }
@@ -71,22 +84,23 @@ impl TelemetryYangConverter {
 impl YangConverter<(SubscriptionInfo, TelemetryMessageWrapper), TelemetryYangConverterError>
     for TelemetryYangConverter
 {
-    fn get_root_schema_name(&self) -> &str {
-        &self.root_schema_name
-    }
-
-    fn get_subject_prefix(&self) -> Option<&str> {
+    fn subject_prefix(&self) -> Option<&str> {
         self.subject_prefix.as_deref()
     }
 
-    fn get_root_schema(&self) -> YangLibraryReference {
-        self.root_yang_lib_ref.clone()
+    fn root_schema_name(&self) -> &str {
+        &self.root_schema_name
     }
 
-    fn get_content_id(
-        &self,
-        input: &(SubscriptionInfo, TelemetryMessageWrapper),
-    ) -> Option<ContentId> {
+    fn default_yang_lib(&self) -> Option<&YangLibraryReference> {
+        self.default_yang_lib_ref.as_ref()
+    }
+
+    fn extension_yang_lib_ref(&self) -> Option<&YangLibraryReference> {
+        self.extension_yang_lib_ref.as_ref()
+    }
+
+    fn content_id(&self, input: &(SubscriptionInfo, TelemetryMessageWrapper)) -> Option<ContentId> {
         let (subscription_info, _) = input;
         if subscription_info.is_empty() {
             None
