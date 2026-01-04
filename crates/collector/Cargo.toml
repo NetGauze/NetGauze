@@ -31,6 +31,7 @@ netgauze-udp-notif-service = { workspace = true }
 netgauze-udp-notif-pkt = { workspace = true }
 netgauze-yang-push = { workspace = true }
 netgauze-iana = { workspace = true }
+netgauze-netconf-proto = { workspace = true }
 tokio = { workspace = true, features = ["full", "tracing", "rt-multi-thread"] }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
@@ -88,6 +89,8 @@ ipnet = { workspace = true, features = ["serde"] }
 notify = { workspace = true }
 sysinfo = { workspace = true }
 criterion = { workspace = true, optional = true } # dev-dependency for benchmarks
+schema-registry-client = { workspace = true }
+russh = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = [
