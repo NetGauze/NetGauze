@@ -393,7 +393,7 @@ impl ValidationActor {
 
         // Validating YANG data against the loaded schemas
         let data_op = DataOperation::NotificationYang;
-        let _data_tree = match DataTree::parse_op_string(
+        match DataTree::parse_op_string(
             &subscription.context,
             message.clone(),
             DataFormat::JSON,
@@ -401,7 +401,23 @@ impl ValidationActor {
         ) {
             Ok(tree) => tree,
             Err(err) => {
-                warn!("Failed to parse Yang Push message: {err}");
+                let errcode = err.errcode;
+                let msg = match &err.msg {
+                    Some(msg) => msg.clone(),
+                    None => "unknown error".to_string(),
+                };
+                let path = match &err.path {
+                    Some(path) => path.clone(),
+                    None => "unknown".to_string(),
+                };
+                let apptag = match &err.apptag {
+                    Some(apptag) => apptag.clone(),
+                    None => "none".to_string(),
+                };
+                warn!(
+                    "Failed to validate Yang Push message: {} (errcode={}, path={}, apptag={})",
+                    msg, errcode, path, apptag
+                );
                 return Err(ValidationActorError::PayloadValidationError);
             }
         };
