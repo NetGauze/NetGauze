@@ -224,12 +224,15 @@ use rustc_hash::FxHashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinError, JoinHandle};
 
 #[derive(Debug, Clone)]
 pub enum CacheActorCommand {
     Shutdown,
+    /// Invoke periodic cleanup operations to prevent memory leaks.
+    Cleanup,
 }
 
 #[derive(Debug)]
@@ -335,6 +338,7 @@ struct CacheActor<F: YangLibraryFetcher> {
     schema_cache: YangLibraryCache,
     requests: async_channel::Receiver<CacheLookupCommand>,
     fetcher: F,
+    fetcher_timeout: Duration,
     pending_requests: FxHashMap<SubscriptionInfo, Vec<async_channel::Sender<CacheResponse>>>,
     workers_queue: FuturesUnordered<JoinHandle<FetcherResult>>,
 }
@@ -438,8 +442,24 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
             Err(err) => {
                 tracing::warn!(error=%err, "cache actor worker failed to execute a task");
             }
-            Ok(Err(err)) => {
+            Ok(Err((subscription_info, err))) => {
                 tracing::warn!(error=%err, "cache actor worker failed");
+                let pending_senders = self.pending_requests.remove(&subscription_info);
+                if let Some(pending_senders) = pending_senders {
+                    for sender in pending_senders {
+                        let _ = sender
+                            .send(CacheResponse {
+                                subscription_info: subscription_info.clone(),
+                                yang_lib_ref: None,
+                            })
+                            .await
+                            .map_err(|error| {
+                                tracing::warn!(
+                                subscription_info=%subscription_info,
+                                error=%error, "failed to send error response to requester");
+                            });
+                    }
+                }
             }
             Ok(Ok((subscription_info, yang_lib, schemas))) => {
                 tracing::info!(
@@ -481,6 +501,13 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         }
     }
 
+    fn cleanup_closed_senders(&mut self) {
+        self.pending_requests.retain(|_, senders| {
+            senders.retain(|s| !s.is_closed());
+            !senders.is_empty()
+        });
+    }
+
     async fn process_request(&mut self, request: CacheLookupCommand) {
         match request {
             CacheLookupCommand::LookupBySubscriptionInfo(subscription_info, sender) => {
@@ -500,15 +527,30 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             .pending_requests
                             .entry(subscription_info.clone())
                             .or_default();
-                        let is_first_request = entry.is_empty();
+                        let should_fetch = entry.is_empty();
                         entry.push(sender);
 
-                        if is_first_request {
+                        if should_fetch {
                             tracing::info!(
                                 subscription_info = %subscription_info,
                                 "cache miss: starting fetch from device"
                             );
-                            let job = self.fetcher.fetch(subscription_info).await;
+                            let job_result = tokio::time::timeout(
+                                self.fetcher_timeout,
+                                self.fetcher.fetch(subscription_info.clone()),
+                            )
+                            .await;
+                            let job = match job_result {
+                                Ok(worker_result) => worker_result,
+                                Err(err) => {
+                                    tracing::warn!(
+                                        subscription_info=%subscription_info,
+                                        error=%err,
+                                        "cache miss: failed to fetch yang library from device"
+                                    );
+                                    return;
+                                }
+                            };
                             self.workers_queue.push(job);
                         } else {
                             tracing::debug!(  // Changed to debug
@@ -528,8 +570,15 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     .get_by_subscription_info(&subscription_info)
                     .is_none()
                 {
-                    let worker_result =
-                        self.fetcher.fetch_blocking(subscription_info.clone()).await;
+                    let worker_result = tokio::time::timeout(
+                        self.fetcher_timeout,
+                        self.fetcher.fetch_blocking(subscription_info.clone()),
+                    )
+                    .await;
+                    let worker_result = match worker_result {
+                        Ok(worker_result) => worker_result,
+                        Err(err) => Err((subscription_info.clone(), err.into())),
+                    };
                     self.process_worker_result(Ok(worker_result)).await;
                 }
                 let yang_lib_ref = self
@@ -587,7 +636,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
             tokio::select! {
                 biased;
                 cmd = self.cmd_rx.recv() => {
-                    return match cmd {
+                    match cmd {
                         Some(CacheActorCommand::Shutdown) => {
                             tracing::info!(
                                 pending_requests = self.pending_requests.len(),
@@ -597,7 +646,10 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             for task in self.workers_queue {
                                 task.abort();
                             }
-                            Ok("Schema cache shutdown successful".to_string())
+                            return Ok("Schema cache shutdown successful".to_string());
+                        }
+                        Some(CacheActorCommand::Cleanup) => {
+                            self.cleanup_closed_senders();
                         }
                         None => {
                             tracing::warn!(
@@ -608,7 +660,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             for task in self.workers_queue {
                                 task.abort();
                             }
-                            Ok("Schema cache shutdown successful".to_string())
+                            return Ok("Schema cache shutdown successful".to_string());
                         }
                     }
                 }
@@ -665,6 +717,7 @@ impl CacheActorHandle {
         buffer_size: usize,
         schema_cache: either::Either<YangLibraryCache, PathBuf>,
         fetcher: F,
+        fetcher_timeout: Duration,
     ) -> Result<(JoinHandle<Result<String, CacheActorCacheError>>, Self), CacheActorHandleError>
     {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);
@@ -679,15 +732,28 @@ impl CacheActorHandle {
             schema_cache,
             requests: requests_rx,
             fetcher,
+            fetcher_timeout,
             pending_requests: FxHashMap::default(),
             workers_queue: FuturesUnordered::new(),
         };
 
+        let cmd_tx_clone = cmd_tx.clone();
         let handle = Self {
             cmd_tx,
             requests_tx,
         };
         let join_handle = tokio::spawn(actor.run());
+
+        tokio::spawn(async move {
+            let mut cleanup_interval = tokio::time::interval(Duration::from_secs(300));
+            loop {
+                cleanup_interval.tick().await;
+                if let Err(err) = cmd_tx_clone.send(CacheActorCommand::Cleanup).await {
+                    tracing::warn!(error=%err, "failed to send cleanup command to cache actor, stopping periodic cleanup task");
+                    break;
+                }
+            }
+        });
         Ok((join_handle, handle))
     }
 
@@ -700,5 +766,304 @@ impl CacheActorHandle {
 
     pub fn request_tx(&self) -> async_channel::Sender<CacheLookupCommand> {
         self.requests_tx.clone()
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::cache::fetcher::tests::TestYangLibFetcher;
+    use futures_util::stream::FuturesOrdered;
+    use netgauze_udp_notif_pkt::notification::Target;
+    use std::collections::HashMap;
+    use std::net::{IpAddr, Ipv4Addr};
+    use std::path::Path;
+    use std::time::Duration;
+
+    pub(crate) fn test_subscription_info() -> SubscriptionInfo {
+        SubscriptionInfo::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
+            1,
+            ContentId::from("ietf-interfaces-lib".to_string()),
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+            ),
+            vec!["ietf-interfaces".to_string(), "ietf-ip".to_string()],
+        )
+    }
+
+    fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+        std::fs::create_dir_all(&dst)?;
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let ty = entry.file_type()?;
+            if ty.is_dir() {
+                copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+            } else {
+                std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+            }
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn setup_actor_with_loaded_cache() -> (
+        JoinHandle<Result<String, CacheActorCacheError>>,
+        CacheActorHandle,
+        YangLibraryReference,
+        SubscriptionInfo,
+        Arc<std::sync::Mutex<HashMap<SubscriptionInfo, usize>>>,
+    ) {
+        let cache_dir = tempfile::tempdir().unwrap();
+        let yang_lib_ref_path = cache_dir.path().to_path_buf().join("ietf-interfaces-lib");
+        copy_dir_all(
+            "../../assets/yang/ietf-interfaces",
+            yang_lib_ref_path.as_path(),
+        )
+        .unwrap();
+        let yang_lib_path = yang_lib_ref_path.join("yang-lib.xml");
+        let yang_lib_ref = YangLibraryReference::load_from_disk(yang_lib_path, yang_lib_ref_path)
+            .expect("Failed to load yang library reference from disk");
+        let subscription_info = yang_lib_ref
+            .subscriptions_info()
+            .expect("Failed to get subscriptions info")[0]
+            .clone();
+        let yang_lib = yang_lib_ref.yang_library().unwrap();
+        let schemas = yang_lib_ref.load_schemas().unwrap();
+        let fetcher = TestYangLibFetcher::new(HashMap::from([(
+            subscription_info.clone(),
+            (yang_lib, schemas),
+        )]));
+        let fetcher_count = Arc::clone(&fetcher.fetch_counts);
+        let (join, handle) = CacheActorHandle::new(
+            100,
+            either::Right(cache_dir.path().to_path_buf()),
+            fetcher,
+            Duration::from_secs(1),
+        )
+        .expect("Failed to create cache actor");
+        (join, handle, yang_lib_ref, subscription_info, fetcher_count)
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn setup_actor_with_empty_cache() -> (
+        JoinHandle<Result<String, CacheActorCacheError>>,
+        CacheActorHandle,
+        SubscriptionInfo,
+        Arc<std::sync::Mutex<HashMap<SubscriptionInfo, usize>>>,
+    ) {
+        // Keep the YANG lib reference in a different directory than the cache
+        let fetcher_dir = tempfile::tempdir().unwrap();
+        let yang_lib_ref_path = fetcher_dir.path().to_path_buf().join("ietf-interfaces-lib");
+        copy_dir_all(
+            "../../assets/yang/ietf-interfaces",
+            yang_lib_ref_path.as_path(),
+        )
+        .unwrap();
+        let yang_lib_path = yang_lib_ref_path.join("yang-lib.xml");
+        let yang_lib_ref = YangLibraryReference::load_from_disk(yang_lib_path, yang_lib_ref_path)
+            .expect("Failed to load yang library reference from disk");
+        let subscription_info = yang_lib_ref
+            .subscriptions_info()
+            .expect("Failed to get subscriptions info")[0]
+            .clone();
+        let yang_lib = yang_lib_ref.yang_library().unwrap();
+        let schemas = yang_lib_ref.load_schemas().unwrap();
+        let fetcher = TestYangLibFetcher::new(HashMap::from([(
+            subscription_info.clone(),
+            (yang_lib, schemas),
+        )]));
+        let fetcher_count = Arc::clone(&fetcher.fetch_counts);
+
+        let cache_dir = tempfile::tempdir().unwrap();
+        let (join, handle) = CacheActorHandle::new(
+            100,
+            either::Right(cache_dir.path().to_path_buf()),
+            fetcher,
+            Duration::from_secs(1),
+        )
+        .expect("Failed to create cache actor");
+        (join, handle, subscription_info, fetcher_count)
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_cache_miss_device_fail() {
+        let (join_handle, handle, _cached_lib_ref, _cached_subscription_info, fetcher_count) =
+            setup_actor_with_loaded_cache();
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 0);
+        }
+        let subscription_info = test_subscription_info();
+
+        let (tx, rx) = async_channel::unbounded();
+        handle
+            .request_tx()
+            .send(CacheLookupCommand::LookupBySubscriptionInfo(
+                subscription_info.clone(),
+                tx,
+            ))
+            .await
+            .unwrap();
+
+        tokio::task::yield_now().await;
+        let response = tokio::time::timeout(Duration::from_millis(1000), rx.recv())
+            .await
+            .expect("timeout waiting for response")
+            .expect("failed to receive response");
+        assert_eq!(response.subscription_info(), &subscription_info);
+        assert_eq!(response.yang_lib_ref(), None);
+
+        // check that the fetcher was called
+
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            eprintln!("Hits counts:\n{hits_counts:#?}");
+            assert_eq!(hits_counts.len(), 1);
+            assert_eq!(hits_counts.get(&subscription_info), Some(&1));
+        }
+
+        tokio::time::timeout(Duration::from_millis(100), handle.shutdown())
+            .await
+            .expect("timeout during shutdown")
+            .expect("failed to shutdown actor");
+        tokio::time::timeout(Duration::from_millis(100), join_handle)
+            .await
+            .expect("timeout during join")
+            .expect("failed to join actor")
+            .expect("cache actor failed");
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_cache_miss_triggers_fetch() {
+        let (join_handle, handle, subscription_info, fetcher_count) =
+            setup_actor_with_empty_cache();
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 0);
+        }
+
+        let (tx, rx) = async_channel::unbounded();
+        handle
+            .request_tx()
+            .send(CacheLookupCommand::LookupBySubscriptionInfo(
+                subscription_info.clone(),
+                tx,
+            ))
+            .await
+            .unwrap();
+
+        tokio::task::yield_now().await;
+        let response = tokio::time::timeout(Duration::from_millis(1000), rx.recv())
+            .await
+            .expect("timeout waiting for response")
+            .expect("failed to receive response");
+        assert_eq!(response.subscription_info(), &subscription_info);
+        assert!(response.yang_lib_ref().is_some());
+
+        // check that the fetcher was called
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 1);
+            assert_eq!(hits_counts.get(&subscription_info), Some(&1));
+        }
+
+        let (tx, rx) = async_channel::unbounded();
+        handle
+            .request_tx()
+            .send(CacheLookupCommand::LookupBySubscriptionInfo(
+                subscription_info.clone(),
+                tx,
+            ))
+            .await
+            .unwrap();
+
+        tokio::task::yield_now().await;
+        let response = tokio::time::timeout(Duration::from_millis(1000), rx.recv())
+            .await
+            .expect("timeout waiting for response")
+            .expect("failed to receive response");
+        assert_eq!(response.subscription_info(), &subscription_info);
+        assert!(response.yang_lib_ref().is_some());
+
+        // check that the fetcher was NOT called
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 1);
+            assert_eq!(hits_counts.get(&subscription_info), Some(&1));
+        }
+
+        tokio::time::timeout(Duration::from_millis(100), handle.shutdown())
+            .await
+            .expect("timeout during shutdown")
+            .expect("failed to shutdown actor");
+        tokio::time::timeout(Duration::from_millis(100), join_handle)
+            .await
+            .expect("timeout during join")
+            .expect("failed to join actor")
+            .expect("cache actor failed");
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_fetch_deduplication() {
+        let (join_handle, handle, subscription_info, fetcher_count) =
+            setup_actor_with_empty_cache();
+
+        let mut tasks = FuturesOrdered::new();
+        for _ in 0..10 {
+            let h = handle.clone();
+            let sub = subscription_info.clone();
+            tasks.push_back(tokio::spawn(async move {
+                let (tx, rx) = async_channel::unbounded();
+                h.request_tx()
+                    .send(CacheLookupCommand::LookupBySubscriptionInfo(sub, tx))
+                    .await
+                    .unwrap();
+                rx.recv().await.unwrap()
+            }));
+        }
+
+        let results = tasks
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .map(|res| res.unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(results.len(), 10);
+
+        // Verify only ONE fetch occurred
+        {
+            let count = fetcher_count.lock().unwrap();
+            assert_eq!(count.get(&subscription_info), Some(&1));
+        }
+
+        // Cleanup
+        tokio::time::timeout(Duration::from_millis(100), handle.shutdown())
+            .await
+            .expect("timeout during shutdown")
+            .expect("failed to shutdown actor");
+        tokio::time::timeout(Duration::from_millis(100), join_handle)
+            .await
+            .expect("timeout during join")
+            .expect("failed to join actor")
+            .expect("cache actor failed");
     }
 }

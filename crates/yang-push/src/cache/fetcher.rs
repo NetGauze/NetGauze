@@ -33,8 +33,10 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
-pub type FetcherResult =
-    Result<(SubscriptionInfo, YangLibrary, HashMap<Box<str>, Box<str>>), YangLibraryCacheError>;
+pub type FetcherResult = Result<
+    (SubscriptionInfo, YangLibrary, HashMap<Box<str>, Box<str>>),
+    (SubscriptionInfo, YangLibraryCacheError),
+>;
 
 /// Fetch YANG Library and schemas from an external source
 pub trait YangLibraryFetcher {
@@ -94,8 +96,7 @@ impl NetconfYangLibraryFetcher {
         private_key: Arc<russh::keys::ssh_key::PrivateKey>,
         client_config: Arc<russh::client::Config>,
         default_port: u16,
-    ) -> Result<(SubscriptionInfo, YangLibrary, HashMap<Box<str>, Box<str>>), YangLibraryCacheError>
-    {
+    ) -> FetcherResult {
         let host = SocketAddr::new(subscription_info.peer().ip(), default_port);
         tracing::info!(
             host = %host,
@@ -110,11 +111,11 @@ impl NetconfYangLibraryFetcher {
             Ok(Ok(c)) => c,
             Ok(Err(err)) => {
                 tracing::error!(host=%host,error=%err, "error connecting to device over SSH");
-                return Err(err.into());
+                return Err((subscription_info.clone(), err.into()));
             }
             Err(err) => {
                 tracing::error!(host=%host,error=%err, "timeout while connecting to device over SSH");
-                return Err(err.into());
+                return Err((subscription_info.clone(), err.into()));
             }
         };
         let modules = subscription_info
@@ -125,7 +126,8 @@ impl NetconfYangLibraryFetcher {
         // TODO: add timeout to loading YANG Library from the device
         let (yang_lib, schemas) = client
             .load_from_modules(&modules, &PermissiveVersionChecker)
-            .await?;
+            .await
+            .map_err(|err| (subscription_info.clone(), err.into()))?;
         match tokio::time::timeout(timeout_duration, client.close()).await {
             Ok(Ok(_)) => {
                 tracing::info!(host=%host,"SSH connection closed successfully");
@@ -167,5 +169,64 @@ impl YangLibraryFetcher for NetconfYangLibraryFetcher {
             self.default_port,
         )
         .await
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    #[allow(clippy::type_complexity)]
+    pub(crate) struct TestYangLibFetcher {
+        pub yang_libs: HashMap<SubscriptionInfo, (YangLibrary, HashMap<Box<str>, Box<str>>)>,
+        /// for testing, the number of times a SubscriptionInfo has been fetched
+        pub fetch_counts: Arc<Mutex<HashMap<SubscriptionInfo, usize>>>,
+    }
+
+    impl TestYangLibFetcher {
+        #[allow(clippy::type_complexity)]
+        pub(crate) fn new(
+            yang_libs: HashMap<SubscriptionInfo, (YangLibrary, HashMap<Box<str>, Box<str>>)>,
+        ) -> Self {
+            for (sub_info, (yang_lib, _schemas)) in &yang_libs {
+                tracing::info!(
+                    subscription_info=%sub_info,
+                    content_id=yang_lib.content_id(),
+                    "Fetcher stored YANG Library in cache",
+                )
+            }
+            Self {
+                yang_libs,
+                fetch_counts: Arc::new(Mutex::new(HashMap::new())),
+            }
+        }
+
+        #[allow(clippy::result_large_err)]
+        fn get_from_cache(&self, subscription_info: SubscriptionInfo) -> FetcherResult {
+            tracing::info!(subscription_info=%subscription_info, "fetching from device");
+            // Increment counter in the instance state
+            {
+                let mut counts = self.fetch_counts.lock().unwrap();
+                *counts.entry(subscription_info.clone()).or_default() += 1;
+            }
+
+            let (yang_lib, schemas) = self.yang_libs.get(&subscription_info).cloned().ok_or_else(|| {
+                tracing::info!(subscription_info=%subscription_info, "YANG Library not found in cache");
+                (subscription_info.clone(), YangLibraryCacheError::IoError(std::io::Error::other("not found")))
+            })?;
+            Ok((subscription_info, yang_lib, schemas))
+        }
+    }
+
+    impl YangLibraryFetcher for TestYangLibFetcher {
+        async fn fetch(&self, subscription_info: SubscriptionInfo) -> JoinHandle<FetcherResult> {
+            let result = self.get_from_cache(subscription_info);
+            tokio::spawn(async move { result })
+        }
+
+        async fn fetch_blocking(&self, subscription_info: SubscriptionInfo) -> FetcherResult {
+            self.get_from_cache(subscription_info)
+        }
     }
 }
