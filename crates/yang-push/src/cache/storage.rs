@@ -26,6 +26,7 @@
 //!   Target filters, module sets)
 //! - Persist YANG libraries and schemas to disk for durability
 //! - Load cached YANG libraries from disk on startup
+//! - Support multiple subscriptions referencing the same YANG library.
 //!
 //! # Key Components
 //!
@@ -44,10 +45,10 @@
 //! The cache persists data to disk in a structured directory hierarchy:
 //!
 //! ```text
-//! <schemas_root_path>/
+//! <cache_root_path>/
 //!   ├── <content-id-1>/
 //!   │   ├── yang-lib.xml           # Serialized YANG library
-//!   │   ├── subscription-info.json # Subscription metadata
+//!   │   ├── subscriptions-info.json # Subscriptions metadata
 //!   │   └── modules/               # YANG module files
 //!   │       ├── module1@revision.yang
 //!   │       └── module2@revision.yang
@@ -76,7 +77,8 @@
 //! // Or load existing cache from disk
 //! let mut cache = YangLibraryCache::from_disk(PathBuf::from("/path/to/schemas"))?;
 //!
-//! // Store a YANG library with subscription info
+//! // Store a YANG library with subscription info, or append the subscription info to the existing one
+//! // if the YANG library already exists and is identical.
 //! let yang_lib_ref = cache.put_yang_library(subscription_info, yang_lib, schemas)?;
 //!
 //! // Retrieve by subscription info
@@ -97,7 +99,7 @@ use netgauze_udp_notif_pkt::notification::{SubscriptionId, Target};
 use quick_xml::NsReader;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
@@ -116,7 +118,7 @@ const MODULE_STATE: &str = r#"
 const YANG_LIBRARY_FILE_NAME: &str = "yang-lib.xml";
 
 // default file names for the subscription info file
-const SUBSCRIPTION_INFO_FILE_NAME: &str = "subscription-info.json";
+const SUBSCRIPTIONS_INFO_FILE_NAME: &str = "subscriptions-info.json";
 
 /// Error types for YANG Library Cache operations.
 ///
@@ -212,6 +214,19 @@ impl From<tokio::time::error::Elapsed> for YangLibraryCacheError {
 /// information needed to locate and load the YANG library and its associated
 /// modules on demand.
 ///
+/// # Multi-Subscription Support
+///
+/// A single `YangLibraryReference` can be associated with multiple
+/// subscriptions from different peers, as long as they all use the same YANG
+/// library (content-id).
+///
+/// - [`subscriptions_info`](Self::subscriptions_info): Retrieve all associated
+///   subscriptions
+/// - [`append_subscription_info`](Self::append_subscription_info): Add another
+///   subscription
+/// - [`save_to_disk`](Self::save_to_disk): Persist YANG library and
+///   subscriptions
+///
 /// # Components
 ///
 /// - **Content ID**: A unique identifier for the YANG library, extracted from
@@ -220,10 +235,11 @@ impl From<tokio::time::error::Elapsed> for YangLibraryCacheError {
 /// - **YANG Library Path**: The filesystem path to the serialized YANG library
 ///   XML file (`yang-lib.xml`).
 ///
-/// - **Reference Directory**: The directory containing the `yang-lib.xml`,
-///   `subscription-info.json` and `modules` directory containing YANG modules
-///   referenced by the library. Modules are loaded from `{dir}/modules ` in
-///   this directory when [`load_schemas`](Self::load_schemas) is called.
+/// - **YANG Library Reference Directory**: The directory containing the
+///   `yang-lib.xml`, `subscriptions-info.json` and `modules` directory
+///   containing YANG modules referenced by the library. Modules are loaded from
+///   `{yang_lib_ref_path}/modules ` in this directory when
+///   [`load_schemas`](Self::load_schemas) is called.
 ///
 /// # Lazy Loading
 ///
@@ -264,7 +280,7 @@ impl From<tokio::time::error::Elapsed> for YangLibraryCacheError {
 pub struct YangLibraryReference {
     content_id: ContentId,
     yang_library_path: PathBuf,
-    dir: PathBuf,
+    yang_lib_ref_path: PathBuf,
 }
 
 impl YangLibraryReference {
@@ -276,7 +292,10 @@ impl YangLibraryReference {
     ///
     /// This does not load the YANG modules themselves, only the reference to
     /// them.
-    pub fn new(yang_library_path: PathBuf, dir: PathBuf) -> Result<Self, YangLibraryCacheError> {
+    pub fn load_from_disk(
+        yang_library_path: PathBuf,
+        yang_lib_ref_path: PathBuf,
+    ) -> Result<Self, YangLibraryCacheError> {
         if !yang_library_path.exists() {
             tracing::warn!(
                 yang_library_path = %yang_library_path.display(),
@@ -295,44 +314,221 @@ impl YangLibraryReference {
                 yang_library_path,
             ));
         }
-        if !dir.exists() {
+        if !yang_lib_ref_path.exists() {
             tracing::warn!(
-                 dir=%dir.display(),
+                 yang_lib_ref_path=%yang_lib_ref_path.display(),
                 "YANG library reference path not found"
             );
-            return Err(YangLibraryCacheError::YangLibrarySearchPathNotFound(dir));
+            return Err(YangLibraryCacheError::YangLibrarySearchPathNotFound(
+                yang_lib_ref_path,
+            ));
         }
-        if !dir.is_dir() {
+        if !yang_lib_ref_path.is_dir() {
             tracing::warn!(
-                dir=%dir.display(),
+                yang_lib_ref_path=%yang_lib_ref_path.display(),
                 "YANG library reference path is not a directory"
             );
-            return Err(YangLibraryCacheError::YangLibrarySearchPathIsNotValid(dir));
+            return Err(YangLibraryCacheError::YangLibrarySearchPathIsNotValid(
+                yang_lib_ref_path,
+            ));
         }
         tracing::debug!(
-             yang_library_path = %yang_library_path.display(),
-            dir = %dir.display(),
+            yang_library_path=%yang_library_path.display(),
+            yang_lib_ref_path= %yang_lib_ref_path.display(),
             "loading YANG library reference",
         );
+        let subscriptions_info_path = yang_lib_ref_path.join(SUBSCRIPTIONS_INFO_FILE_NAME);
+        let subscriptions_info_file = std::fs::File::open(subscriptions_info_path.as_path()).map_err(|error| {
+            tracing::warn!(
+                subscriptions_info_path=%subscriptions_info_path.display(), "failed to open subscriptions info file");
+            std::io::Error::other(format!(
+                "failed to open subscriptions info file {}: {error}",
+                subscriptions_info_path.display()
+            ))
+        })?;
+        let subscriptions_info: Vec<SubscriptionInfo> = serde_json::from_reader(subscriptions_info_file).map_err(|error| {
+           tracing::warn!(subscriptions_info_path=%subscriptions_info_path.display(), error=%error, "failed to parse subscriptions info file");
+            YangLibraryCacheError::SerdeJsonError(error)
+        })?;
         let yang_library = Self::load_yang_library(&yang_library_path)?;
         let content_id = yang_library.content_id().into();
         tracing::info!(
-            yang_library_path = %yang_library_path.display(),
-            dir = %dir.display(),
+            yang_library_path=%yang_library_path.display(),
+            yang_lib_ref_path=%yang_lib_ref_path.display(),
             content_id,
+            subscriptions_count=subscriptions_info.len(),
             "loaded YANG library reference",
         );
         Ok(Self {
             content_id,
             yang_library_path,
-            dir,
+            yang_lib_ref_path,
+        })
+    }
+
+    /// Create and save a YANG Library Reference to disk.
+    ///
+    /// This will create the necessary directory structure and files to store
+    /// the YANG library, subscription info, and YANG modules.
+    ///
+    /// If the YANG Library already exists on disk and differs from the provided
+    /// YANG Library, an error is returned to prevent overwriting.
+    ///
+    /// If the YANG Library already exists and is identical, the existing
+    /// reference is returned and the subscription info is extended with the new
+    /// subscriptions.
+    pub fn save_to_disk(
+        yang_lib_ref_path: PathBuf,
+        yang_library: &YangLibrary,
+        schemas: HashMap<Box<str>, Box<str>>,
+        subscriptions_info: &[SubscriptionInfo],
+    ) -> Result<Self, YangLibraryCacheError> {
+        if !yang_lib_ref_path.exists() {
+            std::fs::create_dir_all(&yang_lib_ref_path).map_err(|error| {
+                tracing::warn!(
+                    yang_lib_ref_path=%yang_lib_ref_path.display(),
+                    content_id=yang_library.content_id(),
+                    "failed to create YANG Library Reference dir");
+                std::io::Error::other(format!(
+                    "failed to create YANG Library Reference {} dir {}: {error}",
+                    yang_library.content_id(),
+                    yang_lib_ref_path.display()
+                ))
+            })?
+        }
+        if !yang_lib_ref_path.is_dir() {
+            tracing::warn!(
+                yang_lib_ref_path=%yang_lib_ref_path.display(),
+                "YANG library reference path is not a directory"
+            );
+            return Err(YangLibraryCacheError::YangLibrarySearchPathIsNotValid(
+                yang_lib_ref_path,
+            ));
+        }
+        let yang_library_path = yang_lib_ref_path.join(YANG_LIBRARY_FILE_NAME);
+        if yang_library_path.exists() {
+            if !yang_library_path.is_file() {
+                tracing::warn!(
+                    yang_library_path = %yang_library_path.display(),
+                    "YANG library path is not a file"
+                );
+                return Err(YangLibraryCacheError::YangLibraryPathIsNotValid(
+                    yang_library_path,
+                ));
+            }
+            let loaded_yang_lib = Self::load_yang_library(yang_library_path.as_path())?;
+            if &loaded_yang_lib != yang_library {
+                tracing::warn!(
+                    yang_library_path = %yang_library_path.display(),
+                    "Different YANG library found, cannot override"
+                );
+                return Err(YangLibraryCacheError::DuplicateYangLibrary(
+                    yang_library_path.clone(),
+                ));
+            }
+        } else {
+            let file = std::fs::File::create(&yang_library_path)?;
+            let writer = std::io::BufWriter::new(file);
+            let quick_xml_writer = quick_xml::writer::Writer::new_with_indent(writer, 32, 2);
+            let mut xml_writer = XmlWriter::new(quick_xml_writer);
+            yang_library.xml_serialize(&mut xml_writer)?;
+            let mut inner = xml_writer.into_inner();
+            inner.write_all(MODULE_STATE.as_bytes())?;
+            inner.flush()?;
+        }
+
+        let subscriptions_info_path = yang_lib_ref_path.join(SUBSCRIPTIONS_INFO_FILE_NAME);
+        let subscriptions_info = if subscriptions_info_path.is_file() {
+            tracing::debug!(
+                subscriptions_info_path=%subscriptions_info_path.display(),
+                content_id=yang_library.content_id(),
+                "subscriptions info file already exists, extending it with new subscriptions"
+            );
+            let subscriptions_info_file = std::fs::File::open(subscriptions_info_path.as_path())
+                .map_err(|error| {
+                    tracing::error!(
+                    subscriptions_info_path=%subscriptions_info_path.display(),
+                    error=%error,
+                    "failed to open subscriptions info file");
+                    std::io::Error::other(format!(
+                        "failed to open subscriptions info file {}: {error}",
+                        subscriptions_info_path.display()
+                    ))
+                })?;
+            let mut read_subscriptions_info: HashSet<SubscriptionInfo> =
+                serde_json::from_reader(subscriptions_info_file).map_err(|error| {
+                    tracing::error!(
+                        subscriptions_info_path=%subscriptions_info_path.display(),
+                        error=%error,
+                        "failed to parse subscriptions info file"
+                    );
+                    error
+                })?;
+            read_subscriptions_info.extend(subscriptions_info.iter().cloned());
+            &read_subscriptions_info
+                .into_iter()
+                .collect::<Vec<SubscriptionInfo>>()
+        } else {
+            subscriptions_info
+        };
+
+        let subscriptions_info_file = std::fs::File::create(subscriptions_info_path.as_path())
+            .map_err(|error| {
+                tracing::warn!(
+                subscriptions_info_path=%subscriptions_info_path.display(),
+                error=%error,
+                "failed to open subscriptions info file");
+                std::io::Error::other(format!(
+                    "failed to open subscriptions info file {}: {error}",
+                    subscriptions_info_path.display()
+                ))
+            })?;
+        serde_json::to_writer_pretty(subscriptions_info_file, subscriptions_info)?;
+
+        let modules_path = yang_lib_ref_path.join("modules");
+        std::fs::create_dir_all(&modules_path)?;
+        for (name, schema) in &schemas {
+            let mut revision = None;
+            if let Some(module) = yang_library.find_module(name.as_ref()) {
+                revision = module.revision();
+            } else if let Some(import_only_modules) = yang_library.find_import_module(name.as_ref())
+            {
+                if let Some(import_only_module) = import_only_modules.into_iter().next() {
+                    revision = import_only_module.revision();
+                }
+            } else if let Some(submodule) = yang_library.find_submodule(name.as_ref()) {
+                revision = submodule.revision();
+            }
+            let filename = if let Some(revision) = revision {
+                format!("{name}@{revision}.yang")
+            } else {
+                name.to_string()
+            };
+            let yang_module_path = modules_path.join(&filename);
+            std::fs::write(&yang_module_path, schema.as_ref())?;
+            tracing::info!(yang_module_path = %yang_module_path.display(), "saved yang module to disk");
+        }
+        tracing::info!(
+            content_id=yang_library.content_id(),
+            modules_count = schemas.len(),
+            modules_path = %modules_path.display(),
+            "saved YANG modules to disk"
+        );
+
+        Ok(Self {
+            content_id: yang_library.content_id().into(),
+            yang_library_path,
+            yang_lib_ref_path,
         })
     }
 
     // Load the YANG Library from the given path.
     fn load_yang_library(yang_library_path: &Path) -> Result<YangLibrary, YangLibraryCacheError> {
         let reader = NsReader::from_file(yang_library_path)
-            .map_err(|x| YangLibraryCacheError::ParsingError(x.into()))?;
+            .map_err(|error| {
+                tracing::warn!(yang_library_path=%yang_library_path.display(), error=%error, "failed to open yang library file");
+                YangLibraryCacheError::ParsingError(error.into())
+            })?;
         tracing::trace!(yang_library_path=%yang_library_path.display(), "parsing yang library from disk");
         let mut xml_reader = netgauze_netconf_proto::xml_utils::XmlParser::new(reader)?;
         let yang_library = YangLibrary::xml_deserialize(&mut xml_reader)?;
@@ -354,13 +550,13 @@ impl YangLibraryReference {
     }
 
     /// Get the path to the directory containing the YANG Library file.
-    pub fn dir(&self) -> &Path {
-        self.dir.as_path()
+    pub fn yang_lib_ref_path(&self) -> &Path {
+        self.yang_lib_ref_path.as_path()
     }
 
     /// Get the path to the search directory containing the YANG modules.
     pub fn search_dir(&self) -> PathBuf {
-        self.dir().join("modules")
+        self.yang_lib_ref_path().join("modules")
     }
 
     ///Load the YANG schemas defined in the library from disk.
@@ -389,6 +585,131 @@ impl YangLibraryReference {
                 Err(err.into())
             }
         }
+    }
+
+    pub fn subscription_info_path(&self) -> PathBuf {
+        self.yang_lib_ref_path.join(SUBSCRIPTIONS_INFO_FILE_NAME)
+    }
+
+    pub fn subscriptions_info(&self) -> Result<Vec<SubscriptionInfo>, YangLibraryCacheError> {
+        let subscriptions_info_path = self.subscription_info_path();
+        tracing::debug!(
+            subscriptions_info_path = %subscriptions_info_path.display(),
+            content_id=self.content_id,
+            "loading subscription info from disk"
+        );
+        let subscriptions_info_file = std::fs::File::open(subscriptions_info_path.as_path())
+            .map_err(|error| {
+                std::io::Error::other(format!(
+                    "failed to read subscriptions info from {}: {error}",
+                    subscriptions_info_path.display()
+                ))
+            })?;
+        let subscriptions_info = serde_json::from_reader(subscriptions_info_file)?;
+        Ok(subscriptions_info)
+    }
+
+    /// Appends a subscription information entry to the persisted list.
+    ///
+    /// If the subscription info already exists, this operation is idempotent
+    /// (no duplicate entry is created). Uses file locking to prevent concurrent
+    /// modification issues and atomic writes for crash safety.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The subscription info file cannot be accessed
+    /// - JSON parsing/serialization fails
+    /// - File system operations fail
+    pub fn append_subscription_info(
+        &self,
+        subscription_info: SubscriptionInfo,
+    ) -> Result<(), YangLibraryCacheError> {
+        let subscriptions_info_path = self.subscription_info_path();
+
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&subscriptions_info_path)?;
+
+        file.lock().map_err(|e| {
+            YangLibraryCacheError::IoError(std::io::Error::other(format!(
+                "failed to acquire lock on {}: {e}",
+                subscriptions_info_path.display()
+            )))
+        })?;
+
+        // Ensure unlock on all paths
+        let result = (|| {
+            let mut subscriptions_info: Vec<SubscriptionInfo> = serde_json::from_reader(&file)?;
+
+            if subscriptions_info
+                .iter()
+                .any(|info| info == &subscription_info)
+            {
+                return Ok(());
+            }
+
+            subscriptions_info.push(subscription_info);
+
+            // Atomic write via a temp file
+            let temp_path = subscriptions_info_path.with_extension(".tmp");
+            let temp_file = std::fs::File::create(&temp_path)?;
+            serde_json::to_writer_pretty(temp_file, &subscriptions_info)?;
+            std::fs::rename(temp_path, &subscriptions_info_path)?;
+
+            Ok(())
+        })();
+
+        file.unlock()?;
+        result
+    }
+
+    /// Remove a subscription info from the YANG library reference.
+    ///
+    /// If the subscription info is found and removed, it is returned.
+    /// If not found, None is returned.
+    pub fn remove_subscription_info(
+        &self,
+        subscription_info: &SubscriptionInfo,
+    ) -> Result<Option<SubscriptionInfo>, YangLibraryCacheError> {
+        let subscriptions_info_path = self.subscription_info_path();
+
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&subscriptions_info_path)?;
+
+        file.lock().map_err(|e| {
+            YangLibraryCacheError::IoError(std::io::Error::other(format!(
+                "failed to acquire lock on {}: {e}",
+                subscriptions_info_path.display()
+            )))
+        })?;
+
+        let result = (|| {
+            let mut subscriptions_info: Vec<SubscriptionInfo> = serde_json::from_reader(&file)?;
+
+            let original_len = subscriptions_info.len();
+            subscriptions_info.retain(|info| info != subscription_info);
+
+            if subscriptions_info.len() == original_len {
+                return Ok(None);
+            }
+
+            // Atomic write
+            let temp_path = subscriptions_info_path.with_extension(".tmp");
+            let temp_file = std::fs::File::create(&temp_path)?;
+            serde_json::to_writer_pretty(temp_file, &subscriptions_info)?;
+            std::fs::rename(temp_path, &subscriptions_info_path)?;
+
+            Ok(Some(subscription_info.clone()))
+        })();
+
+        file.unlock()?;
+        result
     }
 }
 
@@ -584,16 +905,16 @@ impl YangLibraryCache {
             IpAddr,
             FxHashMap<SubscriptionId, SubscriptionInfo>,
         > = FxHashMap::default();
-        let read_dir = std::fs::read_dir(cache_root_path.as_path()).map_err(|e| {
+        let read_dir = std::fs::read_dir(cache_root_path.as_path()).map_err(|error| {
             std::io::Error::other(format!(
-                "failed to read cached root path {}: {e}",
+                "failed to read cached root path {}: {error}",
                 cache_root_path.display()
             ))
         })?;
         for dir in read_dir {
-            let entry = dir.map_err(|e| {
+            let entry = dir.map_err(|error| {
                 std::io::Error::other(format!(
-                    "failed to read cached entry in root path {}: {e}",
+                    "failed to read cached entry in root path {}: {error}",
                     cache_root_path.display()
                 ))
             })?;
@@ -602,39 +923,25 @@ impl YangLibraryCache {
                 continue;
             }
             let yang_lib_path = path.join(YANG_LIBRARY_FILE_NAME);
-            let yang_lib_ref = YangLibraryReference::new(yang_lib_path, path.clone())?;
+            let yang_lib_ref = YangLibraryReference::load_from_disk(yang_lib_path, path.clone())?;
             let yang_lib_ref = Arc::new(yang_lib_ref);
             // Loading the schemas to verify they are correctly stored
             _ = yang_lib_ref.load_schemas()?;
             let content_id = yang_lib_ref.content_id().clone();
-            let subscription_info_path = path.join(SUBSCRIPTION_INFO_FILE_NAME);
-            tracing::debug!(
-                subscription_info_path = %subscription_info_path.display(),
-                content_id,
-                "loading subscription info from disk"
-            );
-            let subscription_info_file = std::fs::File::open(subscription_info_path.as_path())
-                .map_err(|e| {
-                    std::io::Error::other(format!(
-                        "failed to read subscription info from {}: {e}",
-                        subscription_info_path.display()
-                    ))
-                })?;
-            let subscription_info: SubscriptionInfo =
-                serde_json::from_reader(subscription_info_file)?;
+            let subscriptions_info = yang_lib_ref.subscriptions_info()?;
             tracing::info!(
                 yang_library_path = %path.display(),
-                subscription_info = %subscription_info,
+                subscriptions_info = ?subscriptions_info,
                 "loaded yang library reference ",
-
             );
-
             cache_by_content_id.insert(content_id, Arc::clone(&yang_lib_ref));
-            cache_by_subscription_id
-                .entry(subscription_info.peer().ip())
-                .or_default()
-                .insert(subscription_info.id(), subscription_info.clone());
-            cache_by_subscription_info.insert(subscription_info, yang_lib_ref);
+            for subscription_info in subscriptions_info {
+                cache_by_subscription_id
+                    .entry(subscription_info.peer().ip())
+                    .or_default()
+                    .insert(subscription_info.id(), subscription_info.clone());
+                cache_by_subscription_info.insert(subscription_info, Arc::clone(&yang_lib_ref));
+            }
         }
         tracing::info!(
             total_entries = %cache_by_content_id.len(),
@@ -650,21 +957,51 @@ impl YangLibraryCache {
 
     /// Store a YANG Library along with its associated Subscription Info
     /// and schemas into the cache and persist them to disk.
+    ///
+    /// If the YANG Library already exists in the cache and is identical,
+    /// the existing reference is returned and the subscription info is
+    /// appended.
     pub fn put_yang_library(
         &mut self,
         subscription_info: SubscriptionInfo,
         yang_lib: YangLibrary,
         schemas: HashMap<Box<str>, Box<str>>,
     ) -> Result<Arc<YangLibraryReference>, YangLibraryCacheError> {
-        let (yang_lib_path, entry_path) =
-            self.save_to_disk(&subscription_info, &yang_lib, &schemas)?;
-        let yang_lib_ref = YangLibraryReference::new(yang_lib_path, entry_path)?;
+        let content_id = yang_lib.content_id();
+        // Check if already cached
+        if let Some(existing_ref) = self.cache_by_content_id.get(content_id) {
+            if !self
+                .cache_by_subscription_info
+                .contains_key(&subscription_info)
+            {
+                existing_ref.append_subscription_info(subscription_info.clone())?;
+                self.cache_by_subscription_info
+                    .insert(subscription_info.clone(), Arc::clone(existing_ref));
+                self.cache_by_subscription_id
+                    .entry(subscription_info.peer().ip())
+                    .or_default()
+                    .insert(subscription_info.id(), subscription_info);
+            }
+            return Ok(Arc::clone(existing_ref));
+        }
+        // New entry - save to disk
+        let entry_path = self.cache_root_path.join(yang_lib.content_id());
+        let yang_lib_ref = YangLibraryReference::save_to_disk(
+            entry_path,
+            &yang_lib,
+            schemas,
+            std::slice::from_ref(&subscription_info),
+        )?;
         let content_id = yang_lib_ref.content_id().clone();
         let yang_lib_ref = Arc::new(yang_lib_ref);
         self.cache_by_subscription_info
-            .insert(subscription_info, Arc::clone(&yang_lib_ref));
+            .insert(subscription_info.clone(), Arc::clone(&yang_lib_ref));
         self.cache_by_content_id
-            .insert(content_id.clone(), Arc::clone(&yang_lib_ref));
+            .insert(content_id, Arc::clone(&yang_lib_ref));
+        self.cache_by_subscription_id
+            .entry(subscription_info.peer().ip())
+            .or_default()
+            .insert(subscription_info.id(), subscription_info);
         Ok(yang_lib_ref)
     }
 
@@ -676,8 +1013,12 @@ impl YangLibraryCache {
         if let Some(yang_lib_ref) = self.cache_by_content_id.remove(content_id) {
             self.cache_by_subscription_info
                 .retain(|_, v| v.content_id() != content_id);
+            self.cache_by_subscription_id.retain(|_, sub_map| {
+                sub_map.retain(|_, sub_info| sub_info.content_id() != content_id);
+                !sub_map.is_empty()
+            });
             std::fs::remove_file(yang_lib_ref.yang_library_path())?;
-            std::fs::remove_dir_all(yang_lib_ref.dir())?;
+            std::fs::remove_dir_all(yang_lib_ref.yang_lib_ref_path())?;
             tracing::info!(
                 content_id,
                 "removed yang library with content id from cache"
@@ -694,22 +1035,58 @@ impl YangLibraryCache {
     pub fn remove_by_subscription_info(
         &mut self,
         subscription_info: &SubscriptionInfo,
-    ) -> Result<(), YangLibraryCacheError> {
-        tracing::info!(
-            subscription_info = %subscription_info,
-            "removing yang library for subscription info from cache"
-        );
-        if let Some(yang_lib_ref) = self.cache_by_subscription_info.remove(subscription_info) {
-            self.cache_by_content_id.remove(yang_lib_ref.content_id());
-            std::fs::remove_file(yang_lib_ref.yang_library_path())?;
-            std::fs::remove_dir_all(yang_lib_ref.dir())?;
-            tracing::info!(
-            subscription_info = %subscription_info,
-            "removed yang library for subscription from cache");
-        } else {
-            tracing::info!(subscription_info = %subscription_info, "no yang library reference found for subscription info in cache");
+    ) -> Result<Option<SubscriptionInfo>, YangLibraryCacheError> {
+        // Step 1: Remove from subscription_info -> content_id mapping
+        let yang_lib_ref = match self.cache_by_subscription_info.remove(subscription_info) {
+            Some(yang_lib_ref) => yang_lib_ref,
+            None => return Ok(None),
+        };
+
+        // Step 2: Remove from (peer_ip, sub_id) -> SubscriptionInfo mapping
+        if let Some(sub_map) = self
+            .cache_by_subscription_id
+            .get_mut(&subscription_info.peer().ip())
+        {
+            sub_map.remove(&subscription_info.id());
+            if sub_map.is_empty() {
+                self.cache_by_subscription_id
+                    .remove(&subscription_info.peer().ip());
+            }
         }
-        Ok(())
+
+        // Step 3: Check if any other subscriptions are still using this content_id
+        let content_id_still_in_use = self
+            .cache_by_subscription_info
+            .values()
+            .any(|lib_ref| lib_ref.content_id() == yang_lib_ref.content_id());
+
+        // Step 4: Only remove YangLibraryReference and delete files if no subscriptions
+        // remain
+        if !content_id_still_in_use {
+            if let Some(yang_lib_ref) = self.cache_by_content_id.remove(yang_lib_ref.content_id()) {
+                // Remove subscription from the reference's internal list
+                yang_lib_ref.remove_subscription_info(subscription_info)?;
+
+                // Delete the directory and all its contents from the filesystem
+                let content_dir = self.cache_root_path.join(yang_lib_ref.content_id());
+                if content_dir.exists() {
+                    std::fs::remove_dir_all(&content_dir).map_err(|error| {
+                        YangLibraryCacheError::IoError(std::io::Error::other(format!(
+                            "Failed to remove directory {}: {error}",
+                            content_dir.display(),
+                        )))
+                    })?;
+                }
+            }
+        } else {
+            // Step 5: Content is still in use - just remove this subscription from the
+            // reference
+            if let Some(yang_lib_ref) = self.cache_by_content_id.get_mut(yang_lib_ref.content_id())
+            {
+                yang_lib_ref.remove_subscription_info(subscription_info)?;
+            }
+        }
+        Ok(Some(subscription_info.clone()))
     }
 
     pub fn get_by_subscription_info(
@@ -764,77 +1141,6 @@ impl YangLibraryCache {
             "cache lookup by subscription id"
         );
         result
-    }
-
-    /// Saves the yang modules of the given yang library to disk.
-    /// Returns the path to the yang library file and the path to the directory
-    /// where the yang modules are saved.
-    fn save_to_disk(
-        &self,
-        subscription_info: &SubscriptionInfo,
-        yang_lib: &YangLibrary,
-        schemas: &HashMap<Box<str>, Box<str>>,
-    ) -> Result<(PathBuf, PathBuf), YangLibraryCacheError> {
-        let content_id = yang_lib.content_id();
-        let entry_path = self.cache_root_path.join(yang_lib.content_id());
-        tracing::debug!(
-            content_id,
-            yang_reference_path = %entry_path.display(),
-             modules_count = schemas.len(),
-            "saving yang modules to disk",
-        );
-        if entry_path.exists() {
-            return Err(YangLibraryCacheError::DuplicateYangLibrary(entry_path));
-        }
-        std::fs::create_dir_all(&entry_path)?;
-        let yang_lib_path = entry_path.join(YANG_LIBRARY_FILE_NAME);
-        let file = std::fs::File::create(&yang_lib_path)?;
-        let writer = std::io::BufWriter::new(file);
-        let quick_xml_writer = quick_xml::writer::Writer::new_with_indent(writer, 32, 2);
-        let mut xml_writer = XmlWriter::new(quick_xml_writer);
-        yang_lib.xml_serialize(&mut xml_writer)?;
-        let mut inner = xml_writer.into_inner();
-        inner.write_all(MODULE_STATE.as_bytes())?;
-        inner.flush()?;
-        drop(inner);
-
-        let subscription_info_path = entry_path.join(SUBSCRIPTION_INFO_FILE_NAME);
-        tracing::info!(
-            subscription_info = %subscription_info,
-            "writing subscription info",
-        );
-        let subscription_info_file = std::fs::File::create(&subscription_info_path)?;
-        serde_json::to_writer_pretty(subscription_info_file, &subscription_info)?;
-
-        let modules_path = entry_path.join("modules");
-        std::fs::create_dir_all(&modules_path)?;
-        for (name, schema) in schemas {
-            let mut revision = None;
-            if let Some(module) = yang_lib.find_module(name.as_ref()) {
-                revision = module.revision();
-            } else if let Some(import_only_modules) = yang_lib.find_import_module(name.as_ref()) {
-                if let Some(import_only_module) = import_only_modules.into_iter().next() {
-                    revision = import_only_module.revision();
-                }
-            } else if let Some(submodule) = yang_lib.find_submodule(name.as_ref()) {
-                revision = submodule.revision();
-            }
-            let filename = if let Some(revision) = revision {
-                format!("{name}@{revision}.yang")
-            } else {
-                name.to_string()
-            };
-            let yang_module_path = modules_path.join(&filename);
-            std::fs::write(&yang_module_path, schema.as_ref())?;
-            tracing::info!(yang_module_path = %yang_module_path.display(), "saved yang module to disk");
-        }
-        tracing::info!(
-            content_id,
-            modules_count = schemas.len(),
-            modules_path = %modules_path.display(),
-            "saved YANG modules to disk"
-        );
-        Ok((yang_lib_path, entry_path))
     }
 }
 
@@ -900,6 +1206,7 @@ mod tests {
     fn setup_yang_library_on_disk(
         temp_dir: &TempDir,
         content_id: &str,
+        subscriptions_info: &[SubscriptionInfo],
     ) -> Result<PathBuf, YangLibraryCacheError> {
         let entry_path = temp_dir.path().join(content_id);
         std::fs::create_dir_all(&entry_path)?;
@@ -910,10 +1217,9 @@ mod tests {
         std::fs::write(&yang_lib_path, yang_lib_xml)?;
 
         // Write subscription info
-        let subscription_info = create_test_subscription_info(content_id);
-        let subscription_info_path = entry_path.join(SUBSCRIPTION_INFO_FILE_NAME);
-        let subscription_info_file = std::fs::File::create(&subscription_info_path)?;
-        serde_json::to_writer_pretty(subscription_info_file, &subscription_info)?;
+        let subscriptions_info_path = entry_path.join(SUBSCRIPTIONS_INFO_FILE_NAME);
+        let subscriptions_info_file = std::fs::File::create(&subscriptions_info_path)?;
+        serde_json::to_writer_pretty(subscriptions_info_file, subscriptions_info)?;
 
         // Create the modules directory with a test module
         let modules_path = entry_path.join("modules");
@@ -943,7 +1249,7 @@ mod tests {
         let yang_lib_path = temp_dir.path().join("nonexistent.xml");
         let search_dir = temp_dir.path().to_path_buf();
 
-        let result = YangLibraryReference::new(yang_lib_path.clone(), search_dir);
+        let result = YangLibraryReference::load_from_disk(yang_lib_path.clone(), search_dir);
         assert!(matches!(
             result,
             Err(YangLibraryCacheError::YangLibraryPathNotFound(_))
@@ -957,7 +1263,7 @@ mod tests {
         let yang_lib_path = temp_dir.path().to_path_buf();
         let search_dir = temp_dir.path().to_path_buf();
 
-        let result = YangLibraryReference::new(yang_lib_path.clone(), search_dir);
+        let result = YangLibraryReference::load_from_disk(yang_lib_path.clone(), search_dir);
         assert!(matches!(
             result,
             Err(YangLibraryCacheError::YangLibraryPathIsNotValid(_))
@@ -972,7 +1278,7 @@ mod tests {
         std::fs::write(&yang_lib_path, create_minimal_yang_library_xml("test-id")).unwrap();
         let search_dir = temp_dir.path().join("nonexistent");
 
-        let result = YangLibraryReference::new(yang_lib_path, search_dir.clone());
+        let result = YangLibraryReference::load_from_disk(yang_lib_path, search_dir.clone());
         assert!(matches!(
             result,
             Err(YangLibraryCacheError::YangLibrarySearchPathNotFound(_))
@@ -988,7 +1294,7 @@ mod tests {
         let search_dir = temp_dir.path().join("file.txt");
         std::fs::write(&search_dir, "test").unwrap();
 
-        let result = YangLibraryReference::new(yang_lib_path, search_dir.clone());
+        let result = YangLibraryReference::load_from_disk(yang_lib_path, search_dir.clone());
         assert!(matches!(
             result,
             Err(YangLibraryCacheError::YangLibrarySearchPathIsNotValid(_))
@@ -1000,16 +1306,23 @@ mod tests {
     fn test_yang_library_reference_new_success() {
         let temp_dir = TempDir::new().unwrap();
         let content_id = "test-content-id-123";
-        let entry_path = setup_yang_library_on_disk(&temp_dir, content_id).unwrap();
+        let subscription_info = create_test_subscription_info(content_id);
+        let entry_path = setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info),
+        )
+        .unwrap();
         let yang_lib_path = entry_path.join(YANG_LIBRARY_FILE_NAME);
 
-        let result = YangLibraryReference::new(yang_lib_path.clone(), entry_path.clone());
+        let result =
+            YangLibraryReference::load_from_disk(yang_lib_path.clone(), entry_path.clone());
         assert!(result.is_ok());
 
         let yang_lib_ref = result.unwrap();
         assert_eq!(yang_lib_ref.content_id(), content_id);
         assert_eq!(yang_lib_ref.yang_library_path(), yang_lib_path);
-        assert_eq!(yang_lib_ref.dir(), entry_path);
+        assert_eq!(yang_lib_ref.yang_lib_ref_path(), entry_path);
     }
 
     #[test]
@@ -1017,10 +1330,16 @@ mod tests {
     fn test_yang_library_reference_yang_library() {
         let temp_dir = TempDir::new().unwrap();
         let content_id = "test-content-id-456";
-        let entry_path = setup_yang_library_on_disk(&temp_dir, content_id).unwrap();
+        let subscription_info = create_test_subscription_info(content_id);
+        let entry_path = setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info),
+        )
+        .unwrap();
         let yang_lib_path = entry_path.join(YANG_LIBRARY_FILE_NAME);
 
-        let yang_lib_ref = YangLibraryReference::new(yang_lib_path, entry_path).unwrap();
+        let yang_lib_ref = YangLibraryReference::load_from_disk(yang_lib_path, entry_path).unwrap();
         let yang_lib = yang_lib_ref.yang_library().unwrap();
 
         assert_eq!(yang_lib.content_id(), content_id);
@@ -1087,8 +1406,13 @@ mod tests {
     fn test_yang_library_cache_from_disk_with_entries() {
         let temp_dir = TempDir::new().unwrap();
         let content_id = "disk-test-id";
-
-        setup_yang_library_on_disk(&temp_dir, content_id).unwrap();
+        let subscription_info = create_test_subscription_info(content_id);
+        setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info),
+        )
+        .unwrap();
 
         let cache = YangLibraryCache::from_disk(temp_dir.path().to_path_buf()).unwrap();
 
@@ -1108,7 +1432,13 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let content_id = "get-by-id-test";
 
-        setup_yang_library_on_disk(&temp_dir, content_id).unwrap();
+        let subscription_info = create_test_subscription_info(content_id);
+        setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info),
+        )
+        .unwrap();
 
         let mut cache = YangLibraryCache::from_disk(temp_dir.path().to_path_buf()).unwrap();
 
@@ -1126,7 +1456,13 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let content_id = "get-by-sub-test";
 
-        setup_yang_library_on_disk(&temp_dir, content_id).unwrap();
+        let subscription_info = create_test_subscription_info(content_id);
+        setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info),
+        )
+        .unwrap();
 
         let cache = YangLibraryCache::from_disk(temp_dir.path().to_path_buf()).unwrap();
 
@@ -1146,7 +1482,13 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let content_id = "get-by-sub-id-test";
 
-        setup_yang_library_on_disk(&temp_dir, content_id).unwrap();
+        let subscription_info = create_test_subscription_info(content_id);
+        setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info),
+        )
+        .unwrap();
 
         let cache = YangLibraryCache::from_disk(temp_dir.path().to_path_buf()).unwrap();
 
@@ -1178,7 +1520,13 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let content_id = "remove-by-id-test";
 
-        setup_yang_library_on_disk(&temp_dir, content_id).unwrap();
+        let subscription_info = create_test_subscription_info(content_id);
+        setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info),
+        )
+        .unwrap();
 
         let mut cache = YangLibraryCache::from_disk(temp_dir.path().to_path_buf()).unwrap();
         assert_eq!(cache.cache_by_content_id.len(), 1);
@@ -1196,7 +1544,13 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let content_id = "remove-by-sub-test";
 
-        setup_yang_library_on_disk(&temp_dir, content_id).unwrap();
+        let subscription_info = create_test_subscription_info(content_id);
+        setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info),
+        )
+        .unwrap();
 
         let mut cache = YangLibraryCache::from_disk(temp_dir.path().to_path_buf()).unwrap();
         assert_eq!(cache.cache_by_subscription_info.len(), 1);
@@ -1243,13 +1597,219 @@ mod tests {
     fn test_yang_library_cache_multiple_entries() {
         let temp_dir = TempDir::new().unwrap();
 
-        setup_yang_library_on_disk(&temp_dir, "content-id-1").unwrap();
-        setup_yang_library_on_disk(&temp_dir, "content-id-2").unwrap();
-        setup_yang_library_on_disk(&temp_dir, "content-id-3").unwrap();
+        let subscription_info1 = create_test_subscription_info("content_id");
+        let subscription_info2 = SubscriptionInfo::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
+            2,
+            ContentId::from("content_id2".to_string()),
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-routing:routing/routing-protocols".to_string()),
+            ),
+            vec!["ietf-routing".to_string()],
+        );
+        let subscription_info3 = SubscriptionInfo::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 102)), 830),
+            2,
+            ContentId::from("content_id3".to_string()),
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-routing:routing/routing-protocols".to_string()),
+            ),
+            vec!["ietf-routing".to_string()],
+        );
+        setup_yang_library_on_disk(
+            &temp_dir,
+            "content-id-1",
+            std::slice::from_ref(&subscription_info1),
+        )
+        .unwrap();
+        setup_yang_library_on_disk(
+            &temp_dir,
+            "content-id-2",
+            std::slice::from_ref(&subscription_info2),
+        )
+        .unwrap();
+        setup_yang_library_on_disk(
+            &temp_dir,
+            "content-id-3",
+            std::slice::from_ref(&subscription_info3),
+        )
+        .unwrap();
 
         let cache = YangLibraryCache::from_disk(temp_dir.path().to_path_buf()).unwrap();
 
         assert_eq!(cache.cache_by_content_id.len(), 3);
         assert_eq!(cache.cache_by_subscription_info.len(), 3);
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_yang_library_reference_append_subscription_info() {
+        let temp_dir = TempDir::new().unwrap();
+        let content_id = "append-sub-test";
+
+        // Create initial subscription info
+        let subscription_info1 = create_test_subscription_info(content_id);
+        setup_yang_library_on_disk(
+            &temp_dir,
+            content_id,
+            std::slice::from_ref(&subscription_info1),
+        )
+        .unwrap();
+
+        let entry_path = temp_dir.path().join(content_id);
+        let yang_lib_path = entry_path.join(YANG_LIBRARY_FILE_NAME);
+        let yang_lib_ref = YangLibraryReference::load_from_disk(yang_lib_path, entry_path).unwrap();
+
+        // Verify initial state
+        let initial_subscriptions = yang_lib_ref.subscriptions_info().unwrap();
+        assert_eq!(initial_subscriptions, vec![subscription_info1.clone()]);
+
+        // Test appending duplicate subscription info, should have no effect
+        yang_lib_ref
+            .append_subscription_info(subscription_info1.clone())
+            .unwrap();
+        let subscriptions_after_duplicate = yang_lib_ref.subscriptions_info().unwrap();
+        assert_eq!(
+            subscriptions_after_duplicate,
+            vec![subscription_info1.clone()]
+        );
+
+        // Create different subscription info with the same content_id
+        let subscription_info2 = SubscriptionInfo::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
+            2,
+            ContentId::from(content_id.to_string()),
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-routing:routing/routing-protocols".to_string()),
+            ),
+            vec!["ietf-routing".to_string()],
+        );
+
+        // Test appending new subscription info
+        yang_lib_ref
+            .append_subscription_info(subscription_info2.clone())
+            .unwrap();
+        let subscriptions_after_new = yang_lib_ref.subscriptions_info().unwrap();
+        assert_eq!(
+            HashSet::from_iter(subscriptions_after_new.into_iter()),
+            HashSet::from([subscription_info1.clone(), subscription_info2.clone()])
+        );
+
+        // Verify persisted data on disk
+        let reloaded_yang_lib_ref = YangLibraryReference::load_from_disk(
+            yang_lib_ref.yang_library_path().to_path_buf(),
+            yang_lib_ref.yang_lib_ref_path().to_path_buf(),
+        )
+        .unwrap();
+        let persisted_subscriptions = reloaded_yang_lib_ref.subscriptions_info().unwrap();
+        assert_eq!(
+            HashSet::from_iter(persisted_subscriptions.into_iter()),
+            HashSet::from([subscription_info1, subscription_info2])
+        );
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_yang_library_cache_put_with_same_content_id_different_subscription() {
+        let cache_dir = TempDir::new().unwrap();
+        let content_id = "shared-content-id";
+        let mut cache = YangLibraryCache::new(cache_dir.path().to_path_buf());
+
+        // Create first subscription info
+        let subscription_info1 = SubscriptionInfo::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
+            1,
+            ContentId::from(content_id.to_string()),
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-interfaces:interfaces/ietf-interfaces:interface[ietf-interfaces:name='eth0']/statistics".to_string()),
+            ),
+            vec!["ietf-interfaces".to_string(), "ietf-ip".to_string()],
+        );
+
+        // Create YANG library and schemas
+        let yang_lib_xml = create_minimal_yang_library_xml(content_id);
+        let reader = NsReader::from_str(&yang_lib_xml);
+        let mut xml_reader = netgauze_netconf_proto::xml_utils::XmlParser::new(reader).unwrap();
+        let yang_library = YangLibrary::xml_deserialize(&mut xml_reader).unwrap();
+
+        let mut schemas = HashMap::new();
+        schemas.insert(
+            Box::from("test-module"),
+            Box::from(create_test_yang_module()),
+        );
+
+        // Put first subscription
+        let yang_lib_ref1 = cache
+            .put_yang_library(
+                subscription_info1.clone(),
+                yang_library.clone(),
+                schemas.clone(),
+            )
+            .unwrap();
+
+        // Verify the first subscription is stored
+        assert_eq!(cache.cache_by_content_id.len(), 1);
+        assert_eq!(cache.cache_by_subscription_info.len(), 1);
+        assert_eq!(cache.cache_by_subscription_id.len(), 1);
+
+        // Create second subscription info with different peer and target but same
+        // content_id
+        let subscription_info2 = SubscriptionInfo::new(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 101)), 830),
+            2,
+            ContentId::from(content_id.to_string()),
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-routing:routing/routing-protocols".to_string()),
+            ),
+            vec!["ietf-routing".to_string()],
+        );
+
+        // Put a second subscription with the same YANG library
+        let yang_lib_ref2 = cache
+            .put_yang_library(
+                subscription_info2.clone(),
+                yang_library.clone(),
+                schemas.clone(),
+            )
+            .unwrap();
+
+        // Verify both subscriptions share the same YANG library reference
+        assert_eq!(yang_lib_ref1.content_id(), yang_lib_ref2.content_id());
+        assert_eq!(cache.cache_by_content_id.len(), 1);
+        assert_eq!(cache.cache_by_subscription_info.len(), 2);
+        assert_eq!(cache.cache_by_subscription_id.len(), 2);
+
+        // Verify both subscriptions can be retrieved
+        let retrieved1 = cache.get_by_subscription_info(&subscription_info1);
+        assert!(retrieved1.is_some());
+        assert_eq!(retrieved1.unwrap().content_id(), content_id);
+
+        let retrieved2 = cache.get_by_subscription_info(&subscription_info2);
+        assert!(retrieved2.is_some());
+        assert_eq!(retrieved2.unwrap().content_id(), content_id);
+
+        // Verify both subscription IDs can be retrieved
+        let (sub1_info, sub1_ref) = cache
+            .get_by_subscription_id(subscription_info1.peer().ip(), subscription_info1.id())
+            .unwrap();
+        assert_eq!(sub1_info, subscription_info1);
+        assert!(sub1_ref.is_some());
+
+        let (sub2_info, sub2_ref) = cache
+            .get_by_subscription_id(subscription_info2.peer().ip(), subscription_info2.id())
+            .unwrap();
+        assert_eq!(sub2_info, subscription_info2);
+        assert!(sub2_ref.is_some());
+
+        // Verify both subscriptions are persisted in the reference
+        let subscriptions = yang_lib_ref2.subscriptions_info().unwrap();
+        assert_eq!(subscriptions.len(), 2);
+        assert!(subscriptions.contains(&subscription_info1));
+        assert!(subscriptions.contains(&subscription_info2));
     }
 }

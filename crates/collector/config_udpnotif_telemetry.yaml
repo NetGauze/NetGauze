@@ -72,8 +72,8 @@ udp_notif:
             default_yang_lib_ref:
               content_id: ietf-telemetry-message-full
               yang_library_path: assets/yang/ietf-telemetry-message/yang-lib-full.xml
-              dir: assets/yang/ietf-telemetry-message/
+              yang_lib_ref_path: assets/yang/ietf-telemetry-message/
             extension_yang_lib_ref:
               content_id: ietf-telemetry-message-min
               yang_library_path: assets/yang/ietf-telemetry-message/yang-lib-min.xml
-              dir: assets/yang/ietf-telemetry-message
+              yang_lib_ref_path: assets/yang/ietf-telemetry-message
