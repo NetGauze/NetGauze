@@ -115,7 +115,9 @@
 use crate::cache::actor::{CacheLookupCommand, CacheResponse};
 use crate::cache::storage::SubscriptionInfo;
 use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
-use netgauze_udp_notif_pkt::notification::{NotificationVariant, SubscriptionId};
+use netgauze_udp_notif_pkt::notification::{
+    NotificationVariant, SubscriptionId, SubscriptionStartedModified,
+};
 use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
 use rustc_hash::FxHashMap;
 use std::net::{IpAddr, SocketAddr};
@@ -165,25 +167,34 @@ struct ValidationActor {
 }
 
 impl ValidationActor {
-    /// Remove a subscription from the cache. If the peer has no more
-    /// subscriptions, remove the peer from the cache as well.
-    fn remove_subscription(&mut self, peer: SocketAddr, subscription_id: SubscriptionId) {
+    /// Check if the subscription is different from the existing one in the
+    /// cache.
+    ///
+    /// If it is different, remove the existing one from the cache to allow a
+    /// new request to the caching actor.
+    fn check_subscription_new(&mut self, peer: SocketAddr, subscription_info: &SubscriptionInfo) {
         if let Some(cached_peer_subscriptions) = self.peer_cache.get_mut(&peer.ip()) {
-            let removed = cached_peer_subscriptions
+            let is_different = cached_peer_subscriptions
                 .subscriptions
-                .remove(&subscription_id);
-            if removed.is_some() {
-                tracing::info!(peer=%peer, subscription_id, "Removed subscription from cache");
+                .get(&subscription_info.id())
+                .map(|x| x.subscription_info != *subscription_info)
+                .unwrap_or(true);
+            if is_different {
+                tracing::trace!(peer=%peer, subscription_id=%subscription_info.id(), "Subscription changed, removing from cache");
+                cached_peer_subscriptions
+                    .subscriptions
+                    .remove(&subscription_info.id());
             }
+            // clear peer if there are no subscriptions left
             if cached_peer_subscriptions.subscriptions.is_empty() {
-                tracing::debug!(peer=%peer, "Removed peer subscriptions cache since it is empty");
                 self.peer_cache.remove(&peer.ip());
             }
         }
     }
 
     /// Get the subscription info from the cache or from the SubscriptionStarted
-    /// notification.
+    /// notification, a boolean indicating whether the subscription info was
+    /// found in the cache.
     ///
     /// If the notification is a SubscriptionStarted, create a new
     /// SubscriptionInfo and return it. If the notification is not a
@@ -200,43 +211,48 @@ impl ValidationActor {
             return None;
         };
 
-        if let NotificationVariant::SubscriptionStarted(subscription_started) = notif_contents {
-            let modules = if let Some(modules) = subscription_started.module_version() {
-                let mut modules = modules
-                    .iter()
-                    .map(|module| module.name().to_string())
-                    .collect::<Vec<String>>();
-                modules.push("ietf-subscribed-notifications".to_string());
-                modules
+        let subscription_info = if let NotificationVariant::SubscriptionStarted(
+            subscription_started,
+        )
+        | NotificationVariant::SubscriptionModified(
+            subscription_started,
+        ) = notif_contents
+        {
+            let subscription_info = if let Some(subscription_info) =
+                self.build_subscription_info(peer, subscription_started)
+            {
+                subscription_info
             } else {
-                tracing::warn!(peer=%peer, "Received UDP-Notif payload without module version, dropping packet");
+                tracing::warn!(peer=%peer, "Received UDP-Notif payload without subscription info, dropping packet");
                 return None;
             };
-            let subscription_info = SubscriptionInfo::new(
-                peer,
-                subscription_started.id(),
-                subscription_started
-                    .yang_library_content_id()
-                    .map(|x| x.to_string())
-                    .unwrap_or_default(),
-                subscription_started.target().clone(),
-                modules,
-            );
-            // clear the cache of the previous subscription info
-            self.remove_subscription(peer, subscription_started.id());
-            return Some((subscription_info, true));
+            self.check_subscription_new(peer, &subscription_info);
+            Some(subscription_info)
+        } else {
+            self.peer_cache.get(&peer.ip()).and_then(
+                |cached_peer_subscriptions: &CachedPeerSubscriptions| {
+                    cached_peer_subscriptions
+                        .subscriptions
+                        .get(&notif_contents.subscription_id())
+                        .map(|x| x.subscription_info.clone())
+                },
+            )
+        };
+        if let Some(subscription_info) = subscription_info {
+            let cached = self
+                .peer_cache
+                .get(&peer.ip())
+                .and_then(|cached_peer_subscriptions: &CachedPeerSubscriptions| {
+                    cached_peer_subscriptions
+                        .subscriptions
+                        .get(&notif_contents.subscription_id())
+                })
+                .map(|x| x.subscription_info == subscription_info)
+                .unwrap_or(false);
+            Some((subscription_info, cached))
+        } else {
+            None
         }
-        self.peer_cache
-            .get(&peer.ip())
-            .and_then(|cached_peer_subscriptions: &CachedPeerSubscriptions| {
-                cached_peer_subscriptions
-                    .subscriptions
-                    .get(&notif_contents.subscription_id())
-            })
-            .map(|cached_subscription: &CachedSubscription| {
-                let subscription_info = &cached_subscription.subscription_info;
-                (subscription_info.clone(), false)
-            })
     }
 
     fn cache_packet(
@@ -291,8 +307,8 @@ impl ValidationActor {
         };
 
         let subscription_info = match self.get_subscription_info(peer, &decoded) {
-            Some((subscription_info, is_new)) => {
-                if is_new {
+            Some((subscription_info, is_cached)) => {
+                if !is_cached {
                     tracing::trace!(peer=%peer, subscription_id=subscription_info.id(), "Received new subscription fetching schemas from the cache");
                     self.cache_cmd_tx
                         .send(CacheLookupCommand::LookupBySubscriptionInfo(
@@ -301,11 +317,7 @@ impl ValidationActor {
                         ))
                         .await
                         .map_err(|_| ValidationActorError::CacheLookupSendError)?;
-                    self.cache_packet(
-                        peer,
-                        SubscriptionInfo::new_empty(peer, subscription_info.id()),
-                        msg,
-                    );
+                    self.cache_packet(peer, subscription_info.clone(), msg);
                     return Ok(());
                 }
                 subscription_info
@@ -462,6 +474,39 @@ impl ValidationActor {
         Ok(())
     }
 
+    fn build_subscription_info(
+        &self,
+        peer: SocketAddr,
+        sub_started: &SubscriptionStartedModified,
+    ) -> Option<SubscriptionInfo> {
+        let modules = match sub_started.module_version() {
+            Some(modules) => {
+                let mut module_names: Vec<String> =
+                    modules.iter().map(|m| m.name().to_string()).collect();
+                module_names.push("ietf-subscribed-notifications".to_string());
+                module_names
+            }
+            None => {
+                tracing::warn!(
+                    peer=%peer,
+                    "SubscriptionStarted missing module version"
+                );
+                return None;
+            }
+        };
+
+        Some(SubscriptionInfo::new(
+            peer,
+            sub_started.id(),
+            sub_started
+                .yang_library_content_id()
+                .map(|x| x.to_string())
+                .unwrap_or_default(),
+            sub_started.target().clone(),
+            modules,
+        ))
+    }
+
     async fn run(mut self) -> Result<String, ValidationActorError> {
         tracing::info!("Starting Yang-Push validation actor");
         loop {
@@ -563,5 +608,213 @@ impl ValidationActorHandle {
             .send(ValidationActorCommand::Shutdown)
             .await
             .map_err(|_| ValidationActorHandleError::SendErr)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cache::actor::tests::setup_actor_with_empty_cache;
+    use bytes::Bytes;
+    use netgauze_udp_notif_pkt::raw::MediaType;
+    use std::collections::HashMap;
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_validation_actor_schema_feched() {
+        // Setup caching actor
+        let (caching_join_handle, caching_handle, subscription_info, fetcher_count) =
+            setup_actor_with_empty_cache();
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 0);
+        }
+
+        // Setup channels
+        let (udp_notif_tx, udp_notif_rx) = async_channel::bounded(100);
+        let (validated_tx, validated_rx) = async_channel::bounded(100);
+
+        // Spawn validation actor
+        let (_join_handle, handle) = ValidationActorHandle::new(
+            100,
+            1000,
+            100,
+            udp_notif_rx,
+            validated_tx,
+            caching_handle.request_tx(),
+        )
+        .expect("Failed to spawn validation actor");
+
+        // Create a test peer address
+        let peer = subscription_info.peer();
+        let payload = serde_json::json!(
+            {
+                "ietf-yp-notification:envelope": {
+                    "event-time": "2025-09-23T14:12:16.024Z",
+                    "hostname": "ipf-zbl1327-r-daisy-48",
+                    "sequence-number": 0,
+                    "contents": {
+                        "ietf-subscribed-notifications:subscription-started": {
+                            "id": 1,
+                            "ietf-yang-push:datastore": "ietf-datastores:operational",
+                            "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces",
+                            "transport": "ietf-udp-notif-transport:udp-notif",
+                            "encoding": "encode-json",
+                            "ietf-distributed-notif:message-publisher-id": [
+                                16843789
+                            ],
+                            "ietf-yang-push-revision:module-version": [
+                                {
+                                    "name": "ietf-interfaces",
+                                    "revision": ""
+                                }
+                            ],
+                            "ietf-yang-push-revision:yang-library-content-id": "test-content-id-1",
+                            "ietf-yang-push:periodic": {
+                                "period": 6000
+                            }
+                        }
+                    }
+                }
+            }
+        );
+        let bytes = serde_json::to_vec(&payload).unwrap();
+        let subscription_started_packet = UdpNotifPacket::new(
+            MediaType::YangDataJson,
+            10,
+            1,
+            HashMap::new(),
+            Bytes::from(bytes),
+        );
+
+        // Send SubscriptionStarted packet
+        udp_notif_tx
+            .send(Arc::new((peer, subscription_started_packet)))
+            .await
+            .unwrap();
+
+        // Allow actor to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // Verify packet is validated
+        let (content_id, sub_info, _validated) = validated_rx.recv().await.unwrap();
+        assert!(content_id.is_some());
+        assert!(!sub_info.is_empty());
+
+        // check fetcher was called
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 1);
+        }
+
+        // Shutdown actor
+        handle.shutdown().await.unwrap();
+        caching_handle.shutdown().await.unwrap();
+        caching_join_handle.await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_validation_actor_schema_not_found() {
+        // Setup caching actor
+        let (caching_join_handle, caching_handle, subscription_info, fetcher_count) =
+            setup_actor_with_empty_cache();
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 0);
+        }
+
+        // Setup channels
+        let (udp_notif_tx, udp_notif_rx) = async_channel::bounded(100);
+        let (validated_tx, validated_rx) = async_channel::bounded(100);
+
+        // Spawn validation actor
+        let (_join_handle, handle) = ValidationActorHandle::new(
+            100,
+            1000,
+            100,
+            udp_notif_rx,
+            validated_tx,
+            caching_handle.request_tx(),
+        )
+        .expect("Failed to spawn validation actor");
+
+        // Create a test peer address
+        let peer = subscription_info.peer();
+        let payload = serde_json::json!(
+            {
+                "ietf-yp-notification:envelope": {
+                    "event-time": "2025-09-23T14:12:16.024Z",
+                    "hostname": "ipf-zbl1327-r-daisy-48",
+                    "sequence-number": 0,
+                    "contents": {
+                        "ietf-subscribed-notifications:subscription-started": {
+                            "id": 2,
+                            "ietf-yang-push:datastore": "ietf-datastores:operational",
+                            "ietf-yang-push:datastore-xpath-filter": "/ietf-hardware:hardware",
+                            "transport": "ietf-udp-notif-transport:udp-notif",
+                            "encoding": "encode-json",
+                            "ietf-distributed-notif:message-publisher-id": [
+                                16843789
+                            ],
+                            "ietf-yang-push-revision:module-version": [
+                                {
+                                    "name": "ietf-hardware",
+                                    "revision": ""
+                                }
+                            ],
+                            "ietf-yang-push-revision:yang-library-content-id": "test-content-id-1",
+                            "ietf-yang-push:periodic": {
+                                "period": 6000
+                            }
+                        }
+                    }
+                }
+            }
+        );
+        let bytes = serde_json::to_vec(&payload).unwrap();
+        let subscription_started_packet = UdpNotifPacket::new(
+            MediaType::YangDataJson,
+            10,
+            1,
+            HashMap::new(),
+            Bytes::from(bytes),
+        );
+
+        // Send SubscriptionStarted packet
+        udp_notif_tx
+            .send(Arc::new((peer, subscription_started_packet)))
+            .await
+            .unwrap();
+
+        // Allow actor to process
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        // Verify packet is not validated
+        let (sub_info, _validated) = validated_rx.recv().await.unwrap();
+        assert!(sub_info.is_empty());
+
+        // check fetcher was called
+        {
+            let hits_counts = fetcher_count
+                .lock()
+                .expect("Failed to lock fetcher counts")
+                .clone();
+            assert_eq!(hits_counts.len(), 1);
+        }
+
+        // Shutdown actor
+        handle.shutdown().await.unwrap();
+        caching_handle.shutdown().await.unwrap();
+        caching_join_handle.await.unwrap().unwrap();
     }
 }
