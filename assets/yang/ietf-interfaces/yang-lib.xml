@@ -1,0 +1,35 @@
+<yang-library xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+  <module-set>
+    <name>ALL</name>
+    <module>
+      <name>ietf-interfaces</name>
+      <revision>2014-05-08</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-interfaces</namespace>
+      <feature>arbitrary-names</feature>
+      <feature>pre-provisioning</feature>
+      <feature>if-mib</feature>
+    </module>
+    <module>
+      <name>ietf-yang-types</name>
+      <revision>2013-07-15</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-types</namespace>
+    </module>
+    <module>
+      <name>ietf-inet-types</name>
+      <revision>2013-07-15</revision>
+      <namespace>urn:ietf:params:xml:ns:yang:ietf-inet-types</namespace>
+    </module>
+  </module-set>
+  <schema>
+    <name>ALL</name>
+    <module-set>ALL</module-set>
+  </schema>
+  <datastore>
+    <name xmlns:ds="urn:ietf:params:xml:ns:yang:ietf-datastores">ds:operational</name>
+    <schema>ALL</schema>
+  </datastore>
+  <content-id>ietf-interfaces-lib</content-id>
+</yang-library>
+<modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
+    <module-set-id>ALL</module-set-id>
+</modules-state>

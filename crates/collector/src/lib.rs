@@ -398,8 +398,12 @@ pub async fn init_udp_notif_collection(
     // Only one schema cache is needed for all publishers
     let cache_location: PathBuf = udp_notif_config.cache_location.into();
     let netconf_fetcher = netconf_fetcher(&udp_notif_config.netconf)?;
-    let (_schema_join, schema_handle) =
-        CacheActorHandle::new(10000, either::Right(cache_location), netconf_fetcher)?;
+    let (_schema_join, schema_handle) = CacheActorHandle::new(
+        10000,
+        either::Right(cache_location),
+        netconf_fetcher,
+        Duration::from_mins(5),
+    )?;
 
     for (group_name, publisher_config) in udp_notif_config.publishers {
         info!("Starting publishers group '{group_name}'");
