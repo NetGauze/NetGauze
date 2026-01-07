@@ -38,6 +38,7 @@ use netgauze_udp_notif_pkt::decoded::{UdpNotifPacketDecoded, UdpNotifPayload};
 use netgauze_udp_notif_pkt::notification::{
     NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
 };
+use netgauze_yang_push::ContentId;
 use netgauze_yang_push::cache::storage::SubscriptionInfo;
 use netgauze_yang_push::model::telemetry::{
     FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol, TelemetryMessage,
@@ -183,8 +184,10 @@ fn fetch_sysinfo_manifest(name: Option<String>) -> Manifest {
 struct YangPushEnrichmentActor {
     cmd_rx: mpsc::Receiver<YangPushEnrichmentActorCommand>,
     enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-    validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
-    enriched_tx: async_channel::Sender<(SubscriptionInfo, TelemetryMessageWrapper)>,
+    validated_rx:
+        async_channel::Receiver<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
+    enriched_tx:
+        async_channel::Sender<(Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper)>,
     labels: HashMap<IpAddr, HashMap<String, WeightedLabel>>,
     subscriptions: HashMap<SocketAddr, SubscriptionsCache>,
     manifest: Manifest,
@@ -195,8 +198,16 @@ impl YangPushEnrichmentActor {
     fn new(
         cmd_rx: mpsc::Receiver<YangPushEnrichmentActorCommand>,
         enrichment_rx: async_channel::Receiver<EnrichmentOperation>,
-        validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
-        enriched_tx: async_channel::Sender<(SubscriptionInfo, TelemetryMessageWrapper)>,
+        validated_rx: async_channel::Receiver<(
+            Option<ContentId>,
+            SubscriptionInfo,
+            UdpNotifPacketDecoded,
+        )>,
+        enriched_tx: async_channel::Sender<(
+            Option<ContentId>,
+            SubscriptionInfo,
+            TelemetryMessageWrapper,
+        )>,
         stats: YangPushEnrichmentStats,
         writer_id: String,
     ) -> Self {
@@ -616,7 +627,7 @@ impl YangPushEnrichmentActor {
                 msg = self.validated_rx.recv() => {
                     match msg {
                         Ok(msg) => {
-                            let (subscription_info, pkt) = msg;
+                            let (content_id, subscription_info, pkt) = msg;
                             let peer = subscription_info.peer();
                             let peer_tags = [
                                 opentelemetry::KeyValue::new(
@@ -633,7 +644,7 @@ impl YangPushEnrichmentActor {
                             // Process the payload and send the enriched TelemetryMessage
                             match self.process_payload(peer, pkt.payload()) {
                                 Ok(telemetry_message) => {
-                                    if let Err(err) = self.enriched_tx.send((subscription_info, telemetry_message)).await {
+                                    if let Err(err) = self.enriched_tx.send((content_id, subscription_info, telemetry_message)).await {
                                         error!("YangPushEnrichmentActor send error: {err}");
                                         self.stats.send_error.add(1, &peer_tags);
                                     } else {
@@ -670,13 +681,18 @@ impl std::error::Error for YangPushEnrichmentActorHandleError {}
 pub struct YangPushEnrichmentActorHandle {
     cmd_send: mpsc::Sender<YangPushEnrichmentActorCommand>,
     enrichment_tx: async_channel::Sender<EnrichmentOperation>,
-    enriched_rx: async_channel::Receiver<(SubscriptionInfo, TelemetryMessageWrapper)>,
+    enriched_rx:
+        async_channel::Receiver<(Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper)>,
 }
 
 impl YangPushEnrichmentActorHandle {
     pub fn new(
         buffer_size: usize,
-        validated_rx: async_channel::Receiver<(SubscriptionInfo, UdpNotifPacketDecoded)>,
+        validated_rx: async_channel::Receiver<(
+            Option<ContentId>,
+            SubscriptionInfo,
+            UdpNotifPacketDecoded,
+        )>,
         stats: either::Either<opentelemetry::metrics::Meter, YangPushEnrichmentStats>,
         writer_id: String,
     ) -> (JoinHandle<anyhow::Result<String>>, Self) {
@@ -713,7 +729,8 @@ impl YangPushEnrichmentActorHandle {
 
     pub fn subscribe(
         &self,
-    ) -> async_channel::Receiver<(SubscriptionInfo, TelemetryMessageWrapper)> {
+    ) -> async_channel::Receiver<(Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper)>
+    {
         self.enriched_rx.clone()
     }
 }

@@ -313,11 +313,16 @@ impl std::error::Error for CacheActorCacheError {}
 
 #[derive(Debug, Clone)]
 pub struct CacheResponse {
+    cached_content_id: Option<ContentId>,
     subscription_info: SubscriptionInfo,
     yang_lib_ref: Option<Arc<YangLibraryReference>>,
 }
 
 impl CacheResponse {
+    pub const fn cached_content_id(&self) -> Option<&ContentId> {
+        self.cached_content_id.as_ref()
+    }
+
     pub const fn subscription_info(&self) -> &SubscriptionInfo {
         &self.subscription_info
     }
@@ -327,9 +332,19 @@ impl CacheResponse {
     }
 }
 
-impl From<CacheResponse> for (SubscriptionInfo, Option<Arc<YangLibraryReference>>) {
+impl From<CacheResponse>
+    for (
+        Option<ContentId>,
+        SubscriptionInfo,
+        Option<Arc<YangLibraryReference>>,
+    )
+{
     fn from(value: CacheResponse) -> Self {
-        (value.subscription_info, value.yang_lib_ref)
+        (
+            value.cached_content_id,
+            value.subscription_info,
+            value.yang_lib_ref,
+        )
     }
 }
 
@@ -351,6 +366,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
     ) {
         let hit = yang_lib_ref.is_some();
         let response = CacheResponse {
+            cached_content_id: yang_lib_ref.as_ref().map(|x| x.content_id().clone()),
             subscription_info: subscription_info.clone(),
             yang_lib_ref,
         };
@@ -397,6 +413,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
     ) {
         let hit = yang_lib_ref.is_some();
         let response = CacheResponse {
+            cached_content_id: yang_lib_ref.as_ref().map(|x| x.content_id().clone()),
             subscription_info: subscription_info.clone(),
             yang_lib_ref,
         };
@@ -449,6 +466,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     for sender in pending_senders {
                         let _ = sender
                             .send(CacheResponse {
+                                cached_content_id: None,
                                 subscription_info: subscription_info.clone(),
                                 yang_lib_ref: None,
                             })

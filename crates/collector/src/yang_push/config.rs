@@ -81,8 +81,11 @@ impl TelemetryYangConverter {
     }
 }
 
-impl YangConverter<(SubscriptionInfo, TelemetryMessageWrapper), TelemetryYangConverterError>
-    for TelemetryYangConverter
+impl
+    YangConverter<
+        (Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper),
+        TelemetryYangConverterError,
+    > for TelemetryYangConverter
 {
     fn subject_prefix(&self) -> Option<&str> {
         self.subject_prefix.as_deref()
@@ -100,29 +103,27 @@ impl YangConverter<(SubscriptionInfo, TelemetryMessageWrapper), TelemetryYangCon
         self.extension_yang_lib_ref.as_ref()
     }
 
-    fn content_id(&self, input: &(SubscriptionInfo, TelemetryMessageWrapper)) -> Option<ContentId> {
-        let (subscription_info, _) = input;
-        if subscription_info.is_empty() {
-            None
-        } else {
-            Some(input.0.content_id().clone())
-        }
+    fn content_id(
+        &self,
+        input: &(Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper),
+    ) -> Option<ContentId> {
+        input.0.clone()
     }
 
     fn get_key(
         &self,
-        input: &(SubscriptionInfo, TelemetryMessageWrapper),
+        input: &(Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper),
     ) -> Option<serde_json::Value> {
-        let (subscription_info, _) = input;
+        let (_, subscription_info, _) = input;
         let ip = subscription_info.peer().ip();
         Some(serde_json::Value::String(ip.to_string()))
     }
 
     fn serialize_json(
         &self,
-        input: (SubscriptionInfo, TelemetryMessageWrapper),
+        input: (Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper),
     ) -> Result<serde_json::Value, TelemetryYangConverterError> {
-        let telemetry_message_wrapper = input.1;
+        let telemetry_message_wrapper = input.2;
         serde_json::to_value(telemetry_message_wrapper).map_err(Into::into)
     }
 }

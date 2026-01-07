@@ -112,6 +112,7 @@
 //!   - Cache channel closed: Actor terminates (dependency failure)
 //!   - Shutdown command received: Graceful termination
 
+use crate::ContentId;
 use crate::cache::actor::{CacheLookupCommand, CacheResponse};
 use crate::cache::storage::SubscriptionInfo;
 use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
@@ -127,6 +128,7 @@ use yang4::data::{DataFormat, DataOperation, DataParserFlags, DataValidationFlag
 
 #[derive(Debug)]
 struct CachedSubscription {
+    cached_content_id: Option<ContentId>,
     subscription_info: SubscriptionInfo,
     yang_ctx: Option<yang4::context::Context>,
     cached_packets: Vec<Arc<(SocketAddr, UdpNotifPacket)>>,
@@ -160,7 +162,7 @@ struct ValidationActor {
     peer_cache: FxHashMap<IpAddr, CachedPeerSubscriptions>,
     cmd_rx: mpsc::Receiver<ValidationActorCommand>,
     rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
-    tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
+    tx: async_channel::Sender<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
     cache_cmd_tx: async_channel::Sender<CacheLookupCommand>,
     cache_tx: async_channel::Sender<CacheResponse>,
     cache_rx: async_channel::Receiver<CacheResponse>,
@@ -273,6 +275,7 @@ impl ValidationActor {
                 .subscriptions
                 .entry(subscription_id)
                 .or_insert(CachedSubscription {
+                    cached_content_id: None,
                     subscription_info,
                     yang_ctx: None,
                     cached_packets: Vec::new(),
@@ -354,13 +357,14 @@ impl ValidationActor {
             .subscriptions
             .entry(subscription_info.id())
             .or_insert(CachedSubscription {
+                cached_content_id: None,
                 subscription_info: subscription_info.clone(),
                 yang_ctx: None,
                 cached_packets: Vec::new(),
             });
-        if subscription_info.is_empty() {
+        if subscription_info.is_empty() || subscription_cache.cached_content_id.is_none() {
             self.tx
-                .send((subscription_info, decoded))
+                .send((None, subscription_info, decoded))
                 .await
                 .map_err(|_| ValidationActorError::SendError)?;
             return Ok(());
@@ -370,6 +374,7 @@ impl ValidationActor {
         } else {
             self.tx
                 .send((
+                    None,
                     SubscriptionInfo::new_empty(subscription_info.peer(), subscription_info.id()),
                     decoded,
                 ))
@@ -410,7 +415,11 @@ impl ValidationActor {
             }
         }
         self.tx
-            .send((subscription_info, decoded))
+            .send((
+                subscription_cache.cached_content_id.clone(),
+                subscription_info,
+                decoded,
+            ))
             .await
             .map_err(|_| ValidationActorError::SendError)?;
         Ok(())
@@ -420,7 +429,7 @@ impl ValidationActor {
         &mut self,
         response: CacheResponse,
     ) -> Result<(), ValidationActorError> {
-        let (subscription_info, yang_lib_ref) = response.into();
+        let (cached_content_id, subscription_info, yang_lib_ref) = response.into();
         let peer_cache = if let Some(peer_cache) =
             self.peer_cache.get_mut(&subscription_info.peer().ip())
         {
@@ -463,8 +472,10 @@ impl ValidationActor {
                     None
                 }
             };
+            subscription_cache.cached_content_id = cached_content_id;
             subscription_cache.yang_ctx = yang_ctx;
         } else {
+            subscription_cache.cached_content_id = None;
             subscription_cache.yang_ctx = None;
         }
         let cached_packets = std::mem::take(&mut subscription_cache.cached_packets);
@@ -576,7 +587,7 @@ impl ValidationActorHandle {
         max_cached_packets_per_peer: usize,
         max_cached_packets_per_subscription: usize,
         rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
-        tx: async_channel::Sender<(SubscriptionInfo, UdpNotifPacketDecoded)>,
+        tx: async_channel::Sender<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
         cache_cmd_tx: async_channel::Sender<CacheLookupCommand>,
     ) -> Result<
         (
@@ -800,8 +811,9 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         // Verify packet is not validated
-        let (sub_info, _validated) = validated_rx.recv().await.unwrap();
-        assert!(sub_info.is_empty());
+        let (content_id, sub_info, _validated) = validated_rx.recv().await.unwrap();
+        assert!(content_id.is_none());
+        assert!(!sub_info.is_empty());
 
         // check fetcher was called
         {
