@@ -51,7 +51,7 @@
       <name>ietf-yang-push</name>
       <revision>2019-09-09</revision>
       <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-push</namespace>
-      <!-- We are premissive with the features for testing purposes -->
+      <!-- We are permissive with the features for testing purposes -->
       <feature>on-change</feature>
     </module>
     <module>
