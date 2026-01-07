@@ -2,14 +2,14 @@
   {
     "peer": "0.0.0.0:830",
     "id": 1,
-    "content_id": "ietf-telemetry-message",
+    "content_id": "test-content-id-1",
     "target": {
-      "ietf-yang-push:datastore": "ds:operational",
-      "ietf-yang-push:datastore-xpath-filter": "/ietf-telemetry-message:message"
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces"
     },
     "models": [
-      "ietf-telemetry-message",
-      "ietf-yang-push-telemetry-message"
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
     ]
   }
 ]
