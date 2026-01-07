@@ -33,6 +33,7 @@ use netgauze_flow_service::flow_supervisor::FlowCollectorsSupervisorActorHandle;
 use netgauze_udp_notif_pkt::raw::MediaType;
 use netgauze_udp_notif_service::UdpNotifRequest;
 use netgauze_udp_notif_service::supervisor::UdpNotifSupervisorHandle;
+use netgauze_yang_push::ContentId;
 use netgauze_yang_push::cache::actor::CacheActorHandle;
 use netgauze_yang_push::cache::fetcher::NetconfYangLibraryFetcher;
 use netgauze_yang_push::cache::storage::SubscriptionInfo;
@@ -749,10 +750,10 @@ fn serialize_udp_notif(
 }
 
 fn serialize_telemetry_json(
-    input: (SubscriptionInfo, TelemetryMessageWrapper),
+    input: (Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper),
     _writer_id: String,
 ) -> Result<(Option<serde_json::Value>, serde_json::Value), UdpNotifSerializationError> {
-    let tmw = input.1;
+    let tmw = input.2;
     let ip = tmw.message().telemetry_message_metadata().export_address();
     let value = serde_json::to_value(tmw)?;
     let key = serde_json::Value::String(ip.to_string());
