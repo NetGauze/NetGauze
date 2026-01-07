@@ -297,19 +297,36 @@ fn calculate_set_size_with_padding(
     templates_map: Option<&TemplatesMap>,
     set: &Set,
 ) -> (usize, usize) {
-    let length = Set::BASE_LENGTH
-        + match set {
-            Set::Template(records) => records.iter().map(|x| x.len()).sum::<usize>(),
-            Set::OptionsTemplate(records) => records.iter().map(|x| x.len()).sum::<usize>(),
-            Set::Data { id: _, records } => {
-                let decoding_template = templates_map.and_then(|x| x.get(&set.id()));
-                records
-                    .iter()
-                    .map(|x| x.len(decoding_template))
-                    .sum::<usize>()
-            }
-        };
-    (length, length % 4)
+    let base_length = Set::BASE_LENGTH;
+    let (length, min_length) = match set {
+        Set::Template(records) => {
+            let length = records.iter().map(|x| x.len()).sum::<usize>();
+            let min_length = 4;
+            (length, min_length)
+        }
+        Set::OptionsTemplate(records) => {
+            let length = records.iter().map(|x| x.len()).sum::<usize>();
+            let min_length = 4;
+            (length, min_length)
+        }
+        Set::Data { id: _, records } => {
+            let decoding_template = templates_map.and_then(|x| x.get(&set.id()));
+
+            let lengths: Vec<usize> = records.iter().map(|x| x.len(decoding_template)).collect();
+            let min_length = lengths.iter().min().copied().unwrap_or(4);
+            let length = lengths.iter().sum::<usize>();
+            (length, min_length)
+        }
+    };
+    let length = length + base_length;
+    let padding = length % 4;
+    if min_length < padding {
+        // According to RFC 7011 The padding length MUST be shorter than any allowable
+        // record in this Set.
+        (length, 0)
+    } else {
+        (length, padding)
+    }
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
