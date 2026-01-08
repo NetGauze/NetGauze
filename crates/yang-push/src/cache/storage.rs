@@ -506,7 +506,7 @@ impl YangLibraryReference {
             };
             let yang_module_path = modules_path.join(&filename);
             std::fs::write(&yang_module_path, schema.as_ref())?;
-            tracing::info!(yang_module_path = %yang_module_path.display(), "saved yang module to disk");
+            tracing::debug!(yang_module_path = %yang_module_path.display(), "saved yang module to disk");
         }
         tracing::info!(
             content_id=yang_library.content_id(),
