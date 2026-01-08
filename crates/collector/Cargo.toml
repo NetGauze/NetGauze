@@ -48,7 +48,7 @@ reqwest = { workspace = true, default-features = false, features = [
     "rustls-tls-native-roots",
 ] }
 chrono = { workspace = true, default-features = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"]}
 anyhow = { workspace = true }
 opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
 opentelemetry_sdk = { workspace = true, features = [
@@ -105,9 +105,10 @@ chrono = { workspace = true, default-features = false, features = [
     "std",
     "clock",
 ] }
-tracing-subscriber = { workspace = true }
 bytes = { workspace = true }
 tempfile = { workspace = true }
+yang4 = { workspace = true}
+clap = { workspace = true, features = ["derive"] }
 
 [features]
 bench = ["criterion"]
