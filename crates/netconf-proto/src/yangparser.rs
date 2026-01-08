@@ -34,6 +34,16 @@ pub struct YangDependencies {
     pub includes: Vec<YangInclude>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct YangModuleMetadata {
+    pub name: String,
+    pub namespace: Option<String>,
+    pub prefix: Option<String>,
+    pub revision: Option<String>,
+    // if Some, it's a submodule of the given parent module
+    pub is_submodule_of: Option<String>,
+}
+
 impl fmt::Display for YangDependencies {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Imports ({}):", self.imports.len())?;
@@ -62,6 +72,12 @@ pub fn extract_yang_dependencies(yang_content: &str) -> Result<YangDependencies,
     parser.parse()
 }
 
+/// Extract module metadata from a YANG schema string (without dependencies)
+pub fn extract_yang_metadata(yang_content: &str) -> Result<YangModuleMetadata, String> {
+    let mut parser = YangParser::new(yang_content);
+    parser.parse_metadata()
+}
+
 struct YangParser<'a> {
     content: &'a str,
     position: usize,
@@ -75,6 +91,119 @@ impl<'a> YangParser<'a> {
         }
     }
 
+    /// Parse module metadata (name, namespace, prefix, revision)
+    fn parse_metadata(&mut self) -> Result<YangModuleMetadata, String> {
+        let mut module_name = None;
+        let mut namespace = None;
+        let mut prefix = None;
+        let mut revision = None;
+        let mut is_submodule_of = None;
+
+        while !self.is_eof() {
+            self.skip_whitespace_and_comments();
+
+            if self.is_eof() {
+                break;
+            }
+
+            if self.match_keyword("module") {
+                self.skip_whitespace_and_comments();
+                module_name = Some(
+                    self.read_string_or_identifier()
+                        .ok_or("Expected module name")?,
+                );
+                self.skip_whitespace_and_comments();
+                self.expect_char('{')?;
+            } else if self.match_keyword("submodule") {
+                self.skip_whitespace_and_comments();
+                module_name = Some(
+                    self.read_string_or_identifier()
+                        .ok_or("Expected submodule name")?,
+                );
+                self.skip_whitespace_and_comments();
+                self.expect_char('{')?;
+            } else if self.match_keyword("belongs-to") {
+                // Only in submodules
+                self.skip_whitespace_and_comments();
+                is_submodule_of = Some(
+                    self.read_string_or_identifier()
+                        .ok_or("Expected parent module name")?,
+                );
+                // Skip the rest of belongs-to statement (prefix declaration)
+                self.skip_statement();
+            } else if self.match_keyword("namespace") {
+                self.skip_whitespace_and_comments();
+                namespace = Some(
+                    self.read_string_or_identifier()
+                        .ok_or("Expected namespace value")?,
+                );
+                self.skip_whitespace_and_comments();
+                self.expect_char(';')?;
+            } else if self.match_keyword("prefix") {
+                // Only capture the first module-level prefix
+                if prefix.is_none() {
+                    self.skip_whitespace_and_comments();
+                    prefix = Some(
+                        self.read_string_or_identifier()
+                            .ok_or("Expected prefix value")?,
+                    );
+                    self.skip_whitespace_and_comments();
+                    self.expect_char(';')?;
+                } else {
+                    // Skip prefix statements inside import blocks
+                    self.skip_statement();
+                }
+            } else if self.match_keyword("yang-version") {
+                self.skip_whitespace_and_comments();
+                self.read_string_or_identifier();
+                self.skip_whitespace_and_comments();
+                self.expect_char(';')?;
+            } else if self.match_keyword("revision") {
+                self.skip_whitespace_and_comments();
+                let rev = self
+                    .read_string_or_identifier()
+                    .ok_or("Expected revision date")?;
+                // Only keep the first (latest) revision
+                if revision.is_none() {
+                    revision = Some(rev);
+                }
+                // Skip the revision body
+                self.skip_whitespace_and_comments();
+                if self.peek_char() == Some('{') {
+                    self.skip_statement();
+                } else {
+                    self.expect_char(';')?;
+                }
+            } else if self.match_keyword("container")
+                || self.match_keyword("list")
+                || self.match_keyword("leaf")
+                || self.match_keyword("grouping")
+                || self.match_keyword("typedef")
+                || self.match_keyword("identity")
+                || self.match_keyword("augment")
+                || self.match_keyword("rpc")
+                || self.match_keyword("notification")
+            {
+                // Once we hit data definition statements, we can stop
+                break;
+            } else {
+                // Skip other statements
+                self.skip_one_token();
+            }
+        }
+
+        let name = module_name.ok_or("Module/submodule name not found")?;
+
+        Ok(YangModuleMetadata {
+            name,
+            namespace,
+            prefix,
+            revision,
+            is_submodule_of,
+        })
+    }
+
+    /// Parse YangDependencies
     fn parse(&mut self) -> Result<YangDependencies, String> {
         let mut imports = Vec::new();
         let mut includes = Vec::new();
@@ -705,5 +834,58 @@ mod tests {
             deps.includes[1].revision_date,
             Some("2023-05-01".to_string())
         );
+    }
+
+    #[test]
+    fn test_extract_metadata_only() {
+        let yang = r#"
+            module ietf-yp-observation {
+              yang-version 1.1;
+              namespace "urn:ietf:params:xml:ns:yang:ietf-yp-observation";
+              prefix ypot;
+
+              import ietf-yang-types {
+                prefix yang;
+              }
+
+              organization "IETF NETCONF Working Group";
+
+              revision 2025-02-24 {
+                description "First revision";
+              }
+            }
+        "#;
+
+        let metadata = extract_yang_metadata(yang).unwrap();
+        assert_eq!(metadata.name, "ietf-yp-observation");
+        assert_eq!(
+            metadata.namespace,
+            Some("urn:ietf:params:xml:ns:yang:ietf-yp-observation".to_string())
+        );
+        assert_eq!(metadata.prefix, Some("ypot".to_string()));
+        assert_eq!(metadata.revision, Some("2025-02-24".to_string()));
+    }
+
+    #[test]
+    fn test_metadata_with_imports() {
+        let yang = r#"
+            module test {
+              namespace "urn:test";
+              prefix test;
+
+              import other {
+                prefix other;
+              }
+
+              revision 2025-01-01 {
+                description "Latest";
+              }
+            }
+        "#;
+
+        let metadata = extract_yang_metadata(yang).unwrap();
+        assert_eq!(metadata.name, "test");
+        assert_eq!(metadata.prefix, Some("test".to_string()));
+        // Should not be confused by the prefix inside import
     }
 }
