@@ -193,7 +193,7 @@ impl YangLibrary {
                 let dep_name = *graph.node_weight(incoming_edge.source()).unwrap();
                 let dep = supplied_references.get(dep_name).unwrap().clone();
                 if tracing::enabled!(tracing::Level::DEBUG) {
-                    let retrieved = client
+                    match client
                         .get_version(
                             dep.subject.as_deref().unwrap_or(""),
                             dep.version.unwrap_or(1),
@@ -201,23 +201,28 @@ impl YangLibrary {
                             None,
                         )
                         .await
-                        .expect("Failed to get schema");
-                    let features = retrieved
-                        .metadata
-                        .unwrap_or_default()
-                        .tags
-                        .unwrap_or_default()
-                        .get("features")
-                        .unwrap_or(&vec![])
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(",");
-                    tracing::debug!(
-                        "For schema `{name}` registering reference `{dep_name}` with features [{features}]"
-                    );
+                    {
+                        Ok(retrieved) => {
+                            let features = retrieved
+                                .metadata
+                                .unwrap_or_default()
+                                .tags
+                                .unwrap_or_default()
+                                .get("features")
+                                .unwrap_or(&vec![])
+                                .iter()
+                                .map(|x| x.to_string())
+                                .collect::<Vec<String>>()
+                                .join(",");
+                            tracing::debug!(
+                                "For schema `{name}` registering reference `{dep_name}` with features [{features}]"
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to get schema `{dep_name}`: {e}");
+                        }
+                    }
                 }
-
                 references.push(dep);
             }
             // Sort references for consistent schema registration
