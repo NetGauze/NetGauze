@@ -291,42 +291,22 @@ impl WritablePduWithOneInput<Option<&DecodingTemplate>, DataRecordWritingError> 
     }
 }
 
-/// Calculate padding such that next set starts at a 4-byte aligned boundary
+/// Calculate Set size
 #[inline]
-fn calculate_set_size_with_padding(
-    templates_map: Option<&TemplatesMap>,
-    set: &Set,
-) -> (usize, usize) {
+fn calculate_set_size(templates_map: Option<&TemplatesMap>, set: &Set) -> usize {
     let base_length = Set::BASE_LENGTH;
-    let (length, min_length) = match set {
-        Set::Template(records) => {
-            let length = records.iter().map(|x| x.len()).sum::<usize>();
-            let min_length = 4;
-            (length, min_length)
-        }
-        Set::OptionsTemplate(records) => {
-            let length = records.iter().map(|x| x.len()).sum::<usize>();
-            let min_length = 4;
-            (length, min_length)
-        }
+    let length = match set {
+        Set::Template(records) => records.iter().map(|x| x.len()).sum::<usize>(),
+        Set::OptionsTemplate(records) => records.iter().map(|x| x.len()).sum::<usize>(),
         Set::Data { id: _, records } => {
             let decoding_template = templates_map.and_then(|x| x.get(&set.id()));
-
-            let lengths: Vec<usize> = records.iter().map(|x| x.len(decoding_template)).collect();
-            let min_length = lengths.iter().min().copied().unwrap_or(4);
-            let length = lengths.iter().sum::<usize>();
-            (length, min_length)
+            records
+                .iter()
+                .map(|x| x.len(decoding_template))
+                .sum::<usize>()
         }
     };
-    let length = length + base_length;
-    let padding = length % 4;
-    if min_length < padding {
-        // According to RFC 7011 The padding length MUST be shorter than any allowable
-        // record in this Set.
-        (length, 0)
-    } else {
-        (length, padding)
-    }
+    length + base_length
 }
 
 #[derive(WritingError, Eq, PartialEq, Clone, Debug)]
@@ -364,8 +344,7 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, SetWritingError> for Set {
     const BASE_LENGTH: usize = 4;
 
     fn len(&self, templates_map: Option<&TemplatesMap>) -> usize {
-        let (length, padding) = calculate_set_size_with_padding(templates_map, self);
-        length + padding
+        calculate_set_size(templates_map, self)
     }
 
     fn write<T: Write>(
@@ -373,8 +352,7 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, SetWritingError> for Set {
         writer: &mut T,
         templates_map: Option<&TemplatesMap>,
     ) -> Result<(), SetWritingError> {
-        let (length, padding) = calculate_set_size_with_padding(templates_map, self);
-        let length = (length + padding) as u16;
+        let length = calculate_set_size(templates_map, self) as u16;
         match self {
             Self::Template(records) => {
                 writer.write_u16::<NetworkEndian>(IPFIX_TEMPLATE_SET_ID)?;
@@ -398,9 +376,6 @@ impl WritablePduWithOneInput<Option<&TemplatesMap>, SetWritingError> for Set {
                     record.write(writer, decoding_template)?;
                 }
             }
-        }
-        for _ in 0..padding {
-            writer.write_u8(0x00)?;
         }
         Ok(())
     }
