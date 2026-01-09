@@ -185,9 +185,8 @@ pub enum RouteMonitoringTlvValue {
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PathMarking {
-    /// Represented as u32 instead of [PathStatus] since it is a bitflag
     /// [PathStatus] is just a collection of all possible flags in this bitflag
-    path_status: u32,
+    path_status: PathStatus,
     /// Represented as u16 instead of [PathMarkingReason] to accept
     /// non-IANA-defined reason codes Well-known reason codes are defined in
     /// [PathMarkingReason] Reason codes are used (Some(_)) with
@@ -196,15 +195,15 @@ pub struct PathMarking {
 }
 
 impl PathMarking {
-    pub fn new(path_status: u32, reason_code: Option<PathMarkingReason>) -> PathMarking {
+    pub fn new(path_status: PathStatus, reason_code: Option<PathMarkingReason>) -> PathMarking {
         Self {
             path_status,
             reason: reason_code,
         }
     }
 
-    pub const fn path_status(&self) -> u32 {
-        self.path_status
+    pub const fn path_status(&self) -> &PathStatus {
+        &self.path_status
     }
 
     pub const fn reason(&self) -> Option<PathMarkingReason> {
@@ -217,37 +216,148 @@ impl PathMarking {
 
 // TODO assign real codes and move to IANA when draft becomes RFC
 //  (https://datatracker.ietf.org/doc/html/draft-ietf-grow-bmp-path-marking-tlv)
-#[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, FromRepr, Display)]
+#[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum PathStatus {
-    Invalid = 0x00000001,
-    Best = 0x00000002,
-    NonSelected = 0x00000004,
-    Primary = 0x00000008,
-    Backup = 0x00000010,
-    NonInstalled = 0x00000020,
-    BestExternal = 0x00000040,
-    AddPath = 0x00000080,
-    FilteredInInboundPolicy = 0x00000100,
-    FilteredInOutboundPolicy = 0x00000200,
-    Stale = 0x00000400,
-    Suppressed = 0x00000800,
+pub struct PathStatus {
+    pub invalid: bool,
+    pub best: bool,
+    pub non_selected: bool,
+    pub primary: bool,
+    pub backup: bool,
+    pub non_installed: bool,
+    pub best_external: bool,
+    pub add_path: bool,
+    pub filtered_in_inbound_policy: bool,
+    pub filtered_in_outbound_policy: bool,
+    pub stale: bool,
+    pub suppressed: bool,
 }
 
-impl BitOr for PathStatus {
-    type Output = u32;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        self as u32 | rhs as u32
+impl PathStatus {
+    pub fn to_vec(&self) -> Vec<&'static str> {
+        let mut flags = Vec::new();
+        if self.invalid {
+            flags.push("Invalid");
+        }
+        if self.best {
+            flags.push("Best");
+        }
+        if self.non_selected {
+            flags.push("NonSelected");
+        }
+        if self.primary {
+            flags.push("Primary");
+        }
+        if self.backup {
+            flags.push("Backup");
+        }
+        if self.non_installed {
+            flags.push("NonInstalled");
+        }
+        if self.best_external {
+            flags.push("BestExternal");
+        }
+        if self.add_path {
+            flags.push("AddPath");
+        }
+        if self.filtered_in_inbound_policy {
+            flags.push("FilteredInInboundPolicy");
+        }
+        if self.filtered_in_outbound_policy {
+            flags.push("FilteredInOutboundPolicy");
+        }
+        if self.stale {
+            flags.push("Stale");
+        }
+        if self.suppressed {
+            flags.push("Suppressed");
+        }
+        flags
     }
 }
 
-impl BitOr<PathStatus> for u32 {
-    type Output = u32;
+impl From<u32> for PathStatus {
+    fn from(value: u32) -> Self {
+        PathStatus {
+            invalid: (value & 0x00000001) != 0,
+            best: (value & 0x00000002) != 0,
+            non_selected: (value & 0x00000004) != 0,
+            primary: (value & 0x00000008) != 0,
+            backup: (value & 0x00000010) != 0,
+            non_installed: (value & 0x00000020) != 0,
+            best_external: (value & 0x00000040) != 0,
+            add_path: (value & 0x00000080) != 0,
+            filtered_in_inbound_policy: (value & 0x00000100) != 0,
+            filtered_in_outbound_policy: (value & 0x00000200) != 0,
+            stale: (value & 0x00000400) != 0,
+            suppressed: (value & 0x00000800) != 0,
+        }
+    }
+}
 
-    fn bitor(self, rhs: PathStatus) -> Self::Output {
-        self | rhs as u32
+impl From<PathStatus> for u32 {
+    fn from(flags: PathStatus) -> Self {
+        let mut value: u32 = 0;
+        if flags.invalid {
+            value |= 0x00000001;
+        }
+        if flags.best {
+            value |= 0x00000002;
+        }
+        if flags.non_selected {
+            value |= 0x00000004;
+        }
+        if flags.primary {
+            value |= 0x00000008;
+        }
+        if flags.backup {
+            value |= 0x00000010;
+        }
+        if flags.non_installed {
+            value |= 0x00000020;
+        }
+        if flags.best_external {
+            value |= 0x00000040;
+        }
+        if flags.add_path {
+            value |= 0x00000080;
+        }
+        if flags.filtered_in_inbound_policy {
+            value |= 0x00000100;
+        }
+        if flags.filtered_in_outbound_policy {
+            value |= 0x00000200;
+        }
+        if flags.stale {
+            value |= 0x00000400;
+        }
+        if flags.suppressed {
+            value |= 0x00000800;
+        }
+        value
+    }
+}
+
+impl BitOr for PathStatus {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        PathStatus {
+            invalid: self.invalid | rhs.invalid,
+            best: self.best | rhs.best,
+            non_selected: self.non_selected | rhs.non_selected,
+            primary: self.primary | rhs.primary,
+            backup: self.backup | rhs.backup,
+            non_installed: self.non_installed | rhs.non_installed,
+            best_external: self.best_external | rhs.best_external,
+            add_path: self.add_path | rhs.add_path,
+            filtered_in_inbound_policy: self.filtered_in_inbound_policy
+                | rhs.filtered_in_inbound_policy,
+            filtered_in_outbound_policy: self.filtered_in_outbound_policy
+                | rhs.filtered_in_outbound_policy,
+            stale: self.stale | rhs.stale,
+            suppressed: self.suppressed | rhs.suppressed,
+        }
     }
 }
 

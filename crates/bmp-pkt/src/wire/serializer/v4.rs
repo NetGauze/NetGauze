@@ -244,7 +244,7 @@ impl WritablePdu<RouteMonitoringTlvValueWritingError> for RouteMonitoringTlvValu
             RouteMonitoringTlvValue::StatelessParsing(capability) => capability.write(writer)?,
             RouteMonitoringTlvValue::Unknown { value, .. } => writer.write_all(value)?,
             RouteMonitoringTlvValue::PathMarking(path_marking) => {
-                writer.write_u32::<NetworkEndian>(path_marking.path_status())?;
+                writer.write_u32::<NetworkEndian>((*path_marking.path_status()).into())?;
                 if let Some(reason_code) = path_marking.reason_code() {
                     writer.write_u16::<NetworkEndian>(reason_code)?
                 }

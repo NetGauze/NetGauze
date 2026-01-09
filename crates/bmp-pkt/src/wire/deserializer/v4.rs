@@ -414,7 +414,8 @@ impl<'a> ReadablePdu<'a, LocatedPathMarkingParsingError<'a>> for v4::PathMarking
     where
         Self: Sized,
     {
-        let (data, path_status) = be_u32(buf)?;
+        let (data, path_status_u32) = be_u32(buf)?;
+        let path_status = v4::PathStatus::from(path_status_u32);
 
         let reason_code_len = data.len();
         let (data, reason_code) = match reason_code_len {

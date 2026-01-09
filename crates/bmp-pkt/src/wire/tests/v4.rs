@@ -562,7 +562,11 @@ fn test_bmp_v4_path_marking() -> Result<(), BmpMessageWritingError> {
                 RouteMonitoringTlv::build(
                     0,
                     RouteMonitoringTlvValue::PathMarking(PathMarking::new(
-                        PathStatus::Primary | PathStatus::Best,
+                        PathStatus {
+                            best: true,
+                            primary: true,
+                            ..Default::default()
+                        },
                         None,
                     )),
                 )
@@ -689,7 +693,10 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
                 RouteMonitoringTlv::build(
                     0,
                     RouteMonitoringTlvValue::PathMarking(PathMarking::new(
-                        0 | PathStatus::Invalid,
+                        PathStatus {
+                            invalid: true,
+                            ..Default::default()
+                        },
                         Some(WellKnownPathMarkingReasonCode::InvalidAsLoop.into()),
                     )),
                 )
