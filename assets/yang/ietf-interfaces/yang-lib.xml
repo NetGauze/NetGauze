@@ -138,7 +138,7 @@
     <module>
         <name>ietf-udp-client</name>
         <revision>2025-02-24</revision>
-        <namespace>urn:ietf:params:xml:ns:yang:ietf-subscribed-notif-receivers</namespace>
+        <namespace>urn:ietf:params:xml:ns:yang:ietf-udp-client</namespace>
     </module>
     <module>
         <name>ietf-tls-client</name>
