@@ -41,8 +41,9 @@ use netgauze_udp_notif_pkt::notification::{
 use netgauze_yang_push::ContentId;
 use netgauze_yang_push::cache::storage::SubscriptionInfo;
 use netgauze_yang_push::model::telemetry::{
-    FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol, TelemetryMessage,
-    TelemetryMessageMetadata, TelemetryMessageWrapper, YangPushSubscriptionMetadata,
+    EventType, FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol,
+    TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
+    YangPushSubscriptionMetadata,
 };
 use serde_json::Value;
 use shadow_rs::shadow;
@@ -571,6 +572,8 @@ impl YangPushEnrichmentActor {
         let telemetry_message_metadata = TelemetryMessageMetadata::new(
             Some(node_export_timestamp),
             Utc::now(),
+            EventType::Log,
+            None,                      // we don't set sequence numbers for now
             SessionProtocol::YangPush, // only option at the moment
             peer.ip(),
             Some(peer.port()),
