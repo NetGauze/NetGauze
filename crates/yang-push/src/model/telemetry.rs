@@ -120,7 +120,7 @@ impl TelemetryMessage {
 /// Telemetry Session Protocol Type
 #[derive(Default, Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum SessionProtocol {
-    #[serde(rename = "yp-push")]
+    #[serde(rename = "yang-push")]
     YangPush,
 
     #[serde(rename = "netconf")]
@@ -133,6 +133,19 @@ pub enum SessionProtocol {
     #[serde(other)]
     #[serde(rename = "unknown")]
     Unknown,
+}
+
+/// Telemetry Notification Event Type
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub enum EventType {
+    #[serde(rename = "log")]
+    Log,
+
+    #[serde(rename = "update")]
+    Update,
+
+    #[serde(rename = "delete")]
+    Delete,
 }
 
 /// Generic Metadata Manifest
@@ -192,6 +205,11 @@ pub struct TelemetryMessageMetadata {
 
     collection_timestamp: DateTime<Utc>,
 
+    notification_event: EventType,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sequence_number: Option<u32>,
+
     session_protocol: SessionProtocol,
 
     export_address: IpAddr,
@@ -215,6 +233,8 @@ impl TelemetryMessageMetadata {
     pub const fn new(
         node_export_timestamp: Option<DateTime<Utc>>,
         collection_timestamp: DateTime<Utc>,
+        notification_event: EventType,
+        sequence_number: Option<u32>,
         session_protocol: SessionProtocol,
         export_address: IpAddr,
         export_port: Option<u16>,
@@ -225,6 +245,8 @@ impl TelemetryMessageMetadata {
         Self {
             node_export_timestamp,
             collection_timestamp,
+            notification_event,
+            sequence_number,
             session_protocol,
             export_address,
             export_port,
@@ -238,6 +260,12 @@ impl TelemetryMessageMetadata {
     }
     pub const fn collection_timestamp(&self) -> DateTime<Utc> {
         self.collection_timestamp
+    }
+    pub const fn notification_event(&self) -> EventType {
+        self.notification_event
+    }
+    pub const fn sequence_number(&self) -> Option<u32> {
+        self.sequence_number
     }
     pub const fn session_protocol(&self) -> &SessionProtocol {
         &self.session_protocol
@@ -479,6 +507,10 @@ impl Label {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
 pub enum LabelValue {
+    NumberValue {
+        #[serde(rename = "number-value")]
+        number_value: u64,
+    },
     StringValue {
         #[serde(rename = "string-value")]
         string_value: String,
@@ -490,6 +522,12 @@ pub enum LabelValue {
 }
 
 impl LabelValue {
+    pub const fn as_u64(&self) -> Option<u64> {
+        match self {
+            LabelValue::NumberValue { number_value } => Some(*number_value),
+            _ => None,
+        }
+    }
     pub const fn as_string(&self) -> Option<&str> {
         match self {
             LabelValue::StringValue { string_value } => Some(string_value.as_str()),
@@ -528,6 +566,8 @@ mod tests {
                 telemetry_message_metadata: TelemetryMessageMetadata {
                     node_export_timestamp: None,
                     collection_timestamp: Utc.timestamp_millis_opt(0).unwrap(),
+                    notification_event: EventType::Log,
+                    sequence_number: Some(1),
                     session_protocol: SessionProtocol::YangPush,
                     export_address: "127.0.0.1".parse().unwrap(),
                     export_port: Some(8080),
@@ -595,7 +635,7 @@ mod tests {
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Expected JSON string
-        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","session-protocol":"yp-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
+        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","notification-event":"log","sequence-number":1,"session-protocol":"yp-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
@@ -619,6 +659,8 @@ mod tests {
                 telemetry_message_metadata: TelemetryMessageMetadata {
                     node_export_timestamp: None,
                     collection_timestamp: Utc.timestamp_millis_opt(0).unwrap(),
+                    notification_event: EventType::Log,
+                    sequence_number: None,
                     session_protocol: SessionProtocol::Unknown,
                     export_address: "127.0.0.1".parse().unwrap(),
                     export_port: None,
@@ -636,7 +678,7 @@ mod tests {
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Expected JSON string
-        let expected_json = r#"{"ietf-telemetry-message:message":{"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","session-protocol":"unknown","export-address":"127.0.0.1"}}}"#;
+        let expected_json = r#"{"ietf-telemetry-message:message":{"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","notification-event":"log","session-protocol":"unknown","export-address":"127.0.0.1"}}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
