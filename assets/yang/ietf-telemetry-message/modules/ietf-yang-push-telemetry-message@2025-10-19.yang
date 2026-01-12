@@ -42,6 +42,11 @@ module ietf-yang-push-telemetry-message {
     reference
       "draft-ietf-netmod-yang-semver: YANG Semantic Versioning";
   }
+  import ietf-yang-structure-ext {
+    prefix sx;
+    reference
+      "RFC 8791: YANG Data Structure Extensions";
+  }
 
   organization
     "IETF Draft";
@@ -75,14 +80,14 @@ module ietf-yang-push-telemetry-message {
      This version of this YANG module is part of RFC XXXX; see the RFC
      itself for full legal notices.";
 
-  revision 2025-08-15 {
+  revision 2025-10-19 {
     description
       "Initial revision.";
     reference
       "RFC XXXX";
   }
 
-  augment "/tm:message/tm:telemetry-message-metadata" {
+  sx:augment-structure "/tm:message/tm:telemetry-message-metadata" {
     description
       "Augments telemetry-message-metadata with YANG-Push specific
        subscription metadata";

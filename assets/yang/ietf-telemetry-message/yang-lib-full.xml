@@ -4,14 +4,14 @@
     <!-- Main IETF telemetry message and the YANG push augmentation -->
     <module>
       <name>ietf-telemetry-message</name>
-      <revision>2025-06-10</revision>
+      <revision>2025-10-19</revision>
       <namespace>urn:ietf:params:xml:ns:yang:ietf-telemetry-message</namespace>
       <feature>network-node-manifest</feature>
       <feature>data-collection-manifest</feature>
     </module>
     <module>
       <name>ietf-yang-push-telemetry-message</name>
-      <revision>2025-08-15</revision>
+      <revision>2025-10-19</revision>
       <namespace>urn:ietf:params:xml:ns:yang:ietf-yang-push-telemetry-message</namespace>
     </module>
     <!-- Direct imports by ietf-telemetry-message -->
@@ -193,5 +193,5 @@
   <content-id>ietf-telemetry-message-full</content-id>
 </yang-library>
 <modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
-<module-set-id>34</module-set-id>
+  <module-set-id>34</module-set-id>
 </modules-state>
