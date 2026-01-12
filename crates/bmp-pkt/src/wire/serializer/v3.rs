@@ -612,32 +612,58 @@ impl WritablePdu<StatisticsCounterMessageWritingError> for StatisticsCounter {
     const BASE_LENGTH: usize = 4;
 
     fn len(&self) -> usize {
-        Self::BASE_LENGTH
-            + match self {
-                Self::NumberOfPrefixesRejectedByInboundPolicy(_) => 4,
-                Self::NumberOfDuplicatePrefixAdvertisements(_) => 4,
-                Self::NumberOfDuplicateWithdraws(_) => 4,
-                Self::NumberOfUpdatesInvalidatedDueToClusterListLoop(_) => 4,
-                Self::NumberOfUpdatesInvalidatedDueToAsPathLoop(_) => 4,
-                Self::NumberOfUpdatesInvalidatedDueToOriginatorId(_) => 4,
-                Self::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(_) => 4,
-                Self::NumberOfRoutesInAdjRibIn(_) => 8,
-                Self::NumberOfRoutesInLocRib(_) => 8,
-                Self::NumberOfRoutesInPerAfiSafiAdjRibIn(_, _) => 11,
-                Self::NumberOfRoutesInPerAfiSafiLocRib(_, _) => 11,
-                Self::NumberOfUpdatesSubjectedToTreatAsWithdraw(_) => 4,
-                Self::NumberOfPrefixesSubjectedToTreatAsWithdraw(_) => 4,
-                Self::NumberOfDuplicateUpdateMessagesReceived(_) => 4,
-                Self::NumberOfRoutesInPrePolicyAdjRibOut(_) => 8,
-                Self::NumberOfRoutesInPostPolicyAdjRibOut(_) => 8,
-                Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(_, _) => 11,
-                Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(_, _) => 11,
-                Self::Experimental65531(value) => value.len(),
-                Self::Experimental65532(value) => value.len(),
-                Self::Experimental65533(value) => value.len(),
-                Self::Experimental65534(value) => value.len(),
-                Self::Unknown(_, value) => value.len(),
-            }
+        Self::BASE_LENGTH + match self {
+            Self::NumberOfPrefixesRejectedByInboundPolicy(_) => 4,
+            Self::NumberOfDuplicatePrefixAdvertisements(_) => 4,
+            Self::NumberOfDuplicateWithdraws(_) => 4,
+            Self::NumberOfUpdatesInvalidatedDueToClusterListLoop(_) => 4,
+            Self::NumberOfUpdatesInvalidatedDueToAsPathLoop(_) => 4,
+            Self::NumberOfUpdatesInvalidatedDueToOriginatorId(_) => 4,
+            Self::NumberOfUpdatesInvalidatedDueToAsConfederationLoop(_) => 4,
+            Self::NumberOfRoutesInAdjRibIn(_) => 8,
+            Self::NumberOfRoutesInLocRib(_) => 8,
+            Self::NumberOfRoutesInPerAfiSafiAdjRibIn(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiLocRib(_, _) => 11,
+            Self::NumberOfUpdatesSubjectedToTreatAsWithdraw(_) => 4,
+            Self::NumberOfPrefixesSubjectedToTreatAsWithdraw(_) => 4,
+            Self::NumberOfDuplicateUpdateMessagesReceived(_) => 4,
+            Self::NumberOfRoutesInPrePolicyAdjRibOut(_) => 8,
+            Self::NumberOfRoutesInPostPolicyAdjRibOut(_) => 8,
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(_, _) => 11,
+            Self::NumberOfRoutesInPrePolicyAdjRibIn(_) => 8,
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn(_, _) => 11,
+            Self::NumberOfRoutesInPostPolicyAdjRibIn(_) => 8,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiSuppressedByDamping(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiMarkedStaleByGr(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr(_, _) => 11,
+            Self::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold(_) => 8,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold(_, _) => 11,
+            Self::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(_) => 8,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(
+                _,
+                _,
+            ) => 11,
+            Self::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength(_) => 8,
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected(_, _) => 11,
+            Self::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength(_) => 8,
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(_, _) => 11,
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(_, _) => 11,
+            Self::Experimental65531(value) => value.len(),
+            Self::Experimental65532(value) => value.len(),
+            Self::Experimental65533(value) => value.len(),
+            Self::Experimental65534(value) => value.len(),
+            Self::Unknown(_, value) => value.len(),
+        }
     }
 
     fn write<T: Write>(&self, writer: &mut T) -> Result<(), StatisticsCounterMessageWritingError> {
@@ -701,6 +727,141 @@ impl WritablePdu<StatisticsCounterMessageWritingError> for StatisticsCounter {
                 writer.write_u64::<NetworkEndian>(value.0)?;
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPrePolicyAdjRibIn(value) => {
+                writer.write_u64::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPostPolicyAdjRibIn(value) => {
+                writer.write_u64::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiSuppressedByDamping(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiMarkedStaleByGr(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold(value) => {
+                writer.write_u64::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold(
+                address_type,
+                value,
+            ) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(value) => {
+                writer.write_u64::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(
+                address_type,
+                value,
+            ) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength(value) => {
+                writer.write_u64::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength(
+                address_type,
+                value,
+            ) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki(
+                address_type,
+                value,
+            ) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki(
+                address_type,
+                value,
+            ) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected(address_type, value) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength(value) => {
+                writer.write_u64::<NetworkEndian>(value.0)?
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength(
+                address_type,
+                value,
+            ) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(
+                address_type,
+                value,
+            ) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(
+                address_type,
+                value,
+            ) => {
+                writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
+                writer.write_u8(address_type.subsequent_address_family().into())?;
+                writer.write_u64::<NetworkEndian>(value.0)?;
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(
+                address_type,
+                value,
+            ) => {
                 writer.write_u16::<NetworkEndian>(address_type.address_family().into())?;
                 writer.write_u8(address_type.subsequent_address_family().into())?;
                 writer.write_u64::<NetworkEndian>(value.0)?;

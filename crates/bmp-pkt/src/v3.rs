@@ -660,6 +660,33 @@ pub enum StatisticsCounter {
     NumberOfRoutesInPostPolicyAdjRibOut(GaugeU64),
     NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut(AddressType, GaugeU64),
     NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(AddressType, GaugeU64),
+    NumberOfRoutesInPrePolicyAdjRibIn(GaugeU64),
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn(AddressType, GaugeU64),
+    NumberOfRoutesInPostPolicyAdjRibIn(GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiSuppressedByDamping(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiMarkedStaleByGr(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr(AddressType, GaugeU64),
+    NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold(GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold(AddressType, GaugeU64),
+    NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(
+        AddressType,
+        GaugeU64,
+    ),
+    NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength(GaugeU64),
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected(AddressType, GaugeU64),
+    NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength(GaugeU64),
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(AddressType, GaugeU64),
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(AddressType, GaugeU64),
     Experimental65531(Vec<u8>),
     Experimental65532(Vec<u8>),
     Experimental65533(Vec<u8>),
@@ -719,6 +746,78 @@ impl StatisticsCounter {
             }
             Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut(_, _) => {
                 Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut)
+            }
+            Self::NumberOfRoutesInPrePolicyAdjRibIn(_) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibIn)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn)
+            }
+            Self::NumberOfRoutesInPostPolicyAdjRibIn(_) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibIn)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted)
+            }
+            Self::NumberOfRoutesInPerAfiSafiSuppressedByDamping(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiSuppressedByDamping)
+            }
+            Self::NumberOfRoutesInPerAfiSafiMarkedStaleByGr(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiMarkedStaleByGr)
+            }
+            Self::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr)
+            }
+            Self::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold(_) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold)
+            }
+            Self::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(_) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold)
+            }
+            Self::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength(_) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected)
+            }
+            Self::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength(_) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki)
+            }
+            Self::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(_, _) => {
+                Ok(BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound)
             }
             Self::Experimental65531(_) => Ok(BmpStatisticsType::Experimental65531),
             Self::Experimental65532(_) => Ok(BmpStatisticsType::Experimental65532),

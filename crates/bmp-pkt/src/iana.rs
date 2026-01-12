@@ -371,6 +371,7 @@ impl TryFrom<u16> for RouteMirroringInformation {
 #[derive(Display, FromRepr, Copy, Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub enum BmpStatisticsType {
+    // [RFC8671](https://datatracker.ietf.org/doc/html/rfc8671)
     NumberOfPrefixesRejectedByInboundPolicy = 0,
     NumberOfDuplicatePrefixAdvertisements = 1,
     NumberOfDuplicateWithdraws = 2,
@@ -389,6 +390,32 @@ pub enum BmpStatisticsType {
     NumberOfRoutesInPostPolicyAdjRibOut = 15,
     NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOut = 16,
     NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOut = 17,
+    // [RFC-ietf-grow-bmp-bgp-rib-stats-17](https://datatracker.ietf.org/doc/html/draft-ietf-grow-bmp-bgp-rib-stats)
+    NumberOfRoutesInPrePolicyAdjRibIn = 18,
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn = 19,
+    NumberOfRoutesInPostPolicyAdjRibIn = 20,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn = 21,
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected = 22,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted = 23,
+    NumberOfRoutesInPerAfiSafiSuppressedByDamping = 26,
+    NumberOfRoutesInPerAfiSafiMarkedStaleByGr = 27,
+    NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr = 28,
+    NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold = 29,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold = 30,
+    NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold = 31,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold = 32,
+    NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength = 33,
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength = 34,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki = 35,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki = 36,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound = 37,
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected = 38,
+    NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength = 39,
+    NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength = 40,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki = 41,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki = 42,
+    NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound = 43,
+    // [RFC7854](https://datatracker.ietf.org/doc/html/rfc7854)
     Experimental65531 = 65531,
     Experimental65532 = 65532,
     Experimental65533 = 65533,

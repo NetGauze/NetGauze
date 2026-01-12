@@ -1018,6 +1018,228 @@ impl<'a> ReadablePdu<'a, LocatedStatisticsCounterParsingError<'a>> for v3::Stati
                         ),
                     )
                 }
+                BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibIn => {
+                    let (buf, value) = be_u64(buf)?;
+                    (buf, v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibIn(GaugeU64(value)))
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibIn(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibIn => {
+                    let (buf, value) = be_u64(buf)?;
+                    (buf, v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibIn(GaugeU64(value)))
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibIn(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejected(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInAccepted(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiSuppressedByDamping => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiSuppressedByDamping(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiMarkedStaleByGr => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiMarkedStaleByGr(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiMarkedStaleByLlgr(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold => {
+                    let (buf, value) = be_u64(buf)?;
+                    (buf, v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibInBeforeThreshold(GaugeU64(value)))
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInBeforeThreshold(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold => {
+                    let (buf, value) = be_u64(buf)?;
+                    (buf, v3::StatisticsCounter::NumberOfRoutesInPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(GaugeU64(value)))
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInOrLocRibBeforeLicenseThreshold(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength => {
+                    let (buf, value) = be_u64(buf)?;
+                    (buf, v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibInRejectedDueToAsPathLength(GaugeU64(value)))
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibInRejectedDueToAsPathLength(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInInvalidatedByRpki(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInValidatedByRpki(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibInRpkiNotFound(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutRejected(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength => {
+                    let (buf, value) = be_u64(buf)?;
+                    (buf, v3::StatisticsCounter::NumberOfRoutesInPrePolicyAdjRibOutFilteredDueToAsPathLength(GaugeU64(value)))
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPrePolicyAdjRibOutFilteredDueToAsPathLength(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutInvalidatedByRpki(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutValidatedByRpki(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
+                BmpStatisticsType::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound => {
+                    let (buf, address_type) = parse_address_type(buf)?;
+                    let (buf, value) = be_u64(buf)?;
+                    (
+                        buf,
+                        v3::StatisticsCounter::NumberOfRoutesInPerAfiSafiPostPolicyAdjRibOutRpkiNotFound(
+                            address_type,
+                            GaugeU64::new(value),
+                        ),
+                    )
+                }
                 BmpStatisticsType::Experimental65531 => {
                     let (buf, data) = nom::bytes::complete::take(length)(buf)?;
                     (buf, v3::StatisticsCounter::Experimental65531(data.to_vec()))
