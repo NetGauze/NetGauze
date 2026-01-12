@@ -46,6 +46,7 @@ use serde_json::json;
 use shadow_rs::shadow;
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, SocketAddr};
+use tokio::signal;
 use tracing::{debug, error, info, trace, warn};
 use yang4::context::Context;
 use yang4::data::{DataFormat, DataParserFlags, DataValidationFlags};
@@ -130,6 +131,7 @@ struct ValidationStats {
     failed: usize,
     context_errors: usize,
     no_schema: usize,
+    no_tm_schema: usize,
 }
 
 /// Cache for YANG contexts indexed by schema ID
@@ -802,6 +804,7 @@ fn log_statistics(stats: &ValidationStats, total_count: usize) {
     info!("  Failed:                      {}", stats.failed);
     info!("  Context errors:              {}", stats.context_errors);
     info!("  No schema-id (skipped):      {}", stats.no_schema);
+    info!("  No ietf-tm schema (skipped): {}", stats.no_tm_schema);
     info!("");
 
     let validated_total = stats.passed + stats.failed;
@@ -865,157 +868,200 @@ async fn main() -> Result<()> {
     let mut total_count = 0;
     let mut validation_stats = ValidationStats::default();
 
-    while let Some(message_result) = message_stream.next().await {
-        match message_result {
-            Ok(borrowed_message) => {
-                let partition_id = borrowed_message.partition();
+    // Setup Ctrl+C handler
+    let ctrl_c = signal::ctrl_c();
+    tokio::pin!(ctrl_c);
 
-                // Check per-partition limit (only applies during tail phase or when not
-                // following)
-                let current_count = partition_counts[&partition_id];
-                if !tail_completed && current_count >= per_partition_limit {
-                    if partition_counts.values().all(|&c| c >= per_partition_limit) {
-                        if args.follow {
-                            debug!("Tail completed, now following new messages...");
-                            tail_completed = true;
-                            // Reset counters for follow mode
-                            for count in partition_counts.values_mut() {
-                                *count = 0;
+    loop {
+        tokio::select! {
+            _ = &mut ctrl_c => {
+                info!("Received Ctrl+C, shutting down...");
+                break;
+            }
+            message_result = message_stream.next() => {
+                match message_result {
+                    Some(Ok(borrowed_message)) => {
+                        let partition_id = borrowed_message.partition();
+
+                        // Check per-partition limit (only applies during tail phase or when not
+                        // following)
+                        let current_count = partition_counts[&partition_id];
+                        if !tail_completed && current_count >= per_partition_limit {
+                            if partition_counts.values().all(|&c| c >= per_partition_limit) {
+                                if args.follow {
+                                    debug!("Tail completed, now following new messages...");
+                                    tail_completed = true;
+                                    // Reset counters for follow mode
+                                    for count in partition_counts.values_mut() {
+                                        *count = 0;
+                                    }
+                                } else {
+                                    info!("All partitions reached message limit, exiting");
+                                    break;
+                                }
+                            } else {
+                                continue;
+                            }
+                        }
+
+                        // Extract message components
+                        let payload = borrowed_message.payload().unwrap_or(&[]);
+                        let key = borrowed_message.key().unwrap_or(&[]);
+                        let headers = borrowed_message.headers().map(|headers| {
+                            headers
+                                .iter()
+                                .map(|h| {
+                                    json!({
+                                        "key": h.key,
+                                        "value": h.value.map(|v| String::from_utf8_lossy(v).to_string())
+                                    })
+                                })
+                                .collect::<Vec<_>>()
+                        });
+
+                        // Parse payload as JSON
+                        let payload_json = if !payload.is_empty() {
+                            match serde_json::from_slice::<serde_json::Value>(payload) {
+                                Ok(json_value) => json_value,
+                                Err(_) => json!(String::from_utf8_lossy(payload)),
                             }
                         } else {
-                            info!("All partitions reached message limit, exiting");
-                            break;
-                        }
-                    } else {
-                        continue;
-                    }
-                }
+                            serde_json::Value::Null
+                        };
 
-                // Extract message components
-                let payload = borrowed_message.payload().unwrap_or(&[]);
-                let key = borrowed_message.key().unwrap_or(&[]);
-                let headers = borrowed_message.headers().map(|headers| {
-                    headers
-                        .iter()
-                        .map(|h| {
-                            json!({
-                                "key": h.key,
-                                "value": h.value.map(|v| String::from_utf8_lossy(v).to_string())
-                            })
-                        })
-                        .collect::<Vec<_>>()
-                });
+                        // Log message metadata
+                        let message_metadata = json!({
+                            "topic": borrowed_message.topic(),
+                            "partition": borrowed_message.partition(),
+                            "offset": borrowed_message.offset(),
+                            "timestamp": borrowed_message.timestamp().to_millis(),
+                            "key": String::from_utf8_lossy(key),
+                            "headers": headers,
+                            "payload_len": payload.len(),
+                        });
 
-                // Parse payload as JSON
-                let payload_json = if !payload.is_empty() {
-                    match serde_json::from_slice::<serde_json::Value>(payload) {
-                        Ok(json_value) => json_value,
-                        Err(_) => json!(String::from_utf8_lossy(payload)),
-                    }
-                } else {
-                    serde_json::Value::Null
-                };
+                        debug!(
+                            "Message Metadata:\n{}",
+                            serde_json::to_string_pretty(&message_metadata)?
+                        );
+                        debug!(
+                            "Message Payload:\n{}",
+                            serde_json::to_string(&payload_json)?
+                        );
 
-                // Log message metadata
-                let message_metadata = json!({
-                    "topic": borrowed_message.topic(),
-                    "partition": borrowed_message.partition(),
-                    "offset": borrowed_message.offset(),
-                    "timestamp": borrowed_message.timestamp().to_millis(),
-                    "key": String::from_utf8_lossy(key),
-                    "headers": headers,
-                    "payload_len": payload.len(),
-                });
+                        // Extract and validate with schema
+                        if let Some(schema_id) = extract_schema_id(borrowed_message.headers()) {
+                            debug!("Found schema-id in headers: {}", schema_id);
 
-                debug!(
-                    "Message Metadata:\n{}",
-                    serde_json::to_string_pretty(&message_metadata)?
-                );
-                debug!(
-                    "Message Payload:\n{}",
-                    serde_json::to_string(&payload_json)?
-                );
+                            match yang_ctx_cache
+                                .get_or_create(
+                                    schema_id,
+                                    &sr_client,
+                                    &args.cache_root_path,
+                                    &subscription_info,
+                                )
+                                .await
+                            {
+                                Ok(yang_ctx) => {
+                                    debug!("Using YANG context for schema ID: {}", schema_id);
 
-                // Extract and validate with schema
-                if let Some(schema_id) = extract_schema_id(borrowed_message.headers()) {
-                    debug!("Found schema-id in headers: {}", schema_id);
+                                    // Get Telemetry Message module
+                                    let tm_module =
+                                        yang_ctx.get_module_implemented("ietf-telemetry-message");
 
-                    match yang_ctx_cache
-                        .get_or_create(
-                            schema_id,
-                            &sr_client,
-                            &args.cache_root_path,
-                            &subscription_info,
-                        )
-                        .await
-                    {
-                        Ok(yang_ctx) => {
-                            debug!("Using YANG context for schema ID: {}", schema_id);
+                                    if tm_module.is_none() {
+                                        warn!(
+                                            "Message validation SKIPPED - partition: {}, offset: {}",
+                                            borrowed_message.partition(),
+                                            borrowed_message.offset()
+                                        );
+                                        warn!("  --> ietf-telemetry-message schema not found");
+                                        validation_stats.no_tm_schema += 1;
+                                    } else {
+                                        // Extract ietf-telemetry-message extension instance
+                                        let tm_ext = tm_module.as_ref().and_then(|m| m.extensions().next());
 
-                            // Validate message payload
-                            let validation_result = yang4::data::DataTree::parse_string(
-                                yang_ctx,
-                                &serde_json::to_string(&payload_json)?,
-                                DataFormat::JSON,
-                                DataParserFlags::STRICT,
-                                DataValidationFlags::PRESENT,
-                            );
+                                        // Validate message payload
+                                        let validation_result = match &tm_ext {
+                                            Some(ext) => yang4::data::DataTree::parse_ext_string(
+                                                ext,
+                                                &payload,
+                                                DataFormat::JSON,
+                                                DataParserFlags::STRICT,
+                                                DataValidationFlags::PRESENT,
+                                            ),
+                                            // Support legacy ietf-telemetry-message without YANG structure
+                                            None => yang4::data::DataTree::parse_string(
+                                                yang_ctx,
+                                                &payload,
+                                                DataFormat::JSON,
+                                                DataParserFlags::STRICT,
+                                                DataValidationFlags::PRESENT,
+                                            ),
+                                        };
 
-                            match validation_result {
-                                Ok(_) => {
-                                    info!(
-                                        "Message validation PASSED ✓ - partition: {}, offset: {}, schema_id: {}",
-                                        borrowed_message.partition(),
-                                        borrowed_message.offset(),
-                                        schema_id
-                                    );
-                                    validation_stats.passed += 1;
+                                        match validation_result {
+                                            Ok(_) => {
+                                                info!(
+                                                    "Message validation PASSED ✓ - partition: {}, offset: {}, schema_id: {}",
+                                                    borrowed_message.partition(),
+                                                    borrowed_message.offset(),
+                                                    schema_id
+                                                );
+                                                validation_stats.passed += 1;
+                                            }
+                                            Err(err) => {
+                                                error!(
+                                                    "Message validation FAILED ✗ - partition: {}, offset: {}, schema_id: {}",
+                                                    borrowed_message.partition(),
+                                                    borrowed_message.offset(),
+                                                    schema_id
+                                                );
+                                                error!("  --> Validation error: {}", err);
+                                                validation_stats.failed += 1;
+                                            }
+                                        }
+                                    }
                                 }
-                                Err(err) => {
+                                Err(e) => {
                                     error!(
                                         "Message validation FAILED ✗ - partition: {}, offset: {}, schema_id: {}",
                                         borrowed_message.partition(),
                                         borrowed_message.offset(),
-                                        schema_id
+                                        schema_id,
                                     );
-                                    error!("  --> Validation error: {}", err);
-                                    validation_stats.failed += 1;
+                                    error!("  --> Failed to get/create YANG context: {}", e);
+                                    validation_stats.context_errors += 1;
                                 }
                             }
-                        }
-                        Err(e) => {
-                            error!(
-                                "Message validation FAILED ✗ - partition: {}, offset: {}, schema_id: {}",
+                        } else {
+                            warn!(
+                                "Message validation SKIPPED - partition: {}, offset: {}",
                                 borrowed_message.partition(),
-                                borrowed_message.offset(),
-                                schema_id,
+                                borrowed_message.offset()
                             );
-                            error!("  --> Failed to get/create YANG context: {}", e);
-                            validation_stats.context_errors += 1;
+                            warn!("  --> No schema-id found in message headers");
+                            validation_stats.no_schema += 1;
+                        }
+
+                        // Update counters
+                        *partition_counts.get_mut(&partition_id).unwrap() += 1;
+                        total_count += 1;
+
+                        // Check exit condition
+                        if !args.follow && partition_counts.values().all(|&c| c >= per_partition_limit) {
+                            info!("All partitions reached limit, exiting");
+                            break;
                         }
                     }
-                } else {
-                    warn!(
-                        "Message validation SKIPPED - partition: {}, offset: {}",
-                        borrowed_message.partition(),
-                        borrowed_message.offset()
-                    );
-                    warn!("  --> No schema-id found in message headers");
-                    validation_stats.no_schema += 1;
+                    Some(Err(e)) => {
+                        error!("Error receiving message: {}", e);
+                    }
+                    None => {
+                        // Stream ended
+                        break;
+                    }
                 }
-
-                // Update counters
-                *partition_counts.get_mut(&partition_id).unwrap() += 1;
-                total_count += 1;
-
-                // Check exit condition
-                if !args.follow && partition_counts.values().all(|&c| c >= per_partition_limit) {
-                    info!("All partitions reached limit, exiting");
-                    break;
-                }
-            }
-            Err(e) => {
-                error!("Error receiving message: {}", e);
             }
         }
     }

@@ -19,6 +19,11 @@ module ietf-telemetry-message {
       "draft-ietf-opsawg-collected-data-manifest: A Data Manifest for
        Contextualized Telemetry Data";
   }
+  import ietf-yang-structure-ext {
+    prefix sx;
+    reference
+      "RFC 8791: YANG Data Structure Extensions";
+  }
 
   organization
     "IETF Draft";
@@ -45,7 +50,7 @@ module ietf-telemetry-message {
      This version of this YANG module is part of RFC XXXX; see the RFC
      itself for full legal notices.";
 
-  revision 2025-06-10 {
+  revision 2025-10-19 {
     description
       "Initial revision.";
     reference
@@ -57,7 +62,7 @@ module ietf-telemetry-message {
       "Base identity to represent session protocols.";
   }
 
-  identity yp-push {
+  identity yang-push {
     base session-protocol;
     description
       "YANG-Push in RFC 8640 or RFC 8641 or RFC 8650.";
@@ -125,8 +130,7 @@ module ietf-telemetry-message {
        between the network node and the data collector.";
   }
 
-  container message {
-    config false;
+  sx:structure message {
     description
       "Telemetry message used within the Data Mesh";
     container network-node-manifest {
@@ -139,7 +143,8 @@ module ietf-telemetry-message {
     container telemetry-message-metadata {
       description
         "contains the session information about the session between the
-         collector and the network node.";
+         collector and the network node and the publishing process
+         of the collector.";
       leaf node-export-timestamp {
         type yang:date-and-time;
         description
@@ -156,6 +161,22 @@ module ietf-telemetry-message {
         description
           "Timestamp when the data collector collected the Network
            Telemetry data from the network element.";
+      }
+      leaf notification-event {
+        type telemetry-notification-event-type;
+        mandatory true;
+        description
+          "Describes wherever the notification was received and forwarded
+           from the network node or generated or removed from the data
+           collector state cache.";
+      }
+      leaf sequence-number {
+        type yang:counter32;
+        description
+          "Unique unique sequence number for each published telemetry
+           message by the collector. The initial number is 1 and
+           counts up by 1 at every published telemetry message
+           until it reaches 4294967295 and wraps around.";
       }
       leaf session-protocol {
         type telemetry-session-protocol-type;
@@ -216,6 +237,15 @@ module ietf-telemetry-message {
           mandatory true;
           description
             "label value";
+          choice number-choice {
+            description
+              "Number value";
+            leaf number-value {
+              type uint64;
+              description
+                "Number value";
+            }
+          }
           choice string-choice {
             description
               "String value";
