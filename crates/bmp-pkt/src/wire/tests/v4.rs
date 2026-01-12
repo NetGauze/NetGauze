@@ -723,3 +723,59 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
 
     Ok(())
 }
+
+#[test]
+fn test_path_status_flags() {
+    let status = PathStatus {
+        invalid: true,
+        best: true,
+        non_selected: false,
+        primary: true,
+        backup: false,
+        non_installed: true,
+        best_external: false,
+        add_path: true,
+        filtered_in_inbound_policy: false,
+        filtered_in_outbound_policy: true,
+        stale: false,
+        suppressed: true,
+    };
+
+    let flags = status.to_vec();
+    let expected = vec![
+        "Invalid",
+        "Best",
+        "Primary",
+        "Non-installed",
+        "Add-Path",
+        "Filtered in outbound policy",
+        "Suppressed",
+    ];
+
+    assert_eq!(flags, expected);
+}
+
+#[test]
+fn test_path_status_bitor() {
+    let status1 = PathStatus {
+        invalid: true,
+        best: true,
+        ..Default::default()
+    };
+    let status2 = PathStatus {
+        primary: true,
+        backup: true,
+        ..Default::default()
+    };
+
+    let combined = status1 | status2;
+    let expected = PathStatus {
+        invalid: true,
+        best: true,
+        primary: true,
+        backup: true,
+        ..Default::default()
+    };
+
+    assert_eq!(combined, expected);
+}

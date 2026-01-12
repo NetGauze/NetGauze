@@ -252,19 +252,19 @@ impl PathStatus {
             flags.push("Backup");
         }
         if self.non_installed {
-            flags.push("NonInstalled");
+            flags.push("Non-installed");
         }
         if self.best_external {
-            flags.push("BestExternal");
+            flags.push("Best-external");
         }
         if self.add_path {
-            flags.push("AddPath");
+            flags.push("Add-Path");
         }
         if self.filtered_in_inbound_policy {
-            flags.push("FilteredInInboundPolicy");
+            flags.push("Filtered in inbound policy");
         }
         if self.filtered_in_outbound_policy {
-            flags.push("FilteredInOutboundPolicy");
+            flags.push("Filtered in outbound policy");
         }
         if self.stale {
             flags.push("Stale");
@@ -394,20 +394,33 @@ impl From<WellKnownPathMarkingReasonCode> for PathMarkingReason {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr, strum_macros::Display,
+)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[repr(u16)]
 pub enum WellKnownPathMarkingReasonCode {
+    #[strum(to_string = "Invalid due to AS loop")]
     InvalidAsLoop = 0x0001,
+    #[strum(to_string = "Invalid due to unresolvable nexthop")]
     InvalidUnresolvableNexthop = 0x0002,
+    #[strum(to_string = "Not preferred for local preference")]
     NotPreferredLocalPref = 0x0003,
+    #[strum(to_string = "Not preferred for AS Path Length")]
     NotPreferredAsPathLength = 0x0004,
+    #[strum(to_string = "Not preferred for origin")]
     NotPreferredOrigin = 0x0005,
+    #[strum(to_string = "Not preferred for MED")]
     NotPreferredMed = 0x0006,
+    #[strum(to_string = "Not preferred for peer type")]
     NotPreferredPeerType = 0x0007,
+    #[strum(to_string = "Not preferred for IGP cost")]
     NotPreferredIgpCost = 0x0008,
+    #[strum(to_string = "Not preferred for router ID")]
     NotPreferredRouterId = 0x0009,
+    #[strum(to_string = "Not preferred for peer address")]
     NotPreferredPeerAddress = 0x000A,
+    #[strum(to_string = "Not preferred for AIGP")]
     NotPreferredAigp = 0x000B,
 }
 
