@@ -194,7 +194,12 @@ impl YangLibrary {
                 let dep = supplied_references.get(dep_name).unwrap().clone();
                 if tracing::enabled!(tracing::Level::DEBUG) {
                     let retrieved = client
-                        .get_version(dep_name, dep.version.unwrap(), false, None)
+                        .get_version(
+                            dep.subject.as_deref().unwrap_or(""),
+                            dep.version.unwrap_or(1),
+                            false,
+                            None,
+                        )
                         .await
                         .expect("Failed to get schema");
                     let features = retrieved
