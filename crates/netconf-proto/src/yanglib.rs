@@ -311,7 +311,29 @@ impl YangLibrary {
         let subject = format!("{}{}", subject_prefix.unwrap_or(""), name);
         let registered_schema_result = client.register_schema(&subject, schema, false).await;
         let registered_schema = match registered_schema_result {
-            Ok(registered_schema) => registered_schema,
+            Ok(registered_schema) => {
+                // version number is only returned from schema registry 7.4 and higher
+                // older versions don't return the version number, thus we need to make
+                // more calls to the schema registry to obtain the version number.
+                if registered_schema.version.is_none() {
+                    let schema = client
+                        .get_by_subject_and_id(Some(&subject), registered_schema.id.unwrap(), None)
+                        .await
+                        .map_err(|e| {
+                            tracing::warn!("failed to obtain registered schema {e}");
+                            SchemaConstructionError::RegistrationError(e)
+                        })?;
+                    client
+                        .get_by_schema(&subject, &schema, false, false)
+                        .await
+                        .map_err(|e| {
+                            tracing::warn!("failed to obtain registered schema {e}");
+                            SchemaConstructionError::RegistrationError(e)
+                        })?
+                } else {
+                    registered_schema
+                }
+            }
             Err(e) => {
                 tracing::warn!(
                     "Failed to register schema `{name}` as subject `{subject}` with error `{e}`, trying again with disabling compatibility check"
