@@ -15,12 +15,12 @@
 
 use crate::iana::{BmpMessageType, InitiationInformationTlvType};
 use crate::{PeerHeader, v3};
+use bitflags::bitflags;
 use either::Either;
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::capabilities::BgpCapability;
 use netgauze_bgp_pkt::iana::BgpMessageType;
 use serde::{Deserialize, Serialize};
-use std::ops::BitOr;
 use strum_macros::{Display, FromRepr};
 
 pub const BMPV4_TLV_GROUP_GBIT: u16 = 0x8000;
@@ -185,9 +185,8 @@ pub enum RouteMonitoringTlvValue {
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 pub struct PathMarking {
-    /// Represented as u32 instead of [PathStatus] since it is a bitflag
     /// [PathStatus] is just a collection of all possible flags in this bitflag
-    path_status: u32,
+    path_status: PathStatus,
     /// Represented as u16 instead of [PathMarkingReason] to accept
     /// non-IANA-defined reason codes Well-known reason codes are defined in
     /// [PathMarkingReason] Reason codes are used (Some(_)) with
@@ -196,15 +195,15 @@ pub struct PathMarking {
 }
 
 impl PathMarking {
-    pub fn new(path_status: u32, reason_code: Option<PathMarkingReason>) -> PathMarking {
+    pub fn new(path_status: PathStatus, reason_code: Option<PathMarkingReason>) -> PathMarking {
         Self {
             path_status,
             reason: reason_code,
         }
     }
 
-    pub const fn path_status(&self) -> u32 {
-        self.path_status
+    pub const fn path_status(&self) -> &PathStatus {
+        &self.path_status
     }
 
     pub const fn reason(&self) -> Option<PathMarkingReason> {
@@ -217,37 +216,68 @@ impl PathMarking {
 
 // TODO assign real codes and move to IANA when draft becomes RFC
 //  (https://datatracker.ietf.org/doc/html/draft-ietf-grow-bmp-path-marking-tlv)
-#[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, FromRepr, Display)]
-#[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
-pub enum PathStatus {
-    Invalid = 0x00000001,
-    Best = 0x00000002,
-    NonSelected = 0x00000004,
-    Primary = 0x00000008,
-    Backup = 0x00000010,
-    NonInstalled = 0x00000020,
-    BestExternal = 0x00000040,
-    AddPath = 0x00000080,
-    FilteredInInboundPolicy = 0x00000100,
-    FilteredInOutboundPolicy = 0x00000200,
-    Stale = 0x00000400,
-    Suppressed = 0x00000800,
-}
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
+    pub struct PathStatus: u32 {
+        const INVALID = 0x00000001;
+        const BEST = 0x00000002;
+        const NON_SELECTED = 0x00000004;
+        const PRIMARY = 0x00000008;
+        const BACKUP = 0x00000010;
+        const NON_INSTALLED = 0x00000020;
+        const BEST_EXTERNAL = 0x00000040;
+        const ADD_PATH = 0x00000080;
+        const FILTERED_IN_INBOUND_POLICY = 0x00000100;
+        const FILTERED_IN_OUTBOUND_POLICY = 0x00000200;
+        const STALE = 0x00000400;
+        const SUPPRESSED = 0x00000800;
 
-impl BitOr for PathStatus {
-    type Output = u32;
-
-    fn bitor(self, rhs: Self) -> Self::Output {
-        self as u32 | rhs as u32
+        // accept any additional unknown bits
+        const _ = !0;
     }
 }
 
-impl BitOr<PathStatus> for u32 {
-    type Output = u32;
-
-    fn bitor(self, rhs: PathStatus) -> Self::Output {
-        self | rhs as u32
+impl PathStatus {
+    pub fn to_vec(&self) -> Vec<&'static str> {
+        let mut flags = Vec::new();
+        if self.contains(Self::INVALID) {
+            flags.push("Invalid");
+        }
+        if self.contains(Self::BEST) {
+            flags.push("Best");
+        }
+        if self.contains(Self::NON_SELECTED) {
+            flags.push("NonSelected");
+        }
+        if self.contains(Self::PRIMARY) {
+            flags.push("Primary");
+        }
+        if self.contains(Self::BACKUP) {
+            flags.push("Backup");
+        }
+        if self.contains(Self::NON_INSTALLED) {
+            flags.push("Non-installed");
+        }
+        if self.contains(Self::BEST_EXTERNAL) {
+            flags.push("Best-external");
+        }
+        if self.contains(Self::ADD_PATH) {
+            flags.push("Add-Path");
+        }
+        if self.contains(Self::FILTERED_IN_INBOUND_POLICY) {
+            flags.push("Filtered in inbound policy");
+        }
+        if self.contains(Self::FILTERED_IN_OUTBOUND_POLICY) {
+            flags.push("Filtered in outbound policy");
+        }
+        if self.contains(Self::STALE) {
+            flags.push("Stale");
+        }
+        if self.contains(Self::SUPPRESSED) {
+            flags.push("Suppressed");
+        }
+        flags
     }
 }
 
@@ -284,20 +314,33 @@ impl From<WellKnownPathMarkingReasonCode> for PathMarkingReason {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, FromRepr, strum_macros::Display,
+)]
 #[cfg_attr(feature = "fuzz", derive(arbitrary::Arbitrary))]
 #[repr(u16)]
 pub enum WellKnownPathMarkingReasonCode {
+    #[strum(to_string = "Invalid due to AS loop")]
     InvalidAsLoop = 0x0001,
+    #[strum(to_string = "Invalid due to unresolvable nexthop")]
     InvalidUnresolvableNexthop = 0x0002,
+    #[strum(to_string = "Not preferred for local preference")]
     NotPreferredLocalPref = 0x0003,
+    #[strum(to_string = "Not preferred for AS Path Length")]
     NotPreferredAsPathLength = 0x0004,
+    #[strum(to_string = "Not preferred for origin")]
     NotPreferredOrigin = 0x0005,
+    #[strum(to_string = "Not preferred for MED")]
     NotPreferredMed = 0x0006,
+    #[strum(to_string = "Not preferred for peer type")]
     NotPreferredPeerType = 0x0007,
+    #[strum(to_string = "Not preferred for IGP cost")]
     NotPreferredIgpCost = 0x0008,
+    #[strum(to_string = "Not preferred for router ID")]
     NotPreferredRouterId = 0x0009,
+    #[strum(to_string = "Not preferred for peer address")]
     NotPreferredPeerAddress = 0x000A,
+    #[strum(to_string = "Not preferred for AIGP")]
     NotPreferredAigp = 0x000B,
 }
 

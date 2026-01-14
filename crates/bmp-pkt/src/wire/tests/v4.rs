@@ -562,7 +562,7 @@ fn test_bmp_v4_path_marking() -> Result<(), BmpMessageWritingError> {
                 RouteMonitoringTlv::build(
                     0,
                     RouteMonitoringTlvValue::PathMarking(PathMarking::new(
-                        PathStatus::Primary | PathStatus::Best,
+                        PathStatus::BEST | PathStatus::PRIMARY,
                         None,
                     )),
                 )
@@ -689,7 +689,7 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
                 RouteMonitoringTlv::build(
                     0,
                     RouteMonitoringTlvValue::PathMarking(PathMarking::new(
-                        0 | PathStatus::Invalid,
+                        PathStatus::INVALID,
                         Some(WellKnownPathMarkingReasonCode::InvalidAsLoop.into()),
                     )),
                 )
@@ -715,4 +715,95 @@ fn test_bmp_v4_path_marking_invalid_with_reason() -> Result<(), BmpMessageWritin
     test_write(&good, &good_wire)?;
 
     Ok(())
+}
+
+#[test]
+fn test_path_status_bitor() {
+    let status1 = PathStatus::INVALID | PathStatus::BEST;
+    let mut status2 = PathStatus::PRIMARY | PathStatus::BACKUP;
+
+    let combined = status1 | status2;
+    let expected =
+        PathStatus::INVALID | PathStatus::BEST | PathStatus::PRIMARY | PathStatus::BACKUP;
+
+    assert_eq!(combined, expected);
+
+    // Test BitOrAssign as well
+    status2 |= status1;
+    assert_eq!(status2, expected);
+}
+
+#[test]
+fn test_path_status_json_serialization() {
+    let status =
+        PathStatus::INVALID | PathStatus::BEST | PathStatus::ADD_PATH | PathStatus::PRIMARY;
+
+    // Serialize to JSON and check
+    let json = serde_json::to_string(&status).unwrap();
+    assert_eq!(json, r#""INVALID | BEST | PRIMARY | ADD_PATH""#);
+
+    // Deserialize back and check
+    let deserialized: PathStatus = serde_json::from_str(&json).unwrap();
+    assert_eq!(status, deserialized);
+}
+
+#[test]
+fn test_path_status_contains() {
+    let status = PathStatus::INVALID | PathStatus::BEST | PathStatus::PRIMARY;
+
+    assert!(status.contains(PathStatus::INVALID));
+    assert!(status.contains(PathStatus::BEST));
+    assert!(status.contains(PathStatus::PRIMARY));
+    assert!(!status.contains(PathStatus::BACKUP));
+
+    // Can also check multiple flags at once
+    assert!(status.contains(PathStatus::INVALID | PathStatus::BEST));
+}
+
+#[test]
+fn test_path_status_flags_to_vec() {
+    let status = PathStatus::INVALID
+        | PathStatus::BEST
+        | PathStatus::PRIMARY
+        | PathStatus::NON_INSTALLED
+        | PathStatus::ADD_PATH
+        | PathStatus::FILTERED_IN_OUTBOUND_POLICY
+        | PathStatus::SUPPRESSED;
+
+    let flags = status.to_vec();
+    let expected = vec![
+        "Invalid",
+        "Best",
+        "Primary",
+        "Non-installed",
+        "Add-Path",
+        "Filtered in outbound policy",
+        "Suppressed",
+    ];
+
+    assert_eq!(flags, expected);
+}
+
+#[test]
+fn test_path_status_with_unknown_bits() {
+    // Set mixed bits (known and unknown)
+    let mixed_bits = 0b1111000000001011;
+    let status = PathStatus::from_bits_truncate(mixed_bits);
+
+    // Check that known flags are preserved
+    assert!(status.contains(PathStatus::INVALID));
+    assert!(status.contains(PathStatus::BEST));
+    assert!(status.contains(PathStatus::PRIMARY));
+
+    // to_vec() should only show known flags
+    let flags = status.to_vec();
+    assert_eq!(flags, vec!["Invalid", "Best", "Primary"]);
+
+    // JSON serialization should show all bits (known + unknown)
+    let json = serde_json::to_string(&status).unwrap();
+    assert_eq!(json, r#""INVALID | BEST | PRIMARY | 0xf000""#);
+
+    // Deserialize back - unknown bits should be preserved
+    let deserialized: PathStatus = serde_json::from_str(&json).unwrap();
+    assert_eq!(status, deserialized);
 }
