@@ -548,6 +548,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use netgauze_udp_notif_pkt::notification::CentiSeconds;
     use serde_json;
+    use std::str::FromStr;
     use std::vec;
 
     #[test]
@@ -614,6 +615,10 @@ mod tests {
                 network_operator_metadata: Some(NetworkOperatorMetadata {
                     labels: vec![
                         Label {
+                            name: "priority_level".to_string(),
+                            value: LabelValue::NumberValue { number_value: 100 },
+                        },
+                        Label {
                             name: "platform_id".to_string(),
                             value: LabelValue::StringValue {
                                 string_value: "IETF LAB".to_string(),
@@ -635,7 +640,7 @@ mod tests {
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Expected JSON string
-        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","notification-event":"log","sequence-number":1,"session-protocol":"yang-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
+        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","notification-event":"log","sequence-number":1,"session-protocol":"yang-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"priority_level","number-value":100},{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
@@ -692,5 +697,103 @@ mod tests {
 
         // Assert that the original and deserialized messages are equal
         assert_eq!(original_message, deserialized);
+    }
+
+    #[test]
+    fn test_telemetry_message_metadata_new_and_getters() {
+        let metadata = TelemetryMessageMetadata::new(
+            Some(Utc.timestamp_millis_opt(1000).unwrap()),
+            Utc.timestamp_millis_opt(2000).unwrap(),
+            EventType::Update,
+            Some(42),
+            SessionProtocol::Netconf,
+            "192.168.1.1".parse().unwrap(),
+            Some(9090),
+            Some("10.0.0.1".parse().unwrap()),
+            Some(8080),
+            None,
+        );
+        assert_eq!(
+            metadata.node_export_timestamp(),
+            Some(Utc.timestamp_millis_opt(1000).unwrap())
+        );
+        assert_eq!(
+            metadata.collection_timestamp(),
+            Utc.timestamp_millis_opt(2000).unwrap()
+        );
+        assert_eq!(metadata.notification_event(), EventType::Update);
+        assert_eq!(metadata.sequence_number(), Some(42));
+        assert_eq!(metadata.session_protocol(), &SessionProtocol::Netconf);
+        assert_eq!(
+            metadata.export_address(),
+            IpAddr::from_str("192.168.1.1").unwrap()
+        );
+        assert_eq!(metadata.export_port(), Some(9090));
+        assert_eq!(
+            metadata.collection_address(),
+            Some("10.0.0.1".parse().unwrap())
+        );
+        assert_eq!(metadata.collection_port(), Some(8080));
+        assert_eq!(metadata.yang_push_subscription(), None);
+    }
+
+    #[test]
+    fn test_yang_push_subscription_metadata_new_and_getters() {
+        let filter_spec = FilterSpec::new(
+            Some("stream".to_string()),
+            Some("datastore".to_string()),
+            Some("xpath".to_string()),
+            Some(serde_json::json!({"key": "value"})),
+        );
+        let update_trigger = UpdateTrigger::OnChange {
+            dampening_period: Some(CentiSeconds::new(50)),
+            sync_on_start: Some(true),
+            excluded_change: Some(vec![ChangeType::Delete]),
+        };
+        let module = vec![YangPushModuleVersion::new(
+            "mod".to_string(),
+            Some("rev".to_string()),
+            Some("ver".to_string()),
+        )];
+        let metadata = YangPushSubscriptionMetadata::new(
+            Some(1),
+            filter_spec.clone(),
+            Some(Utc.timestamp_millis_opt(3000).unwrap()),
+            Some(Transport::UDPNotif),
+            Some(Encoding::Json),
+            Some("purpose".to_string()),
+            Some(update_trigger.clone()),
+            module.clone(),
+            Some("content_id".to_string()),
+        );
+        assert_eq!(metadata.id(), Some(1));
+        assert_eq!(metadata.filter_spec(), &filter_spec);
+        assert_eq!(
+            metadata.stop_time(),
+            Some(Utc.timestamp_millis_opt(3000).unwrap())
+        );
+        assert_eq!(metadata.transport(), Some(&Transport::UDPNotif));
+        assert_eq!(metadata.encoding(), Some(&Encoding::Json));
+        assert_eq!(metadata.purpose(), Some("purpose"));
+        assert_eq!(metadata.update_trigger(), Some(&update_trigger));
+        assert_eq!(metadata.module(), module.as_slice());
+        assert_eq!(metadata.yang_library_content_id(), Some("content_id"));
+    }
+
+    #[test]
+    fn test_filter_spec_new_and_getters() {
+        let filter_spec = FilterSpec::new(
+            Some("stream".to_string()),
+            Some("datastore".to_string()),
+            Some("xpath".to_string()),
+            Some(serde_json::json!({"key": "value"})),
+        );
+        assert_eq!(filter_spec.stream(), Some("stream"));
+        assert_eq!(filter_spec.datastore(), Some("datastore"));
+        assert_eq!(filter_spec.xpath_filter(), Some("xpath"));
+        assert_eq!(
+            filter_spec.subtree_filter(),
+            Some(&serde_json::json!({"key": "value"}))
+        );
     }
 }
