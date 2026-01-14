@@ -71,9 +71,9 @@ pub enum YangPushEnrichmentActorCommand {
 
 #[derive(Debug, Clone, PartialEq, Eq, strum_macros::Display)]
 pub enum YangPushEnrichmentActorError {
-    #[strum(to_string = "enrichment channel closed")]
+    #[strum(to_string = "YangPushEnrichmentActor channel closed")]
     EnrichmentChannelClosed,
-    #[strum(to_string = "error in flow receive channel")]
+    #[strum(to_string = "error in YangPushEnrichmentActor receive channel")]
     YangPushReceiveError,
     #[strum(to_string = "received Yang-Push Notification without content")]
     NotificationWithoutContent,
@@ -647,7 +647,7 @@ impl YangPushEnrichmentActor {
                             }
                         }
                         Err(err) => {
-                            error!("Shutting down due to FlowEnrichment recv error: {err}");
+                            error!("Shutting down YangPushEnrichmentActor due to recv error: {err}");
                             Err(YangPushEnrichmentActorError::YangPushReceiveError)?;
                         }
                     }
@@ -722,7 +722,7 @@ impl EnrichmentHandle<EnrichmentOperation> for YangPushEnrichmentActorHandle {
     /// Send an enrichment cache update to the actor.
     ///
     /// Updates are applied asynchronously and will affect subsequent
-    /// flow enrichment operations. The operation can be either an
+    /// Yang-Push enrichment operations. The operation can be either an
     /// upsert (add/update) or delete.
     fn update_enrichment(
         &self,
