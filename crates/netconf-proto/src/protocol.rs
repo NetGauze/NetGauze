@@ -1872,7 +1872,7 @@ impl XmlDeserialize<ErrorInfo> for ErrorInfo {
         // Skipping any additional elements
         loop {
             if let Event::End(end) = parser.peek() {
-                let (ns, local) = parser.ns_reader().resolve(end.name(), false);
+                let (ns, local) = parser.ns_reader().resolver().resolve(end.name(), true);
                 if ns == ResolveResult::Bound(NETCONF_NS) && local.into_inner() == b"error-info" {
                     break;
                 } else {
