@@ -47,7 +47,7 @@ reqwest = { workspace = true, default-features = false, features = [
     "rustls-tls-native-roots",
 ] }
 chrono = { workspace = true, default-features = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"]}
 anyhow = { workspace = true }
 opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
 opentelemetry_sdk = { workspace = true, features = [
