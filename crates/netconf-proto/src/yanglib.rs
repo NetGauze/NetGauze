@@ -1545,7 +1545,10 @@ impl XmlDeserialize<Datastore> for Datastore {
         parser.open(Some(YANG_LIBRARY_NS), "name")?;
         let name: Box<str> = parser.tag_string()?.trim().into();
         // Resolve datastore name
-        let (ns, local) = parser.ns_reader().resolve(QName(name.as_bytes()), false);
+        let (ns, local) = parser
+            .ns_reader()
+            .resolver()
+            .resolve(QName(name.as_bytes()), true);
         let ds_ns = match ns {
             ResolveResult::Bound(ns) => std::str::from_utf8(ns.into_inner())?,
             _ => return Err(ParsingError::InvalidValue(name.to_string())),

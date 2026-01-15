@@ -374,7 +374,7 @@ impl<R: io::BufRead> XmlParser<R> {
             _ => return false,
         };
 
-        let (resolved, local) = self.ns_reader.resolve_element(qname);
+        let (resolved, local) = self.ns_reader.resolver().resolve_element(qname);
         if local.into_inner() != key.as_bytes() {
             return false;
         }
@@ -556,7 +556,7 @@ impl<R: io::BufRead> XmlParser<R> {
                         })
                         .collect::<HashMap<_, _>>();
                     if !attrs.contains_key("xmlns") {
-                        let (ns, _) = self.ns_reader.resolve(a.name(), false);
+                        let (ns, _) = self.ns_reader.resolver().resolve(a.name(), true);
                         if let ResolveResult::Bound(ns) = ns {
                             a.push_attribute((&b"xmlns"[..], ns.0));
                         }
@@ -625,7 +625,7 @@ impl<R: io::BufRead> XmlParser<R> {
         loop {
             self.skip_text()?;
             if let Event::Start(ref e) = self.current {
-                let (n, l) = self.ns_reader.resolve(e.name(), false);
+                let (n, l) = self.ns_reader.resolver().resolve(e.name(), true);
                 if !(n == resolved_ns && l.into_inner() == tag) {
                     return Ok(acc);
                 }
