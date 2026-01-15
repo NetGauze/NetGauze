@@ -13,20 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, NetworkEndian};
-use bytes::{Buf, BufMut, BytesMut};
-use nom::Needed;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tokio_util::codec::{Decoder, Encoder};
-
 use crate::BgpMessage;
 use crate::capabilities::BgpCapability;
 use crate::wire::deserializer::{
     BgpMessageParsingError, BgpParsingContext, BgpParsingIgnoredErrors,
 };
 use crate::wire::serializer::BgpMessageWritingError;
+use byteorder::{ByteOrder, NetworkEndian};
+use bytes::{Buf, BufMut, BytesMut};
 use netgauze_parse_utils::{LocatedParsingError, ReadablePduWithOneInput, Span, WritablePdu};
+use nom::Needed;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use tokio_util::codec::{Decoder, Encoder};
+use tracing::{Level, debug, enabled, error, trace};
 
 pub trait BgpCodecInitializer<Peer> {
     fn new(peer: &Peer) -> Self;
@@ -95,8 +95,8 @@ impl Decoder for BgpCodec {
             if buf.len() < length {
                 Ok(None)
             } else {
-                if log::log_enabled!(log::Level::Debug) {
-                    log::debug!("Decoding buffer message: {buf:?}")
+                if enabled!(Level::TRACE) {
+                    trace!(buffer=?buf, length=buf.len(), "decoding buffered message")
                 }
                 // ASN4 capability is used only when both peers agree on enabling ASN4
                 let asn4 = self.asn4_received.unwrap_or(false) && self.asn4_sent.unwrap_or(false);
@@ -110,13 +110,13 @@ impl Decoder for BgpCodec {
                                 .capabilities()
                                 .into_iter()
                                 .any(|cap| matches!(cap, BgpCapability::FourOctetAs(_)));
-                            log::debug!("Sending ASN4 received to: {asn4}");
+                            debug!(asn4 = asn4, "setting ASN4 received");
                             self.asn4_received = Some(asn4);
                         }
                         Ok(Some((msg, self.ctx.reset_parsing_errors())))
                     }
                     Err(error) => {
-                        log::error!("Error: {:?} buf: {:?}", error, buf.to_vec());
+                        error!(error=%error, buffer=?buf, "error decoding BGP message");
                         let err = match error {
                             nom::Err::Incomplete(needed) => {
                                 let needed = match needed {
@@ -132,8 +132,8 @@ impl Decoder for BgpCodec {
                         Err(err)
                     }
                 };
-                if log::log_enabled!(log::Level::Debug) {
-                    log::debug!("Decoding buffer result is: {decoding_result:?}");
+                if enabled!(Level::TRACE) {
+                    trace!(result=?decoding_result, "decoding buffer result");
                 }
                 decoding_result
             }
@@ -147,15 +147,15 @@ impl Encoder<BgpMessage> for BgpCodec {
     type Error = BgpMessageWritingError;
 
     fn encode(&mut self, msg: BgpMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        if log::log_enabled!(log::Level::Debug) {
-            log::debug!("Encoding message: {msg:?}")
+        if enabled!(Level::TRACE) {
+            trace!(message=?msg, "encoding message")
         }
         if let BgpMessage::Open(ref open) = msg {
             let asn4 = open
                 .capabilities()
                 .into_iter()
                 .any(|cap| matches!(cap, BgpCapability::FourOctetAs(_)));
-            log::debug!("Sending ASN4 sent to: {asn4}");
+            debug!(asn4 = asn4, "setting ASN4 sent");
             self.asn4_sent = Some(asn4);
         }
         msg.write(&mut dst.writer())
