@@ -60,37 +60,31 @@ shadow!(build);
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Kafka bootstrap servers
-    #[arg(
-        short = 'b',
-        long,
-        default_value = "localhost:49092",
-        conflicts_with = "config_file"
-    )]
-    bootstrap_servers: Option<String>,
-
     /// Librdkafka config file (json)
-    #[arg(short = 'c', long, conflicts_with = "bootstrap_servers")]
+    #[arg(short = 'c', long)]
     config_file: Option<std::path::PathBuf>,
 
-    /// Consumer Group to use for consume
-    #[arg(
-        short = 'g',
-        long = "group",
-        default_value = "daisy.dev.kafka-yang-consumer"
-    )]
-    group_id: String,
+    /// Kafka bootstrap servers
+    /// (overrides bootstrap.servers or metadata.broker.list
+    /// parameters if present in librdkafka config file)
+    #[arg(short = 'b', long)]
+    bootstrap_servers: Option<String>,
+
+    /// Consumer Group to use for consumer
+    /// (overrides group.id parameter if present in librdkafka config file)
+    #[arg(short = 'g', long = "group")]
+    group_id: Option<String>,
 
     /// Topic to consume from
-    #[arg(short = 't', long, default_value = "telemetry-message-yang")]
+    #[arg(short = 't', long)]
     topic: String,
 
     /// Schema Registry URL
-    #[arg(short = 's', long, default_value = "http://localhost:48081")]
+    #[arg(short = 's', long)]
     schema_registry_url: String,
 
     /// Path to cache YANG libraries
-    #[arg(long, default_value = "/tmp/yang-consumer-cache")]
+    #[arg(long, default_value = "kafka-yang-consumer-cache")]
     cache_root_path: std::path::PathBuf,
 
     /// Partitions to consume from (if empty, consumes from all partitions)
@@ -482,10 +476,21 @@ fn build_yang_library_and_save(
     // Save to disk
     let yang_lib_ref_path = cache_root_path.join(content_id.as_ref());
 
-    // Remove existing directory if it exists
+    // Clear existing directory content if it exists
     if yang_lib_ref_path.exists() {
-        debug!("Removing existing YangLibrary at: {:?}", yang_lib_ref_path);
-        std::fs::remove_dir_all(&yang_lib_ref_path)?;
+        debug!(
+            "Clearing existing YangLibrary content at: {:?}",
+            yang_lib_ref_path
+        );
+        for entry in std::fs::read_dir(&yang_lib_ref_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                std::fs::remove_dir_all(&path)?;
+            } else {
+                std::fs::remove_file(&path)?;
+            }
+        }
     }
 
     debug!("Saving YangLibraryReference to: {:?}", yang_lib_ref_path);
@@ -518,37 +523,62 @@ fn extract_schema_id(headers: Option<&rdkafka::message::BorrowedHeaders>) -> Opt
     })
 }
 
-/// Load Kafka configuration from file or use defaults
-fn load_kafka_config(args: &Args) -> Result<(String, HashMap<String, String>)> {
-    if let Some(config_path) = &args.config_file {
+/// Load any Kafka configuration from file and overwrite from cli args if needed
+fn load_kafka_config(args: &Args) -> Result<(String, String, HashMap<String, String>)> {
+    let config: HashMap<String, String> = if let Some(config_path) = &args.config_file {
         let content = std::fs::read_to_string(config_path)?;
-        let config: HashMap<String, String> = serde_json::from_str(&content)?;
+        serde_json::from_str(&content)?
+    } else {
+        HashMap::new()
+    };
 
-        let bootstrap = config
+    // CLI args take precedence over config file
+    let bootstrap = if let Some(bootstrap) = &args.bootstrap_servers {
+        bootstrap.clone()
+    } else {
+        config
             .get("bootstrap.servers")
             .or_else(|| config.get("metadata.broker.list"))
             .ok_or_else(|| {
                 anyhow::anyhow!(
-                    "Config file must contain 'bootstrap.servers' or 'metadata.broker.list'"
+                    "bootstrap.servers must be provided via --bootstrap-servers CLI argument or in librdkafka config file.\n\
+                     At least one of the following must be specified:\n\
+                     - --bootstrap-servers\n\
+                     - --config-file (containing bootstrap.servers or metadata.broker.list)"
                 )
             })?
-            .clone();
+            .clone()
+    };
 
-        Ok((bootstrap, config))
+    let group_id = if let Some(group_id) = &args.group_id {
+        group_id.clone()
     } else {
-        Ok((args.bootstrap_servers.clone().unwrap(), HashMap::new()))
-    }
+        config
+            .get("group.id")
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "group.id must be provided via --group CLI argument or in librdkafka config file.\n\
+                     At least one of the following must be specified:\n\
+                     - --group\n\
+                     - --config-file (containing group.id)"
+                )
+            })?
+            .clone()
+    };
+
+    Ok((bootstrap, group_id, config))
 }
 
 /// Setup Kafka consumer with partition assignment
 async fn setup_consumer(
     args: &Args,
     bootstrap_servers: &str,
+    group_id: &str,
     config_file: &HashMap<String, String>,
 ) -> Result<(StreamConsumer, Vec<i32>, usize)> {
     // Create consumer config
     let mut client_config = ClientConfig::new();
-    client_config.set("group.id", &args.group_id);
+    client_config.set("group.id", group_id);
     client_config.set("bootstrap.servers", bootstrap_servers);
     client_config.set("enable.auto.commit", "false");
     client_config.set("enable.auto.offset.store", "false");
@@ -557,9 +587,10 @@ async fn setup_consumer(
         client_config.set("auto.offset.reset", "latest");
     }
 
-    // Apply additional config from file
+    // Apply additional config from file (skip bootstrap.servers,
+    // metadata.broker.list, and group.id which we already pre-fetched)
     for (key, value) in config_file {
-        if key != "bootstrap.servers" && key != "metadata.broker.list" {
+        if key != "bootstrap.servers" && key != "metadata.broker.list" && key != "group.id" {
             client_config.set(key, value);
         }
     }
@@ -696,7 +727,12 @@ fn log_build_info() {
     info!("");
 }
 
-fn log_configuration(args: &Args, bootstrap_servers: &str, config_file: &HashMap<String, String>) {
+fn log_configuration(
+    args: &Args,
+    bootstrap_servers: &str,
+    group_id: &str,
+    config_file: &HashMap<String, String>,
+) {
     info!("");
     info!("═════════════════════════════════════════════════════════");
     info!(" * Kafka YANG Consumer Configuration * ");
@@ -709,7 +745,7 @@ fn log_configuration(args: &Args, bootstrap_servers: &str, config_file: &HashMap
         let mut sorted_keys: Vec<_> = config_file.keys().collect();
         sorted_keys.sort();
         for key in sorted_keys {
-            if key == "bootstrap.servers" || key == "metadata.broker.list" {
+            if key == "bootstrap.servers" || key == "metadata.broker.list" || key == "group.id" {
                 continue;
             }
             let value = &config_file[key];
@@ -727,7 +763,7 @@ fn log_configuration(args: &Args, bootstrap_servers: &str, config_file: &HashMap
 
     info!("Consumer:");
     info!("  Topic: {}", args.topic);
-    info!("  Group ID: {}", args.group_id);
+    info!("  Group ID: {}", group_id);
     if args.tail.is_some() {
         info!("  Mode: tail (offset parameter ignored)");
     } else {
@@ -793,13 +829,13 @@ async fn main() -> Result<()> {
     log_build_info();
 
     // Load configuration
-    let (bootstrap_servers, config_file) = load_kafka_config(&args)?;
+    let (bootstrap_servers, group_id, config_file) = load_kafka_config(&args)?;
 
-    log_configuration(&args, &bootstrap_servers, &config_file);
+    log_configuration(&args, &bootstrap_servers, &group_id, &config_file);
 
     // Setup consumer
     let (consumer, target_partitions, per_partition_limit) =
-        setup_consumer(&args, &bootstrap_servers, &config_file).await?;
+        setup_consumer(&args, &bootstrap_servers, &group_id, &config_file).await?;
 
     // Create Schema Registry client
     let sr_config = schema_registry_client::rest::client_config::ClientConfig::new(vec![
