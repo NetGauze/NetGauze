@@ -29,19 +29,31 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::str::FromStr;
-use tracing::{Level, info};
+use tracing::info;
 
 shadow!(build);
 
 fn init_tracing(level: &'_ str) {
-    // Very simple setup at the moment to validate the instrumentation in the code
-    // is working in the future that should be configured automatically based on
-    // configuration options
-    let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_max_level(Level::from_str(level).expect("invalid logging level"))
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::{EnvFilter, fmt};
+
+    // default to configured level from config file
+    // override via RUST_LOG env var at runtime
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(level.parse().expect(
+            "Invalid log level in config file. Expected: trace, debug, info, warn, or error",
+        ))
+        .from_env()
+        .expect(
+          "Invalid RUST_LOG environment variable. Use valid filter directives like 'debug' or 'my_crate=trace'"
+        );
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(fmt::layer())
+        .try_init()
+        .expect("Failed to register tracing subscriber");
 }
 
 fn log_info() {
