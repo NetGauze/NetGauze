@@ -35,7 +35,9 @@ pub trait XmlDeserialize<T: Sized> {
 
 #[derive(Debug, strum_macros::Display)]
 pub enum XmlWriterError {
+    #[strum(to_string = "undefined namespace: `{0}`")]
     UndefinedNamespace(String),
+    #[strum(to_string = "duplicate namespace prefix: `{0}`")]
     DuplicateNamespacePrefix(String),
 }
 
@@ -204,6 +206,7 @@ pub enum ParsingError {
         found: Event<'static>,
     },
 
+    #[strum(to_string = "required XML attribute `{0}` is missing")]
     MissingAttribute(String),
 
     #[strum(to_string = "required XML element `{0}` is missing")]
