@@ -104,6 +104,7 @@ use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tracing::{debug, info, trace, warn};
 
 /// Need to add this at the end of yang library to make it work with libyang.
 /// This is a temporary fix, hopefully new versions of libyang will fix this
@@ -297,7 +298,7 @@ impl YangLibraryReference {
         yang_lib_ref_path: PathBuf,
     ) -> Result<Self, YangLibraryCacheError> {
         if !yang_library_path.exists() {
-            tracing::warn!(
+            warn!(
                 yang_library_path = %yang_library_path.display(),
                 "YANG library not found at path"
             );
@@ -306,7 +307,7 @@ impl YangLibraryReference {
             ));
         }
         if !yang_library_path.is_file() {
-            tracing::warn!(
+            warn!(
                 yang_library_path = %yang_library_path.display(),
                 "YANG library path is not a file"
             );
@@ -315,7 +316,7 @@ impl YangLibraryReference {
             ));
         }
         if !yang_lib_ref_path.exists() {
-            tracing::warn!(
+            warn!(
                  yang_lib_ref_path=%yang_lib_ref_path.display(),
                 "YANG library reference path not found"
             );
@@ -324,7 +325,7 @@ impl YangLibraryReference {
             ));
         }
         if !yang_lib_ref_path.is_dir() {
-            tracing::warn!(
+            warn!(
                 yang_lib_ref_path=%yang_lib_ref_path.display(),
                 "YANG library reference path is not a directory"
             );
@@ -332,14 +333,14 @@ impl YangLibraryReference {
                 yang_lib_ref_path,
             ));
         }
-        tracing::debug!(
+        debug!(
             yang_library_path=%yang_library_path.display(),
             yang_lib_ref_path= %yang_lib_ref_path.display(),
             "loading YANG library reference",
         );
         let subscriptions_info_path = yang_lib_ref_path.join(SUBSCRIPTIONS_INFO_FILE_NAME);
         let subscriptions_info_file = std::fs::File::open(subscriptions_info_path.as_path()).map_err(|error| {
-            tracing::warn!(
+            warn!(
                 subscriptions_info_path=%subscriptions_info_path.display(), "failed to open subscriptions info file");
             std::io::Error::other(format!(
                 "failed to open subscriptions info file {}: {error}",
@@ -347,12 +348,12 @@ impl YangLibraryReference {
             ))
         })?;
         let subscriptions_info: Vec<SubscriptionInfo> = serde_json::from_reader(subscriptions_info_file).map_err(|error| {
-           tracing::warn!(subscriptions_info_path=%subscriptions_info_path.display(), error=%error, "failed to parse subscriptions info file");
+           warn!(subscriptions_info_path=%subscriptions_info_path.display(), error=%error, "failed to parse subscriptions info file");
             YangLibraryCacheError::SerdeJsonError(error)
         })?;
         let yang_library = Self::load_yang_library(&yang_library_path)?;
         let content_id = yang_library.content_id().into();
-        tracing::info!(
+        info!(
             yang_library_path=%yang_library_path.display(),
             yang_lib_ref_path=%yang_lib_ref_path.display(),
             content_id,
@@ -385,7 +386,7 @@ impl YangLibraryReference {
     ) -> Result<Self, YangLibraryCacheError> {
         if !yang_lib_ref_path.exists() {
             std::fs::create_dir_all(&yang_lib_ref_path).map_err(|error| {
-                tracing::warn!(
+                warn!(
                     yang_lib_ref_path=%yang_lib_ref_path.display(),
                     content_id=yang_library.content_id(),
                     "failed to create YANG Library Reference dir");
@@ -397,7 +398,7 @@ impl YangLibraryReference {
             })?
         }
         if !yang_lib_ref_path.is_dir() {
-            tracing::warn!(
+            warn!(
                 yang_lib_ref_path=%yang_lib_ref_path.display(),
                 "YANG library reference path is not a directory"
             );
@@ -408,7 +409,7 @@ impl YangLibraryReference {
         let yang_library_path = yang_lib_ref_path.join(YANG_LIBRARY_FILE_NAME);
         if yang_library_path.exists() {
             if !yang_library_path.is_file() {
-                tracing::warn!(
+                warn!(
                     yang_library_path = %yang_library_path.display(),
                     "YANG library path is not a file"
                 );
@@ -418,7 +419,7 @@ impl YangLibraryReference {
             }
             let loaded_yang_lib = Self::load_yang_library(yang_library_path.as_path())?;
             if &loaded_yang_lib != yang_library {
-                tracing::warn!(
+                warn!(
                     yang_library_path = %yang_library_path.display(),
                     "Different YANG library found, cannot override"
                 );
@@ -439,7 +440,7 @@ impl YangLibraryReference {
 
         let subscriptions_info_path = yang_lib_ref_path.join(SUBSCRIPTIONS_INFO_FILE_NAME);
         let subscriptions_info = if subscriptions_info_path.is_file() {
-            tracing::debug!(
+            debug!(
                 subscriptions_info_path=%subscriptions_info_path.display(),
                 content_id=yang_library.content_id(),
                 "subscriptions info file already exists, extending it with new subscriptions"
@@ -474,7 +475,7 @@ impl YangLibraryReference {
 
         let subscriptions_info_file = std::fs::File::create(subscriptions_info_path.as_path())
             .map_err(|error| {
-                tracing::warn!(
+                warn!(
                 subscriptions_info_path=%subscriptions_info_path.display(),
                 error=%error,
                 "failed to open subscriptions info file");
@@ -506,9 +507,9 @@ impl YangLibraryReference {
             };
             let yang_module_path = modules_path.join(&filename);
             std::fs::write(&yang_module_path, schema.as_ref())?;
-            tracing::debug!(yang_module_path = %yang_module_path.display(), "saved yang module to disk");
+            debug!(yang_module_path = %yang_module_path.display(), "saved yang module to disk");
         }
-        tracing::info!(
+        info!(
             content_id=yang_library.content_id(),
             modules_count = schemas.len(),
             modules_path = %modules_path.display(),
@@ -526,10 +527,10 @@ impl YangLibraryReference {
     fn load_yang_library(yang_library_path: &Path) -> Result<YangLibrary, YangLibraryCacheError> {
         let reader = NsReader::from_file(yang_library_path)
             .map_err(|error| {
-                tracing::warn!(yang_library_path=%yang_library_path.display(), error=%error, "failed to open yang library file");
+                warn!(yang_library_path=%yang_library_path.display(), error=%error, "failed to open yang library file");
                 YangLibraryCacheError::ParsingError(error.into())
             })?;
-        tracing::trace!(yang_library_path=%yang_library_path.display(), "parsing yang library from disk");
+        trace!(yang_library_path=%yang_library_path.display(), "parsing yang library from disk");
         let mut xml_reader = netgauze_netconf_proto::xml_utils::XmlParser::new(reader)?;
         let yang_library = YangLibrary::xml_deserialize(&mut xml_reader)?;
         Ok(yang_library)
@@ -563,21 +564,21 @@ impl YangLibraryReference {
     pub fn load_schemas(&self) -> Result<HashMap<Box<str>, Box<str>>, YangLibraryCacheError> {
         let yang_library = Self::load_yang_library(self.yang_library_path.as_path())?;
         let search_dir = self.search_dir();
-        tracing::info!(
+        info!(
             search_dir = %search_dir.display(),
             "loading yang schemas from search directory",
         );
 
         match yang_library.load_schemas_from_search_path(search_dir.as_path()) {
             Ok(schemas) => {
-                tracing::debug!(
+                debug!(
                     schemas_count = schemas.len(),
                     "loaded yang schemas successfully"
                 );
                 Ok(schemas)
             }
             Err(err) => {
-                tracing::warn!(
+                warn!(
                     search_dir = %search_dir.display(),
                     error = %err,
                     "failed to load yang schemas from search directory"
@@ -593,7 +594,7 @@ impl YangLibraryReference {
 
     pub fn subscriptions_info(&self) -> Result<Vec<SubscriptionInfo>, YangLibraryCacheError> {
         let subscriptions_info_path = self.subscription_info_path();
-        tracing::debug!(
+        debug!(
             subscriptions_info_path = %subscriptions_info_path.display(),
             content_id=self.content_id,
             "loading subscription info from disk"
@@ -895,7 +896,7 @@ impl YangLibraryCache {
     /// The YANG modules are loaded for each YANG Library reference to verify
     /// they are correctly stored.
     pub fn from_disk(cache_root_path: PathBuf) -> Result<Self, YangLibraryCacheError> {
-        tracing::debug!(
+        debug!(
             cache_root_path = %cache_root_path.display(),
             "loading YANG Library references cache",
         );
@@ -929,7 +930,7 @@ impl YangLibraryCache {
             _ = yang_lib_ref.load_schemas()?;
             let content_id = yang_lib_ref.content_id().clone();
             let subscriptions_info = yang_lib_ref.subscriptions_info()?;
-            tracing::info!(
+            info!(
                 yang_library_path = %path.display(),
                 subscriptions_info = ?subscriptions_info,
                 "loaded yang library reference ",
@@ -943,7 +944,7 @@ impl YangLibraryCache {
                 cache_by_subscription_info.insert(subscription_info, Arc::clone(&yang_lib_ref));
             }
         }
-        tracing::info!(
+        info!(
             total_entries = %cache_by_content_id.len(),
             "loaded YANG Library references cache",
         );
@@ -1009,7 +1010,7 @@ impl YangLibraryCache {
         &mut self,
         content_id: &ContentId,
     ) -> Result<(), YangLibraryCacheError> {
-        tracing::info!(content_id, "removing yang library for content from cache");
+        info!(content_id, "removing yang library for content from cache");
         if let Some(yang_lib_ref) = self.cache_by_content_id.remove(content_id) {
             self.cache_by_subscription_info
                 .retain(|_, v| v.content_id() != content_id);
@@ -1019,12 +1020,12 @@ impl YangLibraryCache {
             });
             std::fs::remove_file(yang_lib_ref.yang_library_path())?;
             std::fs::remove_dir_all(yang_lib_ref.yang_lib_ref_path())?;
-            tracing::info!(
+            info!(
                 content_id,
                 "removed yang library with content id from cache"
             );
         } else {
-            tracing::info!(
+            info!(
                 content_id,
                 "no yang library reference found for content id in cache"
             );
@@ -1097,7 +1098,7 @@ impl YangLibraryCache {
             .cache_by_subscription_info
             .get(subscription_info)
             .map(Arc::clone);
-        tracing::debug!(
+        debug!(
             subscription_info = %subscription_info,
             hit = result.is_some(),
             "cache lookup by subscription info"
@@ -1110,7 +1111,7 @@ impl YangLibraryCache {
         content_id: &ContentId,
     ) -> Option<Arc<YangLibraryReference>> {
         let result = self.cache_by_content_id.get(content_id).map(Arc::clone);
-        tracing::debug!(
+        debug!(
             content_id,
             hit = result.is_some(),
             "cache lookup by content id"
@@ -1135,7 +1136,7 @@ impl YangLibraryCache {
                     .map(Arc::clone);
                 (subscription_info, yang_lib_ref)
             });
-        tracing::debug!(
+        debug!(
             peer_ip=%peer_ip,
             hit = result.is_some(),
             "cache lookup by subscription id"
@@ -1225,7 +1226,7 @@ mod tests {
         let modules_path = entry_path.join("modules");
         std::fs::create_dir_all(&modules_path)?;
         let module_path = modules_path.join("test-module@2025-12-12.yang");
-        tracing::debug!("creating test module at {module_path:?}");
+        debug!("creating test module at {module_path:?}");
         std::fs::write(&module_path, create_test_yang_module())?;
 
         Ok(entry_path)
