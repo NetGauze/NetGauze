@@ -1,12 +1,12 @@
 use bytes::Bytes;
 use futures_util::StreamExt;
 use futures_util::stream::SplitSink;
+use netgauze_flow_pkt::codec::FlowInfoCodec;
 use std::collections::HashMap;
 use tokio::net::UdpSocket;
 use tokio_util::codec::{BytesCodec, Decoder};
 use tokio_util::udp::UdpFramed;
-
-use netgauze_flow_pkt::codec::FlowInfoCodec;
+use tracing::info;
 
 fn init_tracing() {
     // Very simple setup at the moment to validate the instrumentation in the code
@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
                     .or_insert(FlowInfoCodec::default())
                     .decode(&mut buf);
                 match result {
-                    Ok(Some(pkt)) => tracing::info!("{}", serde_json::to_string(&pkt).unwrap()),
+                    Ok(Some(pkt)) => info!("{}", serde_json::to_string(&pkt).unwrap()),
                     Ok(None) => {
                         println!("Stream closed, exiting");
                         return Ok(());
