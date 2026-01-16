@@ -23,6 +23,7 @@ use crate::xml_utils::{ParsingError, XmlDeserialize, XmlParser, XmlSerialize, Xm
 use quick_xml::NsReader;
 use tokio_util::bytes::{Buf, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
+use tracing::trace;
 
 const XML_HEADER: &str = "<?xml version=\"1.0\" encoding=\"utf-8\"?>";
 const HELLO_TERMINATOR: &str = "]]>]]>";
@@ -133,7 +134,7 @@ impl Decoder for SshCodec {
                 let data = src.split_to(pos + HELLO_TERMINATOR.len());
                 let data = &data[..pos];
                 if tracing::enabled!(tracing::Level::TRACE) {
-                    tracing::trace!("Parsing hello message: `{:?}`", std::str::from_utf8(data));
+                    trace!("Parsing hello message: `{:?}`", std::str::from_utf8(data));
                 }
                 let reader = NsReader::from_reader(data);
                 let mut xml_parser = XmlParser::new(reader)?;
@@ -215,7 +216,7 @@ impl Decoder for SshCodec {
             if src.starts_with(MESSAGE_TERMINATOR.as_bytes()) {
                 let data = self.buf.split();
                 if tracing::enabled!(tracing::Level::TRACE) {
-                    tracing::trace!(
+                    trace!(
                         "Parsing netconf message: `{:?}`",
                         std::str::from_utf8(&data)
                     );
@@ -239,7 +240,7 @@ impl Encoder<NetConfMessage> for SshCodec {
         item.xml_serialize(&mut xml_writer)?;
         let buf = xml_writer.into_inner().into_inner();
         if tracing::enabled!(tracing::Level::TRACE) {
-            tracing::trace!("Serialized payload: `{}`", std::str::from_utf8(&buf)?);
+            trace!("Serialized payload: `{}`", std::str::from_utf8(&buf)?);
         }
         if let NetConfMessage::Hello(_) = item {
             dst.extend_from_slice(XML_HEADER.as_bytes());

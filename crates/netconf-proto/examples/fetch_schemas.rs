@@ -24,6 +24,7 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{debug, info};
 
 const MODULE_STATE: &str = r#"
 <modules-state xmlns="urn:ietf:params:xml:ns:yang:ietf-yang-library">
@@ -137,14 +138,14 @@ pub async fn main() -> anyhow::Result<()> {
         ..<_>::default()
     };
     let ssh_config = Arc::new(ssh_config);
-    tracing::info!("connecting to {}", args.host);
+    info!("connecting to {}", args.host);
     let auth = get_auth(&args)?;
 
     let config = NetconfSshConnectConfig::new(auth, host, ssh_handler, ssh_config);
     let mut client = connect(config).await?;
-    tracing::info!("connected to {}", args.host);
+    info!("connected to {}", args.host);
 
-    tracing::info!(
+    info!(
         "loading router yang library from {} to obtain the seed modules",
         args.host
     );
@@ -156,7 +157,7 @@ pub async fn main() -> anyhow::Result<()> {
         .iter()
         .map(|x| x.as_str())
         .collect::<Vec<&str>>();
-    tracing::info!(
+    info!(
         "loading seed modules {} and their dependencies from {}",
         modules.join(","),
         args.host
@@ -166,7 +167,7 @@ pub async fn main() -> anyhow::Result<()> {
         .load_from_modules(modules.as_slice(), &PermissiveVersionChecker)
         .await
         .expect("Failed to load dependency graph from router");
-    tracing::info!(
+    info!(
         "created a the yang library for the dependencies with {} schemas total",
         schemas.len()
     );
@@ -177,7 +178,7 @@ pub async fn main() -> anyhow::Result<()> {
             std::fs::create_dir_all(&output_path)?;
         }
         let yang_lib_path = output_path.join("router-yanglib.xml");
-        tracing::info!("writing yang library obtained from the router to {yang_lib_path:?}");
+        info!("writing yang library obtained from the router to {yang_lib_path:?}");
         let file = std::fs::File::create(&yang_lib_path)?;
         let writer = std::io::BufWriter::new(file);
         let quick_xml_writer = quick_xml::writer::Writer::new_with_indent(writer, 32, 2);
@@ -191,16 +192,16 @@ pub async fn main() -> anyhow::Result<()> {
     }
 
     if let Some(yang_lib_path) = &args.extend_yang_lib {
-        tracing::info!("Extending subscription yang library with schemas from {yang_lib_path}");
+        info!("Extending subscription yang library with schemas from {yang_lib_path}");
         let reader = NsReader::from_file(yang_lib_path)?;
         let mut xml_reader = netgauze_netconf_proto::xml_utils::XmlParser::new(reader)?;
         let existing_yang_lib = YangLibrary::xml_deserialize(&mut xml_reader)?;
         let existing_yang_schemas = if let Some(search_path) = &args.yang_dep_path {
             let search_path = Path::new(search_path);
-            tracing::info!("Loading schemas for existing yang library from {search_path:?}");
+            info!("Loading schemas for existing yang library from {search_path:?}");
             existing_yang_lib.load_schemas_from_search_path(search_path)?
         } else {
-            tracing::info!("Loading schemas for based on the location defined in the yang library");
+            info!("Loading schemas for based on the location defined in the yang library");
             existing_yang_lib.load_schemas()?
         };
         let mut builder = yang_lib.clone().into_module_set_builder(
@@ -230,10 +231,10 @@ pub async fn main() -> anyhow::Result<()> {
         let dot = petgraph::dot::Dot::with_config(&graph, &[petgraph::dot::Config::EdgeNoLabel]);
         if let Some(output) = &args.output {
             let output_path = Path::new(&output).join("inverted_graph.dot");
-            tracing::info!("writing inverted dependency graph in DOT format to {output_path:?}");
+            info!("writing inverted dependency graph in DOT format to {output_path:?}");
             std::fs::write(output_path, format!("{dot:?}\n"))?;
         } else {
-            tracing::info!("writing inverted dependency graph to stdout in DOT format");
+            info!("writing inverted dependency graph to stdout in DOT format");
             println!("{dot:?}");
         }
     }
@@ -251,7 +252,7 @@ pub async fn main() -> anyhow::Result<()> {
                 "the subject schema `{subject}` does not exist in the yang library"
             ));
         }
-        tracing::info!("writing schemas to registry URL {url} with root schema `{subject}`");
+        info!("writing schemas to registry URL {url} with root schema `{subject}`");
         // Setup connection to schema registry
         let client_conf =
             schema_registry_client::rest::client_config::ClientConfig::new(vec![url.to_string()]);
@@ -269,10 +270,9 @@ pub async fn main() -> anyhow::Result<()> {
             .await
             .map_err(|x| anyhow!(x))?;
 
-        tracing::info!(
+        info!(
             "registered schemas for {subject} with subject `{:?}` and ID `{:?}`",
-            registered_schema.subject,
-            registered_schema.id
+            registered_schema.subject, registered_schema.id
         );
     }
 
@@ -281,14 +281,14 @@ pub async fn main() -> anyhow::Result<()> {
 
 fn get_auth(args: &Args) -> anyhow::Result<SshAuth> {
     let auth = if let Some(private_key_path) = &args.key {
-        tracing::info!("Loading the private key at: {}", private_key_path);
+        info!("Loading the private key at: {}", private_key_path);
         let key_string = std::fs::read_to_string(private_key_path).map_err(|x| {
             anyhow!("failed to read private key from `{private_key_path}` due to error `{x}`")
         })?;
-        tracing::debug!("Private key string loaded");
+        debug!("Private key string loaded");
         let private_key =
             russh::keys::decode_secret_key(key_string.as_str(), args.password.as_deref())?;
-        tracing::debug!("Private key parsed");
+        debug!("Private key parsed");
         SshAuth::Key {
             user: args.user.clone(),
             private_key: Arc::new(private_key),
@@ -310,7 +310,7 @@ fn save_modules_to_disk(
     output_path: &Path,
 ) -> anyhow::Result<()> {
     let yang_lib_path = output_path.join("yanglib.xml");
-    tracing::info!("writing yang library of dependencies to {yang_lib_path:?}");
+    info!("writing yang library of dependencies to {yang_lib_path:?}");
     let file = std::fs::File::create(&yang_lib_path)?;
     let writer = std::io::BufWriter::new(file);
     let quick_xml_writer = quick_xml::writer::Writer::new_with_indent(writer, 32, 2);
@@ -338,7 +338,7 @@ fn save_modules_to_disk(
             name.to_string()
         };
         let yang_module_path = output_path.join(&filename);
-        tracing::info!("writing yang module `{name}` to `{yang_module_path:?}`");
+        info!("writing yang module `{name}` to `{yang_module_path:?}`");
         std::fs::write(&yang_module_path, schema.as_ref())?;
     }
     Ok(())

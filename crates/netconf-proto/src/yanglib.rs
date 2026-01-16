@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io;
 use std::path::Path;
+use tracing::{debug, info, warn};
 // ============================================================================
 // Core Structures
 // ============================================================================
@@ -163,7 +164,7 @@ impl YangLibrary {
                 .map(|idx| graph.node_weight(*idx).unwrap().to_string())
                 .collect::<Vec<String>>()
                 .join(",");
-            tracing::debug!(
+            debug!(
                 "topological sort to register schemas in the the schema registry: {}",
                 topo_sort
             );
@@ -177,7 +178,7 @@ impl YangLibrary {
         > = HashMap::new();
         for node_idx in topo_sorted {
             let name = *graph.node_weight(node_idx).unwrap();
-            tracing::debug!("Starting process to register schema {name}");
+            debug!("Starting process to register schema {name}");
             self.find_module(root_schema_name)
                 .ok_or(SchemaConstructionError::ModuleNotFound {
                     module_name: name.to_string(),
@@ -214,12 +215,12 @@ impl YangLibrary {
                                 .map(|x| x.to_string())
                                 .collect::<Vec<String>>()
                                 .join(",");
-                            tracing::debug!(
+                            debug!(
                                 "For schema `{name}` registering reference `{dep_name}` with features [{features}]"
                             );
                         }
                         Err(e) => {
-                            tracing::warn!("Failed to get schema `{dep_name}`: {e}");
+                            warn!("Failed to get schema `{dep_name}`: {e}");
                         }
                     }
                 }
@@ -261,7 +262,7 @@ impl YangLibrary {
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(",");
-                tracing::debug!("Registering schema `{name}` with features [{features}]");
+                debug!("Registering schema `{name}` with features [{features}]");
             }
             let registered_schema =
                 Self::register_with_retry(client, name, subject_prefix, &schema).await?;
@@ -291,12 +292,12 @@ impl YangLibrary {
         };
         for incoming_edge in graph.edges_directed(root_index, petgraph::Direction::Incoming) {
             let dep = *graph.node_weight(incoming_edge.source()).unwrap();
-            tracing::debug!("Adding Root {dep} Depending on {root_schema_name}");
+            debug!("Adding Root {dep} Depending on {root_schema_name}");
             refs.push(supplied_references.get(dep).unwrap().clone());
         }
         // This part adds the deviations to the root scheme
         for n in nodes_with_zero_outgoing_edges {
-            tracing::debug!("Adding Root {n} Depending on {root_schema_name}");
+            debug!("Adding Root {n} Depending on {root_schema_name}");
             refs.push(supplied_references.get(n).unwrap().clone());
         }
         if !refs.is_empty() {
@@ -330,14 +331,14 @@ impl YangLibrary {
                         .get_by_subject_and_id(Some(&subject), registered_schema.id.unwrap(), None)
                         .await
                         .map_err(|e| {
-                            tracing::warn!("failed to obtain registered schema {e}");
+                            warn!("failed to obtain registered schema {e}");
                             SchemaConstructionError::RegistrationError(e)
                         })?;
                     client
                         .get_by_schema(&subject, &schema, false, false)
                         .await
                         .map_err(|e| {
-                            tracing::warn!("failed to obtain registered schema {e}");
+                            warn!("failed to obtain registered schema {e}");
                             SchemaConstructionError::RegistrationError(e)
                         })?
                 } else {
@@ -345,7 +346,7 @@ impl YangLibrary {
                 }
             }
             Err(e) => {
-                tracing::warn!(
+                warn!(
                     "Failed to register schema `{name}` as subject `{subject}` with error `{e}`, trying again with disabling compatibility check"
                 );
                 let server_config = schema_registry_client::rest::models::ServerConfig {
@@ -364,11 +365,9 @@ impl YangLibrary {
                     .map_err(SchemaConstructionError::RegistrationError)?
             }
         };
-        tracing::info!(
+        info!(
             "registered schema {name} with subject `{:?}`, version `{:?}` and ID `{:?}`",
-            registered_schema.subject,
-            registered_schema.version,
-            registered_schema.id,
+            registered_schema.subject, registered_schema.version, registered_schema.id,
         );
         Ok(registered_schema)
     }
@@ -675,25 +674,21 @@ impl YangLibrary {
         // First try to find the exact revision of the schema
         if let Some(revision) = revision {
             let schema_path = Path::new(search_path).join(format!("{module_name}@{revision}.yang"));
-            tracing::debug!("loading yang schema {module_name} from {schema_path:?}");
+            debug!("loading yang schema {module_name} from {schema_path:?}");
             if schema_path.exists() {
                 let schema = std::fs::read_to_string(schema_path)?.into_boxed_str();
                 return Ok(schema);
             }
-            tracing::debug!(
-                "file doesn't exist to load yang schema {module_name} from {schema_path:?}"
-            );
+            debug!("file doesn't exist to load yang schema {module_name} from {schema_path:?}");
         }
         // If not found, try to find the schema without revision
         let schema_path = Path::new(search_path).join(format!("{module_name}.yang"));
-        tracing::debug!("loading yang schema {module_name} from {schema_path:?}");
+        debug!("loading yang schema {module_name} from {schema_path:?}");
         if schema_path.exists() {
             let schema = std::fs::read_to_string(schema_path)?.into_boxed_str();
             return Ok(schema);
         }
-        tracing::debug!(
-            "file doesn't exist to load yang schema {module_name} from {schema_path:?}"
-        );
+        debug!("file doesn't exist to load yang schema {module_name} from {schema_path:?}");
         Err(SchemaLoadingError::SchemaNotFoundInSearchPath {
             module_name: module_name.to_string(),
             search_path: search_path.to_string_lossy().to_string().to_string(),
