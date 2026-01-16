@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use netgauze_bmp_pkt::BmpMessage;
+use netgauze_bmp_pkt::codec::BmpCodec;
 use std::fmt::Debug;
 use std::io;
 use std::net::SocketAddr;
@@ -21,9 +23,7 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 use tower::ServiceExt;
 use tower_service::Service;
-
-use netgauze_bmp_pkt::BmpMessage;
-use netgauze_bmp_pkt::codec::BmpCodec;
+use tracing::info;
 
 use crate::handle::BmpServerHandle;
 use crate::{AddrInfo, BmpCodecDecoderError, TaggedData};
@@ -68,22 +68,22 @@ impl BmpServer {
         E: Debug,
     {
         let local_addr = self.local_addr;
-        tracing::info!("binding on socket");
+        info!("binding on socket");
         let listener = TcpListener::bind(local_addr).await?;
         let handle = self.handle;
         handle.notify_listening();
-        tracing::info!("started listening");
+        info!("started listening");
         let accept_loop_future = async {
             loop {
                 let (tcp_stream, remote_addr) = tokio::select! {
                     biased;
                     result = listener.accept() => {
                         let (tcp_stream, remote_addr) = result?;
-                        tracing::info!("accepted new connection: {:?}", remote_addr);
+                        info!("accepted new connection: {:?}", remote_addr);
                         (tcp_stream, remote_addr)
                     },
                     _ = handle.wait_graceful_shutdown() => {
-                        tracing::info!("graceful_shutdown");
+                        info!("graceful_shutdown");
                         return Ok::<(), io::Error>(())
                     },
                 };
@@ -93,38 +93,38 @@ impl BmpServer {
                 let watcher = handle.watcher();
                 tokio::spawn(async move {
                     tracing::trace_span!("client_worker");
-                    tracing::info!("worker_started");
+                    info!("worker_started");
                     tokio::select! {
                         biased;
                         _ = watcher.wait_shutdown() => {
-                             tracing::info!("worker_shutdown: {:?}", addr_info);
+                             info!("worker_shutdown: {:?}", addr_info);
                         },
                         ret = Self::handle_connection(svc.clone(), addr_info, framed) =>{
-                            tracing::info!("worker closed {:?} and service ret: {:?}", addr_info, ret);
+                            info!("worker closed {:?} and service ret: {:?}", addr_info, ret);
                         },
                     }
-                    tracing::info!("worker_ended");
+                    info!("worker_ended");
                 });
             }
         };
         tokio::select! {
             biased;
             _ = handle.wait_shutdown() => {
-                tracing::info!("server is shutting down on request by handle");
+                info!("server is shutting down on request by handle");
                 return Ok(())
             },
             result = accept_loop_future => {
-                tracing::info!("server is shutting down due to: {:?}", result);
+                info!("server is shutting down due to: {:?}", result);
                 result
             },
         }?;
 
-        tracing::info!(
+        info!(
             "waiting on connections to be cleanly closed. remaining connections: {}",
             handle.connection_count()
         );
         handle.wait_connections_end().await;
-        tracing::info!("server closed");
+        info!("server closed");
         Ok(())
     }
 
