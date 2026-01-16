@@ -33,6 +33,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::Framed;
+use tracing::{debug, error, info, trace, warn};
 
 /// SSH client handler to enable certain behaviors in the russh::client
 /// at the moment, this is simple implementation that accepts connections to all
@@ -160,13 +161,13 @@ where
     NetConfSshClientError: From<<H as russh::client::Handler>::Error>,
 {
     let peer = config.host;
-    tracing::debug!("[{peer}] Initiating TCP connection");
+    debug!("[{peer}] Initiating TCP connection");
     let mut session = russh::client::connect(config.config, config.host, config.handler).await?;
-    tracing::debug!("[{peer}] TCP connected");
+    debug!("[{peer}] TCP connected");
 
     let (user, auth_result) = match &config.auth {
         SshAuth::Password { user, password } => {
-            tracing::debug!("[{peer}] Using password authentication for user `{user}`");
+            debug!("[{peer}] Using password authentication for user `{user}`");
             (
                 user,
                 session
@@ -175,12 +176,12 @@ where
             )
         }
         SshAuth::Key { user, private_key } => {
-            tracing::debug!("[{peer}] Using private key authentication for user `{user}`");
+            debug!("[{peer}] Using private key authentication for user `{user}`");
             let private_key = russh::keys::PrivateKeyWithHashAlg::new(
                 Arc::clone(private_key),
                 session.best_supported_rsa_hash().await?.flatten(),
             );
-            tracing::debug!(
+            debug!(
                 "[{peer}] Negotiated private key and using `{}` hashing algorithm",
                 private_key.algorithm()
             );
@@ -191,18 +192,18 @@ where
         }
     };
     if !auth_result.success() {
-        tracing::error!("[{peer}] Authentication failed");
+        error!("[{peer}] Authentication failed");
         return Err(NetConfSshClientError::SshError(
             russh::Error::NotAuthenticated,
         ));
     }
-    tracing::debug!(
+    debug!(
         "[{peer}] Authentication successful to `{user}@{}`, requesting the NETCONF subsystem",
         config.host
     );
     let channel = session.channel_open_session().await?;
     channel.request_subsystem(true, "netconf").await?;
-    tracing::info!(
+    info!(
         "[{peer}] NETCONF subsystem connected to `{user}@{}`",
         config.host
     );
@@ -309,10 +310,9 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         let message_id = self.next_message_id().to_string().into_boxed_str();
         let rpc = Rpc::new(message_id.clone(), operation);
         if tracing::enabled!(tracing::Level::TRACE) {
-            tracing::trace!(
+            trace!(
                 "[{}] Sending RPC Request with message id `{}` and payload `{rpc:?}`",
-                self.peer,
-                message_id
+                self.peer, message_id
             );
         }
         self.framed.send(NetConfMessage::Rpc(rpc)).await?;
@@ -322,11 +322,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
     pub async fn rpc_reply(&mut self) -> Result<RpcReply, NetConfSshClientError> {
         let msg = self.framed.next().await;
         if tracing::enabled!(tracing::Level::TRACE) {
-            tracing::trace!("[{}] Received NETCONF message: `{msg:?}`", self.peer);
+            trace!("[{}] Received NETCONF message: `{msg:?}`", self.peer);
         }
         match msg {
             None => {
-                tracing::warn!("[{}] Broken connection", self.peer);
+                warn!("[{}] Broken connection", self.peer);
                 Err(NetConfSshClientError::SshError(russh::Error::IO(
                     io::Error::new(io::ErrorKind::BrokenPipe, "No response from the server"),
                 )))
@@ -348,7 +348,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
 
     pub async fn close(mut self) -> Result<(), NetConfSshClientError> {
         let message_id = self.next_message_id.to_string().into_boxed_str();
-        tracing::debug!(
+        debug!(
             "[{}] sending close message RPC with id `{message_id}`",
             self.peer
         );
@@ -360,9 +360,9 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             .await?;
         let reply = self.rpc_reply().await?;
         if reply.reply().is_ok() {
-            tracing::debug!("[{}] received ok response to close connection", self.peer);
+            debug!("[{}] received ok response to close connection", self.peer);
         } else {
-            tracing::warn!(
+            warn!(
                 "[{}] received unexpected response to close connection: {reply:?}",
                 self.peer
             );
@@ -372,7 +372,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             });
         }
         self.framed.close().await?;
-        tracing::info!("[{}] gracefully closed connection", self.peer);
+        info!("[{}] gracefully closed connection", self.peer);
         Ok(())
     }
 
@@ -382,7 +382,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         name: &str,
         version: Option<&str>,
     ) -> Result<Box<str>, NetConfSshClientError> {
-        tracing::debug!(
+        debug!(
             "[{}] Getting a YANG schema with name `{name}` and version {version:?}",
             self.peer
         );

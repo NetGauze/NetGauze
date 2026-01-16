@@ -21,6 +21,7 @@ use std::collections::HashSet;
 use std::io;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::info;
 
 #[derive(clap::Parser, Debug)]
 struct Args {
@@ -78,20 +79,20 @@ pub async fn main() -> anyhow::Result<()> {
         ..<_>::default()
     };
     let ssh_config = Arc::new(ssh_config);
-    tracing::info!("connecting to {}", args.host);
+    info!("connecting to {}", args.host);
     let auth = if let Some(password) = &args.password {
         SshAuth::Password {
             user: args.user.clone(),
             password: secrecy::SecretBox::new(password.clone().into()),
         }
     } else if let Some(private_key_path) = &args.key_path {
-        tracing::info!("Using the private key at: {}", private_key_path);
+        info!("Using the private key at: {}", private_key_path);
         let key_string =
             std::fs::read_to_string(private_key_path).expect("failed to read private key");
-        tracing::info!("Private key string loaded");
+        info!("Private key string loaded");
         let private_key =
             russh::keys::decode_secret_key(key_string.as_str(), args.key_pass.as_deref())?;
-        tracing::info!("Private key parsed");
+        info!("Private key parsed");
         SshAuth::Key {
             user: args.user.clone(),
             private_key: Arc::new(private_key),
@@ -102,7 +103,7 @@ pub async fn main() -> anyhow::Result<()> {
 
     let config = NetconfSshConnectConfig::new(auth, host, ssh_handler, ssh_config);
     let mut client = connect(config).await?;
-    tracing::info!("Connected to server with caps: {:?}", client.peer_caps());
+    info!("Connected to server with caps: {:?}", client.peer_caps());
 
     let (yang_lib, schemas) = client
         .load_from_modules(&["ietf-interfaces", "ietf-ip"], &PermissiveVersionChecker)
