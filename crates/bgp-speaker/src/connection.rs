@@ -17,18 +17,6 @@ use chrono::prelude::*;
 use futures::{Sink, Stream, StreamExt};
 use futures_util::{FutureExt, SinkExt};
 
-use pin_project::pin_project;
-use std::fmt::{Debug, Display};
-use std::future::Future;
-use std::io;
-use std::net::{Ipv4Addr, SocketAddr};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::TcpStream;
-use tokio_util::codec::{Decoder, Encoder, Framed};
-
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::capabilities::BgpCapability;
 use netgauze_bgp_pkt::codec::{BgpCodec, BgpCodecDecoderError};
@@ -46,6 +34,18 @@ use netgauze_bgp_pkt::wire::deserializer::path_attribute::{
 };
 use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
 use netgauze_iana::address_family::{AddressFamily, SubsequentAddressFamily};
+use pin_project::pin_project;
+use std::fmt::{Debug, Display};
+use std::future::Future;
+use std::io;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::TcpStream;
+use tokio_util::codec::{Decoder, Encoder, Framed};
+use tracing::{Level, debug, enabled, error, info};
 
 use crate::events::{ConnectionEvent, UpdateTreatment};
 use crate::fsm::FsmStateError;
@@ -446,11 +446,9 @@ impl<
     #[inline]
     fn start_hold_timer(&mut self) {
         if self.config.hold_timer_duration_large_value != 0 {
-            log::debug!(
+            debug!(
                 "[{}][{}] Set hold timer to: {:?}",
-                self.peer_addr,
-                self.state,
-                self.config.hold_timer_duration_large_value
+                self.peer_addr, self.state, self.config.hold_timer_duration_large_value
             );
             self.hold_timer_duration = self.config.hold_timer_duration_large_value();
             let mut interval = tokio::time::interval(self.hold_timer_duration);
@@ -464,8 +462,8 @@ impl<
         policy: &mut P,
         event: ConnectionEvent<A>,
     ) -> Result<ConnectionEvent<A>, FsmStateError<A>> {
-        if log::log_enabled!(log::Level::Debug) {
-            log::debug!("[{}][{}] handling: {}", self.peer_addr, self.state, event);
+        if enabled!(Level::DEBUG) {
+            debug!("[{}][{}] handling: {}", self.peer_addr, self.state, event);
         }
         let pre_state = self.state;
         let post_event = match pre_state {
@@ -479,19 +477,15 @@ impl<
             ConnectionState::Established => self.handle_established_event(event).await?,
         };
         if self.state != pre_state {
-            if log::log_enabled!(log::Level::Debug) {
-                log::debug!(
+            if enabled!(Level::DEBUG) {
+                debug!(
                     "[{}][{}] Transitioned from {pre_state:?} to {:?} on event: {post_event}",
-                    self.peer_addr,
-                    self.state,
-                    self.state
+                    self.peer_addr, self.state, self.state
                 );
             } else {
-                log::info!(
+                info!(
                     "[{}][{}] Transitioned from {pre_state:?} to {:?}",
-                    self.peer_addr,
-                    self.state,
-                    self.state
+                    self.peer_addr, self.state, self.state
                 );
             }
         }
@@ -518,11 +512,9 @@ impl<
                     self.send(BgpMessage::Open(open)).await?;
                     self.state = ConnectionState::OpenSent;
                 } else {
-                    log::debug!(
+                    debug!(
                         "[{}][{}] Set open delay timer to: {:?}",
-                        self.peer_addr,
-                        self.state,
-                        self.config.open_delay_timer_duration
+                        self.peer_addr, self.state, self.config.open_delay_timer_duration
                     );
                     let mut interval =
                         tokio::time::interval(self.config.open_delay_timer_duration());
@@ -558,10 +550,9 @@ impl<
                         ))
                         .await;
                     if let Err(send_err) = ret {
-                        log::error!(
+                        error!(
                             "[{}][{}] Error sending notification message to peer: {send_err:?}",
-                            self.peer_addr,
-                            self.state,
+                            self.peer_addr, self.state,
                         );
                     }
                 }
@@ -575,10 +566,9 @@ impl<
                         ))
                         .await;
                     if let Err(send_err) = ret {
-                        log::error!(
+                        error!(
                             "[{}][{}] Error sending notification message to peer: {send_err:?}",
-                            self.peer_addr,
-                            self.state,
+                            self.peer_addr, self.state,
                         );
                     }
                 }
@@ -588,10 +578,9 @@ impl<
                 self.state = ConnectionState::Terminate;
             }
             ConnectionEvent::NotifMsgErr(ref err) => {
-                log::error!(
+                error!(
                     "[{}][{}] Error parsing notification message from peer: {err:?}",
-                    self.peer_addr,
-                    self.state,
+                    self.peer_addr, self.state,
                 );
             }
             ConnectionEvent::HoldTimerExpires
@@ -651,10 +640,9 @@ impl<
                 let notif = BgpNotificationMessage::MessageHeaderError(err.clone());
                 let ret = self.send(BgpMessage::Notification(notif)).await;
                 if let Err(send_err) = ret {
-                    log::error!(
+                    error!(
                         "[{}][{}] Error sending notification message to peer: {send_err:?}",
-                        self.peer_addr,
-                        self.state,
+                        self.peer_addr, self.state,
                     );
                 }
                 self.state = ConnectionState::Terminate;
@@ -663,19 +651,17 @@ impl<
                 let notif = BgpNotificationMessage::OpenMessageError(err.clone());
                 let ret = self.send(BgpMessage::Notification(notif)).await;
                 if let Err(send_err) = ret {
-                    log::error!(
+                    error!(
                         "[{}][{}] Error sending notification message to peer: {send_err:?}",
-                        self.peer_addr,
-                        self.state,
+                        self.peer_addr, self.state,
                     );
                 }
                 self.state = ConnectionState::Terminate;
             }
             ConnectionEvent::NotifMsgErr(ref err) => {
-                log::error!(
+                error!(
                     "[{}][{}] Error parsing notification message from peer: {err:?}",
-                    self.peer_addr,
-                    self.state,
+                    self.peer_addr, self.state,
                 );
             }
             ConnectionEvent::NotifMsgVerErr => self.state = ConnectionState::Terminate,
@@ -694,10 +680,9 @@ impl<
                     },
                 );
                 if let Err(err) = self.send(BgpMessage::Notification(notif)).await {
-                    log::error!(
+                    error!(
                         "[{}][{}] Error sending notification message to peer: {err:?}",
-                        self.peer_addr,
-                        self.state,
+                        self.peer_addr, self.state,
                     );
                 }
                 self.state = ConnectionState::Terminate;
@@ -734,10 +719,9 @@ impl<
                 let notif = BgpNotificationMessage::MessageHeaderError(err.clone());
                 let ret = self.send(BgpMessage::Notification(notif)).await;
                 if let Err(send_err) = ret {
-                    log::error!(
+                    error!(
                         "[{}][{}] Error sending notification message to peer: {send_err:?}",
-                        self.peer_addr,
-                        self.state,
+                        self.peer_addr, self.state,
                     );
                 }
                 self.state = ConnectionState::Terminate;
@@ -745,10 +729,9 @@ impl<
             ConnectionEvent::BGPOpenMsgErr(ref err) => {
                 let notif = BgpNotificationMessage::OpenMessageError(err.clone());
                 if let Err(send_err) = self.send(BgpMessage::Notification(notif)).await {
-                    log::error!(
+                    error!(
                         "[{}][{}] Error sending notification message to peer: {send_err:?}",
-                        self.peer_addr,
-                        self.state,
+                        self.peer_addr, self.state,
                     );
                 }
                 self.state = ConnectionState::Terminate;
@@ -761,10 +744,9 @@ impl<
                 );
                 let ret = self.send(BgpMessage::Notification(notif)).await;
                 if let Err(send_err) = ret {
-                    log::error!(
+                    error!(
                         "[{}][{}] Error sending notification message to peer: {send_err:?}",
-                        self.peer_addr,
-                        self.state,
+                        self.peer_addr, self.state,
                     );
                 }
                 self.state = ConnectionState::Terminate;
@@ -779,10 +761,9 @@ impl<
                 self.state = ConnectionState::Terminate;
             }
             ConnectionEvent::NotifMsgErr(ref err) => {
-                log::error!(
+                error!(
                     "[{}][{}] Error parsing notification message from peer: {err:?}",
-                    self.peer_addr,
-                    self.state,
+                    self.peer_addr, self.state,
                 );
             }
             ConnectionEvent::DelayOpenTimerExpires
@@ -797,10 +778,9 @@ impl<
                     },
                 );
                 if let Err(err) = self.send(BgpMessage::Notification(notif)).await {
-                    log::error!(
+                    error!(
                         "[{}][{}] Error sending notification message to peer: {err:?}",
-                        self.peer_addr,
-                        self.state,
+                        self.peer_addr, self.state,
                     );
                 }
                 self.state = ConnectionState::Terminate;
@@ -826,10 +806,9 @@ impl<
                     },
                 );
                 if let Err(err) = self.send(BgpMessage::Notification(notif)).await {
-                    log::error!(
+                    error!(
                         "[{}][{}] Error sending notification message to peer: {err:?}",
-                        self.peer_addr,
-                        self.state,
+                        self.peer_addr, self.state,
                     );
                 }
                 self.state = ConnectionState::Terminate
@@ -864,10 +843,9 @@ impl<
                 self.state = ConnectionState::Terminate;
             }
             ConnectionEvent::NotifMsgErr(ref err) => {
-                log::error!(
+                error!(
                     "[{}][{}] Error parsing notification message from peer: {err:?}",
-                    self.peer_addr,
-                    self.state,
+                    self.peer_addr, self.state,
                 );
             }
         }
@@ -1382,9 +1360,9 @@ where
                                 BgpMessage::Open(open) => {
                                     this.stats.open_received += 1;
                                     // As per RFC5492 Section 5, Capability errors are ignored
-                                    if log::log_enabled!(log::Level::Debug) {
+                                    if enabled!(Level::DEBUG) {
                                         for cap_err in parsing_errors.capability_errors() {
-                                            log::debug!(
+                                            debug!(
                                                 "[{}][{}] Ignored BGP Capability parsing error: {cap_err:?}",
                                                 this.peer_addr,
                                                 this.state,
@@ -1442,11 +1420,10 @@ impl<
     }
 
     fn start_send(self: Pin<&mut Self>, message: BgpMessage) -> Result<(), Self::Error> {
-        if log::log_enabled!(log::Level::Debug) {
-            log::debug!(
+        if enabled!(Level::DEBUG) {
+            debug!(
                 "[{}][{}] Sending message: {message:?}",
-                self.peer_addr,
-                self.state,
+                self.peer_addr, self.state,
             );
         }
         let mut this = self.project();

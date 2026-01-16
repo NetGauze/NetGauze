@@ -23,7 +23,8 @@ use std::net::SocketAddr;
 const TCP_STREAM_POLICY: EchoCapabilitiesPolicy<SocketAddr, tokio::net::TcpStream, BgpCodec> =
     EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_add_remove_peers() -> Result<(), PeersSupervisorError> {
     let mut supervisor = PeersSupervisor::new(MY_AS, MY_BGP_ID);
 
@@ -50,7 +51,8 @@ async fn test_add_remove_peers() -> Result<(), PeersSupervisorError> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_dynamic_peers() -> Result<(), PeersSupervisorError> {
     let mut supervisor = PeersSupervisor::new(MY_AS, MY_BGP_ID);
     let (_rx, _peer_handle) =

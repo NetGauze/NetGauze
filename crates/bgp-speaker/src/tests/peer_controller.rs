@@ -33,7 +33,9 @@ use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
+#[allow(clippy::result_large_err)]
 async fn test_start_stop()
 -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
     let config = PeerConfigBuilder::default().build();
@@ -83,7 +85,9 @@ async fn test_start_stop()
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
+#[allow(clippy::result_large_err)]
 async fn test_start_stop_with_passive_tcp()
 -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
     let config = PeerConfigBuilder::default()
@@ -114,7 +118,9 @@ async fn test_start_stop_with_passive_tcp()
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
+#[allow(clippy::result_large_err)]
 async fn test_get_exchanged_capabilities()
 -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
     let my_asn = 66_000;
@@ -238,7 +244,9 @@ async fn test_get_exchanged_capabilities()
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
+#[allow(clippy::result_large_err)]
 async fn test_get_exchanged_capabilities_tracked_connection()
 -> Result<(), mpsc::error::SendError<PeerEvent<SocketAddr, tokio_test::io::Mock>>> {
     let my_asn = 66_000;
