@@ -42,7 +42,6 @@ netgauze-analytics = { version = "0.8.0", path = "crates/analytics" }
 netgauze-yang-push = { version = "0.8.0", path = "crates/yang-push" }
 netgauze-pcap-decoder = { version = "0.8.0", path = "crates/pcap-decoder" }
 netgauze-netconf-proto = { version = "0.8.0", path = "crates/netconf-proto" }
-log = "0.4"
 thiserror = "2.0"
 async-channel = "2.5"
 libc = { version = "0.2" }
