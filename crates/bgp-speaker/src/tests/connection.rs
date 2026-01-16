@@ -52,7 +52,8 @@ async fn get_connection(
     Ok(connection)
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connected_delay_open_timer_expires() -> io::Result<()> {
     let mut policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
@@ -82,7 +83,8 @@ async fn test_connected_delay_open_timer_expires() -> io::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connected_open_with_delay_open_timer() -> io::Result<()> {
     let mut policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
@@ -138,7 +140,8 @@ async fn test_connected_open_with_delay_open_timer() -> io::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connected_bgp_header_err() -> io::Result<()> {
     let mut policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
@@ -171,7 +174,8 @@ async fn test_connected_bgp_header_err() -> io::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connected_open_sent() -> io::Result<()> {
     let mut policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
@@ -195,7 +199,8 @@ async fn test_connected_open_sent() -> io::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_hold_timer_expires() -> io::Result<()> {
     let mut policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
@@ -237,7 +242,8 @@ async fn test_open_sent_hold_timer_expires() -> io::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_bgp_open() -> io::Result<()> {
     let peer_hold_time = 120;
     let our_hold_time = 240;
@@ -290,7 +296,8 @@ async fn test_open_sent_bgp_open() -> io::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_tcp_connection_fails() -> io::Result<()> {
     let mut policy =
         EchoCapabilitiesPolicy::new(MY_AS, false, MY_BGP_ID, HOLD_TIME, Vec::new(), Vec::new());
@@ -324,7 +331,8 @@ async fn test_open_sent_tcp_connection_fails() -> io::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_hold_timer_expires() -> io::Result<()> {
     let hold_time_seconds = 3;
     let mut policy = EchoCapabilitiesPolicy::new(

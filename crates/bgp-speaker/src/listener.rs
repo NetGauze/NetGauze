@@ -22,14 +22,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use crate::connection::TcpActiveConnect;
+use crate::fsm::FsmState;
+use crate::peer_controller::PeerHandle;
+use crate::supervisor::PeersSupervisor;
 use futures_util::stream::FuturesUnordered;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::StreamExt;
-
-use crate::fsm::FsmState;
-use crate::peer_controller::PeerHandle;
-use crate::supervisor::PeersSupervisor;
+use tracing::{error, info, warn};
 
 /// A modified version of Tokio's TcpListenerStream wrapper that returns the
 /// peer socket along the incoming stream
@@ -100,48 +100,46 @@ impl BgpListener<SocketAddr, TcpStream> {
     ) {
         match self.peers.get_mut(&peer_key) {
             Some(peer_handle) => {
-                log::info!("Accepted Connection for peer {peer_key}");
+                info!("Accepted Connection for peer {peer_key}");
                 if let Err(err) = peer_handle.accept_connection(peer_addr, stream) {
-                    log::error!("Error sending event to peer: {err:?}");
+                    error!("Error sending event to peer: {err:?}");
                 }
             }
             None => {
                 if !self.allow_dynamic_peers {
-                    log::info!("No peer configured for: {peer_addr}");
+                    info!("No peer configured for: {peer_addr}");
                 } else {
                     // TODO: rewrite for more clear logic and dynamic peer handling factory
                     if let Ok((mut rx, mut peer_handle)) =
                         peer_supervisor.dynamic_peer(peer_key, peer_addr, TcpActiveConnect)
                     {
                         if let Err(err) = peer_handle.start() {
-                            log::error!("Error starting dynamic peer: {err:?}");
+                            error!("Error starting dynamic peer: {err:?}");
                             return;
                         }
                         rx.recv().await;
                         if let Err(err) = peer_handle.accept_connection(peer_addr, stream) {
-                            log::error!(
+                            error!(
                                 "[{peer_addr}] Dynamic connection error sending event to peer: {err:?}"
                             );
                             return;
                         }
                         while let Some(Ok((state, event))) = rx.recv().await {
-                            log::info!(
+                            info!(
                                 "[{peer_addr}] Dynamic connection at state {state} GOT EVENT: {event:?}"
                             );
                             if state == FsmState::Idle {
-                                log::warn!(
+                                warn!(
                                     "[{peer_addr}] Dynamic Connection failed before reaching OpenConfirm state"
                                 );
                                 return;
                             }
                             if state == FsmState::OpenConfirm {
-                                log::info!(
-                                    "[{peer_addr}] Accepted Dynamic Connection: {peer_addr}"
-                                );
+                                info!("[{peer_addr}] Accepted Dynamic Connection: {peer_addr}");
                                 self.peers.insert(peer_key, peer_handle);
                                 tokio::spawn(async move {
                                     while let Some(event) = rx.recv().await {
-                                        log::info!(
+                                        info!(
                                             "[{peer_addr}] dynamic connection got event: {event:?}"
                                         );
                                     }
@@ -159,7 +157,7 @@ impl BgpListener<SocketAddr, TcpStream> {
         &mut self,
         peer_supervisor: &mut PeersSupervisor<IpAddr, SocketAddr, TcpStream>,
     ) -> Result<(), io::Error> {
-        log::info!("Configured listening socket: {:?}", self.sockets);
+        info!("Configured listening socket: {:?}", self.sockets);
         let mut listening_sockets = Vec::with_capacity(self.sockets.len());
 
         for socket in &self.sockets {
@@ -172,7 +170,7 @@ impl BgpListener<SocketAddr, TcpStream> {
             for incoming in &mut listening_sockets {
                 listen_futures.push(incoming.next());
             }
-            log::info!("BGP Listener listening on sockets: {:?}", self.sockets);
+            info!("BGP Listener listening on sockets: {:?}", self.sockets);
             while let Some(Some(Ok((stream, peer_addr)))) = listen_futures.next().await {
                 self.accept_peer_connection(peer_addr.ip(), peer_addr, stream, peer_supervisor)
                     .await;

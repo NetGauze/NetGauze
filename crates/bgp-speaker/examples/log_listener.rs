@@ -14,15 +14,15 @@
 // limitations under the License.
 
 use clap::Parser;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
-use std::vec;
-use tokio::net::TcpStream;
-
 use netgauze_bgp_speaker::connection::TcpActiveConnect;
 use netgauze_bgp_speaker::listener::BgpListener;
 use netgauze_bgp_speaker::peer::{EchoCapabilitiesPolicy, PeerConfigBuilder, PeerProperties};
 use netgauze_bgp_speaker::peer_controller::PeerHandle;
 use netgauze_bgp_speaker::supervisor::PeersSupervisor;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::vec;
+use tokio::net::TcpStream;
+use tracing::info;
 
 #[derive(clap::Parser, Debug)]
 struct Args {
@@ -58,19 +58,33 @@ fn create_peer(
     peer_handle.start().unwrap();
     tokio::spawn(async move {
         while let Some(event) = received_rx.recv().await {
-            log::info!("[LISTENER] GOT EVENT: {event:?}");
+            info!("[LISTENER] GOT EVENT: {event:?}");
         }
     });
     peer_handle
 }
 
+fn init_tracing() -> Result<(), Box<dyn std::error::Error>> {
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::{EnvFilter, fmt};
+
+    let env_filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("info"))
+        .expect("Failed to set default tracing env filter");
+
+    tracing_subscriber::registry()
+        .with(env_filter)
+        .with(fmt::layer())
+        .try_init()
+        .expect("Failed to register tracing subscriber");
+
+    Ok(())
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 4)]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-    let env = env_logger::Env::default()
-        .filter_or("MY_LOG_LEVEL", "INFO")
-        .write_style_or("MY_LOG_STYLE", "always");
-    env_logger::init_from_env(env);
-
+    init_tracing().expect("Failed to init tracing subscriber");
     let args = Args::parse();
 
     let my_asn = args.my_asn;
@@ -88,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>
 
     // Example registering peer manually
     let peer_asn = 100;
-    let peer_addr: SocketAddr = "192.168.56.10:179".parse().unwrap();
+    let peer_addr: SocketAddr = "192.168.56.10:179".parse()?;
     let peer_handle = create_peer(my_asn, peer_asn, my_bgp_id, peer_addr, &mut supervisor);
     listener.reg_peer(peer_addr.ip(), peer_handle.clone());
 

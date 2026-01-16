@@ -21,13 +21,6 @@ use std::time::Duration;
 
 use futures::StreamExt;
 use futures_util::SinkExt;
-use rand::rngs::SmallRng;
-use rand::{Rng, RngCore, SeedableRng};
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::oneshot;
-use tokio::time::Interval;
-use tokio_util::codec::{Decoder, Encoder, Framed};
-
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::capabilities::{BgpCapability, FourOctetAsCapability};
 use netgauze_bgp_pkt::codec::{BgpCodecDecoderError, BgpCodecInitializer};
@@ -36,6 +29,13 @@ use netgauze_bgp_pkt::notification::{BgpNotificationMessage, CeaseError, OpenMes
 use netgauze_bgp_pkt::open::{BgpOpenMessage, BgpOpenMessageParameter};
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingIgnoredErrors;
 use netgauze_bgp_pkt::wire::serializer::BgpMessageWritingError;
+use rand::rngs::SmallRng;
+use rand::{Rng, RngCore, SeedableRng};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::oneshot;
+use tokio::time::Interval;
+use tokio_util::codec::{Decoder, Encoder, Framed};
+use tracing::{debug, info};
 
 use crate::connection::{
     ActiveConnect, Connection, ConnectionState, ConnectionStats, ConnectionType,
@@ -634,17 +634,14 @@ impl<
         }
         let before = self.fsm_state;
         self.fsm_state = new_state;
-        log::info!(
+        info!(
             "[{}][{}] FSM state transitions from {} to {}",
-            self.peer_key,
-            self.fsm_state,
-            before,
-            new_state
+            self.peer_key, self.fsm_state, before, new_state
         );
     }
     fn add_connection(&mut self, connection: Connection<A, I, D>) {
         if self.connection.is_some() {
-            log::debug!(
+            debug!(
                 "[{}][{}] tracking a second connection: {}",
                 self.peer_key,
                 self.fsm_state,
@@ -661,10 +658,9 @@ impl<
                 ConnectionState::Established => FsmState::Established,
             };
             if before != after {
-                log::info!(
+                info!(
                     "[{}][{}] FSM transitioned from {before} to {after}",
-                    self.peer_key,
-                    self.fsm_state
+                    self.peer_key, self.fsm_state
                 );
             }
             self.fsm_transition(after);
@@ -703,11 +699,9 @@ impl<
             || (self.fsm_state == FsmState::Established
                 && !self.config.collision_detect_established_state)
         {
-            log::info!(
+            info!(
                 "[{}][{}] Connection Rejected: {}",
-                self.peer_key,
-                self.fsm_state,
-                peer_addr
+                self.peer_key, self.fsm_state, peer_addr
             );
             if self.config.send_notif_without_open() {
                 let notif = BgpNotificationMessage::CeaseError(CeaseError::ConnectionRejected {
@@ -721,7 +715,7 @@ impl<
             }
             return Ok(None);
         }
-        log::info!("[{}][{}] Passive connected", self.peer_key, self.fsm_state);
+        info!("[{}][{}] Passive connected", self.peer_key, self.fsm_state);
         self.connect_retry_timer.take();
         let jitter = self.rng.random_range(0.75..=1.0);
         let mut connection =
@@ -743,7 +737,7 @@ impl<
         {
             // Errors writing to a tracked connection are ignored and we assume that the
             // connection is not good anymore.
-            log::info!(
+            info!(
                 "[{}][{}] Error writing to tracked connection at state {} : {err:?}",
                 self.peer_key,
                 self.fsm_state,
@@ -798,7 +792,7 @@ impl<
     }
 
     async fn shutdown(&mut self) {
-        log::info!("[{}][{}] Shutting down peer", self.peer_key, self.fsm_state);
+        info!("[{}][{}] Shutting down peer", self.peer_key, self.fsm_state);
         self.connect_retry_timer.take();
         self.peer_state = PeerState::AdminDown;
         self.fsm_transition(FsmState::Idle);
@@ -1319,19 +1313,17 @@ impl<
     ) -> Result<I, ConnectError> {
         match (fsm_state, &allowed_to_active_connect) {
             (FsmState::Connect, true) => {
-                log::info!("[{peer_key}][{fsm_state}] Connecting to peer: {peer_addr}");
+                info!("[{peer_key}][{fsm_state}] Connecting to peer: {peer_addr}");
                 *allowed_to_active_connect = false;
                 match tokio::time::timeout(connect_timeout, active_connect.connect(peer_addr)).await
                 {
                     Ok(Ok(stream)) => Ok(stream),
                     Ok(Err(err)) => {
-                        log::info!(
-                            "[{peer_key}][{fsm_state}] Couldn't establish connection: {err:?}"
-                        );
+                        info!("[{peer_key}][{fsm_state}] Couldn't establish connection: {err:?}");
                         Err(ConnectError::TcpConnectionFails)
                     }
                     Err(_) => {
-                        log::info!("[{peer_key}][{fsm_state}] Timeout establishing connection");
+                        info!("[{peer_key}][{fsm_state}] Timeout establishing connection");
                         Err(ConnectError::TcpConnectionFails)
                     }
                 }
@@ -1502,7 +1494,7 @@ impl<
                 if let Some(tracked) = self.tracked_connection.take() {
                     self.stats.connect_retry_counter += 1;
                     let new_state = Self::fsm_state_from_tracked(self.fsm_state, &tracked)?;
-                    log::info!(
+                    info!(
                         "[{}][{}] BGP Collision replacing main connection with tracked connection: {}",
                         self.peer_key,
                         self.fsm_state,
@@ -1525,7 +1517,7 @@ impl<
             }
             ConnectionNextEvent::DropTracked => {
                 if let Some(mut tracked) = self.tracked_connection.take() {
-                    log::info!(
+                    info!(
                         "[{}][{}] BGP Collision detection dropping tracked connection: {}",
                         self.peer_key,
                         self.fsm_state,

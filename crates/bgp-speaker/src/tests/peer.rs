@@ -16,7 +16,8 @@ use crate::fsm::*;
 use crate::peer::*;
 use crate::tests::*;
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_idle_manual_start() {
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
@@ -38,7 +39,8 @@ async fn test_idle_manual_start() {
     assert_eq!(peer.peer_stats().connect_retry_counter(), 0);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_idle_manual_start_with_passive_tcp() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
@@ -68,7 +70,8 @@ async fn test_idle_manual_start_with_passive_tcp() {
     assert_eq!(peer.peer_stats().connect_retry_counter(), 0);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_idle_automatic_start() {
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
@@ -91,7 +94,8 @@ async fn test_idle_automatic_start() {
     assert_eq!(peer.peer_stats().connect_retry_counter(), 0);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_idle_automatic_start_with_passive() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
@@ -121,7 +125,8 @@ async fn test_idle_automatic_start_with_passive() {
     assert_eq!(peer.peer_stats().connect_retry_counter(), 0);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_manual_start() {
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
@@ -147,7 +152,8 @@ async fn test_connect_manual_start() {
     assert_eq!(peer.fsm_state(), FsmState::Connect);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_automatic_start() {
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
@@ -173,7 +179,8 @@ async fn test_connect_automatic_start() {
     assert_eq!(peer.fsm_state(), FsmState::Connect);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_manual_stop() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
@@ -222,7 +229,8 @@ async fn test_connect_manual_stop() {
     assert_eq!(peer.peer_stats().connect_retry_counter(), 0);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_retry_timer_expires() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
@@ -260,7 +268,8 @@ async fn test_connect_retry_timer_expires() {
     assert_eq!(peer.peer_stats().connect_retry_counter(), 0);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_delay_open_timer_expires() {
     let delay_open_duration = 1;
     let mut io_builder = BgpIoMockBuilder::new();
@@ -309,7 +318,8 @@ async fn test_connect_delay_open_timer_expires() {
     );
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_tcp_connection_confirmed() {
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -363,7 +373,8 @@ async fn test_connect_tcp_connection_confirmed() {
     );
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_tcp_connection_confirmed_with_open_delay() {
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -406,7 +417,8 @@ async fn test_connect_tcp_connection_confirmed_with_open_delay() {
     assert!(conn.open_delay_timer().is_some())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_tcp_connection_fails() {
     let active_connect = MockFailedActiveConnect {
         peer_addr: PEER_ADDR,
@@ -438,12 +450,14 @@ async fn test_connect_tcp_connection_fails() {
     assert_eq!(peer.peer_stats().connect_retry_counter(), 0);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_tcp_connection_fails_with_open_delay_timer() {
     // TODO
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_bgp_open_with_delay() {
     let delay_open_duration = 1;
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
@@ -497,7 +511,8 @@ async fn test_connect_bgp_open_with_delay() {
     assert!(conn.hold_timer().is_some())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_tcp_cr_acked() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Open(BgpOpenMessage::new(
@@ -530,7 +545,8 @@ async fn test_connect_tcp_cr_acked() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_bgp_header_err() {
     let mut io_builder = BgpIoMockBuilder::new();
     let bad_header = [0xee; 16];
@@ -575,7 +591,8 @@ async fn test_connect_bgp_header_err() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_bgp_open_err_unsupported_version() {
     let mut io_builder = BgpIoMockBuilder::new();
     let bgp_version = 0x03;
@@ -621,7 +638,8 @@ async fn test_connect_bgp_open_err_unsupported_version() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_bgp_open_err_unacceptable_hold_time() {
     let mut io_builder = BgpIoMockBuilder::new();
     let hold_time = 1;
@@ -667,13 +685,15 @@ async fn test_connect_bgp_open_err_unacceptable_hold_time() {
 }
 
 #[ignore]
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_notif_version_err() {
     // TODO: hard to do since without open delay peer will immediately send
     // a BGP Open and transition to OpenSent state
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_notif_version_err_with_open_delay() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.read(BgpMessage::Notification(
@@ -707,7 +727,8 @@ async fn test_connect_notif_version_err_with_open_delay() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_automatic_stop() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.write(BgpMessage::Notification(
@@ -742,13 +763,15 @@ async fn test_connect_automatic_stop() {
 }
 
 #[ignore]
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_hold_timer_expires() {
     // TODO: this sound like impossible to test since a BGP message is sent
     // and state is transitioned to OpenSent
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_notif_msg() {
     let mut io_builder = BgpIoMockBuilder::new();
     let notif =
@@ -781,7 +804,8 @@ async fn test_connect_notif_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_keepalive_msg() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder.read(BgpMessage::KeepAlive);
@@ -812,7 +836,8 @@ async fn test_connect_keepalive_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_update_msg() {
     let mut io_builder = BgpIoMockBuilder::new();
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
@@ -847,7 +872,8 @@ async fn test_connect_update_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_update_err_msg() {
     let mut io_builder = BgpIoMockBuilder::new();
     let update = [
@@ -887,7 +913,8 @@ async fn test_connect_update_err_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_route_refresh_msg() {
     let mut io_builder = BgpIoMockBuilder::new();
     let route_refresh = BgpRouteRefreshMessage::new(
@@ -922,7 +949,8 @@ async fn test_connect_route_refresh_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_manual_start() {
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
@@ -952,7 +980,8 @@ async fn test_active_manual_start() {
     assert!(peer.connect_retry_timer().is_some());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_automatic_start() {
     let io_builder = BgpIoMockBuilder::new();
     let active_connect = MockActiveConnect {
@@ -982,7 +1011,8 @@ async fn test_active_automatic_start() {
     assert!(peer.connect_retry_timer().is_some());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_connect_retry_timer_expires() {
     let io_builder = BgpIoMockBuilder::new();
 
@@ -1020,7 +1050,8 @@ async fn test_active_connect_retry_timer_expires() {
     assert_eq!(peer.peer_stats().connect_retry_counter(), 0);
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_delay_open_timer_expires() {
     let open_delay = 1;
     let active_io_builder = BgpIoMockBuilder::new();
@@ -1075,7 +1106,8 @@ async fn test_active_delay_open_timer_expires() {
     );
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_tcp_connection_confirmed() {
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -1123,7 +1155,8 @@ async fn test_active_tcp_connection_confirmed() {
     );
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_tcp_connection_confirmed_with_open_delay() {
     let active_io_builder = BgpIoMockBuilder::new();
     let mut passive_io_builder = BgpIoMockBuilder::new();
@@ -1161,7 +1194,8 @@ async fn test_active_tcp_connection_confirmed_with_open_delay() {
     assert!(conn.open_delay_timer().is_some());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_tcp_connection_fails() -> Result<(), FsmStateError<SocketAddr>> {
     let active_io_builder = BgpIoMockBuilder::new();
     let passive_io = tokio_test::io::Builder::new()
@@ -1209,7 +1243,8 @@ async fn test_active_tcp_connection_fails() -> Result<(), FsmStateError<SocketAd
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_bgp_open_with_open_delay() {
     let delay_open_duration = 1;
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
@@ -1280,7 +1315,8 @@ async fn test_active_bgp_open_with_open_delay() {
     assert!(conn.hold_timer().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_bgp_header_err() {
     let delay_open_duration = 1;
     let active_io_builder = BgpIoMockBuilder::new();
@@ -1339,7 +1375,8 @@ async fn test_active_bgp_header_err() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_bgp_open_err() {
     let delay_open_duration = 1;
 
@@ -1400,13 +1437,15 @@ async fn test_active_bgp_open_err() {
 }
 
 #[ignore]
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_notif_version_err() {
     // TODO: hard to do since without open delay peer will immediately send
     // a BGP Open and transition to OpenSent state
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_notif_version_err_with_open_delay() {
     let delay_open_duration = 1;
 
@@ -1453,7 +1492,8 @@ async fn test_active_notif_version_err_with_open_delay() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_automatic_stop() {
     let delay_open_duration = 1;
     let active_io_builder = BgpIoMockBuilder::new();
@@ -1499,7 +1539,8 @@ async fn test_active_automatic_stop() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_notif_msg() {
     let delay_open_duration = 1;
     let active_io_builder = BgpIoMockBuilder::new();
@@ -1545,7 +1586,8 @@ async fn test_active_notif_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_keepalive_msg() {
     let delay_open_duration = 1;
     let active_io_builder = BgpIoMockBuilder::new();
@@ -1588,7 +1630,8 @@ async fn test_active_keepalive_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_update_msg() {
     let delay_open_duration = 1;
     let active_io_builder = BgpIoMockBuilder::new();
@@ -1634,7 +1677,8 @@ async fn test_active_update_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_update_err_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let delay_open_duration = 1;
     let active_io_builder = BgpIoMockBuilder::new();
@@ -1686,7 +1730,8 @@ async fn test_active_update_err_msg() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_active_route_refresh_msg() {
     let delay_open_duration = 1;
     let active_io_builder = BgpIoMockBuilder::new();
@@ -1733,7 +1778,8 @@ async fn test_active_route_refresh_msg() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_manual_stop() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -1779,7 +1825,8 @@ async fn test_open_sent_manual_stop() {
     assert!(peer.connect_retry_timer().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_automatic_stop() {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -1825,7 +1872,8 @@ async fn test_open_sent_automatic_stop() {
     assert!(peer.connect_retry_timer().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_hold_timer_expires() {
     let hold_time = 1;
     let policy =
@@ -1872,7 +1920,8 @@ async fn test_open_sent_hold_timer_expires() {
     assert!(peer.tracked_connection().is_none());
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_tcp_connection_confirmed() -> Result<(), FsmStateError<SocketAddr>> {
     let mut passive_addr = PEER_ADDR;
     passive_addr.set_port(5000);
@@ -1927,13 +1976,15 @@ async fn test_open_sent_tcp_connection_confirmed() -> Result<(), FsmStateError<S
 }
 
 #[ignore]
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_tcp_cr_acked() {
     // TODO: this implementation doesn't initiate connections in OpenSent
     // state, hence TCP CR acked is impossible
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_tcp_connections_fails() -> Result<(), FsmStateError<SocketAddr>> {
     let active_io_builder = BgpIoMockBuilder::new();
 
@@ -1988,7 +2039,8 @@ async fn test_open_sent_tcp_connections_fails() -> Result<(), FsmStateError<Sock
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_bgp_open() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -2037,7 +2089,8 @@ async fn test_open_sent_bgp_open() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>> {
     let bad_header = [0xee; 16];
     let mut io_builder = BgpIoMockBuilder::new();
@@ -2098,7 +2151,8 @@ async fn test_open_sent_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> {
     let bgp_version = 0x03;
     let mut io_builder = BgpIoMockBuilder::new();
@@ -2158,7 +2212,8 @@ async fn test_open_sent_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> 
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAddr>> {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -2208,7 +2263,8 @@ async fn test_open_sent_notif_version_err() -> Result<(), FsmStateError<SocketAd
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let notif =
         BgpNotificationMessage::CeaseError(CeaseError::AdministrativeShutdown { value: vec![] });
@@ -2261,7 +2317,8 @@ async fn test_open_sent_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let mut io_builder = BgpIoMockBuilder::new();
     io_builder
@@ -2312,7 +2369,8 @@ async fn test_open_sent_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -2364,7 +2422,8 @@ async fn test_open_sent_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
     let update = [
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -2422,7 +2481,8 @@ async fn test_open_sent_update_err() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_sent_route_refresh_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let route_refresh = BgpRouteRefreshMessage::new(
         AddressType::Ipv4Unicast,
@@ -2477,7 +2537,8 @@ async fn test_open_sent_route_refresh_msg() -> Result<(), FsmStateError<SocketAd
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_starts() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -2536,7 +2597,8 @@ async fn test_open_confirm_starts() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_manual_stop() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -2594,7 +2656,8 @@ async fn test_open_confirm_manual_stop() -> Result<(), FsmStateError<SocketAddr>
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_automatic_stop() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -2652,7 +2715,8 @@ async fn test_open_confirm_automatic_stop() -> Result<(), FsmStateError<SocketAd
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -2730,7 +2794,8 @@ async fn test_open_confirm_hold_timer_expires() -> Result<(), FsmStateError<Sock
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_keep_alive_timer_expires() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -2784,7 +2849,8 @@ async fn test_open_confirm_keep_alive_timer_expires() -> Result<(), FsmStateErro
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -2843,7 +2909,8 @@ async fn test_open_confirm_notif_msg() -> Result<(), FsmStateError<SocketAddr>> 
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -2904,7 +2971,8 @@ async fn test_open_confirm_notif_version_err() -> Result<(), FsmStateError<Socke
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmStateError<SocketAddr>>
 {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) + 1);
@@ -2996,7 +3064,8 @@ async fn test_open_confirm_collision_dump_main_connection() -> Result<(), FsmSta
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_collision_dump_tracked_connection()
 -> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
@@ -3088,7 +3157,8 @@ async fn test_open_confirm_collision_dump_tracked_connection()
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_open_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -3149,7 +3219,8 @@ async fn test_open_confirm_open_msg() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -3220,7 +3291,8 @@ async fn test_open_confirm_bgp_open_err() -> Result<(), FsmStateError<SocketAddr
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -3289,7 +3361,8 @@ async fn test_open_confirm_bgp_header_err() -> Result<(), FsmStateError<SocketAd
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -3340,7 +3413,8 @@ async fn test_open_confirm_keep_alive_msg() -> Result<(), FsmStateError<SocketAd
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
@@ -3401,7 +3475,8 @@ async fn test_open_confirm_update_msg() -> Result<(), FsmStateError<SocketAddr>>
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let update = [
@@ -3468,7 +3543,8 @@ async fn test_open_confirm_update_err() -> Result<(), FsmStateError<SocketAddr>>
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let route_refresh = BgpRouteRefreshMessage::new(
@@ -3532,7 +3608,8 @@ async fn test_open_confirm_route_refresh_msg() -> Result<(), FsmStateError<Socke
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_starts() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -3596,7 +3673,8 @@ async fn test_established_starts() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_manual_stop() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -3659,7 +3737,8 @@ async fn test_established_manual_stop() -> Result<(), FsmStateError<SocketAddr>>
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_automatic_stop() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -3722,7 +3801,8 @@ async fn test_established_automatic_stop() -> Result<(), FsmStateError<SocketAdd
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -3803,7 +3883,8 @@ async fn test_established_hold_timer_expires() -> Result<(), FsmStateError<Socke
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_keep_alive_timer_expires() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -3867,7 +3948,8 @@ async fn test_established_keep_alive_timer_expires() -> Result<(), FsmStateError
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_collision_dump_main_connection() -> Result<(), FsmStateError<SocketAddr>>
 {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) + 1);
@@ -3965,7 +4047,8 @@ async fn test_established_collision_dump_main_connection() -> Result<(), FsmStat
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_collision_dump_tracked_connection()
 -> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
@@ -4062,7 +4145,8 @@ async fn test_established_collision_dump_tracked_connection()
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_reject_connection_tracking_disabled()
 -> Result<(), FsmStateError<SocketAddr>> {
     let peer_bgp_id = Ipv4Addr::from(u32::from(MY_BGP_ID) - 1);
@@ -4134,7 +4218,8 @@ async fn test_established_reject_connection_tracking_disabled()
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -4197,7 +4282,8 @@ async fn test_established_notif_msg() -> Result<(), FsmStateError<SocketAddr>> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_notif_version_error() -> Result<(), FsmStateError<SocketAddr>> {
     let hold_time = 3;
     let policy =
@@ -4262,7 +4348,8 @@ async fn test_established_notif_version_error() -> Result<(), FsmStateError<Sock
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_tcp_connection_fails() -> Result<(), FsmStateError<SocketAddr>> {
     let my_open = BgpMessage::Open(BgpOpenMessage::new(
         MY_AS as u16,
@@ -4341,7 +4428,8 @@ async fn test_established_tcp_connection_fails() -> Result<(), FsmStateError<Soc
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_keep_alive_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let mut io_builder = BgpIoMockBuilder::new();
@@ -4395,7 +4483,8 @@ async fn test_established_keep_alive_msg() -> Result<(), FsmStateError<SocketAdd
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_established_update_msg() -> Result<(), FsmStateError<SocketAddr>> {
     let peer_open = BgpOpenMessage::new(PEER_AS as u16, HOLD_TIME, PEER_BGP_ID, vec![]);
     let update = BgpUpdateMessage::new(vec![], vec![], vec![]);
@@ -4450,7 +4539,8 @@ async fn test_established_update_msg() -> Result<(), FsmStateError<SocketAddr>> 
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
+#[tracing_test::traced_test]
 async fn test_connect_echo_policy() -> Result<(), FsmStateError<SocketAddr>> {
     let my_asn = 66_000; // must be encoded as ASN4
     let extended_msg_cap = BgpCapability::ExtendedMessage;

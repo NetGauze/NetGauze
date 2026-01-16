@@ -30,6 +30,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio_util::codec::{Decoder, Encoder};
+use tracing::{debug, error};
 
 pub type PeerStateResult<A> = Result<(FsmState, BgpEvent<A>), FsmStateError<A>>;
 
@@ -102,45 +103,43 @@ impl<
                 PeerEvent::GetPeerStats(tx) => {
                     let stats = peer.peer_stats();
                     if let Err(err) = tx.send(stats) {
-                        log::error!("Error sending peer stats: {err:?}");
+                        error!("Error sending peer stats: {err:?}");
                     }
                 }
                 PeerEvent::GetConnectionStats(tx) => {
                     let stats = peer.main_connection_stats();
                     if let Err(err) = tx.send(stats) {
-                        log::error!("Error sending main connection stats: {err:?}");
+                        error!("Error sending main connection stats: {err:?}");
                     }
                 }
                 PeerEvent::GetTrackedConnectionStats(tx) => {
                     let stats = peer.tracked_connection_stats();
                     if let Err(err) = tx.send(stats) {
-                        log::error!("Error sending tracked connection stats: {err:?}");
+                        error!("Error sending tracked connection stats: {err:?}");
                     }
                 }
                 PeerEvent::ConnectionSentCapabilities(tx) => {
                     let caps = peer.main_connection_sent_capabilities();
                     if let Err(err) = tx.send(caps) {
-                        log::error!("Error sending main connection sent capabilities: {err:?}");
+                        error!("Error sending main connection sent capabilities: {err:?}");
                     }
                 }
                 PeerEvent::ConnectionReceivedCapabilities(tx) => {
                     let caps = peer.main_connection_received_capabilities();
                     if let Err(err) = tx.send(caps) {
-                        log::error!("Error sending main connection received capabilities: {err:?}");
+                        error!("Error sending main connection received capabilities: {err:?}");
                     }
                 }
                 PeerEvent::TrackedConnectionSentCapabilities(tx) => {
                     let caps = peer.tracked_connection_sent_capabilities();
                     if let Err(err) = tx.send(caps) {
-                        log::error!("Error sending tracked sent tracked capabilities: {err:?}");
+                        error!("Error sending tracked sent tracked capabilities: {err:?}");
                     }
                 }
                 PeerEvent::TrackedConnectionReceivedCapabilities(tx) => {
                     let caps = peer.tracked_connection_received_capabilities();
                     if let Err(err) = tx.send(caps) {
-                        log::error!(
-                            "Error sending tracked connection received capabilities: {err:?}"
-                        );
+                        error!("Error sending tracked connection received capabilities: {err:?}");
                     }
                 }
             }
@@ -154,7 +153,7 @@ impl<
         fsm_state: FsmState,
         rec_tx: mpsc::UnboundedSender<PeerStateResult<A>>,
     ) -> Result<(), ()> {
-        log::debug!(
+        debug!(
             "[{}][{}] BGP Event {}",
             peer_key,
             fsm_state,
@@ -166,7 +165,7 @@ impl<
         match bgp_event {
             Ok(event) => {
                 if let Err(err) = rec_tx.send(Ok((fsm_state, event))) {
-                    log::error!(
+                    error!(
                         "[{peer_key}][{fsm_state}] Couldn't send BGP event message, terminating the connection: {err:?}"
                     );
                     return Err(());
@@ -174,11 +173,11 @@ impl<
                 Ok(())
             }
             Err(err) => {
-                log::error!(
+                error!(
                     "[{peer_key}][{fsm_state}] Terminating Peer due to error in handling BgpEvent: {err}"
                 );
                 if let Err(err) = rec_tx.send(Err(err)) {
-                    log::error!(
+                    error!(
                         "[{peer_key}][{fsm_state}] Couldn't report error in handling BgpEvent: {err:?}"
                     );
                     return Err(());
@@ -212,7 +211,7 @@ impl<
                     biased;
                     peer_event = peer_rx.recv() => {
                         if let Err(err) = Self::handle_peer_event(&mut peer, peer_event).await {
-                            log::error!("Terminating Peer due to error in handling PeerEvent: {err}");
+                            error!("Terminating Peer due to error in handling PeerEvent: {err}");
                             rec_tx.send(Err(err))?;
                             break;
                         }
