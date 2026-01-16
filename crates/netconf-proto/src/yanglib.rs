@@ -2281,13 +2281,12 @@ pub enum SchemaConstructionError {
     Graph(String),
 
     #[strum(to_string = "Module '{module_name}' not found")]
-    ModuleNotFound {
-        module_name: String,
-    },
+    ModuleNotFound { module_name: String },
 
     #[strum(to_string = "Dependency cycle detected at node {0}")]
     CycleDetected(String),
 
+    #[strum(to_string = "Schema registration error {0}")]
     RegistrationError(schema_registry_client::rest::apis::Error),
 }
 
@@ -2296,9 +2295,7 @@ impl std::error::Error for SchemaConstructionError {}
 #[derive(Debug, strum_macros::Display)]
 pub enum SchemaLoadingError {
     #[strum(to_string = "no valid location found to the schema of the module `{module_name}`")]
-    NoValidLocationFound {
-        module_name: String,
-    },
+    NoValidLocationFound { module_name: String },
 
     #[strum(
         to_string = "failed find the schema of the module `{module_name}` from search path {search_path}"
@@ -2308,6 +2305,7 @@ pub enum SchemaLoadingError {
         search_path: String,
     },
 
+    #[strum(to_string = "I/O error {0}")]
     IoError(io::Error),
 }
 
