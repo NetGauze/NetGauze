@@ -18,7 +18,7 @@ categories = ["network-programming"]
 [dependencies]
 reqwest = { workspace = true, default-features = false, features = ["blocking", "rustls-tls"] }
 roxmltree = { workspace = true }
-log = { workspace = true }
+tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 regex = { workspace = true }
