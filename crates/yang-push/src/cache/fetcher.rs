@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
+use tracing::{error, info, warn};
 
 pub type FetcherResult = Result<
     (SubscriptionInfo, YangLibrary, HashMap<Box<str>, Box<str>>),
@@ -98,7 +99,7 @@ impl NetconfYangLibraryFetcher {
         default_port: u16,
     ) -> FetcherResult {
         let host = SocketAddr::new(subscription_info.peer().ip(), default_port);
-        tracing::info!(
+        info!(
             host = %host,
             subscription_info = %subscription_info,
             "fetching YANG Library from device",
@@ -110,11 +111,11 @@ impl NetconfYangLibraryFetcher {
         let mut client = match tokio::time::timeout(timeout_duration, connect(config)).await {
             Ok(Ok(c)) => c,
             Ok(Err(err)) => {
-                tracing::error!(host=%host,error=%err, "error connecting to device over SSH");
+                error!(host=%host,error=%err, "error connecting to device over SSH");
                 return Err((subscription_info.clone(), err.into()));
             }
             Err(err) => {
-                tracing::error!(host=%host,error=%err, "timeout while connecting to device over SSH");
+                error!(host=%host,error=%err, "timeout while connecting to device over SSH");
                 return Err((subscription_info.clone(), err.into()));
             }
         };
@@ -130,14 +131,14 @@ impl NetconfYangLibraryFetcher {
             .map_err(|err| (subscription_info.clone(), err.into()))?;
         match tokio::time::timeout(timeout_duration, client.close()).await {
             Ok(Ok(_)) => {
-                tracing::info!(host=%host,"SSH connection closed successfully");
+                info!(host=%host,"SSH connection closed successfully");
             }
-            Ok(Err(err)) => tracing::warn!(host=%host,error = %err, "Error closing SSH connection"),
+            Ok(Err(err)) => warn!(host=%host, error=%err, "Error closing SSH connection"),
             Err(err) => {
-                tracing::warn!(host=%host,error=%err, "Timeout while closing SSH connection")
+                warn!(host=%host, error=%err, "Timeout while closing SSH connection")
             }
         }
-        tracing::info!( host = %host,
+        info!( host = %host,
             subscription_info = %subscription_info,
             content_id = %yang_lib.content_id(),
             schema_count = schemas.len(),
@@ -190,7 +191,7 @@ pub(crate) mod tests {
             yang_libs: HashMap<SubscriptionInfo, (YangLibrary, HashMap<Box<str>, Box<str>>)>,
         ) -> Self {
             for (sub_info, (yang_lib, _schemas)) in &yang_libs {
-                tracing::info!(
+                info!(
                     subscription_info=%sub_info,
                     content_id=yang_lib.content_id(),
                     "Fetcher stored YANG Library in cache",
@@ -204,17 +205,22 @@ pub(crate) mod tests {
 
         #[allow(clippy::result_large_err)]
         fn get_from_cache(&self, subscription_info: SubscriptionInfo) -> FetcherResult {
-            tracing::info!(subscription_info=%subscription_info, "fetching from device");
+            info!(subscription_info=%subscription_info, "fetching from device");
             // Increment counter in the instance state
             {
                 let mut counts = self.fetch_counts.lock().unwrap();
                 *counts.entry(subscription_info.clone()).or_default() += 1;
             }
 
-            let (yang_lib, schemas) = self.yang_libs.get(&subscription_info).cloned().ok_or_else(|| {
-                tracing::info!(subscription_info=%subscription_info, "YANG Library not found in cache");
-                (subscription_info.clone(), YangLibraryCacheError::IoError(std::io::Error::other("not found")))
-            })?;
+            let (yang_lib, schemas) = self.yang_libs.get(&subscription_info).cloned().ok_or_else(
+                || {
+                    info!(subscription_info=%subscription_info, "YANG Library not found in cache");
+                    (
+                        subscription_info.clone(),
+                        YangLibraryCacheError::IoError(std::io::Error::other("not found")),
+                    )
+                },
+            )?;
             Ok((subscription_info, yang_lib, schemas))
         }
     }

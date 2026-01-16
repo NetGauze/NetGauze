@@ -124,6 +124,7 @@ use rustc_hash::FxHashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tracing::{info, trace, warn};
 use yang4::data::{DataFormat, DataOperation, DataParserFlags, DataValidationFlags};
 
 #[derive(Debug)]
@@ -182,7 +183,7 @@ impl ValidationActor {
                 .map(|x| x.subscription_info != *subscription_info)
                 .unwrap_or(true);
             if is_different {
-                tracing::trace!(peer=%peer, subscription_id=%subscription_info.id(), "Subscription changed, removing from cache");
+                trace!(peer=%peer, subscription_id=subscription_info.id(), "Subscription changed, removing from cache");
                 cached_peer_subscriptions
                     .subscriptions
                     .remove(&subscription_info.id());
@@ -209,7 +210,7 @@ impl ValidationActor {
         let notif_contents = if let Some(notif) = decoded.payload().notification_contents() {
             notif
         } else {
-            tracing::warn!(peer=%peer, "Received UDP-Notif payload without content, dropping packet");
+            warn!(peer=%peer, "Received UDP-Notif payload without content, dropping packet");
             return None;
         };
 
@@ -225,7 +226,7 @@ impl ValidationActor {
             {
                 subscription_info
             } else {
-                tracing::warn!(peer=%peer, "Received UDP-Notif payload without subscription info, dropping packet");
+                warn!(peer=%peer, "Received UDP-Notif payload without subscription info, dropping packet");
                 return None;
             };
             self.check_subscription_new(peer, &subscription_info);
@@ -282,14 +283,14 @@ impl ValidationActor {
                 });
         if subscription_cache.cached_packets.len() > self.max_cached_packets_per_subscription {
             // drop the new packet, since the cache is full
-            tracing::warn!(peer=%peer, subscription_id, "Cache full for subscription, dropping new packet");
+            warn!(peer=%peer, subscription_id, "Cache full for subscription, dropping new packet");
             return;
         }
         if total_cached_packets > self.max_cached_packets_per_peer {
-            tracing::warn!(peer=%peer, "Cache full for peer, dropping new packet");
+            warn!(peer=%peer, "Cache full for peer, dropping new packet");
             return;
         }
-        tracing::trace!(peer=%peer, subscription_id, "Cached UDP-Notif packet");
+        trace!(peer=%peer, subscription_id, "Cached UDP-Notif packet");
         subscription_cache.cached_packets.push(packet);
     }
 
@@ -304,7 +305,7 @@ impl ValidationActor {
         let decoded = match UdpNotifPacketDecoded::try_from(packet) {
             Ok(decoded) => decoded,
             Err(err) => {
-                tracing::warn!(peer=%peer, error=%err, "Failed to decode UDP-Notif payload, dropping packet");
+                warn!(peer=%peer, error=%err, "Failed to decode UDP-Notif payload, dropping packet");
                 return Ok(());
             }
         };
@@ -312,7 +313,7 @@ impl ValidationActor {
         let subscription_info = match self.get_subscription_info(peer, &decoded) {
             Some((subscription_info, is_cached)) => {
                 if !is_cached {
-                    tracing::trace!(peer=%peer, subscription_id=subscription_info.id(), "Received new subscription fetching schemas from the cache");
+                    trace!(peer=%peer, subscription_id=subscription_info.id(), "Received new subscription fetching schemas from the cache");
                     self.cache_cmd_tx
                         .send(CacheLookupCommand::LookupBySubscriptionInfo(
                             subscription_info.clone(),
@@ -331,7 +332,7 @@ impl ValidationActor {
                     .notification_contents()
                     .map(|x| x.subscription_id());
                 if let Some(subscription_id) = subscription_id {
-                    tracing::trace!(peer=%peer, subscription_id, "Received UDP-Notif packet without subscription info, caching the packet and looking up subscription info in cache");
+                    trace!(peer=%peer, subscription_id, "Received UDP-Notif packet without subscription info, caching the packet and looking up subscription info in cache");
                     self.cache_cmd_tx
                         .send(CacheLookupCommand::LookupBySubscriptionId {
                             peer,
@@ -347,7 +348,7 @@ impl ValidationActor {
                     );
                     return Ok(());
                 }
-                tracing::warn!(peer=%peer, "Received UDP-Notif packet without subscription info nor subscription ID, dropping packet");
+                warn!(peer=%peer, "Received UDP-Notif packet without subscription info nor subscription ID, dropping packet");
                 return Ok(());
             }
         };
@@ -398,7 +399,7 @@ impl ValidationActor {
                 DataValidationFlags::PRESENT,
             );
             if let Err(err) = validation_result {
-                tracing::warn!(peer=%peer, subscription_id=subscription_info.id(), error=%err, "Failed to validate UDP-Notif payload, dropping packet");
+                warn!(peer=%peer, subscription_id=subscription_info.id(), error=%err, "Failed to validate UDP-Notif payload, dropping packet");
                 return Ok(());
             }
         } else {
@@ -410,7 +411,7 @@ impl ValidationActor {
                 DataOperation::NotificationYang,
             );
             if let Err(err) = validation_result {
-                tracing::warn!(peer=%peer, subscription_id=subscription_info.id(), error=%err, "Failed to validate UDP-Notif payload, dropping packet");
+                warn!(peer=%peer, subscription_id=subscription_info.id(), error=%err, "Failed to validate UDP-Notif payload, dropping packet");
                 return Ok(());
             }
         }
@@ -435,7 +436,7 @@ impl ValidationActor {
         {
             peer_cache
         } else {
-            tracing::warn!(peer=%subscription_info.peer(), subscription_id=%subscription_info.id(), "Received cache response for subscription from peer that is not in the cache, ignoring the response");
+            warn!(peer=%subscription_info.peer(), subscription_id=subscription_info.id(), "Received cache response for subscription from peer that is not in the cache, ignoring the response");
             return Ok(());
         };
 
@@ -444,7 +445,7 @@ impl ValidationActor {
         {
             subscription_cache
         } else {
-            tracing::warn!(peer=%subscription_info.peer(), subscription_id=%subscription_info.id(), "Received cache response for subscription that is not in the cache, ignoring the response");
+            warn!(peer=%subscription_info.peer(), subscription_id=subscription_info.id(), "Received cache response for subscription that is not in the cache, ignoring the response");
             return Ok(());
         };
 
@@ -461,7 +462,7 @@ impl ValidationActor {
             let yang_ctx = match yang_ctx_result {
                 Ok(yang_ctx) => Some(yang_ctx),
                 Err(err) => {
-                    tracing::warn!(
+                    warn!(
                         peer=%subscription_info.peer(),
                         subscription_id=subscription_info.id(),
                         content_id=%yang_lib_ref.content_id(),
@@ -498,7 +499,7 @@ impl ValidationActor {
                 module_names
             }
             None => {
-                tracing::warn!(
+                warn!(
                     peer=%peer,
                     "SubscriptionStarted missing module version"
                 );
@@ -519,18 +520,18 @@ impl ValidationActor {
     }
 
     async fn run(mut self) -> Result<String, ValidationActorError> {
-        tracing::info!("Starting Yang-Push validation actor");
+        info!("Starting Yang-Push validation actor");
         loop {
             tokio::select! {
                 biased;
                 cmd = self.cmd_rx.recv() => {
                     return match cmd {
                         Some(ValidationActorCommand::Shutdown) => {
-                            tracing::info!("Shutting down Yang Push validation actor");
+                            info!("Shutting down Yang Push validation actor");
                             Ok("Enrichment shutdown successfully".to_string())
                         }
                         None => {
-                            tracing::warn!("Yang Push validation actor terminated due to command channel closing");
+                            warn!("Yang Push validation actor terminated due to command channel closing");
                             Ok("Enrichment shutdown successfully".to_string())
                         }
                     }
@@ -539,12 +540,12 @@ impl ValidationActor {
                     match msg {
                         Ok(msg) => {
                             if let Err(err) = self.process_udp_notif_msg(msg).await {
-                                tracing::warn!(error=%err, "Yang Push validation actor UDP-Notif processing error, shutting down");
+                                warn!(error=%err, "Yang Push validation actor UDP-Notif processing error, shutting down");
                                 return Ok("Yang Push validation actor UDP-Notif processing error, shutting down".to_string());
                             }
                         }
                         Err(error) => {
-                            tracing::warn!(error=%error, "Yang Push validation actor receive error, shutting down");
+                            warn!(error=%error, "Yang Push validation actor receive error, shutting down");
                             return Ok("Yang Push validation actor receive error, shutting down".to_string());
                         }
                     }
@@ -553,12 +554,12 @@ impl ValidationActor {
                     match msg {
                         Ok(response) => {
                             if let Err(err) = self.process_cache_response(response).await {
-                                tracing::warn!(error=%err, "Yang Push validation actor cache response processing error, shutting down");
+                                warn!(error=%err, "Yang Push validation actor cache response processing error, shutting down");
                                 return Ok("Yang Push validation actor cache response processing error, shutting down".to_string());
                             }
                         }
                         Err(error) => {
-                            tracing::warn!(error=%error, "Yang Push validation actor cache receive error, shutting down");
+                            warn!(error=%error, "Yang Push validation actor cache receive error, shutting down");
                             return Ok("Yang Push validation actor cache receive error, shutting down".to_string());
                         }
                     }

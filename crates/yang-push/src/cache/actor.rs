@@ -227,6 +227,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinError, JoinHandle};
+use tracing::{debug, info, warn};
 
 #[derive(Debug, Clone)]
 pub enum CacheActorCommand {
@@ -372,10 +373,10 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         };
         match sender.send(response).await {
             Ok(_) => {
-                tracing::debug!(subscription_info=%subscription_info, hit, "yang library reference sent to requester");
+                debug!(subscription_info=%subscription_info, hit, "yang library reference sent to requester");
             }
             Err(err) => {
-                tracing::warn!(
+                warn!(
                     subscription_info = %subscription_info,
                     hit,
                     error = %err,
@@ -393,10 +394,10 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         let hit = yang_lib_ref.is_some();
         match sender.send((content_id.clone(), yang_lib_ref)).await {
             Ok(_) => {
-                tracing::debug!(content_id, hit, "yang library reference sent to requester");
+                debug!(content_id, hit, "yang library reference sent to requester");
             }
             Err(err) => {
-                tracing::warn!(
+                warn!(
                     content_id,
                     hit,
                     error = %err,
@@ -419,10 +420,10 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         };
         match sender.send(response) {
             Ok(_) => {
-                tracing::debug!(subscription_info=%subscription_info, hit, "yang library reference sent (oneshot) to requester");
+                debug!(subscription_info=%subscription_info, hit, "yang library reference sent (oneshot) to requester");
             }
             Err(_err) => {
-                tracing::warn!(
+                warn!(
                     subscription_info = %subscription_info,
                     "failed to send (oneshot) yang library reference to requester"
                 );
@@ -438,17 +439,15 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         let hit = yang_lib_ref.is_some();
         match sender.send((content_id.clone(), yang_lib_ref)) {
             Ok(_) => {
-                tracing::debug!(
+                debug!(
                     content_id,
-                    hit,
-                    "yang library reference sent (oneshot) to requester"
+                    hit, "yang library reference sent (oneshot) to requester"
                 );
             }
             Err(_err) => {
-                tracing::warn!(
+                warn!(
                     content_id,
-                    hit,
-                    "failed to send (oneshot) yang library reference to requester"
+                    hit, "failed to send (oneshot) yang library reference to requester"
                 );
             }
         }
@@ -457,10 +456,10 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
     async fn process_worker_result(&mut self, worker_result: Result<FetcherResult, JoinError>) {
         match worker_result {
             Err(err) => {
-                tracing::warn!(error=%err, "cache actor worker failed to execute a task");
+                warn!(error=%err, "cache actor worker failed to execute a task");
             }
             Ok(Err((subscription_info, err))) => {
-                tracing::warn!(error=%err, "cache actor worker failed");
+                warn!(error=%err, "cache actor worker failed");
                 let pending_senders = self.pending_requests.remove(&subscription_info);
                 if let Some(pending_senders) = pending_senders {
                     for sender in pending_senders {
@@ -472,7 +471,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             })
                             .await
                             .map_err(|error| {
-                                tracing::warn!(
+                                warn!(
                                 subscription_info=%subscription_info,
                                 error=%error, "failed to send error response to requester");
                             });
@@ -480,7 +479,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 }
             }
             Ok(Ok((subscription_info, yang_lib, schemas))) => {
-                tracing::info!(
+                info!(
                     subscription_info = %subscription_info,
                     modules_count = schemas.len(),
                     content_id = yang_lib.content_id(),
@@ -493,14 +492,14 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 );
                 let yang_lib_ref = match result {
                     Ok(yang_lib_ref) => {
-                        tracing::info!(
+                        info!(
                             subscription_info=%subscription_info,
                             "yang library for subscription info stored in cache successfully"
                         );
                         Some(yang_lib_ref)
                     }
                     Err(err) => {
-                        tracing::warn!(
+                        warn!(
                             subscription_info = %subscription_info,
                             error = %err,
                             "failed to store yang library in cache"
@@ -529,7 +528,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
     async fn process_request(&mut self, request: CacheLookupCommand) {
         match request {
             CacheLookupCommand::LookupBySubscriptionInfo(subscription_info, sender) => {
-                tracing::debug!(subscription_info=%subscription_info, "processing cache lookup request");
+                debug!(subscription_info=%subscription_info, "processing cache lookup request");
                 let yang_lib_ref = self
                     .schema_cache
                     .get_by_subscription_info(&subscription_info);
@@ -549,7 +548,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                         entry.push(sender);
 
                         if should_fetch {
-                            tracing::info!(
+                            info!(
                                 subscription_info = %subscription_info,
                                 "cache miss: starting fetch from device"
                             );
@@ -561,7 +560,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             let job = match job_result {
                                 Ok(worker_result) => worker_result,
                                 Err(err) => {
-                                    tracing::warn!(
+                                    warn!(
                                         subscription_info=%subscription_info,
                                         error=%err,
                                         "cache miss: failed to fetch yang library from device"
@@ -571,7 +570,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             };
                             self.workers_queue.push(job);
                         } else {
-                            tracing::debug!(  // Changed to debug
+                            debug!(  // Changed to debug
                                 subscription_info = %subscription_info,
                                 pending_count = entry.len(),
                                 "cache miss: fetch in progress, queuing request"
@@ -581,7 +580,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 }
             }
             CacheLookupCommand::LookupBySubscriptionInfoOneShot(subscription_info, sender) => {
-                tracing::debug!(subscription_info=%subscription_info, "processing cache lookup request (one shot)");
+                debug!(subscription_info=%subscription_info, "processing cache lookup request (one shot)");
                 // fetch the schemas if needed from the device
                 if self
                     .schema_cache
@@ -609,7 +608,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 subscription_id,
                 tx,
             } => {
-                tracing::debug!(peer=%peer, subscription_id, "processing cache lookup request");
+                debug!(peer=%peer, subscription_id, "processing cache lookup request");
                 let response = self
                     .schema_cache
                     .get_by_subscription_id(peer.ip(), subscription_id);
@@ -617,7 +616,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     Self::send_yang_lib_ref(&subscription_info, yang_lib_ref, tx).await;
                 } else {
                     // TODO: lookup subscription direction from router config
-                    tracing::warn!(peer=%peer, subscription_id, "cache miss: subscription id not found in cache");
+                    warn!(peer=%peer, subscription_id, "cache miss: subscription id not found in cache");
                 }
             }
             CacheLookupCommand::LookupBySubscriptionIdOneShot {
@@ -625,7 +624,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 subscription_id,
                 tx,
             } => {
-                tracing::debug!(peer=%peer, subscription_id, "processing cache lookup request (one shot)");
+                debug!(peer=%peer, subscription_id, "processing cache lookup request (one shot)");
                 let response = self
                     .schema_cache
                     .get_by_subscription_id(peer.ip(), subscription_id);
@@ -633,16 +632,16 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     Self::send_yang_lib_ref_oneshot(&subscription_info, yang_lib_ref, tx);
                 } else {
                     // TODO: lookup subscription direction from router config
-                    tracing::warn!(peer=%peer, subscription_id, "cache miss: subscription id not found in cache");
+                    warn!(peer=%peer, subscription_id, "cache miss: subscription id not found in cache");
                 }
             }
             CacheLookupCommand::LookupByContentId(content_id, sender) => {
-                tracing::debug!(content_id, "processing cache lookup request");
+                debug!(content_id, "processing cache lookup request");
                 let yang_lib_ref = self.schema_cache.get_by_content_id(&content_id);
                 Self::send_yang_lib_ref_content_id(&content_id, yang_lib_ref, sender).await;
             }
             CacheLookupCommand::LookupByContentIdOneShot(content_id, sender) => {
-                tracing::debug!(content_id, "processing cache lookup request (one shot)");
+                debug!(content_id, "processing cache lookup request (one shot)");
                 let yang_lib_ref = self.schema_cache.get_by_content_id(&content_id);
                 Self::send_yang_lib_ref_oneshot_content_id(&content_id, yang_lib_ref, sender);
             }
@@ -656,7 +655,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 cmd = self.cmd_rx.recv() => {
                     match cmd {
                         Some(CacheActorCommand::Shutdown) => {
-                            tracing::info!(
+                            info!(
                                 pending_requests = self.pending_requests.len(),
                                 active_workers = self.workers_queue.len(),
                                 "cache actor shutting down and aborting all active workers"
@@ -670,7 +669,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             self.cleanup_closed_senders();
                         }
                         None => {
-                            tracing::warn!(
+                            warn!(
                                 pending_requests = self.pending_requests.len(),
                                 active_workers = self.workers_queue.len(),
                                 "cache actor channel closed unexpectedly due to closed command channel"
@@ -691,7 +690,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     if let Ok(request) = request {
                         self.process_request(request).await;
                     } else {
-                        tracing::warn!(
+                        warn!(
                             pending_requests = self.pending_requests.len(),
                             active_workers = self.workers_queue.len(),
                             "cache actor channel closed unexpectedly due to closed request channel"
@@ -767,7 +766,7 @@ impl CacheActorHandle {
             loop {
                 cleanup_interval.tick().await;
                 if let Err(err) = cmd_tx_clone.send(CacheActorCommand::Cleanup).await {
-                    tracing::warn!(error=%err, "failed to send cleanup command to cache actor, stopping periodic cleanup task");
+                    warn!(error=%err, "failed to send cleanup command to cache actor, stopping periodic cleanup task");
                     break;
                 }
             }
