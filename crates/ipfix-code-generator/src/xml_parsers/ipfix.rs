@@ -19,6 +19,7 @@ use crate::{InformationElement, InformationElementSubRegistry, SimpleRegistry, S
 use regex::Regex;
 use roxmltree::Node;
 use std::collections::HashMap;
+use tracing::info;
 
 const ID_IE_DATA_TYPES: &str = "ipfix-information-element-data-types";
 pub(crate) const ID_IE: &str = "ipfix-information-elements";
@@ -158,20 +159,20 @@ pub(crate) fn parse_information_elements(
         let name = get_string_child(child, (IANA_NAMESPACE, "name").into());
         let name = if let Some(name) = name {
             if name.as_str() == ASSIGNED_FOR_NF_V9 {
-                log::info!("Skipping Netflow V9 element {name}");
+                info!("Skipping Netflow V9 element {name}");
                 continue;
             }
             if name == *UNASSIGNED {
-                log::info!("Skipping unsigned name: {child:?}");
+                info!("Skipping unsigned name: {child:?}");
                 continue;
             }
             if name == *RESERVED {
-                log::info!("Skipping reserved name: {child:?}");
+                info!("Skipping reserved name: {child:?}");
                 continue;
             }
             name
         } else {
-            log::info!("Skipping a child with no name: {child:?}");
+            info!("Skipping a child with no name: {child:?}");
             continue;
         };
 
@@ -186,7 +187,7 @@ pub(crate) fn parse_information_elements(
                 }
             })
         else {
-            log::info!("Skipping {name} a child with no data type defined: {child:?}");
+            info!("Skipping {name} a child with no data type defined: {child:?}");
             continue;
         };
         let group = get_string_child(child, (IANA_NAMESPACE, "group").into());
@@ -197,13 +198,13 @@ pub(crate) fn parse_information_elements(
         let element_id = match element_id {
             Some(Ok(element_id)) => element_id,
             Some(Err(err)) => {
-                log::info!(
+                info!(
                     "Skipping {name} a child with invalid element id defined `{err:?}`: {child:?}"
                 );
                 continue;
             }
             None => {
-                log::info!("Skipping {name} a child with no element id defined: {child:?}");
+                info!("Skipping {name} a child with no element id defined: {child:?}");
                 continue;
             }
         };
@@ -212,13 +213,13 @@ pub(crate) fn parse_information_elements(
             if let Some(status) = get_string_child(child, (IANA_NAMESPACE, "status").into()) {
                 status
             } else {
-                log::info!("Skipping {name} a child with no status defined: {child:?}");
+                info!("Skipping {name} a child with no status defined: {child:?}");
                 continue;
             };
         let description = match parse_description_string(child) {
             Some(description) => description,
             None => {
-                log::info!("Skipping {name} a child with no description defined: {child:?}");
+                info!("Skipping {name} a child with no description defined: {child:?}");
                 continue;
             }
         };
@@ -229,20 +230,20 @@ pub(crate) fn parse_information_elements(
             match revision.as_str().parse::<u32>() {
                 Ok(rev) => rev,
                 Err(err) => {
-                    log::info!(
+                    info!(
                         "Skipping {name} a child with invalid revision defined `{err:?}`: {child:?}"
                     );
                     continue;
                 }
             }
         } else {
-            log::info!("Skipping {name} a child with no revision defined: {child:?}");
+            info!("Skipping {name} a child with no revision defined: {child:?}");
             continue;
         };
         let date = if let Some(data) = get_string_child(child, (IANA_NAMESPACE, "date").into()) {
             data
         } else {
-            log::info!("Skipping {name} a child with no date defined: {child:?}");
+            info!("Skipping {name} a child with no date defined: {child:?}");
             continue;
         };
         let references = if let Some(references) = child

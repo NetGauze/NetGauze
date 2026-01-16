@@ -21,6 +21,7 @@ use crate::{
 
 use regex::Regex;
 use roxmltree::Node;
+use tracing::info;
 
 const MAX_WORDS_NAME: usize = 10;
 const MAX_CHARS_DISPLAY_NAME: usize = 50;
@@ -225,7 +226,7 @@ pub fn parse_val_name_desc_u8_registry(node: &Node<'_, '_>) -> (u16, Vec<ValueNa
                     display_name = description.clone();
                 }
             } else {
-                log::info!("Skipping sub-registry: missing both name and description!");
+                info!("Skipping sub-registry: missing both name and description!");
                 continue;
             }
 
