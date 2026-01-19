@@ -12,22 +12,22 @@ homepage = "https://github.com/NetGauze/NetGauze"
 description = """
 UDP-Notif (draft-ietf-netconf-udp-notif) packet library for YANG Push streaming telemetry. Provides zero-copy wire format handling, automatic JSON/CBOR deserialization, and type-safe access to RFC 8639/8641 subscription notifications.
 """
-keywords = ["udp-notif", "netconf", "yang", "yang-push", "parser", "protocol"]
+keywords = ["udp-notif", "netconf", "yang", "yang-push"]
 categories = ["network-programming", "parsing"]
 
 
 [dependencies]
-netgauze-locate = { workspace = true , optional = true }
+netgauze-locate = { workspace = true, optional = true }
 netgauze-parse-utils = { workspace = true, optional = true }
-netgauze-serde-macros = { workspace = true , optional = true }
+netgauze-serde-macros = { workspace = true, optional = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 
 serde = { workspace = true, features = ["derive"] }
 nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
-bytes = { workspace = true, features = ["serde"]}
-tokio-util = { workspace = true, features = ["full", "tracing"] , optional = true}
+bytes = { workspace = true, features = ["serde"] }
+tokio-util = { workspace = true, features = ["full", "tracing"], optional = true }
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
 serde_json = { workspace = true }
