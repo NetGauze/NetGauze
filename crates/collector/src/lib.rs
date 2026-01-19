@@ -458,6 +458,7 @@ pub async fn init_udp_notif_collection(
                         udp_notif_recv.clone(),
                         validated_tx,
                         schema_handle.request_tx(),
+                        either::Left(meter.clone()),
                     )?;
                     validation_join_set.push(validation_join);
                     validation_handles.push(validation_handle.clone());
@@ -532,6 +533,7 @@ pub async fn init_udp_notif_collection(
                         udp_notif_recv.clone(),
                         validated_tx,
                         schema_handle.request_tx(),
+                        either::Left(meter.clone()),
                     )?;
                     validation_join_set.push(validation_join);
                     validation_handles.push(validation_handle.clone());
