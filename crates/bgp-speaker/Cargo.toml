@@ -2,7 +2,7 @@ lints.workspace = true
 
 [package]
 name = "netgauze-bgp-speaker"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2024"
 authors = ["Ahmed Elhassany <a.hassany@gmail.com>"]
 license = "Apache-2.0"
