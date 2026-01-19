@@ -21,10 +21,12 @@ This project is still in an early stage.
     1. Packet representation and wire format
        serialization/deserialization: [`netgauze-flow-pkt`](crates/flow-pkt/README.md)
     2. Service building block to receive messages: [`netgauze-flow-service`](crates/flow-service/README.md)
-4. UDP-Notif
+4. YANG-Push over UDP-Notif
     1. Packet representation and wire format
        serialization/deserialization: [`netgauze-udp-notif-pkt`](crates/udp-notif-pkt/README.md)
     2. Service building block to receive messages: [`netgauze-udp-notif-service`](crates/udp-notif-service/README.md)
+    3. YANG-Push data models and YANG validation: [`netgauze-yang-push`](crates/yang-push/README.md)
+    4. Collector daemon: [`netgauze-collector`](crates/collector/README.md)
 
 # Development documentation
 
