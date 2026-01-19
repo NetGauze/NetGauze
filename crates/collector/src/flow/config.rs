@@ -42,7 +42,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use smallvec::SmallVec;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::net::IpAddr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -383,12 +383,20 @@ impl FieldSelect for CoalesceFieldSelect {
     }
 
     fn avro_type(&self) -> AvroValueKind {
-        let avro_type = self.ies.iter().map(|x| x.ie()).collect::<HashSet<_>>();
-        if avro_type.len() == 1 {
-            self.ies[0].avro_type()
-        } else {
-            AvroValueKind::String
+        if self.ies.is_empty() {
+            return AvroValueKind::String;
         }
+
+        let first_type = ie_avro_type(self.ies[0].ie());
+
+        // return string if we find a different type
+        for ie in &self.ies[1..] {
+            if ie_avro_type(ie.ie()) != first_type {
+                return AvroValueKind::String;
+            }
+        }
+
+        first_type
     }
 
     fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
