@@ -140,6 +140,55 @@ struct CachedPeerSubscriptions {
     subscriptions: FxHashMap<SubscriptionId, CachedSubscription>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ValidationStats {
+    pub messages_dropped_caching: opentelemetry::metrics::Counter<u64>,
+    pub messages_dropped_decoding: opentelemetry::metrics::Counter<u64>,
+    pub messages_dropped_subscription: opentelemetry::metrics::Counter<u64>,
+    pub messages_dropped_validation: opentelemetry::metrics::Counter<u64>,
+    pub messages_received: opentelemetry::metrics::Counter<u64>,
+    pub messages_sent: opentelemetry::metrics::Counter<u64>,
+}
+
+impl ValidationStats {
+    pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
+        let messages_dropped_caching = meter
+            .u64_counter("netgauze.collector.yang_push.validation.messages.dropped.caching")
+            .with_description("Number of Yang Push messages dropped because of cache overflow")
+            .build();
+        let messages_dropped_decoding = meter
+            .u64_counter("netgauze.collector.yang_push.validation.messages.dropped.decoding")
+            .with_description("Number of Yang Push messages dropped because of decoding errors")
+            .build();
+        let messages_dropped_subscription = meter
+            .u64_counter("netgauze.collector.yang_push.validation.messages.dropped.subscription")
+            .with_description(
+                "Number of Yang Push messages dropped because of missing subscription info",
+            )
+            .build();
+        let messages_dropped_validation = meter
+            .u64_counter("netgauze.collector.yang_push.validation.messages.dropped.validation")
+            .with_description("Number of Yang Push messages dropped because of validation errors")
+            .build();
+        let messages_received = meter
+            .u64_counter("netgauze.collector.yang_push.validation.messages.received")
+            .with_description("Number of Yang Push messages received for validation")
+            .build();
+        let messages_sent = meter
+            .u64_counter("netgauze.collector.yang_push.validation.messages.sent")
+            .with_description("Number of Telemetry Messages successfully sent upstream")
+            .build();
+        Self {
+            messages_dropped_caching,
+            messages_dropped_decoding,
+            messages_dropped_subscription,
+            messages_dropped_validation,
+            messages_received,
+            messages_sent,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, strum_macros::Display)]
 pub enum ValidationActorError {
     #[strum(serialize = "Failed to send cache lookup command")]
@@ -167,6 +216,7 @@ struct ValidationActor {
     cache_cmd_tx: async_channel::Sender<CacheLookupCommand>,
     cache_tx: async_channel::Sender<CacheResponse>,
     cache_rx: async_channel::Receiver<CacheResponse>,
+    stats: ValidationStats,
 }
 
 impl ValidationActor {
@@ -263,7 +313,7 @@ impl ValidationActor {
         peer: SocketAddr,
         subscription_info: SubscriptionInfo,
         packet: Arc<(SocketAddr, UdpNotifPacket)>,
-    ) {
+    ) -> bool {
         let subscription_id = subscription_info.id();
         let peer_cache = self.peer_cache.entry(peer.ip()).or_default();
         let total_cached_packets = peer_cache
@@ -284,14 +334,15 @@ impl ValidationActor {
         if subscription_cache.cached_packets.len() > self.max_cached_packets_per_subscription {
             // drop the new packet, since the cache is full
             warn!(peer=%peer, subscription_id, "Cache full for subscription, dropping new packet");
-            return;
+            return false;
         }
         if total_cached_packets > self.max_cached_packets_per_peer {
             warn!(peer=%peer, "Cache full for peer, dropping new packet");
-            return;
+            return false;
         }
         trace!(peer=%peer, subscription_id, "Cached UDP-Notif packet");
         subscription_cache.cached_packets.push(packet);
+        true
     }
 
     async fn process_udp_notif_msg(
@@ -300,12 +351,21 @@ impl ValidationActor {
     ) -> Result<(), ValidationActorError> {
         let (peer, packet) = msg.as_ref();
         let peer = *peer;
+        let peer_tags = [
+            opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
+            opentelemetry::KeyValue::new(
+                "network.peer.port",
+                opentelemetry::Value::I64(peer.port().into()),
+            ),
+        ];
+        self.stats.messages_received.add(1, &peer_tags);
 
         // Decode the UDP-Notif packet to get subscription ID and payload information
         let decoded = match UdpNotifPacketDecoded::try_from(packet) {
             Ok(decoded) => decoded,
             Err(err) => {
                 warn!(peer=%peer, error=%err, "Failed to decode UDP-Notif payload, dropping packet");
+                self.stats.messages_dropped_decoding.add(1, &peer_tags);
                 return Ok(());
             }
         };
@@ -341,14 +401,17 @@ impl ValidationActor {
                         })
                         .await
                         .map_err(|_| ValidationActorError::CacheLookupSendError)?;
-                    self.cache_packet(
+                    if !self.cache_packet(
                         peer,
                         SubscriptionInfo::new_empty(peer, subscription_id),
                         msg,
-                    );
+                    ) {
+                        self.stats.messages_dropped_caching.add(1, &peer_tags);
+                    }
                     return Ok(());
                 }
                 warn!(peer=%peer, "Received UDP-Notif packet without subscription info nor subscription ID, dropping packet");
+                self.stats.messages_dropped_subscription.add(1, &peer_tags);
                 return Ok(());
             }
         };
@@ -400,6 +463,7 @@ impl ValidationActor {
             );
             if let Err(err) = validation_result {
                 warn!(peer=%peer, subscription_id=subscription_info.id(), error=%err, "Failed to validate UDP-Notif payload, dropping packet");
+                self.stats.messages_dropped_validation.add(1, &peer_tags);
                 return Ok(());
             }
         } else {
@@ -412,6 +476,7 @@ impl ValidationActor {
             );
             if let Err(err) = validation_result {
                 warn!(peer=%peer, subscription_id=subscription_info.id(), error=%err, "Failed to validate UDP-Notif payload, dropping packet");
+                self.stats.messages_dropped_validation.add(1, &peer_tags);
                 return Ok(());
             }
         }
@@ -423,6 +488,7 @@ impl ValidationActor {
             ))
             .await
             .map_err(|_| ValidationActorError::SendError)?;
+        self.stats.messages_sent.add(1, &peer_tags);
         Ok(())
     }
 
@@ -590,6 +656,7 @@ impl ValidationActorHandle {
         rx: async_channel::Receiver<Arc<(SocketAddr, UdpNotifPacket)>>,
         tx: async_channel::Sender<(Option<ContentId>, SubscriptionInfo, UdpNotifPacketDecoded)>,
         cache_cmd_tx: async_channel::Sender<CacheLookupCommand>,
+        stats: either::Either<opentelemetry::metrics::Meter, ValidationStats>,
     ) -> Result<
         (
             tokio::task::JoinHandle<Result<String, ValidationActorError>>,
@@ -599,6 +666,10 @@ impl ValidationActorHandle {
     > {
         let (cmd_tx, cmd_rx) = mpsc::channel(100);
         let (cache_tx, cache_rx) = async_channel::bounded(buffer_size);
+        let stats = match stats {
+            either::Either::Left(meter) => ValidationStats::new(meter),
+            either::Either::Right(stats) => stats,
+        };
         let actor = ValidationActor {
             max_cached_packets_per_peer,
             max_cached_packets_per_subscription,
@@ -609,6 +680,7 @@ impl ValidationActorHandle {
             cache_cmd_tx,
             cache_tx,
             cache_rx,
+            stats,
         };
         let handle = ValidationActorHandle { cmd_tx };
         let join_handle = tokio::spawn(async move { actor.run().await });
@@ -657,6 +729,9 @@ mod tests {
             udp_notif_rx,
             validated_tx,
             caching_handle.request_tx(),
+            either::Right(ValidationStats::new(opentelemetry::global::meter(
+                "test_meter",
+            ))),
         )
         .expect("Failed to spawn validation actor");
 
@@ -757,6 +832,9 @@ mod tests {
             udp_notif_rx,
             validated_tx,
             caching_handle.request_tx(),
+            either::Right(ValidationStats::new(opentelemetry::global::meter(
+                "test_meter",
+            ))),
         )
         .expect("Failed to spawn validation actor");
 
