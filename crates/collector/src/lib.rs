@@ -45,7 +45,7 @@ use std::path::PathBuf;
 use std::str::Utf8Error;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 pub mod config;
 pub mod flow;
@@ -114,6 +114,17 @@ pub async fn init_flow_collection(
                     }
                 }
                 PublisherEndpoint::FlowKafkaAvro(config) => {
+                    match config.avro_converter.validate() {
+                        Ok(_) => {
+                            debug!("Avro converter config validation successful.")
+                        }
+                        Err(e) => {
+                            return Err(anyhow::anyhow!(
+                                "Error validating avro converter configuration: {e}"
+                            ));
+                        }
+                    }
+
                     for (shard_id, flow_recv) in flow_recvs.iter().enumerate() {
                         let (enrichment_join, enrichment_handle) = FlowEnrichmentActorHandle::new(
                             publisher_config.buffer_size,
