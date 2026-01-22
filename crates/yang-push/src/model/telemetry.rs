@@ -507,8 +507,12 @@ impl Label {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
 pub enum LabelValue {
+    /// u64 requires to be serialized as string according to JSON Encoding of
+    /// YANG data specification from [RFC7951](https://datatracker.ietf.org/doc/html/rfc7951#section-6.1).
     NumberValue {
         #[serde(rename = "number-value")]
+        #[serde(serialize_with = "serialize_u64_as_string")]
+        #[serde(deserialize_with = "deserialize_u64_from_string")]
         number_value: u64,
     },
     StringValue {
@@ -540,6 +544,21 @@ impl LabelValue {
             _ => None,
         }
     }
+}
+
+fn serialize_u64_as_string<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&value.to_string())
+}
+
+fn deserialize_u64_from_string<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    s.parse::<u64>().map_err(serde::de::Error::custom)
 }
 
 #[cfg(test)]
@@ -640,7 +659,7 @@ mod tests {
         let serialized = serde_json::to_string(&original_message).expect("Failed to serialize");
 
         // Expected JSON string
-        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","notification-event":"log","sequence-number":1,"session-protocol":"yang-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"priority_level","number-value":100},{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
+        let expected_json = r#"{"ietf-telemetry-message:message":{"network-node-manifest":{"name":"node_id","vendor":"FRR"},"telemetry-message-metadata":{"collection-timestamp":"1970-01-01T00:00:00Z","notification-event":"log","sequence-number":1,"session-protocol":"yang-push","export-address":"127.0.0.1","export-port":8080,"ietf-yang-push-telemetry-message:yang-push-subscription":{"id":1,"stream":"example-stream-subtree-filter-map","subtree-filter":{"example-map":{"e1":"v1","e2":"v2"}},"transport":"ietf-udp-notif-transport:udp-notif","encoding":"ietf-subscribed-notifications:encode-json","periodic":{"period":100,"anchor-time":"1970-01-01T00:00:00Z"},"module":[{"name":"example-module","revision":"2025-01-01","version":"1.0.0"}],"yang-library-content-id":"random-content-id"}},"data-collection-manifest":{"name":"dev-collector","vendor":"NetGauze","vendor-pen":12345,"software-version":"1.0.0","software-flavor":"release","os-version":"8.10","os-type":"Rocky Linux"},"network-operator-metadata":{"labels":[{"name":"priority_level","number-value":"100"},{"name":"platform_id","string-value":"IETF LAB"},{"name":"test_anykey_label","anydata-values":{"key":"value"}}]}}}"#;
 
         // Assert that the serialized JSON string matches the expected JSON string
         assert_eq!(
