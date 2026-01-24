@@ -105,7 +105,7 @@ rustc-hash = { version = "2.1" }
 yang4 = { version = "0.1", features = ["bundled"] }
 tempfile = { version = "3.23.0" }
 quick-xml = { version = "0.39" }
-russh = { version = "0.56" }
+russh = { version = "0.57" }
 secrecy = { version = "0.10" }
 notify = { version = "8.2" }
 petgraph = { version = "0.8" }
