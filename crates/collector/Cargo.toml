@@ -87,7 +87,7 @@ smallvec = { workspace = true }
 rustc-hash = { workspace = true }
 ipnet = { workspace = true, features = ["serde"] }
 notify = { workspace = true }
-sysinfo = { workspace = true }
+sysinfo = { workspace = true, default-features = false, features = ["system"] }
 criterion = { workspace = true, optional = true } # dev-dependency for benchmarks
 schema-registry-client = { workspace = true }
 russh = { workspace = true }
