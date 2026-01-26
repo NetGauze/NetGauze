@@ -34,7 +34,7 @@ arbitrary_ext = { workspace = true, optional = true }
 tokio-util = { workspace = true, features = ["codec"], optional = true }
 bytes = { workspace = true, optional = true }
 either = { workspace = true }
-bitflags = { workspace = true , features = ["serde", "arbitrary"]}
+bitflags = { workspace = true, features = ["serde"] }
 
 [features]
 default = ["serde"]
@@ -47,7 +47,7 @@ serde = [
 ]
 codec = ["tokio-util", "bytes"]
 bench = ["criterion"]
-fuzz = ["arbitrary", "arbitrary_ext"]
+fuzz = ["arbitrary", "arbitrary_ext", "bitflags/arbitrary"]
 
 [dev-dependencies]
 netgauze-pcap-reader = { workspace = true }
