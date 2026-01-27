@@ -25,15 +25,15 @@ netgauze-parse-utils = { workspace = true }
 netgauze-udp-notif-pkt = { workspace = true, features = ["codec"] }
 serde = { workspace = true, features = ["derive"] }
 socket2 = { workspace = true }
-strum = { workspace = true }
 strum_macros = { workspace = true }
-tokio = { workspace = true, features = ["full", "tracing"] }
-tokio-util = { workspace = true, features = ["full", "tracing"] }
+tokio = { workspace = true, default-features = false, features = ["macros", "signal"] }
+tokio-util = { workspace = true, default-features = false }
 tracing = { workspace = true }
 opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
 either = { workspace = true }
 
 [dev-dependencies]
+tokio = { workspace = true, default-features = false, features = ["macros", "rt-multi-thread"] }
 tracing-subscriber = { workspace = true }
 tracing-test = { workspace = true }
 serde_json = { workspace = true }

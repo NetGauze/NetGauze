@@ -139,7 +139,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::StreamExt;
+    use futures_util::StreamExt;
     use netgauze_bmp_pkt::codec::{BmpCodec, BmpCodecDecoderError};
     use netgauze_bmp_pkt::iana::UndefinedBmpVersion;
     use netgauze_bmp_pkt::v3::*;

@@ -17,12 +17,12 @@ categories = ["algorithms", "data-structures"]
 
 [dependencies]
 either = { workspace = true }
-chrono = { workspace = true }
+chrono = { workspace = true, default-features = false }
 strum_macros = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-futures = { workspace = true }
 futures-core = { workspace = true }
 pin-project = { workspace = true }
 
 [dev-dependencies]
-tokio = {workspace = true, features = ["full"]}
+tokio = { workspace = true, default-features = false, features = ["test-util", "macros"] }
+futures = { workspace = true }

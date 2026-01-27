@@ -24,8 +24,8 @@ chrono = { workspace = true, default-features = false, features = [
     "clock",
 ] }
 
-tokio = { workspace = true, features = ["full"] }
-tokio-util = { workspace = true, features = ["codec"] }
+tokio = { workspace = true, default-features = false,  features = ["macros"]}
+tokio-util = { workspace = true, default-features = false, features = ["codec"] }
 futures = { workspace = true }
 futures-util = { workspace = true }
 futures-core = { workspace = true }
@@ -43,6 +43,7 @@ arbitrary_ext = { workspace = true, optional = true }
 fuzz = ["arbitrary", "arbitrary_ext"]
 
 [dev-dependencies]
+tokio = { workspace = true, default-features = false,  features = ["macros", "rt-multi-thread"]}
 tokio-test = { workspace = true }
 tracing-test = { workspace = true }
 clap = { workspace = true, features = ["derive"] }

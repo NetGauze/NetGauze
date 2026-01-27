@@ -17,15 +17,14 @@ categories = ["network-programming", "parsing"]
 
 [dependencies]
 netgauze-flow-pkt = { workspace = true, features = ["codec"] }
-tokio = { workspace = true, features = ["full", "tracing"] }
-tokio-util = { workspace = true, features = ["full", "tracing"] }
+tokio = { workspace = true, default-features = false, features = ["macros", "rt", "time"] }
+tokio-util = { workspace = true, default-features = false, features = ["net"] }
 bytes = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
 futures = { workspace = true }
 futures-util = { workspace = true }
 socket2 = { workspace = true, features = ["all"] }
-strum = { workspace = true }
 strum_macros = { workspace = true }
 async-channel = { workspace = true }
 libc = { workspace = true }
@@ -33,6 +32,7 @@ opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
 either = { workspace = true }
 
 [dev-dependencies]
+tokio = { workspace = true, default-features = false, features = ["macros", "rt", "time", "rt-multi-thread", "signal"] }
 chrono = { workspace = true, default-features = false, features = [
     "std",
     "clock",

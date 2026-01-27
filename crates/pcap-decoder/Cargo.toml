@@ -26,7 +26,7 @@ serde = { workspace = true, features = ["derive"] } #  a generic serialization/d
 serde_json = { workspace = true, features = ["preserve_order"] }
 pcap-parser = { workspace = true, features = ["data"] }
 bytes = { workspace = true }
-tokio-util = { workspace = true, features = ["codec"] }
+tokio-util = { workspace = true, default-features = false, features = ["codec"] }
 clap = { workspace = true, features = ["default", "derive"] }
 
 [dev-dependencies]
