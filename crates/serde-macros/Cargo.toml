@@ -23,7 +23,7 @@ name = "tests"
 path = "tests/tests.rs"
 
 [dependencies]
-syn = { workspace = true, features = ["full", "extra-traits"] }
+syn = { workspace = true, default-features = false, features = ["full"] }
 quote = { workspace = true }
 
 [dev-dependencies]

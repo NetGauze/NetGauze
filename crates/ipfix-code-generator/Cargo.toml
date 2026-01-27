@@ -22,7 +22,7 @@ tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 regex = { workspace = true }
-syn = { workspace = true, features = ["full", "extra-traits"] }
+syn = { workspace = true, default-features = false, features = ["parsing", "printing"] }
 quote = { workspace = true }
 proc-macro2 = { workspace = true }
 prettyplease = { workspace = true }

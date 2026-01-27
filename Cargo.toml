@@ -52,12 +52,12 @@ futures = "0.3"
 futures-util = "0.3"
 futures-core = "0.3"
 pin-project = "1.1"
-tokio = { version = "1" }
-tokio-util = { version = "0.7" }
-tokio-stream = { version = "0.1" }
+tokio = { version = "1", default-features = false }
+tokio-util = { version = "0.7", default-features = false }
+tokio-stream = { version = "0.1", default-features = false }
 tokio-test = "0.4"
-tower = { version = "0.5" }
-tower-service = "0.3"
+tower = { version = "0.5", default-features = false }
+tower-service = { version = "0.3", default-features = false }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 bytes = "1.10"
@@ -74,7 +74,7 @@ arbitrary = { version = "1" }
 arbitrary_ext = { version = "0.3" }
 rstest = "0.26"
 pcap-parser = { version = "0.17" }
-clap = { version = "4.5" }
+clap = { version = "4.5", default-features = true }
 socket2 = { version = "0.6" }
 either = { version = "1.15" }
 opentelemetry = { version = "0.31" }
@@ -87,7 +87,7 @@ apache-avro = { version = "0.21" }
 schema_registry_converter = { version = "4.7", default-features = false }
 rdkafka = { version = "0.39", default-features = false }
 tracing-test = { version = "0.2" }
-syn = { version = "2.0" }
+syn = { version = "2.0", default-features = false }
 quote = { version = "1.0" }
 trybuild = { version = "1.0" }
 regex = { version = "1.12" }
@@ -108,7 +108,7 @@ quick-xml = { version = "0.39" }
 russh = { version = "0.57" }
 secrecy = { version = "0.10" }
 notify = { version = "8.2" }
-petgraph = { version = "0.8" }
+petgraph = { version = "0.8", default-features = false }
 sha2 = { version = "0.10" }
 schema-registry-client = { version = "0.4" }
 bitflags = { version = "2.10" }

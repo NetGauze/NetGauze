@@ -18,19 +18,19 @@ categories = ["network-programming", "parsing"]
 [dependencies]
 netgauze-bmp-pkt = { workspace = true, features = ["serde", "codec"] }
 
-tokio = { workspace = true, features = ["full"] }
-tokio-util = { workspace = true, features = ["codec"] }
-futures = { workspace = true }
-futures-util = { workspace = true }
+tokio = { workspace = true, default-features = false, features = ["macros", "net"] }
+tokio-util = { workspace = true, default-features = false }
+futures-util = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
 pin-project = { workspace = true }
-tokio-stream = { workspace = true, features = ["net"] }
-tower = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true, default-features = false }
+tower = { workspace = true, default-features = false, features = ["buffer", "util"] }
 tower-service = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
+tokio = { workspace = true, default-features = false, features = ["macros", "net", "rt-multi-thread"] }
 tokio-test = { workspace = true }
 rand = { workspace = true }
 tracing-subscriber = { workspace = true }

@@ -21,16 +21,15 @@ netgauze-locate = { workspace = true, optional = true }
 netgauze-parse-utils = { workspace = true, optional = true }
 netgauze-serde-macros = { workspace = true, optional = true }
 ipnet = { workspace = true, features = ["serde"] }
-strum = { workspace = true }
 strum_macros = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 nom = { workspace = true, optional = true }
 byteorder = { workspace = true, optional = true }
-criterion = { workspace = true, optional = true }                        # Dev dep for bench
+criterion = { workspace = true, optional = true } # Dev dep for bench
 arbitrary = { workspace = true, optional = true }
 arbitrary_ext = { workspace = true, optional = true }
 tracing = { workspace = true, optional = true }
-tokio-util = { workspace = true, features = ["codec"], optional = true }
+tokio-util = { workspace = true, default-features = false, features = ["codec"], optional = true }
 bytes = { workspace = true, optional = true }
 
 [features]
