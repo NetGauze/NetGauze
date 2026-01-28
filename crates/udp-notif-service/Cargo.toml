@@ -26,8 +26,8 @@ netgauze-udp-notif-pkt = { workspace = true, features = ["codec"] }
 serde = { workspace = true, features = ["derive"] }
 socket2 = { workspace = true }
 strum_macros = { workspace = true }
-tokio = { workspace = true, default-features = false, features = ["macros", "signal"] }
-tokio-util = { workspace = true, default-features = false }
+tokio = { workspace = true, default-features = false, features = ["macros", "time", "net", "signal"] }
+tokio-util = { workspace = true, default-features = false, features = ["net"] }
 tracing = { workspace = true }
 opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
 either = { workspace = true }
