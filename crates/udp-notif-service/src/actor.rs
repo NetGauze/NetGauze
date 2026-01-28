@@ -127,7 +127,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::codec::{BytesCodec, Decoder};
 use tokio_util::udp::UdpFramed;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 /// Commands that can be sent to the [UdpNotifActor].
 #[derive(Debug, Clone, strum_macros::Display)]
@@ -300,7 +300,7 @@ impl UdpNotifActor {
                 Some((addr, pkt))
             }
             Ok(None) => {
-                debug!(
+                trace!(
                     "[Actor {}-{}] needs more data to decode the packet",
                     self.actor_id, self.socket_addr
                 );
@@ -387,7 +387,7 @@ impl UdpNotifActor {
             }
             match tx.send(ref_clone).await {
                 Ok(_) => {
-                    debug!(
+                    trace!(
                         "[Actor {}-{}] sent udp-notif message to subscriber: {}",
                         actor_id, socket_addr, id
                     );
@@ -502,7 +502,7 @@ impl UdpNotifActor {
                     format!("{}", self.actor_id),
                 )],
             );
-            debug!(
+            trace!(
                 "[Actor {}-{}] sending udp-notif packet received from {} to a total of {} subscribers",
                 self.actor_id,
                 self.socket_addr,
