@@ -232,7 +232,7 @@ fn fetch_schema_recursively<'a>(
     visited: &'a mut HashSet<i32>,
     schemas: &'a mut HashMap<Box<str>, Box<str>>,
     metadata_map: &'a mut HashMap<Box<str>, SchemaMetadata>,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + 'a>> {
+) -> std::pin::Pin<Box<dyn Future<Output = Result<()>> + 'a>> {
     Box::pin(async move {
         if visited.contains(&schema_id) {
             debug!("Already fetched schema ID {}, skipping", schema_id);
@@ -429,7 +429,7 @@ fn build_yang_library_and_save(
                 .namespace
                 .as_ref()
                 .map(|s| s.as_str().into())
-                .unwrap_or_else(|| format!("urn:unknown:{}", name).into()),
+                .unwrap_or_else(|| format!("urn:unknown:{name}").into()),
             metadata
                 .features
                 .iter()
@@ -463,7 +463,7 @@ fn build_yang_library_and_save(
     let datastore = Datastore::new(DatastoreName::Operational, schema_name);
 
     // Use schema_id as content_id
-    let content_id: Box<str> = format!("schema-id-{}", schema_id).into();
+    let content_id: Box<str> = format!("schema-id-{schema_id}").into();
 
     // Build YangLibrary
     let yang_library = YangLibrary::new(
@@ -619,7 +619,7 @@ async fn setup_consumer(
         let available: Vec<i32> = topic_metadata.partitions().iter().map(|p| p.id()).collect();
         for &p in &args.partitions {
             if !available.contains(&p) {
-                return Err(anyhow::anyhow!("Partition {} does not exist", p));
+                return Err(anyhow::anyhow!("Partition {p} does not exist"));
             }
         }
         args.partitions.clone()
@@ -661,8 +661,7 @@ async fn setup_consumer(
                         rdkafka::Offset::Offset(offset_num)
                     } else {
                         return Err(anyhow::anyhow!(
-                            "Invalid offset '{}'. Use: oldest, newest, or integer",
-                            offset_str
+                            "Invalid offset '{offset_str}'. Use: oldest, newest, or integer"
                         ));
                     }
                 }
@@ -985,7 +984,7 @@ async fn main() -> Result<()> {
                                         let validation_result = match &tm_ext {
                                             Some(ext) => yang4::data::DataTree::parse_ext_string(
                                                 ext,
-                                                &payload,
+                                                payload,
                                                 DataFormat::JSON,
                                                 DataParserFlags::STRICT,
                                                 DataValidationFlags::PRESENT,
@@ -993,7 +992,7 @@ async fn main() -> Result<()> {
                                             // Support legacy ietf-telemetry-message without YANG structure
                                             None => yang4::data::DataTree::parse_string(
                                                 yang_ctx,
-                                                &payload,
+                                                payload,
                                                 DataFormat::JSON,
                                                 DataParserFlags::STRICT,
                                                 DataValidationFlags::PRESENT,
