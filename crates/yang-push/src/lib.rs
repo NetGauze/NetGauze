@@ -29,3 +29,17 @@ pub struct CustomSchema {
     pub yanglib: PathBuf,
     pub schema: PathBuf,
 }
+
+pub const OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY: &str = "netgauze.udp.notif.yang.push.subscription.id";
+pub const OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY: &str =
+    "netgauze.udp.notif.yang.push.subscription.target";
+pub const OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY: &str =
+    "netgauze.udp.notif.yang.push.subscription.router_content_id";
+pub const OTL_YANG_PUSH_CACHED_CONTENT_ID_KEY: &str =
+    "netgauze.udp.notif.yang.push.subscription.cached_content_id";
+const OTL_CACHE_DROP_REASON_KEY: &str = "netgauze.udp.notif.yang.push.cache.drop.reason";
+const OTL_CACHE_DROP_REASON_SUBSCRIPTION_CACHE_FULL: &str = "subscription cache is full";
+const OTL_CACHE_DROP_REASON_PEER_CACHE_FULL: &str = "peer cache is full";
+const OTL_UDP_NOTIF_MESSAGE_ID_KEY: &str = "netgauze.udp.notif.message_id";
+const OTL_UDP_NOTIF_PUBLISHER_ID_KEY: &str = "netgauze.udp.notif.publisher_id";
+const OTL_YANG_PUSH_DECODE_ERROR_ID_KEY: &str = "netgauze.udp.notif.yang.push.decode.error";

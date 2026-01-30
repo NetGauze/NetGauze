@@ -112,9 +112,15 @@
 //!   - Cache channel closed: Actor terminates (dependency failure)
 //!   - Shutdown command received: Graceful termination
 
-use crate::ContentId;
 use crate::cache::actor::{CacheLookupCommand, CacheResponse};
 use crate::cache::storage::SubscriptionInfo;
+use crate::{
+    ContentId, OTL_CACHE_DROP_REASON_KEY, OTL_CACHE_DROP_REASON_PEER_CACHE_FULL,
+    OTL_CACHE_DROP_REASON_SUBSCRIPTION_CACHE_FULL, OTL_UDP_NOTIF_MESSAGE_ID_KEY,
+    OTL_UDP_NOTIF_PUBLISHER_ID_KEY, OTL_YANG_PUSH_DECODE_ERROR_ID_KEY,
+    OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY, OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY,
+    OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
+};
 use netgauze_udp_notif_pkt::decoded::UdpNotifPacketDecoded;
 use netgauze_udp_notif_pkt::notification::{
     NotificationVariant, SubscriptionId, SubscriptionStartedModified,
@@ -126,19 +132,6 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, info, trace, warn};
 use yang4::data::{DataFormat, DataOperation, DataParserFlags, DataValidationFlags};
-
-const OTL_CACHE_DROP_REASON_KEY: &str = "netgauze.udp.notif.yang.push.cache.drop.reason";
-const OTL_CACHE_DROP_REASON_SUBSCRIPTION_CACHE_FULL: &str = "subscription cache is full";
-const OTL_CACHE_DROP_REASON_PEER_CACHE_FULL: &str = "peer cache is full";
-
-const OTL_UDP_NOTIF_MESSAGE_ID_KEY: &str = "netgauze.udp.notif.message_id";
-const OTL_UDP_NOTIF_PUBLISHER_ID_KEY: &str = "netgauze.udp.notif.publisher_id";
-const OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY: &str = "netgauze.udp.notif.yang.push.subscription.id";
-const OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY: &str =
-    "netgauze.udp.notif.yang.push.subscription.target";
-const OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY: &str =
-    "netgauze.udp.notif.yang.push.subscription.router_content_id";
-const OTL_YANG_PUSH_DECODE_ERROR_ID_KEY: &str = "netgauze.udp.notif.yang.push.decode.error";
 
 #[derive(Debug)]
 struct CachedSubscription {

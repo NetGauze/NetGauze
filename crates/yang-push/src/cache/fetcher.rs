@@ -100,9 +100,12 @@ impl NetconfYangLibraryFetcher {
     ) -> FetcherResult {
         let host = SocketAddr::new(subscription_info.peer().ip(), default_port);
         info!(
-            host = %host,
-            subscription_info = %subscription_info,
-            "fetching YANG Library from device",
+            host=%host,
+            peer=%subscription_info.peer(),
+            subscription_id=subscription_info.id(),
+            router_content_id=subscription_info.content_id(),
+            target=%subscription_info.target(),
+            "starting fetching YANG Library from device",
         );
         let ssh_handler = SshHandler::default();
         let auth = SshAuth::Key { user, private_key };
@@ -139,8 +142,11 @@ impl NetconfYangLibraryFetcher {
             }
         }
         info!( host = %host,
-            subscription_info = %subscription_info,
-            content_id = %yang_lib.content_id(),
+            peer=%subscription_info.peer(),
+            subscription_id=subscription_info.id(),
+            router_content_id=subscription_info.content_id(),
+            target=%subscription_info.target(),
+            cached_content_id=yang_lib.content_id(),
             schema_count = schemas.len(),
             "YANG Library fetched from device");
         Ok((subscription_info, yang_lib, schemas))
@@ -190,10 +196,13 @@ pub(crate) mod tests {
         pub(crate) fn new(
             yang_libs: HashMap<SubscriptionInfo, (YangLibrary, HashMap<Box<str>, Box<str>>)>,
         ) -> Self {
-            for (sub_info, (yang_lib, _schemas)) in &yang_libs {
+            for (subscription_info, (yang_lib, _schemas)) in &yang_libs {
                 info!(
-                    subscription_info=%sub_info,
-                    content_id=yang_lib.content_id(),
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    cached_content_id=yang_lib.content_id(),
                     "Fetcher stored YANG Library in cache",
                 )
             }
@@ -205,22 +214,36 @@ pub(crate) mod tests {
 
         #[allow(clippy::result_large_err)]
         fn get_from_cache(&self, subscription_info: SubscriptionInfo) -> FetcherResult {
-            info!(subscription_info=%subscription_info, "fetching from device");
+            info!(
+                peer=%subscription_info.peer(),
+                subscription_id=subscription_info.id(),
+                router_content_id=subscription_info.content_id(),
+                target=%subscription_info.target(),
+                "fetching from device"
+            );
             // Increment counter in the instance state
             {
                 let mut counts = self.fetch_counts.lock().unwrap();
                 *counts.entry(subscription_info.clone()).or_default() += 1;
             }
 
-            let (yang_lib, schemas) = self.yang_libs.get(&subscription_info).cloned().ok_or_else(
-                || {
-                    info!(subscription_info=%subscription_info, "YANG Library not found in cache");
-                    (
-                        subscription_info.clone(),
-                        YangLibraryCacheError::IoError(std::io::Error::other("not found")),
-                    )
-                },
-            )?;
+            let (yang_lib, schemas) =
+                self.yang_libs
+                    .get(&subscription_info)
+                    .cloned()
+                    .ok_or_else(|| {
+                        info!(
+                            peer=%subscription_info.peer(),
+                            subscription_id=subscription_info.id(),
+                            router_content_id=subscription_info.content_id(),
+                            target=%subscription_info.target(),
+                            "YANG Library not found in cache"
+                        );
+                        (
+                            subscription_info.clone(),
+                            YangLibraryCacheError::IoError(std::io::Error::other("not found")),
+                        )
+                    })?;
             Ok((subscription_info, yang_lib, schemas))
         }
     }
