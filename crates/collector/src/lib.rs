@@ -404,6 +404,7 @@ pub async fn init_udp_notif_collection(
         either::Right(cache_location),
         netconf_fetcher,
         Duration::from_mins(5),
+        either::Left(meter.clone()),
     )?;
 
     for (group_name, publisher_config) in udp_notif_config.publishers {

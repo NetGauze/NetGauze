@@ -212,10 +212,13 @@
 //! - **Fetch deduplication**: Prevents N × network_latency for N concurrent
 //!   requests
 
-use crate::ContentId;
 use crate::cache::fetcher::{FetcherResult, YangLibraryFetcher};
 use crate::cache::storage::{
     SubscriptionInfo, YangLibraryCache, YangLibraryCacheError, YangLibraryReference,
+};
+use crate::{
+    ContentId, OTL_YANG_PUSH_CACHED_CONTENT_ID_KEY, OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+    OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY, OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
 };
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
@@ -228,6 +231,69 @@ use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::{JoinError, JoinHandle};
 use tracing::{debug, info, warn};
+
+const OTL_CACHE_REQUEST_TYPE: &str = "netgauze.udp.notif.yang.push.cache.request.type";
+
+#[derive(Debug, Clone)]
+pub struct CachingStats {
+    pub requests_received: opentelemetry::metrics::Counter<u64>,
+    pub pending_cache_requests: opentelemetry::metrics::Gauge<u64>,
+    pub cache_hits: opentelemetry::metrics::Counter<u64>,
+    pub cache_misses: opentelemetry::metrics::Counter<u64>,
+    pub device_fetch_request: opentelemetry::metrics::Counter<u64>,
+    pub device_fetch_queue: opentelemetry::metrics::Gauge<u64>,
+    pub device_fetch_succeeded: opentelemetry::metrics::Counter<u64>,
+    pub device_fetch_failed: opentelemetry::metrics::Counter<u64>,
+}
+
+impl CachingStats {
+    pub fn new(meter: opentelemetry::metrics::Meter) -> Self {
+        let requests_received = meter
+            .u64_counter("netgauze.collector.yang_push.caching.requests.received")
+            .with_description("Number of requests received by the YANG library cache actor")
+            .build();
+        let pending_cache_requests = meter
+            .u64_gauge("netgauze.collector.yang_push.caching.requests.pending")
+            .with_description("Number of pending cache requests in the YANG library cache actor that are waiting for fetch to complete")
+            .build();
+        let cache_hits = meter
+            .u64_counter("netgauze.collector.yang_push.caching.requests.cache.hits")
+            .with_description("Number of cache hits in the YANG library cache actor")
+            .build();
+        let cache_misses = meter
+            .u64_counter("netgauze.collector.yang_push.caching.requests.cache.misses")
+            .with_description("Number of cache misses in the YANG library cache actor")
+            .build();
+        let device_fetch_request = meter
+            .u64_counter("netgauze.collector.yang_push.caching.device.fetch.requests")
+            .with_description(
+                "Number of device fetch requests initiated by the YANG library cache actor",
+            )
+            .build();
+        let device_fetch_queue = meter
+            .u64_gauge("netgauze.collector.yang_push.caching.device.fetch.pending")
+            .with_description("Number of device fetch requests that are currently queued in the YANG library cache actor")
+            .build();
+        let device_fetch_succeeded = meter
+            .u64_counter("netgauze.collector.yang_push.caching.device.fetch.response.succeeded")
+            .with_description("Number of device fetch requests initiated by the YANG library cache actor and succeeded")
+            .build();
+        let device_fetch_failed = meter
+            .u64_counter("netgauze.collector.yang_push.caching.device.fetch.response.failed")
+            .with_description("Number of device fetch requests initiated by the YANG library cache actor and failed")
+            .build();
+        Self {
+            requests_received,
+            pending_cache_requests,
+            cache_hits,
+            cache_misses,
+            device_fetch_request,
+            device_fetch_queue,
+            device_fetch_succeeded,
+            device_fetch_failed,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum CacheActorCommand {
@@ -357,6 +423,7 @@ struct CacheActor<F: YangLibraryFetcher> {
     fetcher_timeout: Duration,
     pending_requests: FxHashMap<SubscriptionInfo, Vec<async_channel::Sender<CacheResponse>>>,
     workers_queue: FuturesUnordered<JoinHandle<FetcherResult>>,
+    stats: CachingStats,
 }
 
 impl<F: YangLibraryFetcher> CacheActor<F> {
@@ -366,6 +433,10 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         sender: async_channel::Sender<CacheResponse>,
     ) {
         let hit = yang_lib_ref.is_some();
+        let cached_content_id = yang_lib_ref
+            .as_ref()
+            .map(|x| x.content_id().clone())
+            .unwrap_or("None".to_string());
         let response = CacheResponse {
             cached_content_id: yang_lib_ref.as_ref().map(|x| x.content_id().clone()),
             subscription_info: subscription_info.clone(),
@@ -373,11 +444,23 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         };
         match sender.send(response).await {
             Ok(_) => {
-                debug!(subscription_info=%subscription_info, hit, "yang library reference sent to requester");
+                debug!(
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    cached_content_id,
+                    hit,
+                    "yang library reference sent to requester"
+                );
             }
             Err(err) => {
                 warn!(
-                    subscription_info = %subscription_info,
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    cached_content_id,
                     hit,
                     error = %err,
                     "failed to send yang library reference to requester"
@@ -391,15 +474,22 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         yang_lib_ref: Option<Arc<YangLibraryReference>>,
         sender: async_channel::Sender<(ContentId, Option<Arc<YangLibraryReference>>)>,
     ) {
-        let hit = yang_lib_ref.is_some();
+        let found = yang_lib_ref.is_some();
+        let cached_content_id = yang_lib_ref.as_ref().map(|x| x.content_id().clone());
         match sender.send((content_id.clone(), yang_lib_ref)).await {
             Ok(_) => {
-                debug!(content_id, hit, "yang library reference sent to requester");
+                debug!(
+                    content_id,
+                    found,
+                    cached_content_id = cached_content_id.as_deref().unwrap_or("None"),
+                    "yang library reference sent to requester"
+                );
             }
             Err(err) => {
                 warn!(
                     content_id,
-                    hit,
+                    found,
+                    cached_content_id=cached_content_id.as_deref().unwrap_or("None"),
                     error = %err,
                     "failed to send yang library reference to requester"
                 );
@@ -413,6 +503,10 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         sender: oneshot::Sender<CacheResponse>,
     ) {
         let hit = yang_lib_ref.is_some();
+        let cached_content_id = yang_lib_ref
+            .as_ref()
+            .map(|x| x.content_id().clone())
+            .unwrap_or("None".to_string());
         let response = CacheResponse {
             cached_content_id: yang_lib_ref.as_ref().map(|x| x.content_id().clone()),
             subscription_info: subscription_info.clone(),
@@ -420,11 +514,23 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         };
         match sender.send(response) {
             Ok(_) => {
-                debug!(subscription_info=%subscription_info, hit, "yang library reference sent (oneshot) to requester");
+                debug!(
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    cached_content_id,
+                    hit,
+                    "yang library reference sent (oneshot) to requester"
+                );
             }
             Err(_err) => {
                 warn!(
-                    subscription_info = %subscription_info,
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    cached_content_id,
                     "failed to send (oneshot) yang library reference to requester"
                 );
             }
@@ -456,11 +562,54 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
     async fn process_worker_result(&mut self, worker_result: Result<FetcherResult, JoinError>) {
         match worker_result {
             Err(err) => {
+                self.stats.device_fetch_failed.add(
+                    1,
+                    &[opentelemetry::KeyValue::new(
+                        "error.message",
+                        format!("{err}"),
+                    )],
+                );
                 warn!(error=%err, "cache actor worker failed to execute a task");
             }
             Ok(Err((subscription_info, err))) => {
-                warn!(error=%err, "cache actor worker failed");
+                self.stats.device_fetch_failed.add(
+                    1,
+                    &[
+                        opentelemetry::KeyValue::new(
+                            "network.peer.address",
+                            format!("{}", subscription_info.peer().ip()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "network.peer.port",
+                            opentelemetry::Value::I64(subscription_info.peer().port().into()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+                            opentelemetry::Value::I64(subscription_info.id().into()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
+                            format!("{}", subscription_info.target()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY,
+                            subscription_info.content_id().to_string(),
+                        ),
+                        opentelemetry::KeyValue::new("error.message", format!("{err}")),
+                    ],
+                );
+                warn!(
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    error=%err,
+                    "network fetcher failed to fetch yang library from device for subscription info"
+                );
                 let pending_senders = self.pending_requests.remove(&subscription_info);
+                self.stats
+                    .pending_cache_requests
+                    .record(self.pending_requests.len() as u64, &[]);
                 if let Some(pending_senders) = pending_senders {
                     for sender in pending_senders {
                         let _ = sender
@@ -472,17 +621,59 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             .await
                             .map_err(|error| {
                                 warn!(
-                                subscription_info=%subscription_info,
-                                error=%error, "failed to send error response to requester");
+                                    peer=%subscription_info.peer(),
+                                    subscription_id=subscription_info.id(),
+                                    router_content_id=subscription_info.content_id(),
+                                    target=%subscription_info.target(),
+                                    error=%error,
+                                    "failed to send error response to requester"
+                                );
                             });
+                        debug!(
+                            peer=%subscription_info.peer(),
+                            subscription_id=subscription_info.id(),
+                            router_content_id=subscription_info.content_id(),
+                            target=%subscription_info.target(),
+                            error=%err,
+                            "sent error response to requester due to fetch failure"
+                        );
                     }
                 }
             }
             Ok(Ok((subscription_info, yang_lib, schemas))) => {
+                let otl_tags = [
+                    opentelemetry::KeyValue::new(
+                        "network.peer.address",
+                        format!("{}", subscription_info.peer().ip()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        "network.peer.port",
+                        opentelemetry::Value::I64(subscription_info.peer().port().into()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+                        opentelemetry::Value::I64(subscription_info.id().into()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
+                        format!("{}", subscription_info.target()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY,
+                        subscription_info.content_id().to_string(),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        OTL_YANG_PUSH_CACHED_CONTENT_ID_KEY,
+                        yang_lib.content_id().to_string(),
+                    ),
+                ];
+                self.stats.device_fetch_succeeded.add(1, &otl_tags);
                 info!(
-                    subscription_info = %subscription_info,
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
                     modules_count = schemas.len(),
-                    content_id = yang_lib.content_id(),
+                    cached_content_id = yang_lib.content_id(),
                     "fetched yang library from device successfully"
                 );
                 let result = self.schema_cache.put_yang_library(
@@ -493,21 +684,30 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 let yang_lib_ref = match result {
                     Ok(yang_lib_ref) => {
                         info!(
-                            subscription_info=%subscription_info,
+                            peer=%subscription_info.peer(),
+                            subscription_id=subscription_info.id(),
+                            router_content_id=subscription_info.content_id(),
+                            target=%subscription_info.target(),
                             "yang library for subscription info stored in cache successfully"
                         );
                         Some(yang_lib_ref)
                     }
                     Err(err) => {
                         warn!(
-                            subscription_info = %subscription_info,
-                            error = %err,
+                            peer=%subscription_info.peer(),
+                            subscription_id=subscription_info.id(),
+                            router_content_id=subscription_info.content_id(),
+                            target=%subscription_info.target(),
+                            error=%err,
                             "failed to store yang library in cache"
                         );
                         None
                     }
                 };
                 let pending_senders = self.pending_requests.remove(&subscription_info);
+                self.stats
+                    .pending_cache_requests
+                    .record(self.pending_requests.len() as u64, &[]);
                 if let Some(pending_senders) = pending_senders {
                     for sender in pending_senders {
                         Self::send_yang_lib_ref(&subscription_info, yang_lib_ref.clone(), sender)
@@ -523,23 +723,72 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
             senders.retain(|s| !s.is_closed());
             !senders.is_empty()
         });
+        self.stats
+            .pending_cache_requests
+            .record(self.pending_requests.len() as u64, &[]);
+    }
+
+    fn otl_tags_from_subscription_inf(
+        subscription_info: &SubscriptionInfo,
+    ) -> Vec<opentelemetry::KeyValue> {
+        Vec::from([
+            opentelemetry::KeyValue::new(
+                "network.peer.address",
+                format!("{}", subscription_info.peer().ip()),
+            ),
+            opentelemetry::KeyValue::new(
+                "network.peer.port",
+                opentelemetry::Value::I64(subscription_info.peer().port().into()),
+            ),
+            opentelemetry::KeyValue::new(
+                OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+                opentelemetry::Value::I64(subscription_info.id().into()),
+            ),
+            opentelemetry::KeyValue::new(
+                OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
+                format!("{}", subscription_info.target()),
+            ),
+            opentelemetry::KeyValue::new(
+                OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY,
+                subscription_info.content_id().to_string(),
+            ),
+            opentelemetry::KeyValue::new(OTL_CACHE_REQUEST_TYPE, "LOOKUP_BY_SUBSCRIPTION_INFO"),
+        ])
     }
 
     async fn process_request(&mut self, request: CacheLookupCommand) {
         match request {
             CacheLookupCommand::LookupBySubscriptionInfo(subscription_info, sender) => {
-                debug!(subscription_info=%subscription_info, "processing cache lookup request");
+                let otl_tags = Self::otl_tags_from_subscription_inf(&subscription_info);
+                self.stats.requests_received.add(1, otl_tags.as_ref());
+                debug!(
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    "processing cache lookup by subscription info request"
+                );
                 let yang_lib_ref = self
                     .schema_cache
                     .get_by_subscription_info(&subscription_info);
                 match yang_lib_ref {
                     Some(yang_lib_ref) => {
+                        info!(
+                            peer=%subscription_info.peer(),
+                            subscription_id=subscription_info.id(),
+                            router_content_id=subscription_info.content_id(),
+                            target=%subscription_info.target(),
+                            cached_content_id=yang_lib_ref.content_id(),
+                            "cache hit: yang library reference found in cache"
+                        );
+                        self.stats.cache_hits.add(1, &otl_tags);
                         Self::send_yang_lib_ref(&subscription_info, Some(yang_lib_ref), sender)
                             .await;
                     }
                     None => {
                         // YANG Library Reference is not found in the cache.
                         // Start a new worker to fetch the YANG Library from the server.
+                        self.stats.cache_misses.add(1, &otl_tags);
                         let entry = self
                             .pending_requests
                             .entry(subscription_info.clone())
@@ -549,9 +798,13 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
 
                         if should_fetch {
                             info!(
-                                subscription_info = %subscription_info,
+                                peer=%subscription_info.peer(),
+                                subscription_id=subscription_info.id(),
+                                router_content_id=subscription_info.content_id(),
+                                target=%subscription_info.target(),
                                 "cache miss: starting fetch from device"
                             );
+                            self.stats.device_fetch_request.add(1, &otl_tags);
                             let job_result = tokio::time::timeout(
                                 self.fetcher_timeout,
                                 self.fetcher.fetch(subscription_info.clone()),
@@ -561,40 +814,86 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                                 Ok(worker_result) => worker_result,
                                 Err(err) => {
                                     warn!(
-                                        subscription_info=%subscription_info,
+                                        peer=%subscription_info.peer(),
+                                        subscription_id=subscription_info.id(),
+                                        router_content_id=subscription_info.content_id(),
+                                        target=%subscription_info.target(),
                                         error=%err,
-                                        "cache miss: failed to fetch yang library from device"
+                                        "failed to fetch yang library from device"
                                     );
+                                    // remove the sender we just added since the fetch failed to
+                                    // start
+                                    entry.remove(entry.len() - 1);
+                                    self.stats.device_fetch_failed.add(1, &otl_tags);
                                     return;
                                 }
                             };
                             self.workers_queue.push(job);
+                            self.stats
+                                .device_fetch_queue
+                                .record(self.workers_queue.len() as u64, &[]);
                         } else {
-                            debug!(  // Changed to debug
-                                subscription_info = %subscription_info,
-                                pending_count = entry.len(),
-                                "cache miss: fetch in progress, queuing request"
+                            debug!(
+                                peer=%subscription_info.peer(),
+                                subscription_id=subscription_info.id(),
+                                router_content_id=subscription_info.content_id(),
+                                target=%subscription_info.target(),
+                                pending_requests_count=entry.len(),
+                                "cache miss: fetch request in progress from the router, queuing request to avoid duplicate requests to the router"
                             );
                         }
+                        self.stats
+                            .pending_cache_requests
+                            .record(self.pending_requests.len() as u64, &otl_tags);
                     }
                 }
             }
             CacheLookupCommand::LookupBySubscriptionInfoOneShot(subscription_info, sender) => {
-                debug!(subscription_info=%subscription_info, "processing cache lookup request (one shot)");
+                let mut otl_tags = Self::otl_tags_from_subscription_inf(&subscription_info);
+                self.stats.requests_received.add(1, otl_tags.as_ref());
+                debug!(
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    "processing cache lookup by subscription info request (one shot)"
+                );
                 // fetch the schemas if needed from the device
-                if self
+                if let Some(yang_lib_ref) = self
                     .schema_cache
                     .get_by_subscription_info(&subscription_info)
-                    .is_none()
                 {
+                    info!(
+                        peer=%subscription_info.peer(),
+                        subscription_id=subscription_info.id(),
+                        router_content_id=subscription_info.content_id(),
+                        target=%subscription_info.target(),
+                        cached_content_id=yang_lib_ref.content_id(),
+                        "cache hit: yang library reference found in cache"
+                    );
+                    self.stats.cache_hits.add(1, &otl_tags);
+                } else {
+                    self.stats.cache_misses.add(1, &otl_tags);
+                    self.stats.device_fetch_request.add(1, &otl_tags);
                     let worker_result = tokio::time::timeout(
                         self.fetcher_timeout,
                         self.fetcher.fetch_blocking(subscription_info.clone()),
                     )
                     .await;
+
                     let worker_result = match worker_result {
-                        Ok(worker_result) => worker_result,
-                        Err(err) => Err((subscription_info.clone(), err.into())),
+                        Ok(worker_result) => {
+                            self.stats.device_fetch_succeeded.add(1, &otl_tags);
+                            worker_result
+                        }
+                        Err(err) => {
+                            otl_tags.push(opentelemetry::KeyValue::new(
+                                "error.message",
+                                format!("{err}"),
+                            ));
+                            self.stats.device_fetch_failed.add(1, &otl_tags);
+                            Err((subscription_info.clone(), err.into()))
+                        }
                     };
                     self.process_worker_result(Ok(worker_result)).await;
                 }
@@ -608,15 +907,33 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 subscription_id,
                 tx,
             } => {
-                debug!(peer=%peer, subscription_id, "processing cache lookup request");
+                let otel_tags = [
+                    opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
+                    opentelemetry::KeyValue::new(
+                        "network.peer.port",
+                        opentelemetry::Value::I64(peer.port().into()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+                        opentelemetry::Value::I64(subscription_id.into()),
+                    ),
+                ];
+                self.stats.requests_received.add(1, &otel_tags);
+                debug!(peer=%peer, subscription_id, "processing cache lookup by subscription id request");
                 let response = self
                     .schema_cache
                     .get_by_subscription_id(peer.ip(), subscription_id);
                 if let Some((subscription_info, yang_lib_ref)) = response {
+                    self.stats.cache_hits.add(1, &otel_tags);
                     Self::send_yang_lib_ref(&subscription_info, yang_lib_ref, tx).await;
                 } else {
                     // TODO: lookup subscription direction from router config
-                    warn!(peer=%peer, subscription_id, "cache miss: subscription id not found in cache");
+                    self.stats.cache_misses.add(1, &otel_tags);
+                    warn!(
+                        peer=%peer,
+                        subscription_id,
+                        "cache miss: subscription id not found in cache"
+                    );
                 }
             }
             CacheLookupCommand::LookupBySubscriptionIdOneShot {
@@ -624,25 +941,69 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 subscription_id,
                 tx,
             } => {
-                debug!(peer=%peer, subscription_id, "processing cache lookup request (one shot)");
+                let otel_tags = [
+                    opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
+                    opentelemetry::KeyValue::new(
+                        "network.peer.port",
+                        opentelemetry::Value::I64(peer.port().into()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+                        opentelemetry::Value::I64(subscription_id.into()),
+                    ),
+                ];
+                self.stats.requests_received.add(1, &otel_tags);
+                debug!(
+                    peer=%peer,
+                    subscription_id,
+                    "processing cache lookup by subscription id request (one shot)");
                 let response = self
                     .schema_cache
                     .get_by_subscription_id(peer.ip(), subscription_id);
                 if let Some((subscription_info, yang_lib_ref)) = response {
+                    self.stats.cache_hits.add(1, &otel_tags);
                     Self::send_yang_lib_ref_oneshot(&subscription_info, yang_lib_ref, tx);
                 } else {
                     // TODO: lookup subscription direction from router config
-                    warn!(peer=%peer, subscription_id, "cache miss: subscription id not found in cache");
+                    self.stats.cache_misses.add(1, &otel_tags);
+                    warn!(
+                        peer=%peer,
+                        subscription_id,
+                        "cache miss: subscription id not found in cache"
+                    );
                 }
             }
             CacheLookupCommand::LookupByContentId(content_id, sender) => {
-                debug!(content_id, "processing cache lookup request");
+                let otl_tags = [opentelemetry::KeyValue::new(
+                    OTL_YANG_PUSH_CACHED_CONTENT_ID_KEY,
+                    content_id.to_string(),
+                )];
+                self.stats.requests_received.add(1, &otl_tags);
+                debug!(content_id, "processing cache lookup request by content id");
                 let yang_lib_ref = self.schema_cache.get_by_content_id(&content_id);
+                if yang_lib_ref.is_some() {
+                    self.stats.cache_hits.add(1, &otl_tags);
+                } else {
+                    self.stats.cache_misses.add(1, &otl_tags);
+                }
                 Self::send_yang_lib_ref_content_id(&content_id, yang_lib_ref, sender).await;
             }
             CacheLookupCommand::LookupByContentIdOneShot(content_id, sender) => {
-                debug!(content_id, "processing cache lookup request (one shot)");
+                let otl_tags = [opentelemetry::KeyValue::new(
+                    OTL_YANG_PUSH_CACHED_CONTENT_ID_KEY,
+                    content_id.to_string(),
+                )];
+                self.stats.requests_received.add(1, &otl_tags);
+                debug!(
+                    content_id,
+                    "processing cache lookup request by content id (one shot)"
+                );
                 let yang_lib_ref = self.schema_cache.get_by_content_id(&content_id);
+                if yang_lib_ref.is_some() {
+                    self.stats.cache_hits.add(1, &otl_tags);
+                } else {
+                    self.stats.cache_misses.add(1, &otl_tags);
+                }
                 Self::send_yang_lib_ref_oneshot_content_id(&content_id, yang_lib_ref, sender);
             }
         }
@@ -677,12 +1038,14 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                             for task in self.workers_queue {
                                 task.abort();
                             }
+                            self.stats.device_fetch_queue.record(0, &[]);
                             return Ok("Schema cache shutdown successful".to_string());
                         }
                     }
                 }
                 work_result = self.workers_queue.next(), if !self.workers_queue.is_empty()=> {
                     if let Some(work_result) = work_result {
+                        self.stats.device_fetch_queue.record(self.workers_queue.len() as u64, &[]);
                         self.process_worker_result(work_result).await;
                     }
                 }
@@ -690,6 +1053,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                     if let Ok(request) = request {
                         self.process_request(request).await;
                     } else {
+                        self.stats.requests_received.add(1, &[]);
                         warn!(
                             pending_requests = self.pending_requests.len(),
                             active_workers = self.workers_queue.len(),
@@ -698,6 +1062,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                         for task in self.workers_queue {
                             task.abort();
                         }
+                        self.stats.device_fetch_queue.record(0, &[]);
                         return Ok("Schema cache shutdown successful".to_string())
                     }
                 }
@@ -735,6 +1100,7 @@ impl CacheActorHandle {
         schema_cache: either::Either<YangLibraryCache, PathBuf>,
         fetcher: F,
         fetcher_timeout: Duration,
+        stats: either::Either<opentelemetry::metrics::Meter, CachingStats>,
     ) -> Result<(JoinHandle<Result<String, CacheActorCacheError>>, Self), CacheActorHandleError>
     {
         let (cmd_tx, cmd_rx) = mpsc::channel(10);
@@ -742,6 +1108,10 @@ impl CacheActorHandle {
         let schema_cache = match schema_cache {
             either::Either::Left(schema_cache) => schema_cache,
             either::Either::Right(root_path) => YangLibraryCache::from_disk(root_path)?,
+        };
+        let stats = match stats {
+            either::Either::Left(meter) => CachingStats::new(meter),
+            either::Either::Right(stats) => stats,
         };
 
         let actor = CacheActor {
@@ -752,6 +1122,7 @@ impl CacheActorHandle {
             fetcher_timeout,
             pending_requests: FxHashMap::default(),
             workers_queue: FuturesUnordered::new(),
+            stats,
         };
 
         let cmd_tx_clone = cmd_tx.clone();
@@ -858,6 +1229,7 @@ pub(crate) mod tests {
             either::Right(cache_dir.path().to_path_buf()),
             fetcher,
             Duration::from_secs(1),
+            either::Either::Left(opentelemetry::global::meter("test-meter")),
         )
         .expect("Failed to create cache actor");
         (join, handle, yang_lib_ref, subscription_info, fetcher_count)
@@ -899,6 +1271,7 @@ pub(crate) mod tests {
             either::Right(cache_dir.path().to_path_buf()),
             fetcher,
             Duration::from_secs(1),
+            either::Either::Left(opentelemetry::global::meter("test-meter")),
         )
         .expect("Failed to create cache actor");
         (join, handle, subscription_info, fetcher_count)
@@ -943,7 +1316,6 @@ pub(crate) mod tests {
                 .lock()
                 .expect("Failed to lock fetcher counts")
                 .clone();
-            eprintln!("Hits counts:\n{hits_counts:#?}");
             assert_eq!(hits_counts.len(), 1);
             assert_eq!(hits_counts.get(&subscription_info), Some(&1));
         }

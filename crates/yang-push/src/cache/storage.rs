@@ -1099,7 +1099,10 @@ impl YangLibraryCache {
             .get(subscription_info)
             .map(Arc::clone);
         debug!(
-            subscription_info = %subscription_info,
+            peer=%subscription_info.peer(),
+            subscription_id=subscription_info.id(),
+            router_content_id=subscription_info.content_id(),
+            target=%subscription_info.target(),
             hit = result.is_some(),
             "cache lookup by subscription info"
         );
