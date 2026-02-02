@@ -458,7 +458,7 @@ where
         }
 
         // TODO: expose timeout to config
-        let (_content_id, yang_lib_ref) = match tokio::time::timeout(
+        let (content_id, yang_lib_ref) = match tokio::time::timeout(
             Duration::from_secs(5),
             response_rx,
         )
@@ -524,6 +524,7 @@ where
                 "Schema ID not found in registered schema response for content_id: {id}"
             ))
         })?;
+        self.schema_id_cache.insert(content_id, schema_id);
         Ok(Some(schema_id))
     }
 
