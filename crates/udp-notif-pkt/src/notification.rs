@@ -340,7 +340,7 @@ impl NotificationLegacy {
 
 /// Easy type to point to the type of [NotificationVariant] without having
 /// to use big match statement.
-#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Display, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NotificationVariantType {
     SubscriptionStarted,
     SubscriptionModified,
