@@ -112,8 +112,8 @@
 //! ```
 
 use crate::{
-    ActorId, SubscriberId, Subscription, UdpNotifReceiver, UdpNotifRequest, UdpNotifSender,
-    create_udp_notif_channel,
+    ActorId, OTL_UDP_NOTIF_MESSAGE_ID_KEY, OTL_UDP_NOTIF_PUBLISHER_ID_KEY, SubscriberId,
+    Subscription, UdpNotifReceiver, UdpNotifRequest, UdpNotifSender, create_udp_notif_channel,
 };
 use bytes::{Bytes, BytesMut};
 use futures_util::StreamExt;
@@ -280,6 +280,8 @@ impl UdpNotifActor {
         let result = self.clients.entry(addr).or_default().decode(&mut buf);
         match result {
             Ok(Some(pkt)) => {
+                let message_id = pkt.message_id();
+                let publisher_id = pkt.publisher_id();
                 self.stats.decoded.add(
                     1,
                     &[
@@ -295,12 +297,28 @@ impl UdpNotifActor {
                             "network.peer.port",
                             opentelemetry::Value::I64(addr.port().into()),
                         ),
+                        opentelemetry::KeyValue::new(
+                            OTL_UDP_NOTIF_MESSAGE_ID_KEY,
+                            opentelemetry::Value::I64(message_id.into()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
+                            opentelemetry::Value::I64(publisher_id.into()),
+                        ),
                     ],
+                );
+                trace!(
+                    peer=%addr,
+                    message_id,
+                    publisher_id,
+                    "[Actor {}-{}] decoded udp-notif packet",
+                    self.actor_id, self.socket_addr,
                 );
                 Some((addr, pkt))
             }
             Ok(None) => {
                 trace!(
+                    peer=%addr,
                     "[Actor {}-{}] needs more data to decode the packet",
                     self.actor_id, self.socket_addr
                 );
@@ -329,8 +347,10 @@ impl UdpNotifActor {
                     ],
                 );
                 warn!(
-                    "[Actor {}-{}] dropping packet due to an error in decoding packet: {}",
-                    self.actor_id, self.socket_addr, err
+                    peer=%addr,
+                    errro=%err,
+                    "[Actor {}-{}] dropping packet due to an error in decoding packet",
+                    self.actor_id, self.socket_addr
                 );
                 None
             }
@@ -352,11 +372,19 @@ impl UdpNotifActor {
         // subscriber.
         let ref_clone = msg.clone();
         let drop_counter_clone = drop_counter.clone();
+        let (peer, pkt) = ref_clone.as_ref();
+        let peer = *peer;
+        let message_id = pkt.message_id();
+        let publisher_id = pkt.publisher_id();
         let timeout_ret = tokio::time::timeout(timeout, async move {
             if tx.is_full() {
                 warn!(
-                    "[Actor {}-{}] channel for subscriber {} is full, dropping message",
-                    actor_id, socket_addr, id
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    actor_subscriber_id=id,
+                    "[Actor {}-{}] channel for subscriber is full, dropping message",
+                    actor_id, socket_addr,
                 );
                 drop_counter.add(
                     1,
@@ -368,6 +396,14 @@ impl UdpNotifActor {
                         opentelemetry::KeyValue::new(
                             "network.peer.port",
                             opentelemetry::Value::I64(socket_addr.port().into()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            OTL_UDP_NOTIF_MESSAGE_ID_KEY,
+                            opentelemetry::Value::I64(message_id.into()),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
+                            opentelemetry::Value::I64(publisher_id.into()),
                         ),
                         opentelemetry::KeyValue::new(
                             "netgauze.udp-notif.actor",
@@ -388,8 +424,12 @@ impl UdpNotifActor {
             match tx.send(ref_clone).await {
                 Ok(_) => {
                     trace!(
-                        "[Actor {}-{}] sent udp-notif message to subscriber: {}",
-                        actor_id, socket_addr, id
+                        peer=%peer,
+                        message_id,
+                        publisher_id,
+                        actor_subscriber_id=id,
+                        "[Actor {}-{}] sent udp-notif message to actor subscriber",
+                        actor_id, socket_addr,
                     );
                     sent_counter.add(
                         1,
@@ -401,6 +441,14 @@ impl UdpNotifActor {
                             opentelemetry::KeyValue::new(
                                 "network.peer.port",
                                 opentelemetry::Value::I64(socket_addr.port().into()),
+                            ),
+                            opentelemetry::KeyValue::new(
+                                OTL_UDP_NOTIF_MESSAGE_ID_KEY,
+                                opentelemetry::Value::I64(message_id.into()),
+                            ),
+                            opentelemetry::KeyValue::new(
+                                OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
+                                opentelemetry::Value::I64(publisher_id.into()),
                             ),
                             opentelemetry::KeyValue::new(
                                 "netgauze.udp-notif.actor",
@@ -415,8 +463,12 @@ impl UdpNotifActor {
                 }
                 Err(_err) => {
                     warn!(
-                        "[Actor {}-{}] subscriber {} is unresponsive, removing it from the list",
-                        actor_id, socket_addr, id
+                        peer=%peer,
+                        message_id,
+                        publisher_id,
+                        actor_subscriber_id=id,
+                        "[Actor {}-{}] subscriber is unresponsive, removing it from the list",
+                        actor_id, socket_addr
                     );
                     drop_counter.add(
                         1,
@@ -428,6 +480,14 @@ impl UdpNotifActor {
                             opentelemetry::KeyValue::new(
                                 "network.peer.port",
                                 opentelemetry::Value::I64(socket_addr.port().into()),
+                            ),
+                            opentelemetry::KeyValue::new(
+                                OTL_UDP_NOTIF_MESSAGE_ID_KEY,
+                                opentelemetry::Value::I64(message_id.into()),
+                            ),
+                            opentelemetry::KeyValue::new(
+                                OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
+                                opentelemetry::Value::I64(publisher_id.into()),
                             ),
                             opentelemetry::KeyValue::new(
                                 "netgauze.udp-notif.actor",
@@ -449,8 +509,12 @@ impl UdpNotifActor {
         .await;
         if timeout_ret.is_err() {
             warn!(
-                "[Actor {}-{}] subscriber {} is experiencing backpressure and possibly dropping packets",
-                actor_id, socket_addr, id
+                peer=%peer,
+                message_id,
+                publisher_id,
+                actor_subscriber_id=id,
+                "[Actor {}-{}] subscriber is experiencing backpressure and possibly dropping packets",
+                actor_id, socket_addr,
             );
             drop_counter_clone.add(
                 1,
@@ -462,6 +526,14 @@ impl UdpNotifActor {
                     opentelemetry::KeyValue::new(
                         "network.peer.port",
                         opentelemetry::Value::I64(socket_addr.port().into()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        OTL_UDP_NOTIF_MESSAGE_ID_KEY,
+                        opentelemetry::Value::I64(message_id.into()),
+                    ),
+                    opentelemetry::KeyValue::new(
+                        OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
+                        opentelemetry::Value::I64(publisher_id.into()),
                     ),
                     opentelemetry::KeyValue::new("netgauze.udp-notif.actor", format!("{actor_id}")),
                     opentelemetry::KeyValue::new(
@@ -481,13 +553,18 @@ impl UdpNotifActor {
     /// implementation, it sends the message to all subscribers.
     async fn handle_decoded_msg(&mut self, next: Option<UdpNotifRequest>) {
         if let Some((peer, msg)) = next {
+            let message_id = msg.message_id();
+            let publisher_id = msg.publisher_id();
             let usage = self.peers_usage.entry(peer).or_default();
             usage.current_count += 1;
-            // Clean closed subscribers
+            // Clean the closed subscribers
             self.subscribers.retain(|id, tx| {
                 if tx.is_closed() {
                     info!(
-                        "[Actor {}-{}] subscriber {} is closed, removing it from the list",
+                        peer=%peer,
+                        message_id,
+                        publisher_id,
+                        "[Actor {}-{}] subscriber {} is closed, removing it from the list and not sending it the UDP Notif packet",
                         self.actor_id, self.socket_addr, id
                     );
                     false
@@ -503,11 +580,13 @@ impl UdpNotifActor {
                 )],
             );
             trace!(
-                "[Actor {}-{}] sending udp-notif packet received from {} to a total of {} subscribers",
+                peer=%peer,
+                message_id,
+                publisher_id,
+                subscriber_count=%self.subscribers.len(),
+                "[Actor {}-{}] sending udp-notif packet received to all subscribers",
                 self.actor_id,
                 self.socket_addr,
-                peer,
-                self.subscribers.len()
             );
             let mut send_handlers = vec![];
             let udp_notif_request = Arc::new((peer, msg));
