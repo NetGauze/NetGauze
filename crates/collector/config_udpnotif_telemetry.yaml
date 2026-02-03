@@ -3,7 +3,8 @@ runtime:
   threads: 4
 
 logging:
-  level: info
+  level: netgauze_collector=trace,netgauze_yang_push=trace,info
+  ansi: true
 
 telemetry:
   url: http://localhost:4317/v1/metrics

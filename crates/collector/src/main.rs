@@ -40,14 +40,16 @@ fn init_tracing(level: &'_ str, use_ansi: bool) {
 
     // default to configured level from config file
     // override via RUST_LOG env var at runtime
-    let env_filter = EnvFilter::builder()
-        .with_default_directive(level.parse().expect(
-            "Invalid log level in config file. Expected: trace, debug, info, warn, or error",
-        ))
-        .from_env()
-        .expect(
-          "Invalid RUST_LOG environment variable. Use valid filter directives like 'debug' or 'my_crate=trace'"
-        );
+    let rust_log = env::var("RUST_LOG").unwrap_or_default();
+    let env_filter = if !rust_log.is_empty() {
+        EnvFilter::builder().parse(&rust_log).expect(
+            "Invalid RUST_LOG environment variable. Use valid filter directives like 'debug' or 'netgauze_collector=trace'",
+        )
+    } else {
+        EnvFilter::builder().parse(level).expect(
+            "Invalid log level in config file. Expected: trace, debug, info, warn, error, or filter directives like 'netgauze_collector=debug'",
+        )
+    };
 
     tracing_subscriber::registry()
         .with(env_filter)
