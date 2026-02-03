@@ -943,14 +943,19 @@ async fn main() -> Result<()> {
                             "Message Metadata:\n{}",
                             serde_json::to_string_pretty(&message_metadata)?
                         );
-                        debug!(
-                            "Message Payload:\n{}",
-                            serde_json::to_string(&payload_json)?
-                        );
 
                         // Extract and validate with schema
                         if let Some(schema_id) = extract_schema_id(borrowed_message.headers()) {
                             debug!("Found schema-id in headers: {}", schema_id);
+
+                            debug!(
+                                "Message Payload [partition: {}, offset: {}, key: {}, schema_id: {}]: {}",
+                                  borrowed_message.partition(),
+                                  borrowed_message.offset(),
+                                  String::from_utf8_lossy(key),
+                                  schema_id,
+                                  serde_json::to_string(&payload_json)?
+                            );
 
                             match yang_ctx_cache
                                 .get_or_create(
@@ -970,11 +975,12 @@ async fn main() -> Result<()> {
 
                                     if tm_module.is_none() {
                                         warn!(
-                                            "Message validation SKIPPED - partition: {}, offset: {}",
+                                            "Message validation SKIPPED [partition: {}, offset: {}, key: {}]: \
+                                            ietf-telemetry-message schema not found",
                                             borrowed_message.partition(),
-                                            borrowed_message.offset()
+                                            borrowed_message.offset(),
+                                            String::from_utf8_lossy(key)
                                         );
-                                        warn!("  --> ietf-telemetry-message schema not found");
                                         validation_stats.no_tm_schema += 1;
                                     } else {
                                         // Extract ietf-telemetry-message extension instance
@@ -1001,45 +1007,57 @@ async fn main() -> Result<()> {
 
                                         match validation_result {
                                             Ok(_) => {
-                                                info!(
-                                                    "Message validation PASSED ✓ - partition: {}, offset: {}, schema_id: {}",
+                                                debug!(
+                                                    "Message validation PASSED [partition: {}, offset: {}, key: {}, schema_id: {}]",
                                                     borrowed_message.partition(),
                                                     borrowed_message.offset(),
+                                                    String::from_utf8_lossy(key),
                                                     schema_id
                                                 );
                                                 validation_stats.passed += 1;
                                             }
                                             Err(err) => {
                                                 error!(
-                                                    "Message validation FAILED ✗ - partition: {}, offset: {}, schema_id: {}",
+                                                    "Message validation FAILED [partition: {}, offset: {}, key: {}, schema_id: {}]: {}",
                                                     borrowed_message.partition(),
                                                     borrowed_message.offset(),
-                                                    schema_id
+                                                    String::from_utf8_lossy(key),
+                                                    schema_id,
+                                                    err
                                                 );
-                                                error!("  --> Validation error: {}", err);
                                                 validation_stats.failed += 1;
                                             }
                                         }
                                     }
                                 }
-                                Err(e) => {
+                                Err(err) => {
                                     error!(
-                                        "Message validation FAILED ✗ - partition: {}, offset: {}, schema_id: {}",
+                                        "Message validation FAILED [partition: {}, offset: {}, key: {}, schema_id: {}]: \
+                                        failed to get/create YANG context: {}",
                                         borrowed_message.partition(),
                                         borrowed_message.offset(),
+                                        String::from_utf8_lossy(key),
                                         schema_id,
+                                        err
                                     );
-                                    error!("  --> Failed to get/create YANG context: {}", e);
                                     validation_stats.context_errors += 1;
                                 }
                             }
                         } else {
-                            warn!(
-                                "Message validation SKIPPED - partition: {}, offset: {}",
-                                borrowed_message.partition(),
-                                borrowed_message.offset()
+                            debug!(
+                                "Message Payload [partition: {}, offset: {}, key: {}]: {}",
+                                  borrowed_message.partition(),
+                                  borrowed_message.offset(),
+                                  String::from_utf8_lossy(key),
+                                  serde_json::to_string(&payload_json)?
                             );
-                            warn!("  --> No schema-id found in message headers");
+
+                            warn!(
+                                "Message validation SKIPPED [partition: {}, offset: {}, key: {}]: no schema-id found in message headers",
+                                borrowed_message.partition(),
+                                borrowed_message.offset(),
+                                String::from_utf8_lossy(key)
+                            );
                             validation_stats.no_schema += 1;
                         }
 
