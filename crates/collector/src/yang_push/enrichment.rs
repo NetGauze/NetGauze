@@ -511,7 +511,7 @@ impl YangPushEnrichmentActor {
         let peer = subscription_info.peer();
         let message_id = decoded_packet.message_id();
         let publisher_id = decoded_packet.publisher_id();
-        let cached_content_id = content_id.map(|cid| cid.to_string()).unwrap_or_default();
+        let cached_content_id = content_id.map_or("", |v| v);
         let notification_type = decoded_packet
             .notification_type()
             .map(|nt| nt.to_string())
@@ -663,7 +663,7 @@ impl YangPushEnrichmentActor {
                 subscription_id=subscription_info.id(),
                 router_content_id=subscription_info.content_id(),
                 target=%subscription_info.target(),
-                cached_content_id=%content_id.map(|cid| cid.to_string()).unwrap_or_default(),
+                cached_content_id=content_id.map_or("", |v| v),
                 notification_type,
                 error=%err,
                 "Failed to re-serialize UDP-Notif Payload (should never happen)"
@@ -748,7 +748,7 @@ impl YangPushEnrichmentActor {
                                 ),
                                 opentelemetry::KeyValue::new(
                                     OTL_YANG_PUSH_CACHED_CONTENT_ID_KEY,
-                                    content_id.as_ref().map(|cid| cid.to_string()).unwrap_or_default(),
+                                    content_id.as_ref().map(|cid| cid.to_string()).unwrap_or_default()
                                 )
                             ];
                             self.stats.received_messages.add(1, &peer_tags);
