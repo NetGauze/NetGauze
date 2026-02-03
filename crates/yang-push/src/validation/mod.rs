@@ -116,8 +116,7 @@ use crate::cache::actor::{CacheLookupCommand, CacheResponse};
 use crate::cache::storage::SubscriptionInfo;
 use crate::{
     ContentId, OTL_CACHE_DROP_REASON_KEY, OTL_CACHE_DROP_REASON_PEER_CACHE_FULL,
-    OTL_CACHE_DROP_REASON_SUBSCRIPTION_CACHE_FULL, OTL_UDP_NOTIF_MESSAGE_ID_KEY,
-    OTL_UDP_NOTIF_PUBLISHER_ID_KEY, OTL_YANG_PUSH_DECODE_ERROR_ID_KEY,
+    OTL_CACHE_DROP_REASON_SUBSCRIPTION_CACHE_FULL, OTL_YANG_PUSH_DECODE_ERROR_ID_KEY,
     OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY, OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY,
     OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
 };
@@ -126,6 +125,7 @@ use netgauze_udp_notif_pkt::notification::{
     NotificationVariant, SubscriptionId, SubscriptionStartedModified,
 };
 use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
+use netgauze_udp_notif_service::{OTL_UDP_NOTIF_MESSAGE_ID_KEY, OTL_UDP_NOTIF_PUBLISHER_ID_KEY};
 use rustc_hash::FxHashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
