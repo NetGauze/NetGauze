@@ -362,6 +362,7 @@ impl ValidationActor {
                     peer=%peer,
                     message_id,
                     publisher_id,
+                    notifification_type=%notif_contents.notification_type(),
                     "Received UDP-Notif of subscription started/modified payload without subscription info, dropping packet"
                 );
                 return None;
@@ -533,27 +534,28 @@ impl ValidationActor {
                         opentelemetry::Value::I64(notif_contents.subscription_id().into()),
                     ));
                 }
+                let notification_type = decoded
+                    .notification_type()
+                    .map(|x| x.to_string())
+                    .unwrap_or("UNKNOWN".to_string());
+                trace!(
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    notification_type,
+                    "Decoded UDP-Notif payload, starting the validation step"
+                );
                 self.stats.messages_received.add(1, &peer_tags);
                 Ok(decoded)
             }
             Err(err) => {
-                if tracing::enabled!(tracing::Level::TRACE) {
-                    warn!(
-                        peer=%peer,
-                        message_id,
-                        publisher_id,
-                        error=%err,
-                        "Failed to decode UDP-Notif payload, dropping packet"
-                    );
-                } else {
-                    warn!(
-                        peer=%peer,
-                        message_id,
-                        publisher_id,
-                        error=%err,
-                        "Failed to decode UDP-Notif payload, dropping packet"
-                    );
-                }
+                warn!(
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    error=%err,
+                    "Failed to decode UDP-Notif payload, dropping packet"
+                );
                 peer_tags.push(opentelemetry::KeyValue::new(
                     OTL_YANG_PUSH_DECODE_ERROR_ID_KEY,
                     format!("{err}"),
@@ -577,6 +579,10 @@ impl ValidationActor {
             // here
             Err(_) => return Ok(()),
         };
+        let notification_type = decoded
+            .notification_type()
+            .map(|x| x.to_string())
+            .unwrap_or("UNKNOWN".to_string());
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         let message_id = decoded.message_id();
         let publisher_id = decoded.publisher_id();
@@ -610,6 +616,7 @@ impl ValidationActor {
                 peer,
                 &subscription_info,
                 cached_content_id.clone(),
+                notification_type.clone(),
                 yang_ctx,
             );
             // logging of error is handled in the [Self::validate_message]
@@ -626,6 +633,7 @@ impl ValidationActor {
                 subscription_id=subscription_info.id(),
                 router_content_id=subscription_info.content_id(),
                 target=%subscription_info.target(),
+                notification_type,
                 "No YANG schemas found, skipping validation step",
             );
             self.stats.validation_skip.add(1, &peer_tags);
@@ -648,6 +656,7 @@ impl ValidationActor {
                     router_content_id=subscription_info.content_id(),
                     target=%subscription_info.target(),
                     cached_content_id=?cached_content_id,
+                    notification_type,
                     "Failed to send UDP-Notif message for the next actor to process"
                 );
                 ValidationActorError::SendError
@@ -661,6 +670,7 @@ impl ValidationActor {
             router_content_id=subscription_info.content_id(),
             target=%subscription_info.target(),
             cached_content_id=?cached_content_id,
+            notification_type,
             "Successfully send UDP-Notif message for the next actor to process"
         );
         Ok(())
@@ -671,6 +681,7 @@ impl ValidationActor {
         peer: SocketAddr,
         subscription_info: &SubscriptionInfo,
         cached_content_id: ContentId,
+        notification_type: String,
         yang_ctx: &yang4::context::Context,
     ) -> Result<(), yang4::Error> {
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
@@ -701,6 +712,7 @@ impl ValidationActor {
                     router_content_id=subscription_info.content_id(),
                     target=%subscription_info.target(),
                     cached_content_id,
+                    notification_type,
                     error=%err,
                     "Failed to validate UDP-Notif payload using draft-ietf-netconf-notif-envelope, dropping packet"
                 );
@@ -713,6 +725,7 @@ impl ValidationActor {
                 subscription_id=subscription_info.id(),
                 router_content_id=subscription_info.content_id(),
                 target=%subscription_info.target(),
+                notification_type,
                 cached_content_id,
                 "Successfully validated YANG-Push message using draft-ietf-netconf-notif-envelope",
             );
@@ -732,6 +745,7 @@ impl ValidationActor {
                     router_content_id=subscription_info.content_id(),
                     target=%subscription_info.target(),
                     cached_content_id,
+                    notification_type,
                     error=%err, "Failed to validate legacy UDP-Notif payload, dropping packet");
                 return Err(err);
             }
@@ -742,6 +756,7 @@ impl ValidationActor {
                 subscription_id=subscription_info.id(),
                 router_content_id=subscription_info.content_id(),
                 target=%subscription_info.target(),
+                notification_type,
                 cached_content_id,
                 "Successfully validated YANG-Push message using legacy UDP-Notif payload",
             );
@@ -761,6 +776,10 @@ impl ValidationActor {
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);
         let message_id = decoded.message_id();
         let publisher_id = decoded.publisher_id();
+        let notification_type = decoded
+            .notification_type()
+            .map(|x| x.to_string())
+            .unwrap_or("UNKNOWN".to_string());
 
         match self.get_subscription_info(peer, decoded) {
             Some((subscription_info, cached_content_id)) => {
@@ -775,6 +794,7 @@ impl ValidationActor {
                     subscription_id=subscription_info.id(),
                     router_content_id=subscription_info.content_id(),
                     subscription_target=%subscription_info.target(),
+                    notification_type,
                     "Received new subscription sending lookup by subscription info request to the cache"
                 );
                 self.stats
@@ -793,6 +813,7 @@ impl ValidationActor {
                             subscription_id=subscription_info.id(),
                             router_content_id=subscription_info.content_id(),
                             subscription_target=%subscription_info.target(),
+                            notification_type,
                             error=%error,
                             "Error sending lookup by subscription info request to the cache"
                         );
@@ -812,6 +833,7 @@ impl ValidationActor {
                         message_id,
                         publisher_id,
                         subscription_id,
+                        notification_type,
                         "Received UDP-Notif packet without subscription info, \
                         caching the packet and looking up subscription info in cache");
                     self.stats
@@ -832,6 +854,7 @@ impl ValidationActor {
                     peer=%peer,
                     message_id,
                     publisher_id,
+                    notification_type,
                     "Received UDP-Notif packet without subscription info nor subscription ID, dropping packet"
                 );
                 self.stats.validation_invalid.add(1, &peer_tags);
