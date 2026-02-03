@@ -348,7 +348,7 @@ impl UdpNotifActor {
                 );
                 warn!(
                     peer=%addr,
-                    errro=%err,
+                    error=%err,
                     "[Actor {}-{}] dropping packet due to an error in decoding packet",
                     self.actor_id, self.socket_addr
                 );
