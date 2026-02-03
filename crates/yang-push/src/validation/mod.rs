@@ -534,17 +534,19 @@ impl ValidationActor {
                         opentelemetry::Value::I64(notif_contents.subscription_id().into()),
                     ));
                 }
-                let notification_type = decoded
-                    .notification_type()
-                    .map(|x| x.to_string())
-                    .unwrap_or("UNKNOWN".to_string());
-                trace!(
-                    peer=%peer,
-                    message_id,
-                    publisher_id,
-                    notification_type,
-                    "Decoded UDP-Notif payload, starting the validation step"
-                );
+                if tracing::enabled!(tracing::Level::TRACE) {
+                    let notification_type = decoded
+                        .notification_type()
+                        .map(|x| x.to_string())
+                        .unwrap_or("UNKNOWN".to_string());
+                    trace!(
+                        peer=%peer,
+                        message_id,
+                        publisher_id,
+                        notification_type,
+                        "Decoded UDP-Notif payload, starting the validation step"
+                    );
+                }
                 self.stats.messages_received.add(1, &peer_tags);
                 Ok(decoded)
             }
@@ -616,7 +618,7 @@ impl ValidationActor {
                 peer,
                 &subscription_info,
                 cached_content_id.clone(),
-                notification_type.clone(),
+                &notification_type,
                 yang_ctx,
             );
             // logging of error is handled in the [Self::validate_message]
@@ -655,7 +657,7 @@ impl ValidationActor {
                     subscription_id=subscription_info.id(),
                     router_content_id=subscription_info.content_id(),
                     target=%subscription_info.target(),
-                    cached_content_id=?cached_content_id,
+                    cached_content_id=cached_content_id.clone().unwrap_or_default(),
                     notification_type,
                     "Failed to send UDP-Notif message for the next actor to process"
                 );
@@ -669,7 +671,7 @@ impl ValidationActor {
             subscription_id=subscription_info.id(),
             router_content_id=subscription_info.content_id(),
             target=%subscription_info.target(),
-            cached_content_id=?cached_content_id,
+            cached_content_id=cached_content_id.unwrap_or_default(),
             notification_type,
             "Successfully send UDP-Notif message for the next actor to process"
         );
@@ -681,7 +683,7 @@ impl ValidationActor {
         peer: SocketAddr,
         subscription_info: &SubscriptionInfo,
         cached_content_id: ContentId,
-        notification_type: String,
+        notification_type: &String,
         yang_ctx: &yang4::context::Context,
     ) -> Result<(), yang4::Error> {
         let mut peer_tags = Self::peer_tags_from_packet(peer, packet);

@@ -435,8 +435,9 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         let hit = yang_lib_ref.is_some();
         let cached_content_id = yang_lib_ref
             .as_ref()
-            .map(|x| x.content_id().clone())
-            .unwrap_or("None".to_string());
+            .map(|x| x.content_id())
+            .cloned()
+            .unwrap_or_default();
         let response = CacheResponse {
             cached_content_id: yang_lib_ref.as_ref().map(|x| x.content_id().clone()),
             subscription_info: subscription_info.clone(),
@@ -481,7 +482,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 debug!(
                     content_id,
                     found,
-                    cached_content_id = cached_content_id.as_deref().unwrap_or("None"),
+                    cached_content_id = cached_content_id.unwrap_or_default(),
                     "yang library reference sent to requester"
                 );
             }
@@ -489,7 +490,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
                 warn!(
                     content_id,
                     found,
-                    cached_content_id=cached_content_id.as_deref().unwrap_or("None"),
+                    cached_content_id=cached_content_id.unwrap_or_default(),
                     error = %err,
                     "failed to send yang library reference to requester"
                 );
@@ -506,7 +507,7 @@ impl<F: YangLibraryFetcher> CacheActor<F> {
         let cached_content_id = yang_lib_ref
             .as_ref()
             .map(|x| x.content_id().clone())
-            .unwrap_or("None".to_string());
+            .unwrap_or_default();
         let response = CacheResponse {
             cached_content_id: yang_lib_ref.as_ref().map(|x| x.content_id().clone()),
             subscription_info: subscription_info.clone(),
