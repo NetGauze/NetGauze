@@ -72,6 +72,10 @@ pub(crate) const fn default_netconf_port() -> u16 {
     830
 }
 
+pub(crate) const fn default_ansi_log() -> bool {
+    false
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CollectorConfig {
     #[serde(default)]
@@ -91,12 +95,17 @@ pub struct RuntimeConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LoggingConfig {
     pub level: String,
+
+    /// Use colorful ANSI characters for logging
+    #[serde(default = "default_ansi_log")]
+    pub ansi: bool,
 }
 
 impl Default for LoggingConfig {
     fn default() -> Self {
         Self {
             level: "info".to_string(),
+            ansi: false,
         }
     }
 }

@@ -33,7 +33,7 @@ use tracing::info;
 
 shadow!(build);
 
-fn init_tracing(level: &'_ str) {
+fn init_tracing(level: &'_ str, use_ansi: bool) {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
     use tracing_subscriber::{EnvFilter, fmt};
@@ -51,7 +51,7 @@ fn init_tracing(level: &'_ str) {
 
     tracing_subscriber::registry()
         .with(env_filter)
-        .with(fmt::layer())
+        .with(fmt::layer().with_ansi(use_ansi))
         .try_init()
         .expect("Failed to register tracing subscriber");
 }
@@ -138,7 +138,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    init_tracing(&config.logging.level);
+    init_tracing(&config.logging.level, config.logging.ansi);
     log_info();
 
     let mut runtime_builder = tokio::runtime::Builder::new_multi_thread();
