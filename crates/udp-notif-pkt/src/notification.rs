@@ -338,6 +338,17 @@ impl NotificationLegacy {
     }
 }
 
+/// Easy type to point to the type of [NotificationVariant] without having
+/// to use big match statement.
+#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NotificationVariantType {
+    SubscriptionStarted,
+    SubscriptionModified,
+    SubscriptionTerminated,
+    YangPushUpdate,
+    YangPushChangeUpdate,
+}
+
 /// Notification Variants
 #[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NotificationVariant {
@@ -366,6 +377,24 @@ impl NotificationVariant {
             NotificationVariant::YangPushUpdate(push_update) => push_update.id(),
             NotificationVariant::YangPushChangeUpdate(push_change_update) => {
                 push_change_update.id()
+            }
+        }
+    }
+
+    pub const fn notification_type(&self) -> NotificationVariantType {
+        match self {
+            NotificationVariant::SubscriptionStarted(_) => {
+                NotificationVariantType::SubscriptionStarted
+            }
+            NotificationVariant::SubscriptionModified(_) => {
+                NotificationVariantType::SubscriptionModified
+            }
+            NotificationVariant::SubscriptionTerminated(_) => {
+                NotificationVariantType::SubscriptionTerminated
+            }
+            NotificationVariant::YangPushUpdate(_) => NotificationVariantType::YangPushUpdate,
+            NotificationVariant::YangPushChangeUpdate(_) => {
+                NotificationVariantType::YangPushChangeUpdate
             }
         }
     }

@@ -53,7 +53,9 @@
 //! }
 //! ```
 
-use crate::notification::{NotificationEnvelope, NotificationLegacy, NotificationVariant};
+use crate::notification::{
+    NotificationEnvelope, NotificationLegacy, NotificationVariant, NotificationVariantType,
+};
 use crate::raw::{MediaType, UDP_NOTIF_V1, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -120,6 +122,25 @@ impl UdpNotifPacketDecoded {
     }
     pub const fn payload(&self) -> &UdpNotifPayload {
         &self.payload
+    }
+
+    pub const fn notification_type(&self) -> Option<NotificationVariantType> {
+        match &self.payload {
+            UdpNotifPayload::NotificationEnvelope(envelope) => {
+                if let Some(contents) = envelope.contents() {
+                    Some(contents.notification_type())
+                } else {
+                    None
+                }
+            }
+            UdpNotifPayload::NotificationLegacy(notif) => {
+                if let Some(notif_variant) = notif.notification() {
+                    Some(notif_variant.notification_type())
+                } else {
+                    None
+                }
+            }
+        }
     }
 }
 
