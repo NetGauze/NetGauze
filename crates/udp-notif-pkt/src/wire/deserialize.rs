@@ -23,12 +23,16 @@ use nom::number::complete::{be_u16, be_u32};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(
+    LocatedError, strum_macros::Display, Eq, PartialEq, Clone, Debug, Serialize, Deserialize,
+)]
 pub enum UdpNotifOptionParsingError {
     #[serde(with = "netgauze_parse_utils::ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
     InvalidOptionLength(u8),
 }
+
+impl std::error::Error for UdpNotifOptionParsingError {}
 
 impl<'a> ReadablePdu<'a, LocatedUdpNotifOptionParsingError<'a>> for UdpNotifOption {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedUdpNotifOptionParsingError<'a>> {
@@ -64,17 +68,33 @@ impl<'a> ReadablePdu<'a, LocatedUdpNotifOptionParsingError<'a>> for UdpNotifOpti
     }
 }
 
-#[derive(LocatedError, Eq, PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(
+    LocatedError, strum_macros::Display, Eq, PartialEq, Clone, Debug, Serialize, Deserialize,
+)]
 pub enum UdpNotifPacketParsingError {
     #[serde(with = "netgauze_parse_utils::ErrorKindSerdeDeref")]
     NomError(#[from_nom] ErrorKind),
+
+    #[strum(to_string = "Invalid UDP-Notif version {0}")]
     InvalidVersion(u8),
+
+    #[strum(to_string = "UDP-Notif with invalid S-Flag")]
     InvalidSFlag,
+
+    #[strum(to_string = "Invalid options: {0}")]
     UdpNotifOptionError(#[from_located(module = "self")] UdpNotifOptionParsingError),
+
+    #[strum(to_string = "UDP-Notif with invalid headers length {0}")]
     InvalidHeaderLength(u8),
+
+    #[strum(to_string = "UDP-Notif with invalid message length {0}")]
     InvalidMessageLength(u16),
+
+    #[strum(to_string = "S Flag is set without private encoding option")]
     PrivateEncodingOptionIsNotPresent,
 }
+
+impl std::error::Error for UdpNotifPacketParsingError {}
 
 impl<'a> ReadablePdu<'a, LocatedUdpNotifPacketParsingError<'a>> for UdpNotifPacket {
     fn from_wire(buf: Span<'a>) -> IResult<Span<'a>, Self, LocatedUdpNotifPacketParsingError<'a>> {

@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::raw::{UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
+use crate::raw::{MediaType, UdpNotifOption, UdpNotifOptionCode, UdpNotifPacket};
 use crate::wire::deserialize::{LocatedUdpNotifPacketParsingError, UdpNotifPacketParsingError};
 use crate::wire::serialize::UdpNotifPacketWritingError;
 use byteorder::{ByteOrder, NetworkEndian};
@@ -28,9 +28,43 @@ use tokio_util::codec::{Decoder, Encoder};
 
 #[derive(Debug, strum_macros::Display, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ReassemblyBufferError {
-    LastSegmentIsNotReceived,
-    NotEnoughSegments { needed: u16, received: u16 },
-    IncorrectSegments,
+    #[strum(
+        to_string = "UDP-Notif packet with last segment marker is not received fot the packet with \
+         media-type={media_type}, publisher-id={publisher_id}, and message-id={message_id} and the \
+         total number of segments received are {received}"
+    )]
+    LastSegmentIsNotReceived {
+        media_type: MediaType,
+        publisher_id: u32,
+        message_id: u32,
+        received: usize,
+    },
+
+    #[strum(
+        to_string = "UDP-Notif packet with incomplete number of segments, media-type={media_type}, \
+        publisher-id={publisher_id}, and message-id={message_id} and the total number of segments \
+        received are {received}"
+    )]
+    IncompleteSegments {
+        media_type: MediaType,
+        publisher_id: u32,
+        message_id: u32,
+        needed: u16,
+        received: u16,
+    },
+
+    #[strum(
+        to_string = "UDP-Notif packet with incorrect segment sequence, media-type={media_type}, \
+        publisher-id={publisher_id}, and message-id={message_id} received {received} segments in \
+        total and is missing a packet with sequence number {missing_segment_number}"
+    )]
+    MissingSegment {
+        media_type: MediaType,
+        publisher_id: u32,
+        message_id: u32,
+        received: usize,
+        missing_segment_number: u16,
+    },
 }
 
 impl std::error::Error for ReassemblyBufferError {}
@@ -61,23 +95,41 @@ impl ReassemblyBuffer {
         self.has_last && self.segments.len() == self.expected_count as usize
     }
 
-    fn reassemble(mut self) -> Result<UdpNotifPacket, ReassemblyBufferError> {
+    fn reassemble(
+        mut self,
+        media_type: MediaType,
+        publisher_id: u32,
+        message_id: u32,
+    ) -> Result<UdpNotifPacket, ReassemblyBufferError> {
         if !self.has_last {
-            return Err(ReassemblyBufferError::LastSegmentIsNotReceived);
+            let number_of_received_segments = self.segments.len();
+            return Err(ReassemblyBufferError::LastSegmentIsNotReceived {
+                media_type,
+                publisher_id,
+                message_id,
+                received: number_of_received_segments,
+            });
         }
         if self.expected_count as usize != self.segments.len() {
-            return Err(ReassemblyBufferError::NotEnoughSegments {
+            return Err(ReassemblyBufferError::IncompleteSegments {
+                media_type,
+                publisher_id,
+                message_id,
                 needed: self.expected_count,
                 received: self.segments.len() as u16,
             });
         }
-        let mismatch = self
-            .segments
-            .iter()
-            .enumerate()
-            .any(|(i, (seg_no, _))| i != *seg_no as usize);
-        if mismatch {
-            return Err(ReassemblyBufferError::IncorrectSegments);
+        for (expected_number, (seg_no, _)) in self.segments.iter().enumerate() {
+            if expected_number != *seg_no as usize {
+                let received = self.segments.len();
+                return Err(ReassemblyBufferError::MissingSegment {
+                    media_type,
+                    publisher_id,
+                    message_id,
+                    received,
+                    missing_segment_number: *seg_no,
+                });
+            }
         }
         let (_, first_segment) = self.segments.pop_first().unwrap();
         let mut assembled_payload = BytesMut::from(first_segment.payload());
@@ -113,11 +165,22 @@ impl Default for ReassemblyBuffer {
 
 #[derive(Debug, strum_macros::Display, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum UdpPacketCodecError {
+    #[strum(to_string = "I/O error {0}")]
     IoError(String),
+
+    #[strum(to_string = "Invalid UDP-Notif header length {0}")]
     InvalidHeaderLength(u8),
+
+    #[strum(to_string = "Invalid UDP-Notif message length {0}")]
     InvalidMessageLength(u16),
+
+    #[strum(to_string = "UDP-Notif packet parsing error: {0}")]
     UdpNotifError(UdpNotifPacketParsingError),
+
+    #[strum(to_string = "segments reassembly error: {0}")]
     ReassemblyError(ReassemblyBufferError),
+
+    #[strum(to_string = "UDP-Notif serialization error: {0}")]
     WritingError(UdpNotifPacketWritingError),
 }
 
@@ -219,6 +282,9 @@ impl UdpPacketCodec {
         pkt: UdpNotifPacket,
     ) -> Result<Option<UdpNotifPacket>, UdpPacketCodecError> {
         let (seg_no, is_last) = Self::extract_segment_info(pkt.options());
+        let media_type = pkt.media_type();
+        let publisher_id = pkt.publisher_id();
+        let message_id = pkt.message_id();
 
         // Short-circuit for unsegmented or single-segment messages
         if seg_no == 0 && is_last {
@@ -233,7 +299,11 @@ impl UdpPacketCodec {
         }
 
         let reassembled = self.incomplete_messages.remove(&message_key).unwrap();
-        Ok(Some(reassembled.reassemble()?))
+        Ok(Some(reassembled.reassemble(
+            media_type,
+            publisher_id,
+            message_id,
+        )?))
     }
 }
 
