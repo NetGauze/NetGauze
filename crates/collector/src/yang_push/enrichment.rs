@@ -38,12 +38,16 @@ use netgauze_udp_notif_pkt::decoded::{UdpNotifPacketDecoded, UdpNotifPayload};
 use netgauze_udp_notif_pkt::notification::{
     NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
 };
-use netgauze_yang_push::ContentId;
 use netgauze_yang_push::cache::storage::SubscriptionInfo;
 use netgauze_yang_push::model::telemetry::{
     EventType, FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol,
     TelemetryMessage, TelemetryMessageMetadata, TelemetryMessageWrapper,
     YangPushSubscriptionMetadata,
+};
+use netgauze_yang_push::{
+    ContentId, OTL_UDP_NOTIF_MESSAGE_ID_KEY, OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
+    OTL_YANG_PUSH_CACHED_CONTENT_ID_KEY, OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+    OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY, OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
 };
 use serde_json::Value;
 use shadow_rs::shadow;
@@ -52,7 +56,7 @@ use std::net::{IpAddr, SocketAddr};
 use sysinfo::System;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 shadow!(build);
 
@@ -411,7 +415,7 @@ impl YangPushEnrichmentActor {
         self.stats
             .update_peer_subscriptions_gauge(&peer, peer_subscriptions.len());
 
-        debug!(
+        trace!(
             "Yang Push Subscription Cache: {}",
             serde_json::to_string(&self.subscriptions).unwrap()
         );
@@ -440,6 +444,10 @@ impl YangPushEnrichmentActor {
                     "network.peer.port",
                     opentelemetry::Value::I64(peer.port().into()),
                 ),
+                opentelemetry::KeyValue::new(
+                    OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+                    opentelemetry::Value::I64(sub.id().into()),
+                ),
             ];
             self.stats.subscription_cache_miss.add(1, &peer_tags);
         }
@@ -465,13 +473,13 @@ impl YangPushEnrichmentActor {
     fn get_subscription(
         &self,
         peer: SocketAddr,
-        subscription_id: &SubscriptionId,
+        subscription_id: SubscriptionId,
     ) -> Result<Option<YangPushSubscriptionMetadata>, YangPushEnrichmentActorError> {
         // Get subscription information from the cache
         let subscription_metadata = self
             .subscriptions
             .get(&peer)
-            .and_then(|subscriptions| subscriptions.get(subscription_id))
+            .and_then(|subscriptions| subscriptions.get(&subscription_id))
             .cloned();
 
         // Increment counter if there was a cache miss
@@ -481,6 +489,10 @@ impl YangPushEnrichmentActor {
                 opentelemetry::KeyValue::new(
                     "network.peer.port",
                     opentelemetry::Value::I64(peer.port().into()),
+                ),
+                opentelemetry::KeyValue::new(
+                    OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+                    opentelemetry::Value::I64(subscription_id.into()),
                 ),
             ];
             self.stats.subscription_cache_miss.add(1, &peer_tags);
@@ -492,82 +504,142 @@ impl YangPushEnrichmentActor {
     /// Processes Notification and returns the relevant TelemetryMessageMetadata
     fn process_notification(
         &mut self,
-        peer: SocketAddr,
-        notification: Option<&NotificationVariant>,
+        content_id: Option<&ContentId>,
+        subscription_info: &SubscriptionInfo,
+        decoded_packet: &UdpNotifPacketDecoded,
     ) -> Result<Option<YangPushSubscriptionMetadata>, YangPushEnrichmentActorError> {
+        let peer = subscription_info.peer();
+        let message_id = decoded_packet.message_id();
+        let publisher_id = decoded_packet.publisher_id();
+        let cached_content_id = content_id.map(|cid| cid.to_string()).unwrap_or_default();
+        let notification_type = decoded_packet
+            .notification_type()
+            .map(|nt| nt.to_string())
+            .unwrap_or("UNKNOWN".to_string());
+
+        let notification = match decoded_packet.payload() {
+            UdpNotifPayload::NotificationEnvelope(envelope) => envelope.contents(),
+            UdpNotifPayload::NotificationLegacy(notif) => notif.notification(),
+        };
         match notification {
             Some(NotificationVariant::SubscriptionStarted(sub_started)) => {
                 debug!(
-                    "Received Subscription Started Message (peer: {}, id={})",
-                    peer,
-                    sub_started.id()
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    subscription_id=sub_started.id(),
+                    router_content_id=sub_started.yang_library_content_id(),
+                    target=%sub_started.target(),
+                    notification_type,
+                    cached_content_id,
+                    "Received Subscription Started Message",
+
                 );
                 self.cache_subscription(peer, sub_started)
             }
             Some(NotificationVariant::SubscriptionModified(sub_modified)) => {
                 debug!(
-                    "Received Subscription Modified Message (peer: {}, id={})",
-                    peer,
-                    sub_modified.id()
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    subscription_id=sub_modified.id(),
+                    router_content_id=sub_modified.yang_library_content_id(),
+                    target=%sub_modified.target(),
+                    notification_type,
+                    cached_content_id,
+                    "Received Subscription Modified Message",
                 );
                 self.cache_subscription(peer, sub_modified)
             }
             Some(NotificationVariant::SubscriptionTerminated(sub_terminated)) => {
                 debug!(
-                    "Received Subscription Terminated Message (peer: {}, id={})",
-                    peer,
-                    sub_terminated.id()
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    subscription_id=sub_terminated.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    termination_reason=sub_terminated.reason(),
+                    notification_type,
+                    cached_content_id,
+                    "Received Subscription Terminated Message",
                 );
                 self.delete_subscription(peer, sub_terminated)
             }
             Some(NotificationVariant::YangPushUpdate(push_update)) => {
-                debug!(
-                    "Received Yang Push Update Message (peer: {}, id={})",
-                    peer,
-                    push_update.id()
+                trace!(
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    subscription_id=push_update.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    notification_type,
+                    cached_content_id,
+                    "Received Yang Push Update Message",
                 );
-                self.get_subscription(peer, &push_update.id())
+                self.get_subscription(peer, push_update.id())
             }
             Some(NotificationVariant::YangPushChangeUpdate(push_change_update)) => {
-                debug!(
-                    "Received Yang Push Change Update Message (peer: {}, id={})",
-                    peer,
-                    push_change_update.id()
+                trace!(
+                    peer=%peer,
+                    message_id,
+                    publisher_id,
+                    subscription_id=push_change_update.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    notification_type,
+                    cached_content_id,
+                    "Received Yang Push Change Update Message",
                 );
-                self.get_subscription(peer, &push_change_update.id())
+                self.get_subscription(peer, push_change_update.id())
             }
             None => {
                 warn!(
-                    "Received Notification Message (peer: {}) without content",
-                    peer
+                 peer=%peer,
+                    message_id,
+                    publisher_id,
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    notification_type,
+                    cached_content_id,
+                    "Received Notification Message without content",
                 );
                 Err(YangPushEnrichmentActorError::NotificationWithoutContent)
             }
         }
     }
 
-    /// Processes UDP-Notif Payload and produces a TelemetryMessage object.
-    fn process_payload(
+    /// Processes UDP-Notif a decoded packet and produce a TelemetryMessage
+    /// object.
+    fn process_decoded_udp_notif_packet(
         &mut self,
-        peer: SocketAddr,
-        payload: &UdpNotifPayload,
+        content_id: Option<&ContentId>,
+        subscription_info: &SubscriptionInfo,
+        decoded_packet: &UdpNotifPacketDecoded,
     ) -> Result<TelemetryMessageWrapper, YangPushEnrichmentActorError> {
+        let peer = subscription_info.peer();
+        let message_id = decoded_packet.message_id();
+        let publisher_id = decoded_packet.publisher_id();
+        let notification_type = decoded_packet
+            .notification_type()
+            .map(|nt| nt.to_string())
+            .unwrap_or("UNKNOWN".to_string());
+
         let labels: Option<Vec<Label>> = self
             .labels
             .get(&peer.ip())
             .map(|l_map| l_map.values().cloned().map(|wl| wl.label).collect());
 
         // Match on the wrapper and process the notification content
-        let (node_export_timestamp, subscription_metadata) = match payload {
-            UdpNotifPayload::NotificationLegacy(legacy) => (
-                legacy.event_time(),
-                self.process_notification(peer, legacy.notification())?,
-            ),
-            UdpNotifPayload::NotificationEnvelope(envelope) => (
-                envelope.event_time(),
-                self.process_notification(peer, envelope.contents())?,
-            ),
+        let node_export_timestamp = match decoded_packet.payload() {
+            UdpNotifPayload::NotificationLegacy(legacy) => legacy.event_time(),
+            UdpNotifPayload::NotificationEnvelope(envelope) => envelope.event_time(),
         };
+
+        let subscription_metadata =
+            self.process_notification(content_id, subscription_info, decoded_packet)?;
 
         let telemetry_message_metadata = TelemetryMessageMetadata::new(
             Some(node_export_timestamp),
@@ -583,8 +655,19 @@ impl YangPushEnrichmentActor {
         );
 
         // Re-serialize the UDP-Notif payload into JSON
-        let json_payload = serde_json::to_value(payload).map_err(|err| {
-            error!("Failed to re-serialize UDP-Notif Payload (should never happen): {err}");
+        let json_payload = serde_json::to_value(decoded_packet).map_err(|err| {
+            error!(
+                peer=%peer,
+                message_id,
+                publisher_id,
+                subscription_id=subscription_info.id(),
+                router_content_id=subscription_info.content_id(),
+                target=%subscription_info.target(),
+                cached_content_id=%content_id.map(|cid| cid.to_string()).unwrap_or_default(),
+                notification_type,
+                error=%err,
+                "Failed to re-serialize UDP-Notif Payload (should never happen)"
+            );
             YangPushEnrichmentActorError::PayloadSerializationError
         })?;
 
@@ -632,6 +715,8 @@ impl YangPushEnrichmentActor {
                         Ok(msg) => {
                             let (content_id, subscription_info, pkt) = msg;
                             let peer = subscription_info.peer();
+                            let message_id = pkt.message_id();
+                            let publisher_id = pkt.publisher_id();
                             let peer_tags = [
                                 opentelemetry::KeyValue::new(
                                     "network.peer.address",
@@ -641,11 +726,35 @@ impl YangPushEnrichmentActor {
                                     "network.peer.port",
                                     opentelemetry::Value::I64(peer.port().into()),
                                 ),
+                                opentelemetry::KeyValue::new(
+                                    OTL_UDP_NOTIF_MESSAGE_ID_KEY,
+                                    opentelemetry::Value::I64(message_id.into())
+                                ),
+                                opentelemetry::KeyValue::new(
+                                    OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
+                                    opentelemetry::Value::I64(publisher_id.into()),
+                                ),
+                                opentelemetry::KeyValue::new(
+                                    OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY,
+                                    opentelemetry::Value::I64(subscription_info.id().into()),
+                                ),
+                                opentelemetry::KeyValue::new(
+                                    OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY,
+                                    format!("{}", subscription_info.target()),
+                                ),
+                                opentelemetry::KeyValue::new(
+                                    OTL_YANG_PUSH_SUBSCRIPTION_ROUTER_CONTENT_ID_KEY,
+                                    subscription_info.content_id().to_string(),
+                                ),
+                                opentelemetry::KeyValue::new(
+                                    OTL_YANG_PUSH_CACHED_CONTENT_ID_KEY,
+                                    content_id.as_ref().map(|cid| cid.to_string()).unwrap_or_default(),
+                                )
                             ];
                             self.stats.received_messages.add(1, &peer_tags);
 
                             // Process the payload and send the enriched TelemetryMessage
-                            match self.process_payload(peer, pkt.payload()) {
+                            match self.process_decoded_udp_notif_packet(content_id.as_ref(), &subscription_info, &pkt) {
                                 Ok(telemetry_message) => {
                                     if let Err(err) = self.enriched_tx.send((content_id, subscription_info, telemetry_message)).await {
                                         error!("YangPushEnrichmentActor send error: {err}");
@@ -829,7 +938,7 @@ mod tests {
         assert!(result.is_ok());
 
         // Check get_subscription method
-        let get_result = actor.get_subscription(peer, &1);
+        let get_result = actor.get_subscription(peer, 1);
         assert!(get_result.is_ok());
         assert_eq!(result.clone().unwrap(), get_result.unwrap());
 
@@ -920,7 +1029,7 @@ mod tests {
         assert!(actor.subscriptions[&peer].contains_key(&23));
         assert_eq!(actor.subscriptions[&peer].len(), 2);
 
-        let get_result = actor.get_subscription(peer, &12);
+        let get_result = actor.get_subscription(peer, 12);
         assert!(get_result.is_ok());
 
         let peer_subscription = get_result.unwrap();
@@ -951,10 +1060,20 @@ mod tests {
             Bytes::from(payload),
         );
 
+        let subscription_info = SubscriptionInfo::new(
+            peer,
+            1,
+            "test-content-id".to_string(),
+            Target::new_datastore(
+                "ds:operational".to_string(),
+                either::Right("/ietf-interfaces".to_string()),
+            ),
+            vec!["ietf-interfaces".to_string()],
+        );
         // Attempt to decode the packet (should succeed)
         let decoded: UdpNotifPacketDecoded = (&packet).try_into().unwrap();
 
-        let result = actor.process_payload(peer, decoded.payload());
+        let result = actor.process_decoded_udp_notif_packet(None, &subscription_info, &decoded);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
