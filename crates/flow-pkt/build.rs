@@ -222,6 +222,23 @@ fn get_vmware_config(
     )
 }
 
+fn get_custom_config(custom_registry_path: String, pen: u32) -> SourceConfig {
+    let cloned_custom_registry_path_cloned = custom_registry_path.clone();
+    let name = Path::new(cloned_custom_registry_path_cloned.as_str())
+        .file_stem()
+        .expect("there is no filename in custom_registry_path")
+        .to_str()
+        .expect("custom_registry_path is not valid Unicode");
+    SourceConfig::new(
+        RegistrySource::File(custom_registry_path),
+        RegistryType::IanaXML,
+        pen,
+        name.to_string().to_lowercase(),
+        name.to_string(),
+        None,
+    )
+}
+
 fn main() {
     let out_dir = env::var_os("OUT_DIR").expect("Couldn't find OUT_DIR in OS env variables");
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -240,10 +257,35 @@ fn main() {
         &registry_path,
         &sub_registry_path,
     );
-    let configs = Config::new(
-        iana_source,
-        vec![nokia_source, netgauze_config, vmware_source],
-    );
+
+    let mut vendors = vec![nokia_source, netgauze_config, vmware_source];
+
+    if cfg!(feature = "custom-upstream-build") {
+        let paths_and_pens = env::var("NETGAUZE_CUSTOM_XML_PATHS").expect("custom-upstream-build feature is enabled but couldn't find NETGAUZE_CUSTOM_XML_PATHS in OS env variables");
+        let mut custom_vendors = vec![];
+
+        for entry in paths_and_pens.split(',') {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                continue;
+            }
+
+            if let Some((path_str, pen_str)) = entry.split_once('=') {
+                let path = path_str.trim().to_string();
+                let pen = pen_str.trim().parse().expect("the PEN must be an integer");
+
+                custom_vendors.push(get_custom_config(path, pen));
+            } else {
+                panic!(
+                    "Format error in NETGAUZE_CUSTOM_XML_PATHS. Expected: 'path=pen', 'path=pen,path2=pen2' or more. "
+                );
+            }
+        }
+
+        vendors.extend(custom_vendors);
+    }
+
+    let configs = Config::new(iana_source, vendors);
     generate(&out_dir, &configs).unwrap();
 
     println!("cargo:rerun-if-changed=build.rs");
