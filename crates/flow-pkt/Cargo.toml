@@ -59,6 +59,7 @@ codec = ["tracing", "tokio-util", "bytes"]
 bench = ["criterion"]
 fuzz = ["arbitrary", "arbitrary_ext", "ordered-float/arbitrary"]
 iana-upstream-build = ["serde"]
+custom-upstream-build = ["default"]
 
 [dev-dependencies]
 netgauze-pcap-reader = { workspace = true }
