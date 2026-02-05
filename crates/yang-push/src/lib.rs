@@ -17,18 +17,7 @@ pub mod cache;
 pub mod model;
 pub mod validation;
 
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-
 pub type ContentId = String;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct CustomSchema {
-    pub content_id: ContentId,
-    pub search_dir: PathBuf,
-    pub yanglib: PathBuf,
-    pub schema: PathBuf,
-}
 
 pub const OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY: &str = "netgauze.udp.notif.yang.push.subscription.id";
 pub const OTL_YANG_PUSH_SUBSCRIPTION_TARGET_KEY: &str =
