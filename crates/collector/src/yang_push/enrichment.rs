@@ -655,7 +655,7 @@ impl YangPushEnrichmentActor {
         );
 
         // Re-serialize the UDP-Notif payload into JSON
-        let json_payload = serde_json::to_value(decoded_packet).map_err(|err| {
+        let json_payload = serde_json::to_value(decoded_packet.payload()).map_err(|err| {
             error!(
                 peer=%peer,
                 message_id,
