@@ -127,7 +127,7 @@ jobs:
     env:
       RUSTDOCFLAGS: -Dwarnings --cfg docsrs
       TRYBUILD: overwrite
-      NETGAUZE_CUSTOM_XML_PATHS:
+      NETGAUZE_CUSTOM_XML_PATHS: ""
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -161,6 +161,7 @@ jobs:
     name: ubuntu / stable / coverage
     env:
       TRYBUILD: overwrite
+      NETGAUZE_CUSTOM_XML_PATHS: ""
     steps:
       - uses: actions/checkout@v4
         with:
