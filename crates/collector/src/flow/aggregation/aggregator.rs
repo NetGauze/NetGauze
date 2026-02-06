@@ -211,12 +211,8 @@ impl AggFlowInfo {
         let observation_domain_ids = rec.observation_domain_ids;
         let template_ids = rec.template_ids;
 
-        // As of rust 2024 we will be able to use `into_iter` directly on Box<[T]>.
-        // (meaning we can remove the `into_vec()` calls)
-        // https://doc.rust-lang.org/nightly/edition-guide/rust-2024/intoiterator-box-slice.html
         let fields: Box<[Field]> =
             key_fields
-                .into_vec()
                 .into_iter()
                 .chain(agg_fields.into_vec())
                 .flatten()
