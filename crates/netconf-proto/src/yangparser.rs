@@ -447,11 +447,36 @@ impl<'a> YangParser<'a> {
     fn read_string_or_identifier(&mut self) -> Option<String> {
         self.skip_whitespace_and_comments();
 
-        match self.peek_char()? {
-            '"' => self.read_double_quoted_string(),
-            '\'' => self.read_single_quoted_string(),
-            _ => self.read_identifier(),
+        let mut result = match self.peek_char()? {
+            '"' => self.read_double_quoted_string()?,
+            '\'' => self.read_single_quoted_string()?,
+            _ => return self.read_identifier(),
+        };
+
+        loop {
+            self.skip_whitespace_and_comments();
+            if self.peek_char() == Some('+') {
+                self.advance(); // handle string concatenation (+)
+                self.skip_whitespace_and_comments();
+                match self.peek_char() {
+                    Some('"') => {
+                        if let Some(next_part) = self.read_double_quoted_string() {
+                            result.push_str(&next_part);
+                        }
+                    }
+                    Some('\'') => {
+                        if let Some(next_part) = self.read_single_quoted_string() {
+                            result.push_str(&next_part);
+                        }
+                    }
+                    _ => break,
+                }
+            } else {
+                break;
+            }
         }
+
+        Some(result)
     }
 
     fn read_double_quoted_string(&mut self) -> Option<String> {
