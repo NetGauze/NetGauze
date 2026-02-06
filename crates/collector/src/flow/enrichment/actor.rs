@@ -159,12 +159,10 @@ impl EnrichmentActor {
 
         let enriched_sets = pkt
             .into_sets()
-            .into_vec()
             .into_iter()
             .filter_map(|set| match set {
                 ipfix::Set::Data { id, records } => {
                     let enriched_records = records
-                        .into_vec()
                         .into_iter()
                         .filter(|record| record.scope_fields().is_empty())
                         .map(|record| {
