@@ -13,6 +13,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Flow packet types and utilities for IPFIX and NetFlow v9.
+//!
+//! This crate provides data models, information elements, and (optional)
+//! codecs for working with IPFIX and NetFlow v9 packets. It includes helpers
+//! to inspect packet metadata and to manipulate fields for IPFIX data records.
+//!
+//! # Example
+//!
+//! ```rust
+//! use chrono::{TimeZone, Utc};
+//! use netgauze_flow_pkt::ipfix::{IpfixPacket, Set};
+//! use netgauze_flow_pkt::{DataSetId, FlowInfo};
+//!
+//! let export_time = Utc.with_ymd_and_hms(2024, 6, 20, 14, 0, 0).unwrap();
+//! let ipfix = IpfixPacket::new(
+//!     export_time,
+//!     1,
+//!     42,
+//!     Box::new([Set::Data {
+//!         id: DataSetId::new(400).unwrap(),
+//!         records: Box::new([]),
+//!     }]),
+//! );
+//!
+//! let flow = FlowInfo::IPFIX(ipfix);
+//! assert_eq!(flow.observation_domain_id(), 42);
+//! ```
+
 #[cfg(feature = "codec")]
 pub mod codec;
 pub mod ie;

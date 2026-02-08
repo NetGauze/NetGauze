@@ -1,5 +1,22 @@
 # NetGauze flow reporting pkt (Netflow V9 and IPFIX)
 
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Apache licensed][apache-badge]][apache-url]
+
+
+[crates-badge]: https://img.shields.io/crates/v/netgauze-netconf-proto.svg
+
+[crates-url]: https://crates.io/crates/netgauze-flow-pkt
+
+[apache-badge]: https://img.shields.io/badge/license-Apache-blue.svg
+
+[apache-url]: https://github.com/NetGauze/NetGauze/blob/main/LICENSE
+
+[docs-badge]: https://docs.rs/netgauze-flow-pkt/badge.svg
+
+[docs-url]: https://docs.rs/netgauze-flow-pkt
+
 ## Supported RFCs
 
 1. Specification of the IP Flow Information Export (IPFIX) Protocol for the Exchange of Flow
@@ -13,7 +30,12 @@
    When the IANA registry introduces changes, such as a new data type, generation may fail.
    If your project depends on this crate and requires stable generation, you can enable the
    backwards-compatibility-snapshot feature in your Cargo.toml file. This feature uses a snapshot of registry
-   files taken at the time of the crate's release, ensuring reliable generation even if the registry is updated. In addition to this, users can define a single custom local registry or multiple custom local registries, allowing NetGauze to generate the necessary code at build time. To use this functionality, the `custom-upstream-build` feature must be enabled and the environment variable `NETGAUZE_CUSTOM_XML_PATHS` must be set. `NETGAUZE_CUSTOM_XML_PATHS` takes the paths and PENs with the format `NETGAUZE_CUSTOM_XML_PATHS="path=pen"` or to specify more registries `NETGAUZE_CUSTOM_XML_PATHS="path=pen,path2=pen2,path3=pen3"`.
+   files taken at the time of the crate's release, ensuring a reliable generation even if the registry is updated. In
+   addition to this, users can define a single custom local registry or multiple custom local registries, allowing
+   NetGauze to generate the necessary code at build time. To use this functionality, the `custom-upstream-build` feature
+   must be enabled and the environment variable `NETGAUZE_CUSTOM_XML_PATHS` must be set. `NETGAUZE_CUSTOM_XML_PATHS`
+   takes the paths and PENs with the format `NETGAUZE_CUSTOM_XML_PATHS="path=pen"` or to specify more registries
+   `NETGAUZE_CUSTOM_XML_PATHS="path=pen,path2=pen2,path3=pen3"`.
 
 ## Examples
 
