@@ -13,4 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Telemetry Message data model definitions.
+//!
+//! This module groups the YANG-Push telemetry models used for serde
+//! serialization and deserialization. See `telemetry` for the concrete
+//! message types and field-level details.
+
 pub mod telemetry;

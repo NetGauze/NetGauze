@@ -13,10 +13,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! # Overview
+//!
+//! This module defines the constants and types relevant to the NetGauze UDP
+//! notification handling system using YANG push subscriptions.
+//! # Exports and Definitions
+//!
+//! ## Submodules
+//! - [cache]: Expected to define and handle caching mechanisms for the system.
+//! - [model]: Contains the data models or structures used IETF Telemetry
+//!   Message.
+//! - [validation]: Implements validation mechanisms for YANG Push messages.
+//!
+//! ## Type Definitions
+//! - `ContentId`: A `String` type alias representing the identifier for content
+//!   within the notification system.
+
 pub mod cache;
 pub mod model;
 pub mod validation;
 
+/// A String type alias representing the Content ID in YANG Library
+/// [RFC8525](https://datatracker.ietf.org/doc/html/rfc8525).
 pub type ContentId = String;
 
 pub const OTL_YANG_PUSH_SUBSCRIPTION_ID_KEY: &str = "netgauze.udp.notif.yang.push.subscription.id";

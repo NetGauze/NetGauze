@@ -13,6 +13,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! YANG library cache subsystem.
+//!
+//! This module groups the cache components used by the YANG-Push pipeline:
+//! storage for persisted YANG libraries, fetchers for retrieving missing
+//! libraries from devices, and an actor-based interface for concurrent access.
+//! For details and examples, see the documentation in each submodule.
+
 pub mod actor;
 pub mod fetcher;
 pub mod storage;
