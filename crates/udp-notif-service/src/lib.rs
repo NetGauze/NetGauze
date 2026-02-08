@@ -13,6 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! UDP-Notif service primitives and wiring helpers.
+//!
+//! This crate provides the top-level types and helpers needed to build
+//! UDP-Notif processing services: channel types, subscription identifiers,
+//! and socket setup utilities. Actor-based processing and supervision are
+//! exposed via the `actor` and `supervisor` modules.
+//!
+//! See the examples directory for end-to-end wiring of listeners and
+//! subscriber pipelines.
+
 use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
 use std::fmt::Display;
 use std::io;
@@ -23,12 +33,17 @@ pub mod actor;
 pub mod supervisor;
 
 pub type ActorId = u32;
+
+/// Type alias to that YANG Push subscription ID as defined in [RFC8641](https://datatracker.ietf.org/doc/html/rfc8641)
 pub type SubscriberId = u32;
+
+/// The UDP-Notif packet and the peer [SocketAddr] that sent it.
 pub type UdpNotifRequest = (SocketAddr, UdpNotifPacket);
 
 pub type UdpNotifSender = async_channel::Sender<Arc<UdpNotifRequest>>;
 pub type UdpNotifReceiver = async_channel::Receiver<Arc<UdpNotifRequest>>;
 
+/// Wrapper function to create a channel to exchange [UdpNotifRequest]
 pub fn create_udp_notif_channel(buffer_size: usize) -> (UdpNotifSender, UdpNotifReceiver) {
     async_channel::bounded(buffer_size)
 }
