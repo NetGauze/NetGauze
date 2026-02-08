@@ -1104,11 +1104,6 @@ impl XmlSerialize for WellKnownOperation {
     }
 }
 
-// pub struct YangOperationData {
-//     context: Arc<yang3::context::Context>,
-//     data_tree: yang3::data::DataTree,
-// }
-
 /// RPC Reply
 /// ```xml
 ///   <xs:complexType name="rpcReplyType">

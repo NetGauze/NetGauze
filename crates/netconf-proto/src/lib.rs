@@ -13,6 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Low-level NETCONF protocol types and helpers.
+//!
+//! This crate provides the NETCONF message model, XML parsing/serialization
+//! traits, SSH client wiring, and YANG library utilities. It is designed as a
+//! building block for higher-level NETCONF or telemetry services.
+//!
+//! Start with [client] for SSH connectivity and session helpers, and [protocol]
+//! for the message types, and [xml_utils] for XML parsing and writing
+//! utilities.
+
 use quick_xml::name::Namespace;
 
 pub mod capabilities;
