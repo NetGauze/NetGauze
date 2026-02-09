@@ -913,4 +913,368 @@ mod tests {
         assert_eq!(metadata.prefix, Some("test".to_string()));
         // Should not be confused by the prefix inside import
     }
+
+    #[test]
+    fn test_concatenated_double_quoted_strings() {
+        let yang = r#"
+            module example {
+                import "ietf" + "-inet-types" {
+                    prefix "inet";
+                }
+            }
+        "#;
+
+        let deps = extract_yang_dependencies(yang).unwrap();
+        assert_eq!(deps.imports.len(), 1);
+        assert_eq!(deps.imports[0].module_name, "ietf-inet-types");
+        assert_eq!(deps.imports[0].prefix, "inet");
+    }
+
+    #[test]
+    fn test_concatenated_single_quoted_strings() {
+        let yang = r#"
+            module example {
+                import 'ietf'
+                  + '-inet-types' {
+                    prefix 'inet';
+                }
+            }
+        "#;
+
+        let deps = extract_yang_dependencies(yang).unwrap();
+        assert_eq!(deps.imports.len(), 1);
+        assert_eq!(deps.imports[0].module_name, "ietf-inet-types");
+        assert_eq!(deps.imports[0].prefix, "inet");
+    }
+
+    #[test]
+    fn test_multiple_concatenations() {
+        let yang = r#"
+            module example {
+                import "ietf" + "-inet" + "-types" {
+                    prefix "inet";
+                }
+            }
+        "#;
+
+        let deps = extract_yang_dependencies(yang).unwrap();
+        assert_eq!(deps.imports.len(), 1);
+        assert_eq!(deps.imports[0].module_name, "ietf-inet-types");
+    }
+
+    #[test]
+    fn test_concatenation_with_spaces() {
+        let yang = r#"
+            module example {
+                import "ietf" + " inet-types" {
+                    prefix "inet";
+                }
+            }
+        "#;
+
+        let deps = extract_yang_dependencies(yang).unwrap();
+        assert_eq!(deps.imports.len(), 1);
+        assert_eq!(deps.imports[0].module_name, "ietf inet-types");
+    }
+
+    #[test]
+    fn test_concatenation_in_include() {
+        let yang = r#"
+            module example {
+                include "example" + "-submodule" {
+                    revision-date 2023-01-01;
+                }
+            }
+        "#;
+
+        let deps = extract_yang_dependencies(yang).unwrap();
+        assert_eq!(deps.includes.len(), 1);
+        assert_eq!(deps.includes[0].submodule_name, "example-submodule");
+        assert_eq!(
+            deps.includes[0].revision_date,
+            Some("2023-01-01".to_string())
+        );
+    }
+
+    #[test]
+    fn test_concatenation_in_metadata_namespace() {
+        let yang = r#"
+            module example {
+                namespace "urn:ietf:params:xml:ns:yang:" + "ietf-example";
+                prefix ex;
+            }
+        "#;
+
+        let metadata = extract_yang_metadata(yang).unwrap();
+        assert_eq!(metadata.name, "example");
+        assert_eq!(
+            metadata.namespace,
+            Some("urn:ietf:params:xml:ns:yang:ietf-example".to_string())
+        );
+    }
+
+    #[test]
+    fn test_no_concatenation_for_identifiers() {
+        // Ensure identifiers are not concatenated
+        let yang = r#"
+            module example {
+                import ietf-inet-types {
+                    prefix inet;
+                }
+            }
+        "#;
+
+        let deps = extract_yang_dependencies(yang).unwrap();
+        assert_eq!(deps.imports.len(), 1);
+        assert_eq!(deps.imports[0].module_name, "ietf-inet-types");
+    }
+
+    #[test]
+    fn test_real_cisco_module_with_concatenation() {
+        let yang = r#"
+            module Cisco-IOS-XR-openconfig-platform-transceiver-ext{
+
+              namespace "http://cisco.com/ns/yang/"+
+                    "Cisco-IOS-XR-openconfig-platform-transceiver-ext";
+
+              prefix oc-opt-trans-ext;
+
+              import ietf-yang-types {
+                prefix yang;
+                }
+
+              import openconfig-platform {
+                      prefix oc-platform;
+                }
+               import openconfig-platform-transceiver {
+                      prefix oc-transceiver;
+                }
+
+                import openconfig-platform-types {
+                       prefix oc-platform-types;
+                }
+
+               organization "Cisco Systems, Inc.";
+
+               contact
+                "Cisco Systems, Inc.
+                 Customer Service
+
+                 Postal: 170 West Tasman Drive
+                 San Jose, CA 95134
+
+                 Tel: +1 800 553-NETS
+
+                 E-mail: cs-yang@cisco.com";
+
+                description
+               "This module is an extension of optical transceiver model
+                 and contains the definition of extended parameters for Physical
+                 Channels in order to add the support of per lane FEC configuration and Performance monitoring.
+
+                 This module contains definitions for the following management objects:
+                 FEC Parameters
+
+                 Copyright (c) 2023-2024 by Cisco Systems, Inc.
+                 All rights reserved.";
+
+             revision 2023-01-30 {
+                  description
+                      "Initial version of oc transceiver extended model";
+                  reference "0.1.0";
+              }
+
+             grouping  transceiver-physical-channel-ext-info {
+                 description "FEC parameters for physical channel";
+                 leaf fec-mode {
+                     type identityref {
+                            base oc-platform-types:FEC_MODE_TYPE;
+                      }
+                      description
+                        "The FEC mode indicates the mode of operation for the
+                         transceiver's physical channel's FEC. This defines typical operational modes
+                         and does not aim to specify more granular FEC capabilities.";
+                 }
+
+                 leaf fec-uncorrectable-words {
+                     type yang:counter64;
+                     description
+                         "The number of words that were uncorrectable by the FEC";
+                 }
+                 leaf fec-corrected-words {
+                      type yang:counter64;
+                      description
+                        "The number of words that were corrected by the FEC";
+                 }
+            }
+
+
+            augment "/oc-platform:components/oc-platform:component/oc-transceiver:transceiver/oc-transceiver:physical-channels/oc-transceiver:channel" {
+                container extended {
+                    description
+                        "Enclosing container for the state fec parameters for extended model";
+
+                    container state {
+
+                        config false;
+
+                        description
+                            "Extended Operational parameters";
+                        leaf index {
+                               type uint16 {
+                             range 0..max;
+                               }
+                               description
+                                "Index of the physical channnel or lane within a physical
+                                client port";
+                        }
+                        uses transceiver-physical-channel-ext-info;
+                    }
+                }
+                description
+                   "This augment extends the operational data of
+                   'oc-transceiver:physical-channel-top'";
+
+                }
+            }
+        "#;
+
+        // Test metadata extraction
+        let metadata = extract_yang_metadata(yang).unwrap();
+        let expected_metadata = YangModuleMetadata {
+            name: "Cisco-IOS-XR-openconfig-platform-transceiver-ext".to_string(),
+            namespace: Some(
+                "http://cisco.com/ns/yang/Cisco-IOS-XR-openconfig-platform-transceiver-ext"
+                    .to_string(),
+            ),
+            prefix: Some("oc-opt-trans-ext".to_string()),
+            revision: Some("2023-01-30".to_string()),
+            is_submodule_of: None,
+        };
+        assert_eq!(metadata, expected_metadata);
+
+        // Test dependencies extraction
+        let deps = extract_yang_dependencies(yang).unwrap();
+        let expected_deps = YangDependencies {
+            imports: vec![
+                YangImport {
+                    module_name: "ietf-yang-types".to_string(),
+                    prefix: "yang".to_string(),
+                    revision_date: None,
+                },
+                YangImport {
+                    module_name: "openconfig-platform".to_string(),
+                    prefix: "oc-platform".to_string(),
+                    revision_date: None,
+                },
+                YangImport {
+                    module_name: "openconfig-platform-transceiver".to_string(),
+                    prefix: "oc-transceiver".to_string(),
+                    revision_date: None,
+                },
+                YangImport {
+                    module_name: "openconfig-platform-types".to_string(),
+                    prefix: "oc-platform-types".to_string(),
+                    revision_date: None,
+                },
+            ],
+            includes: vec![],
+        };
+        assert_eq!(deps, expected_deps);
+    }
+
+    #[test]
+    fn test_real_bbf_submodule() {
+        let yang = r#"
+            submodule bbf-xpongemtcont-traffic-descriptor-profile-body {
+              yang-version 1.1;
+              belongs-to bbf-xpongemtcont {
+                prefix bbf-xpongemtcont;
+              }
+
+              include "bbf-xpongemtcont-base";
+
+              organization "Broadband Forum";
+
+              contact "info@broadband-forum.org";
+
+              revision 2020-10-13 {
+                description "Issue 2.";
+                reference "TR-385i2";
+              }
+              revision 2019-02-25 {
+                description "Initial revision.";
+                reference "TR-385";
+              }
+
+              grouping traffic-descriptor-profile-data {
+                description "Traffic descriptor profile data.";
+                list traffic-descriptor-profile {
+                  key "name";
+                  leaf name {
+                    type string;
+                  }
+                  leaf fixed-bandwidth {
+                    type uint64;
+                    units "bits/second";
+                    default "0";
+                  }
+                  leaf assured-bandwidth {
+                    type uint64;
+                    units "bits/second";
+                    default "0";
+                  }
+                  leaf maximum-bandwidth {
+                    type uint64;
+                    units "bits/second";
+                    mandatory true;
+                  }
+                  leaf priority {
+                    type uint8 {
+                      range "1..8";
+                    }
+                  }
+                  leaf weight {
+                    type uint8;
+                  }
+                  leaf additional-bw-eligibility-indicator {
+                    type enumeration {
+                      enum "non-assured-sharing";
+                      enum "best-effort-sharing";
+                      enum "none";
+                    }
+                  }
+                }
+              }
+
+              augment "/bbf-xpongemtcont:xpongemtcont" {
+                container traffic-descriptor-profiles {
+                  uses traffic-descriptor-profile-data;
+                }
+              }
+            }
+        "#;
+
+        // Test metadata extraction
+        let metadata = extract_yang_metadata(yang).unwrap();
+        let expected_metadata = YangModuleMetadata {
+            name: "bbf-xpongemtcont-traffic-descriptor-profile-body".to_string(),
+            namespace: None,
+            prefix: None,
+            revision: Some("2020-10-13".to_string()),
+            is_submodule_of: Some("bbf-xpongemtcont".to_string()),
+        };
+        assert_eq!(metadata, expected_metadata);
+
+        // Test dependencies extraction
+        let deps = extract_yang_dependencies(yang).unwrap();
+        let expected_deps = YangDependencies {
+            imports: vec![],
+            includes: vec![YangInclude {
+                submodule_name: "bbf-xpongemtcont-base".to_string(),
+                revision_date: None,
+            }],
+        };
+        assert_eq!(deps, expected_deps);
+    }
 }
