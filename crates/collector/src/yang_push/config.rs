@@ -122,189 +122,123 @@ impl
     fn serialize_json(
         &self,
         input: (Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper),
-    ) -> Result<serde_json::Value, TelemetryYangConverterError> {
+    ) -> Result<Vec<u8>, TelemetryYangConverterError> {
         let telemetry_message_wrapper = input.2;
-        serde_json::to_value(telemetry_message_wrapper).map_err(Into::into)
+        serde_json::to_vec(&telemetry_message_wrapper).map_err(Into::into)
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use chrono::TimeZone;
-//     use std::{
-//         io::Write,
-//         net::{IpAddr, Ipv4Addr, SocketAddr},
-//     };
-//     use tempfile::NamedTempFile;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+    use netgauze_yang_push::model::telemetry::*;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-//     fn create_test_schema_file() -> NamedTempFile {
-//         let mut file = NamedTempFile::new().expect("Failed to create temp
-// file");         let schema_content = r#"{
-//             "name": "test-telemetry-message",
-//             "schema_type": {
-//                 "Other": "YANG"
-//             },
-//             "schema": "module test-telemetry-message { namespace
-// \"urn:test\"; prefix tm; }",             "references": [],
-//             "properties": null,
-//             "tags": null
-//         }"#;
-//         file.write_all(schema_content.as_bytes())
-//             .expect("Failed to write test schema");
-//         file
-//     }
+    fn create_test_subscription_info(ip: IpAddr) -> SubscriptionInfo {
+        SubscriptionInfo::new(
+            SocketAddr::new(ip, 8080),
+            1,
+            "test-content-id".to_string(),
+            netgauze_udp_notif_pkt::notification::Target::new_datastore(
+                "ietf-datastores:operational".to_string(),
+                either::Right("/test-path".to_string()),
+            ),
+            vec!["test-module".to_string()],
+        )
+    }
 
-//     fn create_test_subscription_info() -> SubscriptionInfo {
-//         SubscriptionInfo::new(SocketAddr::new(
-//             IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
-//             8080,
-//         ))
-//         .with_subscription_id(1)
-//         .with_content_id("test-subscription".to_string())
-//     }
+    fn create_test_telemetry_message_wrapper() -> TelemetryMessageWrapper {
+        use chrono::Utc;
+        TelemetryMessageWrapper::new(TelemetryMessage::new(
+            None,
+            TelemetryMessageMetadata::new(
+                None,
+                Utc.timestamp_millis_opt(0).unwrap(),
+                EventType::Update,
+                None,
+                SessionProtocol::YangPush,
+                "127.0.0.1".parse().unwrap(),
+                None,
+                None,
+                None,
+                None,
+            ),
+            None,
+            None,
+            None,
+        ))
+    }
 
-//     fn create_test_telemetry_message_wrapper() -> TelemetryMessageWrapper {
-//         use chrono::Utc;
-//         use netgauze_yang_push::model::telemetry::*;
+    #[test]
+    fn test_new_converter() {
+        let root_name = "ietf-telemetry-message".to_string();
+        let converter = TelemetryYangConverter::new(root_name.clone(), None, None);
 
-//         TelemetryMessageWrapper::new(TelemetryMessage::new(
-//             None,
-//             TelemetryMessageMetadata::new(
-//                 None,
-//                 Utc.timestamp_millis_opt(0).unwrap(),
-//                 SessionProtocol::YangPush,
-//                 "127.0.0.1".parse().unwrap(),
-//                 None,
-//                 None,
-//                 None,
-//                 None,
-//             ),
-//             None,
-//             None,
-//             None,
-//         ))
-//     }
+        assert_eq!(converter.root_schema_name, root_name);
+        assert!(converter.subject_prefix.is_none());
+        assert!(converter.default_yang_lib_ref.is_none());
+    }
 
-//     #[test]
-//     fn test_new_converter() {
-//         let schema_path = PathBuf::from("root-schema.json");
-//         let converter = TelemetryYangConverter::new(schema_path.clone());
+    #[test]
+    fn test_trait_getters() {
+        let root_name = "test-root".to_string();
+        let mut converter = TelemetryYangConverter::new(root_name.clone(), None, None);
+        converter.subject_prefix = Some("prefix".to_string());
 
-//         assert_eq!(converter.root_schema, schema_path);
-//     }
+        assert_eq!(converter.root_schema_name(), root_name);
+        assert_eq!(converter.subject_prefix(), Some("prefix"));
+    }
 
-//     #[test]
-//     fn test_get_root_schema_success() {
-//         let schema_file = create_test_schema_file();
-//         let converter =
-// TelemetryYangConverter::new(schema_file.path().to_path_buf());
+    #[test]
+    fn test_content_id_extraction() {
+        let converter = TelemetryYangConverter::new("test".to_string(), None, None);
+        let content_id = Some("cid-123".to_string());
+        let sub_info = create_test_subscription_info(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+        let msg = create_test_telemetry_message_wrapper();
 
-//         let result = converter.get_root_schema();
-//         assert!(result.is_ok());
-//     }
+        let input = (content_id.clone(), sub_info, msg);
+        assert_eq!(converter.content_id(&input), content_id);
+    }
 
-//     #[test]
-//     fn test_get_root_schema_file_not_found() {
-//         let converter =
-// TelemetryYangConverter::new(PathBuf::from("nonexistent.json"));
+    #[test]
+    fn test_get_key_ipv4() {
+        let converter = TelemetryYangConverter::new("test".to_string(), None, None);
+        let ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
+        let sub_info = create_test_subscription_info(ip);
+        let msg = create_test_telemetry_message_wrapper();
 
-//         let result = converter.get_root_schema();
-//         assert!(result.is_err());
+        let input = (None, sub_info, msg);
+        let key = converter.get_key(&input).unwrap();
+        assert_eq!(key, serde_json::Value::String("192.168.1.1".to_string()));
+    }
 
-//         match result.unwrap_err() {
-//             TelemetryYangConverterError::IoError(_) => {}
-//             _ => panic!("Expected IoError"),
-//         }
-//     }
+    #[test]
+    fn test_get_key_ipv6() {
+        let converter = TelemetryYangConverter::new("test".to_string(), None, None);
+        let ip = IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1));
+        let sub_info = create_test_subscription_info(ip);
+        let msg = create_test_telemetry_message_wrapper();
 
-//     #[test]
-//     fn test_get_root_schema_invalid_json() {
-//         let mut file = NamedTempFile::new().expect("Failed to create temp
-// file");         file.write_all(b"invalid json")
-//             .expect("Failed to write invalid JSON");
+        let input = (None, sub_info, msg);
+        let key = converter.get_key(&input).unwrap();
+        assert_eq!(key, serde_json::Value::String("2001:db8::1".to_string()));
+    }
 
-//         let converter =
-// TelemetryYangConverter::new(file.path().to_path_buf());
+    #[test]
+    fn test_serialize_json_success() {
+        let converter = TelemetryYangConverter::new("test".to_string(), None, None);
+        let sub_info = create_test_subscription_info(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+        let msg = create_test_telemetry_message_wrapper();
+        let expected = serde_json::to_value(&msg).unwrap();
 
-//         let result = converter.get_root_schema();
-//         assert!(result.is_err());
+        // Call serialize_json to serialize into bytes
+        let input = (None, sub_info, msg);
+        let result = converter.serialize_json(input);
+        assert!(result.is_ok());
 
-//         match result.unwrap_err() {
-//             TelemetryYangConverterError::JsonError(_) => {}
-//             _ => panic!("Expected JsonError"),
-//         }
-//     }
-
-//     #[test]
-//     fn test_get_key_extracts_ip_address() {
-//         let schema_file = create_test_schema_file();
-//         let converter =
-// TelemetryYangConverter::new(schema_file.path().to_path_buf());
-
-//         let subscription_info = create_test_subscription_info();
-//         let message_wrapper = create_test_telemetry_message_wrapper();
-//         let input = (subscription_info, message_wrapper);
-
-//         let key = converter.get_key(&input);
-//         assert_eq!(
-//             key.unwrap(),
-//             serde_json::Value::String("192.168.1.1".to_string())
-//         );
-//     }
-
-//     #[test]
-//     fn test_get_key_with_ipv6() {
-//         let schema_file = create_test_schema_file();
-//         let converter =
-// TelemetryYangConverter::new(schema_file.path().to_path_buf());
-
-//         let ipv6_addr = "2001:db8::1".parse().unwrap();
-//         let subscription_info =
-// SubscriptionInfo::new(SocketAddr::new(ipv6_addr, 8080))
-// .with_subscription_id(1)
-// .with_content_id("test-subscription".to_string());         let
-// message_wrapper = create_test_telemetry_message_wrapper();         let input
-// = (subscription_info, message_wrapper);
-
-//         let key = converter.get_key(&input);
-//         assert_eq!(
-//             key.unwrap(),
-//             serde_json::Value::String("2001:db8::1".to_string())
-//         );
-//     }
-
-//     #[test]
-//     fn test_serialize_json_success() {
-//         let schema_file = create_test_schema_file();
-//         let converter =
-// TelemetryYangConverter::new(schema_file.path().to_path_buf());
-
-//         let subscription_info = create_test_subscription_info();
-//         let message_wrapper = create_test_telemetry_message_wrapper();
-//         let input = (subscription_info, message_wrapper);
-
-//         let result = converter.serialize_json(input);
-
-//         assert!(result.is_ok());
-//         let json_value = result.unwrap();
-
-//         println!("{}", serde_json::to_string(&json_value).unwrap());
-
-//         let expected_json_str = r#"{
-//     "ietf-telemetry-message:message": {
-//         "telemetry-message-metadata": {
-//             "collection-timestamp": "1970-01-01T00:00:00Z",
-//             "session-protocol": "yp-push",
-//             "export-address": "127.0.0.1"
-//         }
-//     }
-// }"#;
-
-//         let expected_json: serde_json::Value =
-//             serde_json::from_str(expected_json_str).expect("Expected JSON
-// should be valid");
-
-//         assert_eq!(json_value, expected_json);
-//     }
-// }
+        // Deserialize back into json_value and check
+        let json_value: serde_json::Value = serde_json::from_slice(&result.unwrap()).unwrap();
+        assert_eq!(json_value, expected);
+    }
+}
