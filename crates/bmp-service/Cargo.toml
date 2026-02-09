@@ -18,7 +18,7 @@ categories = ["network-programming", "parsing"]
 [dependencies]
 netgauze-bmp-pkt = { workspace = true, features = ["serde", "codec"] }
 
-tokio = { workspace = true, default-features = false, features = ["macros", "net"] }
+tokio = { workspace = true, default-features = false, features = ["macros", "net", "time"] }
 tokio-util = { workspace = true, default-features = false }
 futures-util = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
