@@ -23,8 +23,8 @@ name = "tests"
 path = "tests/tests.rs"
 
 [dependencies]
-syn = { workspace = true, default-features = false, features = ["full"] }
-quote = { workspace = true }
+syn = { workspace = true, default-features = true, features = ["extra-traits", "full"] }
+quote = { workspace = true, default-features = true }
 
 [dev-dependencies]
 netgauze-parse-utils = { workspace = true }
