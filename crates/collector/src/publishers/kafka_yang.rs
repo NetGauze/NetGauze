@@ -83,7 +83,7 @@ pub trait YangConverter<T, E: std::error::Error> {
     fn get_key(&self, input: &T) -> Option<serde_json::Value>;
 
     /// Serialize the input data to YANG-compliant JSON
-    fn serialize_json(&self, input: T) -> Result<serde_json::Value, E>;
+    fn serialize_json(&self, input: T) -> Result<Vec<u8>, E>;
 }
 
 /// Configuration for the Kafka YANG publisher
@@ -544,10 +544,11 @@ where
     async fn send(&mut self, input: T) -> Result<(), KafkaYangPublisherActorError<E>> {
         let content_id = self.config.yang_converter.content_id(&input);
         let key = self.config.yang_converter.get_key(&input);
-        let value = match self.config.yang_converter.serialize_json(input) {
-            Ok(json_value) => json_value,
+
+        let encoded_value = match self.config.yang_converter.serialize_json(input) {
+            Ok(bytes) => bytes,
             Err(err) => {
-                error!("Error serializing message to JSON: {err}");
+                error!("Error serializing message to JSON bytes: {err}");
                 self.stats.error_decode.add(
                     1,
                     &[opentelemetry::KeyValue::new(
@@ -556,21 +557,6 @@ where
                     )],
                 );
                 return Err(KafkaYangPublisherActorError::YangConverterError(err));
-            }
-        };
-
-        let encoded_value = match serde_json::to_vec(&value) {
-            Ok(value) => value,
-            Err(err) => {
-                error!("Error encoding serde_json::value for payload into byte array: {err}");
-                self.stats.error_decode.add(
-                    1,
-                    &[opentelemetry::KeyValue::new(
-                        "netgauze.json.encode.error.msg",
-                        err.to_string(),
-                    )],
-                );
-                return Err(KafkaYangPublisherActorError::JsonError(err));
             }
         };
 
