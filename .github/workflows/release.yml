@@ -2,7 +2,7 @@ name: Release
 
 on:
   release:
-    types: [published]
+    types: [ published ]
 
 permissions:
   contents: read
@@ -47,6 +47,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install stable
         uses: dtolnay/rust-toolchain@stable
+      - name: Install curl-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev
       - name: Publish crates
         uses: katyo/publish-crates@v2
         with:
