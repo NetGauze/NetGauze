@@ -82,6 +82,9 @@ pub enum NetConfSshClientError {
 
     #[strum(to_string = "Error computing the YANG dependency graph {0}")]
     DependencyError(DependencyError),
+
+    #[strum(to_string = "Error in exchanging the <hello> message with the server: {0}")]
+    HelloMessageError(String),
 }
 
 impl std::error::Error for NetConfSshClientError {}
@@ -118,6 +121,7 @@ pub enum SshAuth {
 pub struct NetconfSshConnectConfig<H> {
     auth: SshAuth,
     host: SocketAddr,
+    announce_caps: HashSet<Capability>,
     handler: H,
     config: Arc<russh::client::Config>,
 }
@@ -126,12 +130,14 @@ impl<H: russh::client::Handler> NetconfSshConnectConfig<H> {
     pub const fn new(
         auth: SshAuth,
         host: SocketAddr,
+        announce_caps: HashSet<Capability>,
         handler: H,
         config: Arc<russh::client::Config>,
     ) -> Self {
         Self {
             auth,
             host,
+            announce_caps,
             handler,
             config,
         }
@@ -143,6 +149,10 @@ impl<H: russh::client::Handler> NetconfSshConnectConfig<H> {
 
     pub const fn host(&self) -> SocketAddr {
         self.host
+    }
+
+    pub const fn announce_caps(&self) -> &HashSet<Capability> {
+        &self.announce_caps
     }
 
     pub const fn handler(&self) -> &H {
@@ -208,7 +218,7 @@ where
         config.host
     );
     let stream = channel.into_stream();
-    NetConfSshClient::connect(config.host, stream).await
+    NetConfSshClient::connect(config.host, stream, config.announce_caps).await
 }
 
 pub struct NetConfSshClient<T> {
@@ -262,11 +272,21 @@ impl<T> NetConfSshClient<T> {
 impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
     async fn exchange_hello(
         mut framed: Framed<T, SshCodec>,
+        announce_caps: HashSet<Capability>,
     ) -> Result<(Framed<T, SshCodec>, u32, HashSet<Capability>), NetConfSshClientError> {
         // send a hello message with NETCONF base 1.1 capability to the peer
         // (NetGauze does not support base 1.0 protocol)
-        let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
-        let hello = NetConfMessage::Hello(Hello::new(None, announce_caps.clone()));
+        if !announce_caps.contains(&Capability::NetconfBase(NetconfVersion::V1_1)) {
+            return Err(
+                NetConfSshClientError::HelloMessageError("Client is not configured with the mandatory `urn:ietf:params:netconf:base:1.1` capability".to_string())
+            );
+        }
+        if announce_caps.contains(&Capability::NetconfBase(NetconfVersion::V1_0)) {
+            return Err(
+                NetConfSshClientError::HelloMessageError("Client is configured with the `urn:ietf:params:netconf:base:1.0` capability which is not supported".to_string())
+            );
+        }
+        let hello = NetConfMessage::Hello(Hello::new(None, announce_caps));
         framed.send(hello).await?;
 
         let msg = framed.next().await.ok_or_else(|| {
@@ -290,9 +310,17 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         Ok((framed, session_id, peer_caps))
     }
 
-    pub async fn connect(peer: SocketAddr, stream: T) -> Result<Self, NetConfSshClientError> {
+    /// Connect to a NETCONF server via SSH.
+    /// The client can choose which NETCONF capabilities to announce to the
+    /// server, the [NetconfVersion::V1_1] is required and
+    /// [NetconfVersion::V1_0] is not allowed
+    pub async fn connect(
+        peer: SocketAddr,
+        stream: T,
+        announce_caps: HashSet<Capability>,
+    ) -> Result<Self, NetConfSshClientError> {
         let framed = Framed::new(stream, SshCodec::default());
-        let (framed, session_id, peer_caps) = Self::exchange_hello(framed).await?;
+        let (framed, session_id, peer_caps) = Self::exchange_hello(framed, announce_caps).await?;
         let next_message_id = 10110;
         Ok(Self {
             peer,
