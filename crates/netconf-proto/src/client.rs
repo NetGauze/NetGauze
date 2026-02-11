@@ -281,9 +281,9 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             .session_id()
             .ok_or_else(|| NetConfSshClientError::SessionIdIsNotDefined)?;
         let peer_caps = received_hello.capabilities().clone();
-        // NetGauze doesn't support the old version of NETCONF SSH
-        let mut announce_caps = peer_caps.clone();
-        announce_caps.remove(&Capability::NetconfBase(NetconfVersion::V1_0));
+        // send hello message with NETCONF base 1.1 capability to the peer
+        // (NetGauze does not support base 1.0 protocol)
+        let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
         let hello = NetConfMessage::Hello(Hello::new(None, announce_caps.clone()));
         framed.send(hello).await?;
         Ok((framed, session_id, peer_caps))
