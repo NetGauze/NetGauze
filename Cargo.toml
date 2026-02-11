@@ -24,24 +24,24 @@ members = [
 resolver = "2"
 
 [workspace.dependencies]
-netgauze-pcap-reader = { version = "0.9.2", path = "crates/pcap-reader" }
-netgauze-bgp-pkt = { version = "0.9.2", path = "crates/bgp-pkt" }
-netgauze-bgp-speaker = { version = "0.9.2", path = "crates/bgp-speaker" }
-netgauze-bmp-service = { version = "0.9.2", path = "crates/bmp-service" }
-netgauze-bmp-pkt = { version = "0.9.2", path = "crates/bmp-pkt" }
-netgauze-iana = { version = "0.9.2", path = "crates/iana" }
-netgauze-ipfix-code-generator = { version = "0.9.2", path = "crates/ipfix-code-generator" }
-netgauze-flow-pkt = { version = "0.9.2", path = "crates/flow-pkt" }
-netgauze-flow-service = { version = "0.9.2", path = "crates/flow-service" }
-netgauze-locate = { version = "0.9.2", path = "crates/locate" }
-netgauze-parse-utils = { version = "0.9.2", path = "crates/parse-utils" }
-netgauze-serde-macros = { version = "0.9.2", path = "crates/serde-macros" }
-netgauze-udp-notif-pkt = { version = "0.9.2", path = "crates/udp-notif-pkt" }
-netgauze-udp-notif-service = { version = "0.9.2", path = "crates/udp-notif-service" }
-netgauze-analytics = { version = "0.9.2", path = "crates/analytics" }
-netgauze-yang-push = { version = "0.9.2", path = "crates/yang-push" }
-netgauze-pcap-decoder = { version = "0.9.2", path = "crates/pcap-decoder" }
-netgauze-netconf-proto = { version = "0.9.2", path = "crates/netconf-proto" }
+netgauze-pcap-reader = { version = "0.9.3", path = "crates/pcap-reader" }
+netgauze-bgp-pkt = { version = "0.9.3", path = "crates/bgp-pkt" }
+netgauze-bgp-speaker = { version = "0.9.3", path = "crates/bgp-speaker" }
+netgauze-bmp-service = { version = "0.9.3", path = "crates/bmp-service" }
+netgauze-bmp-pkt = { version = "0.9.3", path = "crates/bmp-pkt" }
+netgauze-iana = { version = "0.9.3", path = "crates/iana" }
+netgauze-ipfix-code-generator = { version = "0.9.3", path = "crates/ipfix-code-generator" }
+netgauze-flow-pkt = { version = "0.9.3", path = "crates/flow-pkt" }
+netgauze-flow-service = { version = "0.9.3", path = "crates/flow-service" }
+netgauze-locate = { version = "0.9.3", path = "crates/locate" }
+netgauze-parse-utils = { version = "0.9.3", path = "crates/parse-utils" }
+netgauze-serde-macros = { version = "0.9.3", path = "crates/serde-macros" }
+netgauze-udp-notif-pkt = { version = "0.9.3", path = "crates/udp-notif-pkt" }
+netgauze-udp-notif-service = { version = "0.9.3", path = "crates/udp-notif-service" }
+netgauze-analytics = { version = "0.9.3", path = "crates/analytics" }
+netgauze-yang-push = { version = "0.9.3", path = "crates/yang-push" }
+netgauze-pcap-decoder = { version = "0.9.3", path = "crates/pcap-decoder" }
+netgauze-netconf-proto = { version = "0.9.3", path = "crates/netconf-proto" }
 thiserror = "2.0"
 async-channel = "2.5"
 libc = { version = "0.2" }
