@@ -263,6 +263,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
     async fn exchange_hello(
         mut framed: Framed<T, SshCodec>,
     ) -> Result<(Framed<T, SshCodec>, u32, HashSet<Capability>), NetConfSshClientError> {
+        // send a hello message with NETCONF base 1.1 capability to the peer
+        // (NetGauze does not support base 1.0 protocol)
+        let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
+        let hello = NetConfMessage::Hello(Hello::new(None, announce_caps.clone()));
+        framed.send(hello).await?;
+
         let msg = framed.next().await.ok_or_else(|| {
             SshCodecError::IO(io::Error::new(
                 io::ErrorKind::BrokenPipe,
@@ -281,11 +287,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             .session_id()
             .ok_or_else(|| NetConfSshClientError::SessionIdIsNotDefined)?;
         let peer_caps = received_hello.capabilities().clone();
-        // send hello message with NETCONF base 1.1 capability to the peer
-        // (NetGauze does not support base 1.0 protocol)
-        let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
-        let hello = NetConfMessage::Hello(Hello::new(None, announce_caps.clone()));
-        framed.send(hello).await?;
         Ok((framed, session_id, peer_caps))
     }
 
