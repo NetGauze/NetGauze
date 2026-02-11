@@ -26,9 +26,10 @@
 //! - [`FetcherResult`]: Type alias for fetch operation results
 
 use crate::cache::storage::{SubscriptionInfo, YangLibraryCacheError};
+use netgauze_netconf_proto::capabilities::{Capability, NetconfVersion};
 use netgauze_netconf_proto::client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect};
 use netgauze_netconf_proto::yanglib::{PermissiveVersionChecker, YangLibrary};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -109,7 +110,9 @@ impl NetconfYangLibraryFetcher {
         );
         let ssh_handler = SshHandler::default();
         let auth = SshAuth::Key { user, private_key };
-        let config = NetconfSshConnectConfig::new(auth, host, ssh_handler, client_config);
+        let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
+        let config =
+            NetconfSshConnectConfig::new(auth, host, announce_caps, ssh_handler, client_config);
 
         let mut client = match tokio::time::timeout(timeout_duration, connect(config)).await {
             Ok(Ok(c)) => c,

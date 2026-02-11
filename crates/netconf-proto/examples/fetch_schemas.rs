@@ -15,11 +15,12 @@
 
 use anyhow::anyhow;
 use clap::Parser;
+use netgauze_netconf_proto::capabilities::{Capability, NetconfVersion};
 use netgauze_netconf_proto::client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect};
 use netgauze_netconf_proto::xml_utils::{XmlDeserialize, XmlSerialize, XmlWriter};
 use netgauze_netconf_proto::yanglib::{PermissiveVersionChecker, YangLibrary};
 use quick_xml::NsReader;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
@@ -141,7 +142,8 @@ pub async fn main() -> anyhow::Result<()> {
     info!("connecting to {}", args.host);
     let auth = get_auth(&args)?;
 
-    let config = NetconfSshConnectConfig::new(auth, host, ssh_handler, ssh_config);
+    let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
+    let config = NetconfSshConnectConfig::new(auth, host, announce_caps, ssh_handler, ssh_config);
     let mut client = connect(config).await?;
     info!("connected to {}", args.host);
 

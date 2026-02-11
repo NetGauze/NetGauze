@@ -14,6 +14,7 @@
 // limitations under the License.
 
 use clap::Parser;
+use netgauze_netconf_proto::capabilities::{Capability, NetconfVersion};
 use netgauze_netconf_proto::client::{NetconfSshConnectConfig, SshAuth, SshHandler, connect};
 use netgauze_netconf_proto::xml_utils::{XmlSerialize, XmlWriter};
 use netgauze_netconf_proto::yanglib::PermissiveVersionChecker;
@@ -101,7 +102,8 @@ pub async fn main() -> anyhow::Result<()> {
         anyhow::bail!("Either username/password or username/private key need to be defined");
     };
 
-    let config = NetconfSshConnectConfig::new(auth, host, ssh_handler, ssh_config);
+    let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
+    let config = NetconfSshConnectConfig::new(auth, host, announce_caps, ssh_handler, ssh_config);
     let mut client = connect(config).await?;
     info!("Connected to server with caps: {:?}", client.peer_caps());
 
