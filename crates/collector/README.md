@@ -8,18 +8,61 @@ Work in progress for telemetry collection. Currently supports:
 
 With publisher towards Kafka and HTTP endpoints.
 
+## Installation
+
+### From RPM (Recommended for RHEL/Rocky/Alma Linux)
+
+Pre-built RPM packages are available on the [GitHub Releases](https://github.com/NetGauze/NetGauze/releases) page.
+
+1. Download the latest RPM for your architecture (e.g., `netgauze-collector-X.Y.Z-1.el8.x86_64.rpm`).
+2. Install using `dnf` or `rpm`:
+   ```bash
+   sudo dnf install ./netgauze-collector-*.rpm
+   ```
+   The RPM installs the binary to `/usr/bin/netgauze-collector` and sets the necessary capabilities (`cap_net_raw+ep`).
+
+### From Source
+
+To build from source, you need a Rust toolchain installed. We recommend using [rustup](https://rustup.rs/).
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/NetGauze/NetGauze.git
+   cd NetGauze
+   ```
+2. Run using cargo:
+   ```bash
+   cargo run -p netgauze-collector --release -- crates/collector/config.yaml
+   ```
+   *Note: You might need to install development libraries such as `libcurl-devel` (or `libcurl4-openssl-dev` on Debian/Ubuntu) depending on your OS.*
+
 ## Running the Collector
 
+Run the collector with a specific config file:
 ```bash
-# Run with a config file
+netgauze-collector /path/to/config.yaml
+
+# Or if running from source:
 cargo run -p netgauze-collector -- /path/to/config.yaml
 ```
 
-## Logging Configuration
+## Configuration
+
+See example configuration files in collector crate root.
+
+Key configuration sections:
+
+- `logging`: Log level configuration
+- `runtime`: Tokio runtime settings (thread count)
+- `telemetry`: OpenTelemetry exporter settings
+- `flow`: IPFIX/NetFlow v9 collection and publishing
+- `udp_notif`: UDP Notification collection and publishing
+
+### Logging Configuration
 
 The collector uses `tracing` with `EnvFilter` for flexible log level control.
 
-### Basic Usage
+#### Basic Usage
 
 Set the default log level in your `config.yaml`:
 
@@ -28,7 +71,7 @@ logging:
   level: "info" # Valid: trace, debug, info, warn, error
 ```
 
-### Runtime Override with `RUST_LOG`
+#### Runtime Override with `RUST_LOG`
 
 Override the log level at runtime using the `RUST_LOG` environment variable:
 
@@ -44,7 +87,7 @@ RUST_LOG="warn,netgauze_collector::flow=trace,netgauze_collector::yang_push=debu
   cargo run -p netgauze-collector -- config.yaml
 ```
 
-### Filter Syntax Examples
+#### Filter Syntax Examples
 
 The `EnvFilter` supports powerful filtering directives:
 
@@ -55,14 +98,14 @@ The `EnvFilter` supports powerful filtering directives:
 - `[{field_name}]=trace` - Enable trace logs for events/spans with specific field
 - `warn,tokio::net=debug` - Global warn, but debug for tokio::net
 
-### Precedence
+#### Precedence
 
 1. **`RUST_LOG` environment variable** (highest priority)
 2. **Config file `logging.level`**
 
 **Note**: Invalid log levels or EnvFilters file will cause the collector to exit immediately with a clear error message.
 
-## Telemetry
+### Telemetry Configuration
 
 The collector exports OpenTelemetry metrics via OTLP/gRPC:
 
@@ -90,18 +133,6 @@ The collector handles `Ctrl+C` (SIGINT) gracefully:
 2. Drains in-flight messages from buffers
 3. Shuts down publishers (1s timeout each)
 4. Exits cleanly
-
-## Configuration
-
-See example configuration files in collector crate root.
-
-Key configuration sections:
-
-- `logging`: Log level configuration
-- `runtime`: Tokio runtime settings (thread count)
-- `telemetry`: OpenTelemetry exporter settings
-- `flow`: IPFIX/NetFlow v9 collection and publishing
-- `udp_notif`: UDP Notification collection and publishing
 
 ## Memory Allocator
 
