@@ -61,7 +61,7 @@ tower-service = { version = "0.3", default-features = false }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 bytes = "1.10"
-rand = "0.9"
+rand = "0.10"
 ipnet = { version = "2.11" }
 strum = "0.27"
 strum_macros = "0.27"
