@@ -13,15 +13,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use netgauze_bmp_pkt::BmpMessage;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
+use std::io;
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use netgauze_bmp_pkt::codec::BmpCodecDecoderError;
-use std::fmt::{Display, Formatter};
-use std::net::SocketAddr;
 
+pub mod actor;
 pub mod handle;
 pub mod server;
+pub mod supervisor;
 pub mod transport;
+
+pub type ActorId = u32;
+pub type SubscriberId = u32;
+pub type BmpRequest = (AddrInfo, BmpMessage);
+
+pub type BmpSender = async_channel::Sender<Arc<BmpRequest>>;
+pub type BmpReceiver = async_channel::Receiver<Arc<BmpRequest>>;
+
+pub fn create_bmp_channel(buffer_size: usize) -> (BmpSender, BmpReceiver) {
+    async_channel::bounded(buffer_size)
+}
+
+#[derive(Debug, Clone)]
+pub struct Subscription {
+    pub(crate) actor_id: ActorId,
+    pub(crate) id: SubscriberId,
+}
+
+impl Display for Subscription {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Subscription {{ actor_id: {}, id: {} }}",
+            self.actor_id, self.id
+        )
+    }
+}
 
 /// Capture the address of both sides of a socket
 #[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Debug, Serialize, Deserialize)]
@@ -75,3 +107,65 @@ impl Display for TaggedData<AddrInfo, BmpCodecDecoderError> {
 }
 
 impl std::error::Error for TaggedData<AddrInfo, BmpCodecDecoderError> {}
+
+/// Enable socket reuse and bind to a device or a VRF on selected platforms for
+/// TCP. Binding to device or VRF is supported on: MacOS and Linux.
+///
+/// Unused variables is enabled to silence the Clippy error for platforms
+/// that doesn't support binding to an interface.#[allow(unused_variables)]
+pub fn new_tcp_reuse_port(
+    local_addr: SocketAddr,
+    device: Option<String>,
+    backlog: i32,
+) -> io::Result<tokio::net::TcpListener> {
+    let tcp_sock = socket2::Socket::new(
+        if local_addr.is_ipv4() {
+            socket2::Domain::IPV4
+        } else {
+            socket2::Domain::IPV6
+        },
+        socket2::Type::STREAM,
+        None,
+    )?;
+    tcp_sock.set_reuse_address(true)?;
+    #[cfg(all(unix, not(any(target_os = "solaris", target_os = "illumos"))))]
+    tcp_sock.set_reuse_port(true)?;
+    #[cfg(unix)]
+    tcp_sock.set_cloexec(true)?;
+    tcp_sock.set_nonblocking(true)?;
+
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "android",
+        target_os = "fuchsia",
+        target_os = "linux"
+    ))]
+    if let Some(name) = device {
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "watchos",
+        ))]
+        {
+            let c_str = std::ffi::CString::new(name)?;
+            let c_index = unsafe { libc::if_nametoindex(c_str.as_ptr() as *const libc::c_char) };
+            let index = std::num::NonZeroU32::new(c_index as u32);
+            if local_addr.is_ipv4() {
+                tcp_sock.bind_device_by_index_v4(index)?;
+            } else {
+                tcp_sock.bind_device_by_index_v6(index)?;
+            }
+        }
+        #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
+        tcp_sock.bind_device(Some(name.as_bytes()))?
+    }
+
+    tcp_sock.bind(&socket2::SockAddr::from(local_addr))?;
+    tcp_sock.listen(backlog)?;
+    let tcp_sock: std::net::TcpListener = tcp_sock.into();
+    tokio::net::TcpListener::from_std(tcp_sock)
+}
