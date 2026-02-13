@@ -45,12 +45,29 @@ use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::net::IpAddr;
 
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum FlowOutputConfigValidationError {
+    #[strum(to_string = "Invalid FieldConfig for {0}, reason: {1}")]
+    InvalidFieldConfig(String, String),
+}
+
+impl std::error::Error for FlowOutputConfigValidationError {}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowOutputConfig {
     pub fields: IndexMap<String, FieldConfig>,
 }
 
 impl FlowOutputConfig {
+    pub fn validate(&self) -> Result<(), FlowOutputConfigValidationError> {
+        for (name, field_config) in &self.fields {
+            field_config.validate().map_err(|e| {
+                FlowOutputConfigValidationError::InvalidFieldConfig(name.to_string(), e.to_string())
+            })?;
+        }
+        Ok(())
+    }
+
     fn get_fields_schema(&self, indent: usize) -> Vec<String> {
         let mut fields_schema = vec![];
         let mut custom_primitives = false;
@@ -175,6 +192,23 @@ impl AvroConverter<(IpAddr, FlowInfo), FunctionError> for FlowOutputConfig {
     }
 }
 
+#[derive(Debug, Clone, strum_macros::Display)]
+pub enum FieldConfigValidationError {
+    #[strum(to_string = "Coalesce list cannot be empty")]
+    EmptyCoalesceList,
+
+    #[strum(to_string = "Multi-select list cannot be empty")]
+    EmptyMultiList,
+
+    #[strum(to_string = "Invalid transform: {0}")]
+    InvalidTransform(String),
+
+    #[strum(to_string = "Incompatible default: {0}")]
+    IncompatibleDefault(String),
+}
+
+impl std::error::Error for FieldConfigValidationError {}
+
 /// Configure how fields are selected and what transformations are applied for
 /// each IE in the [FlowInfo]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,6 +226,196 @@ pub struct FieldConfig {
 }
 
 impl FieldConfig {
+    /// Validate that the transform and default are compatible with the selected
+    /// IE(s)
+    pub fn validate(&self) -> Result<(), FieldConfigValidationError> {
+        let ies = match &self.select {
+            FieldSelectFunction::Single(s) => vec![s.ie()],
+            FieldSelectFunction::Coalesce(c) => c.ies.iter().map(|s| s.ie()).collect(),
+            FieldSelectFunction::Multi(m) => m.ies.iter().map(|s| s.ie()).collect(),
+            FieldSelectFunction::Layer2SegmentId(l2) => vec![l2.single_select.ie()],
+        };
+
+        if ies.is_empty() {
+            return Err(match &self.select {
+                FieldSelectFunction::Coalesce(_) => FieldConfigValidationError::EmptyCoalesceList,
+                FieldSelectFunction::Multi(_) => FieldConfigValidationError::EmptyMultiList,
+                _ => unreachable!(), // will fail at struct serde due to missing ie field
+            });
+        }
+
+        self.validate_select_transform_compatibility(&ies)?;
+
+        for ie in &ies {
+            self.validate_ie_compatibility(*ie)?;
+        }
+
+        if let Some(default) = &self.default {
+            self.validate_default(default)?;
+        }
+
+        Ok(())
+    }
+
+    fn validate_select_transform_compatibility(
+        &self,
+        ies: &[IE],
+    ) -> Result<(), FieldConfigValidationError> {
+        use {FieldSelectFunction as SF, FieldTransformFunction as TF};
+
+        match (&self.select, &self.transform) {
+            (SF::Multi(_), TF::StringArrayAgg | TF::StringMapAgg(_) | TF::MplsIndex) => {
+                // Validate StringMapAgg rename keys match selected IEs
+                if let TF::StringMapAgg(Some(rename_map)) = &self.transform {
+                    let ie_set: HashSet<_> = ies.iter().copied().collect();
+                    for ie in rename_map.keys() {
+                        if !ie_set.contains(ie) {
+                            return Err(FieldConfigValidationError::InvalidTransform(format!(
+                                "StringMapAgg rename references {ie} not in Multi select"
+                            )));
+                        }
+                    }
+                }
+                Ok(())
+            }
+
+            // Multi selection requires an aggregating transform
+            (SF::Multi(_), other) => Err(FieldConfigValidationError::InvalidTransform(format!(
+                "Transform {:?} cannot be used with Multi selection. Use an aggregating \
+                 transform ('StringArrayAgg', 'StringMapAgg', or 'MplsIndex'). IEs: {}",
+                other,
+                ies.iter()
+                    .map(|ie| format!("{} ({:?})", ie, ie.data_type()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))),
+
+            // Single or Coalesce selection cannot be used with aggregating transforms
+            (
+                SF::Single(_) | SF::Coalesce(_) | SF::Layer2SegmentId(_),
+                TF::StringArrayAgg | TF::StringMapAgg(_) | TF::MplsIndex,
+            ) => Err(FieldConfigValidationError::InvalidTransform(format!(
+                "Transform {:?} requires Multi selection. IEs: {}",
+                self.transform,
+                ies.iter()
+                    .map(|ie| format!("{} ({:?})", ie, ie.data_type()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))),
+
+            // Coalesce selection with mixed types requires explicit transform
+            (SF::Coalesce(_), TF::Identity) => {
+                let first_type = ie_avro_type(ies[0]);
+                if ies.iter().any(|ie| ie_avro_type(*ie) != first_type) {
+                    return Err(FieldConfigValidationError::InvalidTransform(format!(
+                        "Coalesce selection with mixed types require explicit \
+                        transform ('String', 'TrimmedString', 'LowercaseString', \
+                       'TimestampMillisString', 'Rename'). IEs: {}",
+                        ies.iter()
+                            .map(|ie| format!("{} ({:?})", ie, ie.data_type()))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )));
+                }
+                Ok(())
+            }
+
+            // Layer2SegmentId must use correct IE
+            (SF::Layer2SegmentId(_), _) if ies.len() != 1 || ies[0] != IE::layer2SegmentId => {
+                Err(FieldConfigValidationError::InvalidTransform(
+                    "Layer2SegmentId requires layer2SegmentId IE".to_string(),
+                ))
+            }
+
+            // All other combinations are valid
+            _ => Ok(()),
+        }
+    }
+
+    fn validate_ie_compatibility(&self, ie: IE) -> Result<(), FieldConfigValidationError> {
+        use FieldTransformFunction as TF;
+
+        match &self.transform {
+            TF::TimestampMillisString => {
+                if !matches!(
+                    ie.data_type(),
+                    InformationElementDataType::dateTimeSeconds
+                        | InformationElementDataType::dateTimeMilliseconds
+                        | InformationElementDataType::dateTimeMicroseconds
+                        | InformationElementDataType::dateTimeNanoseconds
+                ) {
+                    return Err(FieldConfigValidationError::InvalidTransform(format!(
+                        "TimestampMillisString requires timestamp IE, got {} ({:?})",
+                        ie,
+                        ie.data_type()
+                    )));
+                }
+            }
+
+            TF::StringArray => {
+                if ie != IE::tcpControlBits {
+                    return Err(FieldConfigValidationError::InvalidTransform(format!(
+                        "StringArray currently only works with tcpControlBits, got {ie}"
+                    )));
+                }
+            }
+
+            TF::MplsIndex => {
+                if !matches!(
+                    ie,
+                    IE::mplsLabelStackSection
+                        | IE::mplsLabelStackSection2
+                        | IE::mplsLabelStackSection3
+                        | IE::mplsLabelStackSection4
+                        | IE::mplsLabelStackSection5
+                        | IE::mplsLabelStackSection6
+                        | IE::mplsLabelStackSection7
+                        | IE::mplsLabelStackSection8
+                        | IE::mplsLabelStackSection9
+                        | IE::mplsLabelStackSection10
+                ) {
+                    return Err(FieldConfigValidationError::InvalidTransform(format!(
+                        "MplsIndex requires MPLS label stack fields, got {ie}"
+                    )));
+                }
+            }
+
+            // String transforms require TryInto<String> (implemented for all types except Bytes)
+            TF::String
+            | TF::TrimmedString
+            | TF::LowercaseString
+            | TF::Rename(_)
+            | TF::StringArrayAgg
+            | TF::StringMapAgg(_) => {
+                if ie_avro_type(ie) == AvroValueKind::Bytes {
+                    return Err(FieldConfigValidationError::InvalidTransform(format!(
+                        "{:?} requires String conversion, but {} is Bytes type ({:?})",
+                        self.transform,
+                        ie,
+                        ie.data_type()
+                    )));
+                }
+            }
+
+            TF::Identity => {}
+        }
+
+        Ok(())
+    }
+
+    fn validate_default(&self, default: &RawValue) -> Result<(), FieldConfigValidationError> {
+        let expected = self.avro_type();
+        let actual = default.avro_type();
+
+        if expected != actual {
+            Err(FieldConfigValidationError::IncompatibleDefault(format!(
+                "Default type mismatch: expected {expected:?}, {actual:?}"
+            )))
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn get_record_schema(&self, name: &str, inner_val: Option<AvroValueKind>) -> String {
         let mut schema = "{ ".to_string();
         schema.push_str(format!("\"name\": \"{name}\", ").as_str());
@@ -629,6 +853,14 @@ impl FieldTransformFunction {
             Some(fields) => fields,
             None => return Ok(None),
         };
+
+        tracing::trace!(
+            "Transform apply: transform={:?}, num_fields={}, first_field={:?}",
+            self,
+            fields.len(),
+            fields.first().map(|f| f.ie())
+        );
+
         match self {
             Self::Identity => Ok(fields.into_iter().last().map(|x| x.into())),
 
