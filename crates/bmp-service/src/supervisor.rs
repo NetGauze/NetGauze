@@ -525,3 +525,6 @@ impl BmpSupervisorHandle {
         Ok(results)
     }
 }
+
+#[cfg(test)]
+mod tests;

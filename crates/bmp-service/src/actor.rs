@@ -352,7 +352,7 @@ impl BmpActor {
         let _ = tx.try_send(subscription);
     }
 
-    /// remove a subscriber and update the subscription map.
+    /// Remove a subscriber and update the subscription map.
     fn handle_unsubscribe(
         &mut self,
         subscriber_id: SubscriberId,
@@ -678,8 +678,6 @@ impl BmpActor {
             }
             Err(mpsc::error::TrySendError::Full(_)) => {
                 // Channel full - actor is backed up processing closures
-                // This is rare but acceptable: the actor will clean up later
-                // or when a new connection arrives for this address
                 // TODO: consider a periodic sweep task if we observe such warn
                 warn!(
                     actor_id = %actor_id,
@@ -1078,3 +1076,6 @@ impl BmpActorHandle {
         rx.recv().await.ok_or(BmpActorHandleError::ReceiveError)
     }
 }
+
+#[cfg(test)]
+mod tests;
