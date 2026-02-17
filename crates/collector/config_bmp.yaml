@@ -1,0 +1,30 @@
+runtime:
+  # Total number of OS threads used allocated for NetGauze.
+  # If not specified, the number of threads will equal the number of CPU cores.
+  threads: 4
+
+logging:
+  level: netgauze_collector=debug,netgauze_bmp_service=debug,info
+  ansi: true
+
+telemetry:
+  url: http://localhost:4317/v1/metrics
+  id: netgauze-sample-instance
+  exporter_timeout: 3000
+  reader_interval: 60000
+  reader_timeout: 3000
+
+bmp:
+  listeners:
+    - address: "[::]:1790"
+      workers: 1
+    - address: "[::]:1792"
+      workers: 1
+  publishers:
+    raw-json:
+      endpoints:
+        main: !KafkaJson
+          topic: netgauze-bmp-raw-json
+          producer_config:
+            bootstrap.servers: localhost:49092
+          writer_id: writer1
