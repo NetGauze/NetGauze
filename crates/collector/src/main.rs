@@ -20,7 +20,7 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 use anyhow::anyhow;
 use futures::Future;
 use netgauze_collector::config::{CollectorConfig, TelemetryConfig};
-use netgauze_collector::{init_flow_collection, init_udp_notif_collection};
+use netgauze_collector::{init_bmp_collection, init_flow_collection, init_udp_notif_collection};
 use opentelemetry::global;
 use serde_yaml::from_reader;
 use shadow_rs::shadow;
@@ -161,6 +161,12 @@ fn main() -> anyhow::Result<()> {
             let flow_handle: Pin<Box<dyn Future<Output = Result<(), anyhow::Error>>>> =
                 Box::pin(init_flow_collection(flow_config, meter.clone()));
             handles.push(flow_handle);
+        }
+
+        if let Some(bmp_config) = config.bmp {
+            let bmp_handle: Pin<Box<dyn Future<Output = Result<(), anyhow::Error>>>> =
+                Box::pin(init_bmp_collection(bmp_config, meter.clone()));
+            handles.push(bmp_handle);
         }
 
         if let Some(udp_notif_config) = config.udp_notif {
