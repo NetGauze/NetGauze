@@ -39,6 +39,7 @@ pub(crate) fn decode_html_entities(s: &str) -> String {
         .replace("&#38;", "&")
         .replace("&#60;", "<")
         .replace("&#62;", ">")
+        .replace("#13", "\r")
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
