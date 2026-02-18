@@ -112,8 +112,8 @@
 //! ```
 
 use crate::{
-    ActorId, OTL_UDP_NOTIF_MESSAGE_ID_KEY, OTL_UDP_NOTIF_PUBLISHER_ID_KEY, SubscriberId,
-    Subscription, UdpNotifReceiver, UdpNotifRequest, UdpNotifSender, create_udp_notif_channel,
+    ActorId, OTL_UDP_NOTIF_PUBLISHER_ID_KEY, SubscriberId, Subscription, UdpNotifReceiver,
+    UdpNotifRequest, UdpNotifSender, create_udp_notif_channel,
 };
 use bytes::{Bytes, BytesMut};
 use futures_util::StreamExt;
@@ -298,10 +298,6 @@ impl UdpNotifActor {
                             opentelemetry::Value::I64(addr.port().into()),
                         ),
                         opentelemetry::KeyValue::new(
-                            OTL_UDP_NOTIF_MESSAGE_ID_KEY,
-                            opentelemetry::Value::I64(message_id.into()),
-                        ),
-                        opentelemetry::KeyValue::new(
                             OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
                             opentelemetry::Value::I64(publisher_id.into()),
                         ),
@@ -398,10 +394,6 @@ impl UdpNotifActor {
                             opentelemetry::Value::I64(socket_addr.port().into()),
                         ),
                         opentelemetry::KeyValue::new(
-                            OTL_UDP_NOTIF_MESSAGE_ID_KEY,
-                            opentelemetry::Value::I64(message_id.into()),
-                        ),
-                        opentelemetry::KeyValue::new(
                             OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
                             opentelemetry::Value::I64(publisher_id.into()),
                         ),
@@ -443,10 +435,6 @@ impl UdpNotifActor {
                                 opentelemetry::Value::I64(socket_addr.port().into()),
                             ),
                             opentelemetry::KeyValue::new(
-                                OTL_UDP_NOTIF_MESSAGE_ID_KEY,
-                                opentelemetry::Value::I64(message_id.into()),
-                            ),
-                            opentelemetry::KeyValue::new(
                                 OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
                                 opentelemetry::Value::I64(publisher_id.into()),
                             ),
@@ -480,10 +468,6 @@ impl UdpNotifActor {
                             opentelemetry::KeyValue::new(
                                 "network.peer.port",
                                 opentelemetry::Value::I64(socket_addr.port().into()),
-                            ),
-                            opentelemetry::KeyValue::new(
-                                OTL_UDP_NOTIF_MESSAGE_ID_KEY,
-                                opentelemetry::Value::I64(message_id.into()),
                             ),
                             opentelemetry::KeyValue::new(
                                 OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
@@ -526,10 +510,6 @@ impl UdpNotifActor {
                     opentelemetry::KeyValue::new(
                         "network.peer.port",
                         opentelemetry::Value::I64(socket_addr.port().into()),
-                    ),
-                    opentelemetry::KeyValue::new(
-                        OTL_UDP_NOTIF_MESSAGE_ID_KEY,
-                        opentelemetry::Value::I64(message_id.into()),
                     ),
                     opentelemetry::KeyValue::new(
                         OTL_UDP_NOTIF_PUBLISHER_ID_KEY,
