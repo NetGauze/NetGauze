@@ -16,7 +16,7 @@ keywords = ["ipfix", "netflow", "parser", "code", "generator"]
 categories = ["network-programming"]
 
 [dependencies]
-reqwest = { workspace = true, default-features = false, features = ["blocking", "rustls-tls"] }
+reqwest = { workspace = true, default-features = false, features = ["blocking", "rustls"] }
 roxmltree = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
