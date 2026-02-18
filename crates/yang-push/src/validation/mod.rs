@@ -125,7 +125,7 @@ use netgauze_udp_notif_pkt::notification::{
     NotificationVariant, SubscriptionId, SubscriptionStartedModified,
 };
 use netgauze_udp_notif_pkt::raw::UdpNotifPacket;
-use netgauze_udp_notif_service::{OTL_UDP_NOTIF_MESSAGE_ID_KEY, OTL_UDP_NOTIF_PUBLISHER_ID_KEY};
+use netgauze_udp_notif_service::OTL_UDP_NOTIF_PUBLISHER_ID_KEY;
 use rustc_hash::FxHashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -478,17 +478,12 @@ impl ValidationActor {
         peer: SocketAddr,
         packet: &UdpNotifPacket,
     ) -> Vec<opentelemetry::KeyValue> {
-        let message_id = packet.message_id();
         let publisher_id = packet.publisher_id();
         Vec::from([
             opentelemetry::KeyValue::new("network.peer.address", format!("{}", peer.ip())),
             opentelemetry::KeyValue::new(
                 "network.peer.port",
                 opentelemetry::Value::I64(peer.port().into()),
-            ),
-            opentelemetry::KeyValue::new(
-                OTL_UDP_NOTIF_MESSAGE_ID_KEY,
-                opentelemetry::Value::I64(message_id.into()),
             ),
             opentelemetry::KeyValue::new(
                 OTL_UDP_NOTIF_PUBLISHER_ID_KEY,

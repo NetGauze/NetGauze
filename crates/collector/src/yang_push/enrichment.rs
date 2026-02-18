@@ -38,7 +38,7 @@ use netgauze_udp_notif_pkt::decoded::{UdpNotifPacketDecoded, UdpNotifPayload};
 use netgauze_udp_notif_pkt::notification::{
     NotificationVariant, SubscriptionId, SubscriptionStartedModified, SubscriptionTerminated,
 };
-use netgauze_udp_notif_service::{OTL_UDP_NOTIF_MESSAGE_ID_KEY, OTL_UDP_NOTIF_PUBLISHER_ID_KEY};
+use netgauze_udp_notif_service::OTL_UDP_NOTIF_PUBLISHER_ID_KEY;
 use netgauze_yang_push::cache::storage::SubscriptionInfo;
 use netgauze_yang_push::model::telemetry::{
     EventType, FilterSpec, Label, Manifest, NetworkOperatorMetadata, SessionProtocol,
@@ -715,7 +715,6 @@ impl YangPushEnrichmentActor {
                         Ok(msg) => {
                             let (content_id, subscription_info, pkt) = msg;
                             let peer = subscription_info.peer();
-                            let message_id = pkt.message_id();
                             let publisher_id = pkt.publisher_id();
                             let peer_tags = [
                                 opentelemetry::KeyValue::new(
@@ -725,10 +724,6 @@ impl YangPushEnrichmentActor {
                                 opentelemetry::KeyValue::new(
                                     "network.peer.port",
                                     opentelemetry::Value::I64(peer.port().into()),
-                                ),
-                                opentelemetry::KeyValue::new(
-                                    OTL_UDP_NOTIF_MESSAGE_ID_KEY,
-                                    opentelemetry::Value::I64(message_id.into())
                                 ),
                                 opentelemetry::KeyValue::new(
                                     OTL_UDP_NOTIF_PUBLISHER_ID_KEY,

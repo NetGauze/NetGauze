@@ -127,5 +127,4 @@ pub fn new_udp_reuse_port(
     udp_sock.try_into()
 }
 
-pub const OTL_UDP_NOTIF_MESSAGE_ID_KEY: &str = "netgauze.udp.notif.message_id";
 pub const OTL_UDP_NOTIF_PUBLISHER_ID_KEY: &str = "netgauze.udp.notif.publisher_id";
