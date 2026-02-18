@@ -45,7 +45,7 @@ reqwest = { workspace = true, default-features = false, features = [
     "http2",
     "json",
     "stream",
-    "rustls-tls-native-roots",
+    "rustls",
 ] }
 chrono = { workspace = true, default-features = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"]}
