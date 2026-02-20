@@ -594,6 +594,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
                     && !visited.contains(dev_module.name())
                 {
                     to_process.push_back(ModuleType::Full(dev_module.clone()));
+                } else if let Some(dev_modules) = yang_lib.find_import_module(deviation_name) {
+                    for dev_module in dev_modules {
+                        if !visited.contains(dev_module.name()) {
+                            to_process.push_back(ModuleType::ImportOnly(dev_module.clone()));
+                        }
+                    }
                 }
             }
 
@@ -603,6 +609,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
                     && !visited.contains(augmented_by.name())
                 {
                     to_process.push_back(ModuleType::Full(augmented_by.clone()));
+                } else if let Some(augmented_bys) = yang_lib.find_import_module(augmentation_name) {
+                    for augmented_by in augmented_bys {
+                        if !visited.contains(augmented_by.name()) {
+                            to_process.push_back(ModuleType::ImportOnly(augmented_by.clone()));
+                        }
+                    }
                 }
             }
             match module {
