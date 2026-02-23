@@ -98,7 +98,7 @@ impl Ord for UpdateTreatment {
     }
 }
 
-#[derive(Debug, PartialEq, strum_macros::Display, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, strum_macros::Display, serde::Serialize, serde::Deserialize)]
 pub enum BgpEvent<A> {
     /// **Event 1:** Local system administrator manually starts the peer
     /// connection.
