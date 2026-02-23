@@ -1,7 +1,6 @@
 # Rust
 debug/
 target/
-Cargo.lock
 
 # Ignore Fuzzer outputs
 fuzz/artifacts/
