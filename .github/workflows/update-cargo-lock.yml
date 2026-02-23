@@ -1,0 +1,48 @@
+name: Update Cargo.lock
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Every Monday at 8am UTC
+  workflow_dispatch:     # Allow manual triggering
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run cargo update
+        run: cargo update
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --exit-code Cargo.lock; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.PR_PAT }}
+          commit-message: "chore: update Cargo.lock dependencies"
+          branch: chore/cargo-update
+          branch-suffix: timestamp
+          title: "chore: update Cargo.lock dependencies"
+          body: |
+            Automated Cargo.lock dependency update via `cargo update`.
+
+            This PR was created by the **Update Dependencies** workflow.
+            CI will run against the updated `Cargo.lock` to verify nothing is broken.
+          labels: dependencies, automated
+          delete-branch: true
