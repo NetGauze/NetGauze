@@ -86,7 +86,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
         match handler.local_addresses().await {
             Ok(addresses) => {
                 for (actor_id, addr) in addresses {
-                    info!(actor_id = %actor_id, listening_on = %addr, "Actor listening",);
+                    info!(actor_id, listening_on = %addr, "Actor listening",);
                 }
             }
             Err(e) => error!(error = %e, "Failed to get local addresses"),
@@ -104,7 +104,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
                     Ok(s) => s,
                     Err(e) => {
                         error!(error = %e, "Failed to serialize BMP message (should never happen)");
-                        format!("{:?}", bmp_msg)
+                        format!("{bmp_msg:?}")
                     }
                 };
 
@@ -127,8 +127,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
                     Ok(results) => {
                         for (actor_id, peers) in results {
                             info!(
-                                actor_id = %actor_id,
-                                peers_count = %peers.len(),
+                                actor_id,
+                                peers_count = peers.len(),
                                 peers = ?peers,
                                 "Actor connected peers status"
                             );

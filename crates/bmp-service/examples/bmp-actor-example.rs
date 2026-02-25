@@ -87,11 +87,11 @@ async fn disconnect_peer_handler(
     match handler.disconnect_peer(peer_addr).await {
         Ok(true) => Ok(Json(DisconnectResponse {
             success: true,
-            message: format!("Successfully disconnected peer {}", peer_addr),
+            message: format!("Successfully disconnected peer {peer_addr}"),
         })),
         Ok(false) => Ok(Json(DisconnectResponse {
             success: false,
-            message: format!("Peer {} not found", peer_addr),
+            message: format!("Peer {peer_addr} not found"),
         })),
         Err(e) => {
             tracing::error!(error = %e, "Error disconnecting peer");
@@ -139,7 +139,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
                     Ok(s) => s,
                     Err(e) => {
                         error!(error = %e, "Failed to serialize BMP message (should never happen)");
-                        format!("{:?}", bmp_msg)
+                        format!("{bmp_msg:?}")
                     }
                 };
 
@@ -148,7 +148,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
                 tracing::info!(
                     local_addr = %addrinfo.local_socket(),
                     peer_addr = %addrinfo.remote_socket(),
-                    "Received BMP message: {}", json_msg);
+                    "Received BMP message: {json_msg}");
             }
         });
 
@@ -161,8 +161,8 @@ pub fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> 
                 match handler_clone.get_connected_peers().await {
                     Ok((actor_id, peers)) => {
                         info!(
-                            actor_id = %actor_id,
-                            peers_count = %peers.len(),
+                            actor_id,
+                            peers_count = peers.len(),
                             peers = ?peers,
                             "Actor connected peers status"
                         );

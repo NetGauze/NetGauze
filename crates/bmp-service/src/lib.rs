@@ -14,13 +14,12 @@
 // limitations under the License.
 
 use netgauze_bmp_pkt::BmpMessage;
+use netgauze_bmp_pkt::codec::BmpCodecDecoderError;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
-
-use netgauze_bmp_pkt::codec::BmpCodecDecoderError;
 
 pub mod actor;
 pub mod handle;
@@ -41,10 +40,23 @@ pub fn create_bmp_channel(buffer_size: usize) -> (BmpSender, BmpReceiver) {
 
 #[derive(Debug, Clone)]
 pub struct Subscription {
-    pub(crate) actor_id: ActorId,
-    pub(crate) id: SubscriberId,
+    actor_id: ActorId,
+    id: SubscriberId,
 }
 
+impl Subscription {
+    pub const fn new(actor_id: ActorId, id: SubscriberId) -> Self {
+        Self { actor_id, id }
+    }
+
+    pub const fn actor_id(&self) -> ActorId {
+        self.actor_id
+    }
+
+    pub const fn id(&self) -> SubscriberId {
+        self.id
+    }
+}
 impl Display for Subscription {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -110,9 +122,6 @@ impl std::error::Error for TaggedData<AddrInfo, BmpCodecDecoderError> {}
 
 /// Enable socket reuse and bind to a device or a VRF on selected platforms for
 /// TCP. Binding to device or VRF is supported on: MacOS and Linux.
-///
-/// Unused variables is enabled to silence the Clippy error for platforms
-/// that doesn't support binding to an interface.#[allow(unused_variables)]
 pub fn new_tcp_reuse_port(
     local_addr: SocketAddr,
     device: Option<String>,

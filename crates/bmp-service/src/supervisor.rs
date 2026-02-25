@@ -186,14 +186,14 @@ impl BmpSupervisor {
             match cmd {
                 SupervisorCommand::BmpActorCommand(actor_cmd) => {
                     debug!(
-                        count = %self.actor_handlers.len(),
+                        count = self.actor_handlers.len(),
                         command = %actor_cmd,
                         "Broadcasting command to actors"
                     );
                     for handle in self.actor_handlers.values() {
                         if let Err(_err) = handle.cmd_tx.send(actor_cmd.clone()).await {
                             error!(
-                                actor_id = %handle.actor_id(),
+                                actor_id = handle.actor_id(),
                                 local_addr = %handle.local_addr(),
                                 "Failed to send command to Actor"
                             )
@@ -212,7 +212,7 @@ impl BmpSupervisor {
                                 match handle.unsubscribe(*id).await {
                                     Ok(_) => {
                                         info!(
-                                            actor_id = %handle.actor_id(),
+                                            actor_id = handle.actor_id(),
                                             local_addr = %handle.local_addr(),
                                             "Unsubscribed from actor"
                                         );
@@ -220,7 +220,7 @@ impl BmpSupervisor {
                                     }
                                     Err(err) => {
                                         error!(
-                                            actor_id = %handle.actor_id(),
+                                            actor_id = handle.actor_id(),
                                             local_addr = %handle.local_addr(),
                                             error = ?err,
                                             "Failed to send command to Actor"
@@ -231,7 +231,7 @@ impl BmpSupervisor {
                         }
                         if let Err(err) = tx.send(send_back).await {
                             error!(
-                                actor_id = %handle.actor_id(),
+                                actor_id = handle.actor_id(),
                                 local_addr = %handle.local_addr(),
                                 error = ?err,
                                 "Failed to send back the results unsubscribe command from Actor"
@@ -301,7 +301,7 @@ impl BmpSupervisorHandle {
         for binding_address in config.binding_addresses {
             for _ in 0..binding_address.num_workers {
                 info!(
-                    actor_id = %next_actor_id,
+                    actor_id = next_actor_id,
                     socket_addr = %binding_address.socket_addr,
                     "Starting actor listening on socket"
                 );
@@ -354,7 +354,10 @@ impl BmpSupervisorHandle {
         &self,
         buffer_size: usize,
     ) -> Result<(BmpReceiver, Vec<Subscription>), BmpSupervisorHandleError> {
-        trace!(buffer_size = %buffer_size, "Sending new subscription request to supervisor");
+        trace!(
+            buffer_size,
+            "Sending new subscription request to supervisor"
+        );
         let (pkt_tx, pkt_rx) = create_bmp_channel(buffer_size);
         let subscriptions = self.subscribe_tx(pkt_tx).await?;
         Ok((pkt_rx, subscriptions))
@@ -366,9 +369,8 @@ impl BmpSupervisorHandle {
         buffer_size: usize,
     ) -> Result<(Vec<BmpReceiver>, Vec<Subscription>), BmpSupervisorHandleError> {
         trace!(
-            num_workers = %num_workers,
-            buffer_size = %buffer_size,
-            "Sending new subscription request to supervisor"
+            num_workers,
+            buffer_size, "Sending new subscription request to supervisor"
         );
         let mut pkt_tx = Vec::with_capacity(num_workers);
         let mut pkt_rx = Vec::with_capacity(num_workers);
