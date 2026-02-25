@@ -1,3 +1,18 @@
+// Copyright (C) 2026-present The NetGauze Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+// implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use super::*;
 use futures_util::SinkExt;
 use netgauze_bmp_pkt::BmpMessage;
@@ -94,8 +109,8 @@ async fn test_supervisor_subscribe_unsubscribe() {
     // senders
     timeout(Duration::from_millis(500), pkt_rx.recv())
         .await
-        .expect("Timed out waiting for channel closure")
-        .expect_err("Channel should be closed");
+        .expect("timed out waiting for channel closure")
+        .expect_err("channel should be closed");
 
     handle
         .shutdown()
@@ -118,32 +133,42 @@ async fn test_supervisor_peer_management() {
 
     // Connect to the FIRST actor specifically
     let (target_actor_id, target_addr) = local_addrs[0];
-    let stream = TcpStream::connect(target_addr).await.unwrap();
-    let client_addr = stream.local_addr().unwrap();
+    let stream = TcpStream::connect(target_addr)
+        .await
+        .expect("failed to connect to target actor");
+    let client_addr = stream
+        .local_addr()
+        .expect("failed to obtain client local address");
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // 1. Verify specific actor has the peer
-    let peers_list = handle.get_connected_peers().await.unwrap();
+    let peers_list = handle
+        .get_connected_peers()
+        .await
+        .expect("failed to get connected peers from supervisor handle");
 
     // Find the peers for our specific target actor
     let (_, active_peers) = peers_list
         .iter()
         .find(|(id, _)| *id == target_actor_id)
-        .expect("Actor should exist in peers list");
+        .expect("actor should exist in peers list");
 
     assert!(
         active_peers.contains(&client_addr),
         "Target actor should have the peer"
     );
     // 2. Disconnect
-    let results = handle.disconnect_peer(client_addr).await.unwrap();
+    let results = handle
+        .disconnect_peer(client_addr)
+        .await
+        .expect("failed to request disconnect for peer");
 
     // Verify only the target actor returned 'true'
     let (_disconnected_actor, was_disconnected) = results
         .iter()
         .find(|(id, _)| *id == target_actor_id)
-        .unwrap();
+        .expect("failed to request disconnect for peer");
     assert!(was_disconnected);
     assert!(
         results
@@ -152,7 +177,10 @@ async fn test_supervisor_peer_management() {
             .all(|(_, disc)| !disc)
     );
 
-    handle.shutdown().await.unwrap();
+    handle
+        .shutdown()
+        .await
+        .expect("failed to shutdown supervisor");
 }
 
 #[tokio::test]
@@ -173,13 +201,22 @@ async fn test_supervisor_sharded_subscription() {
     assert_eq!(receivers.len(), 2);
 
     // Connect to the first available actor
-    let target_addr = handle.local_addresses().await.unwrap()[0].1;
-    let stream = TcpStream::connect(target_addr).await.unwrap();
+    let target_addr = handle
+        .local_addresses()
+        .await
+        .expect("failed to fetch actor local addresses")[0]
+        .1;
+    let stream = TcpStream::connect(target_addr)
+        .await
+        .expect("failed to create a TCP connection to actor");
     let mut framed = FramedWrite::new(stream, BmpCodec::default());
 
     // Send a test message
     let test_msg = create_test_message();
-    framed.send(test_msg.clone()).await.unwrap();
+    framed
+        .send(test_msg.clone())
+        .await
+        .expect("failed to send test BMP message");
 
     // Wait for the message on either of the two shards
     // recv() returns Result<Arc<(AddrInfo, BmpMessage)>, RecvError>
@@ -190,12 +227,15 @@ async fn test_supervisor_sharded_subscription() {
         }
     })
     .await
-    .expect("Timed out waiting for message");
+    .expect("timed out waiting for message");
 
-    let packet = recv_result.expect("Channel closed unexpectedly");
+    let packet = recv_result.expect("channel closed unexpectedly");
     let (_, received_msg) = &*packet;
 
     assert_eq!(received_msg, &test_msg);
 
-    handle.shutdown().await.unwrap();
+    handle
+        .shutdown()
+        .await
+        .expect("failed to shutdown supervisor");
 }
