@@ -229,7 +229,7 @@ impl BmpActor {
         subscriber_timeout: Duration,
         stats: BmpActorStats,
     ) -> Self {
-        let (subscribers_tx, _) = broadcast::channel(1); // only keep latest subscriber map
+        let (subscribers_tx, _) = broadcast::channel(16);
         let (connection_closed_tx, connection_closed_rx) = mpsc::channel(1000);
         Self {
             actor_id,
@@ -253,30 +253,72 @@ impl BmpActor {
         local_addr: &SocketAddr,
         remote_addr: Option<&SocketAddr>,
     ) -> Vec<KeyValue> {
-        let mut tags = vec![
-            KeyValue::new("actor.id", actor_id.to_string()),
-            KeyValue::new("network.local.address", local_addr.to_string()),
-        ];
         if let Some(remote) = remote_addr {
-            tags.push(KeyValue::new("network.peer.address", remote.to_string()));
+            vec![
+                KeyValue::new("actor.id", actor_id.to_string()),
+                KeyValue::new("network.local.address", local_addr.to_string()),
+                KeyValue::new("network.peer.address", remote.to_string()),
+            ]
+        } else {
+            vec![
+                KeyValue::new("actor.id", actor_id.to_string()),
+                KeyValue::new("network.local.address", local_addr.to_string()),
+            ]
         }
-        tags
+    }
+
+    /// Return a simple table of current connection tasks (one entry per line).
+    /// Sorted by socket address for deterministic output. Use for debugging
+    /// purposes only.
+    fn connection_tasks_table(&self) -> String {
+        let mut entries: Vec<_> = self
+            .connection_tasks
+            .iter()
+            .map(|(addr, task)| (addr.to_string(), format!("{}", task.id())))
+            .collect();
+        entries.sort_by_key(|(addr, _)| addr.clone());
+
+        let header_left = "Peer Address";
+        let header_right = "Tokio Task Id";
+
+        let mut left_width = header_left.len();
+        let mut right_width = header_right.len();
+        for (left, right) in &entries {
+            left_width = left_width.max(left.len());
+            right_width = right_width.max(right.len());
+        }
+
+        let mut out = String::with_capacity(entries.len().saturating_mul(64));
+        out.push_str(&format!(
+            "| {header_left:left_width$} | {header_right:>right_width$} |\n"
+        ));
+
+        // separator line under header using underscores
+        out.push_str(&format!(
+            "| {:-<left_width$} | {:-<right_width$} |\n",
+            "", ""
+        ));
+
+        for (left, right) in entries {
+            out.push_str(&format!("| {left:left_width$} | {right:>right_width$} |\n",));
+        }
+        out
     }
 
     /// Handle command from the actor handle.
     /// Returns Some(tx) if shutdown was requested, None otherwise.
-    fn handle_command(&mut self, cmd: BmpActorCommand) -> Option<mpsc::Sender<ActorId>> {
+    async fn handle_command(&mut self, cmd: BmpActorCommand) -> Option<mpsc::Sender<ActorId>> {
         match cmd {
             BmpActorCommand::Shutdown(tx) => {
                 info!(
-                    actor_id = %self.actor_id,
+                    actor_id = self.actor_id,
                     local_addr = %self.local_addr,
                     "Received shutdown command"
                 );
                 // Abort all connection tasks on shutdown
                 for (addr, task) in self.connection_tasks.drain() {
                     debug!(
-                        actor_id = %self.actor_id,
+                        actor_id = self.actor_id,
                         local_addr = %self.local_addr,
                         peer_addr = %addr,
                         "Aborting connection task for shutdown"
@@ -287,33 +329,74 @@ impl BmpActor {
             }
 
             BmpActorCommand::Subscribe(tx, senders) => {
-                self.handle_subscribe(tx, senders);
+                self.handle_subscribe(tx, senders).await;
             }
             BmpActorCommand::Unsubscribe(subscriber_id, tx) => {
-                self.handle_unsubscribe(subscriber_id, tx);
+                self.handle_unsubscribe(subscriber_id, tx).await;
             }
             BmpActorCommand::LocalAddr(tx) => {
-                let _ = tx.try_send((self.actor_id, self.local_addr));
+                debug!(
+                    actor_id = self.actor_id,
+                    local_addr = %self.local_addr,
+                    "LocalAddr: responding with actor's socket localAddr"
+                );
+
+                // Here don't block as it's not a critical command
+                match tx.try_send((self.actor_id, self.local_addr)) {
+                    Ok(()) => {}
+                    Err(mpsc::error::TrySendError::Full(_)) => {
+                        warn!(
+                            actor_id = self.actor_id,
+                            local_addr = %self.local_addr,
+                            "LocalAddr response channel full, dropping response"
+                        );
+                    }
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                        warn!(
+                            actor_id = self.actor_id,
+                            local_addr = %self.local_addr,
+                            "LocalAddr response channel closed, dropping response"
+                        );
+                    }
+                }
             }
             BmpActorCommand::DisconnectPeer(addr, tx) => {
-                self.handle_disconnect_peer(addr, tx);
+                self.handle_disconnect_peer(addr, tx).await;
             }
             BmpActorCommand::GetConnectedPeers(tx) => {
                 let peers: Vec<SocketAddr> = self.connection_tasks.keys().copied().collect();
                 debug!(
-                    actor_id = %self.actor_id,
+                    actor_id = self.actor_id,
                     local_addr = %self.local_addr,
-                    connected_peers_count = %peers.len(),
+                    connected_peers_count = peers.len(),
                     "GetConnectedPeers: responding with peers list"
                 );
-                let _ = tx.try_send((self.actor_id, peers));
+
+                // Here don't block as it's not a critical command
+                match tx.try_send((self.actor_id, peers)) {
+                    Ok(()) => {}
+                    Err(mpsc::error::TrySendError::Full(_)) => {
+                        warn!(
+                            actor_id = self.actor_id,
+                            local_addr = %self.local_addr,
+                            "GetConnectedPeers response channel full, dropping response"
+                        );
+                    }
+                    Err(mpsc::error::TrySendError::Closed(_)) => {
+                        warn!(
+                            actor_id = self.actor_id,
+                            local_addr = %self.local_addr,
+                            "GetConnectedPeers response channel closed, dropping response"
+                        );
+                    }
+                }
             }
         }
         None
     }
 
     /// Register a new subscriber and update the subscription map.
-    fn handle_subscribe(&mut self, tx: mpsc::Sender<Subscription>, senders: Vec<BmpSender>) {
+    async fn handle_subscribe(&mut self, tx: mpsc::Sender<Subscription>, senders: Vec<BmpSender>) {
         let subscriber_id = self.next_subscriber_id;
         self.next_subscriber_id += 1;
 
@@ -327,7 +410,7 @@ impl BmpActor {
             // This only happens if there are no active receivers (connection tasks), which
             // is fine
             debug!(
-                actor_id = %self.actor_id,
+                actor_id = self.actor_id,
                 local_addr = %self.local_addr,
                 error = %e,
                 "No active connections to notify of new subscriber"
@@ -343,17 +426,24 @@ impl BmpActor {
             id: subscriber_id,
         };
         debug!(
-            actor_id = %self.actor_id,
+            actor_id = self.actor_id,
             local_addr = %self.local_addr,
-            subscriber_id = %subscription.id,
-            total_subscribers = %self.subscribers.len(),
+            subscriber_id = subscription.id,
+            total_subscribers = self.subscribers.len(),
             "New subscriber registered"
         );
-        let _ = tx.try_send(subscription);
+        if let Err(e) = tx.send(subscription).await {
+            warn!(
+                actor_id = self.actor_id,
+                local_addr = %self.local_addr,
+                error = %e,
+                "Failed to deliver new subscription confirmation (receiver dropped)"
+            );
+        }
     }
 
     /// Remove a subscriber and update the subscription map.
-    fn handle_unsubscribe(
+    async fn handle_unsubscribe(
         &mut self,
         subscriber_id: SubscriberId,
         tx: mpsc::Sender<Option<Subscription>>,
@@ -368,7 +458,7 @@ impl BmpActor {
             // This only happens if there are no active receivers (connection tasks), which
             // is fine
             debug!(
-                actor_id = %self.actor_id,
+                actor_id = self.actor_id,
                 local_addr = %self.local_addr,
                 error = %e,
                 "No active connections to notify of subscriber removal"
@@ -385,17 +475,28 @@ impl BmpActor {
             id: subscriber_id,
         });
         debug!(
-            actor_id = %self.actor_id,
+            actor_id = self.actor_id,
             local_addr = %self.local_addr,
-            subscriber_id = ?subscriber_id,
-            remaining_subscribers = %self.subscribers.len(),
+            subscriber_id,
+            remaining_subscribers = self.subscribers.len(),
             "Unsubscribed"
         );
-        let _ = tx.try_send(subscription);
+        if let Err(e) = tx.send(subscription).await {
+            warn!(
+                actor_id = self.actor_id,
+                local_addr = %self.local_addr,
+                error = %e,
+                "Failed to deliver unsubscription confirmation (receiver dropped)"
+            );
+        }
     }
 
     /// Disconnects a peer if connected.
-    fn handle_disconnect_peer(&mut self, addr: SocketAddr, tx: mpsc::Sender<(ActorId, bool)>) {
+    async fn handle_disconnect_peer(
+        &mut self,
+        addr: SocketAddr,
+        tx: mpsc::Sender<(ActorId, bool)>,
+    ) {
         let disconnected = if let Some(task) = self.connection_tasks.remove(&addr) {
             self.stats.active_connections.record(
                 self.connection_tasks.len() as u64,
@@ -406,25 +507,43 @@ impl BmpActor {
                 &Self::get_tags(self.actor_id, &self.local_addr, Some(&addr)),
             );
 
+            let task_id = task.id();
             task.abort();
 
             info!(
-                actor_id = %self.actor_id,
+                actor_id = self.actor_id,
                 local_addr = %self.local_addr,
                 peer_addr = %addr,
+                task_id = %task_id,
                 "Disconnected peer"
             );
+
+            trace!(
+                "actor_id={} local_addr={}\nCurrent connection tasks table:\n{}",
+                self.actor_id,
+                self.local_addr,
+                self.connection_tasks_table()
+            );
+
             true
         } else {
             warn!(
-                actor_id = %self.actor_id,
+                actor_id = self.actor_id,
                 local_addr = %self.local_addr,
                 peer_addr = %addr,
                 "Peer not found for disconnect"
             );
             false
         };
-        let _ = tx.try_send((self.actor_id, disconnected));
+        if let Err(e) = tx.send((self.actor_id, disconnected)).await {
+            warn!(
+                actor_id = self.actor_id,
+                local_addr = %self.local_addr,
+                peer_addr = %addr,
+                error = %e,
+                "Failed to deliver peer disconnect confirmation (receiver dropped)"
+            );
+        }
     }
 
     /// Send a BMP message to all subscribers.
@@ -456,7 +575,7 @@ impl BmpActor {
             match tokio::time::timeout(timeout, sender.send(request.clone())).await {
                 Ok(Ok(())) => {
                     trace!(
-                        actor_id = %actor_id,
+                        actor_id,
                         local_addr = %local_addr,
                         peer_addr = %peer_addr,
                         "Sent message to subscriber"
@@ -465,7 +584,7 @@ impl BmpActor {
                 }
                 Ok(Err(_)) => {
                     debug!(
-                        actor_id = %actor_id,
+                        actor_id,
                         local_addr = %local_addr,
                         peer_addr = %peer_addr,
                         "Subscriber channel closed"
@@ -474,7 +593,7 @@ impl BmpActor {
                 }
                 Err(_) => {
                     warn!(
-                        actor_id = %actor_id,
+                        actor_id,
                         local_addr = %local_addr,
                         peer_addr = %peer_addr,
                         "Timeout sending to subscriber"
@@ -495,8 +614,8 @@ impl BmpActor {
         stats: &BmpActorStats,
     ) -> bool {
         let peer_tags = Self::get_tags(actor_id, &local_addr, Some(&remote_addr));
-        warn!(
-            actor_id = %actor_id,
+        debug!(
+            actor_id,
             local_addr = %local_addr,
             peer_addr = %remote_addr,
             error = ?err,
@@ -508,8 +627,8 @@ impl BmpActor {
         //       (recoverable, unrecoverable?)
         match err {
             BmpCodecDecoderError::Incomplete(_) => {
-                warn!(
-                    actor_id = %actor_id,
+                debug!(
+                    actor_id,
                     local_addr = %local_addr,
                     peer_addr = %remote_addr,
                     "Incomplete BMP frame, closing connection"
@@ -517,8 +636,8 @@ impl BmpActor {
                 false
             }
             BmpCodecDecoderError::BmpMessageParsingError(_) => {
-                warn!(
-                    actor_id = %actor_id,
+                debug!(
+                    actor_id,
                     local_addr = %local_addr,
                     peer_addr = %remote_addr,
                     "BmpMessageParsingError, closing connection"
@@ -526,8 +645,8 @@ impl BmpActor {
                 false
             }
             BmpCodecDecoderError::IoError(_) => {
-                warn!(
-                    actor_id = %actor_id,
+                debug!(
+                    actor_id,
                     local_addr = %local_addr,
                     peer_addr = %remote_addr,
                     "I/O error, closing connection"
@@ -554,8 +673,8 @@ impl BmpActor {
         let local_addr = addr_info.local_socket();
         let remote_addr = addr_info.remote_socket();
 
-        info!(
-            actor_id = %actor_id,
+        debug!(
+            actor_id,
             local_addr = %local_addr,
             peer_addr = %remote_addr,
             "New connection accepted"
@@ -568,7 +687,7 @@ impl BmpActor {
         // Initialize subscribers map
         let mut current_subscribers = initial_subscribers;
         debug!(
-            actor_id = %actor_id,
+            actor_id,
             local_addr = %local_addr,
             peer_addr = %remote_addr,
             subscriber_count = %current_subscribers.len(),
@@ -582,28 +701,28 @@ impl BmpActor {
                     match update {
                         Ok(new_subscribers) => {
                             debug!(
-                                actor_id = %actor_id,
+                                actor_id,
                                 local_addr = %local_addr,
                                 peer_addr = %remote_addr,
-                                new_subscriber_count = %new_subscribers.len(),
+                                new_subscriber_count = new_subscribers.len(),
                                 "Connection task received subscriber update"
                             );
                             current_subscribers = new_subscribers;
                         }
                         Err(broadcast::error::RecvError::Lagged(skipped)) => {
-                            // With buffer_size=1, lagging means previous update was overwritten
+                            // Lagging means some unseen updates were overwritten
                             // Next recv() will anyway give us the most up to date subscribers map
                             debug!(
-                                actor_id = %actor_id,
+                                actor_id,
                                 local_addr = %local_addr,
                                 peer_addr = %remote_addr,
-                                skipped_updates = %skipped,
+                                skipped_updates = skipped,
                                 "Connection lagged updates (will get latest on next recv)"
                             );
                         }
                         Err(broadcast::error::RecvError::Closed) => {
                             warn!(
-                                actor_id = %actor_id,
+                                actor_id,
                                 local_addr = %local_addr,
                                 peer_addr = %remote_addr,
                                 "Subscriber broadcast closed"
@@ -617,7 +736,7 @@ impl BmpActor {
                     match result {
                         Some(Ok(msg)) => {
                             trace!(
-                                actor_id = %actor_id,
+                                actor_id,
                                 local_addr = %local_addr,
                                 peer_addr = %remote_addr,
                                 "Received BMP message"
@@ -647,7 +766,7 @@ impl BmpActor {
                         }
                         None => {
                             debug!(
-                                actor_id = %actor_id,
+                                actor_id,
                                 local_addr = %local_addr,
                                 peer_addr = %remote_addr,
                                 "Connection closed by peer (EOF, no more frames to decode)"
@@ -659,8 +778,8 @@ impl BmpActor {
             }
         }
 
-        info!(
-            actor_id = %actor_id,
+        debug!(
+            actor_id,
             local_addr = %local_addr,
             peer_addr = %remote_addr,
             "Connection closed"
@@ -670,7 +789,7 @@ impl BmpActor {
         match connection_closed_tx.try_send(remote_addr) {
             Ok(_) => {
                 debug!(
-                    actor_id = %actor_id,
+                    actor_id,
                     local_addr = %local_addr,
                     peer_addr = %remote_addr,
                     "Notified actor of connection closure"
@@ -680,7 +799,7 @@ impl BmpActor {
                 // Channel full - actor is backed up processing closures
                 // TODO: consider a periodic sweep task if we observe such warn
                 warn!(
-                    actor_id = %actor_id,
+                    actor_id,
                     local_addr = %local_addr,
                     peer_addr = %remote_addr,
                     "Connection closure notification channel full"
@@ -692,7 +811,7 @@ impl BmpActor {
             Err(mpsc::error::TrySendError::Closed(_)) => {
                 // Actor is shutting down - this is expected during shutdown
                 debug!(
-                    actor_id = %actor_id,
+                    actor_id,
                     local_addr = %local_addr,
                     peer_addr = %remote_addr,
                     "Actor closed, ignoring connection closure notification"
@@ -715,7 +834,7 @@ impl BmpActor {
         let local_addr = self.local_addr;
 
         info!(
-            actor_id = %actor_id,
+            actor_id,
             local_addr = %local_addr,
             "Started listening on socket"
         );
@@ -728,14 +847,24 @@ impl BmpActor {
                 cmd = self.cmd_rx.recv() => {
                     match cmd {
                         Some(cmd) => {
-                            if let Some(shutdown_tx) = self.handle_command(cmd) {
-                                let _ = shutdown_tx.send(actor_id).await;
+                            if let Some(shutdown_tx) = self.handle_command(cmd).await {
+                                match shutdown_tx.send(actor_id).await {
+                                    Ok(()) => {}
+                                    Err(e) => {
+                                        warn!(
+                                            actor_id = actor_id,
+                                            local_addr = %local_addr,
+                                            error = %e,
+                                            "Failed to send shutdown acknowledgement (receiver dropped)"
+                                        );
+                                    }
+                                }
                                 return Ok((actor_id, local_addr));
                             }
                         }
                         None => {
                             error!(
-                                actor_id = %actor_id,
+                                actor_id,
                                 local_addr = %local_addr,
                                 "Command channel closed unexpectedly"
                             );
@@ -747,7 +876,7 @@ impl BmpActor {
                 // Handle connection closed notifications
                 Some(closed_addr) = self.connection_closed_rx.recv() => {
                     // Remove the closed connection from connection_tasks
-                    if let Some(_task) = self.connection_tasks.remove(&closed_addr) {
+                    if let Some(task) = self.connection_tasks.remove(&closed_addr) {
                         self.stats.active_connections.record(
                             self.connection_tasks.len() as u64,
                             &Self::get_tags(actor_id, &local_addr, None),
@@ -758,14 +887,22 @@ impl BmpActor {
                         );
 
                         debug!(
-                            actor_id = %actor_id,
+                            actor_id,
                             local_addr = %local_addr,
                             peer_addr = %closed_addr,
+                            task_id = %task.id(),
                             "Cleaned up finished task"
+                        );
+
+                        trace!(
+                            "actor_id={} local_addr={}\nCurrent connection tasks table:\n{}",
+                            actor_id,
+                            local_addr,
+                            self.connection_tasks_table()
                         );
                     } else {
                         debug!(
-                            actor_id = %actor_id,
+                            actor_id,
                             local_addr = %local_addr,
                             peer_addr = %closed_addr,
                             "Close notification arrived after task was already removed"
@@ -791,15 +928,16 @@ impl BmpActor {
                                 );
 
                                 warn!(
-                                    actor_id = %actor_id,
+                                    actor_id,
                                     local_addr = %local_addr,
                                     peer_addr = %remote_addr,
+                                    task_id = %old_task.id(),
                                     "Replacing existing connection"
                                 );
                                 old_task.abort();
                             }
 
-                            // Subscribe to broadcast buffer and send current subscription state
+                            // Subscribe to broadcast buffer and set current subscription state
                             let subscribers_rx = self.subscribers_tx.subscribe();
                             let initial_subscribers = self.subscribers.clone();
 
@@ -814,6 +952,7 @@ impl BmpActor {
                                 self.connection_closed_tx.clone(),
                                 self.stats.clone(),
                             ));
+                            let task_id = task.id();
 
                             // Update stats
                             self.connection_tasks.insert(remote_addr, task);
@@ -827,16 +966,25 @@ impl BmpActor {
                             );
 
                             debug!(
-                                actor_id = %actor_id,
+                                actor_id,
                                 local_addr = %local_addr,
                                 peer_addr = %remote_addr,
-                                active_connections = %self.connection_tasks.len(),
+                                active_connections = self.connection_tasks.len(),
+                                task_id = %task_id,
                                 "Spawned connection task"
                             );
+
+                            trace!(
+                                "actor_id={} local_addr={}\nCurrent connection tasks table:\n{}",
+                                self.actor_id,
+                                self.local_addr,
+                                self.connection_tasks_table()
+                            );
+
                         }
                         Err(e) => {
                             error!(
-                                actor_id = %actor_id,
+                                actor_id,
                                 local_addr = %local_addr,
                                 error = %e,
                                 "Error accepting connection");
@@ -900,7 +1048,7 @@ impl BmpActorHandle {
         let listener =
             new_tcp_reuse_port(socket_addr, interface_bind.clone(), 1024).map_err(|e| {
                 error!(
-                    actor_id = %actor_id,
+                    actor_id,
                     bind_addr = %socket_addr,
                     error = %e,
                     "Failed to bind TCP listener"
@@ -910,7 +1058,7 @@ impl BmpActorHandle {
 
         let local_addr = listener.local_addr().map_err(|e| {
             error!(
-                actor_id = %actor_id,
+                actor_id,
                 bind_addr = %socket_addr,
                 error = %e,
                 "Failed to get local address"
@@ -962,9 +1110,9 @@ impl BmpActorHandle {
         buffer_size: usize,
     ) -> Result<(BmpReceiver, Subscription), BmpActorHandleError> {
         debug!(
-            actor_id = %self.actor_id,
+            actor_id = self.actor_id,
             local_addr = %self.local_addr,
-            buffer_size = %buffer_size,
+            buffer_size,
             "Subscribing"
         );
         let (pkt_tx, pkt_rx) = create_bmp_channel(buffer_size);
@@ -980,10 +1128,10 @@ impl BmpActorHandle {
         buffer_size: usize,
     ) -> Result<(Vec<BmpReceiver>, Subscription), BmpActorHandleError> {
         debug!(
-            actor_id = %self.actor_id,
+            actor_id = self.actor_id,
             local_addr = %self.local_addr,
-            num_shards = %num_shards,
-            buffer_size = %buffer_size,
+            num_shards,
+            buffer_size,
             "Subscribing with shards"
         );
         let mut txs = Vec::with_capacity(num_shards);
@@ -1033,7 +1181,7 @@ impl BmpActorHandle {
 
     pub async fn shutdown(&self) -> Result<Vec<ActorId>, BmpActorHandleError> {
         debug!(
-            actor_id = %self.actor_id,
+            actor_id = self.actor_id,
             local_addr = %self.local_addr,
             "Sending shutdown command"
         );
