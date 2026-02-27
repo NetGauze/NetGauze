@@ -176,6 +176,7 @@ version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36fa98bc79671c7981272d91a8753a928ff6a1cd8e4f20a44c45bd5d313840bf"
 dependencies = [
+ "apache-avro-derive",
  "bigdecimal",
  "bon",
  "digest 0.10.7",
@@ -192,6 +193,19 @@ dependencies = [
  "strum_macros",
  "thiserror 2.0.18",
  "uuid",
+]
+
+[[package]]
+name = "apache-avro-derive"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a5f1d2499ae9ad7eda0d283bac50140ec75b4d07784124b36dfa21d0b3649cf"
+dependencies = [
+ "darling 0.21.3",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn",
 ]
 
 [[package]]
@@ -2763,6 +2777,7 @@ dependencies = [
  "netgauze-flow-service",
  "netgauze-iana",
  "netgauze-netconf-proto",
+ "netgauze-serde-macros",
  "netgauze-udp-notif-pkt",
  "netgauze-udp-notif-service",
  "netgauze-yang-push",

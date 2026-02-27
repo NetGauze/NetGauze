@@ -403,7 +403,7 @@ fn test_flow_output_config_get_avro_schema() {
     );
 
     let config = FlowOutputConfig { fields };
-    let schema = config.get_avro_schema();
+    let schema = config.get_avro_schema().unwrap();
 
     // Verify schema structure
     assert!(schema.contains("\"type\": \"record\""));

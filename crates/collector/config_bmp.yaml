@@ -27,4 +27,14 @@ bmp:
           topic: netgauze-bmp-raw-json
           producer_config:
             bootstrap.servers: localhost:49092
-          writer_id: writer1
+          writer_id: bmp-raw-json
+    pmacct-avro:
+      endpoints:
+        main: !BmpKafkaAvro
+          topic: netgauze-bmp-avro
+          schema_registry_url: http://localhost:48081
+          producer_config:
+            bootstrap.servers: localhost:49092
+          writer_id: bmp-avro # TODO: fix this duplicated writer_id
+          avro_converter:
+            writer_id: bmp-avro # TODO: fix this duplicated writer_id

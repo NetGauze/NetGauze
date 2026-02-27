@@ -33,6 +33,7 @@ netgauze-bgp-pkt = { workspace = true }
 netgauze-udp-notif-service = { workspace = true }
 netgauze-udp-notif-pkt = { workspace = true }
 netgauze-yang-push = { workspace = true }
+netgauze-serde-macros = { workspace = true }
 netgauze-iana = { workspace = true }
 netgauze-netconf-proto = { workspace = true }
 tokio = { workspace = true, default-features = false, features = ["net", "io-util", "sync", "time", "rt-multi-thread", "macros", "tracing"] }
@@ -66,7 +67,7 @@ opentelemetry-otlp = { workspace = true, features = [
     "logs",
     "grpc-tonic",
 ] }
-apache-avro = { workspace = true }
+apache-avro = { workspace = true, features = ["derive"] }
 indexmap = { workspace = true, features = ["serde"] }
 serde_json = { workspace = true }
 schema_registry_converter = { workspace = true, default-features = false, features = [
