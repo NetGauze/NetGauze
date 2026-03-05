@@ -294,7 +294,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Download RPM artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: rpm-artifact
           pattern: netgauze-collector-*${{ matrix.el_tag }}*.rpm
