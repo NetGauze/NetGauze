@@ -52,18 +52,10 @@ pub mod wire;
 use crate::ie::*;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
+use strum_macros::EnumDiscriminants;
 
-/// Errors for FlowInfo operations
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize, strum_macros::Display)]
-pub enum FlowInfoError {
-    /// NetFlow v9 is not supported for this operation
-    #[strum(serialize = "NetFlow v9 is not supported for this operation")]
-    NetFlowV9NotSupported,
-}
-
-impl std::error::Error for FlowInfoError {}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, EnumDiscriminants)]
+#[strum_discriminants(derive(Hash), name(FlowInfoType))]
 pub enum FlowInfo {
     NetFlowV9(netflow::NetFlowV9Packet),
     IPFIX(ipfix::IpfixPacket),
@@ -91,24 +83,34 @@ impl FlowInfo {
         }
     }
 
-    /// Add fields to all data records in the flow packet
-    pub fn with_fields_added(self, add_fields: &[Field]) -> Result<Self, FlowInfoError> {
+    /// Returns an iterator over the fields of each data record in the packet,
+    /// yielding `(DataSetId, &[Field])` tuples — one per data record.
+    pub fn data_record_fields(&self) -> impl Iterator<Item = (DataSetId, &[Field])> {
         match self {
-            Self::IPFIX(packet) => Ok(Self::IPFIX(packet.with_fields_added(add_fields))),
-            Self::NetFlowV9(_) => Err(FlowInfoError::NetFlowV9NotSupported),
-        }
-    }
-
-    /// Add scope fields to all data records in the flow packet
-    pub fn with_scope_fields_added(
-        self,
-        add_scope_fields: &[Field],
-    ) -> Result<Self, FlowInfoError> {
-        match self {
-            Self::IPFIX(packet) => Ok(Self::IPFIX(
-                packet.with_scope_fields_added(add_scope_fields),
-            )),
-            Self::NetFlowV9(_) => Err(FlowInfoError::NetFlowV9NotSupported),
+            Self::IPFIX(pkt) => either::Either::Left(
+                pkt.sets()
+                    .iter()
+                    .flat_map(|set| {
+                        if let ipfix::Set::Data { id, records } = set {
+                            Some(records.iter().map(move |record| (*id, record.fields())))
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten(),
+            ),
+            Self::NetFlowV9(pkt) => either::Either::Right(
+                pkt.sets()
+                    .iter()
+                    .flat_map(|set| {
+                        if let netflow::Set::Data { id, records } = set {
+                            Some(records.iter().map(move |record| (*id, record.fields())))
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten(),
+            ),
         }
     }
 }

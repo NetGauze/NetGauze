@@ -47,13 +47,13 @@
 //! ## Supported Flow Types
 //!
 //! - **IPFIX** - Full enrichment support
-//! - **NetFlowV9** - Not yet supported
+//! - **NetFlowV9** - Full enrichment support
 
 use crate::flow::enrichment::EnrichmentOperation;
 use crate::flow::enrichment::cache::EnrichmentCache;
 use crate::inputs::EnrichmentHandle;
 use netgauze_flow_pkt::ie::{Field, netgauze};
-use netgauze_flow_pkt::{FlowInfo, ipfix};
+use netgauze_flow_pkt::{FlowInfo, ipfix, netflow};
 use netgauze_flow_service::FlowRequest;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
@@ -129,16 +129,27 @@ impl EnrichmentActor {
             FlowInfo::IPFIX(pkt) => self
                 .enrich_ipfix_packet(peer_ip, pkt)
                 .map(FlowInfo::IPFIX)?,
-            FlowInfo::NetFlowV9(pkt) => {
-                warn!(
-                    "NetFlowV9 enrichment not yet implemented for peer {}",
-                    peer_ip
-                );
-                FlowInfo::NetFlowV9(pkt)
-            }
+            FlowInfo::NetFlowV9(pkt) => self
+                .enrich_netflowv9_packet(peer_ip, pkt)
+                .map(FlowInfo::NetFlowV9)?,
         };
 
         Ok(enriched_flow)
+    }
+
+    /// Compute the enrichment fields for a single data record.
+    fn enrichment_fields_for_record(
+        &self,
+        peer_ip: &IpAddr,
+        obs_id: u32,
+        record_fields: &[Field],
+    ) -> Vec<Field> {
+        let mut fields = self
+            .enrichment_cache
+            .get_enrichment_fields(peer_ip, obs_id, record_fields)
+            .unwrap_or_else(|| Vec::with_capacity(1));
+        fields.push(self.writer_id.clone());
+        fields
     }
 
     /// Enriches an IPFIX packet with cached metadata for the specified peer IP.
@@ -166,13 +177,11 @@ impl EnrichmentActor {
                         .into_iter()
                         .filter(|record| record.scope_fields().is_empty())
                         .map(|record| {
-                            let mut enrichment_fields = self
-                                .enrichment_cache
-                                .get_enrichment_fields(&peer_ip, obs_id, record.fields())
-                                .unwrap_or_else(|| Vec::with_capacity(1));
-
-                            enrichment_fields.push(self.writer_id.clone());
-
+                            let enrichment_fields = self.enrichment_fields_for_record(
+                                &peer_ip,
+                                obs_id,
+                                record.fields(),
+                            );
                             record.with_fields_added(&enrichment_fields)
                         })
                         .collect::<Box<[_]>>();
@@ -183,11 +192,11 @@ impl EnrichmentActor {
                     })
                 }
                 ipfix::Set::OptionsTemplate(_) => {
-                    debug!("Options Data Template Set received: filter out");
+                    debug!("IPFIX Options Template Set received: filter out");
                     None
                 }
                 ipfix::Set::Template(_) => {
-                    debug!("Data Template Set received: filter out");
+                    debug!("IPFIX Template Set received: filter out");
                     None
                 }
             })
@@ -197,6 +206,66 @@ impl EnrichmentActor {
             export_time,
             sequence_number,
             obs_id,
+            enriched_sets,
+        ))
+    }
+
+    /// Enriches a NetFlow V9 packet with cached metadata for the specified peer
+    /// IP.
+    ///
+    /// Follows the same enrichment logic as IPFIX: processes each data record,
+    /// applies enrichment fields that match the observation domain and record
+    /// contents, appends the dataCollectionManifestName field (writer_id from
+    /// config), and filters out template sets and options data records.
+    pub fn enrich_netflowv9_packet(
+        &self,
+        peer_ip: IpAddr,
+        pkt: netflow::NetFlowV9Packet,
+    ) -> Result<netflow::NetFlowV9Packet, EnrichmentActorError> {
+        let sys_up_time = pkt.sys_up_time();
+        let unix_time = pkt.unix_time();
+        let sequence_number = pkt.sequence_number();
+        let source_id = pkt.source_id();
+
+        let enriched_sets = pkt
+            .into_sets()
+            .into_iter()
+            .filter_map(|set| match set {
+                netflow::Set::Data { id, records } => {
+                    let enriched_records = records
+                        .into_iter()
+                        .filter(|record| record.scope_fields().is_empty())
+                        .map(|record| {
+                            let enrichment_fields = self.enrichment_fields_for_record(
+                                &peer_ip,
+                                source_id,
+                                record.fields(),
+                            );
+                            record.with_fields_added(&enrichment_fields)
+                        })
+                        .collect::<Box<[_]>>();
+
+                    Some(netflow::Set::Data {
+                        id,
+                        records: enriched_records,
+                    })
+                }
+                netflow::Set::OptionsTemplate(_) => {
+                    debug!("NetFlow V9 Options Template Set received: filter out");
+                    None
+                }
+                netflow::Set::Template(_) => {
+                    debug!("NetFlow V9 Template Set received: filter out");
+                    None
+                }
+            })
+            .collect::<Box<[_]>>();
+
+        Ok(netflow::NetFlowV9Packet::new(
+            sys_up_time,
+            unix_time,
+            sequence_number,
+            source_id,
             enriched_sets,
         ))
     }
