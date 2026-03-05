@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     name: stable / fmt
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
       - name: Install nightly
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     name: stable / build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
       - name: Install curl-dev
@@ -61,7 +61,7 @@ jobs:
     env:
       TRYBUILD: overwrite
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{matrix.rust}}
@@ -81,7 +81,7 @@ jobs:
     env:
       TRYBUILD: overwrite
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - name: Enable type layout randomization
         run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
@@ -96,7 +96,7 @@ jobs:
   #   env:
   #     TRYBUILD: overwrite
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #     - uses: dtolnay/rust-toolchain@nightly
   #     - name: Install pcre2
   #       run: vcpkg install pcre2
@@ -115,7 +115,7 @@ jobs:
   #    env:
   #      TRYBUILD: overwrite
   #    steps:
-  #      - uses: actions/checkout@v4
+  #      - uses: actions/checkout@v6
   #      - uses: dtolnay/rust-toolchain@nightly
   #      - run: cargo generate-lockfile -Z minimal-versions
   #      - run: cargo check --locked
@@ -129,7 +129,7 @@ jobs:
       TRYBUILD: overwrite
       NETGAUZE_CUSTOM_XML_PATHS: ""
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - uses: dtolnay/install@cargo-docs-rs
       - name: Install curl-dev
@@ -148,7 +148,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@clippy
         with:
           toolchain: beta
@@ -163,7 +163,7 @@ jobs:
       TRYBUILD: overwrite
       NETGAUZE_CUSTOM_XML_PATHS: ""
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
       - name: Install stable
@@ -215,7 +215,7 @@ jobs:
       version: ${{ steps.version_and_release.outputs.VERSION }}
       release: ${{ steps.version_and_release.outputs.RELEASE }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # needs the full git history to get tag information
       - name: Define version and release
@@ -247,7 +247,7 @@ jobs:
     container:
       image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # needs the full git history to get tag information
       - name: Install build dependencies
@@ -292,7 +292,7 @@ jobs:
     container:
       image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Download RPM artifact
         uses: actions/download-artifact@v4
         with:
@@ -349,7 +349,7 @@ jobs:
             strip_command: true
             dist_and_arch: aarch64-apple-latest # used just for naming the binary
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install build dependencies
         if: matrix.install_deps
         run: ${{ matrix.install_deps }}

@@ -44,7 +44,7 @@ jobs:
     name: Publish crates to crates.io
     needs: [ test-and-build ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install stable
         uses: dtolnay/rust-toolchain@stable
       - name: Install curl-dev
