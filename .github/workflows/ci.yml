@@ -149,6 +149,8 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      NETGAUZE_CUSTOM_XML_PATHS: ""
     steps:
       - name: Install curl-dev
         run: |
