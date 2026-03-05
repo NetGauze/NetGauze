@@ -277,7 +277,7 @@ jobs:
           RPM_PATH=$(find target/generate-rpm -name "*.rpm")
           echo "name=$(basename "$RPM_PATH")" >> $GITHUB_OUTPUT
       - name: Upload RPM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.rpm_filename.outputs.name }}
           path: target/generate-rpm/*.rpm
@@ -372,7 +372,7 @@ jobs:
         shell: pwsh # for Windows compatibility, available on all platforms
         run: Move-Item -Path "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" -Destination "target/${{ matrix.target }}/release/${{ steps.binary_filename.outputs.name }}"
       - name: Upload pcap-decoder artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.binary_filename.outputs.name }}
           path: target/${{ matrix.target }}/release/${{ steps.binary_filename.outputs.name }}
