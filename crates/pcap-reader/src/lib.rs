@@ -232,6 +232,7 @@ impl<'a> PcapIter<'a> {
                 }
                 Ipv4::Icmp(_) => None,
                 Ipv4::Gre(_) => unimplemented!("GRE Protocol is not supported!"),
+                Ipv4::Esp(_) => unimplemented!("ESP Protocol is not supported!"),
             },
         }
     }
@@ -277,6 +278,7 @@ impl<'a> PcapIter<'a> {
                 }
                 Ipv6::Icmp(_) => None,
                 Ipv6::Gre(_) => unimplemented!("GRE Protocol is not supported!"),
+                Ipv6::Esp(_) => unimplemented!("ESP Protocol is not supported!"),
             },
         }
     }
