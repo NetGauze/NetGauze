@@ -15,6 +15,7 @@
 
 use crate::inputs::flow_options::normalize::*;
 use netgauze_flow_pkt::ie::Field;
+use netgauze_flow_pkt::netflow::{Cache, Interface, LineCard, System, Template};
 
 #[test]
 fn test_options_data_record_try_from_valid_scope_fields() {
@@ -512,4 +513,113 @@ fn test_normalize_vrf_type_empty_fields() {
             record_type: "VRF".to_string(),
         })
     );
+}
+
+#[test]
+fn test_netflow_try_from_no_scope_fields() {
+    let fields = vec![Field::samplingInterval(1000)];
+    let record = netflow::DataRecord::new(Box::new([]), fields.into_boxed_slice());
+
+    let result = OptionsDataRecord::try_from(record);
+    assert!(matches!(result, Err(OptionsDataRecordError::NoScopeFields)));
+}
+
+#[test]
+fn test_netflow_try_from_system_scope_sampling() {
+    let scope_fields = vec![netflow::ScopeField::System(System(1))];
+    let fields = vec![Field::samplingInterval(500)];
+    let record =
+        netflow::DataRecord::new(scope_fields.into_boxed_slice(), fields.into_boxed_slice());
+
+    let result = OptionsDataRecord::try_from(record).unwrap();
+    let OptionsDataRecord::Sampling(sampling_record) = result else {
+        panic!("Expected Sampling type");
+    };
+    let expected = IndexedDataRecord::new(&[], &[Field::samplingInterval(500)]);
+    assert_eq!(sampling_record, expected);
+}
+
+#[test]
+fn test_netflow_try_from_interface_scope() {
+    let scope_fields = vec![netflow::ScopeField::Interface(Interface(10))];
+    let fields = vec![Field::interfaceName("eth0".to_string().into())];
+    let record =
+        netflow::DataRecord::new(scope_fields.into_boxed_slice(), fields.into_boxed_slice());
+
+    let result = OptionsDataRecord::try_from(record).unwrap();
+    let OptionsDataRecord::Interface(interface_record) = result else {
+        panic!("Expected Interface type");
+    };
+    let expected = IndexedDataRecord::new(
+        &[Field::ingressInterface(10), Field::egressInterface(10)],
+        &[Field::interfaceName("eth0".to_string().into())],
+    );
+    assert_eq!(interface_record, expected);
+}
+
+#[test]
+fn test_netflow_try_from_linecard_scope() {
+    let scope_fields = vec![netflow::ScopeField::LineCard(LineCard(5))];
+    let fields = vec![Field::samplingInterval(100)];
+    let record =
+        netflow::DataRecord::new(scope_fields.into_boxed_slice(), fields.into_boxed_slice());
+
+    let result = OptionsDataRecord::try_from(record).unwrap();
+    let OptionsDataRecord::Sampling(sampling_record) = result else {
+        panic!("Expected Sampling type");
+    };
+    let expected = IndexedDataRecord::new(&[Field::lineCardId(5)], &[Field::samplingInterval(100)]);
+    assert_eq!(sampling_record, expected);
+}
+
+#[test]
+fn test_netflow_try_from_cache_scope() {
+    let scope_fields = vec![netflow::ScopeField::Cache(Cache(Box::new([0, 0, 0, 1])))];
+    let fields = vec![Field::octetDeltaCount(999)];
+    let record =
+        netflow::DataRecord::new(scope_fields.into_boxed_slice(), fields.into_boxed_slice());
+
+    let result = OptionsDataRecord::try_from(record);
+    if let Err(OptionsDataRecordError::UnsupportedNetFlowV9ScopeFieldType { scope_field }) = result
+    {
+        assert_eq!(scope_field, "Cache");
+    } else {
+        panic!("Expected UnsupportedNetFlowV9ScopeFieldType error");
+    }
+}
+
+#[test]
+fn test_netflow_try_from_template_scope() {
+    let scope_fields = vec![netflow::ScopeField::Template(Template(Box::new([0, 1])))];
+    let fields = vec![Field::octetDeltaCount(42)];
+    let record =
+        netflow::DataRecord::new(scope_fields.into_boxed_slice(), fields.into_boxed_slice());
+
+    let result = OptionsDataRecord::try_from(record);
+    if let Err(OptionsDataRecordError::UnsupportedNetFlowV9ScopeFieldType { scope_field }) = result
+    {
+        assert_eq!(scope_field, "Template");
+    } else {
+        panic!("Expected UnsupportedNetFlowV9ScopeFieldType error");
+    }
+}
+
+#[test]
+fn test_netflow_try_from_unknown_scope() {
+    let scope_fields = vec![netflow::ScopeField::Unknown {
+        pen: 0,
+        id: 99,
+        value: Box::new([0, 0, 0, 1]),
+    }];
+    let fields = vec![Field::octetDeltaCount(1)];
+    let record =
+        netflow::DataRecord::new(scope_fields.into_boxed_slice(), fields.into_boxed_slice());
+
+    let result = OptionsDataRecord::try_from(record);
+    if let Err(OptionsDataRecordError::UnsupportedNetFlowV9ScopeFieldType { scope_field }) = result
+    {
+        assert_eq!(scope_field, "Unknown (pen=0, id=99)");
+    } else {
+        panic!("Expected UnsupportedNetFlowV9ScopeFieldType error");
+    }
 }

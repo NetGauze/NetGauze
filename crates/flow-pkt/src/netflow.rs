@@ -152,6 +152,11 @@ impl NetFlowV9Packet {
     pub const fn sets(&self) -> &[Set] {
         &self.sets
     }
+
+    /// Consume the packet and return the owned sets
+    pub fn into_sets(self) -> Box<[Set]> {
+        self.sets
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -260,6 +265,17 @@ impl DataRecord {
 
     pub const fn fields(&self) -> &[Field] {
         &self.fields
+    }
+
+    /// Add multiple fields to this data record
+    pub fn with_fields_added(self, add_fields: &[Field]) -> Self {
+        let mut fields = self.fields.into_vec();
+        fields.extend_from_slice(add_fields);
+
+        Self {
+            scope_fields: self.scope_fields,
+            fields: fields.into_boxed_slice(),
+        }
     }
 }
 

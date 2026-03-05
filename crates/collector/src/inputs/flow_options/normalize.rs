@@ -21,7 +21,7 @@
 
 use crate::flow::types::{FieldRefLookup, IndexedDataRecord};
 use netgauze_flow_pkt::ie::{Field, IE, netgauze};
-use netgauze_flow_pkt::ipfix;
+use netgauze_flow_pkt::{ipfix, netflow};
 use std::string::ToString;
 use tracing::debug;
 
@@ -35,6 +35,8 @@ pub enum OptionsDataRecordError {
     UnsupportedVrfType,
     #[strum(to_string = "Missing required fields for {record_type}")]
     MissingRequiredFields { record_type: String },
+    #[strum(to_string = "Unsupported NetFlowV9 scope field type {scope_field}")]
+    UnsupportedNetFlowV9ScopeFieldType { scope_field: String },
 }
 
 impl std::error::Error for OptionsDataRecordError {}
@@ -61,6 +63,80 @@ impl TryFrom<ipfix::DataRecord> for OptionsDataRecord {
 
         let record: IndexedDataRecord = record.into();
         Ok(Self::classify(record))
+    }
+}
+
+/// Convert a NetFlowV9 DataRecord into an OptionsDataRecord by converting
+/// NetFlowV9-specific scope fields into IPFIX-compatible Fields.
+///
+/// NetFlowV9 uses its own scope field types (System, Interface, LineCard,
+/// Cache, Template) which differ from IPFIX's generic scope fields. To reuse
+/// the same OptionsDataRecord classification and normalization pipeline for
+/// both protocols, we convert the NetFlowV9 scope fields as follows:
+///
+/// - System scope (0x01) is ignored since enrichment uses by default the peer
+///   IP address as the system identifier.
+/// - Interface scope (0x02) is mapped to both ingressInterface and
+///   egressInterface fields. Both are added with the same interface ID, and
+///   normalization will split them into separate records for ingress and
+///   egress.
+/// - LineCard scope (0x03) is mapped to lineCardId field.
+/// - Cache scope (0x04) and Template scope (0x05) are not supported and will
+///   result in an error.
+/// - Unknown scope fields are not supported and will result in an error.
+///
+/// References:
+/// - RFC 3954 Section 6.1: https://datatracker.ietf.org/doc/html/rfc3954#section-6.1
+/// - RFC 5102 Section 5: https://datatracker.ietf.org/doc/html/rfc5102#section-5
+impl TryFrom<netflow::DataRecord> for OptionsDataRecord {
+    type Error = OptionsDataRecordError;
+
+    fn try_from(record: netflow::DataRecord) -> Result<Self, Self::Error> {
+        if record.scope_fields().is_empty() {
+            return Err(OptionsDataRecordError::NoScopeFields);
+        }
+
+        let mut scope_fields = Vec::new();
+        for scope_field in record.scope_fields() {
+            match scope_field {
+                netflow::ScopeField::System(_) => {
+                    // System scope is ignored: enrichment uses by default the
+                    // peer IP address as the system identifier.
+                }
+                netflow::ScopeField::Interface(iface) => {
+                    // In the case of interface scope we push both ingress and egress
+                    // interfaces as scope fields. Thanks to the normalize_interface_type()
+                    // they will be split into two IndexedDataRecord with the same interface
+                    // ID but different ingress/egress specific fields.
+                    scope_fields.extend([
+                        Field::ingressInterface(iface.0),
+                        Field::egressInterface(iface.0),
+                    ]);
+                }
+                netflow::ScopeField::LineCard(lc) => {
+                    (scope_fields).push(Field::lineCardId(lc.0));
+                }
+                netflow::ScopeField::Cache(_) => {
+                    return Err(OptionsDataRecordError::UnsupportedNetFlowV9ScopeFieldType {
+                        scope_field: "Cache".to_string(),
+                    });
+                }
+                netflow::ScopeField::Template(_) => {
+                    return Err(OptionsDataRecordError::UnsupportedNetFlowV9ScopeFieldType {
+                        scope_field: "Template".to_string(),
+                    });
+                }
+                netflow::ScopeField::Unknown { pen, id, .. } => {
+                    return Err(OptionsDataRecordError::UnsupportedNetFlowV9ScopeFieldType {
+                        scope_field: format!("Unknown (pen={pen}, id={id})"),
+                    });
+                }
+            }
+        }
+
+        let fields: Vec<Field> = record.fields().to_vec();
+        let indexed = IndexedDataRecord::new(&scope_fields, &fields);
+        Ok(Self::classify(indexed))
     }
 }
 
@@ -201,6 +277,9 @@ impl OptionsDataRecord {
     /// Creates separate records for ingress and egress interfaces when
     /// they share the same interface ID, mapping to specific ingress/egress
     /// interface name and description fields.
+    ///
+    /// Please note that his function is leveraged in NetFlowV9 support
+    /// for the interface scope field (0x02).
     fn normalize_interface_type(
         record: IndexedDataRecord,
     ) -> Result<Vec<IndexedDataRecord>, OptionsDataRecordError> {

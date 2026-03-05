@@ -36,7 +36,6 @@ use netgauze_flow_pkt::FlowInfo;
 use netgauze_flow_pkt::ie::{
     self, FieldConversionError, HasIE, IE, InformationElementDataType, InformationElementTemplate,
 };
-use netgauze_flow_pkt::ipfix::{DataRecord, Set};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -100,12 +99,16 @@ impl FlowOutputConfig {
         fields_schema
     }
 
-    fn get_avro_value(&self, record: &DataRecord) -> Result<AvroValue, FunctionError> {
+    /// Avro value extraction from a slice of fields
+    fn get_avro_value_from_fields(
+        &self,
+        fields_slice: &[ie::Field],
+    ) -> Result<AvroValue, FunctionError> {
         let mut fields = Vec::<(String, AvroValue)>::with_capacity(self.fields.len());
         let mut custom_primitives = IndexMap::new();
 
         // Store fields indexed by FieldRef (IE, index)
-        let fields_map = FieldRef::map_fields_into_fxhashmap(record.fields());
+        let fields_map = FieldRef::map_fields_into_fxhashmap(fields_slice);
 
         // Collect required fields to construct avro record
         for (name, field_config) in &self.fields {
@@ -178,15 +181,22 @@ impl AvroConverter<(IpAddr, FlowInfo), FunctionError> for FlowOutputConfig {
                 .sets()
                 .iter()
                 .filter_map(|set| match set {
-                    Set::Data { id: _, records } => Some(records),
+                    netgauze_flow_pkt::ipfix::Set::Data { id: _, records } => Some(records),
                     _ => None,
                 })
                 .flatten()
-                .map(|record| self.get_avro_value(record))
+                .map(|record| self.get_avro_value_from_fields(record.fields()))
                 .collect::<Result<SmallVec<_>, _>>(),
-            FlowInfo::NetFlowV9(_) => {
-                Err(FunctionError::UnsupportedFlowType("NetFlowV9".to_string()))
-            }
+            FlowInfo::NetFlowV9(pkt) => pkt
+                .sets()
+                .iter()
+                .filter_map(|set| match set {
+                    netgauze_flow_pkt::netflow::Set::Data { id: _, records } => Some(records),
+                    _ => None,
+                })
+                .flatten()
+                .map(|record| self.get_avro_value_from_fields(record.fields()))
+                .collect::<Result<SmallVec<_>, _>>(),
         }
     }
 }
