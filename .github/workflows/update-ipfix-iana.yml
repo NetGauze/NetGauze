@@ -1,0 +1,46 @@
+name: Update IANA IPFIX registry
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Every Monday at 8am UTC
+  workflow_dispatch:     # Allow manual triggering
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check IANA IPFIX registry for updates
+        run: |
+          cd crates/flow-pkt
+          ./release.sh
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --exit-code crates/flow-pkt/registry; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.PR_PAT }}
+          commit-message: "chore: update IANA IPFIX registry"
+          branch: chore/ipfix-iana
+          branch-suffix: timestamp
+          title: "chore: update IANA IPFIX registry"
+          body: |
+            Automated update IANA IPFIX registry.
+
+            This PR was created by the **Update IANA IPFIX registry** workflow.
+          labels: dependencies, automated
+          delete-branch: true
