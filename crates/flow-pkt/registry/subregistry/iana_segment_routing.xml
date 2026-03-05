@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="segment-routing">
   <title>Segment Routing</title>
   <created>2021-01-08</created>
-  <updated>2025-11-03</updated>
+  <updated>2026-01-26</updated>
   
   <registry id="srv6-endpoint-behaviors">
     <title>SRv6 Endpoint Behaviors</title>
@@ -563,26 +563,26 @@
       <xref type="rfc" data="rfc9524"/>
       <controller>IETF</controller>
     </record>
-    <record date="2022-07-05">
+    <record date="2022-07-05" updated="2026-01-26">
       <value>76</value>
       <hex>0x004C</hex>
       <description>End.DTMC4</description>
-      <xref type="draft" data="draft-ietf-bess-mvpn-evpn-sr-p2mp-06"/>
-      <controller><xref type="person" data="Rishabh_Parekh"/></controller>
+      <xref type="draft" data="RFC-ietf-bess-mvpn-evpn-sr-p2mp-18"/>
+      <controller>IETF</controller>
     </record>
-    <record date="2022-07-05">
+    <record date="2022-07-05" updated="2026-01-26">
       <value>77</value>
       <hex>0x004D</hex>
       <description>End.DTMC6</description>
-      <xref type="draft" data="draft-ietf-bess-mvpn-evpn-sr-p2mp-06"/>
-      <controller><xref type="person" data="Rishabh_Parekh"/></controller>
+      <xref type="draft" data="RFC-ietf-bess-mvpn-evpn-sr-p2mp-18"/>
+      <controller>IETF</controller>
     </record>
-    <record date="2022-07-05">
+    <record date="2022-07-05" updated="2026-01-26">
       <value>78</value>
       <hex>0x004E</hex>
       <description>End.DTMC46</description>
-      <xref type="draft" data="draft-ietf-bess-mvpn-evpn-sr-p2mp-06"/>
-      <controller><xref type="person" data="Rishabh_Parekh"/></controller>
+      <xref type="draft" data="RFC-ietf-bess-mvpn-evpn-sr-p2mp-18"/>
+      <controller>IETF</controller>
     </record>
     <record date="2022-11-23">
       <value>79</value>
@@ -1501,11 +1501,6 @@
       <name>Ran Chen</name>
       <uri>mailto:chen.ran&amp;zte.com.cn</uri>
       <updated>2022-11-23</updated>
-    </person>
-    <person id="Rishabh_Parekh">
-      <name>Rishabh Parekh</name>
-      <uri>mailto:riparekh&amp;cisco.com</uri>
-      <updated>2022-07-05</updated>
     </person>
     <person id="Yuya_Kawakami">
       <name>Yuya Kawakami</name>
