@@ -30,6 +30,7 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
+      - uses: Swatinem/rust-cache@v2
       - name: cargo fmt --check
         run: cargo fmt --check
 
@@ -46,8 +47,9 @@ jobs:
           sudo apt-get install -y libcurl4-openssl-dev
       - name: Install stable
         uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: cargo build
-        run: cargo build
+        run: cargo build --locked
 
   test:
     name: Rust ${{matrix.rust}}
@@ -72,7 +74,9 @@ jobs:
       - name: Enable type layout randomization
         run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
         if: matrix.rust == 'nightly'
-      - run: cargo test --features iana-upstream-build
+      - uses: Swatinem/rust-cache@v2
+      - name: run tests
+        run: cargo test --locked --features iana-upstream-build
 
   macos:
     name: macOS
@@ -85,8 +89,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: Enable type layout randomization
         run: echo RUSTFLAGS=${RUSTFLAGS}\ -Zrandomize-layout >> $GITHUB_ENV
+      - uses: Swatinem/rust-cache@v2
       - name: run tests
-        run: C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOMEBREW_PREFIX/include cargo test
+        run: C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOMEBREW_PREFIX/include cargo test --locked
 
   # TODO: Windows build is not working
   # windows:
@@ -136,8 +141,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
+      - uses: Swatinem/rust-cache@v2
       - name: cargo doc
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --locked --no-deps --all-features
 
   clippy:
     name: Clippy
@@ -152,7 +158,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@clippy
         with:
           toolchain: beta
-      - run: cargo clippy --tests
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo clippy
+        run: cargo clippy --locked --tests --all-features
 
   coverage:
     # use llvm-cov to build and collect coverage and outputs in a format that is compatible with
@@ -174,6 +182,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev
+      - uses: Swatinem/rust-cache@v2
       - name: cargo install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: cargo generate-lockfile
@@ -262,6 +271,7 @@ jobs:
             libcurl-devel \
       - name: Install stable
         uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Install cargo-generate-rpm
         run: cargo install cargo-generate-rpm
       - name: Build netgauze-collector
@@ -357,8 +367,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
       - name: Build pcap-decoder
-        run: cargo build --release --target ${{ matrix.target }} -p netgauze-pcap-decoder
+        run: cargo build --locked --release --target ${{ matrix.target }} -p netgauze-pcap-decoder
       - name: Strip binary (Unix only)
         if: matrix.strip_command == 'true'
         run: strip target/${{ matrix.target }}/release/${{ matrix.binary_name }}
