@@ -277,7 +277,7 @@ jobs:
       - name: Install cargo-generate-rpm
         run: cargo install cargo-generate-rpm
       - name: Build netgauze-collector
-        run: cargo build --release -p netgauze-collector
+        run: cargo build --locked --release -p netgauze-collector
       - name: Strip netgauze-collector binary
         run: strip target/release/netgauze-collector
       - name: Build RPM package
