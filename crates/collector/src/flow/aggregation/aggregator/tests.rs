@@ -18,7 +18,10 @@ use chrono::{TimeZone, Utc};
 use netgauze_analytics::aggregation::Aggregator;
 use netgauze_flow_pkt::ie::{Field, IE, protocolIdentifier};
 use netgauze_flow_pkt::ipfix::{DataRecord, IpfixPacket, Set};
-use netgauze_flow_pkt::{DataSetId, FlowInfo};
+use netgauze_flow_pkt::netflow::{
+    DataRecord as NetFlowV9DataRecord, NetFlowV9Packet, Set as NetFlowV9Set,
+};
+use netgauze_flow_pkt::{DataSetId, FlowInfo, FlowInfoType};
 use netgauze_iana::tcp::TCPHeaderFlags;
 use rustc_hash::FxHashMap;
 use std::collections::HashSet;
@@ -48,6 +51,7 @@ fn create_test_agg_flow_info(
     AggFlowInfo::from((
         FlowCacheKey {
             peer_ip,
+            flow_type: FlowInfoType::IPFIX,
             key_fields,
         },
         FlowCacheRecord {
@@ -58,6 +62,7 @@ fn create_test_agg_flow_info(
             max_export_time: time,
             min_collection_time: time,
             max_collection_time: time,
+            max_sys_up_time: 0,
             agg_fields,
             record_count,
         },
@@ -77,7 +82,7 @@ fn test_aggregator_init() {
 }
 
 #[test]
-fn test_aggregator_push_new_flow() {
+fn test_aggregator_push_new_ipfix_flow() {
     let config = create_test_config(
         Box::new([
             FieldRef::new(IE::sourceIPv4Address, 0),
@@ -122,7 +127,7 @@ fn test_aggregator_push_new_flow() {
 }
 
 #[test]
-fn test_aggregator_push_duplicate_flow_key() {
+fn test_aggregator_push_ipfix_duplicate_flow_key() {
     let config = create_test_config(
         Box::new([
             FieldRef::new(IE::sourceIPv4Address, 0),
@@ -189,7 +194,7 @@ fn test_aggregator_push_duplicate_flow_key() {
 }
 
 #[test]
-fn test_aggregator_push_different_flow_keys() {
+fn test_aggregator_push_ipfix_different_flow_keys() {
     let config = create_test_config(
         Box::new([
             FieldRef::new(IE::sourceIPv4Address, 0),
@@ -259,6 +264,7 @@ fn test_reduce_add_operations() {
         max_export_time: time1,
         min_collection_time: time1,
         max_collection_time: time1,
+        max_sys_up_time: 1000,
         agg_fields: Box::new([
             Some(Field::octetDeltaCount(1000)),
             Some(Field::packetDeltaCount(10)),
@@ -282,6 +288,7 @@ fn test_reduce_add_operations() {
         max_export_time: time2,
         min_collection_time: time2,
         max_collection_time: time2,
+        max_sys_up_time: 2000,
         agg_fields: Box::new([
             Some(Field::octetDeltaCount(2000)),
             Some(Field::packetDeltaCount(20)),
@@ -306,6 +313,7 @@ fn test_reduce_add_operations() {
         max_export_time: time2,
         min_collection_time: time1,
         max_collection_time: time2,
+        max_sys_up_time: 2000,
         agg_fields: Box::new([
             Some(Field::octetDeltaCount(3000)),
             Some(Field::packetDeltaCount(30)),
@@ -329,7 +337,7 @@ fn test_reduce_add_operations() {
 }
 
 #[test]
-fn test_into_flowinfo_with_extra_fields() {
+fn test_ipfix_into_flowinfo_with_extra_fields() {
     // Create test data
     let peer_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100));
     let shard_id = 5;
@@ -359,6 +367,7 @@ fn test_into_flowinfo_with_extra_fields() {
     let agg_flow_info = AggFlowInfo::from((
         FlowCacheKey {
             peer_ip,
+            flow_type: FlowInfoType::IPFIX,
             key_fields: key_fields.clone(),
         },
         FlowCacheRecord {
@@ -372,6 +381,7 @@ fn test_into_flowinfo_with_extra_fields() {
             max_export_time: export_time,
             min_collection_time: collection_time,
             max_collection_time: collection_time,
+            max_sys_up_time: 0,
             agg_fields: agg_fields.clone(),
             record_count: 3,
         },
@@ -450,6 +460,132 @@ fn test_into_flowinfo_with_extra_fields() {
 }
 
 #[test]
+fn test_netflowv9_into_flowinfo_with_extra_fields() {
+    // Create test data
+    let peer_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100));
+    let shard_id = 5;
+    let sequence_number = 42;
+    let export_time = DateTime::parse_from_rfc3339("2025-07-02T10:00:00Z")
+        .unwrap()
+        .to_utc();
+    let collection_time = DateTime::parse_from_rfc3339("2025-07-02T10:00:05Z")
+        .unwrap()
+        .to_utc();
+
+    // Create key fields
+    let key_fields = vec![
+        Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
+        Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
+    ]
+    .into_boxed_slice();
+
+    // Create aggregated fields
+    let agg_fields = vec![
+        Some(Field::octetDeltaCount(1000)),
+        Some(Field::packetDeltaCount(10)),
+    ]
+    .into_boxed_slice();
+
+    // Create AggFlowInfo instance with NetFlowV9 flow type
+    let agg_flow_info = AggFlowInfo::from((
+        FlowCacheKey {
+            peer_ip,
+            flow_type: FlowInfoType::NetFlowV9,
+            key_fields: key_fields.clone(),
+        },
+        FlowCacheRecord {
+            peer_ports: HashSet::from([9995, 9996]),
+            observation_domain_ids: HashSet::from([1, 2]),
+            template_ids: HashSet::from([
+                DataSetId::new(256).unwrap(),
+                DataSetId::new(257).unwrap(),
+            ]),
+            min_export_time: export_time,
+            max_export_time: export_time,
+            min_collection_time: collection_time,
+            max_collection_time: collection_time,
+            max_sys_up_time: 5000,
+            agg_fields: agg_fields.clone(),
+            record_count: 3,
+        },
+    ));
+
+    // Extra fields to add
+    let extra_fields = vec![
+        Field::NetGauze(netgauze::Field::windowStart(
+            DateTime::parse_from_rfc3339("2025-07-02T10:00:00Z")
+                .unwrap()
+                .to_utc(),
+        )),
+        Field::NetGauze(netgauze::Field::windowEnd(
+            DateTime::parse_from_rfc3339("2025-07-02T10:01:00Z")
+                .unwrap()
+                .to_utc(),
+        )),
+    ];
+
+    // Call into_flowinfo
+    let result = agg_flow_info.into_flowinfo_with_extra_fields(
+        shard_id,
+        sequence_number,
+        extra_fields.clone(),
+    );
+
+    // Create expected record
+    let mut expected_fields = Vec::new();
+    expected_fields.extend(key_fields.iter().flatten().cloned());
+    expected_fields.extend(agg_fields.iter().flatten().cloned());
+    expected_fields.extend([
+        Field::originalFlowsPresent(3),
+        Field::minExportSeconds(export_time),
+        Field::maxExportSeconds(export_time),
+        Field::collectionTimeMilliseconds(collection_time),
+    ]);
+    expected_fields.extend(extra_fields);
+    expected_fields.extend([
+        Field::NetGauze(netgauze::Field::originalExporterTransportPort(9995)),
+        Field::NetGauze(netgauze::Field::originalExporterTransportPort(9996)),
+    ]);
+    expected_fields.extend([
+        Field::originalObservationDomainId(1),
+        Field::originalObservationDomainId(2),
+    ]);
+    expected_fields.extend([
+        Field::NetGauze(netgauze::Field::originalTemplateId(256)),
+        Field::NetGauze(netgauze::Field::originalTemplateId(257)),
+    ]);
+
+    // Compare expected with result - should be NetFlowV9
+    assert_eq!(result.sequence_number(), sequence_number);
+    assert_eq!(result.observation_domain_id(), shard_id as u32);
+
+    if let FlowInfo::NetFlowV9(pkt) = result {
+        let sets = pkt.sets();
+        assert_eq!(sets.len(), 1);
+
+        // Verify sys_up_time is preserved from the aggregated records
+        assert_eq!(pkt.sys_up_time(), 5000);
+
+        if let NetFlowV9Set::Data { records, .. } = &sets[0] {
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0].scope_fields().len(), 0);
+
+            let mut resulting_fields = records[0].fields().to_vec();
+
+            // Necessary sorting since HashSet does not guarantee ordering
+            resulting_fields.sort();
+            expected_fields.sort();
+
+            assert_eq!(resulting_fields, expected_fields)
+        } else {
+            panic!("Expected a NetFlow v9 Data Set")
+        }
+    } else {
+        panic!("Expected FlowInfo::NetFlowV9")
+    }
+}
+
+#[test]
 fn test_explode_simple_ipfix_packet() {
     let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)), 9995);
     let collection_time = Utc.with_ymd_and_hms(2025, 1, 1, 10, 0, 0).unwrap();
@@ -491,6 +627,7 @@ fn test_explode_simple_ipfix_packet() {
     let expected = vec![AggFlowInfo::from((
         FlowCacheKey {
             peer_ip: peer.ip(),
+            flow_type: FlowInfoType::IPFIX,
             key_fields: Box::new([
                 Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
                 Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
@@ -506,6 +643,7 @@ fn test_explode_simple_ipfix_packet() {
             max_export_time: export_time,
             min_collection_time: collection_time,
             max_collection_time: collection_time,
+            max_sys_up_time: 0,
             agg_fields: Box::new([
                 Some(Field::octetDeltaCount(1000)),
                 Some(Field::packetDeltaCount(10)),
@@ -520,7 +658,7 @@ fn test_explode_simple_ipfix_packet() {
 }
 
 #[test]
-fn test_explode_multiple_records() {
+fn test_explode_ipfix_multiple_records() {
     let peer = SocketAddr::new(
         IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
         2055,
@@ -564,6 +702,7 @@ fn test_explode_multiple_records() {
         AggFlowInfo::from((
             FlowCacheKey {
                 peer_ip: peer.ip(),
+                flow_type: FlowInfoType::IPFIX,
                 key_fields: Box::new([
                     Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
                     Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
@@ -577,6 +716,7 @@ fn test_explode_multiple_records() {
                 max_export_time: export_time,
                 min_collection_time: collection_time,
                 max_collection_time: collection_time,
+                max_sys_up_time: 0,
                 agg_fields: Box::new([Some(Field::octetDeltaCount(500))]),
                 record_count: 1,
             },
@@ -584,6 +724,7 @@ fn test_explode_multiple_records() {
         AggFlowInfo::from((
             FlowCacheKey {
                 peer_ip: peer.ip(),
+                flow_type: FlowInfoType::IPFIX,
                 key_fields: Box::new([
                     Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 3))),
                     Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 4))),
@@ -597,6 +738,7 @@ fn test_explode_multiple_records() {
                 max_export_time: export_time,
                 min_collection_time: collection_time,
                 max_collection_time: collection_time,
+                max_sys_up_time: 0,
                 agg_fields: Box::new([Some(Field::octetDeltaCount(750))]),
                 record_count: 1,
             },
@@ -610,7 +752,7 @@ fn test_explode_multiple_records() {
 }
 
 #[test]
-fn test_explode_repeating_ie_fields() {
+fn test_explode_ipfix_repeating_ie_fields() {
     let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 1)), 4739);
     let collection_time = Utc.with_ymd_and_hms(2025, 1, 1, 13, 0, 0).unwrap();
 
@@ -653,6 +795,7 @@ fn test_explode_repeating_ie_fields() {
     let expected = vec![AggFlowInfo::from((
         FlowCacheKey {
             peer_ip: peer.ip(),
+            flow_type: FlowInfoType::IPFIX,
             key_fields: Box::new([
                 Some(Field::sourceIPv4Address(Ipv4Addr::new(100, 100, 100, 1))),
                 Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
@@ -668,6 +811,7 @@ fn test_explode_repeating_ie_fields() {
             max_export_time: export_time,
             min_collection_time: collection_time,
             max_collection_time: collection_time,
+            max_sys_up_time: 0,
             agg_fields: Box::new([
                 Some(Field::octetDeltaCount(100)),
                 Some(Field::octetDeltaCount(200)),
@@ -683,7 +827,7 @@ fn test_explode_repeating_ie_fields() {
 }
 
 #[test]
-fn test_explode_missing_fields() {
+fn test_explode_ipfix_missing_fields() {
     let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 1)), 9996);
     let collection_time = Utc.with_ymd_and_hms(2025, 1, 1, 15, 0, 0).unwrap();
 
@@ -719,6 +863,7 @@ fn test_explode_missing_fields() {
     let expected = vec![AggFlowInfo::from((
         FlowCacheKey {
             peer_ip: peer.ip(),
+            flow_type: FlowInfoType::IPFIX,
             key_fields: Box::new([
                 Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
                 None,
@@ -735,6 +880,7 @@ fn test_explode_missing_fields() {
             max_export_time: export_time,
             min_collection_time: collection_time,
             max_collection_time: collection_time,
+            max_sys_up_time: 0,
             agg_fields: Box::new([Some(Field::octetDeltaCount(500)), None]),
             record_count: 1,
         },
@@ -747,7 +893,7 @@ fn test_explode_missing_fields() {
 }
 
 #[test]
-fn test_explode_empty_selectors() {
+fn test_explode_ipfix_empty_selectors() {
     let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(198, 51, 100, 1)), 2055);
     let collection_time = Utc.with_ymd_and_hms(2025, 1, 1, 16, 0, 0).unwrap();
 
@@ -774,6 +920,7 @@ fn test_explode_empty_selectors() {
     let expected = vec![AggFlowInfo::from((
         FlowCacheKey {
             peer_ip: peer.ip(),
+            flow_type: FlowInfoType::IPFIX,
             key_fields: Box::new([]),
         },
         FlowCacheRecord {
@@ -784,6 +931,7 @@ fn test_explode_empty_selectors() {
             max_export_time: export_time,
             min_collection_time: collection_time,
             max_collection_time: collection_time,
+            max_sys_up_time: 0,
             agg_fields: Box::new([]),
             record_count: 1,
         },
@@ -793,4 +941,437 @@ fn test_explode_empty_selectors() {
     let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
 
     assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
+}
+
+#[test]
+fn test_explode_simple_netflowv9_packet() {
+    let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)), 9995);
+    let collection_time = Utc.with_ymd_and_hms(2025, 1, 1, 10, 0, 0).unwrap();
+
+    // Create test fields
+    let fields = vec![
+        Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
+        Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2)),
+        Field::sourceTransportPort(80),
+        Field::destinationTransportPort(443),
+        Field::octetDeltaCount(1000),
+        Field::packetDeltaCount(10),
+    ];
+
+    let record = NetFlowV9DataRecord::new(Box::new([]), fields.into_boxed_slice());
+    let set = NetFlowV9Set::Data {
+        id: DataSetId::new(256).unwrap(),
+        records: Box::new([record]),
+    };
+
+    let export_time = Utc.with_ymd_and_hms(2025, 1, 1, 12, 0, 0).unwrap();
+    let netflow_pkt = NetFlowV9Packet::new(1000, export_time, 1, 100, Box::new([set]));
+    let flow_info = FlowInfo::NetFlowV9(netflow_pkt);
+
+    // Define key and aggregation selectors
+    let key_select = vec![
+        FieldRef::new(IE::sourceIPv4Address, 0),
+        FieldRef::new(IE::destinationIPv4Address, 0),
+        FieldRef::new(IE::sourceTransportPort, 0),
+        FieldRef::new(IE::destinationTransportPort, 0),
+    ];
+
+    let agg_select = vec![
+        AggFieldRef::new(IE::octetDeltaCount, 0, AggOp::Add),
+        AggFieldRef::new(IE::packetDeltaCount, 0, AggOp::Add),
+    ];
+
+    // Create expected AggFlowInfo
+    let expected = vec![AggFlowInfo::from((
+        FlowCacheKey {
+            peer_ip: peer.ip(),
+            flow_type: FlowInfoType::NetFlowV9,
+            key_fields: Box::new([
+                Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
+                Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
+                Some(Field::sourceTransportPort(80)),
+                Some(Field::destinationTransportPort(443)),
+            ]),
+        },
+        FlowCacheRecord {
+            peer_ports: HashSet::from([9995]),
+            observation_domain_ids: HashSet::from([100]),
+            template_ids: HashSet::from([DataSetId::new(256).unwrap()]),
+            min_export_time: export_time,
+            max_export_time: export_time,
+            min_collection_time: collection_time,
+            max_collection_time: collection_time,
+            max_sys_up_time: 1000,
+            agg_fields: Box::new([
+                Some(Field::octetDeltaCount(1000)),
+                Some(Field::packetDeltaCount(10)),
+            ]),
+            record_count: 1,
+        },
+    ))];
+
+    // Call explode and compare
+    let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
+    assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
+}
+
+#[test]
+fn test_explode_netflowv9_multiple_records() {
+    let peer = SocketAddr::new(
+        IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
+        2055,
+    );
+    let collection_time = Utc.with_ymd_and_hms(2025, 1, 1, 11, 0, 0).unwrap();
+
+    // Create multiple records with different flows
+    let record1_fields = vec![
+        Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
+        Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2)),
+        Field::octetDeltaCount(500),
+    ];
+
+    let record2_fields = vec![
+        Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 3)),
+        Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 4)),
+        Field::octetDeltaCount(750),
+    ];
+
+    let record1 = NetFlowV9DataRecord::new(Box::new([]), record1_fields.into_boxed_slice());
+    let record2 = NetFlowV9DataRecord::new(Box::new([]), record2_fields.into_boxed_slice());
+
+    let set = NetFlowV9Set::Data {
+        id: DataSetId::new(300).unwrap(),
+        records: Box::new([record1, record2]),
+    };
+
+    let export_time = Utc.with_ymd_and_hms(2025, 1, 1, 14, 30, 0).unwrap();
+    let netflow_pkt = NetFlowV9Packet::new(2000, export_time, 5, 200, Box::new([set]));
+    let flow_info = FlowInfo::NetFlowV9(netflow_pkt);
+
+    let key_select = vec![
+        FieldRef::new(IE::sourceIPv4Address, 0),
+        FieldRef::new(IE::destinationIPv4Address, 0),
+    ];
+
+    let agg_select = vec![AggFieldRef::new(IE::octetDeltaCount, 0, AggOp::Add)];
+
+    // Create expected AggFlowInfo structs
+    let expected = vec![
+        AggFlowInfo::from((
+            FlowCacheKey {
+                peer_ip: peer.ip(),
+                flow_type: FlowInfoType::NetFlowV9,
+                key_fields: Box::new([
+                    Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
+                    Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
+                ]),
+            },
+            FlowCacheRecord {
+                peer_ports: HashSet::from([2055]),
+                observation_domain_ids: HashSet::from([200]),
+                template_ids: HashSet::from([DataSetId::new(300).unwrap()]),
+                min_export_time: export_time,
+                max_export_time: export_time,
+                min_collection_time: collection_time,
+                max_collection_time: collection_time,
+                max_sys_up_time: 2000,
+                agg_fields: Box::new([Some(Field::octetDeltaCount(500))]),
+                record_count: 1,
+            },
+        )),
+        AggFlowInfo::from((
+            FlowCacheKey {
+                peer_ip: peer.ip(),
+                flow_type: FlowInfoType::NetFlowV9,
+                key_fields: Box::new([
+                    Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 3))),
+                    Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 4))),
+                ]),
+            },
+            FlowCacheRecord {
+                peer_ports: HashSet::from([2055]),
+                observation_domain_ids: HashSet::from([200]),
+                template_ids: HashSet::from([DataSetId::new(300).unwrap()]),
+                min_export_time: export_time,
+                max_export_time: export_time,
+                min_collection_time: collection_time,
+                max_collection_time: collection_time,
+                max_sys_up_time: 2000,
+                agg_fields: Box::new([Some(Field::octetDeltaCount(750))]),
+                record_count: 1,
+            },
+        )),
+    ];
+
+    // Call explode and compare
+    let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
+
+    assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
+}
+
+#[test]
+fn test_explode_netflowv9_missing_fields() {
+    let peer = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 1)), 9996);
+    let collection_time = Utc.with_ymd_and_hms(2025, 1, 1, 15, 0, 0).unwrap();
+
+    // Create record with only some of the expected fields
+    let fields = vec![
+        Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1)),
+        Field::octetDeltaCount(500),
+        Field::sourceIPv6Address(Ipv6Addr::new(0xc, 0xa, 0xf, 0xe, 0, 0, 0, 0)),
+    ];
+
+    let record = NetFlowV9DataRecord::new(Box::new([]), fields.into_boxed_slice());
+    let set = NetFlowV9Set::Data {
+        id: DataSetId::new(500).unwrap(),
+        records: Box::new([record]),
+    };
+
+    let export_time = Utc.with_ymd_and_hms(2025, 1, 1, 18, 0, 0).unwrap();
+    let netflow_pkt = NetFlowV9Packet::new(3000, export_time, 15, 400, Box::new([set]));
+    let flow_info = FlowInfo::NetFlowV9(netflow_pkt);
+
+    let key_select = vec![
+        FieldRef::new(IE::sourceIPv4Address, 0),
+        FieldRef::new(IE::destinationIPv4Address, 0), // Missing
+        FieldRef::new(IE::sourceIPv6Address, 0),
+    ];
+
+    let agg_select = vec![
+        AggFieldRef::new(IE::octetDeltaCount, 0, AggOp::Add),
+        AggFieldRef::new(IE::packetDeltaCount, 0, AggOp::Add), // Missing
+    ];
+
+    // Create expected AggFlowInfo
+    let expected = vec![AggFlowInfo::from((
+        FlowCacheKey {
+            peer_ip: peer.ip(),
+            flow_type: FlowInfoType::NetFlowV9,
+            key_fields: Box::new([
+                Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
+                None,
+                Some(Field::sourceIPv6Address(Ipv6Addr::new(
+                    0xc, 0xa, 0xf, 0xe, 0, 0, 0, 0,
+                ))),
+            ]),
+        },
+        FlowCacheRecord {
+            peer_ports: HashSet::from([9996]),
+            observation_domain_ids: HashSet::from([400]),
+            template_ids: HashSet::from([DataSetId::new(500).unwrap()]),
+            min_export_time: export_time,
+            max_export_time: export_time,
+            min_collection_time: collection_time,
+            max_collection_time: collection_time,
+            max_sys_up_time: 3000,
+            agg_fields: Box::new([Some(Field::octetDeltaCount(500)), None]),
+            record_count: 1,
+        },
+    ))];
+
+    // Call explode and compare
+    let result = explode(&flow_info, peer, &key_select, &agg_select, collection_time);
+
+    assert_eq!(result.1.collect::<Vec<AggFlowInfo>>(), expected);
+}
+
+#[test]
+fn test_aggregator_push_netflowv9_and_ipfix_different_flow_types() {
+    // Test that IPFIX and NetFlow v9 flows with same key fields are NOT aggregated
+    // together because they have different flow_type discriminants
+    let config = create_test_config(
+        Box::new([
+            FieldRef::new(IE::sourceIPv4Address, 0),
+            FieldRef::new(IE::destinationIPv4Address, 0),
+        ]),
+        Box::new([AggFieldRef::new(IE::octetDeltaCount, 0, AggOp::Add)]),
+    );
+    let mut aggregator = FlowAggregator::init(config.clone());
+
+    let peer_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
+    let time = Utc.with_ymd_and_hms(2025, 1, 1, 10, 0, 0).unwrap();
+
+    // Create IPFIX flow
+    let ipfix_key_fields = Box::new([
+        Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
+        Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
+    ]);
+    let ipfix_agg_fields = Box::new([Some(Field::octetDeltaCount(1000))]);
+    let ipfix_flow = AggFlowInfo::from((
+        FlowCacheKey {
+            peer_ip,
+            flow_type: FlowInfoType::IPFIX,
+            key_fields: ipfix_key_fields.clone(),
+        },
+        FlowCacheRecord {
+            peer_ports: HashSet::from([9995]),
+            observation_domain_ids: HashSet::from([100]),
+            template_ids: HashSet::from([DataSetId::new(256).unwrap()]),
+            min_export_time: time,
+            max_export_time: time,
+            min_collection_time: time,
+            max_collection_time: time,
+            max_sys_up_time: 0,
+            agg_fields: ipfix_agg_fields.clone(),
+            record_count: 1,
+        },
+    ));
+
+    // Create NetFlow v9 flow with same key fields
+    let netflow_key_fields = Box::new([
+        Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
+        Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
+    ]);
+    let netflow_agg_fields = Box::new([Some(Field::octetDeltaCount(2000))]);
+    let netflow_flow = AggFlowInfo::from((
+        FlowCacheKey {
+            peer_ip,
+            flow_type: FlowInfoType::NetFlowV9,
+            key_fields: netflow_key_fields.clone(),
+        },
+        FlowCacheRecord {
+            peer_ports: HashSet::from([9996]),
+            observation_domain_ids: HashSet::from([200]),
+            template_ids: HashSet::from([DataSetId::new(300).unwrap()]),
+            min_export_time: time,
+            max_export_time: time,
+            min_collection_time: time,
+            max_collection_time: time,
+            max_sys_up_time: 0,
+            agg_fields: netflow_agg_fields.clone(),
+            record_count: 1,
+        },
+    ));
+
+    // Push both flows
+    aggregator.push(ipfix_flow.clone());
+    aggregator.push(netflow_flow.clone());
+
+    // They should remain separate because flow_type is different
+    let expected_cache = FxHashMap::from_iter(vec![
+        (ipfix_flow.key.clone(), ipfix_flow.rec.clone()),
+        (netflow_flow.key.clone(), netflow_flow.rec.clone()),
+    ]);
+
+    assert_eq!(aggregator.cache, expected_cache);
+
+    // Test flush
+    let flushed_cache = aggregator.flush();
+    assert_eq!(flushed_cache, expected_cache);
+}
+
+#[test]
+fn test_aggregator_push_netflowv9_duplicate_flow_key() {
+    let config = create_test_config(
+        Box::new([
+            FieldRef::new(IE::sourceIPv4Address, 0),
+            FieldRef::new(IE::destinationIPv4Address, 0),
+        ]),
+        Box::new([
+            AggFieldRef::new(IE::octetDeltaCount, 0, AggOp::Add),
+            AggFieldRef::new(IE::tcpControlBits, 0, AggOp::BoolMapOr),
+        ]),
+    );
+    let mut aggregator = FlowAggregator::init(config.clone());
+
+    let peer_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
+    let time = Utc.with_ymd_and_hms(2025, 1, 1, 10, 0, 0).unwrap();
+
+    // Create NetFlow v9 flows with same key
+    let key_fields = Box::new([
+        Some(Field::sourceIPv4Address(Ipv4Addr::new(10, 0, 0, 1))),
+        Some(Field::destinationIPv4Address(Ipv4Addr::new(10, 0, 0, 2))),
+    ]);
+
+    let agg_fields_1 = Box::new([Some(Field::octetDeltaCount(1000)), None]);
+    let agg_fields_2 = Box::new([
+        Some(Field::octetDeltaCount(500)),
+        Some(Field::tcpControlBits(TCPHeaderFlags::new(
+            true, true, false, false, false, false, false, false,
+        ))),
+    ]);
+
+    let flow1 = AggFlowInfo::from((
+        FlowCacheKey {
+            peer_ip,
+            flow_type: FlowInfoType::NetFlowV9,
+            key_fields: key_fields.clone(),
+        },
+        FlowCacheRecord {
+            peer_ports: HashSet::from([9995]),
+            observation_domain_ids: HashSet::from([100]),
+            template_ids: HashSet::from([DataSetId::new(256).unwrap()]),
+            min_export_time: time,
+            max_export_time: time,
+            min_collection_time: time,
+            max_collection_time: time,
+            max_sys_up_time: 0,
+            agg_fields: agg_fields_1,
+            record_count: 1,
+        },
+    ));
+
+    let flow2 = AggFlowInfo::from((
+        FlowCacheKey {
+            peer_ip,
+            flow_type: FlowInfoType::NetFlowV9,
+            key_fields: key_fields.clone(),
+        },
+        FlowCacheRecord {
+            peer_ports: HashSet::from([9996]),
+            observation_domain_ids: HashSet::from([101]),
+            template_ids: HashSet::from([DataSetId::new(257).unwrap()]),
+            min_export_time: time,
+            max_export_time: time,
+            min_collection_time: time,
+            max_collection_time: time,
+            max_sys_up_time: 0,
+            agg_fields: agg_fields_2,
+            record_count: 1,
+        },
+    ));
+
+    // Expected aggregated result
+    let agg_fields_result = Box::new([
+        Some(Field::octetDeltaCount(1500)), // 1000 + 500
+        Some(Field::tcpControlBits(TCPHeaderFlags::new(
+            true, true, false, false, false, false, false, false,
+        ))),
+    ]);
+    let expected_flow = AggFlowInfo::from((
+        FlowCacheKey {
+            peer_ip,
+            flow_type: FlowInfoType::NetFlowV9,
+            key_fields: key_fields.clone(),
+        },
+        FlowCacheRecord {
+            peer_ports: HashSet::from([9995, 9996]),
+            observation_domain_ids: HashSet::from([100, 101]),
+            template_ids: HashSet::from([
+                DataSetId::new(256).unwrap(),
+                DataSetId::new(257).unwrap(),
+            ]),
+            min_export_time: time,
+            max_export_time: time,
+            min_collection_time: time,
+            max_collection_time: time,
+            max_sys_up_time: 0,
+            agg_fields: agg_fields_result,
+            record_count: 2,
+        },
+    ));
+
+    let expected_cache =
+        FxHashMap::from_iter(vec![(expected_flow.key.clone(), expected_flow.rec.clone())]);
+
+    // Push to aggregator
+    aggregator.push(flow1);
+    aggregator.push(flow2);
+
+    // Compare aggregator cache with expected cache
+    assert_eq!(aggregator.cache, expected_cache);
+
+    // Test flush
+    let flushed_cache = aggregator.flush();
+    assert_eq!(flushed_cache, expected_cache);
 }
