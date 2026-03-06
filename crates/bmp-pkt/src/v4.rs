@@ -94,11 +94,11 @@ impl RouteMonitoringTlv {
         value: RouteMonitoringTlvValue,
     ) -> Result<Self, RouteMonitoringTlvError> {
         match &value {
-            RouteMonitoringTlvValue::GroupTlv(_) => {
-                if index & BMPV4_TLV_GROUP_GBIT != BMPV4_TLV_GROUP_GBIT {
-                    // First bit has to be one (G flag)
-                    return Err(RouteMonitoringTlvError::BadGroupTlvIndex(index));
-                }
+            RouteMonitoringTlvValue::GroupTlv(_)
+                if index & BMPV4_TLV_GROUP_GBIT != BMPV4_TLV_GROUP_GBIT =>
+            {
+                // First bit has to be one (G flag)
+                return Err(RouteMonitoringTlvError::BadGroupTlvIndex(index));
             }
             RouteMonitoringTlvValue::VrfTableName(str) => {
                 let len = str.len();
@@ -106,12 +106,12 @@ impl RouteMonitoringTlv {
                     return Err(RouteMonitoringTlvError::VrfTableNameStringIsTooLong(len));
                 }
             }
-            RouteMonitoringTlvValue::BgpUpdate(update_pdu) => {
-                if update_pdu.get_type() != BgpMessageType::Update {
-                    return Err(RouteMonitoringTlvError::BadBgpMessageType(
-                        update_pdu.get_type(),
-                    ));
-                }
+            RouteMonitoringTlvValue::BgpUpdate(update_pdu)
+                if update_pdu.get_type() != BgpMessageType::Update =>
+            {
+                return Err(RouteMonitoringTlvError::BadBgpMessageType(
+                    update_pdu.get_type(),
+                ));
             }
             _ => {}
         };
