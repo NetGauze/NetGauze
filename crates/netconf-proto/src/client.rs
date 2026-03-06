@@ -274,21 +274,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
         mut framed: Framed<T, SshCodec>,
         announce_caps: HashSet<Capability>,
     ) -> Result<(Framed<T, SshCodec>, u32, HashSet<Capability>), NetConfSshClientError> {
-        // send a hello message with NETCONF base 1.1 capability to the peer
-        // (NetGauze does not support base 1.0 protocol)
-        if !announce_caps.contains(&Capability::NetconfBase(NetconfVersion::V1_1)) {
-            return Err(
-                NetConfSshClientError::HelloMessageError("Client is not configured with the mandatory `urn:ietf:params:netconf:base:1.1` capability".to_string())
-            );
-        }
-        if announce_caps.contains(&Capability::NetconfBase(NetconfVersion::V1_0)) {
-            return Err(
-                NetConfSshClientError::HelloMessageError("Client is configured with the `urn:ietf:params:netconf:base:1.0` capability which is not supported".to_string())
-            );
-        }
-        let hello = NetConfMessage::Hello(Hello::new(None, announce_caps));
-        framed.send(hello).await?;
-
         let msg = framed.next().await.ok_or_else(|| {
             SshCodecError::IO(io::Error::new(
                 io::ErrorKind::BrokenPipe,
@@ -307,6 +292,20 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
             .session_id()
             .ok_or_else(|| NetConfSshClientError::SessionIdIsNotDefined)?;
         let peer_caps = received_hello.capabilities().clone();
+        // send a hello message with NETCONF base 1.1 capability to the peer
+        // (NetGauze does not support base 1.0 protocol)
+        if !announce_caps.contains(&Capability::NetconfBase(NetconfVersion::V1_1)) {
+            return Err(
+                NetConfSshClientError::HelloMessageError("Client is not configured with the mandatory `urn:ietf:params:netconf:base:1.1` capability".to_string())
+            );
+        }
+        if announce_caps.contains(&Capability::NetconfBase(NetconfVersion::V1_0)) {
+            return Err(
+                NetConfSshClientError::HelloMessageError("Client is configured with the `urn:ietf:params:netconf:base:1.0` capability which is not supported".to_string())
+            );
+        }
+        let hello = NetConfMessage::Hello(Hello::new(None, announce_caps));
+        framed.send(hello).await?;
         Ok((framed, session_id, peer_caps))
     }
 
