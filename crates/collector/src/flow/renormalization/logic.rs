@@ -15,8 +15,7 @@
 
 use crate::flow::renormalization::actor::RenormalizationStats;
 use netgauze_flow_pkt::ie::{Field, netgauze, selectorAlgorithm};
-use netgauze_flow_pkt::ipfix::DataRecord;
-use netgauze_flow_pkt::{FlowInfo, ipfix};
+use netgauze_flow_pkt::{FlowInfo, ipfix, netflow};
 use opentelemetry::KeyValue;
 use std::net::SocketAddr;
 use tracing::{trace, warn};
@@ -261,12 +260,12 @@ fn calculate_renormalization_factor(
     }
 }
 
-fn renormalize_packet_sampling_ipfix_record(
-    record: DataRecord,
+fn renormalize_fields(
+    fields: Box<[Field]>,
     ctx: &RenormalizationContext,
     stats: &RenormalizationStats,
     stats_tags: &[KeyValue],
-) -> DataRecord {
+) -> Box<[Field]> {
     // Documentation at https://www.iana.org/assignments/ipfix/ipfix.xhtml
 
     // From RFC 3954, deprecated by RFC 7270:
@@ -325,7 +324,7 @@ fn renormalize_packet_sampling_ipfix_record(
     stats.flows_processed.add(1, stats_tags);
 
     // we expect records that have been already enriched with packet sampling IEs
-    for field in record.fields() {
+    for field in &fields {
         match field {
             Field::samplingInterval(v) => params.sampling_interval_34 = Some(*v),
             Field::samplingAlgorithm(v) => params.sampling_algorithm_35 = Some(*v),
@@ -346,7 +345,6 @@ fn renormalize_packet_sampling_ipfix_record(
 
     // apply renormalization factor k to packet and byte counts
     if let Some(k_val) = k {
-        let (scope_fields, fields) = record.into_parts();
         let mut fields = fields.into_vec();
         let mut is_something_renormalized = false;
         for field in &mut fields {
@@ -374,10 +372,10 @@ fn renormalize_packet_sampling_ipfix_record(
             fields.push(Field::NetGauze(netgauze::Field::isRenormalized(true)));
             stats.flows_renormalized.add(1, stats_tags);
         }
-        return DataRecord::new(scope_fields, fields.into_boxed_slice());
+        return fields.into_boxed_slice();
     }
 
-    record
+    fields
 }
 
 pub(crate) fn renormalize(
@@ -386,17 +384,79 @@ pub(crate) fn renormalize(
     stats: &RenormalizationStats,
     stats_tags: &[KeyValue],
 ) -> FlowInfo {
-    // If there is any packet sampling information in the packet, then we adjsut the
+    // If there is any packet sampling information in the packet, then we adjust the
     // flow packets and bytes and then add the isRenormalized boolean field to
     // true. Otherwise, we leave the flow as is.
     match info {
-        FlowInfo::NetFlowV9(info) => {
-            warn!(
-                peer=%peer,
-                "NetFlowV9 renormalization not implemented yet"
-            );
-            stats.netflow_v9_not_supported.add(1, stats_tags);
-            FlowInfo::NetFlowV9(info)
+        FlowInfo::NetFlowV9(pkt) => {
+            let sys_up_time = pkt.sys_up_time();
+            let unix_time = pkt.unix_time();
+            let sequence_number = pkt.sequence_number();
+            let source_id = pkt.source_id();
+
+            let ctx = RenormalizationContext {
+                peer,
+                observation_domain_id: source_id,
+            };
+
+            let mut flow_stats_tags = stats_tags.to_vec();
+            flow_stats_tags.push(KeyValue::new(
+                "observation_domain_id",
+                opentelemetry::Value::I64(source_id as i64),
+            ));
+
+            let renormalized_sets = pkt
+                .into_sets()
+                .into_iter()
+                .filter_map(|set| match set {
+                    netflow::Set::Data { id, records } => {
+                        let enriched_records = records
+                            .into_iter()
+                            .filter(|record| record.scope_fields().is_empty())
+                            .map(|record| {
+                                let scope_fields =
+                                    record.scope_fields().to_vec().into_boxed_slice();
+                                let fields = renormalize_fields(
+                                    record.fields().to_vec().into_boxed_slice(),
+                                    &ctx,
+                                    stats,
+                                    stats_tags,
+                                );
+                                netflow::DataRecord::new(scope_fields, fields)
+                            })
+                            .collect::<Box<[_]>>();
+
+                        Some(netflow::Set::Data {
+                            id,
+                            records: enriched_records,
+                        })
+                    }
+                    netflow::Set::OptionsTemplate(_) => {
+                        trace!(
+                            peer=%ctx.peer,
+                            source_id=ctx.observation_domain_id,
+                            "NetFlow V9 Options Data Template Set received, filtering out"
+                        );
+                        None
+                    }
+                    netflow::Set::Template(_) => {
+                        trace!(
+                            peer=%ctx.peer,
+                            source_id=ctx.observation_domain_id,
+                            "NetFlow V9 Data Template Set received, filtering out"
+                        );
+                        None
+                    }
+                })
+                .collect::<Box<[_]>>();
+
+            FlowInfo::NetFlowV9(netflow::NetFlowV9Packet::new(
+                sys_up_time,
+                unix_time,
+                sequence_number,
+                source_id,
+                renormalized_sets,
+            ))
         }
         FlowInfo::IPFIX(pkt) => {
             let export_time = pkt.export_time();
@@ -423,12 +483,9 @@ pub(crate) fn renormalize(
                             .into_iter()
                             .filter(|record| record.scope_fields().is_empty())
                             .map(|record| {
-                                renormalize_packet_sampling_ipfix_record(
-                                    record,
-                                    &ctx,
-                                    stats,
-                                    &flow_stats_tags,
-                                )
+                                let (scope_fields, fields) = record.into_parts();
+                                let fields = renormalize_fields(fields, &ctx, stats, stats_tags);
+                                ipfix::DataRecord::new(scope_fields, fields)
                             })
                             .collect::<Box<[_]>>();
 
@@ -441,7 +498,7 @@ pub(crate) fn renormalize(
                         trace!(
                             peer=%ctx.peer,
                             observation_domain_id=ctx.observation_domain_id,
-                            "Options Data Template Set received, filtering out"
+                            "IPFIX Options Data Template Set received, filtering out"
                         );
                         None
                     }
@@ -449,7 +506,7 @@ pub(crate) fn renormalize(
                         trace!(
                             peer=%ctx.peer,
                             observation_domain_id=ctx.observation_domain_id,
-                            "Data Template Set received, filtering out"
+                            "IPFIX Data Template Set received, filtering out"
                         );
                         None
                     }

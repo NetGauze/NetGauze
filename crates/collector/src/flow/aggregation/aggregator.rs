@@ -51,13 +51,13 @@ use crate::flow::types::FieldRef;
 use chrono::{DateTime, Utc};
 use netgauze_analytics::aggregation::*;
 use netgauze_flow_pkt::ie::{Field, *};
-use netgauze_flow_pkt::{DataSetId, FlowInfo, ipfix};
+use netgauze_flow_pkt::{DataSetId, FlowInfo, FlowInfoType, ipfix, netflow};
 use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::collections::HashSet;
 use std::collections::hash_map::Entry;
 use std::net::{IpAddr, SocketAddr};
-use tracing::{error, info};
+use tracing::error;
 
 #[derive(Clone, Debug)]
 pub struct FlowAggregator {
@@ -119,6 +119,7 @@ impl TimeSeriesData<IpAddr> for AggFlowInfo {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(crate) struct FlowCacheKey {
     peer_ip: IpAddr,
+    flow_type: FlowInfoType,
     key_fields: Box<[Option<Field>]>,
 }
 impl FlowCacheKey {
@@ -136,6 +137,7 @@ pub(crate) struct FlowCacheRecord {
     max_export_time: DateTime<Utc>,
     min_collection_time: DateTime<Utc>,
     max_collection_time: DateTime<Utc>,
+    max_sys_up_time: u32,
     agg_fields: Box<[Option<Field>]>,
     record_count: u64,
 }
@@ -164,6 +166,7 @@ impl FlowCacheRecord {
         self.max_export_time = std::cmp::max(self.max_export_time, rhs.max_export_time);
         self.min_collection_time = std::cmp::min(self.min_collection_time, rhs.min_collection_time);
         self.max_collection_time = std::cmp::max(self.max_collection_time, rhs.max_collection_time);
+        self.max_sys_up_time = std::cmp::max(self.max_sys_up_time, rhs.max_sys_up_time);
         self.record_count += rhs.record_count;
 
         // Custom aggregations
@@ -196,7 +199,7 @@ impl FlowCacheRecord {
 }
 
 impl AggFlowInfo {
-    /// Convert AggFlowInfo into a FlowInfo IPFIX with a single DataRecord.
+    /// Convert AggFlowInfo into a FlowInfo with a single DataRecord.
     pub(crate) fn into_flowinfo_with_extra_fields(
         self,
         shard_id: usize,
@@ -205,11 +208,13 @@ impl AggFlowInfo {
     ) -> FlowInfo {
         let key = self.key;
         let rec = self.rec;
+        let flow_type = key.flow_type;
         let key_fields = key.key_fields;
         let agg_fields = rec.agg_fields;
         let peer_ports = rec.peer_ports;
         let observation_domain_ids = rec.observation_domain_ids;
         let template_ids = rec.template_ids;
+        let max_sys_up_time = rec.max_sys_up_time;
 
         let fields: Box<[Field]> =
             key_fields
@@ -236,22 +241,47 @@ impl AggFlowInfo {
                 }))
                 .collect();
 
-        let records = [ipfix::DataRecord::new(Box::new([]), fields)];
+        let data_set_id = DataSetId::new(u16::MAX).unwrap();
 
-        let sets = [ipfix::Set::Data {
-            id: DataSetId::new(u16::MAX).unwrap(),
-            records: Box::new(records),
-        }];
-
-        let ipfix_pkt =
-            ipfix::IpfixPacket::new(Utc::now(), sequence_number, shard_id as u32, Box::new(sets));
-
-        FlowInfo::IPFIX(ipfix_pkt)
+        match flow_type {
+            FlowInfoType::IPFIX => {
+                let records = [ipfix::DataRecord::new(Box::new([]), fields)];
+                let sets = [ipfix::Set::Data {
+                    id: data_set_id,
+                    records: Box::new(records),
+                }];
+                let ipfix_pkt = ipfix::IpfixPacket::new(
+                    Utc::now(),
+                    sequence_number,
+                    shard_id as u32,
+                    Box::new(sets),
+                );
+                FlowInfo::IPFIX(ipfix_pkt)
+            }
+            FlowInfoType::NetFlowV9 => {
+                let records = [netflow::DataRecord::new(Box::new([]), fields)];
+                let sets = [netflow::Set::Data {
+                    id: data_set_id,
+                    records: Box::new(records),
+                }];
+                let netflow_pkt = netflow::NetFlowV9Packet::new(
+                    max_sys_up_time,
+                    Utc::now(),
+                    sequence_number,
+                    shard_id as u32,
+                    Box::new(sets),
+                );
+                FlowInfo::NetFlowV9(netflow_pkt)
+            }
+        }
     }
 }
 
 /// Explode a FlowInfo into multiple AggFlowInfo records based on the provided
 /// key and aggregation selectors.
+///
+/// This function processes both IPFIX and NetFlowV9 packets uniformly by
+/// iterating over data records using the `data_records()` method on `FlowInfo`.
 pub(crate) fn explode(
     flow_info: &FlowInfo,
     peer: SocketAddr,
@@ -263,70 +293,59 @@ pub(crate) fn explode(
     let mut exploded = SmallVec::<[AggFlowInfo; 16]>::new();
 
     let peer_ports = HashSet::from([peer.port()]);
+    let observation_domain_ids = HashSet::from([flow_info.observation_domain_id()]);
+    let export_time = flow_info.export_time();
+    let sys_up_time = flow_info.sys_up_time();
+    let flow_type = FlowInfoType::from(flow_info);
 
     let key_len = key_select.len();
     let agg_len = agg_select.len();
 
-    match flow_info {
-        FlowInfo::IPFIX(pkt) => {
-            let observation_domain_ids = HashSet::from([pkt.observation_domain_id()]);
+    for (template_id, fields) in flow_info.data_records() {
+        let template_ids = HashSet::from([template_id]);
 
-            for set in pkt.sets() {
-                let template_ids;
-                let data_records = if let ipfix::Set::Data { id, records } = set {
-                    template_ids = HashSet::from([*id]);
-                    records
-                } else {
-                    continue;
-                };
+        // Store fields indexed by FieldRef (IE, index)
+        let fields_map = FieldRef::map_fields_into_fxhashmap(fields);
 
-                for record in data_records {
-                    // Store fields indexed by FieldRef (IE, index)
-                    let fields_map = FieldRef::map_fields_into_fxhashmap(record.fields());
+        // Initialize output arrays
+        let mut key_fields = vec![None; key_len].into_boxed_slice();
+        let mut agg_fields = vec![None; agg_len].into_boxed_slice();
 
-                    // Initialize output arrays
-                    let mut key_fields = vec![None; key_len].into_boxed_slice();
-                    let mut agg_fields = vec![None; agg_len].into_boxed_slice();
-
-                    // Fill key fields
-                    for (idx, field_ref) in key_select.iter().enumerate() {
-                        if let Some(field) = fields_map.get(field_ref) {
-                            key_fields[idx] = Some((*field).clone());
-                        }
-                    }
-
-                    // Fill agg fields
-                    for (idx, agg) in agg_select.iter().enumerate() {
-                        if let Some(field) = fields_map.get(&agg.field_ref()) {
-                            agg_fields[idx] = Some((*field).clone());
-                        }
-                    }
-
-                    exploded.push(AggFlowInfo {
-                        key: FlowCacheKey {
-                            peer_ip: peer.ip(),
-                            key_fields,
-                        },
-                        rec: FlowCacheRecord {
-                            peer_ports: peer_ports.clone(),
-                            observation_domain_ids: observation_domain_ids.clone(),
-                            template_ids: template_ids.clone(),
-                            min_export_time: pkt.export_time(),
-                            max_export_time: pkt.export_time(),
-                            min_collection_time: collection_time,
-                            max_collection_time: collection_time,
-                            agg_fields,
-                            record_count: 1,
-                        },
-                    });
-                }
+        // Fill key fields
+        for (idx, field_ref) in key_select.iter().enumerate() {
+            if let Some(field) = fields_map.get(field_ref) {
+                key_fields[idx] = Some((*field).clone());
             }
         }
-        // TODO: handle NetFlowV9
-        _ => {
-            info!("Unsupported flow version for peer {}", peer);
+
+        // Fill agg fields
+        for (idx, agg) in agg_select.iter().enumerate() {
+            if let Some(field) = fields_map.get(&agg.field_ref()) {
+                agg_fields[idx] = Some((*field).clone());
+            }
         }
+
+        exploded.push(AggFlowInfo {
+            key: FlowCacheKey {
+                peer_ip: peer.ip(),
+                flow_type,
+                key_fields,
+            },
+            rec: FlowCacheRecord {
+                peer_ports: peer_ports.clone(),
+                observation_domain_ids: observation_domain_ids.clone(),
+                template_ids,
+                min_export_time: export_time,
+                max_export_time: export_time,
+                min_collection_time: collection_time,
+                max_collection_time: collection_time,
+                max_sys_up_time: sys_up_time,
+                agg_fields,
+                record_count: 1,
+            },
+        });
     }
+
     (exploded.len(), exploded.into_iter())
 }
 
