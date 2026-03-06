@@ -268,8 +268,9 @@ impl<'a> ReadablePduWithOneInput<'a, &mut TemplatesMap, LocatedSetParsingError<'
                         .iter()
                         .map(|x| x.length() as usize)
                         .sum::<usize>();
-                let records = if record_length > 0 {
-                    let count = buf.len() / record_length;
+
+                let check_count = buf.len().checked_div(record_length);
+                let records = if let Some(count) = check_count {
                     let mut records = Vec::with_capacity(count);
                     while buf.len() >= record_length {
                         let read_template: &DecodingTemplate = template;
