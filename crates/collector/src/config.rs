@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::bmp::config::BmpAvroConfig;
 use crate::flow::aggregation::AggregationConfig;
 use crate::flow::config::FlowOutputConfig;
 use crate::flow::enrichment::EnrichmentConfig;
@@ -20,6 +21,7 @@ use crate::publishers::http::HttpPublisherEndpoint;
 use crate::publishers::{kafka_avro, kafka_json, kafka_yang};
 use crate::yang_push::config::TelemetryYangConverter;
 use ipnet::IpNet;
+use netgauze_bmp_service::supervisor as bmp_supervisor;
 use netgauze_flow_service::flow_supervisor;
 use netgauze_udp_notif_service::supervisor as udp_notif_supervisor;
 use netgauze_yang_push::cache::storage::YangLibraryReference;
@@ -83,6 +85,7 @@ pub struct CollectorConfig {
     pub logging: LoggingConfig,
     pub telemetry: TelemetryConfig,
     pub flow: Option<FlowConfig>,
+    pub bmp: Option<BmpConfig>,
     pub udp_notif: Option<UdpNotifConfig>,
 }
 
@@ -176,6 +179,31 @@ impl FlowConfig {
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct BmpConfig {
+    #[serde(default = "default_subscriber_timeout_duration")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub subscriber_timeout: Duration,
+
+    #[serde(default = "default_cmd_size_buffer")]
+    pub cmd_buffer_size: usize,
+
+    pub listeners: Vec<Binding>,
+
+    pub publishers: HashMap<String, PublisherConfig>,
+}
+
+impl BmpConfig {
+    pub fn supervisor_config(&self) -> bmp_supervisor::SupervisorConfig {
+        bmp_supervisor::SupervisorConfig {
+            binding_addresses: self.listeners.iter().cloned().map(|x| x.into()).collect(),
+            subscriber_timeout: self.subscriber_timeout,
+            cmd_buffer_size: self.cmd_buffer_size,
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct UdpNotifConfig {
     #[serde(default = "default_subscriber_timeout_duration")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
@@ -250,6 +278,16 @@ impl From<Binding> for udp_notif_supervisor::BindingAddress {
     }
 }
 
+impl From<Binding> for bmp_supervisor::BindingAddress {
+    fn from(value: Binding) -> Self {
+        bmp_supervisor::BindingAddress {
+            socket_addr: value.address,
+            num_workers: value.workers,
+            interface: value.interface,
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PublisherConfig {
     #[serde(default = "default_buffer_size")]
@@ -293,4 +331,7 @@ pub enum PublisherEndpoint {
     /// (for validated yang-push telemetry messages and YANG schema
     /// registration)
     TelemetryKafkaYang(kafka_yang::KafkaConfig<TelemetryYangConverter>),
+
+    /// Kafka AVRO publisher endpoint (for BMP messages)
+    BmpKafkaAvro(kafka_avro::KafkaConfig<BmpAvroConfig>),
 }
