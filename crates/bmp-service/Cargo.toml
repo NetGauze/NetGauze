@@ -20,6 +20,7 @@ netgauze-bmp-pkt = { workspace = true, features = ["serde", "codec"] }
 
 tokio = { workspace = true, default-features = false, features = ["macros", "net", "time"] }
 tokio-util = { workspace = true, default-features = false }
+futures = { workspace = true }
 futures-util = { workspace = true, features = ["sink"] }
 futures-core = { workspace = true }
 pin-project = { workspace = true }
@@ -28,10 +29,18 @@ tower = { workspace = true, default-features = false, features = ["buffer", "uti
 tower-service = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
+socket2 = { workspace = true }
+async-channel = { workspace = true }
+either = { workspace = true }
+opentelemetry = { workspace = true, features = ["metrics", "trace", "logs"] }
+strum_macros = { workspace = true }
+libc = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, default-features = false, features = ["macros", "net", "rt-multi-thread"] }
+tokio = { workspace = true, default-features = false, features = ["macros", "net", "rt-multi-thread", "signal"] }
 tokio-test = { workspace = true }
 rand = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"]}
+tracing-test = { workspace = true }
+axum = { workspace = true }
 serde_json = { workspace = true }
