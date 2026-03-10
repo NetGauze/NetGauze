@@ -2587,7 +2587,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-analytics"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "chrono",
  "either",
@@ -2601,7 +2601,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-bgp-pkt"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "arbitrary",
  "arbitrary_ext",
@@ -2626,7 +2626,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-bgp-speaker"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "arbitrary",
  "arbitrary_ext",
@@ -2653,7 +2653,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-bmp-pkt"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "arbitrary",
  "arbitrary_ext",
@@ -2681,7 +2681,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-bmp-service"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "futures-core",
  "futures-util",
@@ -2702,7 +2702,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-collector"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "apache-avro 0.21.0",
@@ -2757,7 +2757,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-flow-pkt"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "arbitrary",
  "arbitrary_ext",
@@ -2784,7 +2784,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-flow-service"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "async-channel",
  "bytes",
@@ -2808,7 +2808,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-fuzz"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "bytes",
  "futures-core",
@@ -2830,7 +2830,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-iana"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "arbitrary",
  "serde",
@@ -2840,7 +2840,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-ipfix-code-generator"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -2856,14 +2856,14 @@ dependencies = [
 
 [[package]]
 name = "netgauze-locate"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "nom 7.1.3",
 ]
 
 [[package]]
 name = "netgauze-netconf-proto"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2888,7 +2888,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-parse-utils"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "netgauze-locate",
  "nom 7.1.3",
@@ -2897,7 +2897,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-pcap-decoder"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "bytes",
  "chrono",
@@ -2917,7 +2917,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-pcap-reader"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "pcap-parser",
  "pdu",
@@ -2925,7 +2925,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-serde-macros"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "netgauze-locate",
  "netgauze-parse-utils",
@@ -2937,7 +2937,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-udp-notif-pkt"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "arbitrary",
  "arbitrary_ext",
@@ -2962,7 +2962,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-udp-notif-service"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "async-channel",
  "bytes",
@@ -2986,7 +2986,7 @@ dependencies = [
 
 [[package]]
 name = "netgauze-yang-push"
-version = "0.9.3"
+version = "0.10.0"
 dependencies = [
  "async-channel",
  "bytes",
