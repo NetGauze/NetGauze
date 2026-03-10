@@ -286,6 +286,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
                 NetConfSshClientError::HelloMessageError("Client is configured with the `urn:ietf:params:netconf:base:1.0` capability which is not supported".to_string())
             );
         }
+        // yield a bit before sending the hello to not block TCP channel
+        tokio::task::yield_now().await;
         let hello = NetConfMessage::Hello(Hello::new(None, announce_caps));
         framed.send(hello).await?;
 
