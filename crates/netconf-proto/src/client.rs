@@ -597,9 +597,20 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
                 {
                     to_process.push_back(ModuleType::Full(dev_module.clone()));
                 } else if let Some(dev_modules) = yang_lib.find_import_module(deviation_name) {
+                    // Temporary solution see  https://github.com/NetGauze/NetGauze/issues/449
                     for dev_module in dev_modules {
                         if !visited.contains(dev_module.name()) {
-                            to_process.push_back(ModuleType::ImportOnly(dev_module.clone()));
+                            let module = Module::new(
+                                dev_module.name().into(),
+                                dev_module.revision().map(|x| x.into()),
+                                dev_module.namespace().into(),
+                                Box::new([]),
+                                Box::new([]),
+                                Box::new([]),
+                                Box::new([]),
+                                dev_module.locations().to_vec().into_boxed_slice(),
+                            );
+                            to_process.push_back(ModuleType::Full(module));
                         }
                     }
                 }
@@ -612,9 +623,20 @@ impl<T: AsyncRead + AsyncWrite + Unpin> NetConfSshClient<T> {
                 {
                     to_process.push_back(ModuleType::Full(augmented_by.clone()));
                 } else if let Some(augmented_bys) = yang_lib.find_import_module(augmentation_name) {
+                    // Temporary solution see  https://github.com/NetGauze/NetGauze/issues/449
                     for augmented_by in augmented_bys {
                         if !visited.contains(augmented_by.name()) {
-                            to_process.push_back(ModuleType::ImportOnly(augmented_by.clone()));
+                            let module = Module::new(
+                                augmented_by.name().into(),
+                                augmented_by.revision().map(|x| x.into()),
+                                augmented_by.namespace().into(),
+                                Box::new([]),
+                                Box::new([]),
+                                Box::new([]),
+                                Box::new([]),
+                                augmented_by.locations().to_vec().into_boxed_slice(),
+                            );
+                            to_process.push_back(ModuleType::Full(module));
                         }
                     }
                 }
