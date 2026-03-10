@@ -126,6 +126,17 @@ impl
         let telemetry_message_wrapper = input.2;
         serde_json::to_vec(&telemetry_message_wrapper).map_err(Into::into)
     }
+
+    fn subscription_info(
+        &self,
+        input: &(Option<ContentId>, SubscriptionInfo, TelemetryMessageWrapper),
+    ) -> Option<SubscriptionInfo> {
+        if input.1.is_empty() {
+            None
+        } else {
+            Some(input.1.clone())
+        }
+    }
 }
 
 #[cfg(test)]
