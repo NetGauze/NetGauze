@@ -37,7 +37,9 @@ use netgauze_netconf_proto::yanglib::{
 };
 use netgauze_yang_push::ContentId;
 use netgauze_yang_push::cache::actor::CacheLookupCommand;
-use netgauze_yang_push::cache::storage::{YangLibraryCacheError, YangLibraryReference};
+use netgauze_yang_push::cache::storage::{
+    SubscriptionInfo, YangLibraryCacheError, YangLibraryReference,
+};
 use rdkafka::config::{ClientConfig, FromClientConfigAndContext};
 use rdkafka::error::{KafkaError, RDKafkaErrorCode};
 use rdkafka::message::{Header, OwnedHeaders};
@@ -84,6 +86,9 @@ pub trait YangConverter<T, E: std::error::Error> {
 
     /// Serialize the input data to YANG-compliant JSON
     fn serialize_json(&self, input: T) -> Result<Vec<u8>, E>;
+
+    /// Get the [SubscriptionInfo] of a given message
+    fn subscription_info(&self, input: &T) -> Option<SubscriptionInfo>;
 }
 
 /// Configuration for the Kafka YANG publisher
@@ -417,27 +422,70 @@ where
     async fn register_schema(
         &mut self,
         content_id: Option<&str>,
+        subscription_info: Option<&SubscriptionInfo>,
     ) -> Result<Option<i32>, KafkaYangPublisherActorError<E>> {
         let id = if let Some(id) = content_id {
             id
         } else {
             return if let Some(default_schema_id) = self.default_schema_id {
-                warn!(
-                    "No content ID provided, using default schema ID: {}",
-                    default_schema_id
-                );
+                if let Some(subscription_info) = subscription_info {
+                    warn!(
+                        peer=%subscription_info.peer(),
+                        subscription_id=subscription_info.id(),
+                        router_content_id=subscription_info.content_id(),
+                        target=%subscription_info.target(),
+                        default_schema_id,
+                        "No content ID provided and for subscription, \
+                        using default schema ID"
+                    );
+                } else {
+                    warn!(
+                        default_schema_id,
+                        "No content ID provided and no subscription information, \
+                        using default schema ID"
+                    );
+                }
                 Ok(Some(default_schema_id))
             } else {
-                warn!(
-                    "No content ID provided, and no default schema ID configured!, falling back to not using any schema"
-                );
+                if let Some(subscription_info) = subscription_info {
+                    warn!(
+                        peer=%subscription_info.peer(),
+                        subscription_id=subscription_info.id(),
+                        router_content_id=subscription_info.content_id(),
+                        target=%subscription_info.target(),
+                        "No content ID provided, for subscription, \
+                        and no default schema ID configured!, falling back to not using any schema"
+                    );
+                } else {
+                    warn!(
+                        "No content ID provided, no subscription information, \
+                        and no default schema ID configured!, falling back to not using any schema"
+                    );
+                }
                 Ok(None)
             };
         };
 
         // Check if we already have this schema registered
         if let Some(&schema_id) = self.schema_id_cache.get(id) {
-            trace!("Found schemaID {schema_id} for contentID {id}");
+            if let Some(subscription_info) = subscription_info {
+                trace!(
+                    peer=%subscription_info.peer(),
+                    subscription_id=subscription_info.id(),
+                    router_content_id=subscription_info.content_id(),
+                    target=%subscription_info.target(),
+                    schema_id,
+                    content_id,
+                    "Found schemaID for the corresponding contentID"
+                );
+            } else {
+                trace!(
+                    schema_id,
+                    content_id,
+                    "Found schemaID for the corresponding contentID without subscription info"
+                );
+            }
+
             return Ok(Some(schema_id));
         }
 
@@ -543,6 +591,7 @@ where
     /// returned.
     async fn send(&mut self, input: T) -> Result<(), KafkaYangPublisherActorError<E>> {
         let content_id = self.config.yang_converter.content_id(&input);
+        let subscription_info = self.config.yang_converter.subscription_info(&input);
         let key = self.config.yang_converter.get_key(&input);
 
         let encoded_value = match self.config.yang_converter.serialize_json(input) {
@@ -579,7 +628,9 @@ where
         };
 
         // Get schema ID
-        let schema_id = self.register_schema(content_id.as_deref()).await?;
+        let schema_id = self
+            .register_schema(content_id.as_deref(), subscription_info.as_ref())
+            .await?;
 
         let mut headers = OwnedHeaders::new();
         let schema_id_str = schema_id.map(|id| id.to_string());
