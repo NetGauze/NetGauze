@@ -3,7 +3,7 @@
 <?xml-model href="protocol-numbers.rng" schematypens="http://relaxng.org/ns/structure/1.0" ?>
 <registry xmlns="http://www.iana.org/assignments" id="protocol-numbers">
   <title>Protocol Numbers</title>
-  <updated>2025-07-11</updated>
+  <updated>2026-03-09</updated>
   <registry id="protocol-numbers-1">
     <title>Assigned Internet Protocol Numbers</title>
     <xref type="rfc" data="rfc5237"/><xref type="rfc" data="rfc7045"/>
@@ -853,11 +853,11 @@ University of California at Berkeley, June 1986.</xref>
       <description>Secure Packet Shield</description>
       <xref type="person" data="Bill_McIntosh"/>
     </record>
-    <record date="2000-03">
+    <record date="2000-03" updated="2026-03-09">
       <value>131</value>
       <name>PIPE</name>
       <description>Private IP Encapsulation within IP</description>
-      <xref type="person" data="Bernhard_Petri"/>
+      <xref type="person" data="Steffen_Fries"/>
     </record>
     <record date="2000-04">
       <value>132</value>
@@ -996,11 +996,6 @@ University of California at Berkeley, June 1986.</xref>
       <name>Bernard Aboba</name>
       <uri>mailto:bernarda&amp;microsoft.com</uri>
       <updated>1998-04</updated>
-    </person>
-    <person id="Bernhard_Petri">
-      <name>Bernhard Petri</name>
-      <uri>mailto:bernhard.petri&amp;siemens.com</uri>
-      <updated>2012-07-09</updated>
     </person>
     <person id="Bich_Nguyen">
       <name>Bich Nguyen</name>
@@ -1253,6 +1248,11 @@ University of California at Berkeley, June 1986.</xref>
       <name>Ross Callon</name>
       <uri>mailto:rcallon&amp;baynetworks.com</uri>
       <updated>1995-12</updated>
+    </person>
+    <person id="Steffen_Fries">
+      <name>Steffen Fries</name>
+      <uri>mailto:steffen.fries&amp;siemens.com</uri>
+      <updated>2026-03-09</updated>
     </person>
     <person id="Steve_Casner">
       <name>Steve Casner</name>
