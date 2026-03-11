@@ -21,9 +21,9 @@
 
 use crate::flow::types::{FieldRefLookup, IndexedDataRecord};
 use netgauze_flow_pkt::ie::{Field, IE, netgauze};
-use netgauze_flow_pkt::ipfix;
+use netgauze_flow_pkt::{ipfix, netflow};
 use std::string::ToString;
-use tracing::debug;
+use tracing::{debug, warn};
 
 #[derive(strum_macros::Display, Debug, Clone, PartialEq, Eq)]
 pub enum OptionsDataRecordError {
@@ -61,6 +61,79 @@ impl TryFrom<ipfix::DataRecord> for OptionsDataRecord {
 
         let record: IndexedDataRecord = record.into();
         Ok(Self::classify(record))
+    }
+}
+
+/// Convert a NetFlowV9 DataRecord into an OptionsDataRecord by converting
+/// NetFlowV9-specific scope fields into IPFIX-compatible Fields.
+///
+/// NetFlowV9 uses its own scope field types (System, Interface, LineCard,
+/// Cache, Template) which differ from IPFIX's generic scope fields. To reuse
+/// the same OptionsDataRecord classification and normalization pipeline for
+/// both protocols, we convert the NetFlowV9 scope fields as follows:
+///
+/// - System scope (0x01) is ignored since enrichment uses by default the peer
+///   IP address as the system identifier.
+/// - Interface scope (0x02) is mapped to ingressInterface fields (with a TODO
+///   to validate this assumption against real-world data).
+/// - LineCard scope (0x03) is mapped to lineCardId fields (with a TODO to
+///   validate this assumption against real-world data).
+/// - Cache scope (0x04) is ignored since there is no IPFIX equivalent for
+///   enrichment.
+/// - Template scope (0x05) is ignored, but there is an IPFIX equivalent
+///   (templateId). (there is a TODO)
+/// - Unknown scope fields are ignored with a warning log.
+///
+/// References:
+/// - RFC 3954 Section 6.1: https://datatracker.ietf.org/doc/html/rfc3954#section-6.1
+/// - RFC 5102 Section 5: https://datatracker.ietf.org/doc/html/rfc5102#section-5
+impl TryFrom<netflow::DataRecord> for OptionsDataRecord {
+    type Error = OptionsDataRecordError;
+
+    fn try_from(record: netflow::DataRecord) -> Result<Self, Self::Error> {
+        if record.scope_fields().is_empty() {
+            return Err(OptionsDataRecordError::NoScopeFields);
+        }
+
+        let mut scope_fields = Vec::new();
+        for scope_field in record.scope_fields() {
+            match scope_field {
+                netflow::ScopeField::System(_) => {
+                    // System scope is ignored: enrichment uses by default the
+                    // peer IP address as the system
+                    // identifier.
+                }
+                netflow::ScopeField::Interface(iface) => {
+                    // TODO: This assumes all NetFlowV9 interface scope fields map to
+                    // ingressInterface. We should validate this assumption
+                    // against real-world data
+                    scope_fields.push(Field::ingressInterface(iface.0));
+                }
+                netflow::ScopeField::LineCard(lc) => {
+                    // TODO: Documentation is scarce. Is it better to support it maybe wrongly or
+                    // to ignore it with a warning?
+                    (scope_fields).push(Field::lineCardId(lc.0));
+                }
+                netflow::ScopeField::Cache(_) => {
+                    warn!("NetFlowV9 Cache scope field ignored.");
+                }
+                netflow::ScopeField::Template(_) => {
+                    // TODO: Documentation is scarce. Is it better to support it maybe wrongly or
+                    // to ignore it with a warning?
+                    warn!("NetFlowV9 Template scope field ignored.");
+                }
+                netflow::ScopeField::Unknown { pen, id, .. } => {
+                    warn!(
+                        "NetFlowV9 Unknown scope field (pen={}, id={}) ignored.",
+                        pen, id
+                    );
+                }
+            }
+        }
+
+        let fields: Vec<Field> = record.fields().to_vec();
+        let indexed = IndexedDataRecord::new(&scope_fields, &fields);
+        Ok(Self::classify(indexed))
     }
 }
 

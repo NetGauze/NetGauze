@@ -30,8 +30,6 @@ pub struct RenormalizationStats {
 
     pub flows_renormalized: opentelemetry::metrics::Counter<u64>,
     pub flows_processed: opentelemetry::metrics::Counter<u64>,
-    // temporary metric until v9 is fully supported
-    pub netflow_v9_not_supported: opentelemetry::metrics::Counter<u64>,
     pub ie_missing_or_invalid: opentelemetry::metrics::Counter<u64>,
     pub sampling_algorithm_inferred: opentelemetry::metrics::Counter<u64>,
 }
@@ -63,12 +61,6 @@ impl RenormalizationStats {
                 "Number of flows processed for renormalization (including non-renormalizable)",
             )
             .build();
-        let netflow_v9_not_supported = meter
-            .u64_counter("netgauze.collector.flows.renormalization.netflow.v9.not_supported")
-            .with_description(
-                "Number of NetFlow v9 flows received but not renormalized (not yet supported)",
-            )
-            .build();
         let ie_missing_or_invalid = meter
             .u64_counter("netgauze.collector.flows.renormalization.ie.missing_invalid")
             .with_description(
@@ -90,7 +82,6 @@ impl RenormalizationStats {
             messages_sent_error,
             flows_renormalized,
             flows_processed,
-            netflow_v9_not_supported,
             ie_missing_or_invalid,
             sampling_algorithm_inferred,
         }

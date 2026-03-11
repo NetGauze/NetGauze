@@ -33,13 +33,14 @@
 //! ## Supported Flow Types
 //!
 //! - **IPFIX** - Full options template and data record support
-//! - **NetFlowV9** - Not yet implemented
+//! - **NetFlowV9** - Full options template and data record support (scope
+//!   fields are converted to IPFIX-style Fields for unified processing)
 
 use crate::inputs::EnrichmentHandle;
 use crate::inputs::flow_options::FlowOptionsConfig;
 use crate::inputs::flow_options::handlers::{FlowEnrichmentOptionsHandler, FlowOptionsHandler};
 use crate::inputs::flow_options::normalize::OptionsDataRecord;
-use netgauze_flow_pkt::{FlowInfo, ipfix};
+use netgauze_flow_pkt::{FlowInfo, ipfix, netflow};
 use netgauze_flow_service::FlowRequest;
 use std::string::ToString;
 use std::sync::Arc;
@@ -235,8 +236,7 @@ where
                                             .into_vec()
                                             .into_iter()
                                             .filter(|record| !record.scope_fields().is_empty()) {
-
-                                            debug!("Options Data record found: {:?}", record);
+                                            debug!("IPFIX Options Data record found: {:?}", record);
                                             self.stats.processed_options_records.add(1, &peer_tags);
 
                                             // Categorize option types
@@ -253,7 +253,7 @@ where
                                                 },
                                                 Err(e) => {
                                                     self.stats.normalization_errors.add(1, &peer_tags);
-                                                    error!("Failed to handle Flow Option Record: {e}");
+                                                    error!("Failed to handle IPFIX Option Record: {e}");
                                                     continue;
                                                 }
                                             };
@@ -264,8 +264,48 @@ where
                                         }
                                     }
                                 }
-                                FlowInfo::NetFlowV9(_) => {
-                                    warn!("NetFlowV9 options processing not yet implemented for peer  {}", peer);
+                                FlowInfo::NetFlowV9(pkt) => {
+                                    for set in pkt.into_sets() {
+
+                                        let data_records = if let netflow::Set::Data { id: _, records } = set {
+                                            records
+                                        } else {
+                                            continue;
+                                        };
+
+                                        // Filter and process options data records only
+                                        for record in data_records
+                                            .into_vec()
+                                            .into_iter()
+                                            .filter(|record| !record.scope_fields().is_empty()) {
+                                            debug!("NetFlowV9 Options Data record found: {:?}", record);
+                                            self.stats.processed_options_records.add(1, &peer_tags);
+
+                                            // Categorize option types (NetFlowV9 scope fields are
+                                            // converted to IPFIX-style Fields in the TryFrom impl)
+                                            let options_record: OptionsDataRecord = record.try_into()?;
+
+                                            // Construct operations from options data
+                                            let ops = match self.handler.handle_option_record(options_record, peer.ip(), obs_id) {
+                                                Ok(ops) => {
+                                                    self.stats.operations_generated.add(
+                                                        ops.len() as u64,
+                                                        &peer_tags,
+                                                    );
+                                                    ops
+                                                },
+                                                Err(e) => {
+                                                    self.stats.normalization_errors.add(1, &peer_tags);
+                                                    error!("Failed to handle NetFlowV9 Option Record: {e}");
+                                                    continue;
+                                                }
+                                            };
+
+                                            // Send enrichment operations to EnrichmentActor
+                                            self.send_enrichment_operations(ops, &peer_tags).await;
+
+                                        }
+                                    }
                                 }
                             }
 
