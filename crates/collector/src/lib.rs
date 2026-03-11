@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::config::{FlowConfig, NetconfConfig, PublisherEndpoint, UdpNotifConfig};
+use crate::config::{BmpConfig, FlowConfig, NetconfConfig, PublisherEndpoint, UdpNotifConfig};
 use crate::flow::aggregation::AggregationActorHandle;
 use crate::flow::enrichment::FlowEnrichmentActorHandle;
 use crate::flow::renormalization::RenormalizationActorHandle;
@@ -28,6 +28,8 @@ use crate::yang_push::enrichment::YangPushEnrichmentActorHandle;
 
 use futures_util::StreamExt;
 use futures_util::stream::FuturesUnordered;
+use netgauze_bmp_service::BmpRequest;
+use netgauze_bmp_service::supervisor::BmpSupervisorHandle;
 use netgauze_flow_pkt::FlowInfo;
 use netgauze_flow_service::FlowRequest;
 use netgauze_flow_service::flow_supervisor::FlowCollectorsSupervisorActorHandle;
@@ -47,6 +49,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{info, warn};
 
+pub mod bmp;
 pub mod config;
 pub mod flow;
 pub mod inputs;
@@ -333,6 +336,11 @@ pub async fn init_flow_collection(
                         "Telemetry KafkaYang publisher not supported for Flow"
                     ));
                 }
+                PublisherEndpoint::BmpKafkaAvro(_) => {
+                    return Err(anyhow::anyhow!(
+                        "BMP KafkaAvro publisher not supported for Flow"
+                    ));
+                }
             }
         }
     }
@@ -393,6 +401,105 @@ pub async fn init_flow_collection(
                 let _ = handle.shutdown().await;
             }
             for handle in kafka_input_handles {
+                let _ = handle.shutdown().await;
+            }
+            match join_ret {
+                None | Some(Ok(Ok(_))) => Ok(()),
+                Some(Err(err)) => Err(anyhow::anyhow!(err)),
+                Some(Ok(Err(err))) => Err(anyhow::anyhow!(err)),
+            }
+        }
+    };
+    ret
+}
+
+pub async fn init_bmp_collection(
+    bmp_config: BmpConfig,
+    meter: opentelemetry::metrics::Meter,
+) -> anyhow::Result<()> {
+    let supervisor_config = bmp_config.supervisor_config();
+    let (supervisor_join_handle, supervisor_handle) =
+        BmpSupervisorHandle::new(supervisor_config, meter.clone())?;
+
+    let mut join_set = FuturesUnordered::new();
+    let mut kafka_json_handles = Vec::new();
+    let mut kafka_avro_handles = Vec::new();
+
+    for (group_name, publisher_config) in bmp_config.publishers {
+        info!("Starting publishers group '{group_name}'");
+
+        let mut bmp_recvs = Vec::new();
+        if publisher_config.shards > 1 {
+            (bmp_recvs, _) = supervisor_handle
+                .subscribe_shards(publisher_config.shards, publisher_config.buffer_size)
+                .await?;
+        } else {
+            let (bmp_recv, _) = supervisor_handle
+                .subscribe(publisher_config.buffer_size)
+                .await?;
+            bmp_recvs.push(bmp_recv);
+        }
+
+        for (endpoint_name, endpoint) in publisher_config.endpoints {
+            info!("Creating publisher '{endpoint_name}'");
+
+            match &endpoint {
+                PublisherEndpoint::KafkaJson(config) => {
+                    for bmp_recv in &bmp_recvs {
+                        let (join_handle, handle) = KafkaJsonPublisherActorHandle::from_config(
+                            serialize_bmp,
+                            config.clone(),
+                            bmp_recv.clone(),
+                            either::Left(meter.clone()),
+                        )?;
+
+                        join_set.push(join_handle);
+                        kafka_json_handles.push(handle);
+                    }
+                }
+                PublisherEndpoint::BmpKafkaAvro(config) => {
+                    for bmp_recv in &bmp_recvs {
+                        let (kafka_join, kafka_handle) =
+                            KafkaAvroPublisherActorHandle::from_config(
+                                config.clone(),
+                                bmp_recv.clone(),
+                                either::Left(meter.clone()),
+                            )
+                            .await?;
+                        join_set.push(kafka_join);
+                        kafka_avro_handles.push(kafka_handle);
+                    }
+                }
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Only KafkaJson and BmpKafkaAvro publishers are currently supported for BMP"
+                    ));
+                }
+            }
+        }
+    }
+
+    let ret = tokio::select! {
+        supervisor_ret = supervisor_join_handle => {
+            info!("BMP supervisor exited, shutting down all publishers");
+            for handle in kafka_json_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_avro_handles {
+                let _ = handle.shutdown().await;
+            }
+            match supervisor_ret {
+                Ok(_) => Ok(()),
+                Err(err) => Err(anyhow::anyhow!(err)),
+            }
+        },
+        join_ret = join_set.next() => {
+            warn!("BMP publisher exited, shutting down BMP collection and publishers");
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
+            for handle in kafka_json_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_avro_handles {
                 let _ = handle.shutdown().await;
             }
             match join_ret {
@@ -629,6 +736,11 @@ pub async fn init_udp_notif_collection(
                         }
                     }
                 }
+                PublisherEndpoint::BmpKafkaAvro(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Bmp KafkaAvro publisher not supported for UDP Notif"
+                    ));
+                }
             }
         }
     }
@@ -819,6 +931,29 @@ fn serialize_flow(
     let (ip, msg) = input;
     let value = serde_json::to_value(msg)?;
     let key = serde_json::Value::String(ip.to_string());
+    Ok((Some(key), value))
+}
+
+#[derive(Debug, strum_macros::Display)]
+pub enum BmpSerializationError {
+    SerializationError(serde_json::Error),
+}
+
+impl std::error::Error for BmpSerializationError {}
+
+impl From<serde_json::Error> for BmpSerializationError {
+    fn from(err: serde_json::Error) -> Self {
+        BmpSerializationError::SerializationError(err)
+    }
+}
+
+fn serialize_bmp(
+    input: Arc<BmpRequest>,
+    _writer_id: String,
+) -> Result<(Option<serde_json::Value>, serde_json::Value), BmpSerializationError> {
+    let (addr_info, msg) = input.as_ref();
+    let value = serde_json::to_value(msg)?;
+    let key = serde_json::Value::String(addr_info.remote_socket().ip().to_string());
     Ok((Some(key), value))
 }
 
@@ -1030,5 +1165,84 @@ mod tests {
                 expected_value
             )
         );
+    }
+
+    #[test]
+    fn test_serialize_bmp() {
+        use netgauze_bgp_pkt::BgpMessage;
+        use netgauze_bgp_pkt::update::BgpUpdateMessage;
+        use netgauze_bmp_pkt::v4::{BmpMessageValue, RouteMonitoringMessage};
+        use netgauze_bmp_pkt::{BmpMessage, BmpPeerType, PeerHeader};
+        use netgauze_bmp_service::AddrInfo;
+
+        let local_socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1790);
+        let remote_socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)), 55555);
+        let addr_info = AddrInfo::new(local_socket, remote_socket);
+
+        let peer_header = PeerHeader::new(
+            BmpPeerType::GlobalInstancePeer {
+                ipv6: false,
+                post_policy: false,
+                asn2: false,
+                adj_rib_out: false,
+            },
+            None,
+            Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))),
+            65000,
+            Ipv4Addr::new(10, 0, 0, 1),
+            None,
+        );
+
+        let update_msg = BgpMessage::Update(BgpUpdateMessage::new(vec![], vec![], vec![]));
+
+        let bmp_msg_value = RouteMonitoringMessage::build(peer_header, update_msg, vec![])
+            .expect("Failed to build RouteMonitoringMessage");
+
+        let bmp_msg = BmpMessage::V4(BmpMessageValue::RouteMonitoring(bmp_msg_value));
+        let request = Arc::new((addr_info, bmp_msg));
+
+        let expected_value = serde_json::json!({
+            "V4": {
+                "RouteMonitoring": {
+                    "peer_header": {
+                        "peer_type": {
+                            "GlobalInstancePeer": {
+                                "ipv6": false,
+                                "post_policy": false,
+                                "asn2": false,
+                                "adj_rib_out": false
+                            }
+                        },
+                        "rd": null,
+                        "address": "10.0.0.1",
+                        "peer_as": 65000,
+                        "bgp_id": "10.0.0.1",
+                        "timestamp": null
+                    },
+                    "tlvs": [],
+                    "update_pdu": {
+                        "index": 0,
+                        "value": {
+                            "BgpUpdate": {
+                                "Update": {
+                                    "withdrawn_routes": [],
+                                    "path_attributes": [],
+                                    "nlri": []
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        let (key, value) =
+            serialize_bmp(request, String::from("")).expect("Failed to serialize BMP");
+
+        assert_eq!(
+            key,
+            Some(serde_json::Value::String("192.168.1.1".to_string()))
+        );
+        assert_eq!(value, expected_value);
     }
 }
