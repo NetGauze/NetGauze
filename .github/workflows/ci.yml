@@ -205,26 +205,41 @@ jobs:
   # scheme to support development builds from the main branch.
   # ref: https://docs.fedoraproject.org/en-US/packaging-guidelines/Versioning/
   #
-  # The format is: <name>-<version>-<release>.<arch>.rpm
+  # RPM format: <name>-<version>-<release>.<arch>.rpm
+  # DEB format: <name>_<upstream_version>-<debian_revision>_<arch>.deb
   #
   # Versioning Scheme:
   #
   # 1. Tagged Releases (e.g., refs/tags/v0.7.0):
   #    - Version: The git tag without the 'v' prefix (e.g., 0.7.0).
-  #    - Release: '1'.
+  #    - RPM release: '1'.
+  #    - DEB revision: '1'.
   #    - Example: netgauze-collector-0.7.0-1.el8_10.x86_64.rpm
+  #    - Example: netgauze-collector_0.7.0-1_amd64.deb
   #
   # 2. Development Builds (non-tagged commits on main):
   #    - These are for testing the latest changes on the main branch.
   #    - Version: Based on the latest git tag (e.g., 0.7.0).
-  #    - Release: A preview identifier in the format '0.<commits_since_tag>^<date>git<short_sha>'.
+  #    - RPM release: A preview identifier in the format
+  #      '0.<commits_since_tag>^<date>git<short_sha>'.
+  #    - DEB revision: A preview identifier in the format
+  #      '0.<commits_since_tag>~<date>git<short_sha>'.
+  #      Debian treats '~' as sorting before the final release, so development
+  #      packages are ordered lower than the eventual tagged package.
   #    - Example: netgauze-collector-0.7.0-0.1^20250822gita3c6d71b.el8_10.x86_64.rpm
+  #    - Example: netgauze-collector_0.7.0-0.1~20250822gita3c6d71b_amd64.deb
+  #
+  # Output mapping from this job:
+  # - version/release are used by RPM packaging.
+  # - deb_version/deb_release are used by DEB packaging.
   version:
     runs-on: ubuntu-latest
     name: Calculate version information
     outputs:
       version: ${{ steps.version_and_release.outputs.VERSION }}
       release: ${{ steps.version_and_release.outputs.RELEASE }}
+      deb_version: ${{ steps.version_and_release.outputs.DEB_VERSION }}
+      deb_release: ${{ steps.version_and_release.outputs.DEB_RELEASE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -234,14 +249,19 @@ jobs:
         run: |
           TAG=$(git describe --tags --abbrev=0)
           VERSION=${TAG#v}
+          DEB_VERSION=${VERSION}
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             RELEASE="1"
+            DEB_RELEASE="1"
           else
             COMMIT_COUNT=$(git describe --tags | cut -d'-' -f2)
             RELEASE="0.${COMMIT_COUNT}^$(date +%Y%m%d)git$(git rev-parse --short=8 HEAD)"
+            DEB_RELEASE="0.${COMMIT_COUNT}~$(date +%Y%m%d)git$(git rev-parse --short=8 HEAD)"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "RELEASE=${RELEASE}" >> $GITHUB_OUTPUT
+          echo "DEB_VERSION=${DEB_VERSION}" >> $GITHUB_OUTPUT
+          echo "DEB_RELEASE=${DEB_RELEASE}" >> $GITHUB_OUTPUT
 
   # Build RPM packages for different distributions
   build-collector-rpm:
@@ -295,6 +315,64 @@ jobs:
           path: target/generate-rpm/*.rpm
           retention-days: 30
 
+  build-collector-deb:
+    runs-on: ubuntu-latest
+    needs: version
+    strategy:
+      matrix: &deb-matrix
+        include:
+          - name: "Debian 13"
+            image: "debian:13"
+            arch: "amd64"
+    name: Build DEB for ${{ matrix.name }}
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # needs the full git history to get tag information
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y \
+            build-essential \
+            pkg-config \
+            cmake \
+            git \
+            curl \
+            libpcre2-dev \
+            libcurl4-openssl-dev \
+            libssl-dev
+      - name: Install stable
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+      - name: Build netgauze-collector
+        run: cargo build --locked --release -p netgauze-collector
+      - name: Build DEB package
+        run: |
+          cargo deb -p netgauze-collector --no-build --deb-version "${{ needs.version.outputs.deb_version }}-${{ needs.version.outputs.deb_release }}"
+      - name: Get DEB filename
+        id: deb_filename
+        run: |
+          DEB_PATHS=$(find target/debian -type f -name "netgauze-collector*.deb" | sort)
+          DEB_COUNT=$(printf '%s\n' "$DEB_PATHS" | sed '/^$/d' | wc -l | tr -d ' ')
+          if [ "$DEB_COUNT" -ne 1 ]; then
+            echo "Expected exactly one DEB package, found ${DEB_COUNT}"
+            printf '%s\n' "$DEB_PATHS"
+            exit 1
+          fi
+          DEB_PATH=$(printf '%s\n' "$DEB_PATHS" | sed -n '1p')
+          echo "path=${DEB_PATH}" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$DEB_PATH")" >> "$GITHUB_OUTPUT"
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.deb_filename.outputs.name }}
+          path: ${{ steps.deb_filename.outputs.path }}
+          retention-days: 30
+
   test-collector-rpm:
     runs-on: ubuntu-latest
     needs: build-collector-rpm
@@ -316,6 +394,42 @@ jobs:
           RPM_FILE=$(find rpm-artifact -type f -name "*.rpm")
           echo "Installing RPM file: ${RPM_FILE}"
           dnf install -y "${RPM_FILE}"
+      - name: Run netgauze-collector (it should start and then exit without errors)
+        run: netgauze-collector crates/collector/config_ci_rpm_test.yaml
+
+  test-collector-deb:
+    runs-on: ubuntu-latest
+    needs: build-collector-deb
+    strategy:
+      matrix: *deb-matrix
+    name: Test DEB on ${{ matrix.name }}
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download DEB artifact
+        uses: actions/download-artifact@v8
+        with:
+          path: deb-artifact
+          pattern: netgauze-collector*.deb
+      - name: Install DEB
+        run: |
+          apt-get update
+          if [ ! -d deb-artifact ]; then
+            echo "DEB artifact directory was not created. Download step likely matched no artifacts."
+            exit 1
+          fi
+          DEB_PATHS=$(find deb-artifact -type f -name "netgauze-collector*.deb" | sort)
+          DEB_COUNT=$(printf '%s\n' "$DEB_PATHS" | sed '/^$/d' | wc -l | tr -d ' ')
+          if [ "$DEB_COUNT" -ne 1 ]; then
+            echo "Expected exactly one downloaded DEB package, found ${DEB_COUNT}"
+            ls -la deb-artifact || true
+            printf '%s\n' "$DEB_PATHS"
+            exit 1
+          fi
+          DEB_FILE=$(printf '%s\n' "$DEB_PATHS" | sed -n '1p')
+          echo "Installing DEB file: ${DEB_FILE}"
+          dpkg -i "$DEB_FILE" || apt-get install -f -y
       - name: Run netgauze-collector (it should start and then exit without errors)
         run: netgauze-collector crates/collector/config_ci_rpm_test.yaml
 
