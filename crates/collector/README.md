@@ -21,6 +21,22 @@ Pre-built RPM packages are available on the [GitHub Releases](https://github.com
    ```
    The RPM installs the binary to `/usr/bin/netgauze-collector` and sets the necessary capabilities (`cap_net_raw+ep`).
 
+### From DEB (Recommended for Debian/Ubuntu)
+
+Pre-built DEB packages are available on the [GitHub Releases](https://github.com/NetGauze/NetGauze/releases) page.
+
+1. Download the latest DEB for your architecture (e.g., `netgauze-collector-X.Y.Z-1_amd64.deb`).
+2. Install using `apt`:
+   ```bash
+   sudo apt install ./netgauze-collector-*.deb
+   ```
+   The DEB installs the binary to `/usr/bin/netgauze-collector`.
+3. If you need raw socket access without running as root, set capabilities manually:
+   ```bash
+   sudo setcap cap_net_raw+ep /usr/bin/netgauze-collector
+   getcap /usr/bin/netgauze-collector
+   ```
+
 ### From Source
 
 To build from source, you need a Rust toolchain installed. We recommend using [rustup](https://rustup.rs/).
