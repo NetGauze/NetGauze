@@ -34,15 +34,14 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use netgauze_flow_pkt::FlowInfo;
 use netgauze_flow_pkt::ie::{
-    self, Field, FieldConversionError, HasIE, IE, InformationElementDataType,
-    InformationElementTemplate,
+    self, FieldConversionError, HasIE, IE, InformationElementDataType, InformationElementTemplate,
 };
 use netgauze_flow_pkt::ipfix::{DataRecord, Set};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use smallvec::SmallVec;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 
 #[derive(Debug, Clone, strum_macros::Display)]
@@ -261,12 +260,15 @@ impl FieldConfig {
         &self,
         ies: &[IE],
     ) -> Result<(), FieldConfigValidationError> {
-        use {FieldSelectFunction as SF, FieldTransformFunction as TF};
-
         match (&self.select, &self.transform) {
-            (SF::Multi(_), TF::StringArrayAgg | TF::StringMapAgg(_) | TF::MplsIndex) => {
+            (
+                FieldSelectFunction::Multi(_),
+                FieldTransformFunction::StringArrayAgg
+                | FieldTransformFunction::StringMapAgg(_)
+                | FieldTransformFunction::MplsIndex,
+            ) => {
                 // Validate StringMapAgg rename keys match selected IEs
-                if let TF::StringMapAgg(Some(rename_map)) = &self.transform {
+                if let FieldTransformFunction::StringMapAgg(Some(rename_map)) = &self.transform {
                     let ie_set: HashSet<_> = ies.iter().copied().collect();
                     for ie in rename_map.keys() {
                         if !ie_set.contains(ie) {
@@ -280,20 +282,26 @@ impl FieldConfig {
             }
 
             // Multi selection requires an aggregating transform
-            (SF::Multi(_), other) => Err(FieldConfigValidationError::InvalidTransform(format!(
-                "Transform {:?} cannot be used with Multi selection. Use an aggregating \
+            (FieldSelectFunction::Multi(_), other) => {
+                Err(FieldConfigValidationError::InvalidTransform(format!(
+                    "Transform {:?} cannot be used with Multi selection. Use an aggregating \
                  transform ('StringArrayAgg', 'StringMapAgg', or 'MplsIndex'). IEs: {}",
-                other,
-                ies.iter()
-                    .map(|ie| format!("{} ({:?})", ie, ie.data_type()))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ))),
+                    other,
+                    ies.iter()
+                        .map(|ie| format!("{} ({:?})", ie, ie.data_type()))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )))
+            }
 
             // Single or Coalesce selection cannot be used with aggregating transforms
             (
-                SF::Single(_) | SF::Coalesce(_) | SF::Layer2SegmentId(_),
-                TF::StringArrayAgg | TF::StringMapAgg(_) | TF::MplsIndex,
+                FieldSelectFunction::Single(_)
+                | FieldSelectFunction::Coalesce(_)
+                | FieldSelectFunction::Layer2SegmentId(_),
+                FieldTransformFunction::StringArrayAgg
+                | FieldTransformFunction::StringMapAgg(_)
+                | FieldTransformFunction::MplsIndex,
             ) => Err(FieldConfigValidationError::InvalidTransform(format!(
                 "Transform {:?} requires Multi selection. IEs: {}",
                 self.transform,
@@ -304,7 +312,7 @@ impl FieldConfig {
             ))),
 
             // Coalesce selection with mixed types requires explicit transform
-            (SF::Coalesce(_), TF::Identity) => {
+            (FieldSelectFunction::Coalesce(_), FieldTransformFunction::Identity) => {
                 let first_type = ie_avro_type(ies[0]);
                 if ies.iter().any(|ie| ie_avro_type(*ie) != first_type) {
                     return Err(FieldConfigValidationError::InvalidTransform(format!(
@@ -321,7 +329,9 @@ impl FieldConfig {
             }
 
             // Layer2SegmentId must use correct IE
-            (SF::Layer2SegmentId(_), _) if ies.len() != 1 || ies[0] != IE::layer2SegmentId => {
+            (FieldSelectFunction::Layer2SegmentId(_), _)
+                if ies.len() != 1 || ies[0] != IE::layer2SegmentId =>
+            {
                 Err(FieldConfigValidationError::InvalidTransform(
                     "Layer2SegmentId requires layer2SegmentId IE".to_string(),
                 ))
@@ -333,10 +343,8 @@ impl FieldConfig {
     }
 
     fn validate_ie_compatibility(&self, ie: IE) -> Result<(), FieldConfigValidationError> {
-        use FieldTransformFunction as TF;
-
         match &self.transform {
-            TF::TimestampMillisString => {
+            FieldTransformFunction::TimestampMillisString => {
                 if !matches!(
                     ie.data_type(),
                     InformationElementDataType::dateTimeSeconds
@@ -352,7 +360,7 @@ impl FieldConfig {
                 }
             }
 
-            TF::StringArray => {
+            FieldTransformFunction::StringArray => {
                 if ie != IE::tcpControlBits {
                     return Err(FieldConfigValidationError::InvalidTransform(format!(
                         "StringArray currently only works with tcpControlBits, got {ie}"
@@ -360,7 +368,7 @@ impl FieldConfig {
                 }
             }
 
-            TF::MplsIndex => {
+            FieldTransformFunction::MplsIndex => {
                 if !matches!(
                     ie,
                     IE::mplsLabelStackSection
@@ -381,12 +389,12 @@ impl FieldConfig {
             }
 
             // String transforms require TryInto<String> (implemented for all types except Bytes)
-            TF::String
-            | TF::TrimmedString
-            | TF::LowercaseString
-            | TF::Rename(_)
-            | TF::StringArrayAgg
-            | TF::StringMapAgg(_) => {
+            FieldTransformFunction::String
+            | FieldTransformFunction::TrimmedString
+            | FieldTransformFunction::LowercaseString
+            | FieldTransformFunction::Rename(_)
+            | FieldTransformFunction::StringArrayAgg
+            | FieldTransformFunction::StringMapAgg(_) => {
                 if ie_avro_type(ie) == AvroValueKind::Bytes {
                     return Err(FieldConfigValidationError::InvalidTransform(format!(
                         "{:?} requires String conversion, but {} is Bytes type ({:?})",
@@ -397,7 +405,7 @@ impl FieldConfig {
                 }
             }
 
-            TF::Identity => {}
+            FieldTransformFunction::Identity => {}
         }
 
         Ok(())
@@ -496,7 +504,7 @@ impl FieldConfig {
 
     pub fn avro_value(
         &self,
-        flow: &FxHashMap<SingleFieldSelect, &Field>,
+        flow: &FxHashMap<SingleFieldSelect, &ie::Field>,
     ) -> Result<Option<AvroValue>, FunctionError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
@@ -509,7 +517,7 @@ impl FieldConfig {
 
     pub fn json_value(
         &self,
-        flow: &FxHashMap<SingleFieldSelect, &Field>,
+        flow: &FxHashMap<SingleFieldSelect, &ie::Field>,
     ) -> Result<Option<JsonValue>, FunctionError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
@@ -533,7 +541,7 @@ pub trait FieldSelect {
     fn avro_type(&self) -> AvroValueKind;
 
     /// Select a value from the given flow
-    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>>;
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &ie::Field>) -> Option<Vec<ie::Field>>;
 }
 
 /// An enum for all supported Field selection functions
@@ -563,7 +571,7 @@ impl FieldSelect for FieldSelectFunction {
             FieldSelectFunction::Layer2SegmentId(f) => f.avro_type(),
         }
     }
-    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &ie::Field>) -> Option<Vec<ie::Field>> {
         match self {
             FieldSelectFunction::Single(single) => single.apply(flow),
             FieldSelectFunction::Coalesce(coalesce) => coalesce.apply(flow),
@@ -585,7 +593,7 @@ impl FieldSelect for SingleFieldSelect {
         ie_avro_type(self.ie())
     }
 
-    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &ie::Field>) -> Option<Vec<ie::Field>> {
         flow.get(self).map(|&field| vec![field.clone()])
     }
 }
@@ -623,7 +631,7 @@ impl FieldSelect for CoalesceFieldSelect {
         first_type
     }
 
-    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &ie::Field>) -> Option<Vec<ie::Field>> {
         self.ies
             .iter()
             .find_map(|single_select| single_select.apply(flow))
@@ -645,8 +653,8 @@ impl FieldSelect for MultiSelect {
         AvroValueKind::Array
     }
 
-    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
-        let ret: Vec<Field> = self
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &ie::Field>) -> Option<Vec<ie::Field>> {
+        let ret: Vec<ie::Field> = self
             .ies
             .iter()
             .filter_map(|single_select| single_select.apply(flow))
@@ -708,7 +716,7 @@ impl FieldSelect for Layer2SegmentIdFieldSelect {
         AvroValueKind::Long
     }
 
-    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &Field>) -> Option<Vec<Field>> {
+    fn apply(&self, flow: &FxHashMap<SingleFieldSelect, &ie::Field>) -> Option<Vec<ie::Field>> {
         flow.get(&self.single_select).and_then(|&field| {
             // Check if it's a layer2SegmentId field
             if let ie::Field::layer2SegmentId(id) = field {
@@ -848,7 +856,7 @@ impl FieldTransformFunction {
         }
     }
 
-    pub fn apply(&self, fields: Option<Vec<Field>>) -> Result<Option<RawValue>, FunctionError> {
+    pub fn apply(&self, fields: Option<Vec<ie::Field>>) -> Result<Option<RawValue>, FunctionError> {
         let fields = match fields {
             Some(fields) => fields,
             None => return Ok(None),
