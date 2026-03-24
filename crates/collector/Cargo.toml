@@ -23,6 +23,19 @@ assets = [
   { source = "target/release/netgauze-collector", dest = "/usr/bin/netgauze-collector", caps = "cap_net_raw+ep" },
 ]
 
+[package.metadata.deb]
+maintainer = "Ahmed Elhassany <a.hassany@gmail.com>"
+copyright = "2026, NetGauze Authors"
+license-file = ["LICENSE", "0"]
+section = "net"
+priority = "optional"
+depends = "$auto"
+assets = [
+  ["target/release/netgauze-collector", "usr/bin/netgauze-collector", "755"],
+  ["LICENSE", "usr/share/doc/netgauze-collector/LICENSE", "644"],
+  ["README.md", "usr/share/doc/netgauze-collector/README.md", "644"],
+]
+
 [dependencies]
 netgauze-analytics = { workspace = true }
 netgauze-flow-service = { workspace = true }
