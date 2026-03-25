@@ -51,7 +51,8 @@ netgauze-pcap-decoder --input <PCAP_FILE> --protocol <PROTOCOL> --ports <PORTS> 
 ### Options
 
 - `--output <OUTPUT>` - Output JSON Lines file path (defaults to stdout)
-- `--input-count <COUNT>` - Maximum number of packets to process
+- `--input-count <COUNT>` - Maximum number of frame to process
+- `--show-frame-numbers` - Include frame numbers in output
 - `--help` - Show help information
 
 ### Examples

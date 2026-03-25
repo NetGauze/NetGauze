@@ -24,6 +24,24 @@ fn run_pcap_decoder_test(
     expected_json_path: &str,
     input_count: Option<usize>,
 ) {
+    run_pcap_decoder_test_with_options(
+        protocol,
+        ports,
+        pcap_path,
+        expected_json_path,
+        input_count,
+        false,
+    );
+}
+
+fn run_pcap_decoder_test_with_options(
+    protocol: &str,
+    ports: &str,
+    pcap_path: &str,
+    expected_json_path: &str,
+    input_count: Option<usize>,
+    show_frame_number: bool,
+) {
     let overwrite = env::var("OVERWRITE").unwrap_or_else(|_| "false".to_string()) == "true";
 
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_netgauze-pcap-decoder"));
@@ -36,6 +54,10 @@ fn run_pcap_decoder_test(
 
     if let Some(count) = input_count {
         cmd.arg("--input-count").arg(count.to_string());
+    }
+
+    if show_frame_number {
+        cmd.arg("--show-frame-number");
     }
 
     if overwrite {
@@ -126,5 +148,17 @@ fn test_input_count_option() {
         "tests/data/502-IPFIXv10-BGP-IPv6-CISCO-SRv6-lcomms.pcap",
         "tests/data/502-IPFIXv10-BGP-IPv6-CISCO-SRv6-lcomms-bgp-10-packets.jsonl",
         Some(10),
+    );
+}
+
+#[test]
+fn test_packet_count_option() {
+    run_pcap_decoder_test_with_options(
+        "bgp",
+        "179",
+        "tests/data/502-IPFIXv10-BGP-IPv6-CISCO-SRv6-lcomms.pcap",
+        "tests/data/502-IPFIXv10-BGP-IPv6-CISCO-SRv6-lcomms-bgp-packet-number.jsonl",
+        None,
+        true,
     );
 }
