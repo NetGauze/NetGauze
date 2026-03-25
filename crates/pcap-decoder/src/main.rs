@@ -49,10 +49,14 @@ struct Cli {
     #[clap(long, value_delimiter = ',', required = true)]
     ports: Vec<u16>,
 
-    /// Max number of messages to load from the PCAP input file,
-    /// if not set all messages will be loaded
+    /// Max number of frames to load from the PCAP input file,
+    /// if not set all frames will be loaded
     #[clap(short = 'c', long)]
     input_count: Option<usize>,
+
+    /// Include the PCAP frame number alongside each JSON output entry
+    #[clap(long, default_value_t = false)]
+    show_frame_number: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -65,6 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         output_path: cli.output.map(PathBuf::from),
         input_size: cli.input_count,
         dest_ports: cli.ports,
+        show_frame_number: cli.show_frame_number,
     };
 
     match cli.protocol {

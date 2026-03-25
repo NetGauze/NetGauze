@@ -39,6 +39,7 @@ pub struct Config {
     pub input_size: Option<usize>,
     pub pcap_path: PathBuf,
     pub output_path: Option<PathBuf>,
+    pub show_frame_number: bool,
 }
 
 /// Handlers re-export
@@ -70,12 +71,13 @@ where
     H: ProtocolHandler<M, C, E>,
 {
     let pcap_file = File::open(config.pcap_path.as_path()).expect("Failed to open pcap file");
-    let pcap_reader =
-        Box::new(pcap_parser::LegacyPcapReader::new(PCAP_BUFFER_SIZE, pcap_file).unwrap());
+    let pcap_reader = Box::new(pcap_parser::LegacyPcapReader::new(
+        PCAP_BUFFER_SIZE,
+        pcap_file,
+    )?);
 
     let mut exporter_peers: HashMap<(IpAddr, u16, IpAddr, u16), (C, bytes::BytesMut)> =
         HashMap::new();
-    let mut packet_counter = 0;
 
     let mut writer: Box<dyn Write> = if let Some(output_path_ref) = &config.output_path {
         // If an output path is provided, create/truncate the file and use it
@@ -92,10 +94,11 @@ where
         Box::new(BufWriter::new(io::stdout()))
     };
 
-    for (src_ip, src_port, dst_ip, dst_port, protocol, packet_data) in PcapIter::new(pcap_reader) {
-        packet_counter += 1;
+    let mut iter = PcapIter::new(pcap_reader);
+    while let Some((src_ip, src_port, dst_ip, dst_port, protocol, packet_data)) = iter.next() {
+        let frame_counter = iter.frame_counter();
         if let Some(max_packets) = config.input_size
-            && packet_counter > max_packets
+            && frame_counter > max_packets
         {
             break;
         }
@@ -105,7 +108,15 @@ where
         {
             for result in message {
                 let serialized_data = handler.serialize(result)?;
-                writer.write_all(serde_json::to_string(&serialized_data)?.as_bytes())?;
+                let output = if config.show_frame_number {
+                    serde_json::json!({
+                        "frame_number": frame_counter,
+                        "data": serialized_data,
+                    })
+                } else {
+                    serialized_data
+                };
+                writer.write_all(serde_json::to_string(&output)?.as_bytes())?;
                 writer.write_all(b"\n")?;
             }
         }

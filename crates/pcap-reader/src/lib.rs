@@ -69,6 +69,7 @@ pub enum TransportProtocol {
 pub struct PcapIter<'a> {
     reader: Box<dyn PcapReaderIterator + 'a>,
     link_types: Vec<Linktype>,
+    frame_counter: usize,
 }
 
 impl<'a> PcapIter<'a> {
@@ -76,7 +77,13 @@ impl<'a> PcapIter<'a> {
         Self {
             reader,
             link_types: vec![],
+            frame_counter: 0,
         }
+    }
+
+    /// Return the current frame counter
+    pub const fn frame_counter(&self) -> usize {
+        self.frame_counter
     }
 }
 
@@ -89,6 +96,7 @@ impl Iterator for PcapIter<'_> {
                 Ok((offset, block)) => {
                     match block {
                         PcapBlockOwned::Legacy(legacy_packet) => {
+                            self.frame_counter += 1;
                             let link_type = self.link_types[0];
                             let packet_data = data::get_packetdata(
                                 legacy_packet.data,
@@ -111,6 +119,7 @@ impl Iterator for PcapIter<'_> {
                             continue;
                         }
                         PcapBlockOwned::NG(Block::EnhancedPacket(packet)) => {
+                            self.frame_counter += 1;
                             let link_type = self.link_types[packet.if_id as usize];
                             let packet_data = data::get_packetdata(
                                 packet.data,
