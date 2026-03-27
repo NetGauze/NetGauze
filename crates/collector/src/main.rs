@@ -29,6 +29,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::time::Instant;
 use tracing::info;
 
 shadow!(build);
@@ -93,6 +94,83 @@ fn log_info() {
     info!("");
 }
 
+struct CollectorMetrics {
+    _health: opentelemetry::metrics::ObservableGauge<u64>,
+    _uptime: opentelemetry::metrics::ObservableGauge<f64>,
+    _info: opentelemetry::metrics::ObservableGauge<u64>,
+}
+
+impl CollectorMetrics {
+    fn new(meter: &opentelemetry::metrics::Meter, process_start: Instant) -> Self {
+        let health = meter
+            .u64_observable_gauge("netgauze.collector.health")
+            .with_description("1 if the collector is healthy, 0 if degraded.")
+            .with_callback(move |observer| {
+                // TODO: implement actual health checks of the actors
+                observer.observe(1, &[]);
+            })
+            .build();
+
+        // Standard semantic convention:
+        // https://opentelemetry.io/docs/specs/semconv/system/process-metrics/#metric-processuptime
+        let uptime = meter
+            .f64_observable_gauge("process.uptime")
+            .with_unit("s")
+            .with_description("The time the process has been running in seconds.")
+            .with_callback(move |observer| {
+                observer.observe(process_start.elapsed().as_secs_f64(), &[]);
+            })
+            .build();
+
+        let info = meter
+            .u64_observable_gauge("netgauze.collector.info")
+            .with_description(
+                "Always emits 1 while the collector is running. \
+                 Carries version and build metadata as attributes.",
+            )
+            .with_callback(move |observer| {
+                observer.observe(
+                    1,
+                    &[
+                        opentelemetry::KeyValue::new(
+                            "package_version",
+                            build::PKG_VERSION.to_string(),
+                        ),
+                        opentelemetry::KeyValue::new("commit_hash", build::COMMIT_HASH.to_string()),
+                        opentelemetry::KeyValue::new("commit_date", build::COMMIT_DATE.to_string()),
+                        opentelemetry::KeyValue::new("branch", build::BRANCH.to_string()),
+                        opentelemetry::KeyValue::new("tag", build::TAG.to_string()),
+                        opentelemetry::KeyValue::new("build_time", build::BUILD_TIME.to_string()),
+                        opentelemetry::KeyValue::new(
+                            "build_rust_channel",
+                            build::BUILD_RUST_CHANNEL.to_string(),
+                        ),
+                        opentelemetry::KeyValue::new("build_os", build::BUILD_OS.to_string()),
+                        opentelemetry::KeyValue::new(
+                            "rust_channel",
+                            build::RUST_CHANNEL.to_string(),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "rust_version",
+                            build::RUST_VERSION.to_string(),
+                        ),
+                        opentelemetry::KeyValue::new(
+                            "cargo_version",
+                            build::CARGO_VERSION.to_string(),
+                        ),
+                    ],
+                );
+            })
+            .build();
+
+        Self {
+            _health: health,
+            _uptime: uptime,
+            _info: info,
+        }
+    }
+}
+
 fn init_open_telemetry(
     config: &TelemetryConfig,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
@@ -142,6 +220,7 @@ fn main() -> anyhow::Result<()> {
 
     init_tracing(&config.logging.level, config.logging.ansi);
     log_info();
+    let process_start = Instant::now();
 
     let mut runtime_builder = tokio::runtime::Builder::new_multi_thread();
     // If num of threads is not configured then the default use all CPU cores is
@@ -155,6 +234,9 @@ fn main() -> anyhow::Result<()> {
     runtime.block_on(async move {
         init_open_telemetry(&config.telemetry).map_err(|err| anyhow!(err))?;
         let meter = global::meter_provider().meter("netgauze");
+        // Keep the metrics alive for the entire process lifetime.
+        let _collector_metrics = CollectorMetrics::new(&meter, process_start);
+
         let mut handles = vec![];
 
         if let Some(flow_config) = config.flow {
