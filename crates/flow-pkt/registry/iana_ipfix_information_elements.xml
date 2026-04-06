@@ -4,7 +4,7 @@
 <registry xmlns="http://www.iana.org/assignments" id="ipfix">
 <title>IP Flow Information Export (IPFIX) Entities</title>
 <created>2007-05-10</created>
-<updated>2025-11-24</updated>
+<updated>2026-04-02</updated>
 
 <note><xref type="rfc" data="rfc7012"/> has obsoleted <xref type="rfc" data="rfc5102"/>. However, references to <xref type="rfc" data="rfc5102"/>
 remain as part of the historical record.</note>
@@ -12703,12 +12703,113 @@ decode: 0001 - PDU Type value
                       <xref type="rfc" data="rfc9870"/>
                       <revision>0</revision>
                       <date>2024-10-23</date>
-                    </record>
-            
+                    </record> 
+
+<record date="2026-04-02">
+  <name>pathDelayMeanDeltaMicroseconds</name>
+  <dataType>unsigned32</dataType>
+  <dataTypeSemantics>deltaCounter</dataTypeSemantics>
+  <elementId>530</elementId>
+  <status>current</status>
+  <description>
+    <paragraph>
+This Information Element identifies the mean path delay
+of all packets in the Flow, in microseconds, between an OAM header
+encapsulating node and the local node with the OAM domain (either
+an OAM header transit node or an OAM header decapsulating node),
+according to OWDelay_HybridType1_IP_RFC9951_Seconds_Mean in
+the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref>  Registry.
+    </paragraph>
+  </description>
+  <references>
+    <paragraph>
+      OWDelay_HybridType1_IP_RFC9951_Seconds_Mean in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref> registry.
+    </paragraph>
+  </references>
+<xref type="draft" data="RFC-ietf-opsawg-ipfix-on-path-telemetry-23"/>
+  <revision>0</revision>
+  <date>2026-04-02</date>
+</record>
+
+<record date="2026-04-02">
+  <name>pathDelayMinDeltaMicroseconds</name>
+  <dataType>unsigned32</dataType>
+  <dataTypeSemantics>deltaCounter</dataTypeSemantics>
+  <elementId>531</elementId>
+  <status>current</status>
+  <description>
+    <paragraph>
+This Information Element identifies the lowest path
+delay of all packets in the Flow, in microseconds, between an OAM
+header encapsulating node and the local node with the OAM domain
+(either an OAM header transit node or an OAM header decapsulating
+node), according to the OWDelay_HybridType1_IP_RFC9951_Seconds_Min in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref>  Registry.
+    </paragraph>
+  </description>
+  <references>
+    <paragraph>
+      OWDelay_HybridType1_IP_RFC9951_Seconds_Min in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref> registry.
+    </paragraph>
+  </references>
+<xref type="draft" data="RFC-ietf-opsawg-ipfix-on-path-telemetry-23"/>
+  <revision>0</revision>
+  <date>2026-04-02</date>
+</record>
+
+<record date="2026-04-02">
+  <name>pathDelayMaxDeltaMicroseconds</name>
+  <dataType>unsigned32</dataType>
+  <dataTypeSemantics>deltaCounter</dataTypeSemantics>
+  <elementId>532</elementId>
+  <status>current</status>
+  <description>
+    <paragraph>
+This Information Element identifies the highest path
+delay of all packets in the Flow, in microseconds, between an OAM
+header encapsulating node and the local node with the OAM domain
+(either an OAM header transit node or an OAM header decapsulating
+node), according to OWDelay_HybridType1_IP_RFC9951_Seconds_Max in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref>  Registry.
+    </paragraph>
+  </description>
+  <references>
+    <paragraph>
+      OWDelay_HybridType1_IP_RFC9951_Seconds_Max in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref> registry.
+    </paragraph>
+  </references>
+<xref type="draft" data="RFC-ietf-opsawg-ipfix-on-path-telemetry-23"/>
+  <revision>0</revision>
+  <date>2026-04-02</date>
+</record>
+
+<record date="2026-04-02">
+  <name>pathDelaySumDeltaMicroseconds</name>
+  <dataType>unsigned64</dataType>
+  <dataTypeSemantics>deltaCounter</dataTypeSemantics>
+  <elementId>533</elementId>
+  <status>current</status>
+  <description>
+    <paragraph>
+This Information Element identifies the sum of the path
+delay of all packets in the Flow, in microseconds, between an OAM
+header encapsulating node and the local node with the OAM domain
+(either an OAM header transit node or an OAM header decapsulating
+node), according to OWDelay_HybridType1_IP_RFC9951_Seconds_Sum in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref>  Registry.
+    </paragraph>
+  </description>
+  <references>
+    <paragraph>
+      OWDelay_HybridType1_IP_RFC9951_Seconds_Sum in the IANA <xref type="registry" data="performance-metrics">Performance Metric</xref> registry.
+    </paragraph>
+  </references>
+<xref type="draft" data="RFC-ietf-opsawg-ipfix-on-path-telemetry-23"/>
+  <revision>0</revision>
+  <date>2026-04-02</date>
+</record>
+
 <record>
   <name>Unassigned</name>
-  <elementId>530-32767</elementId>
-  </record>
+  <elementId>534-32767</elementId>
+</record>
    
 
 
