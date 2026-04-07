@@ -37,6 +37,8 @@ use netgauze_flow_pkt::ie::{
     self, FieldConversionError, HasIE, IE, InformationElementDataType, InformationElementTemplate,
 };
 use rustc_hash::FxHashMap;
+use schema_registry_converter::avro_common::get_supplied_schema;
+use schema_registry_converter::schema_registry_common::SubjectNameStrategy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use smallvec::SmallVec;
@@ -103,7 +105,7 @@ impl FlowOutputConfig {
     fn get_avro_value_from_fields(
         &self,
         fields_slice: &[ie::Field],
-    ) -> Result<AvroValue, FunctionError> {
+    ) -> Result<AvroValue, FlowAvroConverterError> {
         let mut fields = Vec::<(String, AvroValue)>::with_capacity(self.fields.len());
         let mut custom_primitives = IndexMap::new();
 
@@ -126,7 +128,7 @@ impl FlowOutputConfig {
                 } else if let Some(value) = value {
                     value
                 } else {
-                    return Err(FunctionError::FieldIsNull(name.to_string()));
+                    return Err(FlowAvroConverterError::FieldIsNull(name.to_string()));
                 };
                 fields.push((name.clone(), value));
             }
@@ -143,8 +145,8 @@ impl FlowOutputConfig {
     }
 }
 
-impl AvroConverter<(IpAddr, FlowInfo), FunctionError> for FlowOutputConfig {
-    fn get_avro_schema(&self) -> String {
+impl AvroConverter<(IpAddr, FlowInfo), FlowAvroConverterError> for FlowOutputConfig {
+    fn get_avro_schema(&self) -> Result<String, FlowAvroConverterError> {
         let indent = 2usize;
 
         // Initialize schema
@@ -163,7 +165,19 @@ impl AvroConverter<(IpAddr, FlowInfo), FunctionError> for FlowOutputConfig {
         schema.push_str(format!("{}\n", fields_schema.join(",\n")).as_str());
         schema.push_str(format!("{:indent$}]\n", "").as_str());
         schema.push('}');
-        schema
+        Ok(schema)
+    }
+
+    fn get_subject_name_strategy(
+        &self,
+        topic: &str,
+    ) -> Result<SubjectNameStrategy, FlowAvroConverterError> {
+        let schema = apache_avro::Schema::parse_str(&self.get_avro_schema()?)
+            .map_err(|e| FlowAvroConverterError::AvroSchemaError(e.to_string()))?;
+        Ok(SubjectNameStrategy::TopicRecordNameStrategyWithSchema(
+            topic.to_string(),
+            get_supplied_schema(&schema),
+        ))
     }
 
     fn get_key(&self, input: &(IpAddr, FlowInfo)) -> Option<JsonValue> {
@@ -175,7 +189,7 @@ impl AvroConverter<(IpAddr, FlowInfo), FunctionError> for FlowOutputConfig {
     fn get_avro_values(
         &self,
         input: (IpAddr, FlowInfo),
-    ) -> Result<Self::AvroValues, FunctionError> {
+    ) -> Result<Self::AvroValues, FlowAvroConverterError> {
         match input.1 {
             FlowInfo::IPFIX(pkt) => pkt
                 .sets()
@@ -518,7 +532,7 @@ impl FieldConfig {
     pub fn avro_value(
         &self,
         flow: &FxHashMap<SingleFieldSelect, &ie::Field>,
-    ) -> Result<Option<AvroValue>, FunctionError> {
+    ) -> Result<Option<AvroValue>, FlowAvroConverterError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
         let value = match transformed {
@@ -531,7 +545,7 @@ impl FieldConfig {
     pub fn json_value(
         &self,
         flow: &FxHashMap<SingleFieldSelect, &ie::Field>,
-    ) -> Result<Option<JsonValue>, FunctionError> {
+    ) -> Result<Option<JsonValue>, FlowAvroConverterError> {
         let selected = self.select.apply(flow);
         let transformed = self.transform.apply(selected)?;
         let value = match transformed {
@@ -779,7 +793,7 @@ fn ie_avro_type(ie: IE) -> AvroValueKind {
 }
 
 #[derive(Debug, Clone, strum_macros::Display)]
-pub enum FunctionError {
+pub enum FlowAvroConverterError {
     #[strum(to_string = "Field conversion error: {0}")]
     FieldConversionError(FieldConversionError),
     #[strum(to_string = "Field index not found: {0}")]
@@ -790,18 +804,20 @@ pub enum FunctionError {
     FieldIsNull(String),
     #[strum(to_string = "Unsupported flow type: {0}")]
     UnsupportedFlowType(String),
+    #[strum(to_string = "Avro schema error: {0}")]
+    AvroSchemaError(String),
 }
 
-impl From<FieldConversionError> for FunctionError {
+impl From<FieldConversionError> for FlowAvroConverterError {
     fn from(value: FieldConversionError) -> Self {
         Self::FieldConversionError(value)
     }
 }
 
-impl std::error::Error for FunctionError {}
+impl std::error::Error for FlowAvroConverterError {}
 
-impl From<FunctionError> for KafkaAvroPublisherActorError {
-    fn from(value: FunctionError) -> Self {
+impl From<FlowAvroConverterError> for KafkaAvroPublisherActorError {
+    fn from(value: FlowAvroConverterError) -> Self {
         Self::TransformationError(value.to_string())
     }
 }
@@ -869,7 +885,10 @@ impl FieldTransformFunction {
         }
     }
 
-    pub fn apply(&self, fields: Option<Vec<ie::Field>>) -> Result<Option<RawValue>, FunctionError> {
+    pub fn apply(
+        &self,
+        fields: Option<Vec<ie::Field>>,
+    ) -> Result<Option<RawValue>, FlowAvroConverterError> {
         let fields = match fields {
             Some(fields) => fields,
             None => return Ok(None),
@@ -970,7 +989,7 @@ impl FieldTransformFunction {
                         ie::Field::mplsLabelStackSection8(v) => ret.push(format_mpls(8, &v)),
                         ie::Field::mplsLabelStackSection9(v) => ret.push(format_mpls(9, &v)),
                         ie::Field::mplsLabelStackSection10(v) => ret.push(format_mpls(10, &v)),
-                        _ => return Err(FunctionError::UnexpectedField(field)),
+                        _ => return Err(FlowAvroConverterError::UnexpectedField(field)),
                     }
                 }
                 Ok(Some(RawValue::StringArray(ret)))

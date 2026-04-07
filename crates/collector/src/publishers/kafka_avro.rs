@@ -22,7 +22,7 @@ use schema_registry_converter::async_impl::avro::AvroEncoder;
 use schema_registry_converter::async_impl::schema_registry::{SrSettings, post_schema};
 use schema_registry_converter::avro_common::get_supplied_schema;
 use schema_registry_converter::error::SRCError;
-use schema_registry_converter::schema_registry_common::{SubjectNameStrategy, SuppliedSchema};
+use schema_registry_converter::schema_registry_common::SubjectNameStrategy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -35,7 +35,9 @@ use tracing::{debug, error, info, warn};
 const MAX_POLLING_INTERVAL: Duration = Duration::from_secs(5);
 
 pub trait AvroConverter<T, E: std::error::Error> {
-    fn get_avro_schema(&self) -> String;
+    fn get_avro_schema(&self) -> Result<String, E>;
+
+    fn get_subject_name_strategy(&self, topic: &str) -> Result<SubjectNameStrategy, E>;
 
     fn get_key(&self, input: &T) -> Option<JsonValue>;
 
@@ -201,13 +203,19 @@ where
     ) -> Result<Self, KafkaAvroPublisherActorError> {
         let sr_settings = SrSettings::new(config.schema_registry_url.clone());
         let avro_encoder = AvroEncoder::new(sr_settings.clone());
-        let schema_str = config.avro_converter.get_avro_schema();
-        let supplied_schema =
-            Self::get_schema(config.topic.clone(), schema_str, sr_settings).await?;
-        let subject_name_strategy = SubjectNameStrategy::TopicRecordNameStrategyWithSchema(
-            config.topic.clone(),
-            supplied_schema.clone(),
-        );
+        let schema_str = config.avro_converter.get_avro_schema()?;
+        let subject_name_strategy = config
+            .avro_converter
+            .get_subject_name_strategy(&config.topic)?;
+
+        // Register schema already at producer startup
+        Self::register_schema(
+            schema_str,
+            &subject_name_strategy,
+            &config.topic,
+            sr_settings,
+        )
+        .await?;
         let producer = Self::get_producer(&stats, &config)?;
 
         Ok(Self {
@@ -222,11 +230,12 @@ where
         })
     }
 
-    async fn get_schema(
-        topic: String,
+    async fn register_schema(
         schema_str: String,
+        subject_name_strategy: &SubjectNameStrategy,
+        topic: &str,
         sr_settings: SrSettings,
-    ) -> Result<SuppliedSchema, KafkaAvroPublisherActorError> {
+    ) -> Result<(), KafkaAvroPublisherActorError> {
         let parse_schema = match apache_avro::schema::Schema::parse_str(&schema_str) {
             Ok(schema) => schema,
             Err(err) => {
@@ -234,23 +243,20 @@ where
                 return Err(err)?;
             }
         };
-        let supplied_schema = get_supplied_schema(&parse_schema);
-        info!(
+        debug!(
             "Starting Kafka AVRO publisher to topic: `{topic}` with schema: `{}`",
             parse_schema.canonical_form()
         );
-
-        let subject_strategy =
-            SubjectNameStrategy::TopicRecordNameStrategyWithSchema(topic, supplied_schema.clone());
-        let subject = match subject_strategy.get_subject() {
+        let supplied_schema = get_supplied_schema(&parse_schema);
+        let subject = match subject_name_strategy.get_subject() {
             Ok(subject) => subject,
             Err(err) => {
                 error!("Error getting a subject {err}");
                 return Err(err)?;
             }
         };
-        info!("Registering schema with schema registry");
-        match post_schema(&sr_settings, subject.clone(), supplied_schema.clone()).await {
+        debug!("Registering schema with subject {subject} to schema registry");
+        match post_schema(&sr_settings, subject.clone(), supplied_schema).await {
             Ok(schema) => {
                 info!(
                     "Registered schema with subject {subject} and id {}",
@@ -262,7 +268,7 @@ where
                 return Err(err)?;
             }
         }
-        Ok(supplied_schema)
+        Ok(())
     }
 
     pub fn get_producer(
