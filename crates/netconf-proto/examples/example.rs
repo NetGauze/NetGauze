@@ -103,7 +103,8 @@ pub async fn main() -> anyhow::Result<()> {
     };
 
     let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
-    let config = NetconfSshConnectConfig::new(auth, host, announce_caps, ssh_handler, ssh_config);
+    let config =
+        NetconfSshConnectConfig::new(auth, host, None, announce_caps, ssh_handler, ssh_config);
     let mut client = connect(config).await?;
     info!("Connected to server with caps: {:?}", client.peer_caps());
 

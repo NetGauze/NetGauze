@@ -1172,6 +1172,7 @@ pub(crate) mod tests {
     pub(crate) fn test_subscription_info() -> SubscriptionInfo {
         SubscriptionInfo::new(
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 830),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 200)), 12345),
             1,
             ContentId::from("ietf-interfaces-lib".to_string()),
             Target::new_datastore(

@@ -103,6 +103,7 @@ impl NetconfYangLibraryFetcher {
         info!(
             host=%host,
             peer=%subscription_info.peer(),
+            collector=%subscription_info.collector(),
             subscription_id=subscription_info.id(),
             router_content_id=subscription_info.content_id(),
             target=%subscription_info.target(),
@@ -111,8 +112,15 @@ impl NetconfYangLibraryFetcher {
         let ssh_handler = SshHandler::default();
         let auth = SshAuth::Key { user, private_key };
         let announce_caps = HashSet::from([Capability::NetconfBase(NetconfVersion::V1_1)]);
-        let config =
-            NetconfSshConnectConfig::new(auth, host, announce_caps, ssh_handler, client_config);
+        let collector = subscription_info.collector();
+        let config = NetconfSshConnectConfig::new(
+            auth,
+            host,
+            Some(collector),
+            announce_caps,
+            ssh_handler,
+            client_config,
+        );
 
         let mut client = match tokio::time::timeout(timeout_duration, connect(config)).await {
             Ok(Ok(c)) => c,
