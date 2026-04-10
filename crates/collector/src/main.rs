@@ -18,6 +18,7 @@
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use anyhow::anyhow;
+use clap::Parser;
 use futures::Future;
 use netgauze_collector::config::{CollectorConfig, TelemetryConfig};
 use netgauze_collector::{init_bmp_collection, init_flow_collection, init_udp_notif_collection};
@@ -203,12 +204,49 @@ fn init_open_telemetry(
     Ok(())
 }
 
+/// NetGauze network metrics collector CLI arguments
+#[derive(clap::Parser, Debug)]
+#[command(
+    about = "NetGauze network telemetry collector",
+    long_about = "\
+NetGauze network telemetry collector.
+
+Log level can also be overridden via the RUST_LOG environment variable:
+  RUST_LOG=netgauze_collector=trace netgauze-collector config.yaml"
+)]
+struct Args {
+    /// Path to the YAML config file
+    #[arg(required_unless_present = "version")]
+    config_file: Option<PathBuf>,
+
+    /// Print version and build information, then exit
+    #[arg(long, short = 'v', action = clap::ArgAction::SetTrue)]
+    version: bool,
+}
+
 fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() != 2 {
-        return Err(anyhow!("Usage: {} <config-file>", args[0]));
+    let args = Args::parse();
+    if args.version {
+        println!("NetGauze Collector");
+        println!("  Version:     {}", build::PKG_VERSION);
+        println!(
+            "  Commit:      {} ({})",
+            build::COMMIT_HASH,
+            build::COMMIT_DATE
+        );
+        println!("  Branch/Tag:  {} / {}", build::BRANCH, build::TAG);
+        println!("  Build Time:  {}", build::BUILD_TIME);
+        println!(
+            "  Rust:        {} ({})",
+            build::RUST_VERSION,
+            build::BUILD_RUST_CHANNEL
+        );
+        println!("  OS:          {}", build::BUILD_OS);
+        std::process::exit(0);
     }
-    let config_file = PathBuf::from(&args[1]);
+
+    // Safe to unwrap: clap guarantees config_file is Some when --version is absent
+    let config_file = args.config_file.unwrap();
     let file = File::open(&config_file)?;
     let reader = BufReader::new(file);
     let config: CollectorConfig = match from_reader(reader) {
