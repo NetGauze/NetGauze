@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::bmp::config::BmpAvroConfig;
 use crate::flow::aggregation::AggregationConfig;
 use crate::flow::config::FlowOutputConfig;
 use crate::flow::enrichment::EnrichmentConfig;
@@ -330,4 +331,7 @@ pub enum PublisherEndpoint {
     /// (for validated yang-push telemetry messages and YANG schema
     /// registration)
     TelemetryKafkaYang(kafka_yang::KafkaConfig<TelemetryYangConverter>),
+
+    /// Kafka AVRO publisher endpoint (for BMP messages)
+    BmpKafkaAvro(kafka_avro::KafkaConfig<BmpAvroConfig>),
 }

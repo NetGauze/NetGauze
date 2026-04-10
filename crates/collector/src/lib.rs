@@ -49,6 +49,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
 
+pub mod bmp;
 pub mod config;
 pub mod flow;
 pub mod inputs;
@@ -350,6 +351,11 @@ pub async fn init_flow_collection(
                         "Telemetry KafkaYang publisher not supported for Flow"
                     ));
                 }
+                PublisherEndpoint::BmpKafkaAvro(_) => {
+                    return Err(anyhow::anyhow!(
+                        "BMP KafkaAvro publisher not supported for Flow"
+                    ));
+                }
             }
         }
 
@@ -435,6 +441,7 @@ pub async fn init_bmp_collection(
 
     let mut join_set = FuturesUnordered::new();
     let mut kafka_json_handles = Vec::new();
+    let mut kafka_avro_handles = Vec::new();
 
     for (group_name, publisher_config) in bmp_config.publishers {
         info!("Starting publishers group '{group_name}'");
@@ -468,9 +475,27 @@ pub async fn init_bmp_collection(
                         kafka_json_handles.push(handle);
                     }
                 }
+                PublisherEndpoint::BmpKafkaAvro(config) => {
+                    for bmp_recv in &bmp_recvs {
+                        // pass writer_id to the converter
+                        // (workaround until we have an enrichment actor for bmp)
+                        let mut config = config.clone();
+                        config.avro_converter.writer_id = config.writer_id.clone();
+
+                        let (kafka_join, kafka_handle) =
+                            KafkaAvroPublisherActorHandle::from_config(
+                                config.clone(),
+                                bmp_recv.clone(),
+                                either::Left(meter.clone()),
+                            )
+                            .await?;
+                        join_set.push(kafka_join);
+                        kafka_avro_handles.push(kafka_handle);
+                    }
+                }
                 _ => {
                     return Err(anyhow::anyhow!(
-                        "Only KafkaJson publisher is currently supported for BMP"
+                        "Only KafkaJson and BmpKafkaAvro publishers are currently supported for BMP"
                     ));
                 }
             }
@@ -483,6 +508,9 @@ pub async fn init_bmp_collection(
             for handle in kafka_json_handles {
                 let _ = handle.shutdown().await;
             }
+            for handle in kafka_avro_handles {
+                let _ = handle.shutdown().await;
+            }
             match supervisor_ret {
                 Ok(_) => Ok(()),
                 Err(err) => Err(anyhow::anyhow!(err)),
@@ -492,6 +520,9 @@ pub async fn init_bmp_collection(
             warn!("BMP publisher exited, shutting down BMP collection and publishers");
             let _ = tokio::time::timeout(std::time::Duration::from_secs(1), supervisor_handle.shutdown()).await;
             for handle in kafka_json_handles {
+                let _ = handle.shutdown().await;
+            }
+            for handle in kafka_avro_handles {
                 let _ = handle.shutdown().await;
             }
             match join_ret {
@@ -732,6 +763,11 @@ pub async fn init_udp_notif_collection(
                             }
                         }
                     }
+                }
+                PublisherEndpoint::BmpKafkaAvro(_) => {
+                    return Err(anyhow::anyhow!(
+                        "Bmp KafkaAvro publisher not supported for UDP Notif"
+                    ));
                 }
             }
         }
