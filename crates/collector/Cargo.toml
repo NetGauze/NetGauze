@@ -107,6 +107,8 @@ sysinfo = { workspace = true, default-features = false, features = ["system"] }
 criterion = { workspace = true, optional = true } # dev-dependency for benchmarks
 schema-registry-client = { workspace = true }
 russh = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6", features = [
@@ -123,7 +125,6 @@ chrono = { workspace = true, default-features = false, features = [
 ] }
 tempfile = { workspace = true }
 yang4 = { workspace = true}
-clap = { workspace = true, features = ["derive"] }
 tracing-test = { workspace = true }
 
 [features]
