@@ -15,8 +15,12 @@
 
 //! Traits for Ser/Deser wire protocols
 
+pub mod error;
+pub mod reader;
 #[cfg(feature = "test-helpers")]
 pub mod test_helpers;
+pub mod traits;
+pub mod writer;
 
 use netgauze_locate::BinarySpan;
 use nom::IResult;

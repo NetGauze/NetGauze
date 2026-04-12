@@ -19,6 +19,8 @@ categories = ["parsing"]
 netgauze-locate = { workspace = true  }
 nom = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+bytes = { workspace = true }
 
 [features]
 test-helpers = []
