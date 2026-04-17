@@ -77,6 +77,10 @@ pub async fn init_flow_collection(
     for (group_name, publisher_config) in flow_config.publishers {
         info!("Starting publishers group '{group_name}'");
 
+        // Enrichment actors handles specific to this publisher group
+        // (prevents cross-publisher leakage)
+        let mut publisher_enrichment_handles = Vec::new();
+
         let mut flow_recvs = Vec::new();
         if publisher_config.shards > 1 {
             (flow_recvs, _) = supervisor_handle
@@ -165,7 +169,7 @@ pub async fn init_flow_collection(
                             join_set.push(renormalization_join);
                             join_set.push(agg_join);
                             join_set.push(kafka_join);
-                            enrichment_handles.push(enrichment_handle);
+                            publisher_enrichment_handles.push(enrichment_handle);
                             renormalization_handles.push(renormalization_handle);
                             agg_handles.push(agg_handle);
                             kafka_avro_handles.push(kafka_handle);
@@ -186,7 +190,7 @@ pub async fn init_flow_collection(
                                 FlowOptionsActorHandle::from_config(
                                     flow_options_config,
                                     flow_recv.clone(),
-                                    enrichment_handles.clone(),
+                                    publisher_enrichment_handles.clone(),
                                     either::Left(meter.clone()),
                                 );
                             join_set.push(flow_options_join);
@@ -200,7 +204,7 @@ pub async fn init_flow_collection(
                         {
                             let (files_join, files_handle) = FilesActorHandle::from_config(
                                 files_config.clone(),
-                                enrichment_handles.clone(),
+                                publisher_enrichment_handles.clone(),
                                 either::Left(meter.clone()),
                             );
                             join_set.push(files_join);
@@ -216,7 +220,7 @@ pub async fn init_flow_collection(
                                 let (join_handle, actor_handle) =
                                     KafkaConsumerActorHandle::from_config(
                                         consumer_config,
-                                        enrichment_handles.clone(),
+                                        publisher_enrichment_handles.clone(),
                                         either::Left(meter.clone()),
                                     )?;
                                 join_set.push(join_handle);
@@ -264,7 +268,7 @@ pub async fn init_flow_collection(
                             join_set.push(renormalization_join);
                             join_set.push(agg_join);
                             join_set.push(kafka_join);
-                            enrichment_handles.push(enrichment_handle);
+                            publisher_enrichment_handles.push(enrichment_handle);
                             renormalization_handles.push(renormalization_handle);
                             agg_handles.push(agg_handle);
                             kafka_json_handles.push(kafka_handle);
@@ -285,7 +289,7 @@ pub async fn init_flow_collection(
                                 FlowOptionsActorHandle::from_config(
                                     flow_options_config,
                                     flow_recv.clone(),
-                                    enrichment_handles.clone(),
+                                    publisher_enrichment_handles.clone(),
                                     either::Left(meter.clone()),
                                 );
                             join_set.push(flow_options_join);
@@ -299,7 +303,7 @@ pub async fn init_flow_collection(
                         {
                             let (files_join, files_handle) = FilesActorHandle::from_config(
                                 files_config.clone(),
-                                enrichment_handles.clone(),
+                                publisher_enrichment_handles.clone(),
                                 either::Left(meter.clone()),
                             );
                             join_set.push(files_join);
@@ -315,7 +319,7 @@ pub async fn init_flow_collection(
                                 let (join_handle, actor_handle) =
                                     KafkaConsumerActorHandle::from_config(
                                         consumer_config,
-                                        enrichment_handles.clone(),
+                                        publisher_enrichment_handles.clone(),
                                         either::Left(meter.clone()),
                                     )?;
                                 join_set.push(join_handle);
@@ -348,6 +352,9 @@ pub async fn init_flow_collection(
                 }
             }
         }
+
+        // Add all enrichment handles in outer vec so shutdown works properly
+        enrichment_handles.extend(publisher_enrichment_handles);
     }
     let ret = tokio::select! {
         supervisor_ret = supervisor_join_handle => {
@@ -526,6 +533,11 @@ pub async fn init_udp_notif_collection(
 
     for (group_name, publisher_config) in udp_notif_config.publishers {
         info!("Starting publishers group '{group_name}'");
+
+        // Enrichment actors handles specific to this publisher group
+        // (prevents cross-publisher leakage)
+        let mut publisher_enrichment_handles = Vec::new();
+
         let (udp_notif_recv, _) = supervisor_handle
             .subscribe(publisher_config.buffer_size)
             .await?;
@@ -588,7 +600,7 @@ pub async fn init_udp_notif_collection(
                         config.writer_id.clone(),
                     );
                     join_set.push(enrichment_join);
-                    enrichment_handles.push(enrichment_handle.clone());
+                    publisher_enrichment_handles.push(enrichment_handle.clone());
 
                     let hdl = KafkaJsonPublisherActorHandle::from_config(
                         serialize_telemetry_json,
@@ -616,7 +628,7 @@ pub async fn init_udp_notif_collection(
                         {
                             let (files_join, files_handle) = FilesActorHandle::from_config(
                                 files_config.clone(),
-                                enrichment_handles.clone(),
+                                publisher_enrichment_handles.clone(),
                                 either::Left(meter.clone()),
                             );
                             join_set.push(files_join);
@@ -632,7 +644,7 @@ pub async fn init_udp_notif_collection(
                                 let (join_handle, actor_handle) =
                                     KafkaConsumerActorHandle::from_config(
                                         consumer_config,
-                                        enrichment_handles.clone(),
+                                        publisher_enrichment_handles.clone(),
                                         either::Left(meter.clone()),
                                     )?;
                                 join_set.push(join_handle);
@@ -663,7 +675,7 @@ pub async fn init_udp_notif_collection(
                         config.writer_id.clone(),
                     );
                     join_set.push(enrichment_join);
-                    enrichment_handles.push(enrichment_handle.clone());
+                    publisher_enrichment_handles.push(enrichment_handle.clone());
 
                     let hdl = KafkaYangPublisherActorHandle::from_config(
                         config.clone(),
@@ -696,7 +708,7 @@ pub async fn init_udp_notif_collection(
                         {
                             let (files_join, files_handle) = FilesActorHandle::from_config(
                                 files_config.clone(),
-                                enrichment_handles.clone(),
+                                publisher_enrichment_handles.clone(),
                                 either::Left(meter.clone()),
                             );
                             join_set.push(files_join);
@@ -712,7 +724,7 @@ pub async fn init_udp_notif_collection(
                                 let (join_handle, actor_handle) =
                                     KafkaConsumerActorHandle::from_config(
                                         consumer_config,
-                                        enrichment_handles.clone(),
+                                        publisher_enrichment_handles.clone(),
                                         either::Left(meter.clone()),
                                     )?;
                                 join_set.push(join_handle);
@@ -723,6 +735,9 @@ pub async fn init_udp_notif_collection(
                 }
             }
         }
+
+        // Add all enrichment handles in outer vec so shutdown works properly
+        enrichment_handles.extend(publisher_enrichment_handles);
     }
     let ret = tokio::select! {
         supervisor_ret = supervisor_join_handle => {
