@@ -1065,7 +1065,7 @@ fn test_with_unknown_pen() -> Result<(), IpfixPacketWritingError> {
 }
 
 #[test]
-fn test_with_unknown_pen_complex() -> Result<(), IpfixPacketWritingError> {
+fn test_with_vendor_unknown_field_complex() -> Result<(), IpfixPacketWritingError> {
     let good_template_wire = [
         0x00, 0x0a, 0x00, 0xd8, 0x68, 0xad, 0x74, 0xec, 0x00, 0x00, 0x08, 0xb6, 0x80, 0x1e, 0x81,
         0x01, 0x00, 0x02, 0x00, 0xc8, 0x0a, 0x27, 0x00, 0x2f, 0x00, 0x1b, 0x00, 0x10, 0x00, 0x1c,
@@ -1138,7 +1138,8 @@ fn test_with_unknown_pen_complex() -> Result<(), IpfixPacketWritingError> {
                 FieldSpecifier::new(ie::IE::destinationTransportPort, 2).unwrap(),
                 FieldSpecifier::new(ie::IE::vlanId, 2).unwrap(),
                 FieldSpecifier::new(ie::IE::postVlanId, 2).unwrap(),
-                FieldSpecifier::new(ie::IE::Unknown { pen: 2011, id: 232 }, 2).unwrap(),
+                FieldSpecifier::new(ie::IE::Huawei(ie::huawei::IE::Unknown { id: 232 }), 2)
+                    .unwrap(),
                 FieldSpecifier::new(ie::IE::tcpControlBits, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::protocolIdentifier, 1).unwrap(),
                 FieldSpecifier::new(ie::IE::ipClassOfService, 1).unwrap(),
@@ -1203,11 +1204,10 @@ fn test_with_unknown_pen_complex() -> Result<(), IpfixPacketWritingError> {
                         ie::Field::destinationTransportPort(64299),
                         ie::Field::vlanId(0),
                         ie::Field::postVlanId(0),
-                        ie::Field::Unknown {
-                            pen: 2011,
+                        ie::Field::Huawei(ie::huawei::Field::Unknown {
                             id: 232,
                             value: Box::new([0, 0]),
-                        },
+                        }),
                         ie::Field::tcpControlBits(TCPHeaderFlags::new(
                             false, false, false, false, true, false, false, false,
                         )),
@@ -1265,11 +1265,10 @@ fn test_with_unknown_pen_complex() -> Result<(), IpfixPacketWritingError> {
                         ie::Field::destinationTransportPort(61351),
                         ie::Field::vlanId(0),
                         ie::Field::postVlanId(0),
-                        ie::Field::Unknown {
-                            pen: 2011,
+                        ie::Field::Huawei(ie::huawei::Field::Unknown {
                             id: 232,
                             value: Box::new([0, 1]),
-                        },
+                        }),
                         ie::Field::tcpControlBits(TCPHeaderFlags::new(
                             false, false, false, true, true, false, false, false,
                         )),
