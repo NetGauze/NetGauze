@@ -388,14 +388,17 @@ impl FieldConfig {
                 }
             }
 
-            // String transforms require TryInto<String> (implemented for all types except Bytes)
+            // String transforms require TryInto<String>
+            // - Generally implemented for all types except Bytes
+            // - Exception: also implemented for IE::mplsVpnRouteDistinguisher (octetArray with
+            //   custom string conversion)
             FieldTransformFunction::String
             | FieldTransformFunction::TrimmedString
             | FieldTransformFunction::LowercaseString
             | FieldTransformFunction::Rename(_)
             | FieldTransformFunction::StringArrayAgg
             | FieldTransformFunction::StringMapAgg(_) => {
-                if ie_avro_type(ie) == AvroValueKind::Bytes {
+                if ie_avro_type(ie) == AvroValueKind::Bytes && ie != IE::mplsVpnRouteDistinguisher {
                     return Err(FieldConfigValidationError::InvalidTransform(format!(
                         "{:?} requires String conversion, but {} is Bytes type ({:?})",
                         self.transform,
