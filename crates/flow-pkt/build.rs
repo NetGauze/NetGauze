@@ -150,6 +150,22 @@ fn get_nokia_config(registry_path: &Path) -> SourceConfig {
     )
 }
 
+fn get_huawei_config(registry_path: &Path) -> SourceConfig {
+    let huawei_path = registry_path
+        .join("huawei.xml")
+        .into_os_string()
+        .into_string()
+        .expect("Couldn't load huawei registry file");
+    SourceConfig::new(
+        RegistrySource::File(huawei_path),
+        RegistryType::IanaXML,
+        2011,
+        "huawei".to_string(),
+        "Huawei".to_string(),
+        None,
+    )
+}
+
 fn get_netgauze_config(registry_path: &Path) -> SourceConfig {
     let netgauze_path = registry_path
         .join("netgauze.xml")
@@ -251,14 +267,15 @@ fn main() {
         &sub_registry_path,
     );
     let nokia_source = get_nokia_config(&registry_path);
-    let netgauze_config = get_netgauze_config(&registry_path);
+    let huawei_source = get_huawei_config(&registry_path);
+    let netgauze_source = get_netgauze_config(&registry_path);
     let vmware_source = get_vmware_config(
         cfg!(feature = "iana-upstream-build"),
         &registry_path,
         &sub_registry_path,
     );
 
-    let mut vendors = vec![nokia_source, netgauze_config, vmware_source];
+    let mut vendors = vec![nokia_source, huawei_source, netgauze_source, vmware_source];
 
     if cfg!(feature = "custom-upstream-build") {
         let paths_and_pens = env::var("NETGAUZE_CUSTOM_XML_PATHS").expect("custom-upstream-build feature is enabled but couldn't find NETGAUZE_CUSTOM_XML_PATHS in OS env variables");

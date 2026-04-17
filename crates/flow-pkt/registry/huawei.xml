@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-stylesheet type="text/xsl" href="ipfix.xsl"?>
+<?xml-model href="ipfix.rng" schematypens="http://relaxng.org/ns/structure/1.0"?>
+<registry xmlns="http://www.iana.org/assignments" id="ipfix">
+  <registry id="ipfix-information-elements">
+    <title>Huawei IPFIX Information Elements</title>
+
+    <record>
+      <name>ingressGponGemPortId</name>
+      <dataType>unsigned16</dataType>
+      <dataTypeSemantics>identifier</dataTypeSemantics>
+      <elementId>1</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph> Huawei PEN field: ingressGponGemPortId </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2026-04-17</date>
+    </record>
+
+    <record>
+      <name>egressGponGemPortId</name>
+      <dataType>unsigned16</dataType>
+      <dataTypeSemantics>identifier</dataTypeSemantics>
+      <elementId>2</elementId>
+      <applicability>data</applicability>
+      <status>current</status>
+      <description>
+        <paragraph> Huawei PEN field: egressGponGemPortId </paragraph>
+      </description>
+      <revision>0</revision>
+      <date>2026-04-17</date>
+    </record>
+
+  </registry>
+</registry>
+
