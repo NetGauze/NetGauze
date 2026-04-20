@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -32,7 +32,7 @@ pub enum CommunityParsingError {
 
 impl<'a> ParseFrom<'a> for Community {
     type Error = CommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let value = cur.read_u32_be()?;
         Ok(Community::new(value))
     }
@@ -78,7 +78,7 @@ pub enum ExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for ExtendedCommunity {
     type Error = ExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let code = cur.read_u8()?;
         let comm_type = BgpExtendedCommunityType::try_from(code);
         let ret = match comm_type {
@@ -215,7 +215,7 @@ pub enum LargeCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for LargeCommunity {
     type Error = LargeCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let global_admin = cur.read_u32_be()?;
         let local_data1 = cur.read_u32_be()?;
         let local_data2 = cur.read_u32_be()?;
@@ -231,7 +231,7 @@ pub enum TransitiveTwoOctetExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for TransitiveTwoOctetExtendedCommunity {
     type Error = TransitiveTwoOctetExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let global_admin = cur.read_u16_be()?;
         let local_admin = cur.read_u32_be()?;
@@ -321,7 +321,7 @@ pub enum ExtendedCommunityIpv6ParsingError {
 
 impl<'a> ParseFrom<'a> for ExtendedCommunityIpv6 {
     type Error = ExtendedCommunityIpv6ParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let code = cur.read_u8()?;
         let comm_type = BgpExtendedCommunityIpv6Type::try_from(code);
         let ret = match comm_type {
@@ -350,7 +350,7 @@ pub enum NonTransitiveTwoOctetExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for NonTransitiveTwoOctetExtendedCommunity {
     type Error = NonTransitiveTwoOctetExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let global_admin = cur.read_u16_be()?;
         let local_admin = cur.read_u32_be()?;
@@ -385,7 +385,7 @@ pub enum TransitiveIpv4ExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for TransitiveIpv4ExtendedCommunity {
     type Error = TransitiveIpv4ExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let global_admin = cur.read_u32_be()?;
         let global_admin = Ipv4Addr::from(global_admin);
@@ -499,7 +499,7 @@ pub enum NonTransitiveIpv4ExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for NonTransitiveIpv4ExtendedCommunity {
     type Error = NonTransitiveIpv4ExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let global_admin = cur.read_u32_be()?;
         let global_admin = Ipv4Addr::from(global_admin);
@@ -521,7 +521,7 @@ pub enum TransitiveFourOctetExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for TransitiveFourOctetExtendedCommunity {
     type Error = TransitiveFourOctetExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let global_admin = cur.read_u32_be()?;
         let local_admin = cur.read_u16_be()?;
@@ -592,7 +592,7 @@ pub enum NonTransitiveFourOctetExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for NonTransitiveFourOctetExtendedCommunity {
     type Error = NonTransitiveFourOctetExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let global_admin = cur.read_u32_be()?;
         let local_admin = cur.read_u16_be()?;
@@ -613,7 +613,7 @@ pub enum TransitiveOpaqueExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for TransitiveOpaqueExtendedCommunity {
     type Error = TransitiveOpaqueExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let community = match TransitiveOpaqueExtendedCommunitySubType::try_from(sub_type) {
             Ok(TransitiveOpaqueExtendedCommunitySubType::DefaultGateway) => {
@@ -637,7 +637,7 @@ pub enum NonTransitiveOpaqueExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for NonTransitiveOpaqueExtendedCommunity {
     type Error = NonTransitiveOpaqueExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let value = cur.read_array()?;
         Ok(NonTransitiveOpaqueExtendedCommunity::Unassigned { sub_type, value })
@@ -654,7 +654,7 @@ pub enum EvpnExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for EvpnExtendedCommunity {
     type Error = EvpnExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let community = match EvpnExtendedCommunitySubType::try_from(sub_type) {
             Ok(EvpnExtendedCommunitySubType::MacMobility) => {
@@ -703,7 +703,7 @@ pub enum ExperimentalExtendedCommunityParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, u8> for ExperimentalExtendedCommunity {
     type Error = ExperimentalExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader, code: u8) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, code: u8) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let value: [u8; 6] = cur.read_array()?;
         Ok(ExperimentalExtendedCommunity::new(code, sub_type, value))
@@ -718,7 +718,7 @@ pub enum UnknownExtendedCommunityParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, u8> for UnknownExtendedCommunity {
     type Error = UnknownExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader, code: u8) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, code: u8) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let value: [u8; 6] = cur.read_array()?;
         Ok(UnknownExtendedCommunity::new(code, sub_type, value))
@@ -734,7 +734,7 @@ pub enum TransitiveIpv6ExtendedCommunityParsingError {
 impl<'a> ParseFrom<'a> for TransitiveIpv6ExtendedCommunity {
     type Error = TransitiveIpv6ExtendedCommunityParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let global_admin = cur.read_u128_be()?;
         let global_admin = Ipv6Addr::from(global_admin);
@@ -812,7 +812,7 @@ pub enum NonTransitiveIpv6ExtendedCommunityParsingError {
 
 impl<'a> ParseFrom<'a> for NonTransitiveIpv6ExtendedCommunity {
     type Error = NonTransitiveIpv6ExtendedCommunityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let global_admin = cur.read_u128_be()?;
         let global_admin = Ipv6Addr::from(global_admin);
@@ -834,7 +834,7 @@ pub enum UnknownExtendedCommunityIpv6ParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, u8> for UnknownExtendedCommunityIpv6 {
     type Error = UnknownExtendedCommunityIpv6ParsingError;
-    fn parse(cur: &mut BytesReader, code: u8) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, code: u8) -> Result<Self, Self::Error> {
         let sub_type = cur.read_u8()?;
         let value: [u8; 18] = cur.read_array()?;
         Ok(UnknownExtendedCommunityIpv6::new(code, sub_type, value))

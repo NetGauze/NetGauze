@@ -34,7 +34,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 
 use netgauze_parse_utils::common::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 
 /// BGP Link-State NLRI Parsing Errors
@@ -90,7 +90,7 @@ pub enum BgpLsNlriParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsNlri {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, add_path: bool) -> Result<Self, Self::Error> {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
         } else {
@@ -112,7 +112,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsNlri {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsVpnNlri {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, add_path: bool) -> Result<Self, Self::Error> {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
         } else {
@@ -136,7 +136,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsVpnNlri {
 
 impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsNlriValue {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader, nlri_type: BgpLsNlriType) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, nlri_type: BgpLsNlriType) -> Result<Self, Self::Error> {
         let result = match nlri_type {
             BgpLsNlriType::Node => {
                 let nlri_value = BgpLsNlriNode::parse(cur)?;
@@ -169,7 +169,7 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsNlriValue {
 
 impl<'a> ParseFrom<'a> for BgpLsNlriLink {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let protocol_id = cur.read_u8()?;
         let protocol_id = iana::BgpLsProtocolId::try_from(protocol_id).map_err(|error| {
             BgpLsNlriParsingError::UnknownProtocolId {
@@ -199,7 +199,7 @@ impl<'a> ParseFrom<'a> for BgpLsNlriLink {
 
 impl<'a> ParseFrom<'a> for BgpLsLinkDescriptor {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let (tlv_type, _tlv_length, mut data) =
             read_tlv_header_t16_l16::<BgpLsNlriParsingError>(cur)?;
@@ -253,7 +253,7 @@ impl<'a> ParseFrom<'a> for BgpLsLinkDescriptor {
 
 impl<'a> ParseFrom<'a> for BgpLsNlriNode {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let protocol_id = iana::BgpLsProtocolId::try_from(cur.read_u8()?)
             .map_err(|error| BgpLsNlriParsingError::UnknownProtocolId { offset, error })?;
@@ -270,7 +270,7 @@ impl<'a> ParseFrom<'a> for BgpLsNlriNode {
 
 impl<'a> ParseFrom<'a> for BgpLsLocalNodeDescriptors {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let value = BgpLsNodeDescriptors::parse(cur, BgpLsNodeDescriptorType::LocalNodeDescriptor)?;
         Ok(BgpLsLocalNodeDescriptors(value))
     }
@@ -278,7 +278,7 @@ impl<'a> ParseFrom<'a> for BgpLsLocalNodeDescriptors {
 
 impl<'a> ParseFrom<'a> for BgpLsRemoteNodeDescriptors {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let value =
             BgpLsNodeDescriptors::parse(cur, BgpLsNodeDescriptorType::RemoteNodeDescriptor)?;
         Ok(BgpLsRemoteNodeDescriptors(value))
@@ -288,7 +288,10 @@ impl<'a> ParseFrom<'a> for BgpLsRemoteNodeDescriptors {
 impl<'a> ParseFromWithOneInput<'a, BgpLsNodeDescriptorType> for BgpLsNodeDescriptors {
     type Error = BgpLsNlriParsingError;
 
-    fn parse(cur: &mut BytesReader, input: BgpLsNodeDescriptorType) -> Result<Self, Self::Error> {
+    fn parse(
+        cur: &mut SliceReader<'a>,
+        input: BgpLsNodeDescriptorType,
+    ) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let tlv_type = BgpLsNodeDescriptorType::try_from(cur.read_u16_be()?)
             .map_err(|error| BgpLsNlriParsingError::UnknownDescriptorTlvType { offset, error })?;
@@ -315,7 +318,7 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNodeDescriptorType> for BgpLsNodeDescrip
 
 impl<'a> ParseFrom<'a> for BgpLsNodeDescriptorSubTlv {
     type Error = BgpLsNlriParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let (tlv_type, _tlv_length, mut data) =
             read_tlv_header_t16_l16::<BgpLsNlriParsingError>(cur)?;
@@ -368,7 +371,7 @@ impl<'a> ParseFrom<'a> for BgpLsNodeDescriptorSubTlv {
 impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsNlriIpPrefix {
     type Error = BgpLsNlriParsingError;
 
-    fn parse(cur: &mut BytesReader, nlri_type: BgpLsNlriType) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, nlri_type: BgpLsNlriType) -> Result<Self, Self::Error> {
         let protocol_id = iana::BgpLsProtocolId::try_from(cur.read_u8()?).map_err(|error| {
             BgpLsNlriParsingError::UnknownProtocolId {
                 offset: cur.offset() - 1,
@@ -395,7 +398,7 @@ impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsNlriIpPrefix {
 impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for BgpLsPrefixDescriptor {
     type Error = BgpLsNlriParsingError;
 
-    fn parse(cur: &mut BytesReader, nlri_type: BgpLsNlriType) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, nlri_type: BgpLsNlriType) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let (tlv_type, _tlv_length, mut data) =
             read_tlv_header_t16_l16::<BgpLsNlriParsingError>(cur)?;
@@ -445,7 +448,7 @@ pub enum MultiTopologyIdDataParsingError {
 impl<'a> ParseFrom<'a> for MultiTopologyIdData {
     type Error = MultiTopologyIdDataParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let mut ids = Vec::new();
         while !cur.is_empty() {
             let id = MultiTopologyId::from(cur.read_u16_be()?);
@@ -458,7 +461,7 @@ impl<'a> ParseFrom<'a> for MultiTopologyIdData {
 impl<'a> ParseFrom<'a> for MultiTopologyId {
     type Error = BgpLsNlriParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let id = MultiTopologyId::from(cur.read_u16_be()?);
         Ok(id)
     }
@@ -467,7 +470,7 @@ impl<'a> ParseFrom<'a> for MultiTopologyId {
 impl<'a> ParseFrom<'a> for OspfRouteType {
     type Error = BgpLsNlriParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let code = cur.read_u8()?;
         OspfRouteType::try_from(code).map_err(|error| BgpLsNlriParsingError::UnknownOspfRouteType {
@@ -480,7 +483,7 @@ impl<'a> ParseFrom<'a> for OspfRouteType {
 impl<'a> ParseFromWithOneInput<'a, BgpLsNlriType> for IpReachabilityInformationData {
     type Error = BgpLsNlriParsingError;
 
-    fn parse(cur: &mut BytesReader, nlri_type: BgpLsNlriType) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, nlri_type: BgpLsNlriType) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         match nlri_type {
             BgpLsNlriType::Ipv4TopologyPrefix => {

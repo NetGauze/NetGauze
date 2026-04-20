@@ -22,7 +22,7 @@ use crate::wire::deserializer::BgpParsingContext;
 use crate::wire::deserializer::capabilities::BgpCapabilityParsingError;
 
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
@@ -62,7 +62,7 @@ pub enum BgpParameterParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
     type Error = BgpOpenMessageParsingError;
-    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
         let version = cur.read_u8()?;
         if version != BGP_VERSION {
             return Err(BgpOpenMessageParsingError::UnsupportedVersionNumber {
@@ -108,7 +108,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
 
 impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessageParameter {
     type Error = BgpParameterParsingError;
-    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
         let param_type = BgpOpenMessageParameterType::try_from(cur.read_u8()?).map_err(|err| {
             BgpParameterParsingError::UndefinedParameterType {
                 offset: cur.offset() - 1,
@@ -128,8 +128,8 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessagePar
 }
 
 #[inline]
-fn parse_capability_param(
-    cur: &mut BytesReader,
+fn parse_capability_param<'a>(
+    cur: &mut SliceReader<'a>,
     ctx: &mut BgpParsingContext,
 ) -> Result<BgpOpenMessageParameter, BgpParameterParsingError> {
     let len = cur.read_u8()?;

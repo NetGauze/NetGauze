@@ -23,7 +23,7 @@ use crate::wire::{
 };
 use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::ParseFrom;
 use serde::{Deserialize, Serialize};
 
@@ -73,9 +73,9 @@ pub enum BgpCapabilityParsingError {
     BgpRoleCapabilityError(#[from] BgpRoleCapabilityParsingError),
 }
 
-fn parse_experimental_capability(
+fn parse_experimental_capability<'a>(
     code: ExperimentalCapabilityCode,
-    cur: &mut BytesReader,
+    cur: &mut SliceReader<'a>,
 ) -> Result<BgpCapability, BgpCapabilityParsingError> {
     let len = cur.read_u8()?;
     let value = cur.read_bytes(len as usize)?;
@@ -85,9 +85,9 @@ fn parse_experimental_capability(
     )))
 }
 
-fn parse_unrecognized_capability(
+fn parse_unrecognized_capability<'a>(
     code: u8,
-    cur: &mut BytesReader,
+    cur: &mut SliceReader<'a>,
 ) -> Result<BgpCapability, BgpCapabilityParsingError> {
     let len = cur.read_u8()?;
     let value = cur.read_bytes(len as usize)?;
@@ -99,7 +99,7 @@ fn parse_unrecognized_capability(
 
 /// Helper function to read and check the capability exact length
 #[inline(always)]
-fn check_capability_length(cur: &mut BytesReader, expected: u8) -> Result<u8, u8> {
+fn check_capability_length(cur: &mut SliceReader<'_>, expected: u8) -> Result<u8, u8> {
     let length = cur.read_u8().map_err(|_| 0)?;
     if length == expected {
         Ok(length)
@@ -108,8 +108,8 @@ fn check_capability_length(cur: &mut BytesReader, expected: u8) -> Result<u8, u8
     }
 }
 
-fn parse_route_refresh_capability(
-    cur: &mut BytesReader,
+fn parse_route_refresh_capability<'a>(
+    cur: &mut SliceReader<'a>,
 ) -> Result<BgpCapability, BgpCapabilityParsingError> {
     check_capability_length(cur, ROUTE_REFRESH_CAPABILITY_LENGTH).map_err(|length| {
         BgpCapabilityParsingError::InvalidRouteRefreshLength {
@@ -120,8 +120,8 @@ fn parse_route_refresh_capability(
     Ok(BgpCapability::RouteRefresh)
 }
 
-fn parse_enhanced_route_refresh_capability(
-    cur: &mut BytesReader,
+fn parse_enhanced_route_refresh_capability<'a>(
+    cur: &mut SliceReader<'a>,
 ) -> Result<BgpCapability, BgpCapabilityParsingError> {
     check_capability_length(cur, ENHANCED_ROUTE_REFRESH_CAPABILITY_LENGTH).map_err(|length| {
         BgpCapabilityParsingError::InvalidEnhancedRouteRefreshLength {
@@ -134,7 +134,7 @@ fn parse_enhanced_route_refresh_capability(
 
 impl<'a> ParseFrom<'a> for BgpCapability {
     type Error = BgpCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let code = BgpCapabilityCode::try_from(cur.read_u8()?);
         //.map_err(|err| BgpCapabilityParsingError::UndefinedCapabilityCode{offset:
         //.map_err(|err| cur.offset() - 1, code: err.0})?;
@@ -278,7 +278,7 @@ pub enum FourOctetAsCapabilityParsingError {
 
 impl<'a> ParseFrom<'a> for FourOctetAsCapability {
     type Error = FourOctetAsCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         check_capability_length(cur, FOUR_OCTET_AS_CAPABILITY_LENGTH).map_err(|length| {
             FourOctetAsCapabilityParsingError::InvalidLength {
                 offset: cur.offset() - 1,
@@ -319,7 +319,7 @@ pub enum MultiProtocolExtensionsCapabilityParsingError {
 impl<'a> ParseFrom<'a> for MultiProtocolExtensionsCapability {
     type Error = MultiProtocolExtensionsCapabilityParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         check_capability_length(cur, MULTI_PROTOCOL_EXTENSIONS_CAPABILITY_LENGTH).map_err(
             |length| MultiProtocolExtensionsCapabilityParsingError::InvalidLength {
                 offset: cur.offset() - 1,
@@ -375,7 +375,7 @@ pub enum GracefulRestartCapabilityParsingError {
 
 impl<'a> ParseFrom<'a> for GracefulRestartCapability {
     type Error = GracefulRestartCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let len = cur.read_u8()?;
         let mut params_buf = cur.take_slice(len as usize)?;
         let header = params_buf.read_u16_be()?;
@@ -399,7 +399,7 @@ impl<'a> ParseFrom<'a> for GracefulRestartCapability {
 
 impl<'a> ParseFrom<'a> for GracefulRestartAddressFamily {
     type Error = GracefulRestartCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let mut ehe_buf = cur.take_slice(GRACEFUL_RESTART_ADDRESS_FAMILY_LENGTH as usize)?;
         let afi = AddressFamily::try_from(ehe_buf.read_u16_be()?).map_err(|err| {
             GracefulRestartCapabilityParsingError::UndefinedAddressFamily {
@@ -455,7 +455,7 @@ pub enum AddPathCapabilityParsingError {
 
 impl<'a> ParseFrom<'a> for AddPathCapability {
     type Error = AddPathCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let length = cur.read_u8()?;
         let mut params_buf = cur.take_slice(length as usize)?;
         let mut address_families = Vec::new();
@@ -469,7 +469,7 @@ impl<'a> ParseFrom<'a> for AddPathCapability {
 
 impl<'a> ParseFrom<'a> for AddPathAddressFamily {
     type Error = AddPathCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let afi = AddressFamily::try_from(cur.read_u16_be()?).map_err(|err| {
             AddPathCapabilityParsingError::UndefinedAddressFamily {
                 offset: cur.offset() - 2, // AFI is the last 2 bytes read
@@ -533,7 +533,7 @@ pub enum ExtendedNextHopEncodingCapabilityParsingError {
 
 impl<'a> ParseFrom<'a> for ExtendedNextHopEncodingCapability {
     type Error = ExtendedNextHopEncodingCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let len = cur.read_u8()?;
         let mut encoding_buf = cur.take_slice(len as usize)?;
         let mut encodings = Vec::new();
@@ -547,7 +547,7 @@ impl<'a> ParseFrom<'a> for ExtendedNextHopEncodingCapability {
 
 impl<'a> ParseFrom<'a> for ExtendedNextHopEncoding {
     type Error = ExtendedNextHopEncodingCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let mut ehe_buf = cur.take_slice(EXTENDED_NEXT_HOP_ENCODING_LENGTH as usize)?;
         let nlri_afi = AddressFamily::try_from(ehe_buf.read_u16_be()?).map_err(|err| {
             ExtendedNextHopEncodingCapabilityParsingError::UndefinedAddressFamily {
@@ -605,7 +605,7 @@ pub enum MultipleLabelParsingError {
 
 impl<'a> ParseFrom<'a> for MultipleLabel {
     type Error = MultipleLabelParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let afi = AddressFamily::try_from(cur.read_u16_be()?).map_err(|err| {
             MultipleLabelParsingError::UndefinedAddressFamily { offset, afi: err.0 }
@@ -645,7 +645,7 @@ pub enum BgpRoleCapabilityParsingError {
 
 impl<'a> ParseFrom<'a> for BgpRoleCapability {
     type Error = BgpRoleCapabilityParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         check_capability_length(cur, BGP_ROLE_CAPABILITY_LENGTH).map_err(|length| {
             BgpRoleCapabilityParsingError::InvalidLength {
                 offset: cur.offset() - 1,

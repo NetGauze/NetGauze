@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::net::Ipv6Addr;
 
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 
 use crate::iana::{
@@ -72,7 +72,7 @@ pub enum BgpPrefixSidSubSubTlvParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for PrefixSegmentIdentifier {
     type Error = SegmentIdentifierParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let segment_id_len = if extended_length {
             cur.read_u16_be()? as usize
         } else {
@@ -90,7 +90,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for PrefixSegmentIdentifier {
 
 impl<'a> ParseFrom<'a> for BgpSidAttribute {
     type Error = BgpPrefixSidTlvParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let (tlv_type, _tlv_length, mut data) =
             read_tlv_header_t8_l16::<BgpPrefixSidTlvParsingError>(cur)?;
@@ -149,7 +149,7 @@ impl<'a> ParseFrom<'a> for BgpSidAttribute {
 }
 impl<'a> ParseFrom<'a> for SRv6ServiceSubTlv {
     type Error = BgpPrefixSidSubTlvParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let (tlv_type, _tlv_length, mut data) =
             read_tlv_header_t8_l16::<BgpPrefixSidSubTlvParsingError>(cur)?;
@@ -201,7 +201,7 @@ impl<'a> ParseFrom<'a> for SRv6ServiceSubTlv {
 impl<'a> ParseFrom<'a> for SRv6ServiceSubSubTlv {
     type Error = BgpPrefixSidSubSubTlvParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let (tlv_type, _tlv_length, mut data) =
             read_tlv_header_t8_l16::<BgpPrefixSidSubSubTlvParsingError>(cur)?;
@@ -258,7 +258,7 @@ pub enum BgpSRv6SRGBParsingError {
 
 impl<'a> ParseFrom<'a> for SegmentRoutingGlobalBlock {
     type Error = BgpSRv6SRGBParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let first_label = MplsLabel::parse(cur)?;
         let range_size = cur.read_array()?;
 

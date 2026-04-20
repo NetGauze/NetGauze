@@ -44,7 +44,7 @@ use crate::wire::deserializer::path_attribute::PathAttributeParsingError;
 use crate::wire::deserializer::route_refresh::BgpRouteRefreshMessageParsingError;
 use crate::wire::deserializer::update::BgpUpdateMessageParsingError;
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 
 /// Min message size in BGP is 19 octets. They're counted from
@@ -277,12 +277,13 @@ pub enum BgpMessageOpenAndLengthParsingError {
 /// message is valid according to it's type. Takes into consideration both rules at [RFC4271](https://datatracker.ietf.org/doc/html/rfc4271)
 /// and [RFC8654 Extended Message Support for BGP](https://datatracker.ietf.org/doc/html/rfc8654).
 ///
-/// Returns the length, message type, and BytesReader limited to the BGP message
-/// as specified in the length (everything after the length and type octets)
+/// Returns the length, message type, and SliceReader<'a> limited to the BGP
+/// message as specified in the length (everything after the length and type
+/// octets)
 #[inline]
-fn parse_bgp_message_length_and_type(
-    cur: &mut BytesReader,
-) -> Result<(u16, BgpMessageType, BytesReader), BgpMessageOpenAndLengthParsingError> {
+fn parse_bgp_message_length_and_type<'a>(
+    cur: &mut SliceReader<'a>,
+) -> Result<(u16, BgpMessageType, SliceReader<'a>), BgpMessageOpenAndLengthParsingError> {
     let length = cur.read_u16_be()?;
 
     // Fail early if the message length is not valid
@@ -325,7 +326,7 @@ fn parse_bgp_message_length_and_type(
 
 impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpMessage {
     type Error = BgpMessageParsingError;
-    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
         let header = cur.read_u128_be()?;
         if header != u128::MAX {
             return Err(BgpMessageParsingError::ConnectionNotSynchronized {
@@ -440,7 +441,9 @@ impl From<BgpMessageParsingError> for BgpNotificationMessage {
 }
 
 #[inline]
-pub fn read_tlv_header_t16_l16<E>(cur: &mut BytesReader) -> Result<(u16, u16, BytesReader), E>
+pub fn read_tlv_header_t16_l16<'a, E>(
+    cur: &mut SliceReader<'a>,
+) -> Result<(u16, u16, SliceReader<'a>), E>
 where
     E: std::error::Error + From<ParseError>,
 {
@@ -451,7 +454,9 @@ where
 }
 
 #[inline]
-pub fn read_tlv_header_t8_l16<E>(cur: &mut BytesReader) -> Result<(u8, u16, BytesReader), E>
+pub fn read_tlv_header_t8_l16<'a, E>(
+    cur: &mut SliceReader<'a>,
+) -> Result<(u8, u16, SliceReader<'a>), E>
 where
     E: std::error::Error + From<ParseError>,
 {

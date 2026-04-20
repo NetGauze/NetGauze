@@ -27,7 +27,7 @@ use crate::wire::deserializer::read_tlv_header_t16_l16;
 use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN};
 
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -57,7 +57,7 @@ pub enum BgpLsAttributeParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsAttribute {
     type Error = BgpLsAttributeParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut ls_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -77,7 +77,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for BgpLsAttribute {
 
 impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
     type Error = BgpLsAttributeParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let (tlv_type, tlv_length, mut data) =
             read_tlv_header_t16_l16::<BgpLsAttributeParsingError>(cur)?;
@@ -295,7 +295,7 @@ impl<'a> ParseFrom<'a> for BgpLsAttributeValue {
 
 impl<'a> ParseFrom<'a> for SharedRiskLinkGroupValue {
     type Error = BgpLsAttributeParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let value = cur.read_u32_be()?;
         Ok(SharedRiskLinkGroupValue(value))
     }
@@ -303,7 +303,7 @@ impl<'a> ParseFrom<'a> for SharedRiskLinkGroupValue {
 
 impl<'a> ParseFromWithOneInput<'a, u16> for BgpLsPeerSid {
     type Error = BgpLsAttributeParsingError;
-    fn parse(cur: &mut BytesReader, length: u16) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, length: u16) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let flags = cur.read_u8()?;
         let weight = cur.read_u8()?;

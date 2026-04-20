@@ -1,14 +1,13 @@
 //! Simple example of constructing BGP packet
 //! in addition to serializing and deserializing BGP packet from wire format.
 
-use bytes::BytesMut;
 use netgauze_bgp_pkt::capabilities::*;
 use netgauze_bgp_pkt::open::*;
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
 use netgauze_bgp_pkt::*;
 use netgauze_iana::address_family::*;
 use netgauze_parse_utils::WritablePdu;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::ParseFromWithOneInput;
 use std::io::Cursor;
 use std::net::Ipv4Addr;
@@ -65,7 +64,7 @@ pub fn main() {
 
     // Deserialize the message from binary format
     let msg_back = BgpMessage::parse(
-        &mut BytesReader::new(BytesMut::from(buf.as_slice())),
+        &mut SliceReader::new(buf.as_slice()),
         &mut BgpParsingContext::default(),
     )
     .unwrap();

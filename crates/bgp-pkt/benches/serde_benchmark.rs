@@ -1,8 +1,7 @@
-use bytes::BytesMut;
 use criterion::{Criterion, criterion_group, criterion_main};
 use netgauze_bgp_pkt::BgpMessage;
 use netgauze_bgp_pkt::wire::deserializer::BgpParsingContext;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::ParseFromWithOneInput;
 
 const OPEN_COMPLEX_NO_PARAMS: [u8; 29] = [
@@ -130,60 +129,55 @@ const UPDATE_MPLS: [u8; 143] = [
     0x02, 0xfb, 0xf1, 0x00, 0x00, 0x00, 0x01
 ];
 
-pub fn test_open_message_no_params(reader: &mut BytesReader, ctx: &mut BgpParsingContext) {
-    assert_eq!(reader.remaining(), OPEN_COMPLEX_NO_PARAMS.len());
+pub fn test_open_message_no_params(reader: &mut SliceReader<'_>, ctx: &mut BgpParsingContext) {
     let x = BgpMessage::parse(reader, ctx);
     assert!(matches!(x, Ok(..)), "Found: {x:?}")
 }
 
-pub fn test_complex_open_message(reader: &mut BytesReader, ctx: &mut BgpParsingContext) {
+pub fn test_complex_open_message(reader: &mut SliceReader<'_>, ctx: &mut BgpParsingContext) {
     let x = BgpMessage::parse(reader, ctx);
     assert!(matches!(x, Ok(..)), "Found: {x:?}")
 }
 
-pub fn test_bgp_message(reader: &mut BytesReader, ctx: &mut BgpParsingContext) {
+pub fn test_bgp_message(reader: &mut SliceReader<'_>, ctx: &mut BgpParsingContext) {
     let x = BgpMessage::parse(reader, ctx);
     assert!(matches!(x, Ok(..)), "Found: {x:?}")
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut ctx = BgpParsingContext::default();
-    let no_params_span = BytesReader::new(BytesMut::from_iter(&OPEN_COMPLEX_NO_PARAMS));
-    let complex_span = BytesReader::new(BytesMut::from_iter(&OPEN_COMPLEX_RAW));
     c.bench_function("open no params", |b| {
         b.iter(|| {
-            let mut no_params_span = no_params_span.clone();
-            test_open_message_no_params(&mut no_params_span, &mut ctx)
+            let mut reader = SliceReader::new(&OPEN_COMPLEX_NO_PARAMS);
+            test_open_message_no_params(&mut reader, &mut ctx)
         })
     });
     c.bench_function("open complex", |b| {
         b.iter(|| {
-            let mut complex_span = complex_span.clone();
-            test_complex_open_message(&mut complex_span, &mut ctx)
+            let mut reader = SliceReader::new(&OPEN_COMPLEX_RAW);
+            test_complex_open_message(&mut reader, &mut ctx)
         })
     });
 
     // Setup the context to parse the Update BGP message with MPLS data
     let mut ctx = BgpParsingContext::default();
-    let mut open_mpls_span = BytesReader::new(BytesMut::from_iter(&OPEN_FOR_UPDATE_MPLS));
-    let _ = BgpMessage::parse(&mut open_mpls_span, &mut ctx).unwrap();
-    let update_mpls_span = BytesReader::new(BytesMut::from_iter(&UPDATE_MPLS));
+    let mut open_mpls_reader = SliceReader::new(&OPEN_FOR_UPDATE_MPLS);
+    let _ = BgpMessage::parse(&mut open_mpls_reader, &mut ctx).unwrap();
     c.bench_function("Update MPLS", |b| {
         b.iter(|| {
-            let mut update_mpls_span = update_mpls_span.clone();
-            test_complex_open_message(&mut update_mpls_span, &mut ctx)
+            let mut update_mpls_reader = SliceReader::new(&UPDATE_MPLS);
+            test_bgp_message(&mut update_mpls_reader, &mut ctx)
         })
     });
 
     // Setup the context to parse the Update BGP message with SRV6 data
     let mut ctx = BgpParsingContext::default();
-    let mut open_srv6_span = BytesReader::new(BytesMut::from_iter(&OPEN_FOR_UPDATE_SRV6));
-    let _ = BgpMessage::parse(&mut open_srv6_span, &mut ctx).unwrap();
-    let update_srv6_span = BytesReader::new(BytesMut::from_iter(&UPDATE_SRV6));
+    let mut open_srb6_reader = SliceReader::new(&OPEN_FOR_UPDATE_SRV6);
+    let _ = BgpMessage::parse(&mut open_srb6_reader, &mut ctx).unwrap();
     c.bench_function("Update SRV6", |b| {
         b.iter(|| {
-            let mut update_srv6_span = update_srv6_span.clone();
-            test_complex_open_message(&mut update_srv6_span, &mut ctx)
+            let mut update_srv6_reader = SliceReader::new(&UPDATE_SRV6);
+            test_bgp_message(&mut update_srv6_reader, &mut ctx)
         })
     });
 }

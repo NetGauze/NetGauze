@@ -27,7 +27,7 @@ use crate::notification::{
 };
 
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::ParseFrom;
 use serde::{Deserialize, Serialize};
 
@@ -65,7 +65,7 @@ pub enum BgpNotificationMessageParsingError {
 impl<'a> ParseFrom<'a> for BgpNotificationMessage {
     type Error = BgpNotificationMessageParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let notification_type =
             BgpErrorNotificationCode::try_from(cur.read_u8()?).map_err(|err| {
                 BgpNotificationMessageParsingError::UndefinedBgpErrorNotificationCode {
@@ -117,7 +117,7 @@ pub enum MessageHeaderErrorParsingError {
 
 impl<'a> ParseFrom<'a> for MessageHeaderError {
     type Error = MessageHeaderErrorParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_code = MessageHeaderErrorSubCode::try_from(cur.read_u8()?).map_err(|err| {
             MessageHeaderErrorParsingError::UndefinedMessageHeaderErrorType {
                 offset: cur.offset() - 1,
@@ -153,7 +153,7 @@ pub enum OpenMessageErrorParsingError {
 impl<'a> ParseFrom<'a> for OpenMessageError {
     type Error = OpenMessageErrorParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_code = OpenMessageErrorSubCode::try_from(cur.read_u8()?).map_err(|err| {
             OpenMessageErrorParsingError::UndefinedOpenMessageErrorSubCode {
                 offset: cur.offset() - 1,
@@ -196,7 +196,7 @@ pub enum UpdateMessageErrorParsingError {
 
 impl<'a> ParseFrom<'a> for UpdateMessageError {
     type Error = UpdateMessageErrorParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_code = UpdateMessageErrorSubCode::try_from(cur.read_u8()?).map_err(|err| {
             UpdateMessageErrorParsingError::UndefinedUpdateMessageErrorSubCode {
                 offset: cur.offset() - 1,
@@ -247,7 +247,7 @@ pub enum HoldTimerExpiredErrorParsingError {
 
 impl<'a> ParseFrom<'a> for HoldTimerExpiredError {
     type Error = HoldTimerExpiredErrorParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_code = cur.read_u8()?;
         let value = cur.read_bytes(cur.remaining())?.to_vec();
 
@@ -266,7 +266,7 @@ pub enum FiniteStateMachineErrorParsingError {
 
 impl<'a> ParseFrom<'a> for FiniteStateMachineError {
     type Error = FiniteStateMachineErrorParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_code = FiniteStateMachineErrorSubCode::try_from(cur.read_u8()?).map_err(|err| {
             FiniteStateMachineErrorParsingError::Undefined {
                 offset: cur.offset() - 1,
@@ -303,7 +303,7 @@ pub enum CeaseErrorParsingError {
 
 impl<'a> ParseFrom<'a> for CeaseError {
     type Error = CeaseErrorParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_code = CeaseErrorSubCode::try_from(cur.read_u8()?).map_err(|err| {
             CeaseErrorParsingError::Undefined {
                 offset: cur.offset() - 1,
@@ -346,7 +346,7 @@ pub enum RouteRefreshErrorParsingError {
 impl<'a> ParseFrom<'a> for RouteRefreshError {
     type Error = RouteRefreshErrorParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let sub_code =
             RouteRefreshMessageErrorSubCode::try_from(cur.read_u8()?).map_err(|err| {
                 RouteRefreshErrorParsingError::Undefined {
@@ -358,7 +358,7 @@ impl<'a> ParseFrom<'a> for RouteRefreshError {
         match sub_code {
             RouteRefreshMessageErrorSubCode::InvalidMessageLength => {
                 Ok(RouteRefreshError::InvalidMessageLength {
-                    value: value.into(),
+                    value: value.to_vec(),
                 })
             }
         }

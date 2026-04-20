@@ -22,7 +22,7 @@ use crate::wire::serializer::nlri::{
 use ipnet::{Ipv4Net, Ipv6Net};
 use netgauze_parse_utils::common::{Ipv4PrefixParsingError, Ipv6PrefixParsingError};
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{
     ParseFrom, ParseFromWithOneInput, ParseFromWithThreeInputs, ParseFromWithTwoInputs,
 };
@@ -44,7 +44,7 @@ pub enum MplsLabelParsingError {
 
 impl<'a> ParseFrom<'a> for MplsLabel {
     type Error = MplsLabelParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let label: [u8; 3] = cur.read_array()?;
         Ok(MplsLabel::new(label))
     }
@@ -66,7 +66,7 @@ pub enum RouteDistinguisherParsingError {
 
 impl<'a> ParseFrom<'a> for RouteDistinguisher {
     type Error = RouteDistinguisherParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let rd_type = cur.read_u16_be()?;
         let rd_type = RouteDistinguisherTypeCode::try_from(rd_type).map_err(|error| {
@@ -117,7 +117,7 @@ pub enum LabeledIpv4NextHopParsingError {
 
 impl<'a> ParseFrom<'a> for LabeledIpv4NextHop {
     type Error = LabeledIpv4NextHopParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let rd = RouteDistinguisher::parse(cur)?;
         let ip = cur.read_u32_be()?;
         let ip = Ipv4Addr::from(ip);
@@ -137,7 +137,7 @@ pub enum LabeledIpv6NextHopParsingError {
 impl<'a> ParseFrom<'a> for LabeledIpv6NextHop {
     type Error = LabeledIpv6NextHopParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let rd = RouteDistinguisher::parse(cur)?;
         let ip = cur.read_u128_be()?;
         let next_hop = Ipv6Addr::from(ip);
@@ -169,7 +169,7 @@ pub enum LabeledNextHopParsingError {
 impl<'a> ParseFrom<'a> for LabeledNextHop {
     type Error = LabeledNextHopParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let prefix_len = cur.read_u8()?;
         let mut address_buf = cur.take_slice(prefix_len as usize)?;
@@ -209,7 +209,7 @@ pub enum Ipv4MplsVpnUnicastAddressParsingError {
 impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv4MplsVpnUnicastAddress {
     type Error = Ipv4MplsVpnUnicastAddressParsingError;
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         add_path: bool,
         is_unreach: bool,
         multiple_labels_limit: u8,
@@ -286,7 +286,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv6MplsVpnUnicastAddr
     type Error = Ipv6MplsVpnUnicastAddressParsingError;
 
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         add_path: bool,
         is_unreach: bool,
         multiple_labels_limit: u8,
@@ -355,7 +355,7 @@ pub enum Ipv6UnicastParsingError {
 
 impl<'a> ParseFrom<'a> for Ipv6Unicast {
     type Error = Ipv6UnicastParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let net = <Ipv6Net as ParseFrom>::parse(cur)?;
         let unicast_net = Ipv6Unicast::from_net(net).map_err(|_| {
@@ -370,7 +370,11 @@ impl<'a> ParseFrom<'a> for Ipv6Unicast {
 
 impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv6Unicast {
     type Error = Ipv6UnicastParsingError;
-    fn parse(cur: &mut BytesReader, prefix_len: u8, offset: usize) -> Result<Self, Self::Error> {
+    fn parse(
+        cur: &mut SliceReader<'a>,
+        prefix_len: u8,
+        offset: usize,
+    ) -> Result<Self, Self::Error> {
         let net = <Ipv6Net as ParseFromWithTwoInputs<'a, _, _>>::parse(cur, prefix_len, offset)?;
         let unicast_net = Ipv6Unicast::from_net(net).map_err(|_| {
             Ipv6UnicastParsingError::InvalidUnicastNetwork {
@@ -393,7 +397,7 @@ pub enum Ipv6UnicastAddressParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for Ipv6UnicastAddress {
     type Error = Ipv6UnicastAddressParsingError;
-    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, add_path: bool) -> Result<Self, Self::Error> {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
         } else {
@@ -414,7 +418,7 @@ pub enum Ipv6MulticastParsingError {
 
 impl<'a> ParseFrom<'a> for Ipv6Multicast {
     type Error = Ipv6MulticastParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let network = <Ipv6Net as ParseFrom<'_>>::parse(cur)?;
         let net = Ipv6Multicast::from_net(network)
@@ -434,7 +438,7 @@ pub enum Ipv6MulticastAddressParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for Ipv6MulticastAddress {
     type Error = Ipv6MulticastAddressParsingError;
-    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, add_path: bool) -> Result<Self, Self::Error> {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
         } else {
@@ -456,7 +460,7 @@ pub enum Ipv4UnicastParsingError {
 
 impl<'a> ParseFrom<'a> for Ipv4Unicast {
     type Error = Ipv4UnicastParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let network = <Ipv4Net as ParseFrom>::parse(cur)?;
         let unicast = Self::from_net(network)
@@ -467,7 +471,11 @@ impl<'a> ParseFrom<'a> for Ipv4Unicast {
 
 impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv4Unicast {
     type Error = Ipv4UnicastParsingError;
-    fn parse(cur: &mut BytesReader, prefix_len: u8, offset: usize) -> Result<Self, Self::Error> {
+    fn parse(
+        cur: &mut SliceReader<'a>,
+        prefix_len: u8,
+        offset: usize,
+    ) -> Result<Self, Self::Error> {
         let ipv4_net =
             <Ipv4Net as ParseFromWithTwoInputs<'_, _, _>>::parse(cur, prefix_len, offset)?;
         let net = Self::from_net(ipv4_net).map_err(|_| {
@@ -491,7 +499,7 @@ pub enum Ipv4UnicastAddressParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for Ipv4UnicastAddress {
     type Error = Ipv4UnicastAddressParsingError;
-    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, add_path: bool) -> Result<Self, Self::Error> {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
         } else {
@@ -513,7 +521,7 @@ pub enum Ipv4MulticastParsingError {
 
 impl<'a> ParseFrom<'a> for Ipv4Multicast {
     type Error = Ipv4MulticastParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let net = <Ipv4Net as ParseFrom<'_>>::parse(cur)?;
         let net = Ipv4Multicast::from_net(net).map_err(|_| {
@@ -536,7 +544,7 @@ pub enum Ipv4MulticastAddressParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for Ipv4MulticastAddress {
     type Error = Ipv4MulticastAddressParsingError;
-    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, add_path: bool) -> Result<Self, Self::Error> {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
         } else {
@@ -554,7 +562,7 @@ pub enum MacAddressParsingError {
 }
 impl<'a> ParseFrom<'a> for MacAddress {
     type Error = MacAddressParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let mac_address: [u8; 6] = cur.read_array()?;
         Ok(MacAddress(mac_address))
     }
@@ -568,7 +576,7 @@ pub enum EthernetSegmentIdentifierParsingError {
 
 impl<'a> ParseFrom<'a> for EthernetSegmentIdentifier {
     type Error = EthernetSegmentIdentifierParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let segment = cur.read_array()?;
         Ok(EthernetSegmentIdentifier(segment))
     }
@@ -582,7 +590,7 @@ pub enum EthernetTagParsingError {
 
 impl<'a> ParseFrom<'a> for EthernetTag {
     type Error = EthernetTagParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let tag = cur.read_u32_be()?;
         Ok(EthernetTag(tag))
     }
@@ -604,7 +612,7 @@ pub enum EthernetAutoDiscoveryParsingError {
 
 impl<'a> ParseFrom<'a> for EthernetAutoDiscovery {
     type Error = EthernetAutoDiscoveryParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let rd = RouteDistinguisher::parse(cur)?;
         let segment_id = EthernetSegmentIdentifier::parse(cur)?;
         let tag = EthernetTag::parse(cur)?;
@@ -636,7 +644,7 @@ pub enum MacIpAdvertisementParsingError {
 impl<'a> ParseFrom<'a> for MacIpAdvertisement {
     type Error = MacIpAdvertisementParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let rd = RouteDistinguisher::parse(cur)?;
         let segment_id = EthernetSegmentIdentifier::parse(cur)?;
         let tag = EthernetTag::parse(cur)?;
@@ -705,7 +713,7 @@ pub enum InclusiveMulticastEthernetTagRouteParsingError {
 
 impl<'a> ParseFrom<'a> for InclusiveMulticastEthernetTagRoute {
     type Error = InclusiveMulticastEthernetTagRouteParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let rd = RouteDistinguisher::parse(cur)?;
         let tag = EthernetTag::parse(cur)?;
         let offset = cur.offset();
@@ -747,7 +755,7 @@ pub enum EthernetSegmentRouteParsingError {
 impl<'a> ParseFrom<'a> for EthernetSegmentRoute {
     type Error = EthernetSegmentRouteParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let rd = RouteDistinguisher::parse(cur)?;
         let segment_id = EthernetSegmentIdentifier::parse(cur)?;
         let offset = cur.offset();
@@ -792,7 +800,7 @@ pub enum L2EvpnRouteParsingError {
 
 impl<'a> ParseFrom<'a> for L2EvpnRoute {
     type Error = L2EvpnRouteParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let typ_code = cur.read_u8()?;
         let len = cur.read_u8()?;
         let mut route_buf = cur.take_slice(len as usize)?;
@@ -841,7 +849,7 @@ pub enum L2EvpnAddressParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for L2EvpnAddress {
     type Error = L2EvpnAddressParsingError;
-    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, add_path: bool) -> Result<Self, Self::Error> {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
         } else {
@@ -870,7 +878,7 @@ pub enum L2EvpnIpv4PrefixRouteParsingError {
 
 impl<'a> ParseFrom<'a> for L2EvpnIpv4PrefixRoute {
     type Error = L2EvpnIpv4PrefixRouteParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let rd = RouteDistinguisher::parse(cur)?;
         let segment_id = EthernetSegmentIdentifier::parse(cur)?;
         let tag = EthernetTag::parse(cur)?;
@@ -912,7 +920,7 @@ pub enum L2EvpnIpv6PrefixRouteParsingError {
 
 impl<'a> ParseFrom<'a> for L2EvpnIpv6PrefixRoute {
     type Error = L2EvpnIpv6PrefixRouteParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let rd = RouteDistinguisher::parse(cur)?;
         let segment_id = EthernetSegmentIdentifier::parse(cur)?;
         let tag = EthernetTag::parse(cur)?;
@@ -948,7 +956,7 @@ pub enum L2EvpnIpPrefixRouteParsingError {
 
 impl<'a> ParseFrom<'a> for L2EvpnIpPrefixRoute {
     type Error = L2EvpnIpPrefixRouteParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         match cur.remaining() {
             L2_EVPN_IPV4_PREFIX_ROUTE_LEN => {
@@ -979,7 +987,7 @@ pub enum RouteTargetMembershipAddressParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for RouteTargetMembershipAddress {
     type Error = RouteTargetMembershipAddressParsingError;
-    fn parse(cur: &mut BytesReader, add_path: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, add_path: bool) -> Result<Self, Self::Error> {
         let path_id = if add_path {
             Some(cur.read_u32_be()?)
         } else {
@@ -1010,7 +1018,7 @@ pub enum RouteTargetMembershipParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, u8> for RouteTargetMembership {
     type Error = RouteTargetMembershipParsingError;
-    fn parse(cur: &mut BytesReader, prefix_len: u8) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, prefix_len: u8) -> Result<Self, Self::Error> {
         let origin_as = cur.read_u32_be()?;
         let route_target = cur.read_bytes(((prefix_len - 32) / 8) as usize)?;
         Ok(RouteTargetMembership::new(origin_as, route_target.to_vec()))
@@ -1037,7 +1045,7 @@ pub enum Ipv4NlriMplsLabelsAddressParsingError {
 impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv4NlriMplsLabelsAddress {
     type Error = Ipv4NlriMplsLabelsAddressParsingError;
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         add_path: bool,
         is_unreach: bool,
         multiple_labels_limit: u8,
@@ -1102,7 +1110,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv6NlriMplsLabelsAddr
     type Error = Ipv6NlriMplsLabelsAddressParsingError;
 
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         add_path: bool,
         is_unreach: bool,
         multiple_labels_limit: u8,
@@ -1146,8 +1154,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, bool, u8> for Ipv6NlriMplsLabelsAddr
 }
 
 #[inline]
-fn parse_mpls_label_stack(
-    cur: &mut BytesReader,
+fn parse_mpls_label_stack<'a>(
+    cur: &mut SliceReader<'a>,
     is_unreach: bool,
     mut multiple_labels_limit: u8,
 ) -> Result<Vec<MplsLabel>, MplsLabelParsingError> {

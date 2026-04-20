@@ -38,7 +38,7 @@ use crate::wire::deserializer::path_attribute::{
 };
 use netgauze_parse_utils::common::Ipv4PrefixParsingError;
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{ParseFrom, ParseFromWithOneInput};
 use serde::{Deserialize, Serialize};
 
@@ -61,8 +61,8 @@ pub enum BgpUpdateMessageParsingError {
 }
 
 #[inline]
-fn parse_nlri(
-    cur: &mut BytesReader,
+fn parse_nlri<'a>(
+    cur: &mut SliceReader<'a>,
     add_path: bool,
     is_update: bool,
     ctx: &mut BgpParsingContext,
@@ -105,9 +105,9 @@ fn parse_nlri(
 }
 
 #[inline]
-fn advance_attr_buffer(
-    path_attributes_buf: &mut BytesReader,
-) -> Result<BytesReader, BgpUpdateMessageParsingError> {
+fn advance_attr_buffer<'a>(
+    path_attributes_buf: &mut SliceReader<'a>,
+) -> Result<SliceReader<'a>, BgpUpdateMessageParsingError> {
     let attributes = path_attributes_buf.read_u8()?;
     let _code = path_attributes_buf.read_u8()?;
     let extended_length =
@@ -125,10 +125,10 @@ fn advance_attr_buffer(
 /// Length is for value length only (not counting attribute type and extra byte
 /// for extended length)
 #[inline]
-fn advance_attr_buffer_fixed(
+fn advance_attr_buffer_fixed<'a>(
     length: usize,
-    path_attributes_buf: &mut BytesReader,
-) -> Result<BytesReader, BgpUpdateMessageParsingError> {
+    path_attributes_buf: &mut SliceReader<'a>,
+) -> Result<SliceReader<'a>, BgpUpdateMessageParsingError> {
     let attributes = path_attributes_buf.read_u8()?;
     let extended_length =
         attributes & EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK == EXTENDED_LENGTH_PATH_ATTRIBUTE_MASK;
@@ -147,7 +147,7 @@ fn advance_attr_buffer_fixed(
 
 impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpUpdateMessage {
     type Error = BgpUpdateMessageParsingError;
-    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
         let add_path = ctx
             .add_path
             .get(&AddressType::Ipv4Unicast)
@@ -187,11 +187,11 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpUpdateMessage 
     }
 }
 
-fn handle_path_error(
-    path_attributes_buf: &mut BytesReader,
+fn handle_path_error<'a>(
+    path_attributes_buf: &mut SliceReader<'a>,
     ctx: &mut BgpParsingContext,
     path_attr_error: &PathAttributeParsingError,
-) -> Result<BytesReader, BgpUpdateMessageParsingError> {
+) -> Result<SliceReader<'a>, BgpUpdateMessageParsingError> {
     let buf = match path_attr_error {
         PathAttributeParsingError::Parse(error)
         | PathAttributeParsingError::OriginError(OriginParsingError::Parse(error))

@@ -23,7 +23,7 @@ use netgauze_parse_utils::error::ParseError;
 use serde::{Deserialize, Serialize};
 
 use crate::notification::RouteRefreshError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::ParseFrom;
 
 /// BGP Route Refresh Message Parsing errors
@@ -49,7 +49,7 @@ pub enum BgpRouteRefreshMessageParsingError {
 
 impl<'a> ParseFrom<'a> for BgpRouteRefreshMessage {
     type Error = BgpRouteRefreshMessageParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let afi = AddressFamily::try_from(cur.read_u16_be()?).map_err(|err| {
             BgpRouteRefreshMessageParsingError::UndefinedAddressFamily {
                 offset: cur.offset() - 2,

@@ -36,7 +36,7 @@ use crate::wire::serializer::nlri::{IPV4_LEN, IPV6_LEN, IPV6_WITH_LINK_LOCAL_LEN
 use netgauze_iana::address_family::{AddressFamily, AddressType, SubsequentAddressFamily};
 use netgauze_parse_utils::common::IpAddrParsingError;
 use netgauze_parse_utils::error::ParseError;
-use netgauze_parse_utils::reader::BytesReader;
+use netgauze_parse_utils::reader::SliceReader;
 use netgauze_parse_utils::traits::{
     ParseFrom, ParseFromWithOneInput, ParseFromWithThreeInputs, ParseFromWithTwoInputs,
 };
@@ -118,7 +118,7 @@ pub enum PathAttributeParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for PathAttribute {
     type Error = PathAttributeParsingError;
-    fn parse(cur: &mut BytesReader, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut BgpParsingContext) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let (asn4, multiple_labels, add_path_map) = (ctx.asn4, &ctx.multiple_labels, &ctx.add_path);
         let attributes = cur.read_u8()?;
@@ -249,7 +249,7 @@ pub enum OriginParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for Origin {
     type Error = OriginParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let length = if extended_length {
             let raw = cur.read_u16_be()?;
@@ -293,7 +293,7 @@ pub enum AsPathParsingError {
 impl<'a> ParseFromWithTwoInputs<'a, bool, bool> for AsPath {
     type Error = AsPathParsingError;
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         extended_length: bool,
         asn4: bool,
     ) -> Result<Self, Self::Error> {
@@ -324,7 +324,7 @@ impl<'a> ParseFromWithTwoInputs<'a, bool, bool> for AsPath {
 
 impl<'a> ParseFrom<'a> for As2PathSegment {
     type Error = AsPathParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let code = cur.read_u8()?;
         let segment_type = AsPathSegmentType::try_from(code)
@@ -354,7 +354,7 @@ impl<'a> ParseFrom<'a> for As2PathSegment {
 
 impl<'a> ParseFrom<'a> for As4PathSegment {
     type Error = AsPathParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let code = cur.read_u8()?;
         let segment_type = AsPathSegmentType::try_from(code)
@@ -384,7 +384,7 @@ impl<'a> ParseFrom<'a> for As4PathSegment {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for As4Path {
     type Error = AsPathParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut segments_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -414,7 +414,7 @@ pub enum NextHopParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for NextHop {
     type Error = NextHopParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let length = if extended_length {
             let raw = cur.read_u16_be()?;
@@ -445,7 +445,7 @@ pub enum MultiExitDiscriminatorParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for MultiExitDiscriminator {
     type Error = MultiExitDiscriminatorParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let length = if extended_length {
             let raw = cur.read_u16_be()?;
@@ -476,7 +476,7 @@ pub enum LocalPreferenceParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for LocalPreference {
     type Error = LocalPreferenceParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let length = if extended_length {
             let raw = cur.read_u16_be()?;
@@ -507,7 +507,7 @@ pub enum AtomicAggregateParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for AtomicAggregate {
     type Error = AtomicAggregateParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let length = if extended_length {
             let raw = cur.read_u16_be()?;
@@ -537,7 +537,7 @@ pub enum AggregatorParsingError {
 impl<'a> ParseFromWithTwoInputs<'a, bool, bool> for Aggregator {
     type Error = AggregatorParsingError;
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         extended_length: bool,
         asn4: bool,
     ) -> Result<Self, Self::Error> {
@@ -553,7 +553,7 @@ impl<'a> ParseFromWithTwoInputs<'a, bool, bool> for Aggregator {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for As2Aggregator {
     type Error = AggregatorParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let length = if extended_length {
             let raw = cur.read_u16_be()?;
@@ -574,7 +574,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for As2Aggregator {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for As4Aggregator {
     type Error = AggregatorParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let length = if extended_length {
             let raw = cur.read_u16_be()?;
@@ -640,7 +640,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
 {
     type Error = MpReachParsingError;
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         extended_length: bool,
         multiple_labels: &HashMap<AddressType, u8>,
         add_path_map: &HashMap<AddressType, bool>,
@@ -872,8 +872,8 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
 }
 
 #[inline]
-fn parse_ip_next_hop(
-    mp_buf: &mut BytesReader,
+fn parse_ip_next_hop<'a>(
+    mp_buf: &mut SliceReader<'a>,
     address_type: AddressType,
 ) -> Result<IpAddr, MpReachParsingError> {
     let next_hop = match IpAddr::parse(mp_buf) {
@@ -889,8 +889,8 @@ fn parse_ip_next_hop(
 }
 
 #[inline]
-fn parse_ip4_or_ipv6_next_hop(
-    mp_buf: &mut BytesReader,
+fn parse_ip4_or_ipv6_next_hop<'a>(
+    mp_buf: &mut SliceReader<'a>,
     address_type: AddressType,
 ) -> Result<(IpAddr, Option<Ipv6Addr>), MpReachParsingError> {
     let offset = mp_buf.offset();
@@ -924,8 +924,8 @@ fn parse_ip4_or_ipv6_next_hop(
 }
 
 #[inline]
-fn parse_labeled_next_hop(
-    mp_buf: &mut BytesReader,
+fn parse_labeled_next_hop<'a>(
+    mp_buf: &mut SliceReader<'a>,
     address_type: AddressType,
 ) -> Result<LabeledNextHop, MpReachParsingError> {
     let next_hop = match LabeledNextHop::parse(mp_buf) {
@@ -991,7 +991,7 @@ impl<'a> ParseFromWithThreeInputs<'a, bool, &HashMap<AddressType, u8>, &HashMap<
     type Error = MpUnreachParsingError;
 
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         extended_length: bool,
         multiple_labels: &HashMap<AddressType, u8>,
         add_path_map: &HashMap<AddressType, bool>,
@@ -1166,7 +1166,11 @@ pub enum UnknownAttributeParsingError {
 
 impl<'a> ParseFromWithTwoInputs<'a, u8, bool> for UnknownAttribute {
     type Error = UnknownAttributeParsingError;
-    fn parse(cur: &mut BytesReader, code: u8, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(
+        cur: &mut SliceReader<'a>,
+        code: u8,
+        extended_length: bool,
+    ) -> Result<Self, Self::Error> {
         let length = if extended_length {
             cur.read_u16_be()? as usize
         } else {
@@ -1196,7 +1200,7 @@ pub enum CommunitiesParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for Communities {
     type Error = CommunitiesParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut communities_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -1223,7 +1227,7 @@ pub enum ExtendedCommunitiesParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for ExtendedCommunities {
     type Error = ExtendedCommunitiesParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut communities_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -1251,7 +1255,7 @@ pub enum ExtendedCommunitiesIpv6ParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for ExtendedCommunitiesIpv6 {
     type Error = ExtendedCommunitiesIpv6ParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut communities_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -1278,7 +1282,7 @@ pub enum LargeCommunitiesParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for LargeCommunities {
     type Error = LargeCommunitiesParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut communities_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -1303,7 +1307,7 @@ pub enum OriginatorParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for Originator {
     type Error = OriginatorParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut data_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -1324,7 +1328,7 @@ pub enum ClusterIdParsingError {
 
 impl<'a> ParseFrom<'a> for ClusterId {
     type Error = ClusterIdParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let id = cur.read_u32_be()?;
         Ok(ClusterId::new(Ipv4Addr::from(id)))
     }
@@ -1341,7 +1345,7 @@ pub enum ClusterListParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for ClusterList {
     type Error = ClusterListParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut data_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -1375,7 +1379,7 @@ pub enum AigpParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for Aigp {
     type Error = AigpParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut data_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
@@ -1414,7 +1418,7 @@ pub enum OnlyToCustomerParsingError {
 
 impl<'a> ParseFromWithOneInput<'a, bool> for OnlyToCustomer {
     type Error = OnlyToCustomerParsingError;
-    fn parse(cur: &mut BytesReader, extended_length: bool) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>, extended_length: bool) -> Result<Self, Self::Error> {
         let mut data_buf = if extended_length {
             let len = cur.read_u16_be()?;
             cur.take_slice(len as usize)?
