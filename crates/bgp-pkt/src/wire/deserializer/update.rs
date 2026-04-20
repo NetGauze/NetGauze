@@ -157,7 +157,7 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpUpdateMessage 
         let withdrawn_routes = parse_nlri(&mut withdrawn_buf, add_path, false, ctx)?;
         let len = cur.read_u16_be()?;
         let mut path_attributes_buf = cur.take_slice(len as usize)?;
-        let mut path_attributes = Vec::new();
+        let mut path_attributes = Vec::with_capacity((len as usize) / 4);
         while !path_attributes_buf.is_empty() {
             match PathAttribute::parse(&mut path_attributes_buf, &mut *ctx) {
                 Ok(element) => {

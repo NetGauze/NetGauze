@@ -343,7 +343,7 @@ impl<'a> ParseFrom<'a> for As2PathSegment {
                 found: cur.remaining(),
             });
         }
-        let mut as_numbers = Vec::new();
+        let mut as_numbers = Vec::with_capacity(count);
         for _ in 0..count {
             let asnum = cur.read_u16_be()?;
             as_numbers.push(asnum);
@@ -373,7 +373,7 @@ impl<'a> ParseFrom<'a> for As4PathSegment {
                 found: cur.remaining(),
             });
         }
-        let mut as_numbers = Vec::new();
+        let mut as_numbers = Vec::with_capacity(count);
         for _ in 0..count {
             let asnum = cur.read_u32_be()?;
             as_numbers.push(asnum);
@@ -1208,7 +1208,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for Communities {
             let len = cur.read_u8()?;
             cur.take_slice(len as usize)?
         };
-        let mut communities = Vec::new();
+        let mut communities = Vec::with_capacity(communities_buf.remaining() / 4);
         while !communities_buf.is_empty() {
             let v = Community::parse(&mut communities_buf)?;
             communities.push(v);
@@ -1235,7 +1235,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for ExtendedCommunities {
             let len = cur.read_u8()?;
             cur.take_slice(len as usize)?
         };
-        let mut communities = Vec::new();
+        let mut communities = Vec::with_capacity(communities_buf.remaining() / 8);
         while !communities_buf.is_empty() {
             let v = ExtendedCommunity::parse(&mut communities_buf)?;
             communities.push(v);
@@ -1263,7 +1263,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for ExtendedCommunitiesIpv6 {
             let len = cur.read_u8()?;
             cur.take_slice(len as usize)?
         };
-        let mut communities = Vec::new();
+        let mut communities = Vec::with_capacity(communities_buf.remaining() / 20);
         while !communities_buf.is_empty() {
             let v = ExtendedCommunityIpv6::parse(&mut communities_buf)?;
             communities.push(v);
@@ -1290,7 +1290,7 @@ impl<'a> ParseFromWithOneInput<'a, bool> for LargeCommunities {
             let len = cur.read_u8()?;
             cur.take_slice(len as usize)?
         };
-        let mut communities = Vec::new();
+        let mut communities = Vec::with_capacity(communities_buf.remaining() / 12);
         while !communities_buf.is_empty() {
             let v = LargeCommunity::parse(&mut communities_buf)?;
             communities.push(v);
