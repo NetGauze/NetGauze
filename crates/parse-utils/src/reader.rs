@@ -13,43 +13,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::error::ParseError;
-use bytes::{Buf, BytesMut};
 
-/// A zero-copy, forward-only reader backed by a reference-counted `Bytes`
-/// buffer.
+/// A zero-copy, forward-only reader over a borrowed byte slice.
 ///
-/// Unlike `ByteReader<'a>` (which borrows `&'a [u8]`), `BytesReader` owns a
-/// `Bytes` handle so parsed PDU fields of type `Bytes` can outlive the decode
-/// call.
+/// `SliceReader` is `Copy` — sub-readers from [`Self::take_slice`] are
+/// just pointer arithmetic with zero overhead, identical to nom's `Span`.
 ///
-/// `offset` is the same absolute-offset invariant as `ByteReader<'a>`.
-#[derive(Debug, Clone)]
-pub struct BytesReader {
-    buf: BytesMut,
+/// `offset` tracks the absolute byte position for error reporting.
+#[derive(Debug, Copy, Clone)]
+pub struct SliceReader<'a> {
+    buf: &'a [u8],
     offset: usize,
 }
 
-impl BytesReader {
-    pub fn new(buf: BytesMut) -> Self {
+impl<'a> SliceReader<'a> {
+    #[inline(always)]
+    pub fn new(buf: &'a [u8]) -> Self {
         Self { buf, offset: 0 }
     }
 
-    pub fn new_with_offset(buf: BytesMut, offset: usize) -> Self {
+    #[inline(always)]
+    pub fn new_with_offset(buf: &'a [u8], offset: usize) -> Self {
         Self { buf, offset }
     }
 
     /// Create a sub-reader covering the next `len` bytes — zero-copy.
-    /// `Bytes::split_to` is O(1) and increments the Arc refcount once.
+    /// Just splits the slice reference; no allocation or ref-counting.
     #[inline(always)]
-    pub fn take_slice(&mut self, len: usize) -> Result<BytesReader, ParseError> {
+    pub fn take_slice(&mut self, len: usize) -> Result<SliceReader<'a>, ParseError> {
         if self.buf.len() < len {
             return Err(ParseError::eof(self.offset, len, self.buf.len()));
         }
-        let sub_buf = self.buf.split_to(len); // O(1), no copy
-        let sub = BytesReader {
-            buf: sub_buf,
+        let (head, tail) = self.buf.split_at(len);
+        let sub = SliceReader {
+            buf: head,
             offset: self.offset,
         };
+        self.buf = tail;
         self.offset += len;
         Ok(sub)
     }
@@ -69,13 +69,19 @@ impl BytesReader {
         self.buf.is_empty()
     }
 
+    /// Returns the remaining unread bytes as a slice.
+    #[inline(always)]
+    pub fn as_slice(&self) -> &'a [u8] {
+        self.buf
+    }
+
     #[inline(always)]
     pub fn read_u8(&mut self) -> Result<u8, ParseError> {
         if self.buf.is_empty() {
             return Err(ParseError::eof(self.offset, 1, 0));
         }
         let v = self.buf[0];
-        self.buf.advance(1);
+        self.buf = &self.buf[1..];
         self.offset += 1;
         Ok(v)
     }
@@ -111,21 +117,21 @@ impl BytesReader {
             return Err(ParseError::eof(self.offset, N, self.buf.len()));
         }
         let arr: [u8; N] = self.buf[..N].try_into().unwrap();
-        self.buf.advance(N);
+        self.buf = &self.buf[N..];
         self.offset += N;
         Ok(arr)
     }
 
-    /// Returns a `Bytes` sub-slice — zero-copy, reference-counted.
-    /// The returned `Bytes` keeps the underlying data alive independently of
-    /// `self`.
-    #[inline]
-    pub fn read_bytes(&mut self, len: usize) -> Result<BytesMut, ParseError> {
+    /// Read `len` bytes and return them as a borrowed slice.
+    /// Callers that need owned data can call `.to_vec()` on the result.
+    #[inline(always)]
+    pub fn read_bytes(&mut self, len: usize) -> Result<&'a [u8], ParseError> {
         if self.buf.len() < len {
             return Err(ParseError::eof(self.offset, len, self.buf.len()));
         }
-        let chunk = self.buf.split_to(len); // O(1), single Arc refcount bump
+        let (head, tail) = self.buf.split_at(len);
+        self.buf = tail;
         self.offset += len;
-        Ok(chunk)
+        Ok(head)
     }
 }

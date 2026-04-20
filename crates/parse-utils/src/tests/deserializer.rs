@@ -1,4 +1,4 @@
-use crate::reader::BytesReader;
+use crate::reader::SliceReader;
 use crate::traits::ParseFrom;
 use crate::writer::WriteTo;
 use bytes::BytesMut;
@@ -16,8 +16,8 @@ fn test_ipv4() {
     let ipv4 = IpAddr::V4(Ipv4Addr::from_str("192.168.56.0").unwrap());
     let ipv6 = IpAddr::V6(Ipv6Addr::from_str("2001:db8:2::").unwrap());
 
-    let mut ipv4_reader = BytesReader::new(BytesMut::from(&good_ipv4_wire[..]));
-    let mut ipv6_reader = BytesReader::new(BytesMut::from(&good_ipv6_wire[..]));
+    let mut ipv4_reader = SliceReader::new(&good_ipv4_wire[..]);
+    let mut ipv6_reader = SliceReader::new(&good_ipv6_wire[..]);
 
     assert_eq!(IpAddr::parse(&mut ipv4_reader), Ok(ipv4));
     assert!(ipv4_reader.is_empty());

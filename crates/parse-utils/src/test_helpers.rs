@@ -16,7 +16,7 @@
 //! Various functions used in testing the correctness or
 //! serializing/deserializing wire protocols
 
-use crate::reader::BytesReader;
+use crate::reader::SliceReader;
 use crate::traits::{
     ParseFrom, ParseFromWithOneInput, ParseFromWithThreeInputs, ParseFromWithTwoInputs,
 };
@@ -24,7 +24,6 @@ use crate::{
     ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs, ReadablePduWithTwoInputs,
     Span, WritablePdu, WritablePduWithOneInput, WritablePduWithTwoInputs,
 };
-use bytes::BytesMut;
 use netgauze_locate::BinarySpan;
 use nom::IResult;
 use std::fmt::Debug;
@@ -79,7 +78,7 @@ where
     T: ParseFrom<'a, Error = E> + PartialEq + Debug,
     E: Debug,
 {
-    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let mut bytes_reader = SliceReader::new(input);
     let parsed = T::parse(&mut bytes_reader);
     assert!(
         parsed.is_ok(),
@@ -133,7 +132,7 @@ where
     T: ParseFromWithOneInput<'a, I, Error = E> + PartialEq + Debug,
     E: Debug,
 {
-    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let mut bytes_reader = SliceReader::new(input);
     let parsed = T::parse(&mut bytes_reader, parser_input);
     assert!(
         parsed.is_ok(),
@@ -193,7 +192,7 @@ where
     T: ParseFromWithTwoInputs<'a, I, K, Error = E> + PartialEq + Debug,
     E: Debug,
 {
-    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let mut bytes_reader = SliceReader::new(input);
     let parsed = T::parse(&mut bytes_reader, parser_input1, parser_input2);
     assert!(
         parsed.is_ok(),
@@ -256,7 +255,7 @@ where
     T: ParseFromWithThreeInputs<'a, I1, I2, I3, Error = E> + PartialEq + Debug,
     E: Debug,
 {
-    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let mut bytes_reader = SliceReader::new(input);
     let parsed = T::parse(
         &mut bytes_reader,
         parser_input1,
@@ -307,7 +306,7 @@ where
     T: ParseFrom<'a, Error = E> + PartialEq + Debug,
     E: Debug + PartialEq,
 {
-    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let mut bytes_reader = SliceReader::new(input);
     let parsed = T::parse(&mut bytes_reader);
     assert!(
         parsed.is_err(),
@@ -352,7 +351,7 @@ pub fn test_parse_error_with_one_input_bytes_reader<'a, T, I, E>(
     T: ParseFromWithOneInput<'a, I, Error = E> + PartialEq + Debug,
     E: Debug + PartialEq,
 {
-    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let mut bytes_reader = SliceReader::new(input);
     let parsed = T::parse(&mut bytes_reader, parser_input);
     assert!(
         parsed.is_err(),
@@ -396,7 +395,7 @@ pub fn test_parse_error_with_two_inputs_bytes_reader<'a, T, I, K, E>(
     T: ParseFromWithTwoInputs<'a, I, K, Error = E> + PartialEq + Debug,
     E: Debug + PartialEq,
 {
-    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let mut bytes_reader = SliceReader::new(input);
     let parsed = T::parse(&mut bytes_reader, parser_input1, parser_input2);
     assert!(
         parsed.is_err(),
@@ -443,7 +442,7 @@ pub fn test_parse_error_with_three_inputs_bytes_reader<'a, T, I1, I2, I3, E>(
     T: ParseFromWithThreeInputs<'a, I1, I2, I3, Error = E> + PartialEq + Debug,
     E: Debug + PartialEq,
 {
-    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let mut bytes_reader = SliceReader::new(input);
     let parsed = T::parse(
         &mut bytes_reader,
         parser_input1,

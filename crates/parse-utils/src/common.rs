@@ -1,6 +1,6 @@
 use crate::WritablePdu;
 use crate::error::ParseError;
-use crate::reader::BytesReader;
+use crate::reader::SliceReader;
 use crate::traits::{ParseFrom, ParseFromWithTwoInputs};
 use crate::writer::WriteTo;
 use bytes::BufMut;
@@ -24,7 +24,7 @@ impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv4Net {
     type Error = Ipv4PrefixParsingError;
 
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         prefix_len: u8,
         prefix_offset: usize,
     ) -> Result<Self, Self::Error> {
@@ -54,7 +54,7 @@ impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv4Net {
 impl<'a> ParseFrom<'a> for Ipv4Net {
     type Error = Ipv4PrefixParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let prefix_len = cur.read_u8()?;
         ParseFromWithTwoInputs::parse(cur, prefix_len, offset)
@@ -75,7 +75,7 @@ impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv6Net {
     type Error = Ipv6PrefixParsingError;
 
     fn parse(
-        cur: &mut BytesReader,
+        cur: &mut SliceReader<'a>,
         prefix_len: u8,
         prefix_offset: usize,
     ) -> Result<Self, Self::Error> {
@@ -106,7 +106,7 @@ impl<'a> ParseFromWithTwoInputs<'a, u8, usize> for Ipv6Net {
 impl<'a> ParseFrom<'a> for Ipv6Net {
     type Error = Ipv6PrefixParsingError;
 
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let prefix_len = cur.read_u8()?;
         ParseFromWithTwoInputs::parse(cur, prefix_len, offset)
@@ -163,7 +163,7 @@ pub enum IpAddrParsingError {
 
 impl<'a> ParseFrom<'a> for IpAddr {
     type Error = IpAddrParsingError;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error> {
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error> {
         let offset = cur.offset();
         let ip_len = cur.read_u8()?;
         match ip_len {

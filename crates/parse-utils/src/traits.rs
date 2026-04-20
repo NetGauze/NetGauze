@@ -13,30 +13,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::reader::BytesReader;
+use crate::reader::SliceReader;
 
 /// Parse `Self` from the cursor with no additional context.
 pub trait ParseFrom<'a>: Sized {
     type Error;
-    fn parse(cur: &mut BytesReader) -> Result<Self, Self::Error>;
+    fn parse(cur: &mut SliceReader<'a>) -> Result<Self, Self::Error>;
 }
 
 /// Parse `Self` from the cursor with one immutable context argument.
 pub trait ParseFromWithOneInput<'a, I1>: Sized {
     type Error;
-    fn parse(cur: &mut BytesReader, i1: I1) -> Result<Self, Self::Error>;
+    fn parse(cur: &mut SliceReader<'a>, i1: I1) -> Result<Self, Self::Error>;
 }
 
 /// Parse `Self` from the cursor with two immutable context arguments.
 pub trait ParseFromWithTwoInputs<'a, I1, I2>: Sized {
     type Error;
-    fn parse(cur: &mut BytesReader, i1: I1, i2: I2) -> Result<Self, Self::Error>;
+    fn parse(cur: &mut SliceReader<'a>, i1: I1, i2: I2) -> Result<Self, Self::Error>;
 }
 
 /// Parse `Self` from the cursor with three immutable context arguments.
 pub trait ParseFromWithThreeInputs<'a, I1, I2, I3>: Sized {
     type Error;
-    fn parse(cur: &mut BytesReader, i1: I1, i2: I2, i3: I3) -> Result<Self, Self::Error>;
+    fn parse(cur: &mut SliceReader<'a>, i1: I1, i2: I2, i3: I3) -> Result<Self, Self::Error>;
 }
 
 /// Parse `Self` from the cursor with a **mutable** context.
@@ -44,5 +44,5 @@ pub trait ParseFromWithThreeInputs<'a, I1, I2, I3>: Sized {
 /// context).
 pub trait ParseFromWithMut<'a, Ctx>: Sized {
     type Error;
-    fn parse(cur: &mut BytesReader, ctx: &mut Ctx) -> Result<Self, Self::Error>;
+    fn parse(cur: &mut SliceReader<'a>, ctx: &mut Ctx) -> Result<Self, Self::Error>;
 }
