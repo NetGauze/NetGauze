@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use crate::error::ParseError;
-use bytes::{Buf, Bytes};
+use bytes::{Buf, BytesMut};
 
 /// A zero-copy, forward-only reader backed by a reference-counted `Bytes`
 /// buffer.
@@ -25,21 +25,22 @@ use bytes::{Buf, Bytes};
 /// `offset` is the same absolute-offset invariant as `ByteReader<'a>`.
 #[derive(Debug, Clone)]
 pub struct BytesReader {
-    buf: Bytes,
+    buf: BytesMut,
     offset: usize,
 }
 
 impl BytesReader {
-    pub fn new(buf: Bytes) -> Self {
+    pub fn new(buf: BytesMut) -> Self {
         Self { buf, offset: 0 }
     }
 
-    pub fn new_with_offset(buf: Bytes, offset: usize) -> Self {
+    pub fn new_with_offset(buf: BytesMut, offset: usize) -> Self {
         Self { buf, offset }
     }
 
     /// Create a sub-reader covering the next `len` bytes — zero-copy.
     /// `Bytes::split_to` is O(1) and increments the Arc refcount once.
+    #[inline(always)]
     pub fn take_slice(&mut self, len: usize) -> Result<BytesReader, ParseError> {
         if self.buf.len() < len {
             return Err(ParseError::eof(self.offset, len, self.buf.len()));
@@ -57,9 +58,13 @@ impl BytesReader {
     pub fn offset(&self) -> usize {
         self.offset
     }
+
+    #[inline(always)]
     pub fn remaining(&self) -> usize {
         self.buf.len()
     }
+
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.buf.is_empty()
     }
@@ -96,6 +101,11 @@ impl BytesReader {
     }
 
     #[inline(always)]
+    pub fn read_f32_be(&mut self) -> Result<f32, ParseError> {
+        self.read_array::<4>().map(f32::from_be_bytes)
+    }
+
+    #[inline(always)]
     pub fn read_array<const N: usize>(&mut self) -> Result<[u8; N], ParseError> {
         if self.buf.len() < N {
             return Err(ParseError::eof(self.offset, N, self.buf.len()));
@@ -110,7 +120,7 @@ impl BytesReader {
     /// The returned `Bytes` keeps the underlying data alive independently of
     /// `self`.
     #[inline]
-    pub fn read_bytes(&mut self, len: usize) -> Result<Bytes, ParseError> {
+    pub fn read_bytes(&mut self, len: usize) -> Result<BytesMut, ParseError> {
         if self.buf.len() < len {
             return Err(ParseError::eof(self.offset, len, self.buf.len()));
         }
