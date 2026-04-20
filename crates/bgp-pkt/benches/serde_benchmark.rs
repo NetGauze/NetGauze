@@ -40,23 +40,24 @@ const OPEN_COMPLEX_RAW: [u8; 123] = [
     0x02, 0x00, 0x80, 0x01, 0x04, 0x00, 0x19, 0x00, 0x46,
 ];
 
-pub fn test_open_message_no_params(span: Span<'_>) {
-    let x = BgpMessage::from_wire(span, &mut BgpParsingContext::default());
+pub fn test_open_message_no_params(span: Span<'_>, ctx: &mut BgpParsingContext) {
+    let x = BgpMessage::from_wire(span, ctx);
     x.unwrap();
 }
-pub fn test_complex_open_message(span: Span<'_>) {
-    let x = BgpMessage::from_wire(span, &mut BgpParsingContext::default());
+pub fn test_complex_open_message(span: Span<'_>, ctx: &mut BgpParsingContext) {
+    let x = BgpMessage::from_wire(span, ctx);
     x.unwrap();
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
+    let mut ctx = BgpParsingContext::default();
     let no_params_span = Span::new(&OPEN_COMPLEX_NO_PARAMS);
     let complex_span = Span::new(&OPEN_COMPLEX_RAW);
     c.bench_function("open no params", |b| {
-        b.iter(|| test_open_message_no_params(no_params_span))
+        b.iter(|| test_open_message_no_params(no_params_span, &mut ctx))
     });
     c.bench_function("open complex", |b| {
-        b.iter(|| test_complex_open_message(complex_span))
+        b.iter(|| test_complex_open_message(complex_span, &mut ctx))
     });
 }
 
