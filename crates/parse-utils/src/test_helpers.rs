@@ -16,10 +16,15 @@
 //! Various functions used in testing the correctness or
 //! serializing/deserializing wire protocols
 
+use crate::reader::BytesReader;
+use crate::traits::{
+    ParseFrom, ParseFromWithOneInput, ParseFromWithThreeInputs, ParseFromWithTwoInputs,
+};
 use crate::{
     ReadablePdu, ReadablePduWithOneInput, ReadablePduWithThreeInputs, ReadablePduWithTwoInputs,
     Span, WritablePdu, WritablePduWithOneInput, WritablePduWithTwoInputs,
 };
+use bytes::BytesMut;
 use netgauze_locate::BinarySpan;
 use nom::IResult;
 use std::fmt::Debug;
@@ -69,6 +74,31 @@ where
     value
 }
 
+pub fn test_parsed_completely_bytes_reader<'a, T, E>(input: &'a [u8], expected: &T) -> T
+where
+    T: ParseFrom<'a, Error = E> + PartialEq + Debug,
+    E: Debug,
+{
+    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let parsed = T::parse(&mut bytes_reader);
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
+    let value = parsed.unwrap();
+    assert_eq!(&value, expected);
+    assert_eq!(
+        bytes_reader.remaining(),
+        0,
+        "Not all the input is consumed by the parser, didn't consume: {:?}",
+        bytes_reader
+            .read_bytes(bytes_reader.remaining())
+            .unwrap()
+            .to_vec(),
+    );
+    value
+}
+
 /// Fancier assert to for more meaningful error messages
 pub fn test_parsed_completely_with_one_input<'a, T, I, E>(
     input: &'a [u8],
@@ -90,6 +120,35 @@ where
         span.fragment().len(),
         0,
         "Not all the input is consumed by the parser, didn't consume: {span:?}",
+    );
+    value
+}
+
+pub fn test_parsed_completely_with_one_input_bytes_reader<'a, I, T, E>(
+    input: &'a [u8],
+    parser_input: I,
+    expected: &T,
+) -> T
+where
+    T: ParseFromWithOneInput<'a, I, Error = E> + PartialEq + Debug,
+    E: Debug,
+{
+    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let parsed = T::parse(&mut bytes_reader, parser_input);
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
+    let value = parsed.unwrap();
+    assert_eq!(&value, expected);
+    assert_eq!(
+        bytes_reader.remaining(),
+        0,
+        "Not all the input is consumed by the parser, didn't consume: {:?}",
+        bytes_reader
+            .read_bytes(bytes_reader.remaining())
+            .unwrap()
+            .to_vec(),
     );
     value
 }
@@ -120,6 +179,36 @@ where
         span.fragment().len(),
         0,
         "Not all the input is consumed by the parser, didn't consume: {span:?}",
+    );
+    value
+}
+
+pub fn test_parsed_completely_with_two_inputs_bytes_reader<'a, T, I, K, E>(
+    input: &'a [u8],
+    parser_input1: I,
+    parser_input2: K,
+    expected: &T,
+) -> T
+where
+    T: ParseFromWithTwoInputs<'a, I, K, Error = E> + PartialEq + Debug,
+    E: Debug,
+{
+    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let parsed = T::parse(&mut bytes_reader, parser_input1, parser_input2);
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
+    let value = parsed.unwrap();
+    assert_eq!(&value, expected);
+    assert_eq!(
+        bytes_reader.remaining(),
+        0,
+        "Not all the input is consumed by the parser, didn't consume: {:?}",
+        bytes_reader
+            .read_bytes(bytes_reader.remaining())
+            .unwrap()
+            .to_vec(),
     );
     value
 }
@@ -156,6 +245,41 @@ where
     value
 }
 
+pub fn test_parsed_completely_with_three_inputs_bytes_reader<'a, T, I1, I2, I3, E>(
+    input: &'a [u8],
+    parser_input1: I1,
+    parser_input2: I2,
+    parser_input3: I3,
+    expected: &T,
+) -> T
+where
+    T: ParseFromWithThreeInputs<'a, I1, I2, I3, Error = E> + PartialEq + Debug,
+    E: Debug,
+{
+    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let parsed = T::parse(
+        &mut bytes_reader,
+        parser_input1,
+        parser_input2,
+        parser_input3,
+    );
+    assert!(
+        parsed.is_ok(),
+        "Message failed parsing, while expecting it to pass.\n\tExpected : {expected:?}\n\tParsed msg: {parsed:?}"
+    );
+    let value = parsed.unwrap();
+    assert_eq!(&value, expected);
+    assert_eq!(
+        bytes_reader.remaining(),
+        0,
+        "Not all the input is consumed by the parser, didn't consume: {:?}",
+        bytes_reader
+            .read_bytes(bytes_reader.remaining())
+            .unwrap()
+            .to_vec(),
+    );
+    value
+}
 /// Fancier assert to for more meaningful error messages
 pub fn test_parse_error<'a, T, E>(input: &'a [u8], expected_err: &E)
 where
@@ -176,6 +300,22 @@ where
             "Expected the test to fail with Err(nom::Err:Err(x)) but it didn't. Got {parsed:?} instead"
         );
     }
+}
+
+pub fn test_parse_error_bytes_reader<'a, T, E>(input: &'a [u8], expected_err: &E)
+where
+    T: ParseFrom<'a, Error = E> + PartialEq + Debug,
+    E: Debug + PartialEq,
+{
+    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let parsed = T::parse(&mut bytes_reader);
+    assert!(
+        parsed.is_err(),
+        "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
+    );
+
+    let parsed_error = parsed.unwrap_err();
+    assert_eq!(&parsed_error, expected_err);
 }
 
 /// Fancier assert to for more meaningful error messages
@@ -204,6 +344,26 @@ pub fn test_parse_error_with_one_input<'a, T, I, E>(
 }
 
 /// Fancier assert to for more meaningful error messages
+pub fn test_parse_error_with_one_input_bytes_reader<'a, T, I, E>(
+    input: &'a [u8],
+    parser_input: I,
+    expected_err: &'a E,
+) where
+    T: ParseFromWithOneInput<'a, I, Error = E> + PartialEq + Debug,
+    E: Debug + PartialEq,
+{
+    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let parsed = T::parse(&mut bytes_reader, parser_input);
+    assert!(
+        parsed.is_err(),
+        "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
+    );
+
+    let parsed_error = parsed.unwrap_err();
+    assert_eq!(&parsed_error, expected_err);
+}
+
+/// Fancier assert to for more meaningful error messages
 pub fn test_parse_error_with_two_inputs<'a, T, I, K, E>(
     input: &'a [u8],
     parser_input1: I,
@@ -225,6 +385,26 @@ pub fn test_parse_error_with_two_inputs<'a, T, I, K, E>(
     );
 
     assert_eq!(parsed.err().unwrap(), expected_err);
+}
+
+pub fn test_parse_error_with_two_inputs_bytes_reader<'a, T, I, K, E>(
+    input: &'a [u8],
+    parser_input1: I,
+    parser_input2: K,
+    expected_err: &E,
+) where
+    T: ParseFromWithTwoInputs<'a, I, K, Error = E> + PartialEq + Debug,
+    E: Debug + PartialEq,
+{
+    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let parsed = T::parse(&mut bytes_reader, parser_input1, parser_input2);
+    assert!(
+        parsed.is_err(),
+        "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
+    );
+
+    let parsed_error = parsed.unwrap_err();
+    assert_eq!(&parsed_error, expected_err);
 }
 
 /// Fancier assert to for more meaningful error messages
@@ -251,6 +431,32 @@ pub fn test_parse_error_with_three_inputs<'a, T, I1, I2, I3, E>(
     );
 
     assert_eq!(parsed.err().unwrap(), expected_err);
+}
+
+pub fn test_parse_error_with_three_inputs_bytes_reader<'a, T, I1, I2, I3, E>(
+    input: &'a [u8],
+    parser_input1: I1,
+    parser_input2: I2,
+    parser_input3: I3,
+    expected_err: &E,
+) where
+    T: ParseFromWithThreeInputs<'a, I1, I2, I3, Error = E> + PartialEq + Debug,
+    E: Debug + PartialEq,
+{
+    let mut bytes_reader = BytesReader::new(BytesMut::from(input));
+    let parsed = T::parse(
+        &mut bytes_reader,
+        parser_input1,
+        parser_input2,
+        parser_input3,
+    );
+    assert!(
+        parsed.is_err(),
+        "Message was parsed, while expecting it to fail.\n\tExpected : {expected_err:?}\n\tParsed msg: {parsed:?}"
+    );
+
+    let parsed_error = parsed.unwrap_err();
+    assert_eq!(&parsed_error, expected_err);
 }
 
 pub fn test_write<T: WritablePdu<E>, E: Eq>(input: &T, expected: &[u8]) -> Result<(), E> {
