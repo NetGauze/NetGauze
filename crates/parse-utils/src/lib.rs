@@ -15,10 +15,13 @@
 
 //! Traits for Ser/Deser wire protocols
 
+pub mod common;
 pub mod error;
 pub mod reader;
 #[cfg(feature = "test-helpers")]
 pub mod test_helpers;
+#[cfg(test)]
+mod tests;
 pub mod traits;
 pub mod writer;
 

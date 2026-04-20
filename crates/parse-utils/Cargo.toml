@@ -21,6 +21,7 @@ nom = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 bytes = { workspace = true }
+ipnet = { workspace = true }
 
 [features]
 test-helpers = []
