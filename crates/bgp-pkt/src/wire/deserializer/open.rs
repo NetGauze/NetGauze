@@ -96,8 +96,13 @@ impl<'a> ParseFromWithOneInput<'a, &mut BgpParsingContext> for BgpOpenMessage {
             });
         }
         let len = cur.read_u8()?;
+        // shortcut for speed when there are no parameters
+        if len == 0 {
+            return Ok(BgpOpenMessage::new(my_as, hold_time, bgp_id, vec![]));
+        }
         let mut params_buf = cur.take_slice(len as usize)?;
-        let mut params = Vec::new();
+        // Each parameter has at least 2 bytes (type + length), so pre-size accordingly.
+        let mut params = Vec::with_capacity((len as usize) / 2);
         while !params_buf.is_empty() {
             let element = BgpOpenMessageParameter::parse(&mut params_buf, ctx)?;
             params.push(element);
@@ -134,7 +139,8 @@ fn parse_capability_param<'a>(
 ) -> Result<BgpOpenMessageParameter, BgpParameterParsingError> {
     let len = cur.read_u8()?;
     let mut capabilities_buf = cur.take_slice(len as usize)?;
-    let mut capabilities = Vec::new();
+    // Each capability has at least 2 bytes (code + length), so pre-size accordingly.
+    let mut capabilities = Vec::with_capacity((len as usize) / 2);
     while !capabilities_buf.is_empty() {
         match BgpCapability::parse(&mut capabilities_buf) {
             Ok(capability) => {
